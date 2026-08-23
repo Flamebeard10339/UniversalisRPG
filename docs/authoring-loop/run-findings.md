@@ -127,6 +127,76 @@ from the corpus.
   tulsa` turned each of the five `# test` sections around in about a second.
   Both of those are item 2 and item 3 paying for themselves in the same hour.
 
+## Playbot run 4, 2026-08-22, bughunt, 27 turns — the first run to reach Tulsa
+
+Opened on `--save tulsa.in-town`. Twenty-seven turns applied, none refused. It
+reached nine of the town's places — the square, the row, the rooftops, the forge,
+Oolga's house and cellar, the sewer outfall — fought feral rats and won them, and
+then stopped itself on a real blocker. **The fight fix worked in a live run**: the
+rat went 24 to 15 to 6 with both sides trading, which is the case that could not
+be won this morning.
+
+### Every person in Tulsa goes mute after one conversation
+
+Reproduced exactly:
+
+    talk 0   "I lost it. It went down there." / "He does not say what…"
+    talk 1   (nothing)
+    talk 2   (nothing)
+    talk 3   (nothing)
+
+All thirteen of Tulsa's dialogues are one node marked `always` and nothing else. A
+node is spoken once; **`sticky` is what makes it repeat and `again:` is what it
+says the second time**, and `content/tutorial-quests.dsl` uses both. Tulsa uses
+neither, anywhere. So the town has one line per person and then silence for the
+rest of the game.
+
+**This is the authoring loop's own failure and it is the most important thing this
+run found.** A cold agent wrote thirteen dialogues that are each broken in the same
+way, `npm run oracle` never said the fact that would have prevented it, the corpus
+loaded clean, `npm test` passed, and `npm run review` printed all thirteen lines
+without a hint that no player would hear twelve of them. Nothing in the loop
+catches "this node can only ever be heard once", and the loop's whole claim is that
+an outline goes in and a module comes out.
+
+`always` reading as *always available* rather than *always said* is exactly the
+shape `facts-to-home.md` exists for, and it wants the first home on that list: the
+engine refuses it, or the oracle says it on the line.
+
+### A conversation with nothing to say says nothing, and that reads as a bug
+
+When the node is spent, `talk` resolves to no lines at all and the view re-renders,
+which the player sees as the location's arrival text. The bot read *"talk is
+completely non-functional in Market Square"* and stopped the run — the same wrong
+diagnosis, from the same cause, as Miki's apology branch in run 3.
+
+**Twice now, an entity with nothing to say has been reported as a broken engine.**
+Either the talk choice is not offered when nothing would be said, or something is
+said. Silence is the one option that cannot stay.
+
+### The action status line always reads 100% done
+
+*"Fight 100% done, 0 attempts"* stood while the rat was at full health, and stayed
+while it dropped to 6. Reported on six separate turns.
+
+**This one is ours, surfaced by the cycle rule that landed an hour earlier.**
+Control now returns exactly at a cycle boundary, so the action a player is looking
+at has always just finished one. The label is describing the cycle behind it rather
+than the one ahead. Nothing was wrong with it before because the action was
+freshly re-armed each time — which was the bug.
+
+### Smaller, and each real
+
+- **The journal points at Miki from inside Tulsa**, where Miki cannot be reached.
+  Partly a fixture that starts a player in town with the tutorial quest unstarted,
+  partly the standing complaint that the journal does not keep up with the player.
+- **Flavour promises interactions that do not exist**, reported unprompted three
+  times: the sewer grate is named in the room and cannot be touched, *"a rack of
+  axes nobody is watching closely enough"* offers no way to take one, and Oolga's
+  *"something glints in her eye"* opens no counter. These are for the review pass —
+  writing that implies a mechanic is a promise, and a playtester files it as a bug.
+- **No way to rest or heal**, noticed at 14/30 health with nothing to do about it.
+
 ## Reviewing the writing, 2026-08-22
 
 `npm run review [-- <module>...]` prints every line the game can say, under the
