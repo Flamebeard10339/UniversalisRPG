@@ -8,7 +8,9 @@ import type { GameState, ModalFrame } from './state';
 export const LEAVE: Answer = 'close';
 const LEAVE_SHOWN: EngineKey = 'engine.journal.close';
 
-export const questFrame = (quest = ''): ModalFrame => ({ name: 'quest-journal', answers: {}, quest });
+export type QuestFrame = Extract<ModalFrame, { name: 'quest-journal' }>;
+
+export const questFrame = (quest = ''): QuestFrame => ({ name: 'quest-journal', answers: {}, quest });
 
 // Which quest the open journal is reading, where it is reading one. The list itself reads none, and publishes nothing for a page to draw beside it.
 export const questFocus = (frame: { quest: string }): { kind: 'quest'; quest: Answer } | undefined => (frame.quest === '' ? undefined : { kind: 'quest', quest: frame.quest as Answer });
