@@ -6,6 +6,7 @@ import { buyPrice, sellPrice } from '../content/sections/shop';
 import { initialState } from './save';
 import { GameState } from './state';
 import { applyDirective, startSession, view } from './session';
+import { copiesOf, feedItem, heldCount } from './itemInstance';
 import { buy, coinHeld, countProblem, forSale, sell, stockNow, wanted } from './trade';
 
 const MINUTE = 60_000;
@@ -30,6 +31,15 @@ value: 1
 
 # item bone
 title: Bone
+
+# item blade
+title: Blade
+slot: mainhand
+value: 10
+
+# item whetstone
+title: Whetstone
+item-experience: 500
 
 # shop stall
 coin: coin
@@ -142,6 +152,49 @@ describe('a shop holds what its author said until someone trades', () => {
     buy(shopOf('stall'), state, registry, 'pin', 2);
     expect(stockNow(shopOf('stall'), state)).toEqual({ nail: 4 });
     expect(forSale(shopOf('stall'), state, registry).map((trade) => trade.item)).toEqual(['nail']);
+  });
+});
+
+describe('a grown copy is never spent, at a counter as much as anywhere else', () => {
+  // One plain blade off the stack becomes the grown one, so `plain` is what is left loose beside it.
+  const withAGrownBlade = (plain: number): GameState => {
+    const state = carrying({ blade: plain + 1, whetstone: 1 });
+    expect(feedItem(state, registry, 'blade', 'whetstone').ok).toBe(true);
+    return state;
+  };
+
+  it('leaves a blade held only as a grown copy off the counter, and refuses it there: 0 of the 8 coin it would fetch', () => {
+    const state = withAGrownBlade(0);
+    expect(copiesOf(state, 'blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
+    expect(wanted(shopOf('stall'), state, registry).map((trade) => trade.item)).not.toContain('blade');
+    expect(sell(shopOf('stall'), state, registry, 'blade', 1)).toBe('not-carried');
+    expect(state.inventory.coin ?? 0).toBe(0);
+    expect(copiesOf(state, 'blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
+  });
+
+  it('offers 2 of the 3 blades held when one of them is grown, and pays 16 for the two plain ones', () => {
+    const state = withAGrownBlade(2);
+    expect(wanted(shopOf('stall'), state, registry).find((trade) => trade.item === 'blade')).toEqual({ item: 'blade', count: 2, coin: 8 });
+    expect(sell(shopOf('stall'), state, registry, 'blade', 3)).toBe('not-carried');
+    expect(sell(shopOf('stall'), state, registry, 'blade', 2)).toBeUndefined();
+    expect(state.inventory.coin).toBe(16);
+    expect(copiesOf(state, 'blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
+  });
+
+  // The whole of the bug: the counter asked how many were held and the till took from the stack, so a grown blade fetched 8 coin over and over without ever leaving. The claim is the difference, because every holding where nothing moves also gains nothing.
+  it('pays 8 a blade for exactly the blades that leave, over every holding of 0 to 2 plain beside 0 or 1 grown', () => {
+    for (const grown of [0, 1]) {
+      for (const plain of [0, 1, 2]) {
+        for (const asked of [1, 2, 3]) {
+          const state = grown === 1 ? withAGrownBlade(plain) : carrying({ blade: plain });
+          const heldBefore = heldCount(state, 'blade');
+          const coinBefore = state.inventory.coin ?? 0;
+          sell(shopOf('stall'), state, registry, 'blade', asked);
+          const where = `${plain} plain and ${grown} grown, asked for ${asked}`;
+          expect((state.inventory.coin ?? 0) - coinBefore, where).toBe(8 * (heldBefore - heldCount(state, 'blade')));
+        }
+      }
+    }
   });
 });
 
