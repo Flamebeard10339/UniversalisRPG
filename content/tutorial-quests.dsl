@@ -296,37 +296,57 @@ craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
-// A `use:` that finds its own action already under way against the same target
-// advances one cycle of the fight in progress instead of restarting it, so
-// repeated `use:` with no `wait:` anywhere still puts the rats down.
-//
-// What that claim is not is a body count. How many bare `use:` a rat takes to
-// fall is damage arithmetic — base attack, whatever is in the player's hand,
-// the rat's own sheet — and every one of those is going to move. Three down
-// takes nine of the ten below, which leaves one swing of slack between the
-// mechanic and an unrelated rebalance.
-//
-// What holds however hard the player hits is that one rat falls at all. A
-// `use:` that re-armed would snapshot the rat at full health again every time,
-// so no run of them, however long, would ever empty a pool: a rat down is the
-// whole of the difference between advancing a fight and starting one over. The
-// one rebalance that would take that away is a player who puts a rat down in a
-// single swing, which a re-armed fight would manage too; if the day comes that
-// one does, this needs a different claim rather than a bigger number.
-# test rats-fall-to-repeated-use
-load: miki-route-start
+// Two hammers whose numbers this file declares, and a save that puts each in
+// the player's hands. What the two tests below prove is then proved about the
+// engine rather than about what the last balance pass did to base attack or to
+// the rat's sheet: a million is more than any of that will ever move, and
+// `-100% attack` scales the whole stat — base, bonuses and all — to nothing, so
+// the second hammer's own swing is worth the least the engine lets a landed hit
+// be worth and the eight it drains is the whole of what it does.
+
+# item million-attack-hammer
+slot: mainhand
+weapon, +1000000 attack, +1000000 accuracy
+
+# item eight-a-swing-hammer
+slot: mainhand
+weapon, -100% attack, +1000000 accuracy
+on hit:
+  drain: 8 health from them
+
+# save armed-with-a-million-attack-hammer
+{"version":12,"inventory":{"tutorial-quests.million-attack-hammer":1}}
+
+# save armed-with-an-eight-a-swing-hammer
+{"version":12,"inventory":{"tutorial-quests.eight-a-swing-hammer":1}}
+
+// Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
+// which is what `rats-killed` counts; one swing does it because the hammer says
+// it does, and nothing about the rat's twenty health is being relied on.
+# test one-swing-of-a-million-attack-hammer-fells-a-rat
+load: armed-with-a-million-attack-hammer
+equip: million-attack-hammer
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 1
+
+// The stages of a fight. A `use:` that finds its own action already under way
+// against the same target advances a cycle of the fight in progress; one that
+// re-armed would snapshot the rat at full health every time, so at eight a
+// swing against twenty no run of them, however long, would ever empty the pool.
+// Two swings are sixteen and three are twenty-four, so the third is the one
+// that lands the kill and the second must not — and it is the second assertion
+// that makes a rebalance of the rat fail this loudly, rather than quietly
+// leaving behind a claim about one swing that a re-arming `use:` would pass too.
+# test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
+load: armed-with-an-eight-a-swing-hammer
+equip: eight-a-swing-hammer
 use: entity.stairs.descend
 use: melee-combat on giant-rat
 use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 0
 use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-assert: tulsa.rats-killed >= 1
+assert: tulsa.rats-killed = 1
 
 // --- saves ---
 
