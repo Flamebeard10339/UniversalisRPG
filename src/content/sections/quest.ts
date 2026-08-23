@@ -57,10 +57,11 @@ const spoken = (said: string): ActionResult => ({ kind: 'say', text: said });
 // Every line the journal can read off a quest or off one of its stages, in the order it is written, which is the order they are keyed and reviewed in.
 const spokenHere = (held: { log?: ActionResult; hints: readonly QuestHint[] }): ActionResult[] => [...(held.log === undefined ? [] : [held.log]), ...held.hints.map((hint) => hint.said)];
 
-// A hint line, wherever it is written: the quest's own and a stage's are the same line and answer the same question, one about a quest nobody has begun and one about where it stands.
+// A hint line, wherever it is written: the quest's own and a stage's are the same line and answer the same question, one about a quest nobody has begun and one about where it stands. A second unconditional one would leave nothing saying which is the default, so it is refused rather than silently winning over the first.
 function takeHint(line: RawLine, into: QuestHint[]): boolean {
   const plain = HINT.exec(line.text)?.groups;
   if (plain) {
+    if (into.some((hint) => hint.when === undefined)) throw new DslError('hint: with no condition is defined more than once', line.span);
     into.push({ said: spoken(plain.said!) });
     return true;
   }
@@ -70,16 +71,24 @@ function takeHint(line: RawLine, into: QuestHint[]): boolean {
   return true;
 }
 
+// `log:` is one line, wherever it is written; a second would only ever silently replace the first, so it is refused for the same reason a second unconditional hint is.
+function takeLog(line: RawLine, held: { log?: ActionResult }): boolean {
+  const log = LOG.exec(line.text)?.groups;
+  if (!log) return false;
+  if (held.log !== undefined) throw new DslError('log: is defined more than once', line.span);
+  held.log = spoken(log.said!);
+  return true;
+}
+
 function parseStage(name: string, source: RawLine): QuestStage {
   const stage: QuestStage = { name, hints: [], speech: [] };
   for (const line of takeBlock(source)) {
     if (takeHint(line, stage.hints)) continue;
-    const log = LOG.exec(line.text)?.groups;
+    if (takeLog(line, stage)) continue;
     const done = DONE.exec(line.text)?.groups;
     const goto = GOTO.exec(line.text)?.groups;
     const says = SAYS.exec(line.text)?.groups;
-    if (log) stage.log = spoken(log.said!);
-    else if (done) stage.doneWhen = parseWhole(condition, done.cond!, line.span.start, 'a done when');
+    if (done) stage.doneWhen = parseWhole(condition, done.cond!, line.span.start, 'a done when');
     else if (goto) stage.goto = goto.name;
     else if (line.text === 'complete') stage.complete = true;
     else if (says) stage.speech.push({ owner: says.owner!, node: parseNode('said', line) });
@@ -268,11 +277,10 @@ export const quest = section<Quest>()({
     const parsed: Quest = { id: raw.id, hints: [], stages: [], flags: [] };
     for (const line of raw.body) {
       if (takeHint(line, parsed.hints)) continue;
+      if (takeLog(line, parsed)) continue;
       const title = TITLE.exec(line.text)?.groups;
-      const log = LOG.exec(line.text)?.groups;
       const stage = STAGE.exec(line.text)?.groups;
       if (title) parsed.title = parseWhole(text, title.said!, line.span.start, 'a quest title');
-      else if (log) parsed.log = spoken(log.said!);
       else if (stage) parsed.stages.push(parseStage(stage.name!, line));
       else throw new DslError(`unexpected line in # quest: ${JSON.stringify(line.text)}`, line.span);
     }

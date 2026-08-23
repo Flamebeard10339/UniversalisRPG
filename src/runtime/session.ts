@@ -483,6 +483,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'goto':
     case 'begin':
     case 'assert':
+    case 'journal':
     case 'expect':
     case 'expect-only':
     case 'load':
@@ -618,6 +619,12 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'assert':
       if (!evaluateCondition(directive.condition, state, registry)) return { failure: describeCondition(directive.condition) };
       return {};
+    case 'journal': {
+      const entry = journal(registry, state).find((each) => each.quest === directive.quest);
+      if (!entry) throw new RuntimeError(`unknown quest: ${directive.quest}`);
+      if (entry.hint !== directive.text) return { failure: `journal ${directive.quest}: expected hint ${JSON.stringify(directive.text)}, the journal said ${entry.hint === null ? 'nothing' : JSON.stringify(entry.hint)}` };
+      return {};
+    }
     case 'expect':
     case 'expect-only': {
       const saved = registry.saves.get(directive.save);

@@ -24,6 +24,7 @@ export type Directive =
       inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>;
     }
   | { kind: 'assert'; condition: Condition }
+  | { kind: 'journal'; quest: string; text: string }
   | { kind: 'expect'; save: string }
   | { kind: 'expect-only'; save: string }
   | { kind: 'load'; save: string }
@@ -79,6 +80,7 @@ const BEGIN_USE_ON = new RegExp(`^${USE_ON_PAYLOAD}$`);
 const BEGIN_TRAVEL = new RegExp(`^${TRAVEL_PAYLOAD}$`);
 const BEGIN_CRAFT = new RegExp(`^${CRAFT_PAYLOAD}$`);
 const ASSERT = /^assert:[ \t]*(?<cond>.+)$/;
+const JOURNAL = new RegExp(`^journal:[ \\t]*(?<quest>${PATH})[ \\t]+says[ \\t]+(?<text>.*)$`);
 const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
@@ -254,6 +256,9 @@ export function parseDirectiveLine(text: string): Directive | null {
       condition: parseWhole(condition, assert.cond, 0, 'an assert condition'),
     };
 
+  const journal = JOURNAL.exec(text)?.groups;
+  if (journal) return { kind: 'journal', quest: journal.quest!, text: journal.text! };
+
   const expectOnly = EXPECT_ONLY.exec(text)?.groups;
   if (expectOnly) return { kind: 'expect-only', save: expectOnly.id };
 
@@ -330,6 +335,8 @@ export function printDirective(value: Directive): string {
       return `${printDirective(value.inner)} until ${value.until === 'done' ? 'done' : condition.print(value.until)}`;
     case 'assert':
       return `assert: ${condition.print(value.condition)}`;
+    case 'journal':
+      return `journal: ${value.quest} says ${value.text}`;
     case 'expect':
       return `expect: ${value.save}`;
     case 'expect-only':
@@ -385,6 +392,11 @@ export const test = section<Test>()({
     { form: 'begin: travel <location>', example: 'begin: travel camp' },
     { form: 'begin: craft <recipe>', example: 'begin: craft plank' },
     { form: 'assert: <condition>', example: 'assert: has-key', holds: () => ({ condition }) },
+    {
+      form: 'journal: <quest> says <text>',
+      example: 'journal: finding-your-feet says Talk to Miki in the guide house.',
+      note: 'the hint the journal currently reads for that quest — the last one whose condition holds, the same rule `hint when` follows; fails naming what the journal actually read',
+    },
     { form: 'expect: <save>', example: 'expect: after-intro' },
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
@@ -457,6 +469,9 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'assert':
       visitCondition(value.condition, `${where} assert:`, visit);
+      return;
+    case 'journal':
+      put(value, 'quest', 'quest', `${where} journal:`, visit);
       return;
     case 'begin':
       visitDirective(value.inner, `${where} begin:`, visit);

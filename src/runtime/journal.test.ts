@@ -137,6 +137,32 @@ describe('what the journal says there is left to do', () => {
   });
 });
 
+describe('journal: lets a # test claim what the journal currently reads', () => {
+  const withTest = (id: string, ...lines: string[]) => loadInEnglish([WORLD, TWO_BEATS, '', `# test ${id}`, ...lines].join('\n\n'));
+
+  it('passes when the words match the hint the journal is currently showing', () => {
+    const played = withTest('matches', 'journal: fetch-the-loaf says Find whoever is asking.');
+    expect(runTest('matches', played, createGameState())).toEqual({ passed: true });
+  });
+
+  it('fails naming what the journal actually said', () => {
+    const played = withTest('mismatch', 'journal: fetch-the-loaf says Something else entirely.');
+    const result = runTest('mismatch', played, createGameState());
+
+    expect(result.passed).toBe(false);
+    expect(result.failure).toContain('Find whoever is asking.');
+  });
+
+  it('reads the hint a `hint when` condition picked, once state holds it', () => {
+    const played = withTest('after-flag', 'journal: fetch-the-loaf says They want a loaf. Go back and say yes.');
+    expect(runTest('after-flag', played, held('met-someone'))).toEqual({ passed: true });
+  });
+
+  it('rejects an unknown quest id at load, the way every other directive names its reference', () => {
+    expect(() => loadInEnglish([WORLD, TWO_BEATS, '', '# test bad', 'journal: no-such-quest says Anything.'].join('\n\n'))).toThrow();
+  });
+});
+
 describe('a quest played through', () => {
   // The whole route: the entity is spoken to, the quest's own lines are the ones reached, and taking a choice moves the quest and the journal with it.
   const PLAYED = [WORLD, QUEST, '', '# test takes-the-offer', 'talk: miki', 'choose: 0', 'assert: finding-your-feet.name-yourself'].join('\n\n');

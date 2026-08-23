@@ -109,4 +109,25 @@ describe('what a quest is refused for', () => {
   it('a line a stage has no reading for', () => {
     expect(refusing('stage one:', '  complete', '  nonsense: 3')).toThrow(/unexpected line in a quest stage: "nonsense: 3"/);
   });
+
+  // A second unconditional hint: would silently win over the first, the same way a second log: would; both are refused rather than letting an author lose one without being told.
+  it('a second unconditional hint: in one stage', () => {
+    expect(refusing('stage one:', '  hint: First.', '  hint: Second.', '  complete')).toThrow(/hint: with no condition is defined more than once/);
+  });
+
+  it("a second unconditional hint: at the quest's own top level", () => {
+    expect(refusing('hint: First.', 'hint: Second.', 'stage one:', '  complete')).toThrow(/hint: with no condition is defined more than once/);
+  });
+
+  it('a hint when beside the plain hint: it is an exception to, which is not a collision', () => {
+    expect(refusing('stage one:', '  hint: Default.', '  hint when mirror-done: Exception.', '  complete')).not.toThrow();
+  });
+
+  it('a second log: in one stage', () => {
+    expect(refusing('stage one:', '  log: First.', '  log: Second.', '  complete')).toThrow(/log: is defined more than once/);
+  });
+
+  it("a second log: at the quest's own top level", () => {
+    expect(refusing('log: First.', 'log: Second.', 'stage one:', '  complete')).toThrow(/log: is defined more than once/);
+  });
 });

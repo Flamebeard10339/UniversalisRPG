@@ -343,6 +343,29 @@ describe('refuse: the outcome under test', () => {
   });
 });
 
+describe('journal: pins the hint a quest currently shows', () => {
+  it('reads the quest id up to the first "says" and the rest of the line as the words', () => {
+    expect(parseDirectiveLine('journal: finding-your-feet says Talk to Miki in the guide house.')).toEqual({
+      kind: 'journal',
+      quest: 'finding-your-feet',
+      text: 'Talk to Miki in the guide house.',
+    });
+  });
+
+  it('takes a fully-qualified quest id the same way every other directive does', () => {
+    expect(parseDirectiveLine('journal: tulsa.finding-your-feet says Talk to Miki.')).toEqual({
+      kind: 'journal',
+      quest: 'tulsa.finding-your-feet',
+      text: 'Talk to Miki.',
+    });
+  });
+
+  it('prints back what it parsed', () => {
+    const line = 'journal: finding-your-feet says Talk to Miki in the guide house.';
+    expect(printDirective(parseDirectiveLine(line)!)).toBe(line);
+  });
+});
+
 describe('a terminator follows a payload, not free text', () => {
   const roundTrip = (line: string) => printDirective(parseDirectiveLine(line)!);
 
