@@ -5,10 +5,12 @@ import { pathToFileURL } from 'node:url';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { formatModuleDiagnostic } from '../src/content/registry';
+import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
+import type { ParsedSave } from '../src/content/sections/save';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
-import { adoptRegistry, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import type { PruneWarning } from '../src/runtime/pruning';
+import { adoptRegistry, loadSaved, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
 // docs/specs/a-turn-costs-what-the-last-turn-did.md, whose clauses this file exists to satisfy.
@@ -488,10 +490,23 @@ function fileContentReader(files: readonly string[]): ContentReader {
     );
 }
 
+const usage = [
+  'Usage: npm run playbot -- [<source>...] [--mode author|bughunt] [--turns <n>] [--save <id>]',
+  '',
+  '  <source>   a DSL file to load; with none, the tutorial corpus',
+  '  --mode     author (default) or bughunt — which framing the system prompt uses',
+  '  --turns    how many turns to play, default 100',
+  '  --save     open the run on a named # save fixture instead of a fresh session',
+  '',
+  'Plays the loaded content one turn at a time against a model client, logging',
+  'each turn to stdout. Exits non-zero if no turn completed.',
+].join('\n');
+
 interface CliArgs {
   readonly files: readonly string[];
   readonly mode: PlaybotMode;
   readonly turns: number;
+  readonly save: string | undefined;
 }
 
 function requireMode(value: string | undefined): PlaybotMode {
@@ -506,12 +521,21 @@ function requireTurns(value: string | undefined): number {
   return parsed;
 }
 
+function requireSave(value: string | undefined): string {
+  if (value === undefined) throw new Error(`--save wants a fixture id after it\n\n${usage}`);
+  return value;
+}
+
 function parseArgs(argv: readonly string[]): CliArgs {
   let mode: PlaybotMode = 'author';
   let turns = DEFAULT_TURNS;
+  let save: string | undefined;
   const files: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    if (arg === '--help' || arg === '-h') {
+      throw new Error(usage);
+    }
     if (arg === '--mode') {
       mode = requireMode(argv[++i]);
       continue;
@@ -528,19 +552,70 @@ function parseArgs(argv: readonly string[]): CliArgs {
       turns = requireTurns(arg.slice('--turns='.length));
       continue;
     }
+    if (arg === '--save') {
+      save = requireSave(argv[++i]);
+      continue;
+    }
+    if (arg.startsWith('--save=')) {
+      save = requireSave(arg.slice('--save='.length));
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      throw new Error(`unknown flag ${arg}\n\n${usage}`);
+    }
     files.push(arg);
   }
-  return { files: files.length > 0 ? files : DEFAULT_FILES, mode, turns };
+  return { files: files.length > 0 ? files : DEFAULT_FILES, mode, turns, save };
+}
+
+// The one place a save id becomes a fixture: read off registry.saves the same way the # test
+// directives that load one already do (session.ts), but naming what is available instead of a
+// bare "unknown save" — an operator picking a fixture by hand needs the list a directive script
+// never has to ask for.
+export function resolveSave(registry: Registry, id: string): ParsedSave {
+  const saved = registry.saves.get(id);
+  if (saved !== undefined) return saved;
+  const defined = [...registry.saves.keys()].sort();
+  throw new Error(`${id}: no # save with that id. Defined: ${defined.length > 0 ? defined.join(', ') : 'none'}`);
+}
+
+export interface OpenedSession {
+  readonly session: PlaySession;
+  readonly warnings: readonly PruneWarning[];
+}
+
+// Loading a save is setup, done once before the turn loop exists — runPlaybot and runTurn take
+// only the already-opened session and never learn whether one was loaded.
+export function openSession(registry: Registry, save: string | undefined): OpenedSession {
+  const session = startSession(registry);
+  if (save === undefined) return { session, warnings: [] };
+  return { session, warnings: loadSaved(session, resolveSave(registry, save)) };
 }
 
 async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
+  let args: CliArgs;
+  try {
+    args = parseArgs(process.argv.slice(2));
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exit(2);
+  }
   const read = fileContentReader(args.files);
   const loaded = loadUniverseWithDiagnostics(read());
   for (const diagnostic of loaded.diagnostics) console.error(formatModuleDiagnostic(diagnostic));
-  const session = startSession(loaded.registry);
+
+  let opened: OpenedSession;
+  try {
+    opened = openSession(loaded.registry, args.save);
+  } catch (error) {
+    console.error((error as Error).message);
+    process.exitCode = 1;
+    return;
+  }
+  for (const warning of opened.warnings) console.error(warning.message);
+
   const client = createSdkModelClient(isolatedCwd());
-  const log = await runPlaybot({ session, read, client, mode: args.mode, turns: args.turns, write: (line) => console.log(line) });
+  const log = await runPlaybot({ session: opened.session, read, client, mode: args.mode, turns: args.turns, write: (line) => console.log(line) });
   process.exitCode = log.some((entry) => entry.outcome === 'applied' || entry.outcome === 'refused') ? 0 : 1;
 }
 
