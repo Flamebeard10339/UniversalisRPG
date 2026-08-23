@@ -32,7 +32,7 @@ export interface ShapeChange {
 
 export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
 
-export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(11);
+export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(12);
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
   return change !== null && change.writtenFor !== SAVE_VERSION;

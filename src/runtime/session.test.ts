@@ -984,6 +984,7 @@ describe('what the engine withholds', () => {
       resourceRateRemainders: 'withheld',
       instances: 'published',
       populations: 'withheld',
+      shops: 'withheld',
     };
 
     expect(Object.keys(createGameState()).sort()).toEqual(Object.keys(classified).sort());

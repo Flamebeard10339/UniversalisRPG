@@ -1038,46 +1038,46 @@ node greeting:
 // --- saves ---
 
 # save in-town
-{"version":11,"location":"tulsa.market-square"}
+{"version":12,"location":"tulsa.market-square"}
 
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
 # save in-town-with-bent-coins
-{"version":11,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
+{"version":12,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
 // Out of a fight and back in the square with eleven of thirty left, which is
 // about what the three playtest runs walked away from the cellar rats holding.
 # save hurt-in-town
-{"version":11,"location":"tulsa.market-square","resources":{"core.health":11000}}
+{"version":12,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
 // Down the back way with the lockpick from Miki's dresser, which is what
 // anybody who came here for the barred door would be carrying.
 # save at-the-sewer-junction
-{"version":11,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
+{"version":12,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
 # save dresser-trinket-end
-{"version":11,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
+{"version":12,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":11,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
+{"version":12,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
 
 // Standing at the oven with something to roast. Nothing in the world grants a
 // raw chestnut, so this save is the only way the continuous cadence is reached.
 # save chestnuts-in-hand
-{"version":11,"inventory":{"core.raw-chestnut":3}}
+{"version":12,"inventory":{"core.raw-chestnut":3}}
 
 # save axe-at-the-swamp-edge
-{"version":11,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
+{"version":12,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
-{"version":11,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
+{"version":12,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":11,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":12,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save growing-through-the-inventory-screen-end
-{"version":11,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":12,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // --- tests ---
 

@@ -2,6 +2,7 @@ import { RuntimeError } from './error';
 import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
 import { questFrame, sameQuest } from './questScreen';
+import { sameCount, sameShop, shopFrame } from './shopScreen';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
 
 export type ModalName = ModalFrame['name'];
@@ -20,6 +21,8 @@ const FRAMES: { [K in ModalName]: FrameKind<Extract<ModalFrame, { name: K }>> } 
   'carried-items': { open: () => carriedFrame() },
   'item-plane': { open: () => null, same: samePlane },
   'quest-journal': { open: () => questFrame() as Extract<ModalFrame, { name: 'quest-journal' }>, same: sameQuest },
+  shop: { open: () => null, same: sameShop },
+  'shop-count': { open: () => null, same: sameCount },
   dialogue: {
     open: () => null,
     same: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
@@ -51,6 +54,8 @@ export function openModalNamed(state: GameState, name: string): void {
   if (!frame) throw new RuntimeError(`modal ${name} is not opened by name`);
   openModal(state, frame);
 }
+
+export const openShop = (state: GameState, shop: string): void => openModal(state, shopFrame(shop));
 
 export function topModal(state: GameState): ModalFrame | null {
   return state.modals.length > 0 ? state.modals[state.modals.length - 1] : null;

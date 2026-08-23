@@ -1,6 +1,6 @@
 import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
-import { decimal, duration, Quantified, quantified } from '../../grammar/values';
+import { decimal, duration, id, Quantified, quantified } from '../../grammar/values';
 import { quantified as quantifiedItems, type Loose, type Pruning, type Visit } from '../refs';
 import { section } from './define';
 import { Item } from './item';
@@ -15,6 +15,7 @@ export type Accepts = (typeof ACCEPTS)[number];
 
 export interface Shop {
   id: string;
+  coin: string;
   stocks: Quantified[];
   buying: number;
   selling: number;
@@ -52,7 +53,14 @@ export const buyPrice = (shop: Shop, item: Item | undefined): number | undefined
 
 export const sellPrice = (shop: Shop, item: Item | undefined): number | undefined => (item?.value === undefined ? undefined : Math.floor(item.value * shop.selling));
 
-export const takesItem = (shop: Shop, item: Item | undefined): boolean => isTradable(item) && (shop.accepts === 'any' || stocksItem(shop, item!.id));
+// The shop's own coin is what a price is counted in, so trading it for itself is the one thing no shop does, whatever an author gave it a value of.
+export const takesItem = (shop: Shop, item: Item | undefined): boolean => isTradable(item) && item!.id !== shop.coin && (shop.accepts === 'any' || stocksItem(shop, item!.id));
+
+// A shop can only put a price on what declares one, so the stock an author wrote has to be priceable before anyone stands in front of it.
+export function unpriceableStock(shop: Shop, items: ReadonlyMap<string, Item>): string | undefined {
+  const found = shop.stocks.find((entry) => !isTradable(items.get(entry.item)));
+  return found === undefined ? undefined : `# shop ${shop.id} stocks: names ${found.item}, which declares no value: and so is untradable`;
+}
 
 // How many units of replenishing have fallen due in an elapsed span, and what is left over. Settling to `at + steps * replenish` rather than to now is what keeps a shop traded with every few seconds from replenishing never.
 export function replenishSteps(shop: Shop, elapsed: number): number {
@@ -78,6 +86,7 @@ export const shop = section<Shop>()({
   ids: 'owned',
   map: 'shops',
   fields: {
+    coin: { parser: id, names: { id: 'item' }, note: 'the item this shop counts in, which is therefore the one thing it will neither buy nor sell' },
     stocks: { parser: list(quantified), default: () => [], block: true },
     buying: { parser: decimal, default: () => DEFAULT_BUYING, printed: 'unless-default' },
     selling: { parser: decimal, default: () => DEFAULT_SELLING, printed: 'unless-default' },
@@ -85,6 +94,8 @@ export const shop = section<Shop>()({
     accepts: { parser: acceptsValue, default: () => 'any', printed: 'unless-default' },
   },
   validate: (value) => {
+    if (!value.coin) return 'requires a coin:, which is the item its prices are counted in';
+    if (value.stocks.some((entry) => entry.item === value.coin)) return `stocks: names ${value.coin}, which is this shop's own coin: and so is the one thing it does not trade`;
     if (value.buying <= 0) return `buying: is a multiplier on an item's value, so ${value.buying} would price everything at nothing`;
     if (value.selling <= 0) return `selling: is a multiplier on an item's value, so ${value.selling} would pay nothing for anything`;
     if (value.replenish <= 0) return 'replenish: is how long one unit of stock takes to come back, so it cannot be instant';

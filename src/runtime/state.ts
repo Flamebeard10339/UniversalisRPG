@@ -74,6 +74,12 @@ export interface Deficit {
 
 export type Populations = Record<string, Record<string, Deficit>>;
 
+// What a shop currently holds, and the moment those counts were last settled. Between trades nothing is written: the counts a shop holds now are `at` plus however much replenishing the clock has since paid for.
+export interface ShopStock {
+  readonly at: number;
+  readonly counts: Readonly<Record<string, number>>;
+}
+
 export interface DialogueCursor {
   dialogue: string;
   node: string;
@@ -88,6 +94,8 @@ export type ModalFrame =
   | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
   | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }
   | { readonly name: 'quest-journal'; readonly answers: ModalAnswers; readonly quest: string }
+  | { readonly name: 'shop'; readonly answers: ModalAnswers; readonly shop: string }
+  | { readonly name: 'shop-count'; readonly answers: ModalAnswers; readonly shop: string; readonly side: 'buy' | 'sell'; readonly item: string }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export interface GameState extends RngCursor {
@@ -107,12 +115,13 @@ export interface GameState extends RngCursor {
   equipped: Record<string, string>;
   instances: InstanceTable;
   populations: Populations;
+  shops: Record<string, ShopStock>;
   player: { name: string; race: string };
   modals: readonly ModalFrame[];
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

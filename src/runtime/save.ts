@@ -14,12 +14,13 @@ import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
 import { itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
+import { isShopStock } from './trade';
 import { isModalFrame, pruneModals } from './modals';
 import { Localized, Localizer, localizerOf } from './localized';
 import { PLAYER, templateOf } from './state';
 
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
-export const SAVE_VERSION = 11;
+export const SAVE_VERSION = 12;
 
 export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
 
@@ -90,6 +91,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' },
   instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' },
   populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' },
+  shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } },
   time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isPlayer, sparsest: { name: '', race: '' }, prune: 'holds no registry id' },

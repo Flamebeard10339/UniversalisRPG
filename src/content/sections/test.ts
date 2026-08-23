@@ -19,6 +19,7 @@ export type Directive =
   | { kind: 'travel'; location: string }
   | { kind: 'goto'; location: string }
   | { kind: 'craft'; recipe: string }
+  | { kind: 'shop'; shop: string }
   | {
       kind: 'begin';
       inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>;
@@ -73,6 +74,7 @@ const USE_ON = new RegExp(`^${USE_VERB}[ \\t]*${USE_ON_PAYLOAD}$`);
 const TRAVEL = new RegExp(`^travel:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const GOTO = new RegExp(`^goto:[ \\t]*${TRAVEL_PAYLOAD}$`);
 const CRAFT = new RegExp(`^craft:[ \\t]*${CRAFT_PAYLOAD}$`);
+const SHOP = new RegExp(`^shop:[ \\t]*(?<id>${PATH})$`);
 const BEGIN = /^begin:[ \t]*(?<verb>use|travel|craft)[ \t]+(?<rest>.+)$/;
 const BEGIN_USE = new RegExp(`^${USE_PAYLOAD}$`);
 const BEGIN_USE_ON = new RegExp(`^${USE_ON_PAYLOAD}$`);
@@ -244,6 +246,9 @@ export function parseDirectiveLine(text: string): Directive | null {
   const craft = CRAFT.exec(text)?.groups;
   if (craft) return { kind: 'craft', recipe: craft.id };
 
+  const shopping = SHOP.exec(text)?.groups;
+  if (shopping) return { kind: 'shop', shop: shopping.id };
+
   const begin = BEGIN.exec(text)?.groups;
   if (begin) return parseBegin(text, begin.verb, begin.rest);
 
@@ -322,6 +327,8 @@ export function printDirective(value: Directive): string {
       return `goto: ${value.location}`;
     case 'craft':
       return `craft: ${value.recipe}`;
+    case 'shop':
+      return `shop: ${value.shop}`;
     case 'begin':
       return `begin: ${inlined(value.inner, value.inner.kind === 'use-on' ? 'use' : value.inner.kind)}`;
     case 'refuse':
@@ -381,6 +388,7 @@ export const test = section<Test>()({
     { form: 'travel: <location>', example: 'travel: camp' },
     { form: 'goto: <location>', example: 'goto: camp' },
     { form: 'craft: <recipe>', example: 'craft: plank' },
+    { form: 'shop: <shop>', example: 'shop: general-store' },
     { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing', ...USED },
     { form: 'begin: travel <location>', example: 'begin: travel camp' },
     { form: 'begin: craft <recipe>', example: 'begin: craft plank' },
@@ -449,6 +457,9 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'craft':
       put(value, 'recipe', 'recipe', `${where} craft:`, visit);
+      return;
+    case 'shop':
+      put(value, 'shop', 'shop', `${where} shop:`, visit);
       return;
     case 'expect':
     case 'expect-only':

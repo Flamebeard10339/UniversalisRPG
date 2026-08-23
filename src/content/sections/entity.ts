@@ -142,7 +142,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       keyword: 'equipment-slots',
       default: () => [],
     },
-    shop: { parser: id, names: { id: 'shop' }, standsWithout: true },
+    shop: { parser: id, keyword: 'keeps shop', names: { id: 'shop' }, standsWithout: true },
     uses: { parser: list(id), default: () => [], names: { id: 'action' } },
     faction: { parser: list(id), default: () => [], names: { id: 'faction' } },
     allies: { parser: list(allyValue), default: () => [] },
