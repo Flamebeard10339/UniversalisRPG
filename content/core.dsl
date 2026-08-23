@@ -185,10 +185,10 @@ examine: A bent sliver of metal, worn smooth from use.
 thieving-tool
 
 # item fishing-net
-examine: A fishing net. @@@
+examine: A weighted throw net, the mesh mended in three places with line that does not match.
 
 # item fish
-examine: A fish. @@@
+examine: Whatever came up in the net. Bright, cold, and still working its gills.
 
 # item jug-of-water
 examine: A clay jug of clean water.
@@ -433,9 +433,7 @@ weapon, +4 attack
 max-level: 40
 origin-cluster: heartwood-core
 
-// The kingdom's coin. Tutorial island's bent-coin is a curio a rat leaves
-// behind; the grocer takes those off you at face value, which is the on-ramp
-// to having any money at all.
+// The kingdom's coin, and the bent one above is the curio that trades for it.
 # item coin
 title: Coin
 examine: A milled coin of Yanodonin, the duke's profile worn nearly flat.
@@ -464,7 +462,7 @@ examine: A knuckle of root pulled from black mud. It smells of nothing at all.
 
 # item adders-tongue
 title: Adder's Tongue
-examine: A single split leaf. Oolga's list calls it the last one for a reason.
+examine: A single split leaf. It is the last thing on every list that has one, and there is a reason it is last.
 
 # item hand-axe
 title: Hand Axe
@@ -474,11 +472,11 @@ weapon, +1 attack
 
 # item bundle-of-firewood
 title: Bundle of Firewood
-examine: Split logs, roped together. The bar buys these by the armful.
+examine: Split logs, roped together. Anywhere with a stove in it buys these by the armful.
 
 # item log
 title: Log
-examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so the stall that buys firewood buys nothing anybody can make.
+examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so a bundle of firewood is a thing that can be sold and not made.
 
 # item rat-pelt
 title: Rat Pelt

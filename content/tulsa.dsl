@@ -113,15 +113,27 @@ adjacent:
   market-rooftops
 entities:
   general-store, fishing-supplies, woodcutters-stall
+flags: axe-taken
+lift an axe off the rack:
+  hidden if: axe-taken
+  time: 5
+  xp: thieving 12
+  set: axe-taken
+  give: 1 hand-axe
+  say: You take the end axe off the rack while the woodcutter is counting somebody else's coin, and you are two stalls away before the gap in it shows.
 
 // The roof layer the outline asks for, and the only way onto it is a climb.
 // What it overlooks is a quest's business rather than the town's.
 # location market-rooftops
 x: 4, y: 0, z: 1
 title: Market Rooftops
-examine: Tile and thatch, and the castle's upper windows across the way. @@@ Attention to Detail wants a vantage on the duke from up here; nothing on this roof says so yet.
+examine: Tile and thatch, and the castle's upper windows across the way. @@@ Attention to Detail wants a vantage on the duke from up here; the watch is written and what it is worth seeing is that quest's to say.
 adjacent:
   market-row
+watch the castle windows:
+  time: 8
+  xp: thieving 5
+  say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against. It means something to somebody. It does not yet mean anything to you.
 
 # location forge
 east of market-row
@@ -320,6 +332,9 @@ title: The Third Hive
 examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee. @@@ Birds and the Bees wants this instanced and reset on entry; the engine has no instancing, so it is one ordinary room and the boss it holds belongs to that quest.
 adjacent:
   apiary-field
+look into the comb:
+  time: 6
+  say: You put your face to the gap. The comb is chewed out to the depth of your arm and the cut edges of it are still wet. Whatever did it is not in there now, and it did not leave the way you came in.
 
 # location tunnel-mouth
 x: 8, y: 4
@@ -549,7 +564,7 @@ title: Oolga's Counter
 examine: A counter with nothing on it. Everything worth buying is on the shelves behind her, and the shelves are not for you.
 ask after her wares:
   instant
-  say: Oolga looks at the shelves, then at you, and something glints in her eye. @@@ Kill it with Fire is what opens this counter; until that module is loaded there is nothing to sell you.
+  say: Oolga looks at the shelves, then at you, and puts her back to them. Nothing behind her is for sale, and she does not say what would change that. @@@ Kill it with Fire is what opens this counter; until that module is loaded there is nothing to sell you.
 
 // --- stations and props ---
 
@@ -570,6 +585,14 @@ sit down:
 # entity sewer-grate
 title: Sewer Grate
 examine: An iron grate in the cobbles. The water below it moves faster than you expect.
+flags: reached
+reach through the bars:
+  hidden if: reached
+  time: 6
+  xp: thieving 3
+  set: reached
+  give: 1 core.bent-coin
+  say: The gap takes your arm to the elbow and the cold takes the rest of you. What your fingers close on is a bent coin and a great deal of grit. Whatever the boy lost went under the castle a long time ago.
 
 # entity outfall-grate
 title: Grate
@@ -626,6 +649,9 @@ take the key:
 title: Anvil
 examine: A good anvil, cold. It is not yours to use. @@@ A Grand Blade is what earns the use of it.
 stations: anvil
+strike it:
+  instant
+  say: You get one flat ring out of it before the smith's son is across the floor. Off it. That was my father's anvil, and it is not going to be you who makes it sound like something.
 
 # entity bar-stove
 title: The Bar Stove
@@ -777,7 +803,7 @@ pick lock:
     say: The lock clicks open.
 
 # entity mirror
-examine: A tall mirror in a gilt frame. Your reflection waits, nameless.
+examine: A tall mirror in a gilt frame. Your reflection waits, nameless. Whoever looks into it comes away with a name and a people, and the glass does not ask a second time.
 look in:
   instant
   hidden if: mirror-done
@@ -847,18 +873,18 @@ search drawer:
 // The only way out that never runs through Miki. A player who has burned the
 // front door still has this — a straight drop with a cost, not a puzzle.
 # entity window
-examine: A window. @@@
+examine: A casement over the water, its latch worn bright by somebody's thumb. It is a long drop to the sand and nothing on the way down to slow it.
 climb out:
   instant
   relocate: beach
   drain: 5 health
-  say: You climb out. @@@
+  say: You get a leg over the sill, hang off it as long as your arms will have it, and let go. The sand takes most of the drop and your ankles take the rest.
 fish:
   instant
   requires: has fishing-net
   hidden if: has fish
   give: 1 fish
-  say: You catch a fish. @@@
+  say: You drop the net off the sill and haul it up hand over hand. One fish in it, and it is not pleased about any part of this.
 
 // 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
 // rat falls in about six seconds and lands a bite or two on the way out. It
@@ -998,8 +1024,19 @@ owner = kelsa
 
 node blunt:
   always
-  again: Bees, or the door. I already told you which.
+  sticky
   If you are here about the bees, say so. If you are not, there is the door and it is a nice one.
+  -> I am here about the bees.
+    goto the-third-hive
+  -> Not the bees.
+    goto the-door
+
+node the-third-hive:
+  Third hive, end of the row. Something has been in it that was never a bee, and I have not been down to look at what.
+  Ask George. He has the patience for the whole of it and I have not.
+
+node the-door:
+  Then there it is, and mind the step on your way through it.
 
 # dialogue george
 owner = george
@@ -1032,7 +1069,7 @@ owner = miki
 
 node greeting:
   always
-  Well met. Miki, they call me - I keep an eye on this island.
+  Well met. Miki, they call me - I keep an eye on this stretch of coast.
   There's a mirror upstairs if you've a mind to know your own face, and rats in the basement if you haven't.
 
 // --- saves ---
@@ -1140,6 +1177,35 @@ travel: sha-dynastys
 craft: cooked-herring
 assert: has cooked-herring
 assert: xp.core.cooking > 0
+
+// The two things in the market a light hand gets, and fifteen is the whole of
+// what they are worth: three at the grate and twelve off the rack. Each sets
+// its own flag, which is what its own `hidden if:` reads, so neither is a
+// second helping — and the axe is the tool the dead alder wants, which is why
+// the rack is worth a hand at all.
+# test the-market-is-fifteen-thieving-xp-to-a-light-hand
+load: in-town
+use: entity.sewer-grate.reach-through-the-bars
+assert: has core.bent-coin
+assert: sewer-grate.reached
+travel: market-row
+use: location.market-row.lift-an-axe-off-the-rack
+assert: has core.hand-axe
+assert: market-row.axe-taken
+assert: xp.core.thieving = 15
+
+// Kelsa asks a question and the player can answer it, which is the whole of
+// this: the answer is a choice on her own line, and where it lands is George,
+// who her line says has the patience she has not. The index is safe to name
+// here in a way `sunny-has-three-things-to-say` had to avoid — a menu under
+// one node is offered in the order it is written, and only threads are sorted
+// by the words the player reads.
+# test kelsa-takes-the-answer-she-asks-for
+load: in-town
+travel: kelsa-farmhouse
+talk: kelsa
+choose: 0
+assert: kelsa.the-third-hive.visits = 1
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
 // notes say several people know about, and it puts you in among the rats

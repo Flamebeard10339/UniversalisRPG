@@ -67,7 +67,7 @@ stage bake-bread:
     A warm loaf! Well done, {player.name}.
     Keep it in your pack - eat it whenever you're hungry.
     Every swing and catch builds a skill, and skills raise your stats.
-    Here, gear changes your stats the moment you equip it.
+    Here. Open up what you're carrying and put these on from there - your stats move the moment you do.
     give: core.iron-sword
     give: core.wooden-shield
     Downstairs in the basement you'll find giant rats. Put them down and watch your stats work.
