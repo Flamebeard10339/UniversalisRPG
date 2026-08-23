@@ -8,20 +8,24 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type ModuleDiagnostic } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
-import { splitSections } from '../src/grammar/structure';
+import { splitSections, type RawLine, type RawSection } from '../src/grammar/structure';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 
 const usage = [
   'Usage: npm run oracle -- [<kind>...]',
-  '       npm run oracle -- --at <draft.dsl>',
+  '       npm run oracle -- --at <draft.dsl> [--walk]',
   '',
   '  <kind>    print every line that may be written under that kind, at the',
   '            indentation it is written at; with no kind, print every kind',
   '  --at      read a draft: every line the engine has something to say about,',
   '            then what it says when handed the whole file beside the world as',
-  '            it stands, then — walking the cursor to each placeholder in turn —',
-  '            where each line sits, what it is read as, and what may stand there',
+  '            it stands. That is the answer to "is this draft good, and where is',
+  '            it not", and it stops there',
+  '  --walk    go on, after that, to walk the cursor to each placeholder in turn',
+  '            and say line by line where each line sits, what it is read as, and',
+  '            what may stand there. Thousands of lines for a whole module — what',
+  '            to reach for when one line has you stuck, not to read start to end',
   '',
   'A draft is whichever module its own `# info` names, so an edited copy of a module',
   'that already ships is read in place of the shipped one rather than beside it.',
@@ -233,15 +237,61 @@ export function amissLines(text: string, known: readonly Addressed[], stood = tr
   ];
 }
 
+const lineStarts = (draft: readonly string[]): number[] => {
+  const starts: number[] = [];
+  let at = 0;
+  for (const line of draft) {
+    starts.push(at);
+    at += line.length + 1;
+  }
+  return starts;
+};
+
+// Which lines of a draft the engine actually reads, taken from the splitter's own account of what it kept — so nothing here has to know what a comment looks like, and a comment written where no one would guess one is legal is still read as one. Null where the splitter will not split the file at all, and then every line is answered for, as it was before there was anything to skip.
+const linesRead = (draft: readonly string[], starts: readonly number[]): ReadonlySet<number> | null => {
+  let sections: RawSection[];
+  try {
+    sections = splitSections(draft.join('\n'));
+  } catch {
+    return null;
+  }
+  const lineOf = (offset: number): number => {
+    let low = 0;
+    let high = starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (starts[mid]! <= offset) low = mid;
+      else high = mid - 1;
+    }
+    return low;
+  };
+  const kept = new Set<number>();
+  const mark = (lines: readonly RawLine[]): void => {
+    for (const line of lines) {
+      kept.add(lineOf(line.span.start));
+      mark(line.children);
+    }
+  };
+  for (const section of sections) {
+    kept.add(lineOf(section.span.start));
+    mark(section.body);
+  }
+  return kept;
+};
+
 export function offeringLines(text: string, known: readonly Addressed[]): string[] {
   const out: string[] = [];
   const already = new Set<string>();
   const draft = text.split('\n');
+  const starts = lineStarts(draft);
+  const read = linesRead(draft, starts);
   // A blank line before the next heading is the end of a section, not a place an author is about to write, and the whole grammar of the kind above it is nothing they asked for.
   const writing = (after: number): boolean => draft.slice(after + 1).find((line) => line.trim() !== '')?.startsWith('#') !== true;
-  let at = 0;
+  // A line the engine drops is not a place an author writes either, so it is passed over the same way. A blank line is kept: what may be written on it is the one thing an author standing there is asking.
+  const dropped = (index: number, line: string): boolean => read !== null && line.trim() !== '' && !read.has(index);
   for (const [index, line] of draft.entries()) {
-    at += line.length;
+    if (dropped(index, line)) continue;
+    const at = starts[index]! + line.length;
     const offering = offeringAt(text, at, known);
     const reads = offering.reads ?? offering.filling?.form;
     const note = offering.offers.find((offer) => offer.form === reads)?.note;
@@ -265,31 +315,74 @@ export function offeringLines(text: string, known: readonly Addressed[]): string
         }
       }
     }
-    at += 1;
   }
   return out;
 }
 
+export interface Asked {
+  at: string | null;
+  walk: boolean;
+  kinds: readonly string[];
+}
+
+const requireDraft = (value: string | undefined): string => {
+  if (value === undefined || value.startsWith('-')) throw new Error(`--at wants a draft file after it\n\n${usage}`);
+  return value;
+};
+
+export function parseArgs(argv: readonly string[]): Asked {
+  let at: string | null = null;
+  let walk = false;
+  const kinds: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--at') {
+      at = requireDraft(argv[++i]);
+      continue;
+    }
+    if (arg.startsWith('--at=')) {
+      at = requireDraft(arg.slice('--at='.length));
+      continue;
+    }
+    if (arg === '--walk') {
+      walk = true;
+      continue;
+    }
+    if (arg.startsWith('-')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
+    kinds.push(arg);
+  }
+  return { at, walk, kinds };
+}
+
+// Where the walk is left unasked for, the answer says it is there. It is the rest of the same question, and an author stuck on one line has no other way to hear of it.
+const WALK = 'For any one line — where it sits, what it is read as, and what may stand there — run this again with --walk.';
+
+export function atLines(file: string, written: string, world: readonly ModuleSource[], walk: boolean): string[] {
+  const read = reading(file, written, world);
+  const short = [...amissLines(written, read.known, read.stood), ...takenLines(read)];
+  return walk ? [...short, ...offeringLines(written, read.known)] : [...short, WALK];
+}
+
 function main(): void {
-  const args = process.argv.slice(2);
-  if (args.includes('--help')) {
+  const argv = process.argv.slice(2);
+  // Asked for before anything is read as anything else, so a flag mistyped after it still gets the page that says what the flags are.
+  if (argv.includes('--help') || argv.includes('-h')) {
     console.log(usage);
     return;
   }
-  const draft = args.indexOf('--at');
-  if (draft >= 0) {
-    const file = args[draft + 1];
-    if (file === undefined) {
-      console.error(usage);
-      process.exit(2);
-    }
-    const written = readFileSync(file, 'utf8').replace(/\r\n?/g, '\n');
-    const world = corpus();
-    const read = reading(file, written, world);
-    console.log([...amissLines(written, read.known, read.stood), ...takenLines(read), ...offeringLines(written, read.known)].join('\n'));
+  let asked: Asked;
+  try {
+    asked = parseArgs(argv);
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(2);
+  }
+  if (asked.at !== null) {
+    const written = readFileSync(asked.at, 'utf8').replace(/\r\n?/g, '\n');
+    console.log(atLines(asked.at, written, corpus(), asked.walk).join('\n'));
     return;
   }
-  const kinds = args.length > 0 ? args : sectionKinds();
+  const kinds = asked.kinds.length > 0 ? asked.kinds : sectionKinds();
   console.log(kinds.flatMap((kind) => [...treeOf(kind), '']).join('\n'));
 }
 

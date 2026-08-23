@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
-import { amissLines, offeringLines, reading, takenLines, treeOf } from './oracle';
+import { splitSections, type RawLine } from '../src/grammar/structure';
+import { amissLines, atLines, offeringLines, parseArgs, reading, takenLines, treeOf } from './oracle';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -165,5 +166,96 @@ describe('a draft is answered against the world it declares, not only the one al
 
     expect(said).not.toContain('nothing declares lamp as');
     expect(said).not.toContain('nothing declares hermit as');
+  });
+});
+
+// A comment is whatever the engine drops, and the engine drops it wherever it is written — before the first heading, indented inside a block, at any depth. What it does not drop is a `//` with content in front of it, which is a line like any other and gets the answer any line gets.
+describe('which lines of a draft are answered for', () => {
+  const KNOWN = [{ kind: 'location', address: 'core.beach' }];
+  const DRAFT = [
+    '// a note before anything is declared',
+    '# location core.beach',
+    'title: The Beach // not a comment, and not dropped',
+    'adjacent:',
+    '  // a note indented inside a block',
+    '  core.beach',
+  ].join('\n');
+
+  const readByTheEngine = (text: string): Set<string> => {
+    const kept = new Set<string>();
+    const mark = (lines: readonly RawLine[]): void => {
+      for (const line of lines) {
+        kept.add(line.text);
+        mark(line.children);
+      }
+    };
+    for (const section of splitSections(text)) mark(section.body);
+    return kept;
+  };
+
+  it('answers for every line the engine reads and passes over every line it drops', () => {
+    const walk = offeringLines(DRAFT, KNOWN);
+    const kept = readByTheEngine(DRAFT);
+
+    for (const line of DRAFT.split('\n')) {
+      const written = line.trim();
+      if (written === '' || written.startsWith('#')) continue;
+      expect(walk.includes(line), `${JSON.stringify(line)} is ${kept.has(written) ? 'read by the engine and not answered for' : 'dropped by the engine and answered for anyway'}`).toBe(kept.has(written));
+    }
+    expect(walk).toContain('# location core.beach');
+  });
+
+  it('leaves no breadcrumb or reading behind for a line it passes over', () => {
+    const walk = offeringLines(DRAFT, KNOWN).join('\n');
+
+    expect(walk).not.toContain('a note before anything is declared');
+    expect(walk).not.toContain('a note indented inside a block');
+    expect(walk).not.toContain('reads as ?');
+  });
+
+  it('answers for every line where the engine will not split the file at all', () => {
+    const broken = ['title: The Beach', '# location core.beach'].join('\n');
+
+    expect(() => splitSections(broken)).toThrow();
+    expect(offeringLines(broken, KNOWN)).toContain('title: The Beach');
+  });
+});
+
+describe('the short answer and the walk', () => {
+  const WORLD = [{ name: 'island', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n') }];
+  const DRAFT = ['// a note', '# location glade', 'x: 12, y: 4', 'entities: no-such-thing'].join('\n');
+
+  it('stops after the whole-file verdict, and says where the rest of the answer is', () => {
+    const short = atLines('glade.dsl', DRAFT, WORLD, false);
+
+    expect(short.join('\n')).toContain('no-such-thing');
+    expect(short.join('\n')).toContain('the engine will not take this file');
+    expect(short.some((line) => line.includes('reads as'))).toBe(false);
+    expect(short[short.length - 1]).toContain('--walk');
+  });
+
+  it('walks on from exactly where the short answer stopped', () => {
+    const short = atLines('glade.dsl', DRAFT, WORLD, false);
+    const full = atLines('glade.dsl', DRAFT, WORLD, true);
+    const said = short.slice(0, -1);
+
+    expect(full.slice(0, said.length)).toEqual(said);
+    expect(full.length).toBeGreaterThan(short.length);
+    expect(full.slice(said.length)).toEqual(offeringLines(DRAFT, reading('glade.dsl', DRAFT, WORLD).known));
+  });
+});
+
+describe('what the oracle is asked for', () => {
+  it('reads a draft, a walk and a list of kinds off the arguments', () => {
+    expect(parseArgs(['--at', 'draft.dsl'])).toEqual({ at: 'draft.dsl', walk: false, kinds: [] });
+    expect(parseArgs(['--at=draft.dsl', '--walk'])).toEqual({ at: 'draft.dsl', walk: true, kinds: [] });
+    expect(parseArgs(['item', 'location'])).toEqual({ at: null, walk: false, kinds: ['item', 'location'] });
+  });
+
+  it('will not read a flag as the draft it was asked for, and will not pass one off as a kind', () => {
+    expect(() => parseArgs(['--at', '--walk'])).toThrow('--at wants a draft file after it');
+    expect(() => parseArgs(['--at', '--help'])).toThrow('--at wants a draft file after it');
+    expect(() => parseArgs(['--at'])).toThrow('--at wants a draft file after it');
+    expect(() => parseArgs(['--nonsense'])).toThrow('unknown flag --nonsense');
   });
 });
