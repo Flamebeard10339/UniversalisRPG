@@ -102,6 +102,12 @@ display: full
 resource: health
 trigger: on empty
 
+// The name a change to what the player is holding is bound to: something entered the pack, left it,
+// or was put on or taken off. It fires once per thing that moved, so an action reading `stops on:
+// core.inventory-changed` comes back the moment the player's hands are different.
+# event inventory-changed
+trigger: inventory-changed
+
 // --- factions ---
 
 # faction world
