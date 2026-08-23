@@ -1,4 +1,4 @@
-import { describeRun, isPlayed, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type PlayedTurn, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { describeRun, isPlayed, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type RunLogEntry, type RunNotes, type TurnOutcome } from '../runtime/runLog';
 import type { SlotStore } from '../runtime/store';
 
 // The app's own end of the playtest loop, and the counterpart of runPlaybot: it holds the run,
@@ -42,7 +42,7 @@ export interface Recorder {
   stop(): void;
   // What the player picked, whether the engine took it, and where in the transcript its answer
   // begins.
-  opened(line: string, outcome: PlayedTurn['outcome'], from: number): void;
+  opened(line: string, outcome: TurnOutcome, from: number): void;
   // Everything the transcript has gained since, which is how a live action's ending lines reach
   // the turn that began it rather than the next one.
   settle(said: (from: number) => readonly string[]): boolean;
