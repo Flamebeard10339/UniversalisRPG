@@ -103,15 +103,15 @@ describe('combat-expansion, read off the routes it ships', () => {
   });
 
   it('holds poison on the struck party and on nobody else, and makes its pool fall', () => {
-    const state = played('combat-expansion.poison-holds-the-struck-enemy');
-
-    expect(buffsOf(state, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
-    expect(buffsOf(state, PLAYER)).toEqual([]);
-    expect(statValue('core.regeneration', state, shipped, POST)).toBe(-30);
-
     const poisoned = played('combat-expansion.poison-holds-the-struck-enemy');
     const clean = played('combat-expansion.poison-holds-the-struck-enemy');
     clearBuffs(clean, [POST]);
+
+    expect(buffsOf(poisoned, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
+    expect(buffsOf(poisoned, PLAYER)).toEqual([]);
+    const regeneration = (each: GameState): number => statValue('core.regeneration', each, shipped, POST);
+    expect(regeneration(poisoned) - regeneration(clean)).toBe(-30);
+
     const health = (each: GameState): number => each.activeAction!.actors![POST].resources['core.health'];
     const before = health(clean);
     expect(health(poisoned)).toBe(before);
@@ -128,9 +128,19 @@ describe('combat-expansion, read off the routes it ships', () => {
   it('costs a striker what the thorned enemy it struck carries', () => {
     const state = played('combat-expansion.striking-a-thorned-enemy-costs-the-striker');
     const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
+    const struck = state.resources['core.health'];
 
     expect(shipped.entities.get('combat-expansion.spined-urchin')!.actions).toEqual([]);
-    expect(toMilliUnits(30) - state.resources['core.health']).toBe(toMilliUnits(5) * attempts);
+
+    // The pool fell by what thorns took net of what regeneration gave back, so the same span is run
+    // again with nothing to fight, opened where the fight left off: what it gains is what to add back.
+    const idle = initialState(shipped);
+    const opening = idle.resources['core.health'];
+    restorePools(idle, { 'core.health': struck });
+    resolve(idle, shipped, idle.time + (state.time - idle.time));
+    const regenerated = idle.resources['core.health'] - struck;
+
+    expect(opening + regenerated - struck).toBe(toMilliUnits(5) * attempts);
   });
 });
 

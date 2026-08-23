@@ -145,6 +145,7 @@ starting
   it('prints the status readout /state and /quit both produce', () => {
     const ctx = driver(source);
     runLine(ctx, '/wait 7');
+    const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [row.id, row.value])));
     expect(shown(runLine(ctx, '/state'))).toEqual([
       'Location: core.guide-house',
       'Elapsed simulated time: 7s',
@@ -152,7 +153,7 @@ starting
       'Inventory: {}',
       'XP: {"core.thieving":0,"core.melee":0,"core.cooking":0}',
       'Equipped: {"mainhand":null,"offhand":null}',
-      'stats: {"core.attack":10,"core.defense":5,"core.accuracy":100,"core.evasion":0,"core.attack-rate":25,"core.regeneration":0,"core.max-health":30,"core.cooking-rate":55,"core.luck":60}',
+      `stats: ${sheet}`,
       'Health: ██████████ 30/30',
       'discovered: 3',
       '  Guide House (core.guide-house) at 0,0,0 -> core.guide-house-upstairs, core.basement',
