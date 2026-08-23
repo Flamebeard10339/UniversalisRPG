@@ -59,6 +59,12 @@ is *for* has changed, that is worth a conversation, not an edit.
 Then confirm `git status` is clean and the gates are green. Commit the docs with
 the work, not after it.
 
+**Say in your closing summary that you wrote the handoff, and name the folder** —
+one line, e.g. *"Handoff written: `docs/authoring-loop/`."* Checking whether these
+files are current is the one thing the author does by hand, and that line is what
+they look for. Its absence is the signal to go and check, so never write it for a
+session that did not update them.
+
 ## Starting a folder that does not exist yet
 
 Write all three. `deliverable-log.md` must name the other two, or a reader who

@@ -283,10 +283,6 @@ was a kill nobody announced, "a quest is softlocked" was declaration order decid
 who speaks, "the status line lies" was a figure that had never once been meaningful.
 Reproduce before believing the cause.
 
-**A cold agent is cheap at executing a ratified design and honest about hitting a
-wall**, and it will describe the wall in the vocabulary of the layer it was
-standing in. Re-reading the wall one layer up is where the leverage is.
-
 **A bot's reading of the fiction is evidence about the writing, even when it is
 wrong about the mechanics.** Two runs concluded the orbs must heal, because they
 are called Renewal and Vitality; they are item modifiers. Two read the mirror
@@ -294,9 +290,7 @@ re-offering character creation as save corruption; it is permanent by design and
 the player may rename themselves whenever they like. Neither was an engine bug and
 both were real findings — the words were doing something the author did not intend.
 
-**Several agents on one checkout share the git index.** They must never run
-`git add`, `git commit` or `git stash`; the orchestrator commits alone, by
-pathspec. And **a test run read against a tree another agent is mid-write on is
-worthless** — one suite went 14/32 failing then 32/32 minutes later with no edit
-between. Re-run before believing a failure. A bulk id rewrite runs alone on a quiet
-tree, because its blast radius intersects every other lane.
+**A test run read against a tree another agent is mid-write on is worthless** — one
+suite went 14/32 failing then 32/32 minutes later with no edit between. Re-run
+before believing a failure, and never act on a red result while another lane holds
+a file the test path touches.
