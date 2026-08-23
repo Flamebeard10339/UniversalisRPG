@@ -62,14 +62,14 @@ function fullBar(current: number, max: number): string {
   return `${'█'.repeat(filled)}${'░'.repeat(BAR_WIDTH - filled)} ${tidy(current)}/${tidy(max)}`;
 }
 
-export function minimalGlyph(current: number, max: number): string {
+function minimalGlyph(current: number, max: number): string {
   const stage = Math.min(MINIMAL_STAGES.length - 1, Math.floor(fillRatio(current, max) * MINIMAL_STAGES.length));
   return MINIMAL_STAGES[stage];
 }
 
-export const pool = (localizer: Localizer, resource: Localized, meter: string): Localized => localizer.engine('engine.repl.pool', { resource, meter: localizer.identifier(meter) });
+const pool = (localizer: Localizer, resource: Localized, meter: string): Localized => localizer.engine('engine.repl.pool', { resource, meter: localizer.identifier(meter) });
 
-export function formatResources(resources: PlayView['resources'], localizer: Localizer): PlayerLine[] {
+function formatResources(resources: PlayView['resources'], localizer: Localizer): PlayerLine[] {
   const lines: PlayerLine[] = [];
   for (const r of resources) if (r.display === 'full') lines.push(say(pool(localizer, r.title, fullBar(r.current, r.max))));
   const minimal = resources.filter((r) => r.display === 'minimal');
@@ -86,7 +86,7 @@ export const withCount = (meter: string, remaining: number | null): string => (r
 
 const meterFor = (foe: EncounterFoe): string => withCount(fullBar(foe.current, foe.max), foe.remaining);
 
-export function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer): PlayerLine[] {
+function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer): PlayerLine[] {
   if (!encounter) return [];
   const lines = encounter.foes.map((foe) => say(pool(localizer, foe.title, meterFor(foe))));
   const meters = [localizer.engine('engine.repl.swing', { meter: localizer.identifier(minimalGlyph(encounter.cadence, 1)) })];
@@ -116,7 +116,7 @@ export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
   return [blank, plane.title, ...formatPlane(plane, v.equipment.some((row) => row.item === plane.instance), focus.hex, localizer), blank].map((line) => say(line));
 }
 
-export function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
+function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
   const lines: ReplLine[] = [];
   for (const modal of v.modals) {
     const options = modal.options.map((option) => option.key).join(', ');
