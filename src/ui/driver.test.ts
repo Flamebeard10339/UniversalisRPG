@@ -74,7 +74,10 @@ const DRIVER_MODULE = {
     '',
     '# entity mirror',
     'title: Mirror',
-    'look in: open modal: character-creation',
+    'look in:',
+    '  instant',
+    '  open modal: choose-race',
+    '  open modal: name-yourself',
     '',
   ].join('\n'),
 };
@@ -145,7 +148,7 @@ describe('the GUI driver', () => {
     driver.answer(menu.key, menu.values![0].value);
     driver.choose(position(driver, 'use:entity.proving-ground.mirror.look-in'));
 
-    const name = shown(driver).modals[0].options[0];
+    const name = shown(driver).modals[1].options[0];
     driver.answer(name.key, 'Sir Robin');
     const race = shown(driver).modals[0].options[0];
     driver.answer(race.key, race.values![0].value);

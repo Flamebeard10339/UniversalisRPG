@@ -600,7 +600,10 @@ entities:
 # flag greeted
 
 # entity mirror
-look in: open modal: character-creation
+look in:
+  instant
+  open modal: choose-race
+  open modal: name-yourself
 
 # race human
 
@@ -657,7 +660,7 @@ owner = sage
 node greeting:
   when: not greeted
   set: greeted
-  open modal: character-creation
+  open modal: name-yourself
   -> Ask about the mirror.
 `;
 
@@ -666,11 +669,12 @@ describe('a modal is driven by its published name and options', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
     const opened = runLine(ctx, 'use: entity.mirror.look-in');
-    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
-    expect(opened.view?.modals[0].options.map((option) => option.key)).toEqual(['name', 'race']);
-    expect(opened.view?.modals[0].options[0].values).toBeNull();
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['choose-race', 'name-yourself']);
+    expect(opened.view?.modals[1].options.map((option) => option.key)).toEqual(['name']);
+    expect(opened.view?.modals[1].options[0].values).toBeNull();
 
     const named = runLine(ctx, 'submit-modal: name=Rowan');
+    expect(named.view?.modals.map((modal) => modal.name)).toEqual(['choose-race']);
     expect(named.view?.modals[0].options.map((option) => option.key)).toEqual(['race']);
     expect(takes(named.view?.modals[0].options[0])).toEqual(['human', 'elf', 'dwarf', 'orc']);
   });
@@ -691,11 +695,11 @@ describe('a modal is driven by its published name and options', () => {
     const { ctx } = fixture(STACKED_MODAL_MODULE);
 
     const opened = runLine(ctx, 'talk: sage');
-    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['character-creation', 'dialogue']);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['name-yourself', 'dialogue']);
 
     const answered = runLine(ctx, '1');
     expect(answered.recorded).toEqual(['submit-modal: choice=0']);
-    expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['name-yourself']);
   });
 
   it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
@@ -707,7 +711,7 @@ describe('a modal is driven by its published name and options', () => {
 
     const still = sessionStatus(session);
     expect(still.player).toEqual({ name: null, race: null });
-    expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
+    expect(still.modals.map((modal) => modal.name)).toEqual(['choose-race', 'name-yourself']);
     expect(recorder.history).toEqual(['use: entity.mirror.look-in']);
   });
 

@@ -269,7 +269,7 @@ ${line}
 # test walk
 ${line}
 `);
-    expect(test('open-modal: character-creation')).not.toThrow();
+    expect(test('open-modal: name-yourself')).not.toThrow();
     expect(test('open-modal: no-such-screen')).not.toThrow();
   });
 

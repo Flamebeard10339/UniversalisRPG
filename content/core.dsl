@@ -171,10 +171,13 @@ title: Off Hand
 
 // --- modals ---
 
-// The mirror raises this one; the engine draws it and writes what it is told
-// into the player.
-# modal character-creation
-screen: character-creation
+// Two screens, each writing one field of the player and neither knowing the
+// other. Whatever raises them decides whether it wants one or both.
+# modal name-yourself
+screen: name-yourself
+
+# modal choose-race
+screen: choose-race
 
 // What `/inv` raises, and what a # test answers with submit-modal: item=.
 # modal carried-items

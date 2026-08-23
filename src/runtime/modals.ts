@@ -7,6 +7,7 @@ import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubm
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
 import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, LEAVE as SHOP_LEAVE } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
+import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
 // What the screen standing open is about, where it is about something the view publishes elsewhere. A plane and a quest are both read beside the question rather than in it.
 export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer };
@@ -29,20 +30,35 @@ interface ModalDefinition<F extends ModalFrame> {
   leaves?: Answer;
 }
 
+function carriedWords(localizer: Localizer, tag: TagClause): Localized {
+  if (tag.kind !== 'stat-bonus' || tag.per !== undefined) return localizer.identifier(tagClause.print(tag));
+  return localizer.engine('engine.modal.race.bonus', { amount: localizer.identifier(bonusAmount.print(tag)), stat: localizer.title('stat', tag.statId) });
+}
+
 // Every race the world declares. The order is the order they are written in, which is the same list in every language — sorting by the words would reorder the answers a recording replays.
 function raceChoices(registry: Registry, state: GameState): readonly { value: Answer; shown: Localized }[] {
   const localizer = localizerOf(registry, state);
-  return [...registry.races.keys()].map((id) => ({ value: id, shown: localizer.title('race', id) }));
+  return [...registry.races.entries()].map(([id, race]) => {
+    const title = localizer.title('race', id);
+    if (race.tags.length === 0) return { value: id, shown: title };
+    const [first, ...rest] = race.tags.map((tag) => carriedWords(localizer, tag));
+    const carries = rest.reduce((all, more) => localizer.engine('engine.modal.race.and', { carries: all, more }), first);
+    return { value: id, shown: localizer.engine('engine.modal.race.carries', { race: title, carries }) };
+  });
 }
 
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
-  'character-creation': {
-    options: (_frame, state, registry) => [
-      { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
-      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: raceChoices(registry, state) },
-    ],
+  'name-yourself': {
+    options: (_frame, state, registry) => [{ key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null }],
     submit: (frame, state) => {
-      state.player = { name: frame.answers.name, race: frame.answers.race };
+      state.player = { ...state.player, name: frame.answers.name };
+      return null;
+    },
+  },
+  'choose-race': {
+    options: (_frame, state, registry) => [{ key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: raceChoices(registry, state) }],
+    submit: (frame, state) => {
+      state.player = { ...state.player, race: frame.answers.race };
       return null;
     },
   },

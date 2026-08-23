@@ -105,7 +105,7 @@ A reasonable reply is:
 
 If that opens a screen asking for a name, the next turn's view shows a modal instead of choices, something like:
 
-  open screen: character-creation — asks name:
+  open screen: name-yourself — asks name:
     value=<free text>
 
 and the next reply answers that modal directly:

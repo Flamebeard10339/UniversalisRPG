@@ -115,7 +115,10 @@ entities:
 # flag greeted
 
 # entity mirror
-look in: open modal: character-creation
+look in:
+  instant
+  open modal: choose-race
+  open modal: name-yourself
 
 # race human
 
@@ -137,15 +140,15 @@ node greeting:
     const session = startSession(registry);
 
     let v = apply(session, 'use:entity.mirror.look-in');
-    expect(v.modals).toEqual([{ name: 'character-creation', leaving: null, options: [
-      { key: 'name', label: 'Name', values: null },
-      { key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) },
-    ] }]);
+    expect(v.modals).toEqual([
+      { name: 'choose-race', leaving: null, options: [{ key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) }] },
+      { name: 'name-yourself', leaving: null, options: [{ key: 'name', label: 'Name', values: null }] },
+    ]);
     expect(v.player).toEqual({ name: null, race: null });
 
     v = submitModal(session, { name: 'Rowan' });
-    expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(v.player).toEqual({ name: null, race: null });
+    expect(v.modals.map((modal) => modal.name)).toEqual(['choose-race']);
+    expect(v.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: null });
 
     v = submitModal(session, { race: 'elf' });
     expect(v.modals).toEqual([]);
@@ -489,7 +492,10 @@ entities:
 # flag greeted
 
 # entity mirror
-look in: open modal: character-creation
+look in:
+  instant
+  open modal: choose-race
+  open modal: name-yourself
 
 # race human
 
@@ -538,8 +544,8 @@ submit-modal: choice=0
   it('fails, naming the modal, and passes once every option of it is answered', () => {
     const registry = loadInEnglish(module);
 
-    expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
-    expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: character-creation' });
+    expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: name-yourself' });
+    expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: choose-race' });
 
     const answered = createGameState();
     expect(runTest('answers-the-modal', registry, answered)).toEqual({ passed: true });
@@ -1061,7 +1067,10 @@ entities:
 examine: Warm.
 
 # entity mirror
-look in: open modal: character-creation
+look in:
+  instant
+  open modal: choose-race
+  open modal: name-yourself
 
 # race human
 
@@ -1586,7 +1595,7 @@ describe('a modal answer is spelled in the base language on every screen, and on
 
   const races = (language: string): readonly ModalChoice[] => {
     const session = opened(language);
-    applyDirective(session, { kind: 'open-modal', modal: 'character-creation' });
+    applyDirective(session, { kind: 'open-modal', modal: 'choose-race' });
     return choices(session);
   };
 

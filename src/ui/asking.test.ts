@@ -91,10 +91,10 @@ describe('what a click away from a screen answers', () => {
 
   it('belongs to the covering screen and not to the one underneath it', () => {
     const covering = stocked();
-    applyDirective(covering, { kind: 'open-modal', modal: 'character-creation' });
+    applyDirective(covering, { kind: 'open-modal', modal: 'name-yourself' });
     applyDirective(covering, { kind: 'open-modal', modal: 'carried-items' });
 
-    expect(view(covering).modals.map((modal) => modal.name)).toEqual(['character-creation', 'carried-items']);
+    expect(view(covering).modals.map((modal) => modal.name)).toEqual(['name-yourself', 'carried-items']);
     expect(dismissal(view(covering).modals)).toEqual({ key: 'item', value: 'close' });
 
     const covered = onBlade();
