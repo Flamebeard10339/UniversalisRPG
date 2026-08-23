@@ -267,6 +267,28 @@ export function destroyItem(state: GameState, id: string): Destruction {
   return { ok: true, item: template };
 }
 
+// Everything the player has, parted with through the doors that already exist: a stack leaves as one
+// hand-over it has been asked for, and a grown copy and a worn one each go whole the way the
+// inventory screen's own destroy does. Nothing here writes the stack itself, and the count it
+// answers with is how many holdings left.
+export function stripHoldings(state: GameState): number {
+  let gone = 0;
+  for (const row of packRows(state)) {
+    if (row.kind === 'grown') {
+      if (destroyItem(state, row.id).ok) gone += 1;
+      continue;
+    }
+    const parting = HandOver.asked(state, row.template, row.count);
+    if (!parting) continue;
+    gone += handOver(state, parting);
+    delete state.inventory[row.template];
+  }
+  for (const worn of [...Object.values(state.equipped)]) {
+    if (destroyItem(state, worn).ok) gone += 1;
+  }
+  return gone;
+}
+
 export function itemLevel(payload: ItemInstance, item: Item): number {
   return Math.min(skillLevel(payload.experience), item.maxLevel);
 }

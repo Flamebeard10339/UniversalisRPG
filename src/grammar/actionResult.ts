@@ -21,11 +21,13 @@ export type ActionResult =
   | { kind: 'add'; variable: string; amount: number }
   | { kind: 'give'; item: string; amount?: Range }
   | { kind: 'take'; item: string; amount?: number }
+  | { kind: 'strip' }
   | { kind: 'xp'; skill: string; amount: Range }
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
   | { kind: 'open-modal'; modal: string }
   | { kind: 'pool'; resource: string; delta: Range; party?: Party }
+  | { kind: 'fill'; resource: string; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party }
   | { kind: 'stop' }
   | {
@@ -92,6 +94,12 @@ function parseAdd(cursor: Cursor): ActionResult {
   };
 }
 
+// What `take:` is written with to part the player with all of it rather than with a count of one
+// named thing. It is a word and not an id, so no module can declare an item that shadows it.
+export const EVERYTHING = 'everything';
+
+const EVERYTHING_TAKEN = new RegExp(`${EVERYTHING}(?![\\w-])`);
+
 const PREPOSITION = { drain: 'from', restore: 'to', inflict: 'on' } as const;
 const MOVES = {
   from: 'takes its amount away from a party',
@@ -113,7 +121,16 @@ function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | und
   return party;
 }
 
+// `restore: <resource>` with no amount before it fills the pool to whatever its ceiling is at the
+// moment it runs, which is the one thing a number cannot say: a ceiling a race, an item or a buff
+// has moved is not a figure anybody could have written down. There is deliberately no emptying form
+// until something needs one.
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
+  if (sign > 0 && cursor.peek(/[0-9.]/) === null) {
+    const resource = id.parse(cursor);
+    const whole = parseParty('restore', cursor);
+    return whole === undefined ? { kind: 'fill', resource } : { kind: 'fill', resource, party: whole };
+  }
   const delta = decimalRange(cursor, 'an amount and a resource, as in `drain: 5 health`');
   cursor.take(/[ \t]+/);
   const resource = id.parse(cursor);
@@ -263,7 +280,7 @@ function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/unset[: \t][ \t]*/) !== null) return { kind: 'unset', variable: parseVariable(cursor) };
   if (cursor.take(/add:[ \t]*/) !== null) return parseAdd(cursor);
   if (cursor.take(/give:[ \t]*/) !== null) return parseGive(produced.parse(cursor));
-  if (cursor.take(/take:[ \t]*/) !== null) return { kind: 'take', ...quantified.parse(cursor) };
+  if (cursor.take(/take:[ \t]*/) !== null) return cursor.take(EVERYTHING_TAKEN) !== null ? { kind: 'strip' } : { kind: 'take', ...quantified.parse(cursor) };
   if (cursor.take(/roll:[ \t]*/) !== null) return { kind: 'roll', table: id.parse(cursor) };
   if (cursor.take(/inflict:[ \t]*/) !== null) return parseInflict(cursor);
   if (cursor.take(/xp:[ \t]*/) !== null) {
@@ -365,6 +382,8 @@ export function printResult(value: ActionResult): string {
       return `give: ${produced.print(value)}`;
     case 'take':
       return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
+    case 'strip':
+      return `take: ${EVERYTHING}`;
     case 'xp':
       return `xp: ${value.skill} ${range.print(value.amount)}`;
     case 'relocate':
@@ -378,6 +397,10 @@ export function printResult(value: ActionResult): string {
       const verb = value.delta.max < 0 ? 'drain' : 'restore';
       const party = value.party === undefined ? '' : ` ${PREPOSITION[verb]} ${value.party}`;
       return `${verb}: ${range.print(magnitude)} ${value.resource}${party}`;
+    }
+    case 'fill': {
+      const party = value.party === undefined ? '' : ` ${PREPOSITION.restore} ${value.party}`;
+      return `restore: ${value.resource}${party}`;
     }
     case 'inflict': {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
@@ -438,6 +461,7 @@ const LEAF_EXAMPLES: readonly string[] = [
   'give: 5 arrow',
   'give: 5-10 arrow',
   'take: 3 plank',
+  `take: ${EVERYTHING}`,
   'xp: mining 4-7',
   'relocate: camp',
   `relocate: ${STARTING_LOCATION}`,
@@ -446,6 +470,7 @@ const LEAF_EXAMPLES: readonly string[] = [
   'open modal: name-yourself',
   'drain: 5 health',
   'restore: 1-2 health',
+  'restore: health',
   'inflict: dazzled',
   'roll: common-drops',
   'stop',
@@ -460,6 +485,7 @@ const LEAF_FORMS: readonly string[] = [
   'give: <count> <item>',
   'give: <least>-<most> <item>',
   'take: <count> <item>',
+  `take: ${EVERYTHING}`,
   'xp: <skill> <amount>',
   'relocate: <location>',
   `relocate: ${STARTING_LOCATION}`,
@@ -468,6 +494,7 @@ const LEAF_FORMS: readonly string[] = [
   'open modal: <modal>',
   'drain: <amount> <resource>[ from <me or them>]',
   'restore: <amount> <resource>[ to <me or them>]',
+  'restore: <resource>[ to <me or them>]',
   'inflict: <buff item>[ on <me or them>]',
   'roll: <droptable>',
   'stop',
