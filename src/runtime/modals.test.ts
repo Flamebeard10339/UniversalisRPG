@@ -1,14 +1,13 @@
 import type { ModalChoice, ModalOption } from './modalOption';
 import { type ModalFrame } from './state';
-import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { mapOf, Registry } from '../content/registry';
-import { contentSectionMaps, sectionOf, visitSection } from '../content/sections';
+import { Registry } from '../content/registry';
+import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
 import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
-import { MODAL_SCREENS } from '../content/sections/modal';
+import { MODAL_SCREENS } from '../grammar/actionResult';
 import { shippedSources } from '../content/shipped';
 import { SAVE_VERSION } from './save';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
@@ -170,7 +169,6 @@ node greeting:
 const THROWING_CHOICE_MODULE = `
 # location camp
 x: 0, y: 0
-starting
 entities:
   sage
 
@@ -185,22 +183,15 @@ owner = sage
 node greeting:
   when: not greeted
   -> Ask about the mirror.
-    open modal: no-such-screen
+    relocate: starting-location
   -> Say nothing.
 `;
 
-// Every modal the corpus names, wherever any kind names one: the reference walk reports the site under the kind's own word for it, so a kind that gains an `open modal:` next month is asked for with no edit.
-function modalsNamed(registry: Registry): { id: string; where: string }[] {
-  const named: { id: string; where: string }[] = [];
-  for (const [kind, primary] of contentSectionMaps()) {
-    for (const value of mapOf(registry, primary).values()) {
-      visitSection(sectionOf(kind, { ...value }), `# ${kind} ${value.id}`, (referenced, id, where) => {
-        if (referenced === 'modal') named.push({ id, where });
-        return id;
-      });
-    }
-  }
-  return named;
+// Every modal the shipped corpus names, in both spellings the language writes it. Nothing declares a modal any more, so the lines themselves are the subjects, and a corpus that has stopped writing any is a failure rather than a pass.
+const NAMES_A_MODAL = /open[ -]modal:[ \t]*([a-z][a-z0-9-]*)/g;
+
+function modalsNamed(): { name: string; where: string }[] {
+  return shippedSources().flatMap((source) => [...source.text.matchAll(NAMES_A_MODAL)].map((found) => ({ name: found[1]!, where: source.name })));
 }
 
 function stackingSession(): PlaySession {
@@ -296,11 +287,11 @@ describe('opening and answering', () => {
     const state = createGameState();
     expect(() => openModalNamed(state, 'haggling')).toThrow(/unknown modal: haggling/);
     expect(() => openModalNamed(state, 'dialogue')).toThrow(/not opened by name/);
-    expect(() => applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'shop' }])).toThrow(RuntimeError);
+    expect(() => openModalNamed(state, 'shop')).toThrow(/not opened by name/);
     expect(state.modals).toEqual([]);
   });
 
-  it('opens every screen a # modal may name, and nothing a # modal may not', () => {
+  it('opens every screen the language may name, and nothing beside them', () => {
     for (const screen of MODAL_SCREENS) {
       const state = createGameState();
       openModalNamed(state, screen);
@@ -311,20 +302,12 @@ describe('opening and answering', () => {
     }
   });
 
-  // `open modal:` raises the id the # modal is declared under, so a modal whose id is not a screen the engine runs loads clean and throws the first time anybody looks at it. The subjects are every # modal the corpus ships.
-  it('opens every # modal the shipped corpus declares, by the id it is declared under', () => {
-    const shipped = loadUniverse(shippedSources());
-
-    expect(shipped.modals.size).toBeGreaterThan(0);
-    for (const id of shipped.modals.keys()) expect(() => openModalNamed(createGameState(), id), id).not.toThrow();
-  });
-
-  // Nothing refuses an `open modal:` at load — a modal is a global id, so the reference walk resolves nothing and checks nothing — and the first thing that reads the name is the player raising the screen.
-  it('opens every modal the shipped corpus names, wherever a section names one', () => {
-    const named = modalsNamed(loadUniverse(shippedSources()));
+  it('opens every modal the shipped corpus names, and takes the corpus whole while it says so', () => {
+    const named = modalsNamed();
 
     expect(named.length).toBeGreaterThan(0);
-    for (const { id, where } of named) expect(() => openModalNamed(createGameState(), id), `${where} ${id}`).not.toThrow();
+    for (const { name, where } of named) expect(() => openModalNamed(createGameState(), name), `${where}: ${name}`).not.toThrow();
+    expect(() => loadUniverse(shippedSources())).not.toThrow();
   });
 
   it('refuses an option it does not have, a value it does not take, and an answer with nothing open', () => {
@@ -353,7 +336,7 @@ describe('opening and answering', () => {
     const module = loadInEnglish(THROWING_CHOICE_MODULE);
     const state = talking(module);
 
-    expect(() => answerModal(state, module, { choice: '0' })).toThrow(/unknown modal: no-such-screen/);
+    expect(() => answerModal(state, module, { choice: '0' })).toThrow(/no # location is marked starting/);
     expect(names(state)).toEqual(['dialogue']);
     expect(topModal(state)?.answers).toEqual({});
     expect(takes(publishModal(topModal(state)!, state, module).options[0])).toEqual(['0', '1']);
@@ -511,7 +494,8 @@ describe('the carried-items screen, as a frame like any other', () => {
   it('refuses a screen no definition knows, wherever the name came from', () => {
     const session = startSession(loadInEnglish(CARRIED_MODULE));
 
-    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'carried' })).toThrow(/unknown modal: carried/);
+    expect(() => parseDirectiveLine('open-modal: carried')).toThrow(/a modal screen must be one of/);
+    expect(() => openModalNamed(createGameState(), 'carried')).toThrow(/unknown modal: carried/);
     expect(view(session).modals).toEqual([]);
   });
 
@@ -644,7 +628,8 @@ describe('the plane screen, as a frame like any other', () => {
   it('is not a screen a name alone can raise, because a name cannot say which copy', () => {
     const session = startSession(loadInEnglish(PLANE_MODULE));
 
-    expect(() => applyDirective(session, { kind: 'open-modal', modal: 'item-plane' })).toThrow(/not opened by name/);
+    expect(() => parseDirectiveLine('open-modal: item-plane')).toThrow(/a modal screen must be one of/);
+    expect(() => openModalNamed(createGameState(), 'item-plane')).toThrow(/not opened by name/);
     expect(view(session).modals).toEqual([]);
   });
 

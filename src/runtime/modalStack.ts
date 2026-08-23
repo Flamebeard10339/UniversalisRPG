@@ -3,7 +3,7 @@ import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
 import { questFrame, sameQuest } from './questScreen';
 import { sameCount, sameShop, shopFrame } from './shopScreen';
-import type { ModalScreen } from '../content/sections/modal';
+import type { ModalScreen } from '../grammar/actionResult';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
 
 export type ModalName = ModalFrame['name'];
