@@ -14,6 +14,7 @@ import { formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
+import { spokenBy, type Dialogue, type DialogueNode } from './sections/dialogue';
 
 const CORPUS = readdirSync('content')
   .filter((name) => name.endsWith('.dsl'))
@@ -391,6 +392,43 @@ describe('the shipped corpus', () => {
       const intruded = [written, 'nonsense-nobody-declares:', ...indentLines(['nonsense-nobody-reads'])].join('\n');
       expect(() => owner.parse(splitSections(intruded)[0]!), `# ${section.kind} ${section.id ?? ''}`).toThrow();
     }
+  });
+});
+
+describe('a dialogue node offered as the only word an entity has', () => {
+  const { registry } = loadUniverseWithDiagnostics(CORPUS);
+
+  // A node the game may open a conversation on at all: `always`, or a `when:` narrowing which moment is its turn. One that is only ever arrived at by a goto is neither.
+  const offering = (node: DialogueNode): boolean => node.always === true || node.when !== undefined;
+
+  // Whether entering this node a second time still says or shows something. `sticky` replays it whole; `again:` is what it falls back to otherwise; and a goto or a menu is followed whatever `sticky` says, so either can carry the answer instead — which is why this walks the node rather than reading one field off it.
+  function staysSpeaking(dialogue: Dialogue, node: DialogueNode, seen = new Set<string>()): boolean {
+    if (node.sticky || node.again) return true;
+    if (seen.has(node.name)) return false;
+    seen.add(node.name);
+    for (const step of node.steps) {
+      if (step.kind === 'menu') return true;
+      if (step.kind === 'goto') {
+        const target = dialogue.nodes.find((each) => each.name === step.target);
+        if (target && staysSpeaking(dialogue, target, seen)) return true;
+      }
+    }
+    return false;
+  }
+
+  // Every owner for whom exactly one node, in any dialogue naming them, is ever offered first — so nothing else can take the turn instead, and whatever that node says is the whole of what talking to them ever is.
+  const owners = new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined));
+  const soleVoice = [...owners].flatMap((owner) => {
+    const offered = spokenBy(registry.dialogues, owner).flatMap((dialogue) => dialogue.nodes.filter(offering).map((node) => ({ owner, dialogue, node })));
+    return offered.length === 1 ? offered : [];
+  });
+
+  it('is found across the corpus, so the claim below is not vacuous', () => {
+    expect(soleVoice.length).toBeGreaterThan(5);
+  });
+
+  it('still has something to say once it has already been reached', () => {
+    expect(soleVoice.filter((each) => !staysSpeaking(each.dialogue, each.node)).map((each) => `${each.owner} (# dialogue ${each.dialogue.id}, node ${each.node.name})`)).toEqual([]);
   });
 });
 
