@@ -523,13 +523,11 @@ function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
 }
 
-// The terminator is what makes a span unattended, so it is also what decides whether the player is
-// told turn by turn or handed a summary at the end. Issuing an action without one comes back after a
-// single cycle and never reaches here; handing one over — `wait: done`, `until done`, `until
-// <condition>` — is asking the engine to run the world in the player's absence, and it answers with
-// what moved and what stopped it. `done` is not a condition anything could evaluate, so the loop
-// takes the terminator rather than a test made from it: reading which one it was given is the whole
-// of the split.
+// Handing the engine a terminator is asking it to run the world in the player's absence, so the
+// terminator is also what decides whether they are told turn by turn or handed a summary: issuing an
+// action without one comes back after a single cycle and never reaches here. `done` is not a
+// condition anything could evaluate, so the loop takes the terminator rather than a test made from
+// it — reading which one it was given is the whole of the split.
 export function resolveUnderWay(state: GameState, registry: Registry, terminator: Terminator = 'done', start: SpanStart = spanStart(state)): WaitedOut {
   const startedAt = start.at;
   const say = localizerOf(registry, state);

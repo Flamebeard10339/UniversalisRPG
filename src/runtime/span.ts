@@ -5,9 +5,6 @@ import { skillLevel } from './skills';
 import { GameState } from './state';
 import { fromMilliUnits, msToSeconds } from './units';
 
-// What the world did while it ran on the player's behalf. Its subjects are the state's own save
-// fields, so a `# resource`, a `# skill` or an item added next month is reported without an edit
-// here, and a field added to the state does not compile until it says whether a span mentions it.
 export interface SpanStart {
   readonly at: number;
   readonly state: GameState;
@@ -33,6 +30,9 @@ type SpanVoice = ((told: Told) => Localized[]) | Unsaid;
 
 const numbers = (record: Record<string, number>, id: string): number => record[id] ?? 0;
 
+// What the world did while it ran on the player's behalf, in the vocabulary the world itself
+// declares: a `# resource`, a `# skill` or an item added next month is reported with no edit here,
+// and a field added to the state does not compile until this says whether a span mentions it.
 const SPAN_VOICE: Record<SaveField, SpanVoice> = {
   location: ({ after, say }) => [say.engine('engine.span.moved', { location: say.title('location', after.location) })],
   inventory: ({ moved, before, after, say }) =>
@@ -48,16 +48,14 @@ const SPAN_VOICE: Record<SaveField, SpanVoice> = {
       const params = { skill: say.title('skill', id), gained: now - was };
       return level === skillLevel(was) ? say.engine('engine.span.xp', params) : say.engine('engine.span.levelled', { ...params, level });
     }),
-  resources: ({ moved, before, after, registry, say }) =>
-    moved
-      .filter((id) => registry.resources.has(id))
-      .map((id) =>
-        say.engine('engine.span.pool', {
-          resource: say.title('resource', id),
-          before: fromMilliUnits(numbers(before.resources as Record<string, number>, id)),
-          after: fromMilliUnits(numbers(after.resources as Record<string, number>, id)),
-        }),
-      ),
+  resources: ({ moved, before, after, say }) =>
+    moved.map((id) =>
+      say.engine('engine.span.pool', {
+        resource: say.title('resource', id),
+        before: fromMilliUnits(numbers(before.resources as Record<string, number>, id)),
+        after: fromMilliUnits(numbers(after.resources as Record<string, number>, id)),
+      }),
+    ),
   time: 'the span itself',
   activeAction: 'told by what stopped it',
   journey: 'told by what stopped it',
@@ -74,8 +72,6 @@ const SPAN_VOICE: Record<SaveField, SpanVoice> = {
   modals: 'nothing a player counts',
 };
 
-// A span that took no time and moved nothing says nothing: `wait: done` in a world where nothing is
-// under way is not an absence anyone was away for.
 export function spanSummary(start: SpanStart, state: GameState, registry: Registry, because: Localized): Localized[] {
   const say = localizerOf(registry, state);
   const diff = diffState(state, start.state) as Partial<Record<SaveField, unknown>>;

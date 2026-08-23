@@ -106,8 +106,7 @@ export interface GameState extends RngCursor {
   visits: Record<string, number>;
   xp: Record<string, number>;
   log: Localized[];
-  // Why what was last under way stopped, in the words the player reads. Written by whoever ends it
-  // and never persisted: a save reloads into a world where nothing is under way and nothing stopped.
+  // Why what was last under way stopped, in the words the player reads, written by whoever ends it.
   endedBecause: Localized | null;
   time: number;
   activeAction: ActiveAction | null;
