@@ -15,6 +15,10 @@ export interface Registry extends SectionMaps {
   roads: ReadonlyMap<string, readonly Edge[]>;
 }
 
+export function startingLocationId(registry: Registry): string | undefined {
+  return [...registry.locations.values()].find((location) => location.starting)?.id;
+}
+
 export const mapOf = (registry: Registry, name: string): Map<string, { id?: string }> => registry[name as keyof SectionMaps] as Map<string, { id?: string }>;
 
 export const emptyMaps = (): SectionMaps => Object.fromEntries(mapNames().map((name) => [name, new Map()])) as SectionMaps;
