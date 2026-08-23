@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from './sections';
 import { DslError } from '../grammar/parser';
-import { parseDirectiveLine } from './sections/test';
+import { parseDirectiveLine, printDirective } from './sections/test';
 
 const ref = (...path: string[]) => ({
   kind: 'reference' as const,
@@ -340,5 +340,19 @@ describe('refuse: the outcome under test', () => {
   it('rejects a verb whose refusal is not a value the plane returns', () => {
     expect(() => parseDirectiveLine('refuse: travel beach')).toThrow(/unknown refuse: verb \(expected one of feed, slot, allocate, apply\)/);
     expect(() => parseDirectiveLine('refuse: feed 1')).toThrow(/malformed feed: payload/);
+  });
+});
+
+describe('a terminator follows a payload, not free text', () => {
+  const roundTrip = (line: string) => printDirective(parseDirectiveLine(line)!);
+
+  it('leaves a choice alone, because what a player is shown may say anything', () => {
+    expect(parseDirectiveLine('choose: I will wait until morning')).toEqual({ kind: 'choose', text: 'I will wait until morning' });
+    expect(roundTrip('choose: I will wait until morning')).toBe('choose: I will wait until morning');
+  });
+
+  it('still reads a terminator after a payload that spells itself out', () => {
+    expect(parseDirectiveLine('use: melee-combat on giant-rat until done')).toEqual({ kind: 'until', inner: { kind: 'use-on', action: 'melee-combat', target: 'giant-rat' }, until: 'done' });
+    expect(roundTrip('travel: beach until has rope')).toBe('travel: beach until has rope');
   });
 });

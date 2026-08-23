@@ -206,15 +206,6 @@ function parseBegin(text: string, verb: string, rest: string): Directive {
 }
 
 export function parseDirectiveLine(text: string): Directive | null {
-  const until = UNTIL.exec(text)?.groups;
-  if (until) {
-    const terminator = parseTerminator(until.terminator);
-    if (terminator !== null) {
-      const inner = parseDirectiveLine(until.rest);
-      if (inner) return { kind: 'until', inner, until: terminator };
-    }
-  }
-
   const run = RUN.exec(text)?.groups;
   if (run) return { kind: 'run', test: run.id };
 
@@ -223,6 +214,15 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
+
+  const until = UNTIL.exec(text)?.groups;
+  if (until) {
+    const terminator = parseTerminator(until.terminator);
+    if (terminator !== null) {
+      const inner = parseDirectiveLine(until.rest);
+      if (inner) return { kind: 'until', inner, until: terminator };
+    }
+  }
 
   const use = USE.exec(text)?.groups;
   if (use)
