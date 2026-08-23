@@ -1,7 +1,7 @@
 import { Registry } from '../content/registry';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import { itemCopies, grownItems, isGrownCopy, itemTemplate, wornCopy, wornIn } from './itemInstance';
+import { isGrownCopy, itemTemplate, packRows, wornCopy } from './itemInstance';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 
 export interface CarriedEntry {
@@ -30,16 +30,18 @@ function nameOf(template: string, localizer: Localizer, copy: string | null): Lo
   return carriedName(localizer, 'item', template, copy);
 }
 
+// The pack, row for row as the slot count reads it, and then what the player has on. A row here and
+// a slot there are the same thing by construction: both are `packRows`.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
   const localizer = localizerOf(registry, state);
   const entries: CarriedEntry[] = [];
-  for (const [template, { stack }] of itemCopies(state)) {
-    const name = nameOf(template, localizer, null);
-    if (stack > 0) entries.push({ id: template, name, count: stack, shown: localizer.engine('engine.carried.stack', { item: name, count: stack }), grown: false });
-  }
-  for (const [id, template] of Object.entries(grownItems(state))) {
-    if (wornIn(state, id) !== undefined) continue;
-    entries.push({ id, name: nameOf(template, localizer, id), count: 1, shown: nameOf(template, localizer, id), grown: true });
+  for (const row of packRows(state)) {
+    if (row.kind === 'stack') {
+      const name = nameOf(row.template, localizer, null);
+      entries.push({ id: row.template, name, count: row.count, shown: localizer.engine('engine.carried.stack', { item: name, count: row.count }), grown: false });
+    } else {
+      entries.push({ id: row.id, name: nameOf(row.template, localizer, row.id), count: 1, shown: nameOf(row.template, localizer, row.id), grown: true });
+    }
   }
   for (const row of wornRows(state, registry)) {
     if (row.item === null || row.name === null) continue;

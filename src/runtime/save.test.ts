@@ -138,8 +138,10 @@ describe('loadSave', () => {
     const target = createGameState();
     loadSave(target, saved, registry);
 
-    const { log: _targetLog, ...targetRest } = target;
-    const { log: _stateLog, ...stateRest } = state;
+    // The log and what the player was last told they carry are what a session holds rather than
+    // what a save does, and neither crosses the round trip.
+    const { log: _targetLog, carriedTold: _targetTold, ...targetRest } = target;
+    const { log: _stateLog, carriedTold: _stateTold, ...stateRest } = state;
     expect(targetRest).toEqual(stateRest);
   });
 

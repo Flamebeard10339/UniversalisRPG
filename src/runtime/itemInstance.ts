@@ -3,9 +3,11 @@ import { Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
+import { localizerOf } from './localized';
 import { anId, aCopy, aCount, says, type Said } from './said';
+import { inventorySlots } from './tuning';
 import { skillLevel } from './skills';
-import { GameState } from './state';
+import { createGameState, GameState } from './state';
 
 export const ITEM_INSTANCE = 'item';
 
@@ -128,11 +130,60 @@ export function heldCount(state: GameState, itemId: string): number {
   return stack + grown + worn;
 }
 
-export function stockItem(state: GameState, itemId: string, delta: number): number {
+export type PackRow = { readonly kind: 'stack'; readonly template: string; readonly count: number } | { readonly kind: 'grown'; readonly id: string; readonly template: string };
+
+// One row is one slot. A stack is a row however deep it gets, a grown copy is a thing in its own
+// right and so is a row of its own, and what the player is wearing is on them rather than in the
+// pack — which is why the sheet draws worn gear under a heading of its own and nothing here counts
+// it. Everything that asks how full the pack is, and everything that draws it, reads this list.
+export function packRows(state: GameState): PackRow[] {
+  const rows: PackRow[] = [];
+  for (const [template, { stack }] of itemCopies(state)) {
+    if (stack > 0) rows.push({ kind: 'stack', template, count: stack });
+  }
+  for (const [id, template] of Object.entries(grownItems(state))) {
+    if (wornIn(state, id) === undefined) rows.push({ kind: 'grown', id, template });
+  }
+  return rows;
+}
+
+export function packHasRoom(state: GameState, registry: Registry): boolean {
+  const slots = inventorySlots(registry);
+  return slots === 0 || packRows(state).length < slots;
+}
+
+// Whether something landing in the pack has anywhere to land: a plain item joins the stack it
+// already has and needs no row, and anything else — a first copy, or a grown one, which never joins
+// a stack — needs one of its own.
+export function roomToPack(state: GameState, registry: Registry, id: string): boolean {
+  if (!isGrownCopy(state, id) && copiesOf(state, id).stack > 0) return true;
+  return packHasRoom(state, registry);
+}
+
+export function packFull(state: GameState, registry: Registry, itemId: string): void {
+  const say = localizerOf(registry, state);
+  state.log.push(say.engine('engine.pack.full', { item: say.title('item', itemTemplate(state, itemId)) }));
+}
+
+// The one writer of the stack, so the one place an arrival can be turned away: a stack that is
+// already open takes any depth, and a first copy needs a row the pack may not have. Nothing is lost
+// silently — what could not arrive is said in the log, and the caller reads the count that moved.
+export function stockItem(state: GameState, registry: Registry, itemId: string, delta: number): number {
   const before = copiesOf(state, itemId).stack;
+  if (delta > 0 && before === 0 && !packHasRoom(state, registry)) {
+    packFull(state, registry, itemId);
+    return 0;
+  }
   const after = Math.max(0, before + delta);
   state.inventory[itemId] = after;
   return after - before;
+}
+
+// What the player is holding, in the terms a change to it would have to move. Compared against what
+// they were last told, it is what makes `inventory-changed` news exactly once.
+export function heldSignature(state: GameState): string {
+  const stacks = Object.entries(state.inventory).filter(([, count]) => count > 0);
+  return JSON.stringify([stacks.sort(), Object.entries(grownItems(state)).sort(), Object.entries(state.equipped).sort()]);
 }
 
 export function grownItems(state: GameState): Record<string, string> {
@@ -160,7 +211,7 @@ export function hasStackCopy(state: GameState, id: string): boolean {
   return stackCopy(state, id) !== undefined;
 }
 
-export function destroyItem(state: GameState, id: string): Destruction {
+export function destroyItem(state: GameState, registry: Registry, id: string): Destruction {
   const copy = named(state, id);
   const standing = grown(state, copy);
   if (standing) {
@@ -173,7 +224,7 @@ export function destroyItem(state: GameState, id: string): Destruction {
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
-    stockItem(state, template, -1);
+    stockItem(state, registry, template, -1);
     if (state.inventory[template] === 0) delete state.inventory[template];
   }
   return { ok: true, item: template };
@@ -193,7 +244,7 @@ interface Growing {
   change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
-const take = (state: GameState, itemId: string): void => void stockItem(state, itemId, -1);
+const take = (state: GameState, registry: Registry, itemId: string): void => void stockItem(state, registry, itemId, -1);
 
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
@@ -210,13 +261,17 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   if (!standing && !source) return refused(says('engine.growth.no-copy', { item: anId(template) }));
   if (consumes !== undefined && spendableCount(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
 
+  // Growing one of several leaves the stack standing and adds a copy beside it, which is a row the
+  // pack may not have. Growing the last one, or the one being worn, moves a row rather than adding one.
+  if (source?.from === 'stack' && copiesOf(state, template).stack > 1 && !packHasRoom(state, registry)) return refused(says('engine.pack.full', { item: aCopy('item', template) }));
+
   const payload = standing?.payload ?? { experience: 0, plane };
   const problem = growing.change(payload, item);
   if (problem) return refused(problem);
 
-  if (consumes !== undefined) take(state, consumes);
+  if (consumes !== undefined) take(state, registry, consumes);
   if (!source) return { ok: true, instance: copy };
-  if (source.from === 'stack') take(state, template);
+  if (source.from === 'stack') take(state, registry, template);
   const minted = createInstance(state, ITEM_INSTANCE, template, payload);
   if (source.from === 'slot') state.equipped[source.slot] = minted;
   return { ok: true, instance: minted };
@@ -252,3 +307,7 @@ export function allocate(state: GameState, registry: Registry, target: string, n
     change: (payload, item) => allocateNode(registry, payload.plane, node, pointsRemaining(payload, item)),
   });
 }
+
+// What a player who has been told nothing has been told: they carry nothing, which is where every
+// state starts.
+export const NOTHING_HELD = heldSignature(createGameState());

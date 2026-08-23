@@ -156,7 +156,7 @@ describe('equipment', () => {
     expect(statValue('core.attack', state, tutorial)).toBe(bareAttack + 2);
     expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
 
-    unequip(state, 'mainhand');
+    unequip(state, tutorial, 'mainhand');
     expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
     expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
   });
@@ -184,7 +184,7 @@ describe('carried and worn are disjoint', () => {
     expect(state.inventory['attack-bonus']).toBe(2);
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
 
-    unequip(state, 'mainhand');
+    unequip(state, registry, 'mainhand');
     expect(carriedCount(state, 'attack-bonus')).toBe(3);
     expect(state.equipped).toEqual({});
   });
@@ -199,7 +199,7 @@ describe('carried and worn are disjoint', () => {
     expect(carriedCount(state, 'attack-bonus')).toBe(0);
     expect(carriesItem(state, grownId)).toBe(false);
 
-    unequip(state, 'mainhand');
+    unequip(state, registry, 'mainhand');
     expect(carriedCount(state, 'attack-bonus')).toBe(1);
     expect(carriesItem(state, grownId)).toBe(true);
     expect(state.inventory).toEqual({ 'attack-bonus': 0, whetstone: 0 });

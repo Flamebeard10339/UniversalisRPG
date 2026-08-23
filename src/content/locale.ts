@@ -48,6 +48,7 @@ export const ENGINE_KEYS = [
   'engine.shop.refused.not-carried',
   'engine.shop.refused.not-afforded',
   'engine.shop.refused.not-a-count',
+  'engine.shop.refused.pack-full',
   'engine.carried.confirmed',
   'engine.growth.max-level',
   'engine.growth.no-copy',
@@ -56,6 +57,7 @@ export const ENGINE_KEYS = [
   'engine.growth.not-a-base',
   'engine.growth.no-experience',
   'engine.growth.not-a-jewel',
+  'engine.pack.full',
   'engine.plane.base',
   'engine.plane.go',
   'engine.plane.slot',
@@ -244,6 +246,7 @@ export const ENGINE_KEYS = [
   'engine.stopped.bound',
   'engine.stopped.still',
   'engine.stopped.unloadable',
+  'engine.stopped.pack-full',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

@@ -26,6 +26,12 @@ value: 5
 # variable default-action-duration
 value: 0
 
+// How many things the player's pack holds. A stack counts once however deep it is, and anything
+// grown into a copy of its own counts as itself; what is worn is on the player rather than in the
+// pack. At 0 a world hands out an endless pack instead.
+# variable inventory-slots
+value: 28
+
 // --- stats ---
 
 // What a stat is worth to anything that does not name its own. A fighter names
@@ -95,6 +101,12 @@ display: full
 # event death
 resource: health
 trigger: on empty
+
+// The name a change to what the player is holding is bound to: something entered the pack, left it,
+// or was put on or taken off. It fires once per thing that moved, so an action reading `stops on:
+// core.inventory-changed` comes back the moment the player's hands are different.
+# event inventory-changed
+trigger: inventory-changed
 
 // --- factions ---
 

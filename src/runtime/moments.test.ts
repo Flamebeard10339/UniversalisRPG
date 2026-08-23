@@ -87,6 +87,15 @@ continuous
 time: 1
 xp: lore 1000
 
+# action gather
+title: gather
+continuous
+time: 1
+give: 1 pebble
+
+# item pebble
+title: pebble
+
 # skill lore
 
 ${moment.content}
@@ -95,7 +104,7 @@ ${moment.content}
 faction: people
 stats: max-health 100000, attack 4, attack-rate 60, blind 0, uncanny 400, max-fury 5, max-stamina 10
 skills: tally, lore
-uses: swing, wild-swing, skirmish, forage, train
+uses: swing, wild-swing, skirmish, forage, train, gather
 ${moment.playerBlock ?? ''}
 
 # entity rat
@@ -150,6 +159,15 @@ const MOMENTS: Record<string, Moment[]> = {
       arm: (state, registry) => armAction('action', 'train', 'train', registry, state),
       seconds: 5,
       times: 4,
+    },
+  ],
+  'inventory-changed': [
+    {
+      by: 'a continuous action putting one pebble in the pack a second',
+      content: event('inventory-changed'),
+      arm: (state, registry) => armAction('action', 'gather', 'gather', registry, state),
+      seconds: 10,
+      times: 10,
     },
   ],
   'on hit': [{ by: 'the swinger answering its own landed swing', content: '# skill tally', playerBlock: 'on hit:\n  xp: tally 1', arm: fights('swing', 'rat'), seconds: 4, times: 4 }],

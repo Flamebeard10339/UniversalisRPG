@@ -334,10 +334,10 @@ describe('the stat fold reads the seat, not offerability', () => {
 
   it('keeps a seated action contributing after the item its requires: names has been spent', () => {
     const { registry, state } = seated('duelist', 'sharpen');
-    stockItem(state, 'whetstone', 1);
+    stockItem(state, registry, 'whetstone', 1);
     expect(statValue('attack', state, registry)).toBe(9);
 
-    stockItem(state, 'whetstone', -1);
+    stockItem(state, registry, 'whetstone', -1);
     expect(performable(inTheSeat(state, registry), state, registry)).toBe(false);
     expect(statValue('attack', state, registry)).toBe(9);
   });
@@ -353,7 +353,7 @@ describe('the stat fold reads the seat, not offerability', () => {
 
   it('drops the contribution when the cycle ends, so the fold is re-read and not frozen at its first answer', () => {
     const { registry, state } = seated('duelist', 'sharpen');
-    stockItem(state, 'whetstone', 1);
+    stockItem(state, registry, 'whetstone', 1);
     expect(statValue('attack', state, registry)).toBe(9);
 
     endAction(state, TEST_REASON);
