@@ -12,7 +12,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { blocking, describeEntry, journalWindowText, NOTE_FIELDS, outcomeOf, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
+import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, outcomeOf, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
@@ -339,7 +339,7 @@ export interface RunTurnDeps {
 
 export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   const reloaded = reloadInto(deps.ctx.session, deps.read);
-  if (!reloaded.ok) return { turn: deps.turn, outcome: 'reload-failed', detail: reloaded.message };
+  if (!reloaded.ok) return { turn: deps.turn, outcome: 'reload-failed', detail: reloaded.message, notes: NO_NOTES };
   for (const warning of reloaded.pruned) deps.report(`turn ${deps.turn} [pruned] ${warning.message}`);
 
   deps.ctx.view = view(deps.ctx.session);
@@ -350,11 +350,11 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   try {
     raw = await deps.client.send(request);
   } catch (error) {
-    return { turn: deps.turn, outcome: 'invalid-reply', detail: error instanceof Error ? error.message : String(error) };
+    return { turn: deps.turn, outcome: 'invalid-reply', detail: error instanceof Error ? error.message : String(error), notes: NO_NOTES };
   }
 
   const parsed = parseReply(raw);
-  if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error };
+  if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error, notes: NO_NOTES };
 
   const result = runLine(deps.ctx, parsed.reply.line);
   return turnRecord(deps.turn, parsed.reply.line, outcomeOf(result), answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);

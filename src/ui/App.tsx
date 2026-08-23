@@ -24,7 +24,7 @@ import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
 import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
-import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
+import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaytestBar } from './PlaytestBar';
 import { PlaneModal } from './PlaneModal';
@@ -148,6 +148,11 @@ export function App({
   const notes = useXpNotes(view, clock);
   const opened = useRef<XpMark | null>(null);
   if (opened.current === null) opened.current = markOf(view);
+
+  const page = shellState(where, dev, editing.commandLine);
+  useEffect(() => {
+    if (snapshot.playtest !== null) driver.playtest.moved(`${page.layer}/${page.subpage}`);
+  }, [page.layer, page.subpage, snapshot.playtest === null]);
 
   const leaving = dismissal(view.modals);
   const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;

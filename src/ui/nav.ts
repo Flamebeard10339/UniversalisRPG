@@ -100,3 +100,25 @@ export function layerSpan(offsets: readonly number[], layer: number, dy: number)
   const toward = offsets[dy > 0 ? layer - 1 : layer + 1];
   return toward === undefined ? 0 : Math.abs(toward - offsets[layer]);
 }
+
+// Where the player is, named the way every reader of it names one: the layer and the subpage
+// actually shown, which is not the same as the index held, since dev mode adds pages.
+export interface ShellState {
+  layer: LayerId;
+  subpage: LabelId;
+  layers: readonly LayerId[];
+  subpages: readonly LabelId[];
+  commandLine: boolean;
+}
+
+export function shellState(where: Where, dev: boolean, commandLine = false): ShellState {
+  const layer = LAYERS[where.layer];
+  const shown = shownIn(layer, dev);
+  return {
+    layer: layer.id,
+    subpage: shown[pageOf(where, where.layer, dev)].id,
+    layers: LAYERS.map((each) => each.id),
+    subpages: shown.map((subpage) => subpage.id),
+    commandLine,
+  };
+}

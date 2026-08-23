@@ -45,6 +45,9 @@ export interface PlaytestControls {
   start(): void;
   stop(): void;
   attach(turn: number, notes: RunNotes): void;
+  // Where in the app the player went. The engine never hears about a page, and a player who has
+  // just navigated somewhere is a player with something to say about having navigated there.
+  moved(where: string): void;
   // The run in the same words a playbot run is written in, for whoever reads it next.
   written(): string;
 }
@@ -110,7 +113,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   // A run is read back out of its slot before anything else, so a reload lands mid-playtest with
   // what was already played rather than starting a second run beside it.
-  const record = createRecorder(save.store, (text) => complain(text));
+  const record = createRecorder(save.store, (text) => complain(text), () => ({ at: new Date(save.now()).toISOString(), built: typeof __BUILT_FROM__ === 'string' ? __BUILT_FROM__ : 'unknown' }));
 
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
@@ -162,12 +165,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let running: LiveRun | null = null;
   let stopTicking: (() => void) | null = null;
 
-  const answeredSince = (from: number): string[] => current.transcript.entries.slice(from).map((entry) => String(entry.text));
-
   const publish = (): void => {
-    // What the turn answered with, in the words the author read them in — the transcript this
-    // driver already writes, rather than a second rendering of the same outputs beside it.
-    if (record.settle(answeredSince)) current = { ...current, playtest: record.run() };
     for (const listener of listeners) listener();
   };
 
@@ -210,20 +208,26 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // A run records what the player picked, not how this driver spelled it. Answering a numbered
-  // choice is the one place the two differ: the engine's own protocol for picking one is its
-  // position, and a log of 1, 2, 3 says nothing to whoever reads the run afterwards.
-  const sending = (line: string, chose: string = line): void => {
+  // What the player picked, rather than how the line spelled it. Answering a numbered choice is the
+  // one place the two differ — the engine's protocol for picking one is its position, and a run log
+  // of 1, 2, 3 says nothing to whoever reads it afterwards. Read off the line rather than off which
+  // control sent it, because a tap on the map sends the same position the choice list does.
+  const picked = (line: string): string => {
+    const at = /^[ 	]*(\d+)[ 	]*$/.exec(line);
+    return at === null ? line : (current.view.choices[Number(at[1]) - 1]?.id ?? line);
+  };
+
+  const sending = (line: string): void => {
+    const chose = picked(line);
     const refusal = devRefusal(line, save.dev);
     if (refusal !== null) {
-      record.opened(chose, 'refused', current.transcript.entries.length);
+      record.opened(chose, 'refused');
       complain(refusal);
       return;
     }
     if (running) close(true);
-    const from = current.transcript.entries.length;
     const result = runLine(context, line);
-    record.opened(chose, outcomeOf(result), from);
+    record.opened(chose, outcomeOf(result));
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
@@ -235,9 +239,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  const send = (line: string): void => sending(line);
-
-  const chosen = (position: number): string => current.view.choices[position - 1]?.id ?? String(position);
+  const send = sending;
 
   const reopen = (): void => {
     running = null;
@@ -255,7 +257,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     snapshot: () => current,
     transient: options.transient ?? createTransientChannel(),
     send,
-    choose: (position) => sending(String(position), chosen(position)),
+    choose: (position) => sending(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
     readQuest: (quest) => send(`/quests ${quest}`),
@@ -276,6 +278,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       start: () => changing(() => record.start()),
       stop: () => changing(() => record.stop()),
       attach: (turn, notes) => changing(() => record.attach(turn, notes)),
+      moved: (where) => changing(() => record.moved(where)),
       written: () => record.written(),
     },
     reopen,

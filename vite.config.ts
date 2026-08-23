@@ -1,5 +1,17 @@
+import { execFileSync } from 'node:child_process';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
+
+// Which build a page is. A playtest run recorded against a tree nobody can name is a list of
+// findings nobody can check, so the commit rides into the bundle and out again on the run's own
+// first line. A checkout without git says so rather than guessing.
+function builtFrom(): string {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
 
 const exclude = [
   '**/node_modules/**',
@@ -16,6 +28,7 @@ export default defineConfig({
   // Relative, so the same bundle works under itch.io's subdirectory hosting and
   // inside the Capacitor WebView. An absolute /assets/... 404s under both.
   base: './',
+  define: { __BUILT_FROM__: JSON.stringify(builtFrom()) },
   plugins: [react()],
   server: {
     headers: {

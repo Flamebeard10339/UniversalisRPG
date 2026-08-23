@@ -41,6 +41,7 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     type: 'src/runtime/runLog.ts#RunLogEntry',
     why: "one turn of a recorded run — the line played, whether the engine took it, and what it answered with. It is the protocol a run is written in and is addressed to whoever reads the run afterwards, never to the player, which is why it is one flat English string in every language, the way `Recorder`'s history is",
   },
+  { type: 'src/runtime/runLog.ts#RunHeader', why: 'when a run was played and which build it was played against, written on its first line for whoever reads it afterwards — a timestamp and a commit, neither of which any player is ever shown' },
   { type: 'src/runtime/runLog.ts#RunNotes', why: 'what the player said about a turn in their own words, keyed by the field names a reply and a run log both write. It rides in the run log above and reaches a player through no surface at all' },
   {
     type: 'src/runtime/session.ts#PlaySession',

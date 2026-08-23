@@ -108,10 +108,7 @@ describe('playbot', () => {
         turn: index + 1,
         outcome: 'applied' as const,
         line: 'travel:x',
-        note: 'moving along the fixed loop',
-        expected: '',
-        confusion: '',
-        blocked: '',
+        notes: { note: 'moving along the fixed loop', expected: '', confusion: '', blocked: '' },
         detail: 'arrived somewhere',
       }));
     const requestSize = (n: number): number => system.length + journalWindowText(syntheticLog(n)).length + viewText.length;

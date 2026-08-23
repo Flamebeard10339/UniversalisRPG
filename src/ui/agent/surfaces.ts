@@ -6,7 +6,7 @@ import { modeNamed, type MapMode } from '../mapEdit';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
 import type { LabelId } from '../labels';
-import { LAYERS, pageOf, shownIn, toLayer, toSubpage, type LayerId, type Where } from '../nav';
+import { LAYERS, shellState, shownIn, toLayer, toSubpage, type ShellState, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
 import type { JournalRow } from '../journalPanel';
 import type { JournalEntry } from '../../runtime/session';
@@ -29,25 +29,7 @@ export function subpageNamed(layer: number, dev: boolean, value: unknown): Label
   return found.id;
 }
 
-export interface ShellState {
-  layer: LayerId;
-  subpage: LabelId;
-  layers: readonly LayerId[];
-  subpages: readonly LabelId[];
-  commandLine: boolean;
-}
-
-export function shellState(where: Where, dev: boolean, commandLine = false): ShellState {
-  const layer = LAYERS[where.layer];
-  const shown = shownIn(layer, dev);
-  return {
-    layer: layer.id,
-    subpage: shown[pageOf(where, where.layer, dev)].id,
-    layers: LAYERS.map((each) => each.id),
-    subpages: shown.map((subpage) => subpage.id),
-    commandLine,
-  };
-}
+export type { ShellState };
 
 export function shellSurface(held: AgentSurfaces['shell']): TestSurface {
   const { where, dev, commandLine, go, showCommandLine } = held;

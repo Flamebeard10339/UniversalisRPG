@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import { memoryDriver } from '../runtime/store';
 import { slotStore } from '../runtime/store';
 import { engineLocale } from '../content/engineLocale';
@@ -11,11 +11,13 @@ import { attached, createRecorder, edited, emptyNotes, feedbackOn, turnsPlayed }
 const took = 'applied' as const;
 const turnedAway = 'refused' as const;
 
-const played = (turn: number, line: string, notes: Partial<RunNotes> = {}): RunLogEntry => ({ ...emptyNotes(), ...notes, turn, line, outcome: 'applied', detail: 'something happened' });
+const played = (turn: number, line: string, notes: Partial<RunNotes> = {}): RunLogEntry => ({ notes: { ...emptyNotes(), ...notes }, turn, line, outcome: 'applied', detail: 'something happened' });
 
 const store = () => slotStore(memoryDriver(), () => 0);
 
-const recorder = (kept = store()) => ({ kept, record: createRecorder(kept, () => {}) });
+const PLAYED = { at: '2026-08-23T00:00:00.000Z', built: 'abc1234' };
+
+const recorder = (kept = store()) => ({ kept, record: createRecorder(kept, () => {}, () => PLAYED) });
 
 describe('what the feedback sheet is about', () => {
   it('is the last turn played, since an author writes having seen what the line did', () => {
@@ -25,7 +27,7 @@ describe('what the feedback sheet is about', () => {
 
   it('is nothing at all where nothing has been played, rather than a turn nobody took', () => {
     expect(feedbackOn([])).toBeNull();
-    expect(feedbackOn([{ turn: 1, outcome: 'reload-failed', detail: 'content read failed' }])).toBeNull();
+    expect(feedbackOn([{ turn: 1, outcome: 'reload-failed', detail: 'content read failed', notes: emptyNotes() }])?.line).toBe('content read failed');
   });
 
   it('carries what is already attached, so opening the sheet twice does not lose the first answer', () => {
@@ -59,52 +61,41 @@ describe('the recorder', () => {
   it('holds nothing until a run is started, which is what not recording is', () => {
     const { record } = recorder();
     expect(record.run()).toBeNull();
-    record.opened('travel:beach', took, 0);
+    record.opened('travel:beach', took);
     expect(record.run()).toBeNull();
   });
 
-  it('records the line, whether the engine took it, and the words the author read', () => {
+  it('records the line and whether the engine took it, and not what it answered with', () => {
     const { record } = recorder();
     record.start();
-    record.opened('travel:beach', took, 0);
-    record.settle(() => ['You walk down to the beach.']);
-    record.opened('talk:nobody', turnedAway, 1);
-    record.settle(() => ['There is nobody here by that name.']);
+    record.opened('travel:beach', took);
+    record.opened('talk:nobody', turnedAway);
 
     expect(record.run()?.map((entry) => describeEntry(entry))).toEqual([
-      'turn 1 [applied] travel:beach — note: (none); expected: (none); confusion: (none); result: You walk down to the beach.',
-      'turn 2 [refused] talk:nobody — note: (none); expected: (none); confusion: (none); result: There is nobody here by that name.',
+      'turn 1 [applied] travel:beach — note: (none); expected: (none); confusion: (none)',
+      'turn 2 [refused] talk:nobody — note: (none); expected: (none); confusion: (none)',
     ]);
   });
 
-  it('says nothing happened rather than leaving a turn with no answer at all', () => {
+  // The author is looking at the screen the words were said on. The model is not, so its own
+  // harness still records them and `turnRecord` tells the two apart by what it is handed.
+  it('leaves the answer out entirely, where the playbot would have said nothing happened', () => {
     const { record } = recorder();
     record.start();
-    record.opened('/cancel', took, 0);
-    record.settle(() => ['   ']);
-    expect(describeEntry(record.run()![0])).toContain('result: nothing happened');
-  });
+    record.opened('/cancel', took);
 
-  // A live action's ending lines arrive after the turn that began it has been recorded, and they
-  // are that turn's answer rather than the next one's.
-  it('takes what the transcript gains later as the answer of the turn that opened it', () => {
-    const { record } = recorder();
-    record.start();
-    record.opened('use:entity.oven.roast', took, 0);
-    record.settle(() => ['You put the dough in.']);
-    record.settle(() => ['You put the dough in.', 'The oven bakes it into a golden loaf.']);
-    expect(describeEntry(record.run()![0])).toContain('result: You put the dough in.\nThe oven bakes it into a golden loaf.');
+    expect(describeEntry(record.run()![0])).not.toContain('result:');
+    expect(describeEntry(turnRecord(1, '/cancel', 'applied', []))).toContain('result: nothing happened');
   });
 
   it('picks a run back up where a reload left it, since a kept run is what recording is', () => {
     const kept = store();
-    const first = createRecorder(kept, () => {});
+    const first = createRecorder(kept, () => {}, () => PLAYED);
     first.start();
-    first.opened('travel:beach', took, 0);
-    first.settle(() => ['You walk down to the beach.']);
+    first.opened('travel:beach', took);
     first.attach(1, { ...emptyNotes(), expected: 'to be able to swim' });
 
-    const second = createRecorder(kept, () => {});
+    const second = createRecorder(kept, () => {}, () => PLAYED);
     expect(second.written()).toContain('expected: to be able to swim');
     expect(turnsPlayed(second.run() ?? [])).toBe(1);
   });
@@ -112,19 +103,18 @@ describe('the recorder', () => {
   it('drops the run when recording stops, so a later sitting does not open on an old one', () => {
     const { kept, record } = recorder();
     record.start();
-    record.opened('travel:beach', took, 0);
-    record.settle(() => ['You walk down to the beach.']);
+    record.opened('travel:beach', took);
     record.stop();
 
     expect(kept.read(PLAYTEST_SLOT)).toBeNull();
-    expect(createRecorder(kept, () => {}).run()).toBeNull();
+    expect(createRecorder(kept, () => {}, () => PLAYED).run()).toBeNull();
   });
 
   it('opens on no run rather than refusing where what was kept cannot be read', () => {
     const kept = store();
     kept.write(PLAYTEST_SLOT, 'not a run at all');
     expect(parseRun('not a run at all')).toBeNull();
-    expect(createRecorder(kept, () => {}).run()).toBeNull();
+    expect(createRecorder(kept, () => {}, () => PLAYED).run()).toBeNull();
   });
 
   it('says so rather than throwing where the run cannot be kept', () => {
@@ -140,7 +130,7 @@ describe('the recorder', () => {
       },
       () => 0,
     );
-    createRecorder(refusing, (text) => void said.push(text)).start();
+    createRecorder(refusing, (text) => void said.push(text), () => PLAYED).start();
     expect(said).toEqual(['the playtest run could not be kept: the quota has been exceeded']);
   });
 });
@@ -168,7 +158,7 @@ describe('a run an author played in the app', () => {
     ].join('\n'),
   };
 
-  const playing = (): Driver => createDriver([engineLocale(), WORKSHOP], { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined });
+  const playing = (): Driver => createDriver([engineLocale(), WORKSHOP], { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined, now: () => Date.parse(PLAYED.at) });
 
   it('holds nothing until the author starts one, so an ordinary session records nothing', () => {
     const driver = playing();
@@ -177,16 +167,30 @@ describe('a run an author played in the app', () => {
     expect(driver.playtest.written()).toBe('');
   });
 
-  it('reads back as a playbot run does: the line, whether it was taken, and what it answered', () => {
+  it('reads back one line a turn, under a header saying when and against what', () => {
     const driver = playing();
     driver.playtest.start();
     driver.send('use:entity.workshop.lathe.examine');
     driver.send('travel:nowhere-at-all');
 
-    const written = driver.playtest.written().split('\n');
-    expect(written[0]).toMatch(/^turn 1 \[applied\] use:entity\.workshop\.lathe\.examine — note: \(none\); expected: \(none\); confusion: \(none\); result: /);
-    expect(written[0]).toContain('A lathe, belt slack.');
-    expect(written[written.length - 1]).toMatch(/^turn 2 \[refused\] travel:nowhere-at-all —/);
+    const [header, blank, ...turns] = driver.playtest.written().split('\n');
+    expect(header).toMatch(new RegExp(`^# played ${PLAYED.at} against \\S+$`));
+    expect(blank).toBe('');
+    expect(turns).toEqual([
+      'turn 1 [applied] use:entity.workshop.lathe.examine — note: (none); expected: (none); confusion: (none)',
+      'turn 2 [refused] travel:nowhere-at-all — note: (none); expected: (none); confusion: (none)',
+    ]);
+  });
+
+  it('records where in the app the player went, which the engine never hears about', () => {
+    const driver = playing();
+    driver.playtest.start();
+    driver.send('use:entity.workshop.lathe.examine');
+    driver.playtest.moved('map');
+    const about = feedbackOn(driver.snapshot().playtest ?? [])!;
+    driver.playtest.attach(about.turn, { ...emptyNotes(), confusion: 'the map says nothing about where I am going' });
+
+    expect(driver.playtest.written().split('\n')[3]).toBe('turn 2 [moved] map — note: (none); expected: (none); confusion: the map says nothing about where I am going');
   });
 
   it('names the choice the author picked, not the position this driver sends', () => {

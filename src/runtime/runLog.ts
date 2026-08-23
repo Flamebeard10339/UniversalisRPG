@@ -34,17 +34,23 @@ export const NO_NOTES: RunNotes = Object.fromEntries(NOTE_FIELDS.map((field) => 
 
 export type TurnOutcome = 'applied' | 'refused';
 
-export interface PlayedTurn extends RunNotes {
+export interface PlayedTurn {
   readonly turn: number;
   readonly outcome: TurnOutcome;
   readonly line: string;
   readonly detail: string;
+  readonly notes: RunNotes;
 }
 
+// A turn the harness took that the engine never saw: a reload that failed, a reply that could not
+// be read, or — in the app, which has pages a terminal does not — a move between them. It is still
+// a turn, because a player who has just navigated somewhere is a player with something to say
+// about having navigated there, and `notes` is how they say it.
 export interface SkippedTurn {
   readonly turn: number;
-  readonly outcome: 'reload-failed' | 'invalid-reply';
+  readonly outcome: 'reload-failed' | 'invalid-reply' | 'moved';
   readonly detail: string;
+  readonly notes: RunNotes;
 }
 
 export type RunLogEntry = PlayedTurn | SkippedTurn;
@@ -53,20 +59,33 @@ export const isPlayed = (entry: RunLogEntry): entry is PlayedTurn => 'line' in e
 
 export const JOURNAL_WINDOW = 10;
 
-function noted(entry: PlayedTurn): string {
+function noted(notes: RunNotes): string {
   return NOTE_FIELDS.flatMap((field) => {
-    const said = entry[field.name];
+    const said = notes[field.name];
     if (said !== '') return [`${field.heading}: ${said}`];
     return field.whenEmpty === null ? [] : [`${field.heading}: ${field.whenEmpty}`];
   }).join('; ');
 }
 
+export const said = (notes: RunNotes): boolean => NOTE_FIELDS.some((field) => notes[field.name] !== '');
+
 export function describeEntry(entry: RunLogEntry): string {
-  if (!isPlayed(entry)) return `turn ${entry.turn} [${entry.outcome}] ${entry.detail}`;
-  return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — ${noted(entry)}; result: ${entry.detail}`;
+  // A turn the engine never saw carries its notes only where there are any: a reload that failed
+  // had no player to ask, and four empty fields under it would read as a player who said nothing.
+  if (!isPlayed(entry)) return `turn ${entry.turn} [${entry.outcome}] ${entry.detail}${said(entry.notes) ? ` — ${noted(entry.notes)}` : ''}`;
+  // What the line answered with is carried only by a harness whose player has no other sight of it.
+  return `turn ${entry.turn} [${entry.outcome}] ${entry.line} — ${noted(entry.notes)}${entry.detail === '' ? '' : `; result: ${entry.detail}`}`;
 }
 
-export const describeRun = (log: readonly RunLogEntry[]): string => log.map(describeEntry).join('\n');
+// A run says when it was played and what it was played against, because a list of findings read
+// against a tree nobody can name cannot be checked against that tree afterwards.
+export interface RunHeader {
+  readonly at: string;
+  readonly built: string;
+}
+
+export const describeRun = (log: readonly RunLogEntry[], header?: RunHeader): string =>
+  [...(header === undefined ? [] : [`# played ${header.at} against ${header.built}`, '']), ...log.map(describeEntry)].join('\n');
 
 export function journalWindowText(log: readonly RunLogEntry[]): string {
   const windowed = log.slice(-JOURNAL_WINDOW);
@@ -74,13 +93,18 @@ export function journalWindowText(log: readonly RunLogEntry[]): string {
   return windowed.map(describeEntry).join('\n');
 }
 
-export const blocking = (entry: RunLogEntry): string => (isPlayed(entry) ? entry.blocked : '');
+export const blocking = (entry: RunLogEntry): string => entry.notes.blocked;
 
 // A turn as one of the two harnesses settles it: what the line was, whether the engine took it,
 // and what it answered with in the words that harness's own player read.
-export function turnRecord(turn: number, line: string, outcome: TurnOutcome, detail: readonly string[], notes: RunNotes = NO_NOTES): PlayedTurn {
-  const said = detail.filter((each) => each.trim() !== '').join('\n');
-  return { ...notes, turn, line, outcome, detail: said === '' ? 'nothing happened' : said };
+// `detail` is null where the harness does not record answers at all, and empty where the turn
+// genuinely answered with nothing. An author is looking at the screen the words were said on, and
+// echoing them back tripled the length of the first run anybody read; the model's journal is the
+// only sight it has of what its own last turn did.
+export function turnRecord(turn: number, line: string, outcome: TurnOutcome, detail: readonly string[] | null, notes: RunNotes = NO_NOTES): PlayedTurn {
+  if (detail === null) return { notes, turn, line, outcome, detail: '' };
+  const answered = detail.filter((each) => each.trim() !== '').join('\n');
+  return { notes, turn, line, outcome, detail: answered === '' ? 'nothing happened' : answered };
 }
 
 export const outcomeOf = (result: CommandResult): TurnOutcome => (refusedLine(result) ? 'refused' : 'applied');
@@ -100,7 +124,7 @@ export function serializeRun(log: readonly RunLogEntry[]): string {
 const isEntry = (value: unknown): value is RunLogEntry => {
   if (typeof value !== 'object' || value === null) return false;
   const held = value as Record<string, unknown>;
-  return Number.isInteger(held.turn) && typeof held.outcome === 'string' && typeof held.detail === 'string';
+  return Number.isInteger(held.turn) && typeof held.outcome === 'string' && typeof held.detail === 'string' && typeof held.notes === 'object' && held.notes !== null;
 };
 
 // A run kept between sittings is read back leniently: a log this cannot make sense of is a run

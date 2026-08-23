@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../../runtime/localizedFixture';
-import { layerNamed, mapState, mapSurface, pointFrom, shellState, shellSurface, subpageNamed, zoomFrom, type MapControls } from './surfaces';
+import { layerNamed, mapState, mapSurface, pointFrom, shellSurface, subpageNamed, zoomFrom, type MapControls } from './surfaces';
 import { CLIMB_NUDGE, sheetAt, type Place } from '../discovery';
 import { ZOOM_MAX, ZOOM_MIN, type Point } from '../viewport';
-import { HOME_LAYER, LAYERS, OPENING, toLayer, type Where } from '../nav';
+import { HOME_LAYER, LAYERS, OPENING, shellState, toLayer, type Where } from '../nav';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
