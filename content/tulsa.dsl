@@ -45,6 +45,25 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
 
+// Two hammers whose numbers this file declares, so that what the tests swinging
+// them prove is proved about the engine rather than about what the last balance
+// pass did to base attack or to the rat's sheet: a million is more than any of
+// that will ever move, and `-100% attack` scales the whole stat — base, bonuses
+// and all — to nothing, so the second hammer's own swing is worth the least the
+// engine lets a landed hit be worth and the eight it drains is the whole of what
+// it does.
+# item million-attack-hammer
+DEBUG
+slot: mainhand
+weapon, +1000000 attack, +1000000 accuracy
+
+# item eight-a-swing-hammer
+DEBUG
+slot: mainhand
+weapon, -100% attack, +1000000 accuracy
+on hit:
+  drain: 8 health from them
+
 // --- drop tables ---
 
 # droptable feral-rat-remains
@@ -1089,6 +1108,14 @@ node greeting:
 # save named-once-with-nine-hundred-and-ninety-nine-coin
 {"version":12,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
 
+# save armed-with-a-million-attack-hammer
+DEBUG
+{"version":12,"inventory":{"tulsa.million-attack-hammer":1}}
+
+# save armed-with-an-eight-a-swing-hammer
+DEBUG
+{"version":12,"inventory":{"tulsa.eight-a-swing-hammer":1}}
+
 // --- tests ---
 
 // The first look at the mirror is free and every look after it is a thousand
@@ -1455,3 +1482,33 @@ submit-modal: item=close
 // two hexes out. Nothing else on this route touches attack.
 assert: stat.attack = 14
 expect only: growing-through-the-inventory-screen-end
+
+// Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
+// which is what `rats-killed` counts; one swing does it because the hammer says
+// it does, and nothing about the rat's twenty health is being relied on.
+# test one-swing-of-a-million-attack-hammer-fells-a-rat
+DEBUG
+load: armed-with-a-million-attack-hammer
+equip: million-attack-hammer
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 1
+
+// The stages of a fight. A `use:` that finds its own action already under way
+// against the same target advances a cycle of the fight in progress; one that
+// re-armed would snapshot the rat at full health every time, so at eight a
+// swing against twenty no run of them, however long, would ever empty the pool.
+// Two swings are sixteen and three are twenty-four, so the third is the one
+// that lands the kill and the second must not — and it is the second assertion
+// that makes a rebalance of the rat fail this loudly, rather than quietly
+// leaving behind a claim about one swing that a re-arming `use:` would pass too.
+# test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
+DEBUG
+load: armed-with-an-eight-a-swing-hammer
+equip: eight-a-swing-hammer
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 0
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 1
