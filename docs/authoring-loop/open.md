@@ -12,9 +12,9 @@ without evidence is a hunch and does not belong here yet.
 ---
 
 ## Refactor quest journal
-Refactor the quest journal. It should be written from the player's perspective. No hints or handholding. Just thoughts of what I should do next. If a player wants information, they should talk to people in the world which should update the notes. The journal is useful for remembering what happened and general information. It should not guide the player to the next step.
+Refactor the quest journal. It should be written from the player's perspective. No hints or handholding. Just thoughts of what `I` should do next. If a player wants information, they should talk to people in the world which should update the notes. The journal is useful for remembering what happened and general information. It should not guide the player to the next step exactly.
 
-Part of the fun is figuring out what is the next thing that you need to do. This game will not have a dotted yellow line for players to mindlessly follow. 
+Part of the fun is figuring out what is the next thing that you need to do. This game will not have a dotted yellow line for players to mindlessly follow. We need to be vigilant that agent's being confused by quests being misinterpreted that the quest needs more handholding. We should just tell them that the quests may not be trivial. 
 
 ## Proper shop with modal
 Create a proper shop modal instead of listing specific buy actions at specific entities. The modal has a list of items it sells. And a bool of whether they accept any item or just items they stock (Default true). The modal shows all items the store currently has in stock. Allows selling any tradable item in the inventory, and buying any item currently in stock. Can buy/sell multiples (buy 23), but can't go below the shops stock. Shops don't have a maximum stock. 
@@ -42,6 +42,9 @@ It goes without saying, but coins don't have a value and can't be bought or sold
 Not bugs. Writing that promises a mechanic is a promise, and a playtester files it
 as a bug — three runs did, repeatedly and unprompted. This is the long pole and it
 is Yonatan's; `npm run review` is the sheet.
+
+However, prior to review, the text should be edited by agents freely to fix minor 
+problems as they arise. This includes most of the following. 
 
 - The **sewer grate** is named in Market Square's own description and cannot be
   touched. Two runs filed it four times; Mouse's dialogue hangs a plot hook on it.
