@@ -107,7 +107,7 @@ describe('applyResults: watching what was applied', () => {
 
     applyResults(segment, [
       { kind: 'give', item: 'coin', amount: point(3) },
-      { kind: 'take', item: 'coin', amount: 10 },
+      { kind: 'take', item: 'coin', amount: 5 },
       { kind: 'xp', skill: 'thieving', amount: point(4) },
       { kind: 'chance', numerator: 1, denominator: 1, results: [{ kind: 'set', variable: 'opened' }] },
     ], 'brute');

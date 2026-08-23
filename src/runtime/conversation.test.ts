@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { spokenBy } from '../content/sections/dialogue';
-import { createGameState, RuntimeError } from './runtime';
+import { createGameState, GameState, RuntimeError } from './runtime';
+import { receiveItem } from './itemInstance';
 import { choose, menuChoices, openerShown, openersNow, reachedNow, talk } from './dialogue-runtime';
 
 const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# flag greeted', '# flag asked', '', '# entity miki', 'title: Miki'].join('\n');
@@ -203,5 +204,82 @@ describe('a node the player is given a phrase for', () => {
     expect(() => loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  goto aside', '', 'node aside:', '  ask: What is on tap?', '  Whatever the brewery sends.'].join('\n'))).toThrow(
       /node aside writes ask: and is only ever arrived at from another node/,
     );
+  });
+});
+
+// The equivalent of an action's `hidden if:`, written once in the `take:` itself rather than a
+// second time as a condition an author has to keep in step with it.
+describe('a node that would take what the player has not got', () => {
+  const trade = ['# item blade', 'title: blade', 'value: 5', '', '# item coin', 'title: coin', '', '# dialogue swap', 'owner = miki', '', 'node deal:', '  always', '  ask: swap my blade', '  Done.', '  take: 1 blade', '  give: 3 coin'].join('\n');
+
+  const carrying = (registry: ReturnType<typeof loaded>, blades: number): GameState => {
+    const state = createGameState();
+    if (blades > 0) receiveItem(state, registry, 'blade', blades);
+    return state;
+  };
+
+  it('is not offered at all, and takes the whole conversation with it when it is the only thing they hold open', () => {
+    const registry = loaded(trade);
+
+    expect(openersNow(registry, carrying(registry, 0), 'miki')).toEqual([]);
+    expect(reachedNow(registry, carrying(registry, 0), 'miki')).toBeNull();
+    expect(shown(registry, carrying(registry, 1))).toEqual(['swap my blade']);
+  });
+
+  it('leaves the other threads this entity holds standing, so only the one line goes quiet', () => {
+    const registry = loaded(own, trade);
+
+    expect(shown(registry, carrying(registry, 0))).toEqual(['Fine weather for it.']);
+    expect(shown(registry, carrying(registry, 1))).toEqual(['Fine weather for it.', 'swap my blade']);
+  });
+
+  it('pays out nothing on the 1 blade it never got, which is what being unoffered is protecting', () => {
+    const registry = loaded(trade);
+    const state = carrying(registry, 1);
+
+    talk('miki', registry, state);
+
+    expect(state.inventory).toEqual({ blade: 0, coin: 3 });
+  });
+
+  it('is still offered once it is spent, because a spent node holds its take back and costs nothing', () => {
+    const registry = loaded(['# item blade', 'title: blade', '', '# dialogue swap', 'owner = miki', '', 'node deal:', '  always', '  ask: swap my blade', '  again: Nothing more to swap.', '  Done.', '  take: 1 blade'].join('\n'));
+    const state = carrying(registry, 1);
+
+    talk('miki', registry, state);
+    expect(state.inventory.blade).toBe(0);
+    expect(shown(registry, state)).toEqual(['swap my blade']);
+  });
+
+  it('drops the one line in a menu it cannot pay for and leaves the rest of the list standing', () => {
+    const registry = loaded(['# item blade', 'title: blade', '', '# dialogue miki', 'owner = miki', '', 'node idle:', '  always', '  Fine weather for it.', '  -> Here, take my blade', '    take: 1 blade', '  -> Nothing.'].join('\n'));
+
+    const asks = (blades: number): string[] => {
+      const state = carrying(registry, blades);
+      return menuChoices(talk('miki', registry, state)!, registry, state).map((each) => String(each.display));
+    };
+
+    expect(asks(0)).toEqual(['Nothing.']);
+    expect(asks(1)).toEqual(['Here, take my blade', 'Nothing.']);
+  });
+});
+
+// The other half of the same question, answered the other way on purpose. What the player has not
+// got is a durable fact they can act on and a line about it reads as a quest they have not started;
+// a full pack is a passing one, and an entity who goes silent over it tells them nothing they can
+// do something about.
+describe('a node that hands something over to a pack with no room for it', () => {
+  const oneSlot = ['# variable inventory-slots', 'value: 1', '', '# item coin', 'title: coin', '', '# item pebble', 'title: pebble', '', '# dialogue gift', 'owner = miki', '', 'node here:', '  always', '  ask: anything for me?', '  Here, take this.', '  give: 1 coin'].join('\n');
+
+  it('is offered all the same, and says its one line and then that the pack is full', () => {
+    const registry = loaded(oneSlot);
+    const state = createGameState();
+    receiveItem(state, registry, 'pebble', 1);
+
+    expect(shown(registry, state)).toEqual(['anything for me?']);
+    talk('miki', registry, state);
+
+    expect(state.log.map(String)).toEqual(['Here, take this.', 'Your pack is full, so the coin stays where it is.']);
+    expect(state.inventory).toEqual({ pebble: 1 });
   });
 });

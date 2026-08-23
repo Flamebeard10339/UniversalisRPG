@@ -2,7 +2,7 @@ import { Registry } from '../content/registry';
 import { Item } from '../content/sections/item';
 import { buyPrice, declaredStock, replenished, replenishSteps, sellPrice, Shop, takesItem } from '../content/sections/shop';
 import { RuntimeError } from './error';
-import { roomToPack, spendableCount, stockItem } from './itemInstance';
+import { handOver, HandOver, receiveItem, roomToPack, spendableCount } from './itemInstance';
 import { GameState, ShopStock } from './state';
 
 export const isShopStock = (value: unknown): boolean => {
@@ -96,14 +96,16 @@ export function sellProblem(shop: Shop, state: GameState, registry: Registry, it
 export function buy(shop: Shop, state: GameState, registry: Registry, itemId: string, count: number): Refusal | undefined {
   const refusal = buyProblem(shop, state, registry, itemId, count);
   if (refusal) return refusal;
+  const paid = HandOver.asked(state, shop.coin, buyPrice(shop, itemOf(registry, itemId))! * count);
+  if (!paid) return 'not-afforded';
   const settled = settle(shop, state);
   const counts = { ...settled.counts };
   const left = counts[itemId]! - count;
   if (left > 0) counts[itemId] = left;
   else delete counts[itemId];
   write(state, shop, settled, counts);
-  stockItem(state, registry, shop.coin, -buyPrice(shop, itemOf(registry, itemId))! * count);
-  stockItem(state, registry, itemId, count);
+  handOver(state, paid);
+  receiveItem(state, registry, itemId, count);
   return undefined;
 }
 
@@ -111,10 +113,12 @@ export function buy(shop: Shop, state: GameState, registry: Registry, itemId: st
 export function sell(shop: Shop, state: GameState, registry: Registry, itemId: string, count: number): Refusal | undefined {
   const refusal = sellProblem(shop, state, registry, itemId, count);
   if (refusal) return refusal;
+  const given = HandOver.asked(state, itemId, count);
+  if (!given) return 'not-carried';
   const settled = settle(shop, state);
   write(state, shop, settled, { ...settled.counts, [itemId]: (settled.counts[itemId] ?? 0) + count });
-  stockItem(state, registry, itemId, -count);
-  stockItem(state, registry, shop.coin, sellPrice(shop, itemOf(registry, itemId))! * count);
+  handOver(state, given);
+  receiveItem(state, registry, shop.coin, sellPrice(shop, itemOf(registry, itemId))! * count);
   return undefined;
 }
 

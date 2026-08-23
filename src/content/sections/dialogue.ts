@@ -43,6 +43,9 @@ export const offering = (node: DialogueNode): boolean => node.always === true ||
 // A thread of this entity's, as against what they say when no thread of theirs is open. Saying which moment is its turn makes one, and so does being named: a node a quest gives is a thread because the quest has already said which moment it belongs to, and a node offering nothing but `always` is not one.
 export const isThread = (node: DialogueNode): boolean => node.when !== undefined || node.ask !== undefined;
 
+// What entering this node runs on its own account, as against what a line in its menu runs when the player picks it.
+export const nodeEffects = (node: DialogueNode): ActionResult[] => node.steps.flatMap((step) => (step.kind === 'effect' ? [step.result] : []));
+
 export interface Dialogue {
   id: string;
   owner?: string;

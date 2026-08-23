@@ -1,10 +1,19 @@
 import { RuntimeError } from './error';
 import { GameState } from './state';
 import { Registry } from '../content/registry';
-import { carriesItem, isGrownCopy, itemTemplate, packFull, roomToPack, stockItem } from './itemInstance';
+import { carriesItem, handOver, HandOver, isGrownCopy, itemTemplate, packFull, receiveItem, roomToPack } from './itemInstance';
 
-function carriedBy(state: GameState, registry: Registry, id: string, delta: number): void {
-  if (!isGrownCopy(state, id)) stockItem(state, registry, id, delta);
+// A grown copy is a row of its own and is worn out of that row, so only a plain one moves the stack.
+function outOfPack(state: GameState, id: string): boolean {
+  if (isGrownCopy(state, id)) return true;
+  const parting = HandOver.asked(state, id, 1);
+  if (!parting) return false;
+  handOver(state, parting);
+  return true;
+}
+
+function intoPack(state: GameState, registry: Registry, id: string): void {
+  if (!isGrownCopy(state, id)) receiveItem(state, registry, id, 1);
 }
 
 // Putting something on takes it out of the pack, so it is never refused. Taking something off puts
@@ -17,7 +26,7 @@ export function equip(state: GameState, registry: Registry, itemId: string): boo
   if (!item.slot) throw new RuntimeError(`equip: item ${itemId} has no slot`);
   if (!carriesItem(state, itemId)) throw new RuntimeError(`equip: player does not carry item ${itemId}`);
   if (state.equipped[item.slot] !== undefined && !unequip(state, registry, item.slot)) return false;
-  carriedBy(state, registry, itemId, -1);
+  if (!outOfPack(state, itemId)) return false;
   state.equipped[item.slot] = itemId;
   return true;
 }
@@ -30,6 +39,6 @@ export function unequip(state: GameState, registry: Registry, slot: string): boo
     return false;
   }
   delete state.equipped[slot];
-  carriedBy(state, registry, worn, 1);
+  intoPack(state, registry, worn);
   return true;
 }

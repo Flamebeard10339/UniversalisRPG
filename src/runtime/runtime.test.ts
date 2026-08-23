@@ -152,11 +152,11 @@ describe('applyResult', () => {
     expect(state.inventory['cooked-shrimp']).toBe(3);
   });
 
-  it('floors take at 0, never driving inventory negative', () => {
+  it('leaves all 2 held where they are when a take asks for 5, rather than emptying what is there', () => {
     const state = createGameState();
     applyResultsNow(state, registry, [{ kind: 'give', item: 'cooked-shrimp', amount: point(2) }]);
     applyResultsNow(state, registry, [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }]);
-    expect(state.inventory['cooked-shrimp']).toBe(0);
+    expect(state.inventory['cooked-shrimp']).toBe(2);
   });
 
   it('adds to a numeric flag, treating an absent or boolean-true base as 0', () => {

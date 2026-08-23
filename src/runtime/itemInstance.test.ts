@@ -316,7 +316,7 @@ describe('destroying a carried item', () => {
   it('takes one copy off the stack and leaves the rest countable', () => {
     const state = carrying({ 'iron-sword': 3, whetstone: 1 });
 
-    expect(destroyItem(state, registry, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
+    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
     expect(state.inventory).toEqual({ 'iron-sword': 2, whetstone: 1 });
     expect(carriedCount(state, 'iron-sword')).toBe(2);
   });
@@ -324,10 +324,10 @@ describe('destroying a carried item', () => {
   it('takes an emptied stack out of what the player carries rather than leaving a count of none', () => {
     const state = carrying({ 'iron-sword': 1 });
 
-    expect(destroyItem(state, registry, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
+    expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
     expect(state.inventory).toEqual({});
     expect(carriesItem(state, 'iron-sword')).toBe(false);
-    expect(refusalOf(destroyItem(state, registry, 'iron-sword'))).toBe('you carry no iron-sword');
+    expect(refusalOf(destroyItem(state, 'iron-sword'))).toBe('you carry no iron-sword');
   });
 
   it('destroys a grown copy with the plane it holds, and gives nothing back to the stack', () => {
@@ -338,7 +338,7 @@ describe('destroying a carried item', () => {
     grow(state, '1', slot(ORIGIN));
     slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e');
 
-    expect(destroyItem(state, registry, '1')).toEqual({ ok: true, item: 'heartwood-blade' });
+    expect(destroyItem(state, '1')).toEqual({ ok: true, item: 'heartwood-blade' });
     expect(instanceIsLive(state, '1')).toBe(false);
     expect(itemInstance(state, '1')).toBeUndefined();
     expect(state.inventory).toEqual({ 'heartwood-blade': 1, 'crossroads-jewel': 0, whetstone: 0 });
@@ -351,7 +351,7 @@ describe('destroying a carried item', () => {
     feedItem(state, registry, 'heartwood-blade', 'whetstone');
     grow(state, '2', position(ORIGIN, 2));
 
-    destroyItem(state, registry, '1');
+    destroyItem(state, '1');
     expect(itemInstance(state, '1')).toBeUndefined();
     expect(pointsSpent(itemInstance(state, '2')!.plane)).toBe(1);
   });
@@ -361,8 +361,8 @@ describe('destroying a carried item', () => {
     grow(state, 'heartwood-blade', position(ORIGIN, 2));
     const before = JSON.stringify(state);
 
-    expect(refusalOf(destroyItem(state, registry, 'no-such-thing'))).toBe('you carry no no-such-thing');
-    expect(refusalOf(destroyItem(state, registry, '7'))).toBe('you carry no 7');
+    expect(refusalOf(destroyItem(state, 'no-such-thing'))).toBe('you carry no no-such-thing');
+    expect(refusalOf(destroyItem(state, '7'))).toBe('you carry no 7');
     expect(JSON.stringify(state)).toBe(before);
   });
 
@@ -370,10 +370,10 @@ describe('destroying a carried item', () => {
     const state = carrying({ 'iron-sword': 2 });
     equip(state, registry, 'iron-sword');
 
-    destroyItem(state, registry, 'iron-sword');
+    destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
 
-    destroyItem(state, registry, 'iron-sword');
+    destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({});
   });
 
@@ -382,7 +382,7 @@ describe('destroying a carried item', () => {
     feedItem(state, registry, 'iron-sword', 'whetstone');
     equip(state, registry, '1');
 
-    destroyItem(state, registry, '1');
+    destroyItem(state, '1');
     expect(state.equipped).toEqual({});
     expect(carriedCount(state, 'iron-sword')).toBe(1);
   });
@@ -392,7 +392,7 @@ describe('destroying a carried item', () => {
     feedItem(state, registry, 'iron-sword', 'whetstone');
     equip(state, registry, '1');
 
-    destroyItem(state, registry, 'iron-sword');
+    destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({ mainhand: '1' });
     expect(carriedCount(state, 'iron-sword')).toBe(0);
   });
