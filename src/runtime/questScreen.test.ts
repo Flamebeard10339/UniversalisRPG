@@ -13,7 +13,6 @@ const WORLD = [
   '# quest an-errand',
   'title: An Errand',
   'log: Someone on the shore wants something fetched.',
-  'hint: Talk to Miki.',
   '',
   'stage asking:',
   '  log: Miki asked for a whetstone.',
@@ -46,7 +45,7 @@ describe('the journal as a screen the engine opens', () => {
 
     expect(view(session).focus).toEqual({ kind: 'quest', quest: 'an-errand' });
     expect(asked(session).key).toBe('close');
-    expect(view(session).journal[0]).toMatchObject({ standing: 'unstarted', lines: [{ said: 'Someone on the shore wants something fetched.', struck: false }], hint: 'Talk to Miki.' });
+    expect(view(session).journal[0]).toMatchObject({ standing: 'unstarted', lines: [{ said: 'Someone on the shore wants something fetched.', struck: false }] });
   });
 
   it('closes on the answer that leaves it, and publishes nothing once it has', () => {

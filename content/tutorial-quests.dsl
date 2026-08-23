@@ -21,11 +21,9 @@ dependencies:
 # quest finding-your-feet
 title: Finding Your Feet
 log: I woke in a house that is not mine. They say whoever keeps it takes newcomers in hand.
-hint: I should find out who keeps this house.
 
 stage offered:
   log: A guide called Miki offered to show me the ropes.
-  hint: I have not given him an answer.
   tulsa.miki says:
     always
     Greetings, adventurer! Welcome to UniversalisRPG.
@@ -38,8 +36,6 @@ stage offered:
 
 stage name-yourself:
   log: Miki says a quest begins with knowing who you are, and sent me off to find a mirror.
-  hint: I still do not know what to call myself.
-  hint when tulsa.mirror-done: I have a name now. Miki will want to hear it.
   tulsa.miki says:
     always
     again: The mirror's still waiting. Name yourself first, then we'll talk.
@@ -56,8 +52,6 @@ stage name-yourself:
 
 stage bake-bread:
   log: Miki gave me water and flour. The two of them make dough, and dough wants an oven.
-  hint: I have made nothing of the water and the flour yet.
-  hint when has core.bread: The loaf came out warm. Miki said he would wait.
   tulsa.miki says:
     always
     sticky
@@ -75,8 +69,6 @@ stage bake-bread:
 
 stage clear-the-rats:
   log: A sword and a shield, off Miki. He says there are giant rats under this house, and that three of them down would be proof enough.
-  hint: Not one of them down yet.
-  hint when tulsa.rats-killed >= 3: Three down, and barely a scratch on me. Miki will want to hear it.
   tulsa.miki says:
     always
     sticky
@@ -100,7 +92,6 @@ stage sendoff:
 
 stage snubbed:
   log: I turned Miki down. He took it badly, and the front door has not opened since.
-  hint: The door is locked, and I am no closer to opening it. Miki has not moved.
   tulsa.miki says:
     always
     sticky
@@ -127,8 +118,6 @@ stage snubbed:
 
 stage apologised:
   log: I went back and apologised. Miki took it, and put a price on it: one fish, out of his own net.
-  hint: I have the net. I have not found the water.
-  hint when has core.fish: One fish, caught and cold. Miki said that squares us.
   tulsa.miki says:
     always
     sticky
@@ -156,12 +145,9 @@ stage apologised:
 # quest leave-tutorial-island
 title: Leave Tutorial Island
 log: East of the sand there is a town, and it goes on a while. Miki still calls this an island.
-hint: I have not seen how far this island goes.
-hint when tulsa.market-square.discovered: That was no island. Miki should hear it from me.
 
 stage adrift:
   log: Miki had his last word about my leaving. Neither of us has moved since.
-  hint: Nothing here needs me. Whatever is next is somewhere I have not been.
   tulsa.miki says:
     when: tulsa.market-square.discovered
     sticky
@@ -292,12 +278,10 @@ expect only: left-mikis-house
 expect only: apology-route-full-end
 
 // bake-bread is left by a line Miki says and not by a `done when:`, so one
-// stage stands over two beats: bake the loaf, then carry it back. This is the
-// state each of that stage's two hints is gated on — the plain one while there
-// is no loaf, `hint when has core.bread` once there is — and the proof that no
-// single hint could be right in both. The two `journal:` lines are the words
-// themselves, which is where the two beats are actually felt: one line the
-// player has not done the thing yet, one line they have.
+// stage stands over two beats: bake the loaf, then carry it back. The two
+// `assert:` lines are the beats. The `journal:` lines are what the player is
+// reading across both of them — the stage's own `log:`, still the line they are
+// standing on, with everything behind it crossed off.
 # test bake-bread-spans-two-beats
 load: miki-route-start
 run: quest-offered
@@ -306,11 +290,11 @@ submit-modal: name=Rowan
 submit-modal: race=elf
 talk: tulsa.miki
 assert: finding-your-feet.bake-bread and not has core.bread
-journal: finding-your-feet says I have made nothing of the water and the flour yet.
+journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 craft: dough
 craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
-journal: finding-your-feet says The loaf came out warm. Miki said he would wait.
+journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
 // A `use:` that finds its own action already under way against the same target
 // advances one cycle of the fight in progress instead of restarting it, so

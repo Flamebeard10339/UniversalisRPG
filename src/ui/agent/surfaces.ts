@@ -298,7 +298,7 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
 // The list of quests, and the one way in: opening one, which is a screen the engine opens.
 export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   return {
-    state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, hint: row.hint, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })) }),
+    state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })) }),
     actions: {
       open: (value) => held.controls.open(questNamed(held.rows, value)),
     },
@@ -308,7 +308,7 @@ export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
 // What the journal screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
 export function questSurface(held: AgentSurfaces['quest']): TestSurface {
   return {
-    state: () => ({ quest: held.entry.quest, standing: held.entry.standing, hint: held.entry.hint, lines: held.entry.lines.map((line) => ({ said: line.said, struck: line.struck })) }),
+    state: () => ({ quest: held.entry.quest, standing: held.entry.standing, lines: held.entry.lines.map((line) => ({ said: line.said, struck: line.struck })) }),
     actions: {},
   };
 }

@@ -13,7 +13,6 @@ const QUEST = [
   '',
   'stage offered:',
   '  log: Miki offered to show you the ropes.',
-  '  hint: Talk to Miki.',
   '  miki says:',
   '    Welcome to the island.',
   '    -> Sounds good.',
@@ -110,17 +109,10 @@ describe('what a quest is refused for', () => {
     expect(refusing('stage one:', '  complete', '  nonsense: 3')).toThrow(/unexpected line in a quest stage: "nonsense: 3"/);
   });
 
-  // A second unconditional hint: would silently win over the first, the same way a second log: would; both are refused rather than letting an author lose one without being told.
-  it('a second unconditional hint: in one stage', () => {
-    expect(refusing('stage one:', '  hint: First.', '  hint: Second.', '  complete')).toThrow(/hint: with no condition is defined more than once/);
-  });
-
-  it("a second unconditional hint: at the quest's own top level", () => {
-    expect(refusing('hint: First.', 'hint: Second.', 'stage one:', '  complete')).toThrow(/hint: with no condition is defined more than once/);
-  });
-
-  it('a hint when beside the plain hint: it is an exception to, which is not a collision', () => {
-    expect(refusing('stage one:', '  hint: Default.', '  hint when mirror-done: Exception.', '  complete')).not.toThrow();
+  // `hint:` was the journal's second voice and is gone; the journal reads out of `log:` alone, so a line still writing one is refused rather than quietly dropped.
+  it('a hint: line, which the journal no longer has a reading for', () => {
+    expect(refusing('stage one:', '  hint: Talk to Miki.', '  complete')).toThrow(/unexpected line in a quest stage: "hint: Talk to Miki."/);
+    expect(refusing('hint: Talk to Miki.', 'stage one:', '  complete')).toThrow(/unexpected line in # quest: "hint: Talk to Miki."/);
   });
 
   it('a second log: in one stage', () => {

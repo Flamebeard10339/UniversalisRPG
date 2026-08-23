@@ -11,7 +11,7 @@ import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { adoptRegistry, loadSaved, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { adoptRegistry, loadSaved, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { sourceFiles } from './probe';
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
@@ -226,8 +226,12 @@ function renderEquipment(v: PlayView): string[] {
   return v.equipment.map((row) => (row.name === null ? String(row.title) : `${row.title}: ${row.name}`));
 }
 
+// One line to a quest, the way a person glancing at a shelf of notebooks gets the spines. The whole of what any of them says is what /quests answers with, which is where a terminal player reads it too.
 function renderJournal(v: PlayView): string[] {
-  return v.journal.map((entry) => `${entry.title} [${entry.standing}]${entry.hint === null ? '' : ` — ${entry.hint}`}`);
+  return v.journal.map((entry) => {
+    const standing = standingLine(entry);
+    return `${entry.title} [${entry.standing}]${standing === null ? '' : ` — ${String(standing)}`}`;
+  });
 }
 
 function renderDiscovered(v: PlayView): string[] {

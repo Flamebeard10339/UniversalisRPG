@@ -779,7 +779,7 @@ export const COMMANDS: readonly CommandSpec[] = [
           words: 'player' as const,
           tone: entry.standing === 'complete' ? ('ok' as const) : ('plain' as const),
           text: localizer.engine(heading[entry.standing], { quest: entry.title }),
-          detail: [...entry.lines.map((line) => (line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said)), ...(entry.hint === null ? [] : [entry.hint])],
+          detail: entry.lines.map((line) => (line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said)),
         })),
         quit: false,
         recorded: [],

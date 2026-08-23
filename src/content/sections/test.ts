@@ -417,7 +417,7 @@ export const test = section<Test>()({
     {
       form: 'journal: <quest> says <text>',
       example: 'journal: finding-your-feet says Talk to Miki in the guide house.',
-      note: 'the hint the journal currently reads for that quest — the last one whose condition holds, the same rule `hint when` follows; fails naming what the journal actually read',
+      note: 'the line the journal is standing on for that quest — the one `log:` of it not yet crossed off, and nothing once the quest is over; fails naming what the journal actually read',
     },
     { form: 'expect: <save>', example: 'expect: after-intro' },
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
