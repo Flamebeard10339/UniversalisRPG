@@ -71,6 +71,13 @@ base: 55
 # stat luck
 base: 60
 
+// What one swing of an axe takes off a trunk. An action with nothing to
+// deplete counts down a whole of its own instead of anybody's pool, so this is
+// a fraction of one felling and the swings it costs are read off it — the
+// number lives here and is written nowhere else, in prose least of all.
+# stat felling
+base: 0.25
+
 // --- resources ---
 
 // Health falls to the rats' bites and recovers from the regeneration a meal
@@ -110,6 +117,10 @@ stat-id: attack
 stat-id: attack
 
 # skill cooking
+
+# skill fishing
+
+# skill woodcutting
 
 // --- equipment slots ---
 
@@ -421,6 +432,57 @@ slot: mainhand
 weapon, +4 attack
 max-level: 40
 origin-cluster: heartwood-core
+
+// The kingdom's coin. Tutorial island's bent-coin is a curio a rat leaves
+// behind; the grocer takes those off you at face value, which is the on-ramp
+// to having any money at all.
+# item coin
+title: Coin
+examine: A milled coin of Yanodonin, the duke's profile worn nearly flat.
+
+# item herring
+examine: A silver fish, still cold from the water.
+
+# item honeycomb
+examine: A slab of comb, heavy and dripping.
+
+# item royal-jelly
+title: Royal Jelly
+examine: A spoonful of something pale and faintly warm. It comes from a princess cell and nowhere else.
+
+# item mollusk-venom
+title: Mollusk Venom
+examine: A thumb of cloudy resin scraped from a swamp mollusk's foot.
+
+# item marsh-thistle
+title: Marsh Thistle
+examine: A grey-headed thistle that grows where the water stands.
+
+# item fen-root
+title: Fen Root
+examine: A knuckle of root pulled from black mud. It smells of nothing at all.
+
+# item adders-tongue
+title: Adder's Tongue
+examine: A single split leaf. Oolga's list calls it the last one for a reason.
+
+# item hand-axe
+title: Hand Axe
+examine: A short axe, good for firewood and not much else.
+slot: mainhand
+weapon, +1 attack
+
+# item bundle-of-firewood
+title: Bundle of Firewood
+examine: Split logs, roped together. The bar buys these by the armful.
+
+# item log
+title: Log
+examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so the stall that buys firewood buys nothing anybody can make.
+
+# item rat-pelt
+title: Rat Pelt
+examine: Hairless in patches, and weeping where it is not.
 
 // --- drop tables ---
 

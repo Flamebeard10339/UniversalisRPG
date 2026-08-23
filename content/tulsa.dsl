@@ -20,24 +20,6 @@ version: 1.0.0
 dependencies:
   core
 
-// --- skills ---
-//
-// Two the town's stores exist for. Melee, cooking and thieving are the
-// tutorial's and are used here unchanged.
-
-# skill fishing
-
-# skill woodcutting
-
-// --- stats ---
-
-// What one swing of an axe takes off a trunk. An action with nothing to
-// deplete counts down a whole of its own instead of anybody's pool, so this is
-// a fraction of one felling and the swings it costs are read off it — the
-// number lives here and is written nowhere else, in prose least of all.
-# stat felling
-base: 0.25
-
 // --- flags ---
 //
 // World state no single prop owns. A flag that belongs to one door or one
@@ -55,16 +37,6 @@ base: 0.25
 
 // --- items ---
 
-// The kingdom's coin. Tutorial island's bent-coin is a curio a rat leaves
-// behind; the grocer takes those off you at face value, which is the on-ramp
-// to having any money at all.
-# item coin
-title: Coin
-examine: A milled coin of Yanodonin, the duke's profile worn nearly flat.
-
-# item herring
-examine: A silver fish, still cold from the water.
-
 # item cooked-herring
 title: Cooked Herring
 examine: Grilled through and smelling of the docks. Larry on the sewer door has a nose for these.
@@ -74,50 +46,9 @@ eat:
   take: 1 cooked-herring
   say: You eat the herring off your fingers. Salt, smoke, and small bones.
 
-# item honeycomb
-examine: A slab of comb, heavy and dripping.
-
-# item royal-jelly
-title: Royal Jelly
-examine: A spoonful of something pale and faintly warm. It comes from a princess cell and nowhere else.
-
-# item mollusk-venom
-title: Mollusk Venom
-examine: A thumb of cloudy resin scraped from a swamp mollusk's foot.
-
 # item bottle-of-vodka
 title: Bottle of Vodka
 examine: Sunny's own. The label is hand-written and does not say what is in it.
-
-# item marsh-thistle
-title: Marsh Thistle
-examine: A grey-headed thistle that grows where the water stands.
-
-# item fen-root
-title: Fen Root
-examine: A knuckle of root pulled from black mud. It smells of nothing at all.
-
-# item adders-tongue
-title: Adder's Tongue
-examine: A single split leaf. Oolga's list calls it the last one for a reason.
-
-# item hand-axe
-title: Hand Axe
-examine: A short axe, good for firewood and not much else.
-slot: mainhand
-weapon, +1 attack
-
-# item bundle-of-firewood
-title: Bundle of Firewood
-examine: Split logs, roped together. The bar buys these by the armful.
-
-# item log
-title: Log
-examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so the stall that buys firewood buys nothing anybody can make.
-
-# item rat-pelt
-title: Rat Pelt
-examine: Hairless in patches, and weeping where it is not.
 
 # item sewer-key
 title: Sewer Key
@@ -1137,7 +1068,7 @@ node greeting:
 {"version":11,"inventory":{"core.raw-chestnut":3}}
 
 # save axe-at-the-swamp-edge
-{"version":11,"location":"tulsa.swamp-edge","inventory":{"tulsa.hand-axe":1}}
+{"version":11,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
 {"version":11,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
@@ -1256,8 +1187,8 @@ assert: resource.core.health = 30
 load: axe-at-the-swamp-edge
 use: entity.dead-alder.chop-a-log
 assert: time = 12
-assert: inventory.tulsa.log = 1
-assert: xp.tulsa.woodcutting = 40
+assert: inventory.core.log = 1
+assert: xp.core.woodcutting = 40
 
 // Sunny keeps three threads open at once, so talking to her is the list and
 // not a line, and a thread taken stays open because each is sticky — the third
