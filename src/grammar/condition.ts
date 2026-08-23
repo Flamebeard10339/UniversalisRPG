@@ -8,23 +8,39 @@ export interface Reference {
 export const TIME = 'time';
 export const PLAYER = 'player';
 
+// A root the engine holds itself: the kind the rest of the path is read as, and the one line standing for it wherever the shapes are shown.
+interface Rooted {
+  kind: string;
+  stands: string;
+  against: number;
+}
+
 // What the engine holds itself, rather than a flag an author declares. A root paired with a kind reads the rest of the path as an id of that kind, so `xp.thieving` is the writing module's own skill and a name nothing declares is refused where it is written.
 export const ENGINE_ROOTS = {
   [TIME]: null,
   [PLAYER]: null,
-  xp: 'skill',
-  resource: 'resource',
-  inventory: 'item',
-  stat: 'stat',
-} as const satisfies Readonly<Record<string, string | null>>;
+  xp: { kind: 'skill', stands: 'thieving', against: 4 },
+  level: { kind: 'skill', stands: 'mining', against: 2 },
+  resource: { kind: 'resource', stands: 'health', against: 10 },
+  inventory: { kind: 'item', stands: 'plank', against: 3 },
+  stat: { kind: 'stat', stands: 'attack', against: 10 },
+} as const satisfies Readonly<Record<string, Rooted | null>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
 
 export const ENGINE_ROOT_NAMES = Object.keys(ENGINE_ROOTS) as EngineRoot[];
 
+const rooted = (root: EngineRoot): Rooted | null => ENGINE_ROOTS[root];
+
 export const isEngineRoot = (path: readonly string[]): boolean => path.length > 0 && path[0] in ENGINE_ROOTS;
 
-export const rootedKind = (root: string): string | null => (root in ENGINE_ROOTS ? ENGINE_ROOTS[root as EngineRoot] : null);
+export const rootedKind = (root: string): string | null => (root in ENGINE_ROOTS ? rooted(root as EngineRoot)?.kind ?? null : null);
+
+// The shapes an author is shown for the roots are the roots themselves, so one added above reaches the page with no second list to remember.
+const ROOTED_LINES = ENGINE_ROOT_NAMES.flatMap((root) => {
+  const held = rooted(root);
+  return held === null ? [] : [{ form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` }];
+});
 
 export const VISITS = 'visits';
 
@@ -141,10 +157,7 @@ export const condition: Parser<Condition> = {
   forms: [
     '<flag>',
     '<flag> <comparison> <number>',
-    'xp.<skill> <comparison> <number>',
-    'resource.<resource> <comparison> <number>',
-    'inventory.<item> <comparison> <number>',
-    'stat.<stat> <comparison> <number>',
+    ...ROOTED_LINES.map((line) => line.form),
     'has <item>',
     'has <count> <item>',
     'not <condition>',
@@ -154,10 +167,7 @@ export const condition: Parser<Condition> = {
   examples: [
     'has-key',
     'quest.stage >= 2',
-    'xp.thieving >= 4',
-    'resource.health < 10',
-    'inventory.plank = 3',
-    'stat.attack = 10',
+    ...ROOTED_LINES.map((line) => line.example),
     'has plank',
     'has 3 plank',
     'not has-key',

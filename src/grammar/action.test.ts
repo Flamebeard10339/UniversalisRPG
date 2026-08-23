@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Action, actionBody, assembledActionProblem, isTwoSided } from './action';
+import { Action, actionBody, actionLines, assembledActionProblem, isTwoSided } from './action';
 import { ActionResult, hookResultList } from './actionResult';
 import { Cursor } from './parser';
 import { splitSections } from './structure';
@@ -145,6 +145,17 @@ describe('how an action ends', () => {
   it('has deleted escape after and on escape:, and says what replaced each', () => {
     expect(refusal('escape after 20')).toContain('write `attempts: N`');
     expect(refusal('on escape: give: 1 bread')).toContain('write `on unfinished:`');
+  });
+
+  it('names no event by default, so nothing an action does not ask for ends it', () => {
+    expect(parse(MELEE).stopsOn).toBeUndefined();
+  });
+
+  it('takes the events that end it as a list, and prints back the line that was written', () => {
+    const written = 'stops on: level-up, core.pack-full';
+    const trained = parse(`time: 1\n${written}`);
+    expect(trained.stopsOn).toEqual(['level-up', 'core.pack-full']);
+    expect(actionLines(trained)).toContain(`  ${written}`);
   });
 
   it('leaves on failure: meaning what it means today, unmoved', () => {

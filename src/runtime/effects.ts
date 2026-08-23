@@ -15,6 +15,7 @@ import { stockItem } from './itemInstance';
 import { openModalNamed } from './modalStack';
 import { localizerOf } from './localized';
 import { nextRandom } from './rng';
+import { armedAction } from './roster';
 import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { GameState, PLAYER } from './state';
@@ -198,9 +199,11 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const before = state.xp[result.skill] ?? 0;
       state.xp[result.skill] = before + amount;
       const reached = skillLevel(state.xp[result.skill]);
-      if (reached > skillLevel(before)) {
+      const climbed = reached - skillLevel(before);
+      if (climbed > 0) {
         const localizer = localizerOf(registry, state);
         state.log.push(localizer.engine('engine.skill.levelled', { skill: localizer.title('skill', result.skill), level: reached }));
+        fireEvents(segment, actor, 'level-up', undefined, climbed, reached);
       }
       return amount;
     }
@@ -309,14 +312,26 @@ export function handlersFor(registry: Registry, actorId: string, eventId: string
   return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
 }
 
+// The action under way is the player's, so the events that end it are the ones that happen to the player.
+function endingEvents(segment: Segment, actorId: string): readonly string[] {
+  if (actorId !== PLAYER || !segment.state.activeAction) return NO_STOPPERS;
+  return armedAction(segment.state, segment.registry).stopsOn ?? NO_STOPPERS;
+}
+
+const NO_STOPPERS: readonly string[] = [];
+
 export function fireEvents(segment: Segment, actorId: string, trigger: EventTrigger, resourceId?: string, count = 1, amount = 1): void {
   if (count <= 0) return;
-  for (const event of eventsFor(segment.registry, resourceId, trigger)) {
+  const events = eventsFor(segment.registry, resourceId, trigger);
+  if (events.length === 0) return;
+  const ends = endingEvents(segment, actorId);
+  for (const event of events) {
     for (const results of handlersFor(segment.registry, actorId, event.id)) {
       applyResults(segment, results, actorId, count);
     }
     const earned = experienceFor(segment.registry, actorEntity(segment.registry, actorId), event.id, amount);
     if (earned.length > 0) applyResults(segment, earned, actorId, count);
+    if (ends.includes(event.id)) segment.stopped = true;
   }
 }
 

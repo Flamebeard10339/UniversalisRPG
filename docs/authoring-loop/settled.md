@@ -32,6 +32,16 @@ order — no module takes a place by loading earlier. Before this, the winner wa
 whichever module parsed last, which silently made an earlier quest's opening
 unreachable for fifteen turns of a run.
 
+**`choose:` names what it takes, and only falls back to counting.** A line in one
+node's menu is named by the words the `.dsl` writes it with; a thread is named by
+the node it opens, under the same name `visits` counts it by and answerable by any
+tail of that name. A position still works and is safe under one node, whose
+choices stand in the order they are written — it is a list of *threads* that
+reorders itself in another language. What may be written lives with the list that
+publishes it (`menuChoices` in `src/runtime/dialogue-runtime.ts`), and an answer
+that names nothing comes back with every entry the list held; the modal gate
+defers to it rather than keeping its own copy of the names.
+
 **`hint when <condition>: <text>`, and the last one whose condition holds wins.**
 So a plain `hint:` written above is the default and each conditional line below is
 an exception to it. It sits in a stage block and at a quest's top level, the same
@@ -46,10 +56,13 @@ line — so the mark goes beside the words, never in place of them. The sweep re
 `everySaid`, the same table `npm run notes` and `npm run review` read, so a kind or
 a field added next month is covered with no edit.
 
-**`assert:` reads `xp`, `resource`, `inventory`, `stat`, flags, `time`, `visits`
-and `player.<field>`.** The resolver is a `Record` over the grammar's own roots, so
-a root added there does not compile until it reads something. An unknown id under a
-root is refused at load.
+**`assert:` reads `xp`, `level`, `resource`, `inventory`, `stat`, flags, `time`,
+`visits` and `player.<field>`.** The resolver is a `Record` over the grammar's own
+roots, so a root added there does not compile until it reads something, and the
+shapes the oracle prints are derived from the same table, so it does not reach the
+page by hand either. An unknown id under a root is refused at load. `xp.<skill>` is
+the raw total and `level.<skill>` is what that total has bought — 1000 experience
+is level 2 — so *reach level N* is one root and never arithmetic on the other.
 
 **`until <done | condition>` runs an action to a terminator.** The condition is the
 same grammar `assert:` takes — no second predicate language. `done` means nothing
@@ -162,6 +175,15 @@ any `# test` reaches is 21.6 simulated seconds.
 stopping is the system working. It is not the bound above and must not be routed
 around. Note that a regenerating player may now never die, so death can no longer
 be relied on to end anything.
+
+**Nothing ends an action early unless the action names what does.** `stops on:
+<event>, …` is that naming and its default is none, so no action's behaviour moved
+when it landed. The test is made at `fireEvents`, which is the one place any event
+fires, so every trigger is covered with nothing enumerated — and it reads the
+events that fire **for the player**, since the action under way is the player's. A
+`level-up` fires once per level crossed, carrying the level reached as its
+`amount`, so `gain 1 * amount experience on <event>` weighs by how far the skill
+got.
 
 **A progress figure is published only when it has counted something.**
 `completion` is `number | null` and `stillToCount()` is the one home; a renderer

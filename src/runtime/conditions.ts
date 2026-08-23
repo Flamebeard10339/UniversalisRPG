@@ -2,6 +2,7 @@ import { Condition, type EngineRoot, isEngineRoot, Reference, visitedNode } from
 import { TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { GameState } from './state';
+import { skillLevel } from './skills';
 import { statValue } from './stats';
 import { fromMilliUnits, msToSeconds } from './units';
 import { heldCount } from './itemInstance';
@@ -11,6 +12,7 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   time: (_id, state) => msToSeconds(state.time),
   player: (id, state) => state.player[id as 'name' | 'race'],
   xp: (id, state) => state.xp[id] ?? 0,
+  level: (id, state) => skillLevel(state.xp[id] ?? 0),
   resource: (id, state) => fromMilliUnits(state.resources[id] ?? 0),
   inventory: (id, state) => heldCount(state, id),
   stat: (id, state, registry) => statValue(id, state, registry),

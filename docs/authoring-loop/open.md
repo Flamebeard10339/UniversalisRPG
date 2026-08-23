@@ -28,28 +28,6 @@ Shops only interact with items that define a value in coins. Otherwise, the item
 
 It goes without saying, but coins don't have a value and can't be bought or sold. This doesn't need a rule, just don't give coins a value and it won't create an infinite loop. 
 
-## The two recipes still pinned to tulsa by a station that has moved
-
-`# station <id>` is now a kind, `core` declares `anvil`, `oven` and `stove`, and
-both `stations:` on an entity and `station:` on a recipe resolve through the
-namespace. A recipe is no longer pinned to whatever opens its station, and
-`src/content/shipped.test.ts` holds core to loading clean alone while declaring
-station names nothing in it opens.
-
-*Closes when:* `# recipe bread` and `# recipe cooked-herring` move from `tulsa`
-into `core` — with `# item bread` and `# item cooked-herring`, which are theirs —
-by `npm run move-sections` on a quiet tree. They are the two sections the
-tulsa/core split could not move.
-
-Left behind by the kind landing, and blocked on the files their owners hold:
-
-- `src/content/locale.test.ts`'s `FIELDS` is a hand-listed `Record<keyof
-  Registry, …>`; `stations` has to be added by hand, which is why `tsc` is red.
-  The file already imports `contentSectionMaps` — the table should derive.
-- `CAPABILITY` in `src/content/refs.ts` has no reader left but
-  `src/content/dsl.test.ts`, whose `|| said === CAPABILITY` is a one-entry table
-  of kinds nothing declares. Both go together.
-
 ## A quest cannot hold all of its own state
 
 Ruled by the owner: **everything related to a quest belongs inside the quest
@@ -118,21 +96,27 @@ terminator rather than being declared: an explicit `use:` reports turn by turn, 
 decision. The summary's content is undecided; the obvious body is what changed over
 the span and what stopped it.
 
-**Nothing stops early by default, and what does is a hook the player sets.** Two
-events are missing: **inventory-full** and **level-up**, both the shape `on empty`
-already has. *Closes when:* an action can name arbitrary events that end it, with
-none named by default.
+**Inventory-full has nowhere to fire from.** The rest of that ruling is built —
+an action names the events that end it (`stops on: <event>, …`, none by default)
+and `level-up` fires — but there is no carrying capacity anywhere in the engine:
+`stockItem` clamps only at zero, and no item, entity or stat declares a limit.
+*Closes when:* carrying capacity exists. The ruling to make first is whether it is
+a `# resource` with a `max:`, because if it is, `on full` already fires on it and a
+second trigger name would be the same fact twice.
 
 **A target selector over a set.** *"Fight anything aggressive until X"* needs a
 predicate over what stands here. Fighting one *type* already works
 (`fight:core.melee-combat:tulsa.feral-rat`) and `until <condition>` already works;
 the selector does not exist.
 
-**The level-up event is also why a `@@@` is stuck in the corpus.** Miki wants to ask
-for *"reach level 2 in any skill"* and settles for a fish, because two things are
-absent at once — no `# event` fires on a skill levelling, and the condition grammar
-has no xp-threshold predicate. It is one cause filed twice, in two vocabularies.
-*Closes when:* that mark can be written as a condition. It is the only mark left in
+**The `@@@` in `tutorial-quests` is writable now and not yet written.** Miki's
+*"reach level 2 in any skill"* has its condition: `level.<skill> <comparison>
+<number>`, beside `xp`, which the mark's own words wrongly reported missing as
+well. What is left is a content edit and a balance call — level 2 in fishing is
+1000 experience, which is a longer errand than one fish, so the line the quest ends
+up asking for is the author's. *Closes when:* the `apologised` stage's second Miki
+node names a level instead of the fish, and the mark comes off the line above it.
+`npm run oracle -- --at` takes that edit clean today. It is the only mark left in
 `tutorial-quests`.
 
 ## Left by the core/tulsa split
@@ -145,20 +129,13 @@ hardening pass.
 
 ## Ours, and small
 
-**The oracle advertises a `choose:` form the engine refuses.** It prints
-`choose: <what the choice reads>`, but `answerModal` matches only
-`option.values[].value`, which for a dialogue modal is `String(index)`
-(`src/runtime/modals.ts`), so text never matches and only `choose: 0` works. This
-is the same fact as the line below, found from the other end: the oracle is
-already promising the fix. Whichever lands, both close together.
-
-**`choose: N` is an index into a list ordered by the words the player reads**, so a
-`# test` that picks one specific thread is pinned to one language. Found when Tulsa
-entered `translationSurvival` and `sunny-has-three-things-to-say` could not survive
-it; that test was rewritten to be order-free, and the `choose:` lines in
-`tutorial-quests` routes were not. A `# test` written this week had to fall back to
-`choose: 0` for the same reason. *Closes when:* a test can name the thread it takes
-rather than its position.
+**`tutorial-quests` still counts to its choices.** `choose:` now takes a name —
+the words a menu line is written with, or the node a thread opens — and `tulsa`'s
+two routes were converted with it. The seven `choose: N` lines in
+`content/tutorial-quests.dsl` were left alone because that module was being
+written in another lane at the time. *Closes when:* those seven name what they
+take, and `translationSurvival`'s "names the choice it takes rather than counting
+to it" covers them because `tutorial-quests` has joined the world it loads.
 
 **A stage's `log:` has no conditional form**, so a stage that spans two beats reads
 as one constant where `hint when <condition>:` would read as two. A second

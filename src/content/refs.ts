@@ -192,6 +192,7 @@ function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written
 export function visitAction(action: Action, where: string, visit: Visit): void {
   for (const site of sidedNames(action)) put(site.held, 'id', site.kind, `${where} ${site.written}:`, visit);
   visitTags(action.tags, where, visit);
+  strings(action as unknown as Loose, 'stopsOn', 'event', `${where} stops on:`, visit);
   condition(action.requires, `${where} requires:`, visit);
   condition(action.hiddenIf, `${where} hidden if:`, visit);
   for (const group of [action.results, action.onSuccess, action.onFailure, action.onUnfinished]) results(group, where, visit);

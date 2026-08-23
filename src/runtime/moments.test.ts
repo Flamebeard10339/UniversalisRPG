@@ -81,13 +81,21 @@ title: forage
 continuous
 time: 1
 
+# action train
+title: train
+continuous
+time: 1
+xp: lore 1000
+
+# skill lore
+
 ${moment.content}
 
 # entity player
 faction: people
 stats: max-health 100000, attack 4, attack-rate 60, blind 0, uncanny 400, max-fury 5, max-stamina 10
-skills: tally
-uses: swing, wild-swing, skirmish, forage
+skills: tally, lore
+uses: swing, wild-swing, skirmish, forage, train
 ${moment.playerBlock ?? ''}
 
 # entity rat
@@ -135,6 +143,15 @@ const MOMENTS: Record<string, Moment[]> = {
   evaded: [{ by: 'a swing that did not land on it', content: event('evaded'), arm: fights('wild-swing', 'rat'), seconds: 4, times: 4 }],
   completed: [{ by: 'a continuous action settling a batch of completions', content: event('completed'), arm: (state, registry) => armAction('action', 'forage', 'forage', registry, state), seconds: 10, times: 10 }],
   unfinished: [{ by: 'a repeating fight running out of attempts', content: event('unfinished'), arm: fights('skirmish', 'rat', true), seconds: 12, times: 6 }],
+  'level-up': [
+    {
+      by: 'a skill crossing four thresholds as five payouts of 1000 land on it',
+      content: event('level-up'),
+      arm: (state, registry) => armAction('action', 'train', 'train', registry, state),
+      seconds: 5,
+      times: 4,
+    },
+  ],
   'on hit': [{ by: 'the swinger answering its own landed swing', content: '# skill tally', playerBlock: 'on hit:\n  xp: tally 1', arm: fights('swing', 'rat'), seconds: 4, times: 4 }],
   'when hit': [{ by: 'the struck answering the swing that landed', content: '# skill tally', ratBlock: 'when hit:\n  xp: tally 1', arm: fights('swing', 'rat'), seconds: 4, times: 4 }],
 };

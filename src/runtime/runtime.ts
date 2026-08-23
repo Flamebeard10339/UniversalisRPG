@@ -294,7 +294,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
   const active = state.activeAction!;
 
   for (;;) {
-    if (!actionStillValid(action, active, state, registry)) {
+    if (segment.stopped || !actionStillValid(action, active, state, registry)) {
       endAction(state);
       return;
     }

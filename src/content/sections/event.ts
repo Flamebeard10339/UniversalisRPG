@@ -13,6 +13,7 @@ export const EVENT_TRIGGERS = {
   evaded: 'none',
   completed: 'none',
   unfinished: 'none',
+  'level-up': 'none',
 } as const;
 
 export type EventTrigger = keyof typeof EVENT_TRIGGERS;

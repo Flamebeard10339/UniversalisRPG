@@ -41,6 +41,7 @@ export interface Action {
   damage?: Contest;
   depletes?: Sided;
   attempts?: number;
+  stopsOn?: string[];
   appended?: string[];
 }
 
@@ -157,6 +158,11 @@ const positiveCount: Parser<number> = {
   examples: ['3'],
 };
 
+// A placeholder is called after what it names, so the events an action ends on say so wherever the field is shown.
+const eventNamed: Parser<string> = { ...id, forms: ['<event>'], examples: ['level-up', 'core.level-up'] };
+
+const stoppers = list(eventNamed);
+
 const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => ('element' in parser ? (parser as ListParser<unknown>) : undefined);
 
 // A field reads its value with the parser that shows its shapes, so what an author is offered and what the engine takes are one thing said once. A parser holding a list takes an indented block in place of its inline value, which is a fact about lists rather than about any one field.
@@ -189,6 +195,7 @@ const ACTION_FIELDS: readonly (Filled & {
   { written: 'damage', label: /damage:[ \t]*/, name: 'damage', parser: contest, family: 'what it is contested on' },
   { written: 'depletes', label: /depletes:[ \t]*/, name: 'depletes', parser: depleted, family: 'what it is contested on' },
   { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes' },
+  { written: 'stops on', label: /stops on:[ \t]*/, name: 'stopsOn', parser: stoppers, family: 'how long it takes' },
 ];
 
 const ACTION_READERS = ACTION_FIELDS.map((field) => ({ ...field, read: readsWith(field.written, field.parser) }));
@@ -231,7 +238,7 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: st
   requireEnd(cursor, 'an action field');
 }
 
-const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on unfinished']);
+const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on unfinished', 'stops on']);
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
@@ -412,7 +419,8 @@ export function actionLines(action: Action): string[] {
     action.accuracy ||
     action.damage ||
     action.depletes ||
-    action.attempts !== undefined;
+    action.attempts !== undefined ||
+    action.stopsOn?.length;
 
   if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
 
@@ -431,6 +439,7 @@ export function actionLines(action: Action): string[] {
   if (action.damage) lines.push(`  damage: ${printContest(action.damage)}`);
   if (action.depletes) lines.push(`  depletes: ${printSided(action.depletes)}`);
   if (action.attempts !== undefined) lines.push(`  attempts: ${action.attempts}`);
+  if (action.stopsOn?.length) lines.push(`${at('stopsOn')}stops on: ${stoppers.print(action.stopsOn)}`);
   lines.push(...indentLines(action.results.flatMap(resultLines)));
   printResultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
   printResultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
