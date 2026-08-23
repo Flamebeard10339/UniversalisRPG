@@ -312,6 +312,23 @@ describe('what the shell puts on the screen', () => {
     }
   });
 
+  // The playtest bar and its sheet are drawn only while a run is being recorded, so no other
+  // claim in this file ever reaches them. This is the smoke check that an author starting one
+  // does not lose the session; what the sheet decides is proved in playtest.test.ts.
+  it('draws the playtest bar while a run is recorded, and nothing when none is', () => {
+    const driver = createDriver(SHIPPED_SOURCES);
+    const quiet = readable(renderToStaticMarkup(<App driver={driver} />));
+    expect(onScreen(quiet, shellWord('playtest-attach'))).toBe(false);
+
+    driver.playtest.start();
+    driver.send('/look');
+    const recording = readable(renderToStaticMarkup(<App driver={driver} />));
+
+    expect(onScreen(recording, shellWord('playtest-attach')), 'the bar is drawn').toBe(true);
+    expect(onScreen(recording, shellWord('playtest-turn', { turn: 1 })), 'it says which turn').toBe(true);
+    expect(driver.playtest.written()).toContain('turn 1 [applied] /look');
+  });
+
   it('draws every choice the engine is offering', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
