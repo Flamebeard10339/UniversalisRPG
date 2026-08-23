@@ -1393,10 +1393,10 @@ function goldIn(payload: string | null): number | null {
 describe('no line leaves this session writing a slot that is not its game (c4)', () => {
   const PLAYED_GOLD = 9;
 
-  it('over every line the command table takes', () => {
-    const leaked: string[] = [];
+  for (const spec of COMMANDS) {
+    it(`over every line ${spec.name} takes`, () => {
+      const leaked: string[] = [];
 
-    for (const spec of COMMANDS) {
       for (const line of linesFor(spec)) {
         const game = playing();
         try {
@@ -1420,18 +1420,18 @@ describe('no line leaves this session writing a slot that is not its game (c4)',
           rmSync(game.dir, { recursive: true, force: true });
         }
       }
-    }
 
-    expect(leaked).toEqual([]);
-  });
+      expect(leaked).toEqual([]);
+    });
+  }
 });
 
 describe('nothing done in dev mode reaches the slot being played (c9)', () => {
   for (const [holding, enter] of ENTERED_HOLDING) {
-    it(`over every line the command table takes, entering on ${holding}`, () => {
-      const leaked: string[] = [];
+    for (const spec of COMMANDS) {
+      it(`over every line ${spec.name} takes, entering on ${holding}`, () => {
+        const leaked: string[] = [];
 
-      for (const spec of COMMANDS) {
         for (const line of linesFor(spec)) {
           const game = playing();
           try {
@@ -1459,10 +1459,10 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
             rmSync(game.dir, { recursive: true, force: true });
           }
         }
-      }
 
-      expect(leaked).toEqual([]);
-    });
+        expect(leaked).toEqual([]);
+      });
+    }
   }
 
   it('walks the whole command table, twice per entry', () => {

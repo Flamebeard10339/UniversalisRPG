@@ -13,14 +13,12 @@ const addressed = addressable(SHIPPED_SOURCES);
 
 const DRAWN = offeredBy(addressed, NOWHERE, 'map');
 
-const shipped = (): Map<string, Location> => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
-
 const withStaged = (local: string): Map<string, Location> =>
   loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: local }]).registry.locations;
 
 const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
 
-const REGISTRY_PLACES = shipped();
+const REGISTRY_PLACES: Map<string, Location> = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
 
 function bodyOf(staged: { line: string }): string {
   const driver = opened();
@@ -45,7 +43,7 @@ describe('a drag is a section edit and nothing else (c8)', () => {
   for (const section of ABSOLUTE) {
     it(`stages ${section.address} where it was dropped, through the same door a typed edit takes`, () => {
       const driver = opened();
-      const before = shipped().get(section.address)!;
+      const before = REGISTRY_PLACES.get(section.address)!;
       const moved = movedTo(section, { x: 11.4, y: -6.6 });
 
       expect(moved).toHaveProperty('line');
@@ -127,7 +125,7 @@ describe('where the map lets a place go (c8)', () => {
 
   it('turns the pixels a finger carried a place into the line that says where it is', () => {
     const node = drawn(moved);
-    const before = shipped().get(moved)!;
+    const before = REGISTRY_PLACES.get(moved)!;
 
     const staged = droppedAt(DRAWN, node, { x: PER_UNIT * 3, y: PER_UNIT * -2 });
 
@@ -137,7 +135,7 @@ describe('where the map lets a place go (c8)', () => {
 
   for (const climb of [-2, 2]) {
     it(`takes the drawing nudge back out for a place ${Math.abs(climb)} floors ${climb > 0 ? 'up' : 'down'}`, () => {
-      const place = shipped().get(moved)!;
+      const place = REGISTRY_PLACES.get(moved)!;
       const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
 
       const staged = droppedAt(DRAWN, off, { x: 0, y: 0 });
