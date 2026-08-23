@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/load';
+import { shippedSources } from '../content/shipped';
+import { withoutNote } from '../grammar/note';
+import { publishModal } from './modals';
 import { carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
-import { carriedEntries } from './carried';
+import { carriedEntries, carriedFrame } from './carried';
 import { equip } from './equipment';
 import { carriedCount, feedItem } from './itemInstance';
 import { planeFrame } from './planeScreen';
@@ -267,5 +271,29 @@ describe('what the screen does with an answer', () => {
 
     expect(carriedSubmit({ item: 'Rope x9', verb: 'destroy' }, state, registry)).toBeNull();
     expect(state.inventory).toEqual({ rope: 1 });
+  });
+});
+
+// A prose field reaches a player only where something says it, and no driver names examine: they draw
+// the labels they are handed. So the claim is made where the panel mints one, over every item the
+// shipped corpus writes examine: on, and it is the published modal that is read rather than the
+// options the screen composed.
+describe('an item the corpus writes examine: on', () => {
+  const shipped = loadUniverse(shippedSources());
+  const written = [...shipped.items.values()].filter((each) => each.examine !== undefined);
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(written.length).toBeGreaterThan(40);
+  });
+
+  it('says those words to whoever is carrying it, so nothing is written for nobody to read', () => {
+    const unread = written.filter((each) => {
+      const state = initialState(shipped);
+      state.inventory[each.id] = 1;
+      const published = publishModal(carriedFrame({ item: each.id }), state, shipped);
+      return !published.options.some((option) => option.label.includes(withoutNote(each.examine!)));
+    });
+
+    expect(unread.map((each) => each.id)).toEqual([]);
   });
 });

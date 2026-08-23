@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
+import { shippedSources } from '../content/shipped';
+import { withoutNote } from '../grammar/note';
+import { publishModal } from './modals';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { carriedFrame } from './carried';
 import { equip } from './equipment';
@@ -30,6 +33,7 @@ open-connections: e, ne
 passives: 1 keen
 
 # cluster-jewel spark
+examine: A splinter of something that was recently on fire.
 shape: spindle
 open-connections: e
 
@@ -204,7 +208,7 @@ describe('what the screen does with an answer', () => {
 
     const refused = walk(state, spent, ['allocate: position 1']);
     expect(refused).toEqual({ ...planeFrame('1', '1,0'), said: says('engine.plane.no-points', { node: says('engine.plane.node.position', { position: aCount(1), hex: anId('1,0') }) }) });
-    expect(label(refused as PlaneFrame, state)).toBe('Modified Blade at 1,0 — position 1 of 1,0 costs a point and none remain');
+    expect(label(refused as PlaneFrame, state)).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
     expect(values(refused as PlaneFrame, state)).toContain('allocate: position 1');
     expect(JSON.stringify(state)).toBe(before);
     expect(state.log).toEqual([]);
@@ -259,6 +263,16 @@ describe('what a saved frame may still point at', () => {
   });
 });
 
+describe('what the heading says', () => {
+  it('says the cluster in focus in its own words, and the hexagon it moved off in the base’s', () => {
+    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    const grown = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
+
+    expect(label({ ...grown, hex: '1,0' }, state)).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire.');
+    expect(label(grown, state)).toBe('Modified Blade at 0,0');
+  });
+});
+
 describe('a frame carries a key, not a sentence', () => {
   const SPANISH = [
     '# info camp-es',
@@ -303,7 +317,38 @@ describe('a frame carries a key, not a sentence', () => {
   });
 
   it('renders a frame written by one player in the language of the other, both directions', () => {
-    expect(readIn('en', refusedIn('es'))).toBe('Modified Blade at 1,0 — position 1 of 1,0 costs a point and none remain');
+    expect(readIn('en', refusedIn('es'))).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
     expect(readIn('es', refusedIn('en'))).toBe('Hoja modificada en 1,0 — posicion 1 de 1,0 cuesta un punto y no queda ninguno');
+  });
+});
+
+// The words on a cluster jewel reach a player only where the screen focused on one says them, and no
+// driver names examine: each draws the label it is handed. So the claim is made over every jewel the
+// shipped corpus writes examine: on, standing each at the origin of a base of its own rather than
+// naming a route to it, and it is the published modal that is read.
+describe('a cluster jewel the corpus writes examine: on', () => {
+  const corpus = loadUniverse(shippedSources());
+  const written = [...corpus.clusterJewels.values()].filter((each) => each.examine !== undefined);
+  const probeOf = (jewel: string): string => `jewel-probe.probe-${jewel.replace(/\./g, '-')}`;
+  const owners = [...new Set(written.map((each) => corpus.namespace.ownerOf('cluster-jewel', each.id)))].filter((owner): owner is string => owner !== null);
+  const PROBES = {
+    name: 'jewel-probe',
+    text: ['# info jewel-probe', 'version: 1.0.0', 'dependencies:', ...owners.map((owner) => `  ${owner}`), ...written.flatMap((each) => ['', `# item probe-${each.id.replace(/\./g, '-')}`, 'slot: mainhand', `origin-cluster: ${each.id}`])].join('\n'),
+  };
+  const probed = loadUniverse([...shippedSources(), PROBES]);
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(written.length).toBeGreaterThan(10);
+  });
+
+  it('says those words on the screen that stands the player in it, so nothing is written for nobody to read', () => {
+    const unread = written.filter((each) => {
+      const state = initialState(probed);
+      state.inventory[probeOf(each.id)] = 1;
+      const published = publishModal(planeFrame(probeOf(each.id)), state, probed);
+      return !published.options.some((option) => option.label.includes(withoutNote(each.examine!)));
+    });
+
+    expect(unread.map((each) => each.id)).toEqual([]);
   });
 });
