@@ -10,7 +10,7 @@ import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
 import { parseOwnerRef } from './actions';
 import { TRAVEL_PAIR } from './actionLookup';
-import { relocateTo, spreadDiscovery } from './effects';
+import { locationNamed, relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
 import { journal, standingLine, type JournalEntry } from './journal';
 export { standingLine } from './journal';
@@ -645,9 +645,10 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       return refused ? { failure: refused } : {};
     }
     case 'goto': {
-      if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
+      const going = locationNamed(registry, directive.location);
+      if (!registry.locations.has(going)) throw new RuntimeError(`unknown location: ${going}`);
       endJourney(state, localizerOf(registry, state).engine('engine.stopped.called-off'));
-      relocateTo(state, registry, directive.location);
+      relocateTo(state, registry, going);
       return {};
     }
     case 'craft':

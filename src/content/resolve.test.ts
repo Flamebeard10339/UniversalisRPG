@@ -162,12 +162,13 @@ describe('names the engine keeps for itself', () => {
   });
 
   it('leaves starting-location unnamespaced where a module that stands nowhere names it', () => {
-    const furniture = module('furniture', '# entity plinth', 'title: Plinth', 'go-home:', '  relocate: starting-location', '  discover: starting-location');
+    const furniture = module('furniture', '# entity plinth', 'title: Plinth', 'go-home:', '  relocate: starting-location', '  discover: starting-location', '', '# test sent-home', 'goto: starting-location');
     const registry = loadUniverse([furniture]);
     expect(registry.entities.get('furniture.plinth')!.actions[0].results.map((result) => JSON.stringify(result))).toEqual([
       '{"kind":"relocate","location":"starting-location"}',
       '{"kind":"discover","location":"starting-location"}',
     ]);
+    expect(registry.tests.get('furniture.sent-home')!.directives).toEqual([{ kind: 'goto', location: 'starting-location' }]);
   });
 
   it('reserves the module ids the engine actually owns', () => {

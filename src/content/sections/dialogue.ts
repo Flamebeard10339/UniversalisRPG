@@ -1,4 +1,4 @@
-import { ActionResult, parseResultLine, resultGrammar, resultLines, startsResult } from '../../grammar/actionResult';
+import { ActionResult, itemCost, parseResultLine, resultGrammar, resultLines, startsResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
@@ -91,9 +91,12 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   ...resultGrammar(),
 ];
 
-// `sticky` says a node in full on every visit, and `again:` is what a node without it says instead of the silence it would otherwise fall to. A node writing both has written a line nothing reaches.
+// `sticky` says a node in full on every visit, and `again:` is what a node without it says instead of the silence it would otherwise fall to. A node writing both has written a line nothing reaches. A node reached on its own without being a thread is what is left when no thread is open, and one that takes has nothing behind it.
 function contradiction(node: DialogueNode): string | undefined {
   if (node.sticky && node.again) return `node ${node.name} is sticky and also writes again:, and a sticky node says everything again on every visit, so its again: line is never reached`;
+  const cost = [...itemCost(nodeEffects(node)).keys()];
+  if (cost.length > 0 && offering(node) && !isThread(node))
+    return `node ${node.name} is what is said when no thread is open and also takes ${cost.join(', ')}, so a player who has not got it is offered nothing at all: write the take: under a -> choice, or make the node a thread with when: or ask:`;
   return undefined;
 }
 

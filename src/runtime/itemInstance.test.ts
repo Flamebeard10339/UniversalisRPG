@@ -5,7 +5,7 @@ import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { equip } from './equipment';
 import { instance, instanceIsLive } from './instances';
-import { allocate, carriedCount, carriesItem, destroyItem, feedItem, Growth, Destruction, itemInstance, itemLevel, pointsRemaining, slotJewel } from './itemInstance';
+import { allocate, carriesItem, destroyItem, feedItem, Growth, Destruction, itemInstance, itemLevel, packedCount, pointsRemaining, slotJewel } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { skillLevel } from './skills';
 import { GameState } from './state';
@@ -318,7 +318,7 @@ describe('destroying a carried item', () => {
 
     expect(destroyItem(state, 'iron-sword')).toEqual({ ok: true, item: 'iron-sword' });
     expect(state.inventory).toEqual({ 'iron-sword': 2, whetstone: 1 });
-    expect(carriedCount(state, 'iron-sword')).toBe(2);
+    expect(packedCount(state, 'iron-sword')).toBe(2);
   });
 
   it('takes an emptied stack out of what the player carries rather than leaving a count of none', () => {
@@ -342,7 +342,7 @@ describe('destroying a carried item', () => {
     expect(instanceIsLive(state, '1')).toBe(false);
     expect(itemInstance(state, '1')).toBeUndefined();
     expect(state.inventory).toEqual({ 'heartwood-blade': 1, 'crossroads-jewel': 0, whetstone: 0 });
-    expect(carriedCount(state, 'heartwood-blade')).toBe(1);
+    expect(packedCount(state, 'heartwood-blade')).toBe(1);
   });
 
   it('destroys the one copy it was handed, leaving another grown copy of the same base whole', () => {
@@ -384,7 +384,7 @@ describe('destroying a carried item', () => {
 
     destroyItem(state, '1');
     expect(state.equipped).toEqual({});
-    expect(carriedCount(state, 'iron-sword')).toBe(1);
+    expect(packedCount(state, 'iron-sword')).toBe(1);
   });
 
   it('leaves a worn grown copy on when the stack it left is destroyed out from under it', () => {
@@ -394,7 +394,7 @@ describe('destroying a carried item', () => {
 
     destroyItem(state, 'iron-sword');
     expect(state.equipped).toEqual({ mainhand: '1' });
-    expect(carriedCount(state, 'iron-sword')).toBe(0);
+    expect(packedCount(state, 'iron-sword')).toBe(0);
   });
 });
 
@@ -407,7 +407,7 @@ describe('growing a copy the player is wearing', () => {
     expect(grown).toEqual({ ok: true, instance: '1' });
     expect(state.equipped).toEqual({ mainhand: '1' });
     expect(itemInstance(state, '1')?.experience).toBe(1000);
-    expect(carriedCount(state, 'iron-sword')).toBe(0);
+    expect(packedCount(state, 'iron-sword')).toBe(0);
   });
 
   it('grows a carried copy and leaves the slot alone while the stack still has one', () => {
@@ -416,7 +416,7 @@ describe('growing a copy the player is wearing', () => {
 
     expect(feedItem(state, registry, 'iron-sword', 'whetstone')).toEqual({ ok: true, instance: '1' });
     expect(state.equipped).toEqual({ mainhand: 'iron-sword' });
-    expect(carriedCount(state, 'iron-sword')).toBe(1);
+    expect(packedCount(state, 'iron-sword')).toBe(1);
   });
 
   it('leaves the stack alone when it mints out of a slot', () => {

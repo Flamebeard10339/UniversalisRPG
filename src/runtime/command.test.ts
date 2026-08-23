@@ -503,6 +503,20 @@ describe('the commands a player plays with', () => {
     expect(replayed.ctx.view.location.id).toBe('island');
   });
 
+  it('/goto answers starting-location live, and records the name rather than what it came to', () => {
+    const { ctx, session, recorder } = fixture(CUT_OFF_MODULE);
+    const starting = [...session.registry.locations.values()].find((place) => place.starting)!.id;
+
+    expect(errors(runLine(ctx, '/goto island'))).toEqual([]);
+    expect(errors(runLine(ctx, '/goto starting-location'))).toEqual([]);
+    expect(ctx.view.location.id).toBe(starting);
+    expect(recorder.history).toEqual(['goto: island', 'goto: starting-location']);
+
+    const replayed = fixture(`${CUT_OFF_MODULE}\n# test sent-home\ngoto: island\ngoto: starting-location\n`);
+    expect(errors(runLine(replayed.ctx, '/test sent-home'))).toEqual([]);
+    expect(replayed.ctx.view.location.id).toBe(starting);
+  });
+
   it('/goto refuses a place the registry does not hold, and leaves the player where they were', () => {
     const { ctx } = fixture(CUT_OFF_MODULE);
 

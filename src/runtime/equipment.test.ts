@@ -6,7 +6,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import { standingSources } from '../content/shipped';
 import { parseSaveSection } from '../content/sections/save';
-import { carriedCount, carriesItem, feedItem } from './itemInstance';
+import { carriesItem, feedItem, packedCount } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 import { inEnglish } from './sayFixture';
@@ -169,7 +169,7 @@ describe('equipment', () => {
     const bare = statValue('attack', state, registry);
 
     equip(state, registry, 'attack-bonus');
-    expect(carriedCount(state, 'attack-bonus')).toBe(0);
+    expect(packedCount(state, 'attack-bonus')).toBe(0);
     expect(statValue('attack', state, registry)).toBe(bare + 2);
   });
 });
@@ -180,12 +180,12 @@ describe('carried and worn are disjoint', () => {
     const state = carrying(registry, { 'attack-bonus': 3 });
 
     equip(state, registry, 'attack-bonus');
-    expect(carriedCount(state, 'attack-bonus')).toBe(2);
+    expect(packedCount(state, 'attack-bonus')).toBe(2);
     expect(state.inventory['attack-bonus']).toBe(2);
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
 
     unequip(state, registry, 'mainhand');
-    expect(carriedCount(state, 'attack-bonus')).toBe(3);
+    expect(packedCount(state, 'attack-bonus')).toBe(3);
     expect(state.equipped).toEqual({});
   });
 
@@ -196,11 +196,11 @@ describe('carried and worn are disjoint', () => {
 
     equip(state, registry, grownId);
     expect(state.equipped).toEqual({ mainhand: grownId });
-    expect(carriedCount(state, 'attack-bonus')).toBe(0);
+    expect(packedCount(state, 'attack-bonus')).toBe(0);
     expect(carriesItem(state, grownId)).toBe(false);
 
     unequip(state, registry, 'mainhand');
-    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+    expect(packedCount(state, 'attack-bonus')).toBe(1);
     expect(carriesItem(state, grownId)).toBe(true);
     expect(state.inventory).toEqual({ 'attack-bonus': 0, whetstone: 0 });
   });
@@ -214,12 +214,12 @@ describe('carried and worn are disjoint', () => {
     equip(state, registry, 'attack-bonus');
     equip(state, registry, grownId);
     expect(state.equipped).toEqual({ mainhand: grownId });
-    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+    expect(packedCount(state, 'attack-bonus')).toBe(1);
 
     equip(state, registry, 'attack-bonus');
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
     expect(carriesItem(state, grownId)).toBe(true);
-    expect(carriedCount(state, 'attack-bonus')).toBe(1);
+    expect(packedCount(state, 'attack-bonus')).toBe(1);
   });
 
   it('wears a second copy out of a stack that still has one, and refuses once the stack is empty', () => {
@@ -229,14 +229,14 @@ describe('carried and worn are disjoint', () => {
 
     equip(state, registry, 'attack-bonus');
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
-    expect(carriedCount(state, 'attack-bonus')).toBe(2);
+    expect(packedCount(state, 'attack-bonus')).toBe(2);
 
     const alone = carrying(registry, { 'attack-bonus': 1 });
     equip(alone, registry, 'attack-bonus');
 
     expect(() => equip(alone, registry, 'attack-bonus')).toThrow(/does not carry/);
     expect(alone.equipped).toEqual({ mainhand: 'attack-bonus' });
-    expect(carriedCount(alone, 'attack-bonus')).toBe(0);
+    expect(packedCount(alone, 'attack-bonus')).toBe(0);
   });
 });
 
