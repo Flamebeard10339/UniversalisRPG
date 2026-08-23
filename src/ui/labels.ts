@@ -56,6 +56,16 @@ export const LABELS = {
   speed: 'engine.shell.speed',
   clear: 'engine.shell.clear',
   reopen: 'engine.shell.reopen',
+  playtest: 'engine.playtest',
+  'playtest-turn': 'engine.playtest.turn',
+  'playtest-nothing': 'engine.playtest.nothing',
+  'playtest-about': 'engine.playtest.about',
+  'playtest-attach': 'engine.playtest.attach',
+  'playtest-keep': 'engine.playtest.keep',
+  'playtest-discard': 'engine.playtest.discard',
+  'playtest-copy': 'engine.playtest.copy',
+  'playtest-copied': 'engine.playtest.copied',
+  'playtest-stop': 'engine.playtest.stop',
 } as const satisfies Record<string, EngineKey>;
 
 export type LabelId = keyof typeof LABELS;

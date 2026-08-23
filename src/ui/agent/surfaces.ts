@@ -12,6 +12,9 @@ import type { JournalRow } from '../journalPanel';
 import type { JournalEntry } from '../../runtime/session';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
+import { describeRun, NOTE_FIELDS, type RunLogEntry, type RunNotes } from '../../runtime/runLog';
+import { emptyNotes, feedbackOn } from '../playtest';
+import type { PlaytestControls } from '../driver';
 
 export function layerNamed(value: unknown): number {
   const at = LAYERS.findIndex((layer) => layer.id === value);
@@ -54,6 +57,36 @@ export function shellSurface(held: AgentSurfaces['shell']): TestSurface {
       layer: (value) => go(toLayer(where, layerNamed(value))),
       subpage: (value) => go(toSubpage(where, where.layer, subpageNamed(where.layer, dev, value))),
       'command-line': (value) => showCommandLine(value === true),
+    },
+  };
+}
+
+// An author's run, and the same three acts the bar offers, so an agent can play the browser and
+// read back what was played in the words a playbot run is written in.
+function notesFrom(value: unknown): RunNotes {
+  const given = (value ?? {}) as Record<string, unknown>;
+  const notes = emptyNotes() as Record<string, string>;
+  for (const field of NOTE_FIELDS) {
+    const said = given[field.name];
+    if (said === undefined) continue;
+    if (typeof said !== 'string') throw new Error(`${field.name} is said in words`);
+    notes[field.name] = said;
+  }
+  return notes as RunNotes;
+}
+
+export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
+  const { log, controls } = held;
+  return {
+    state: () => ({ recording: log !== null, turns: log?.length ?? 0, about: log === null ? null : feedbackOn(log), written: describeRun(log ?? []) }),
+    actions: {
+      recording: (value) => (value === true ? controls.start() : controls.stop()),
+      attach: (value) => {
+        if (log === null) throw new Error('no run is being recorded');
+        const about = feedbackOn(log);
+        if (about === null) throw new Error('nothing has been played to attach a note to');
+        controls.attach(about.turn, notesFrom(value));
+      },
     },
   };
 }
@@ -326,6 +359,7 @@ export interface AgentSurfaces {
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
   quest: { entry: JournalEntry };
+  playtest: { log: readonly RunLogEntry[] | null; controls: PlaytestControls };
   edit: EditHeld;
 }
 
@@ -336,5 +370,6 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   skills: (held) => skillsSurface(held),
   journal: (held) => journalSurface(held),
   quest: (held) => questSurface(held),
+  playtest: (held) => playtestSurface(held),
   edit: (held) => editSurface(held),
 };

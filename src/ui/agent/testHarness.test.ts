@@ -14,6 +14,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
     dev: false,
     speed: 1,
     live: null,
+    playtest: null,
     transcript: emptyTranscript(),
     view: {
       location: { id: 'start', title: asLocalized('Start'), description: asLocalized('Here') },
@@ -53,6 +54,12 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     snapshot: () => current,
     transient,
     send: (line) => void calls.push(`send:${line}`),
+    playtest: {
+      start: () => void calls.push('playtest:start'),
+      stop: () => void calls.push('playtest:stop'),
+      attach: (turn) => void calls.push(`playtest:attach:${turn}`),
+      written: () => '',
+    },
     declared: () => [],
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),

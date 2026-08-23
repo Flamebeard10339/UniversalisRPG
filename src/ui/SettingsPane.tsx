@@ -32,6 +32,8 @@ export function SettingsPane({
   words,
   onSend,
   onCommandLine,
+  playtest,
+  onPlaytest,
 }: {
   dev: boolean;
   speed: number;
@@ -39,6 +41,8 @@ export function SettingsPane({
   words: Words;
   onSend: (line: string) => void;
   onCommandLine: (shown: boolean) => void;
+  playtest: boolean;
+  onPlaytest: (recording: boolean) => void;
 }): JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
@@ -54,6 +58,17 @@ export function SettingsPane({
           type="checkbox"
           checked={commandLine}
           onChange={(event) => onCommandLine(event.target.checked)}
+          className="accent-accent"
+        />
+      </label>
+
+      <label className="flex items-center justify-between gap-3 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
+        <span>{words('playtest')}</span>
+        <input
+          data-drive="playtest.recording"
+          type="checkbox"
+          checked={playtest}
+          onChange={(event) => onPlaytest(event.target.checked)}
           className="accent-accent"
         />
       </label>

@@ -29,7 +29,9 @@ interface EveryWayOfAdmittingNothing {
 
 export type TheDerivationNamesEveryWay = Assert<Exactly<AdmitsAbsence<EveryWayOfAdmittingNothing>, 'nullable' | 'undefinable' | 'optional' | 'yields'>>;
 
-type HonestlyAbsentOnASnapshot = 'live';
+// `live` is nothing under way; `playtest` is no run being recorded, which is what not being in
+// playtest mode *is* — a second flag beside it would be the thing that could disagree with it.
+type HonestlyAbsentOnASnapshot = 'live' | 'playtest';
 
 type HonestlyAbsentOnTheDriver = 'localChanges';
 

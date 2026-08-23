@@ -99,7 +99,7 @@ function idsPublished(view: PlayView): string[] {
 
 const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
-const NODE = { position: 1, direction: asLocalized('ne') };
+const NODE = { position: 1, direction: asLocalized('ne'), turn: 1, line: asLocalized('travel:beach') };
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 

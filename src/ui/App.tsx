@@ -26,6 +26,7 @@ import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } f
 import { ModalSheet } from './ModalSheet';
 import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
+import { PlaytestBar } from './PlaytestBar';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
 import { carried, counted, identity, worn } from './sheet';
@@ -184,6 +185,7 @@ export function App({
   };
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
+  useTestSurface('playtest', { log: snapshot.playtest, controls: driver.playtest });
   const wide = useWide();
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
@@ -199,6 +201,8 @@ export function App({
           words={words}
           onSend={driver.send}
           onCommandLine={(shown) => setEditing({ ...editing, commandLine: shown })}
+          playtest={snapshot.playtest !== null}
+          onPlaytest={(on) => (on ? driver.playtest.start() : driver.playtest.stop())}
         />
       ) : null;
     }
@@ -251,6 +255,19 @@ export function App({
       <div className="flex h-[100dvh] select-none flex-col overflow-hidden bg-background text-text">
         <main className="relative flex min-h-0 flex-1 flex-col pt-[env(safe-area-inset-top)]">
           <DevBanner dev={dev} words={words} />
+          {snapshot.playtest === null ? null : (
+            <PlaytestBar
+              log={snapshot.playtest}
+              words={words}
+              localizer={localizer}
+              onAttach={driver.playtest.attach}
+              onCopy={() => {
+                if (typeof navigator !== 'undefined') void navigator.clipboard?.writeText(driver.playtest.written());
+                driver.transient.play('note', String(words('playtest-copied')));
+              }}
+              onStop={driver.playtest.stop}
+            />
+          )}
           {snapshot.problems.length > 0 ? (
             <FaultBanner problems={snapshot.problems} remedies={snapshot.remedies} words={words} onRemedy={(remedy) => (remedy === 'clear-local' ? driver.clearLocalChanges() : tryAgain(driver))} />
           ) : null}

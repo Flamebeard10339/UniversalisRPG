@@ -4,14 +4,16 @@ import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
-import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type CommandResult, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
+import type { RunLogEntry, RunNotes } from '../runtime/runLog';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
+import { createRecorder } from './playtest';
 import { createTransientChannel, type TransientChannel } from './transient';
 
 export const REMEDIES = ['clear-local', 'reopen'] as const;
@@ -34,6 +36,17 @@ export interface DriverSnapshot {
   remedies: readonly Remedy[];
   dev: boolean;
   speed: number;
+  // The run being recorded, or null when none is. Holding one is the whole of being in playtest
+  // mode; there is no second flag to disagree with it.
+  playtest: readonly RunLogEntry[] | null;
+}
+
+export interface PlaytestControls {
+  start(): void;
+  stop(): void;
+  attach(turn: number, notes: RunNotes): void;
+  // The run in the same words a playbot run is written in, for whoever reads it next.
+  written(): string;
 }
 
 export interface Driver {
@@ -55,6 +68,7 @@ export interface Driver {
   note(text: string): void;
   reopen(): void;
   clearLocalChanges(): void;
+  playtest: PlaytestControls;
 }
 
 export interface DriverOptions {
@@ -84,6 +98,11 @@ function open(opened: OpenedUniverse, authoring: AuthoringContext, save: SaveCon
 
 const because = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+// A line the app itself turned away never reached the engine, so there is no result to read an
+// outcome off. It is a refusal all the same, and a run that dropped it would not say what the
+// author actually typed.
+const REFUSED_OUTRIGHT: CommandResult = { output: [{ kind: 'message', words: 'tool', tone: 'error', text: '' }], quit: false, recorded: [] };
+
 export function createDriver(sources: readonly ModuleSource[], options: DriverOptions = {}): Driver {
   const listeners = new Set<() => void>();
   let current!: DriverSnapshot;
@@ -94,9 +113,13 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const shipped = [...sources];
 
+  // A run is read back out of its slot before anything else, so a reload lands mid-playtest with
+  // what was already played rather than starting a second run beside it.
+  const record = createRecorder(save.store, (text) => complain(text));
+
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
-  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed });
+  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run() });
 
   const readLocal = (): { text: string; complaints: CommandOutput[] } => {
     try {
@@ -144,8 +167,19 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let running: LiveRun | null = null;
   let stopTicking: (() => void) | null = null;
 
+  const answeredSince = (from: number): string[] => current.transcript.entries.slice(from).map((entry) => String(entry.text));
+
   const publish = (): void => {
+    // What the turn answered with, in the words the author read them in — the transcript this
+    // driver already writes, rather than a second rendering of the same outputs beside it.
+    if (record.settle(answeredSince)) current = { ...current, playtest: record.run() };
     for (const listener of listeners) listener();
+  };
+
+  const changing = (act: () => void): void => {
+    act();
+    current = { ...current, playtest: record.run() };
+    publish();
   };
 
   const complain = (text: string): void => {
@@ -184,11 +218,14 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   const send = (line: string): void => {
     const refusal = devRefusal(line, save.dev);
     if (refusal !== null) {
+      record.opened(line, REFUSED_OUTRIGHT, current.transcript.entries.length);
       complain(refusal);
       return;
     }
     if (running) close(true);
+    const from = current.transcript.entries.length;
     const result = runLine(context, line);
+    record.opened(line, result, from);
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
@@ -233,6 +270,12 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     baseSources: () => shipped,
     declared: () => declaredBy(context.session.registry),
     note: complain,
+    playtest: {
+      start: () => changing(() => record.start()),
+      stop: () => changing(() => record.stop()),
+      attach: (turn, notes) => changing(() => record.attach(turn, notes)),
+      written: () => record.written(),
+    },
     reopen,
     clearLocalChanges: () => {
       send(`/local clear`);
