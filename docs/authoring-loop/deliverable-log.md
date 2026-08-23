@@ -65,28 +65,41 @@ route out of Miki's house lands. See `settled.md`.
 **2. Module size is settled** — a removability unit, not a size unit. See
 `settled.md`.
 
-**3. The grammar has settled and the region is one module.** The split is done:
-`core` is furniture, `tulsa` is everywhere anybody stands, and both bulk id moves
-were made by tools that refuse on registry drift rather than by hand. A
-conversation offers its open threads, a hint is chosen against live state, an
-action under way is bounded, and a test says the quantity it names.
+**3. The split is finished, and `core` stands nowhere in earnest.** Tulsa keeps two
+items, three droptables its own creatures leave, and four flags. Everything else
+that was in it — two skills, a stat, fourteen items, two recipes — is core's,
+moved by tools that refuse on registry drift rather than by hand. The last two
+sections could not move until a station stopped being a name minted by whichever
+entity happened to open one; `# station` is a kind now, so a recipe is generic
+knowledge and the oven it is worked on is still Tulsa's.
 
-**4. The writing is now the long pole and nothing is in front of it.**
-`npm run review` is the sheet and `content/reviewed.tsv` makes it resumable. **This
-is Yonatan's and everything else is scheduled around it.** It has not started; the
-hold was for the grammar to settle and the bug rate to drop, and both have. The
-list in `open.md` has grown from five items to fourteen because three playtest runs
-kept finding the same shape — a room names a thing and offers no way to touch it.
+**4. The writing is the long pole and nothing is in front of it.** `npm run review`
+is the sheet and `content/reviewed.tsv` makes it resumable. **This is Yonatan's and
+everything else is scheduled around it.** The agent pre-pass is done: every room
+that named a thing and offered no way to touch it now either does something or has
+stopped promising it would, and the corpus holds **no rough lines** where it held
+five. What is left under that heading in `open.md` is two readings, not a queue.
 
 **5. The hardening pass comes after that**, and the runs have already named what
 it is for: `confusion` reports say which lines are actually confusing, so reviewing
-blind and then hardening would do the same reading twice.
+blind and then hardening would do the same reading twice. The playbot's prompt now
+says a quest here is not meant to be trivial, so a `confusion` report should mean
+the writing is wrong rather than that the player was expected to think.
 
 **Map churn is deliberately deferred to that pass.** `combat-expansion.proving-ground`
 sits at x:3,y:0, which is `tulsa.market-square`'s own square, and it hangs off the
 beach for want of anywhere better. Whether the beach still makes sense as the road
 into town is the same question. Neither is worth a hand-fix while the map is
 moving — a playtest names them better than a reading does.
+
+**What the loop keeps turning up is second authorities.** Six landed in one
+session, each found by doing something else: the station vocabulary swept off
+every entity, twenty-seven registry maps classified to name one exception, the
+shipped corpus spelled out in ten files and derived in fourteen more, an exemption
+letting a `names:` value be a kind nothing declared, the condition roots restated
+for the oracle, and a menu entry's kind read back off the shape of its own string.
+None was on anybody's list. The rate at which they turn up is the argument for
+running `one-home` before the work rather than after.
 
 ## What Yonatan has to deliver
 

@@ -117,6 +117,25 @@ refused at load naming the line and a declared one nothing opens loads clean. A
 recipe is therefore generic knowledge and lives wherever it wants, while the
 oven that opens `oven` stays in the region it stands in.
 
+**A shop is a declared kind an entity points at, and price lives on the item.**
+`# shop` says what it stocks, its `buying:`/`selling:` multipliers over an item's
+own `value:`, how long a unit of stock takes back, and whether it `accepts: any`
+tradable thing or only what it stocks. **An item declaring no `value:` is
+untradable** — that is the whole of the rule, and it is why coin declares none and
+why no shop can trade the coin it counts in. The player pays what the shop rounds
+up and receives what it rounds down, so nothing can be bought and sold back at a
+profit. Stock is counted in the save and comes back by whole periods, never to the
+moment, or a shop bought from more often than its rate would restock never;
+nothing is written until somebody trades.
+
+**The journal is the player's own notebook.** First person, and it names no room,
+no route and no verb — working out what is next is the play. `log:` is what
+happened, `hint:` is what they are turning over, and the field's name is now a
+misnomer. The rule's home is the `JOURNAL_VOICE` note on both `hint:` lines in
+`src/content/sections/quest.ts`, which is what `npm run oracle -- quest` prints —
+the oracle's own examples used to be map instructions, so an agent authoring off
+the page learned the wrong voice from the grammar itself.
+
 **The shipped corpus has one home: `src/content/shipped.ts`.** `shippedFiles()` and
 `shippedSources()` read `content/` fresh each call and exclude an author's own
 `local-changes.dsl`, which is legal to run `npm run play` against but is not itself
