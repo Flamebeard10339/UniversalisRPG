@@ -35,6 +35,15 @@ export function putCarried<T extends object>(holder: T, key: keyof T & string, w
   put(holder, key, 'item', where, visit);
 }
 
+// A site that names a location the engine will stand the player in, which may spell the name the
+// engine answers instead of one a module declares. That spelling is left whole for the engine to
+// answer against whatever registry is loaded then; a road cannot be walked this way, because an edge
+// to wherever a world happens to start is no map.
+export function putLocation<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
+  if ((holder as Loose)[key] === STARTING_LOCATION) return;
+  put(holder, key, 'location', where, visit);
+}
+
 export function strings(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
   const list = holder[key];
   const rewrite = (values: unknown[]): void => {
@@ -130,7 +139,7 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         break;
       case 'relocate':
       case 'discover':
-        if (result.location !== STARTING_LOCATION) put(result, 'location', 'location', `${where} ${result.kind}:`, visit);
+        putLocation(result, 'location', `${where} ${result.kind}:`, visit);
         break;
       case 'pool':
         put(result, 'resource', 'resource', `${where} ${result.delta.max < 0 ? 'drain' : 'restore'}:`, visit);

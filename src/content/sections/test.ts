@@ -1,3 +1,4 @@
+import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
@@ -5,7 +6,7 @@ import { hasBlock } from '../../grammar/structure';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
 
 import { section } from './define';
-import { condition as visitCondition, put, putCarried, type Visit } from '../refs';
+import { condition as visitCondition, put, putCarried, putLocation, type Visit } from '../refs';
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
 import { lastSegment } from '../../grammar/values';
@@ -408,6 +409,7 @@ export const test = section<Test>()({
     { form: 'use: <action> on <entity>', example: 'use: chop on oak' },
     { form: 'travel: <location>', example: 'travel: camp' },
     { form: 'goto: <location>', example: 'goto: camp' },
+    { form: `goto: ${STARTING_LOCATION}`, example: `goto: ${STARTING_LOCATION}` },
     { form: 'craft: <recipe>', example: 'craft: plank' },
     { form: 'shop: <shop>', example: 'shop: general-store' },
     { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing', ...USED },
@@ -479,7 +481,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       put(value, 'location', 'location', `${where} travel:`, visit);
       return;
     case 'goto':
-      put(value, 'location', 'location', `${where} goto:`, visit);
+      putLocation(value, 'location', `${where} goto:`, visit);
       return;
     case 'craft':
       put(value, 'recipe', 'recipe', `${where} craft:`, visit);
