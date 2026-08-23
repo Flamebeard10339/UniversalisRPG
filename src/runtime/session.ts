@@ -38,6 +38,7 @@ import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 import { spanStart, type SpanStart } from './span';
+import { choiceWritten, chooseSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
@@ -84,6 +85,23 @@ export interface PlayerRow {
 
 export type PlayerRows = Readonly<Record<PlayerField, PlayerRow | null>>;
 
+// One row per preference a run is played by, drawn from the declaration that names them: what it is
+// called, what it is for, the word it stands at, and every word it takes with the words each is
+// shown as. Every surface that lists a setting or offers one reads these rows, so the terminal and
+// the settings page cannot come to differ about what may be set to what.
+export interface SettingChoiceRow {
+  written: Answer;
+  shown: Localized;
+}
+
+export interface SettingRow {
+  name: Answer;
+  title: Localized;
+  note: Localized;
+  standing: Answer;
+  choices: SettingChoiceRow[];
+}
+
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
   entities: Array<{ id: Answer; title: Localized }>;
@@ -106,6 +124,7 @@ export interface PlayStatus {
   journey: Journey | null;
   journal: JournalEntry[];
   player: PlayerRows;
+  settings: SettingRow[];
   action: PlayAction | null;
 }
 
@@ -412,8 +431,23 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),
     player: playerRows(state, registry),
+    settings: settingRows(state, registry),
     action: publishAction(state, registry),
   };
+}
+
+export function settingRows(state: GameState, registry: Registry): SettingRow[] {
+  const localizer = localizerOf(registry, state);
+  return SETTING_NAMES.map((name) => {
+    const setting = settingNamed(name);
+    return {
+      name,
+      title: localizer.engine(setting.title),
+      note: localizer.engine(setting.note),
+      standing: standingChoice(name, settingStands(state, name))?.typed ?? '',
+      choices: setting.choices.map((choice) => ({ written: choice.typed, shown: localizer.engine(choice.shown) })),
+    };
+  });
 }
 
 function playerRows(state: GameState, registry: Registry): PlayerRows {
@@ -529,6 +563,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'wait-out':
     case 'equip':
     case 'unequip':
+    case 'setting':
     case 'feed':
     case 'slot':
     case 'allocate':
@@ -706,6 +741,13 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'unequip':
       unequip(state, registry, directive.slot);
       return {};
+    case 'setting': {
+      if (!isSettingName(directive.setting)) throw new RuntimeError(`unknown setting: ${directive.setting} — this run is played by ${SETTING_NAMES.join(', ')}`);
+      const choice = choiceWritten(directive.setting, directive.value);
+      if (!choice) throw new RuntimeError(`${directive.setting} is not played ${directive.value}: it is played ${settingNamed(directive.setting).choices.map((each) => each.typed).join(' or ')}`);
+      chooseSetting(state, directive.setting, choice);
+      return {};
+    }
     case 'feed':
     case 'slot':
     case 'allocate':

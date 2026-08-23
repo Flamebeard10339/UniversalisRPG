@@ -93,6 +93,7 @@ export const ENGINE_KEYS = [
   'engine.said.elided',
   'engine.modal.opened',
   'engine.prune.race',
+  'engine.prune.setting',
   'engine.prune.record',
   'engine.prune.location',
   'engine.prune.nowhere',
@@ -251,6 +252,12 @@ export const ENGINE_KEYS = [
   'engine.stopped.unloadable',
   'engine.stopped.pack-full',
   'engine.stopped.short',
+  'engine.setting.stands',
+  'engine.setting.takes',
+  'engine.setting.on',
+  'engine.setting.off',
+  'engine.setting.hardcore',
+  'engine.setting.hardcore.note',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

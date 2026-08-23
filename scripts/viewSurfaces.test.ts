@@ -83,6 +83,7 @@ const SCRIPT: readonly string[] = [
   'submit-modal: verb=grow',
   'submit-modal: plane=back',
   'submit-modal: verb=close',
+  '/settings',
   '/load tutorial-quests.miki-route-start',
   '/goto tulsa.basement',
   '/state',

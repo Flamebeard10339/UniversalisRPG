@@ -7,39 +7,52 @@ export interface Reference {
 
 export const TIME = 'time';
 export const PLAYER = 'player';
+export const SETTING = 'setting';
 
-// A root the engine holds itself: the kind the rest of the path is read as, and the one line standing for it wherever the shapes are shown.
+// A root the engine holds itself, in one of the two shapes it can take: one that names a kind reads the rest of the path as an id of that kind and is weighed against a number, and one that only stands for something reads a name of its own and is read as it is. Either way the one line standing for it wherever the shapes are shown is derived from it.
 interface Rooted {
   kind: string;
   stands: string;
   against: number;
 }
 
+interface Named {
+  stands: string;
+}
+
 // What the engine holds itself, rather than a flag an author declares. A root paired with a kind reads the rest of the path as an id of that kind, so `xp.thieving` is the writing module's own skill and a name nothing declares is refused where it is written.
 export const ENGINE_ROOTS = {
   [TIME]: null,
-  [PLAYER]: null,
+  [PLAYER]: { stands: 'race' },
+  [SETTING]: { stands: 'hardcore' },
   xp: { kind: 'skill', stands: 'thieving', against: 4 },
   level: { kind: 'skill', stands: 'mining', against: 2 },
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
   stat: { kind: 'stat', stands: 'attack', against: 10 },
-} as const satisfies Readonly<Record<string, Rooted | null>>;
+} as const satisfies Readonly<Record<string, Rooted | Named | null>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
 
 export const ENGINE_ROOT_NAMES = Object.keys(ENGINE_ROOTS) as EngineRoot[];
 
-const rooted = (root: EngineRoot): Rooted | null => ENGINE_ROOTS[root];
+const rooted = (root: EngineRoot): Rooted | Named | null => ENGINE_ROOTS[root];
+
+const named = (held: Rooted | Named | null): held is Rooted => held !== null && 'kind' in held;
 
 export const isEngineRoot = (path: readonly string[]): boolean => path.length > 0 && path[0] in ENGINE_ROOTS;
 
-export const rootedKind = (root: string): string | null => (root in ENGINE_ROOTS ? rooted(root as EngineRoot)?.kind ?? null : null);
+export const rootedKind = (root: string): string | null => {
+  const held = root in ENGINE_ROOTS ? rooted(root as EngineRoot) : null;
+  return named(held) ? held.kind : null;
+};
 
 // The shapes an author is shown for the roots are the roots themselves, so one added above reaches the page with no second list to remember.
 const ROOTED_LINES = ENGINE_ROOT_NAMES.flatMap((root) => {
   const held = rooted(root);
-  return held === null ? [] : [{ form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` }];
+  if (held === null) return [];
+  if (!named(held)) return [{ form: `${root}.<name>`, example: `${root}.${held.stands}` }];
+  return [{ form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` }];
 });
 
 export const VISITS = 'visits';

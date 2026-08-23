@@ -18,6 +18,7 @@ import { isShopStock } from './trade';
 import { isModalFrame, pruneModals } from './modals';
 import { Localized, Localizer, localizerOf } from './localized';
 import { emptyPlayerSheet, PLAYER, PLAYER_FIELDS, templateOf } from './state';
+import { isSettingName, isSettingSheet, standingChoice, standingSettings, type SettingSheet } from './settings';
 
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 12;
@@ -95,6 +96,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' },
+  settings: { shape: 'scalar', holds: isSettingSheet, sparsest: standingSettings(), prune: 'pruned by a rule of its own' },
   modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
 };
 
@@ -218,6 +220,8 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
     }
   }
 
+  state.settings = settledSettings(state.settings, warnings, localizer);
+
   const race = state.player.race;
   if (race && !registry.races.has(race)) {
     state.player = { ...state.player, race: '' };
@@ -233,6 +237,22 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   }
 
   return warnings;
+}
+
+// A run is played by the settings it offers and no others: a name the engine has stopped declaring
+// goes, and a value it has stopped offering goes back to where the setting stands. Both are said, in
+// the save-key vocabulary the rest of a prune is written in.
+function settledSettings(held: SettingSheet, warnings: PruneWarning[], localizer: Localizer): SettingSheet {
+  const settled = standingSettings();
+  for (const [name, value] of Object.entries(held)) {
+    if (isSettingName(name) && standingChoice(name, value) !== undefined) {
+      settled[name] = value;
+      continue;
+    }
+    const shown = localizer.identifier(String(value));
+    addWarning(warnings, `settings.${name}`, name, localizer.engine('engine.prune.setting', { setting: localizer.identifier(name), value: shown }));
+  }
+  return settled;
 }
 
 export function diffState(state: GameState, baseline: GameState): SaveDiff {
