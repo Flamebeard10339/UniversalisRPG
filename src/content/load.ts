@@ -7,12 +7,13 @@ import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
 import { Entity, Handler, isHandlerBlock } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
-import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
+import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
 import { actionSlugProblem, textFieldsOf } from './sections';
 import { closeAdjacency, recursivelyResolveRelativeCoordinates } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
+import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
 import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
 import { isNamespacedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
@@ -206,6 +207,16 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
   const unsupplied = unsuppliedParameters(locales, key, value);
   if (unsupplied.length === 0) return undefined;
   return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+}
+
+// A line the game says as nothing is a line nobody has written yet, and a player meets it as a broken engine rather than as a blank. A `@@@` note is dropped when the line is said, so a line that is only a note says nothing at all; a note trailing words is playable and stays legal. This asks the same table `npm run notes` and `npm run review` ask, so a kind or a field added next month is covered with no edit.
+function silence(locales: Locales): DslError | undefined {
+  for (const { key, language, text } of everySaid(locales)) {
+    if (withoutNote(text).trim() !== '') continue;
+    const said = language === DEFAULT_LANGUAGE ? key : `${key} in ${language}`;
+    return new DslError(hasNote(text) ? `${said} is said to a player and is nothing but a ${NOTE_MARK} note, which is dropped when the line is said: write the words beside the mark rather than in place of them` : `${said} is said to a player and says nothing at all`);
+  }
+  return undefined;
 }
 
 type OwnedSection = ModuleSection & { module: ParsedModule };
@@ -754,6 +765,8 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
         };
     }
   }
+  const silent = silence(registry.locales);
+  if (silent) return { failure: { module: modules[0]!, stage: 'build', error: silent } };
   return { registry };
 }
 

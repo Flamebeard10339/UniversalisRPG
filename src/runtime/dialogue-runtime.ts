@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, Spoken, spokenBy } from '../content/sections/dialogue';
+import { Choice, Dialogue, DialogueNode, NodeStep, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -36,15 +36,21 @@ function resolveMenu(cursor: DialogueCursor, registry: Registry): { dialogue: Di
   return { dialogue, node, choices: step.kind === 'menu' ? step.choices : [] };
 }
 
+// What a step still does on a visit the node is not replaying: what is said and what it does are held back, a menu is still put to the player and a goto still followed. A step kind added to the grammar does not compile until it says which it is, and both the loop below and `speaksNow` read the answer here.
+const WHEN_SPENT: Record<NodeStep['kind'], boolean> = { say: false, effect: false, goto: true, menu: true };
+
+const visitCounter = (dialogue: Dialogue, node: DialogueNode): string => `${dialogue.id}.${node.name}`;
+
 function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState, start: number, replay: boolean): DialogueCursor | null {
   for (let i = start; i < node.steps.length; i++) {
     const step = node.steps[i];
+    const kept = replay || WHEN_SPENT[step.kind];
     switch (step.kind) {
       case 'say':
-        if (replay) state.log.push(spokenLine(registry, state, step));
+        if (kept) state.log.push(spokenLine(registry, state, step));
         break;
       case 'effect':
-        if (replay) applyResultsNow(state, registry, [step.result]);
+        if (kept) applyResultsNow(state, registry, [step.result]);
         break;
       case 'goto':
         return enterNode(dialogue, findNode(dialogue, step.target), registry, state);
@@ -60,7 +66,7 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
 }
 
 function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueCursor | null {
-  const counter = `${dialogue.id}.${node.name}`;
+  const counter = visitCounter(dialogue, node);
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = visit === 1 || node.sticky === true;
   if (!replay && node.again) state.log.push(spokenLine(registry, state, node.again));
@@ -70,11 +76,15 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
 // A node that is put forward at all, as against one that is only ever arrived at by a goto from another.
 const offering = (node: DialogueNode): boolean => node.always === true || node.when !== undefined;
 
+// Whether entering this node now would put anything in front of the player. A node already visited that neither replays nor writes an `again:` holds back everything it says, and offering the conversation anyway is how a player comes to click talk and watch the view redraw with nothing new in it.
+const speaksNow = (dialogue: Dialogue, node: DialogueNode, state: GameState): boolean =>
+  (state.visits[visitCounter(dialogue, node)] ?? 0) === 0 || node.sticky === true || node.again !== undefined || node.steps.some((step) => WHEN_SPENT[step.kind]);
+
 // The one thing this entity has to say now, out of everything anyone has given it to say. Every node an author wrote a `when:` on is a claim on this moment, and the last such claim wins — within a dialogue by the order its nodes are written, and between dialogues by the order their modules loaded.
 export function reachedNow(registry: Registry, state: GameState, entityId: string): { dialogue: Dialogue; node: DialogueNode } | null {
   let chosen: { dialogue: Dialogue; node: DialogueNode } | null = null;
   for (const dialogue of spokenBy(registry.dialogues, entityId)) {
-    for (const node of dialogue.nodes) if (offering(node) && (node.when === undefined || evaluateCondition(node.when, state, registry))) chosen = { dialogue, node };
+    for (const node of dialogue.nodes) if (offering(node) && speaksNow(dialogue, node, state) && (node.when === undefined || evaluateCondition(node.when, state, registry))) chosen = { dialogue, node };
   }
   return chosen;
 }
@@ -83,7 +93,7 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
   const reached = reachedNow(registry, state, entityId);
   if (!reached) {
     if (spokenBy(registry.dialogues, entityId).length === 0) throw new RuntimeError(`no dialogue owned by entity: ${entityId}`);
-    throw new RuntimeError(`no reachable node in any dialogue owned by entity: ${entityId}`);
+    throw new RuntimeError(`no node with anything to say in any dialogue owned by entity: ${entityId}`);
   }
   return enterNode(reached.dialogue, reached.node, registry, state);
 }

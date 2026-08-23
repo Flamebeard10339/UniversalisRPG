@@ -40,7 +40,42 @@ describe('what an entity has to say', () => {
     state.flags['asked'] = true;
 
     expect(() => talk('miki', loaded(), state)).toThrow(new RuntimeError('no dialogue owned by entity: miki'));
-    expect(() => talk('miki', loaded(own), state)).toThrow(new RuntimeError('no reachable node in any dialogue owned by entity: miki'));
+    expect(() => talk('miki', loaded(own), state)).toThrow(new RuntimeError('no node with anything to say in any dialogue owned by entity: miki'));
+  });
+});
+
+// A node said once and fallen silent is still a node whose `when:` holds, and offering the conversation anyway is how a player comes to click talk and watch the view redraw with nothing new in it.
+describe('a conversation with nothing left to say is not offered', () => {
+  const spent = (...lines: string[]) => loaded(['# dialogue miki', 'owner = miki', '', 'node idle:', '  always', ...lines].join('\n'));
+
+  const secondVisit = (registry: ReturnType<typeof loaded>) => {
+    const state = createGameState();
+    talk('miki', registry, state);
+    return reachedNow(registry, state, 'miki');
+  };
+
+  it('drops a spent node that neither replays nor writes an again:', () => {
+    expect(secondVisit(spent('  Fine weather for it.'))).toBeNull();
+  });
+
+  it('keeps one that says something on a later visit', () => {
+    expect(secondVisit(spent('  sticky', '  Fine weather for it.'))).toMatchObject({ node: { name: 'idle' } });
+    expect(secondVisit(spent('  again: Still fine.', '  Fine weather for it.'))).toMatchObject({ node: { name: 'idle' } });
+  });
+
+  it('keeps one that still puts a choice, since a spent node holds back what it says and not what it offers', () => {
+    expect(secondVisit(spent('  Fine weather for it.', '  -> Indeed.'))).toMatchObject({ node: { name: 'idle' } });
+  });
+
+  // The last claim on the moment wins, so a spent one hands the moment back rather than taking it and saying nothing.
+  it('falls back to a node written earlier that still has something to say', () => {
+    const registry = loaded(['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  sticky', '  Well met.', '', 'node news:', '  always', '  There is talk of a boat.'].join('\n'));
+    const state = createGameState();
+
+    expect(reachedNow(registry, state, 'miki')).toMatchObject({ node: { name: 'news' } });
+    talk('miki', registry, state);
+
+    expect(reachedNow(registry, state, 'miki')).toMatchObject({ node: { name: 'greeting' } });
   });
 });
 

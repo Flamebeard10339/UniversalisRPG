@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK, noteIn, withoutNote } from '../src/grammar/note';
-import type { Locales } from '../src/content/locale';
+import { everySaid, type Locales } from '../src/content/locale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
@@ -13,7 +13,8 @@ const usage = [
   '',
   `A ${NOTE_MARK} in any line the game says to a player opens a note that runs to the`,
   'end of it. The engine drops the note and says the rest, so what an author',
-  'marked is playable while it waits. This prints every note the corpus holds:',
+  'marked is playable while it waits. A line that is nothing but a mark says',
+  'nothing, and the engine refuses it. This prints every note the corpus holds:',
   'a note with words is work someone asked for, and a bare mark is writing that',
   'is standing in for better writing.',
 ].join('\n');
@@ -25,13 +26,6 @@ export interface Note {
   stands: string;
 }
 
-// Every string the game can say, taken from the tables the engine itself reads, so a kind or a field added next month is swept with no edit here.
-function everySaid(locales: Locales): Array<{ key: string; language: string; text: string }> {
-  const said = [...locales.base].map(([key, entry]) => ({ key, language: entry.language, text: entry.text }));
-  for (const [language, table] of locales.declared) for (const [key, text] of table) said.push({ key, language, text });
-  return said;
-}
-
 export function notesIn(locales: Locales): Note[] {
   const found = everySaid(locales).flatMap(({ key, language, text }) => {
     const said = noteIn(text);
@@ -40,7 +34,7 @@ export function notesIn(locales: Locales): Note[] {
   return found.sort((one, other) => one.key.localeCompare(other.key) || one.language.localeCompare(other.language));
 }
 
-const shown = (note: Note): string[] => [`  ${note.key}${note.language === 'en' ? '' : ` (${note.language})`}`, `    stands as: ${note.stands === '' ? '(nothing at all)' : note.stands}`, ...(note.said === '' ? [] : [`    asked for: ${note.said}`])];
+const shown = (note: Note): string[] => [`  ${note.key}${note.language === 'en' ? '' : ` (${note.language})`}`, `    stands as: ${note.stands}`, ...(note.said === '' ? [] : [`    asked for: ${note.said}`])];
 
 export function noteLines(locales: Locales): string[] {
   const notes = notesIn(locales);

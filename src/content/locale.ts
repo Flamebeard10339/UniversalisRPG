@@ -302,6 +302,19 @@ export function addLocaleSection(locales: Locales, module: string | null, sectio
   locales.declared.set(section.id, table);
 }
 
+export interface Said {
+  key: string;
+  language: string;
+  text: string;
+}
+
+// Every string the game can say, read off the tables the engine itself fills, so a kind or a field added next month is swept with no edit wherever this is asked.
+export function everySaid(locales: Locales): Said[] {
+  const said = [...locales.base].map(([key, entry]) => ({ key, language: entry.language, text: entry.text }));
+  for (const [language, table] of locales.declared) for (const [key, text] of table) said.push({ key, language, text });
+  return said;
+}
+
 export function moduleLocaleSections(locales: Locales, module: string | null): LocaleDeclaration[] {
   return locales.sections.filter((section) => section.module === module);
 }

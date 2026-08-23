@@ -351,6 +351,35 @@ describe('authored text may not name a parameter either', () => {
   });
 });
 
+describe('a line the game says may not say nothing', () => {
+  const authoring =
+    (...lines: string[]) =>
+    () =>
+      loadUniverse([
+        {
+          name: 'isla',
+          text: ['# info isla', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', ...lines].join('\n'),
+        },
+      ]);
+
+  it('refuses one an author left empty, naming the line', () => {
+    expect(authoring('', '# entity miki', 'title: Miki', '', '# dialogue chat', 'owner = miki', 'node greet:', '  always', '  again:', '  A traveller, out here?')).toThrow(/isla\.dialogue\.chat\.greet\.again is said to a player and says nothing at all/);
+  });
+
+  it('refuses one that is nothing but a note, because the note is dropped when the line is said', () => {
+    expect(authoring('', '# item rope', 'title: @@@')).toThrow(/isla\.item\.rope\.title is said to a player and is nothing but a @@@ note/);
+    expect(authoring('', '# item rope', 'title: @@@ it wants a name the ropemaker would use')).toThrow(/isla\.item\.rope\.title is said to a player and is nothing but a @@@ note/);
+  });
+
+  it('takes a note beside words, which is a line that is playable while it waits', () => {
+    expect(authoring('', '# item rope', 'title: Rope @@@ it wants a better name')).not.toThrow();
+  });
+
+  it('reaches a translation as well, since a locale writes lines the game says', () => {
+    expect(authoring('', '# item rope', 'title: Rope', '', '# locale fr', 'isla.item.rope.title: @@@')).toThrow(/isla\.item\.rope\.title in fr is said to a player and is nothing but a @@@ note/);
+  });
+});
+
 const SPOKEN_EVERYWHERE = [
   '# info deep',
   'version: 1.0.0',

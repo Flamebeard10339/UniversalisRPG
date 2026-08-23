@@ -22,10 +22,6 @@ describe('what the corpus says is unfinished', () => {
     expect(lines.join('\n')).toContain('1 line(s) marked rough');
   });
 
-  it('says so plainly where a line is nothing but a mark, which is a line the game will say as nothing', () => {
-    expect(noteLines(island('', '# item rope', 'title: @@@')).join('\n')).toContain('stands as: (nothing at all)');
-  });
-
   it('finds nothing to say about a corpus that left no marks', () => {
     expect(noteLines(island('', '# item rope', 'title: Rope'))).toEqual(['no @@@ anywhere: nothing here is marked unfinished']);
   });
