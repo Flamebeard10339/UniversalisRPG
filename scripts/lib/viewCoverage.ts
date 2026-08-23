@@ -59,12 +59,18 @@ export interface PathExcuse {
   readonly why: string;
 }
 
-// What one driver made of one script: the views it walked through, and everything it drew while
-// walking them.
+// One moment of a run: the view the driver was left holding, beside what it drew for that view
+// alone. Held apart moment by moment rather than poured into one blob, because a whole run's text
+// says a word so many times that no count taken over it can tell which path put it there.
+export interface SurfaceStep {
+  readonly view: PlayView;
+  readonly rendered: string;
+}
+
+// What one driver made of one script.
 export interface SurfaceRun {
   readonly name: string;
-  readonly views: readonly PlayView[];
-  readonly rendered: string;
+  readonly steps: readonly SurfaceStep[];
 }
 
 const under = (path: string, excused: string): boolean => path === excused || path.startsWith(`${excused}.`) || path.startsWith(`${excused}[`) || path.startsWith(`${excused}{`);
@@ -73,18 +79,10 @@ const under = (path: string, excused: string): boolean => path === excused || pa
 // keep it honest — a live view still carries something at the path it names, and the reason is
 // more than a placeholder.
 export function excusedPathsAreReal(runs: readonly SurfaceRun[], excused: readonly PathExcuse[]): string[] {
-  const live = runs.flatMap((run) => run.views).flatMap((view) => leaves(view)).map((leaf) => leaf.path);
+  const live = runs.flatMap((run) => run.steps).flatMap((step) => leaves(step.view)).map((leaf) => leaf.path);
   return excused.filter((each) => each.why.length <= 20 || !live.some((path) => under(path, each.path))).map((each) => each.path);
 }
 
-// Where the drivers disagree. A path drawn by every driver is parity and a path drawn by none is
-// one decision made everywhere — a machine name a player never reads, an enum a renderer acts on
-// rather than prints. A path drawn by some and not the others is a surface that has lost a
-// capability the others kept, which is the only thing this can catch and the only thing worth
-// catching: nothing here says what ought to be drawn, only that they cannot differ about it.
-//
-// A path counts as drawn when every string the view put there turns up verbatim in the render:
-// passing on whichever one came first is what let a quest's title stand in for the lines under it.
 // Every string this world can say, off the locale that declares them. It is what tells a leaf
 // holding words a player reads from one holding a machine name, an enum a renderer acts on, or a
 // figure each surface rounds its own way — none of which any two drivers were ever going to spell
@@ -97,29 +95,66 @@ export function everythingSaid(registry: Registry): ReadonlySet<string> {
   return said;
 }
 
+// A path only some of whose strings are prose is one the world says through and addresses through
+// at once — an id beside a title — and the words are the half a player reads.
+function wordsHere(view: PlayView, said: ReadonlySet<string>): Map<string, readonly string[]> {
+  const words = new Map<string, readonly string[]>();
+  for (const leaf of leaves(view)) {
+    const mine = leaf.signatures.filter((each) => said.has(each));
+    if (mine.length > 0) words.set(leaf.path, mine);
+  }
+  return words;
+}
+
+function times(rendered: string, word: string): number {
+  let count = 0;
+  for (let at = rendered.indexOf(word); at >= 0; at = rendered.indexOf(word, at + word.length)) count += 1;
+  return count;
+}
+
+// The paths one moment's render draws **in its own right**. A path whose words another path also
+// holds is drawn for free by anyone who asks only whether the words are somewhere in the text, so
+// a word counts for a path only beyond the times the paths already known to be drawn account for
+// it — and a path is known to be drawn by holding a word no other path holds, since nothing else
+// could have put such a word on the surface. What is left over is the path's own showing.
+function drawnHere(step: SurfaceStep, said: ReadonlySet<string>): ReadonlySet<string> {
+  const words = wordsHere(step.view, said);
+  const bearers = new Map<string, string[]>();
+  for (const [path, mine] of words) for (const word of mine) bearers.set(word, [...(bearers.get(word) ?? []), path]);
+  const counted = new Map<string, number>();
+  const drawn = (word: string): number => counted.get(word) ?? (counted.set(word, times(step.rendered, word)), counted.get(word)!);
+  const proved = new Set([...words].filter(([, mine]) => mine.some((word) => bearers.get(word)!.length === 1 && drawn(word) > 0)).map(([path]) => path));
+  const spokenFor = (word: string, path: string): number => bearers.get(word)!.filter((each) => each !== path && proved.has(each)).length;
+  return new Set([...words].filter(([path, mine]) => mine.some((word) => drawn(word) > spokenFor(word, path))).map(([path]) => path));
+}
+
+// Where the drivers disagree. A path drawn by every driver is parity and a path drawn by none is
+// one decision made everywhere — a machine name a player never reads, an enum a renderer acts on
+// rather than prints. A path drawn by some and not the others is a surface that has lost a
+// capability the others kept, which is the only thing this can catch and the only thing worth
+// catching: nothing here says what ought to be drawn, only that they cannot differ about it.
 export function driftingPaths(runs: readonly SurfaceRun[], said: ReadonlySet<string>, excused: readonly PathExcuse[]): string[] {
   // Each driver is judged against what its own session published, never against another's: two
   // drivers walking one script still reach different states — a live one ticks an action out
   // where a turn-taking one stops after a cycle — and holding one to strings the other's world
-  // held and its own never did would report a difference nobody made.
+  // held and its own never did would report a difference nobody made. A driver draws a path by
+  // drawing it at any one moment its view carried it: a terminal answers a command rather than
+  // redrawing everything each turn, and being shown once is what being shown means.
   const verdicts = runs.map((run) => {
-    const own = new Map<string, string[]>();
-    for (const view of run.views) {
-      // A path only some of whose strings are prose is one the world says through and addresses
-      // through at once — an id beside a title — and the words are the half a player reads.
-      for (const leaf of leaves(view)) {
-        const words = leaf.signatures.filter((each) => said.has(each));
-        if (words.length > 0) own.set(leaf.path, [...new Set([...(own.get(leaf.path) ?? []), ...words])]);
-      }
+    const carried = new Set<string>();
+    const drew = new Set<string>();
+    for (const step of run.steps) {
+      for (const path of wordsHere(step.view, said).keys()) carried.add(path);
+      for (const path of drawnHere(step, said)) drew.add(path);
     }
-    return { run, own };
+    return { run, carried, drew };
   });
-  const everyPath = [...new Set(verdicts.flatMap(({ own }) => [...own.keys()]))];
+  const everyPath = [...new Set(verdicts.flatMap(({ carried }) => [...carried]))];
 
   return everyPath.flatMap((path) => {
     if (excused.some((each) => under(path, each.path))) return [];
-    const asked = verdicts.filter(({ own }) => (own.get(path) ?? []).length > 0);
-    const drew = asked.filter(({ run, own }) => own.get(path)!.every((each) => run.rendered.includes(each)));
+    const asked = verdicts.filter(({ carried }) => carried.has(path));
+    const drew = asked.filter((each) => each.drew.has(path));
     if (drew.length === 0 || drew.length === asked.length) return [];
     const missing = asked.filter((each) => !drew.includes(each));
     return [`${path} — drawn by ${drew.map(({ run }) => run.name).join(' and ')}, not by ${missing.map(({ run }) => run.name).join(' or ')}`];
