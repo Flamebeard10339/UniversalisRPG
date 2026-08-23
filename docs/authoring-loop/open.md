@@ -11,22 +11,30 @@ without evidence is a hunch and does not belong here yet.
 
 ---
 
-## Refactor quest journal
-Refactor the quest journal. It should be written from the player's perspective. No hints or handholding. Just thoughts of what `I` should do next. If a player wants information, they should talk to people in the world which should update the notes. The journal is useful for remembering what happened and general information. It should not guide the player to the next step exactly.
+## Three rulings left over from the journal and the shop
 
-Part of the fun is figuring out what is the next thing that you need to do. This game will not have a dotted yellow line for players to mindlessly follow. We need to be vigilant that agent's being confused by quests being misinterpreted that the quest needs more handholding. We should just tell them that the quests may not be trivial. 
+Both features landed. What is left under each is a decision the owner has to
+make, not work anybody is blocked on.
 
-## Proper shop with modal
-Create a proper shop modal instead of listing specific buy actions at specific entities. The modal has a list of items it sells. And a bool of whether they accept any item or just items they stock (Default true). The modal shows all items the store currently has in stock. Allows selling any tradable item in the inventory, and buying any item currently in stock. Can buy/sell multiples (buy 23), but can't go below the shops stock. Shops don't have a maximum stock. 
+**`hint:` is now a misnomer.** The journal is written in the player's voice and
+names no room, route or verb, so the field holds what the player is turning over
+rather than a hint. Renaming it (`thinking:`, `wondering:`) touches every quest
+line in the corpus plus the oracle's note and the `journal:` directive's. Worth
+doing or worth dropping; not worth drifting.
 
-Shops keep a running tally of how much stock they currently have, and regenerate stock with a rate. 1 item per minute is the default. The replenish brings the item total toward what the shop stocks, so an unstocked item moves to 0 and gets deleted. 
+**The playbot never sees a quest's `log:`.** `renderJournal`
+(`scripts/playbot.ts`) shows the title, the standing and the hint. A human player
+gets the log lines on the quest screen. Now that hints are deliberately vague,
+the bot has strictly less to go on than a person does, and the runs' `confusion`
+reports are the thing being calibrated. Against that: every line added is paid
+per turn, which is what the cost spec is about.
 
-Shops have an efficiency value for selling and buying. Each one is a multiplier on how much coin a player gets or needs compared to the default value of an item. Buying and selling always uses integer coin values. 
-Defaults: buying=1.2, selling=0.8
-
-Shops only interact with items that define a value in coins. Otherwise, the item is untradable. 
-
-It goes without saying, but coins don't have a value and can't be bought or sold. This doesn't need a rule, just don't give coins a value and it won't create an infinite loop. 
+**Nothing shipped is priced except what the three stalls trade.** A rat pelt, a
+log, a honeycomb, royal jelly and both cooked foods declare no `value:`, so no
+shop will take them even though `accepts: any` is the default. That is a
+coherent state — an item without a value is untradable by design — but it means
+the loot a player accumulates cannot be sold, which is usually the point of
+loot. Pricing them is one balance pass over `content/core.dsl`.
 
 ## A quest cannot hold all of its own state
 
@@ -128,14 +136,6 @@ whether the beach is the right anchor for a proving ground is map churn for the
 hardening pass.
 
 ## Ours, and small
-
-**`tutorial-quests` still counts to its choices.** `choose:` now takes a name —
-the words a menu line is written with, or the node a thread opens — and `tulsa`'s
-two routes were converted with it. The seven `choose: N` lines in
-`content/tutorial-quests.dsl` were left alone because that module was being
-written in another lane at the time. *Closes when:* those seven name what they
-take, and `translationSurvival`'s "names the choice it takes rather than counting
-to it" covers them because `tutorial-quests` has joined the world it loads.
 
 **A stage's `log:` has no conditional form**, so a stage that spans two beats reads
 as one constant where `hint when <condition>:` would read as two. A second
