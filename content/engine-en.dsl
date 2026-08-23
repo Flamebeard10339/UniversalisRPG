@@ -27,7 +27,7 @@ engine.combat.foe.miss: The {attacker} misses you.
 engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
 engine.combat.other.miss: The {attacker} misses the {target}.
 engine.combat.felled: The {target} falls.
-engine.item.examine: This is {article} {item}.
+engine.examine.beside: {subject} — {examine}
 engine.item.modified: Modified {item}
 engine.carried.stack: {item} x{count}
 engine.carried.worn: {item} ({slot})
@@ -61,7 +61,7 @@ engine.plane.allocate.position: allocate: position {position}
 engine.plane.feed: feed: with {item}
 engine.plane.back: Back to inventory
 engine.plane.heading: {plane} at {hex}
-engine.plane.heading.said: {plane} at {hex} — {said}
+engine.plane.heading.said: {heading} — {said}
 engine.plane.node.slot: the {direction} slot of {hex}
 engine.plane.node.position: position {position} of {hex}
 engine.plane.no-slot: there is no jewel slot on the {direction} edge of {hex}

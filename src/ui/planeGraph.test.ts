@@ -17,6 +17,7 @@ function clusterOf(shape: Shape, hex: string, over: Partial<Cluster> = {}): Clus
     hex,
     jewel: shape.name,
     title: asLocalized(shape.name),
+    examine: null,
     shape: shape.name,
     entry: null,
     effects: [],

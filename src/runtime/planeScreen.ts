@@ -86,8 +86,11 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
 function heading(localizer: Localizer, frame: PlaneFrame, report: PlaneReport | undefined): Localized {
   const plane = report?.name ?? localizer.identifier(frame.target);
   const hex = localizer.identifier(frame.hex);
-  if (frame.said === undefined) return localizer.engine('engine.plane.heading', { plane, hex });
-  return localizer.engine('engine.plane.heading.said', { plane, hex, said: say(localizer, frame.said) });
+  const examine = report?.clusters.find((cluster) => cluster.hex === frame.hex)?.examine ?? null;
+  const place = localizer.engine('engine.plane.heading', { plane, hex });
+  const here = examine === null ? place : localizer.engine('engine.examine.beside', { subject: place, examine });
+  if (frame.said === undefined) return here;
+  return localizer.engine('engine.plane.heading.said', { heading: here, said: say(localizer, frame.said) });
 }
 
 export function planeOptions(frame: PlaneFrame, state: GameState, registry: Registry): ModalOption[] {

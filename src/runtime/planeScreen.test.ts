@@ -267,7 +267,8 @@ describe('a frame carries a key, not a sentence', () => {
     '# locale es',
     'item.blade.title: Hoja',
     'engine.item.modified: {item} modificada',
-    'engine.plane.heading.said: {plane} en {hex} — {said}',
+    'engine.plane.heading: {plane} en {hex}',
+    'engine.plane.heading.said: {heading} — {said}',
     'engine.plane.no-points: {node} cuesta un punto y no queda ninguno',
     'engine.plane.node.position: posicion {position} de {hex}',
   ].join('\n');

@@ -29,6 +29,7 @@ const cluster = (over: Partial<ClusterReport> = {}): ClusterReport => ({
   hex: '0,0',
   jewel: 'mod.core',
   title: asLocalized('Core'),
+  examine: null,
   shape: 'spindle',
   entry: null,
   effects: [],
