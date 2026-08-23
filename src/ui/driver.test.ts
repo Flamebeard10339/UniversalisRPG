@@ -151,7 +151,7 @@ describe('the GUI driver', () => {
     driver.answer(race.key, race.values![0].value);
 
     expect(shown(driver).modals).toEqual([]);
-    expect(shown(driver).player.name).toBe('Sir Robin');
+    expect(shown(driver).player.name?.title).toBe('Sir Robin');
   });
 
   it('reports a refusal as the engine worded it and leaves the session where it was', () => {

@@ -28,7 +28,7 @@ import { LAYERS, OPENING, pageRested, shownIn, subpageOf, toLayer, toSubpage, ty
 import { Pager } from './Pager';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
-import { carried, counted, worn } from './sheet';
+import { carried, counted, identity, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
@@ -218,7 +218,7 @@ export function App({
         />
       );
     }
-    if (subpage.id === 'stats') return <Ledger entries={counted(view.stats, localizer)} />;
+    if (subpage.id === 'stats') return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer)]} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;

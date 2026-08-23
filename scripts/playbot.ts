@@ -261,7 +261,7 @@ export function renderView(v: PlayView, localizer: Localizer): string {
     ...labelled('stats', v.stats.map((row) => `${row.title} ${row.value}`)),
     ...labelled('journal', renderJournal(v)),
     ...labelled('discovered', renderDiscovered(v)),
-    ...labelled('player', [v.player.name, v.player.race].filter((each) => each !== '')),
+    ...labelled('player', Object.values(v.player).flatMap((row) => (row === null ? [] : [`${row.label} ${row.title}`]))),
     ...labelled('journey', v.journey === null ? [] : [`travelling to ${v.journey.to} by ${v.journey.legs.join(' ')}`]),
     ...labelled('action', v.action === null ? [] : renderAction(v.action)),
   ];

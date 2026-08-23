@@ -18,7 +18,7 @@ export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
-import { PLAYER } from './state';
+import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, type PlayerField } from './state';
 import { declaredId } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
@@ -72,6 +72,18 @@ export interface SkillRow extends CountedRow {
   span: number;
 }
 
+// One row per field of the player's sheet — what the field is called, the id the state holds, and the
+// words that id is read out as, which are the same string for a field the player wrote themselves. A
+// field nobody has answered yet is null rather than a row of empty strings, so a sheet no character
+// creation has been through publishes nothing to draw.
+export interface PlayerRow {
+  id: Answer;
+  label: Localized;
+  title: Localized;
+}
+
+export type PlayerRows = Readonly<Record<PlayerField, PlayerRow | null>>;
+
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
   entities: Array<{ id: Answer; title: Localized; examine?: Localized }>;
@@ -93,7 +105,7 @@ export interface PlayStatus {
   locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
   journal: JournalEntry[];
-  player: { name: Answer; race: Answer };
+  player: PlayerRows;
   action: PlayAction | null;
 }
 
@@ -399,9 +411,20 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     locations: [...registry.locations.values()].map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),
-    player: { ...state.player },
+    player: playerRows(state, registry),
     action: publishAction(state, registry),
   };
+}
+
+function playerRows(state: GameState, registry: Registry): PlayerRows {
+  const localizer = localizerOf(registry, state);
+  const row = (field: PlayerField): PlayerRow | null => {
+    const id = state.player[field];
+    if (id === '') return null;
+    const { names, asked } = PLAYER_SHEET[field];
+    return { id, label: localizer.engine(asked), title: names === null ? localizer.identifier(id) : localizer.title(names, id) };
+  };
+  return Object.fromEntries(PLAYER_FIELDS.map((field) => [field, row(field)])) as PlayerRows;
 }
 
 function skillRow(id: string, value: number, localizer: Localizer): SkillRow {
