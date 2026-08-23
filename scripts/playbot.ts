@@ -278,7 +278,10 @@ export function renderView(v: PlayView, localizer: Localizer): string {
     else parts.push('  value=<free text>');
   } else if (v.choices.length > 0) {
     parts.push('choices:');
-    for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${String(choice.label)}`);
+    // What the choice is offered by, which the terminal draws beside the label through
+    // `engine.repl.choice.owned`. Without it three things standing here that can each be looked at
+    // read as `Look`, `Look`, `Look`, told apart only by an id the model has to parse.
+    for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
   } else {
     parts.push('choices: (nothing offers itself here)');
   }
