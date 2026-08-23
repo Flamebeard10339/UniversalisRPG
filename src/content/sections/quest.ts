@@ -14,7 +14,7 @@ export interface QuestSpeech {
   node: DialogueNode;
 }
 
-// What to do next, and when that is what there is to do. A stage is left by a line an entity says as often as by a `done when:`, so one stage spans more than one beat — do the thing, then go back and tell them — and no single string is right in both.
+// What the player is turning over, and when that is what they are turning over. A stage is left by a line an entity says as often as by a `done when:`, so one stage spans more than one beat — do the thing, then go back and tell them — and no single string is right in both.
 export interface QuestHint {
   when?: Condition;
   said: ActionResult;
@@ -34,7 +34,7 @@ export interface QuestStage {
 export interface Quest {
   id: string;
   title?: string;
-  // What the journal reads before the quest has begun, and what to do to begin it. A stage's own log says what has happened; these say what has not.
+  // What the journal reads before the quest has begun. A stage's own log says what has happened; these say what has not.
   log?: ActionResult;
   hints: QuestHint[];
   stages: QuestStage[];
@@ -223,6 +223,9 @@ const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
 // One line, said in both places a hint can be written, because it is the same rule in both.
 const HINT_WHEN_NOTE = 'the last hint whose condition holds is the one shown, so a plain `hint:` written above is the default and each of these is an exception to it';
 
+// The journal is the player's own notebook and is written in their voice, which is the whole of what tells a hint from a walkthrough. Said on both `hint:` lines, since that is the line an author reaches for a direction on.
+const JOURNAL_VOICE = 'the player thinking, not the game instructing: what they are wondering or have not managed yet, in their own words. Never a route, a room or a step to take — working out what is next is the play, and a quest is allowed to be hard';
+
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
 const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored`;
 
@@ -253,17 +256,17 @@ export const quest = section<Quest>()({
   says: (value) => [spokenHere(value), ...value.stages.map(spokenHere)],
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
-    { form: 'log: <text>', example: 'log: A guide on the island is said to take newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
-    { form: 'hint: <text>', example: 'hint: Talk to Miki in the guide house.', family: 'before it begins', note: 'what to do to begin it' },
-    { form: 'hint when <condition>: <text>', example: 'hint when has core.lockpick: The front door is locked, and you have something that opens locks.', family: 'before it begins', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
+    { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
+    { form: 'hint: <text>', example: 'hint: I should find out who keeps this house.', family: 'before it begins', note: JOURNAL_VOICE },
+    { form: 'hint when <condition>: <text>', example: 'hint when has core.lockpick: The front door is locked, and this thing opens locks.', family: 'before it begins', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
     {
       form: 'stage <name>:',
       example: 'stage offered:',
       note: STAGE_NOTE,
       block: (): Written[] => [
-        { form: 'log: <text>', example: 'log: Miki offered to show you the ropes.', family: 'what the journal says', note: 'what the journal reads while the quest stands here' },
-        { form: 'hint: <text>', example: 'hint: Talk to Miki in the guide house.', family: 'what the journal says' },
-        { form: 'hint when <condition>: <text>', example: 'hint when has core.bread: Take the loaf back to Miki.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
+        { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: "the player's own note of what happened while the quest stood here, kept to a line or two" },
+        { form: 'hint: <text>', example: 'hint: I have not given him an answer.', family: 'what the journal says', note: JOURNAL_VOICE },
+        { form: 'hint when <condition>: <text>', example: 'hint when has core.bread: The loaf came out warm. Miki said he would wait.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },

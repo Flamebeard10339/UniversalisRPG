@@ -68,7 +68,9 @@ const SHARED_PRODUCT = `## What your reply is for
 
 "note" is a running commentary — keep it to one plain sentence, in your own voice, about what you are doing and why. It is not read by the engine, only by whoever reads the run log afterward.
 
-"expected" and "confusion" are the actual point of this exercise. You are not just moving through the world — you are the first read of it. Every time you reach for something that is not there — an action you would expect to be able to take here, an object the room describes but does not let you touch, a verb that exists everywhere else but not on this one thing — say so in "expected", specifically enough that whoever reads it later knows exactly what is missing and where. Every time something reads as unclear, unfinished, self-contradictory, or like it is announcing a fact that never pays off — a room that keeps mentioning something with no way to interact with it, text that promises a consequence nothing delivers — say so in "confusion". Leave both empty only when there is truly nothing to report: do not pad them with something trivial to seem thorough, and do not leave them empty out of politeness when something genuinely did not work. A run that only records the moves you made and never records what you could not do has produced nothing anyone can act on.`;
+"expected" and "confusion" are the actual point of this exercise. You are not just moving through the world — you are the first read of it. Every time you reach for something that is not there — an action you would expect to be able to take here, an object the room describes but does not let you touch, a verb that exists everywhere else but not on this one thing — say so in "expected", specifically enough that whoever reads it later knows exactly what is missing and where. Every time something reads as unclear, unfinished, self-contradictory, or like it is announcing a fact that never pays off — a room that keeps mentioning something with no way to interact with it, text that promises a consequence nothing delivers — say so in "confusion". Leave both empty only when there is truly nothing to report: do not pad them with something trivial to seem thorough, and do not leave them empty out of politeness when something genuinely did not work. A run that only records the moves you made and never records what you could not do has produced nothing anyone can act on.
+
+One thing about this world bears on "confusion" rather than on any single turn: a quest here is not meant to be trivial, and it is not going to tell you where to go next. The journal is your own notebook — it records what happened and what you are turning over, in your own voice, and it names no room, no route and no verb. Working out what to do next is the game, so not knowing is an ordinary state to be in and is not by itself a fault worth reporting. When you are stuck, that is the cue to look harder at where you are: examine what the room names, talk to whoever is standing in it and talk to them again, and look at what you are carrying — people are how you learn things here, and what they tell you is what your notes get written out of. Save "confusion" for a quest that contradicts itself, that told you something which turns out not to be true, or that you are stuck on after genuinely running out of things to try — never for a step that was simply not spelled out for you.`;
 
 const SHARED_STOPPING = `## Ending the run
 
@@ -225,7 +227,7 @@ function renderEquipment(v: PlayView): string[] {
 }
 
 function renderJournal(v: PlayView): string[] {
-  return v.journal.map((entry) => `${entry.title} [${entry.standing}]${entry.hint === null ? '' : ` — next: ${entry.hint}`}`);
+  return v.journal.map((entry) => `${entry.title} [${entry.standing}]${entry.hint === null ? '' : ` — ${entry.hint}`}`);
 }
 
 function renderDiscovered(v: PlayView): string[] {

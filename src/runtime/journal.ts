@@ -23,7 +23,7 @@ export interface JournalEntry {
   standing: QuestStanding;
   // One line to each stage the quest has been through. A quest nobody has begun has been through nothing and reads as nothing, rather than reading out what has not happened yet.
   lines: JournalLine[];
-  // What to do next, which is nothing for a quest not under way.
+  // What the player is turning over, which is nothing for a quest not under way.
   hint: Localized | null;
 }
 

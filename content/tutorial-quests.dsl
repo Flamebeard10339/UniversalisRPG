@@ -20,12 +20,12 @@ dependencies:
 
 # quest finding-your-feet
 title: Finding Your Feet
-log: They say a guide keeps this house, and takes newcomers in hand.
-hint: Talk to Miki, in the guide house you woke in.
+log: I woke in a house that is not mine. They say whoever keeps it takes newcomers in hand.
+hint: I should find out who keeps this house.
 
 stage offered:
-  log: A guide called Miki offered to show you the ropes.
-  hint: Talk to Miki.
+  log: A guide called Miki offered to show me the ropes.
+  hint: I have not given him an answer.
   tulsa.miki says:
     always
     Greetings, adventurer! Welcome to UniversalisRPG.
@@ -37,9 +37,9 @@ stage offered:
       goto snubbed
 
 stage name-yourself:
-  log: Miki wants you to find the mirror and say who you are.
-  hint: The mirror stands in the guide house, in the room Miki is in.
-  hint when tulsa.mirror-done: You have a name. Miki is in the same room, waiting to hear it.
+  log: Miki says a quest begins with knowing who you are, and sent me off to find a mirror.
+  hint: I still do not know what to call myself.
+  hint when tulsa.mirror-done: I have a name now. Miki will want to hear it.
   tulsa.miki says:
     always
     again: The mirror's still waiting. Name yourself first, then we'll talk.
@@ -55,9 +55,9 @@ stage name-yourself:
     goto bake-bread
 
 stage bake-bread:
-  log: Water and flour make dough, and the oven makes bread of it.
-  hint: Knead the dough, then bake it in the oven.
-  hint when has core.bread: Take the loaf back to Miki.
+  log: Miki gave me water and flour. The two of them make dough, and dough wants an oven.
+  hint: I have made nothing of the water and the flour yet.
+  hint when has core.bread: The loaf came out warm. Miki said he would wait.
   tulsa.miki says:
     always
     sticky
@@ -74,9 +74,9 @@ stage bake-bread:
     goto clear-the-rats
 
 stage clear-the-rats:
-  log: Miki wants three giant rats put down.
-  hint: The basement, below the guide house.
-  hint when tulsa.rats-killed >= 3: Three down. Back up the stairs to Miki.
+  log: A sword and a shield, off Miki. He says there are giant rats under this house, and that three of them down would be proof enough.
+  hint: Not one of them down yet.
+  hint when tulsa.rats-killed >= 3: Three down, and barely a scratch on me. Miki will want to hear it.
   tulsa.miki says:
     always
     sticky
@@ -91,7 +91,7 @@ stage clear-the-rats:
     goto sendoff
 
 stage sendoff:
-  log: You have the measure of the place. Miki says the way off is east, past the sand.
+  log: Miki says he has nothing left to teach me, and that the way off is east, past the sand.
   complete
   tulsa.miki says:
     always
@@ -99,8 +99,8 @@ stage sendoff:
     Still here? East, past the sand. I've nothing else for you.
 
 stage snubbed:
-  log: You turned Miki down, and found your own way.
-  hint: Miki is still in the guide house, if you think better of it. Otherwise the front door is locked, and nothing on this floor opens it.
+  log: I turned Miki down. He took it badly, and the front door has not opened since.
+  hint: The door is locked, and I am no closer to opening it. Miki has not moved.
   tulsa.miki says:
     always
     sticky
@@ -126,9 +126,9 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: You went back and apologised. Miki took it, and set a price on it.
-  hint: Miki handed you a fishing net. The window upstairs looks out over the water.
-  hint when has core.fish: One fish, caught. Take it down to Miki.
+  log: I went back and apologised. Miki took it, and put a price on it: one fish, out of his own net.
+  hint: I have the net. I have not found the water.
+  hint when has core.fish: One fish, caught and cold. Miki said that squares us.
   tulsa.miki says:
     always
     sticky
@@ -155,13 +155,13 @@ stage apologised:
 // you come back for one more word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
-log: There is a town east of the sand, and it goes on a while. Miki still calls this an island.
-hint: East, past the sand. See the town first.
-hint when tulsa.market-square.discovered: Go back to the guide house. Miki will have something to say about it.
+log: East of the sand there is a town, and it goes on a while. Miki still calls this an island.
+hint: I have not seen how far this island goes.
+hint when tulsa.market-square.discovered: That was no island. Miki should hear it from me.
 
 stage adrift:
-  log: Miki said his piece about your leaving. Neither of you has moved.
-  hint: Nothing here needs doing. The town is east, and Miki is not going anywhere.
+  log: Miki had his last word about my leaving. Neither of us has moved since.
+  hint: Nothing here needs me. Whatever is next is somewhere I have not been.
   tulsa.miki says:
     when: tulsa.market-square.discovered
     sticky
@@ -295,7 +295,9 @@ expect only: apology-route-full-end
 // stage stands over two beats: bake the loaf, then carry it back. This is the
 // state each of that stage's two hints is gated on — the plain one while there
 // is no loaf, `hint when has core.bread` once there is — and the proof that no
-// single hint could be right in both.
+// single hint could be right in both. The two `journal:` lines are the words
+// themselves, which is where the two beats are actually felt: one line the
+// player has not done the thing yet, one line they have.
 # test bake-bread-spans-two-beats
 load: miki-route-start
 run: quest-offered
@@ -304,9 +306,11 @@ submit-modal: name=Rowan
 submit-modal: race=elf
 talk: tulsa.miki
 assert: finding-your-feet.bake-bread and not has core.bread
+journal: finding-your-feet says I have made nothing of the water and the flour yet.
 craft: dough
 craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
+journal: finding-your-feet says The loaf came out warm. Miki said he would wait.
 
 // A `use:` that finds its own action already under way against the same target
 // advances one cycle of the fight in progress instead of restarting it, so
