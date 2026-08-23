@@ -4,12 +4,12 @@ import { loadModule } from './load';
 const room = (...lines: string[]): string => ['# location shore', 'x: 0, y: 0', 'starting', 'entities:', '  bollard', '', '# entity bollard', 'title: A Bollard', ...lines].join('\n');
 
 describe('# entity examine:', () => {
-  it('is offered as an action addressed look, which says those words and nothing else', () => {
+  it('is offered as an action addressed examine, which says those words and nothing else', () => {
     const registry = loadModule(room('examine: Iron, and cold to the hand.'));
     const [action, ...rest] = registry.entities.get('bollard')!.actions;
 
     expect(rest).toEqual([]);
-    expect(action.label).toBe('Look');
+    expect(action.label).toBe('Examine');
     expect(action.kind).toBe('instant');
     expect(action.results).toEqual([{ kind: 'say', text: 'Iron, and cold to the hand.', key: 'entity.bollard.examine' }]);
   });
@@ -22,9 +22,9 @@ describe('# entity examine:', () => {
   });
 
   it('is named the same way a written action is, so a # test can walk up to it', () => {
-    const registry = loadModule([room('examine: Iron, and cold to the hand.'), '', '# test walk', 'use: entity.bollard.look'].join('\n'));
+    const registry = loadModule([room('examine: Iron, and cold to the hand.'), '', '# test walk', 'use: entity.bollard.examine'].join('\n'));
 
-    expect(registry.namespace.has('action-slug', 'entity.bollard.look')).toBe(true);
+    expect(registry.namespace.has('action-slug', 'entity.bollard.examine')).toBe(true);
     expect([...registry.tests.keys()]).toEqual(['walk']);
   });
 

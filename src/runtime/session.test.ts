@@ -1363,7 +1363,7 @@ describe('a missing translation shows its key, in every direction', () => {
     expect(v.location.description).toBe('island.location.shore.examine');
     expect(v.entities[0].title).toBe('island.entity.crab.title');
     expect(v.choices.map((choice) => choice.label)).toContain('engine.travel.to');
-    expect(v.choices.map((choice) => choice.label)).toContain('action.look.look');
+    expect(v.choices.map((choice) => choice.label)).toContain('action.examine.examine');
   });
 
   it('shows what the locale does translate, and the key for what it does not', () => {
@@ -1386,7 +1386,7 @@ describe('a missing translation shows its key, in every direction', () => {
     const v = view(startSession(loadUniverse([{ name: 'island', text: ISLAND }]), 'en'));
 
     expect(v.location.title).toBe('Shore');
-    expect(v.choices.map((choice) => choice.label)).toEqual(['Look', 'engine.travel.to']);
+    expect(v.choices.map((choice) => choice.label)).toEqual(['Examine', 'engine.travel.to']);
   });
 
   it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {

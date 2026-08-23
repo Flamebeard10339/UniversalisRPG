@@ -36,6 +36,12 @@ export const isDebug = (value: object | undefined): boolean => (value as { debug
 // Laid on the value rather than held in a table beside it, so every hand a section passes through — a merge, a build, a prune that spreads it, a printer — carries the mark without knowing it is there.
 const asDebug = <V extends object>(value: V): V => Object.defineProperty(value, 'debug', { enumerable: true, configurable: true, value: true });
 
+// An action a section of this kind offers that its author did not write as an action block: the address it takes, and the line an author reads it under.
+export interface MintedAction {
+  address: string;
+  from: string;
+}
+
 // A name the namespace holds under one value of this kind, wherever that value came from. A kind declaring this is answering for every value that lands in its map, including the ones another kind put there.
 export interface MemberName {
   kind: string;
@@ -52,7 +58,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   map: string | null;
   maps: Lands<V, M>;
   nestsActions: boolean;
-  mintedActions?: (value: V) => readonly string[];
+  mintedActions?: (value: V) => readonly MintedAction[];
   flags: readonly string[];
   names: readonly Named[];
   grammar: readonly Written[];
@@ -73,8 +79,8 @@ interface Common<V extends { id: string }> {
   ids: Ids;
   // Where the actions written under this kind reach, said as the rest of "offered …". A kind that nests actions is the only thing that knows this — nothing in the engine can tell an item the player carries from an entity that stays where it stands — so declaring the reach is how a kind declares that it nests them at all.
   nestsActions?: string;
-  // The addresses of the actions a section of this kind offers that its author did not write as an action block. Read off the value, since a kind mints one only where the field it compiles is written.
-  mintedActions?: (value: V) => readonly string[];
+  // The actions a section of this kind offers that its author did not write as an action block. Read off the value, since a kind mints one only where the field it compiles is written.
+  mintedActions?: (value: V) => readonly MintedAction[];
   // Flags every section of this kind owns without an author writing them.
   flags?: readonly string[];
   // The result lists an author wrote here, whose spoken lines key under this id.

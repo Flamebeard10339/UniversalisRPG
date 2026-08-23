@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { declaredId } from './sections/entity';
-import { actionAddress } from './sections/action';
+import { actionAddress, type ActionTextOwner } from './sections/action';
 import { actionSlug, localeKey, missingTranslations, unmatchedLocaleKeys } from './locale';
 import { actionSlugProblem, contentSectionMaps } from './sections';
 import { everyActionTable, mapOf, type Registry } from './registry';
@@ -121,12 +121,26 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
   });
 
   it('refuses an action whose address is a field of the object that owns it', () => {
-    expect(() => loadModule('# action examine\ninstant\nsay: hm\n')).toThrow(/keys as examine, which is already a field of the object that owns it/);
+    const clashing = ['# entity bollard', 'examine: Iron, and cold to the hand.', 'examine--:', '  instant', '  say: hm'].join('\n');
+
+    expect(() => loadModule(clashing)).toThrow(/keys as examine, which is already a field of the object that owns it/);
+  });
+
+  it('takes that same address where the words key under a # action, which has no fields of its own', () => {
+    expect(() => loadModule('# action examine\ninstant\nsay: hm\n')).not.toThrow();
+  });
+
+  it('names the line that minted an address, rather than the action nobody wrote, when an author keys as it too', () => {
+    const clashing = ['# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.', '', '# entity mirror', 'examine: A tall mirror.', 'uses: examine'].join('\n');
+
+    expect(() => loadModule(clashing)).toThrow(/examine: already offers an action addressed examine, which "Give It A Long Look" keys as too/);
   });
 
   it('takes an address opening with a digit, and refuses one that is no key at all', () => {
-    expect(actionSlugProblem('3-card-monte', '3 card monte', new Set())).toBeUndefined();
-    expect(actionSlugProblem('', '...', new Set())).toMatch(/give it a label with a letter or a digit in it/);
+    const addressed = (field: string): ActionTextOwner => ({ namespace: null, kind: 'entity', id: 'door', field });
+
+    expect(actionSlugProblem(addressed('3-card-monte'), '3 card monte', new Map(), new Map())).toBeUndefined();
+    expect(actionSlugProblem(addressed(''), '...', new Map(), new Map())).toMatch(/give it a label with a letter or a digit in it/);
   });
 });
 
@@ -152,7 +166,9 @@ describe('an action declared once carries one key, however many owners perform i
   });
 
   it('writes none under the performer, so no translator fills one word once per performer', () => {
-    const perOwner = performed.map(({ kind, ownerId, action }) => localeKey(island.namespace.ownerOf(kind, ownerId) ?? null, kind, ownerId, actionAddress(action))).filter((key) => island.locales.base.has(key) || island.locales.addressable.has(key));
+    const perOwner = performed
+      .map(({ kind, ownerId, action }) => ({ key: localeKey(island.namespace.ownerOf(kind, ownerId) ?? null, kind, ownerId, actionAddress(action)), label: action.label }))
+      .filter(({ key, label }) => island.locales.base.get(key)?.text === label);
 
     expect(perOwner).toEqual([]);
   });
