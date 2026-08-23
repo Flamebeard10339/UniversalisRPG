@@ -318,7 +318,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     }
 
     if (roster.length === 0) {
-      endAction(state, localizerOf(registry, state).engine('engine.stopped.nobody'));
+      endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
       advanceTime(state, segEnd - state.time);
       return;
     }
@@ -399,7 +399,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     let changed = applyRespawns(state);
     if (stepJourney(state, registry)) changed = true;
     if (fightLeftItsLocation(state, registry)) {
-      endAction(state, localizerOf(registry, state).engine('engine.stopped.left'));
+      endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
       changed = true;
     }
 

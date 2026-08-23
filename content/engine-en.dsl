@@ -248,8 +248,6 @@ engine.stopped.event: {event} happened
 engine.stopped.finished: it was finished
 engine.stopped.unfinished: it ran out of attempts
 engine.stopped.unavailable: you could not carry on with it
-engine.stopped.nobody: there was nothing left to fight
-engine.stopped.left: what you were fighting was no longer here
 engine.stopped.arrived: you got where you were going
 engine.stopped.no-road: the way on was closed
 engine.stopped.called-off: you called it off
