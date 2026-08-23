@@ -21,6 +21,7 @@ names no room, route or verb, so the field holds what the player is turning over
 rather than a hint. Renaming it (`thinking:`, `wondering:`) touches every quest
 line in the corpus plus the oracle's note and the `journal:` directive's. Worth
 doing or worth dropping; not worth drifting.
+  RESPONSE: hint should be removed wholesale. 
 
 **The playbot never sees a quest's `log:`.** `renderJournal`
 (`scripts/playbot.ts`) shows the title, the standing and the hint. A human player
@@ -28,13 +29,26 @@ gets the log lines on the quest screen. Now that hints are deliberately vague,
 the bot has strictly less to go on than a person does, and the runs' `confusion`
 reports are the thing being calibrated. Against that: every line added is paid
 per turn, which is what the cost spec is about.
+  RESPONSE: The playbot has to have absolute parity with the other play surfaces. 
+  Otherwise it isn't effective at its job. We need to do a pass to make sure it is 
+  either impossible or very very difficult for the surfaces to drift in capability. 
 
-**Nothing shipped is priced except what the three stalls trade.** A rat pelt, a
-log, a honeycomb, royal jelly and both cooked foods declare no `value:`, so no
-shop will take them even though `accepts: any` is the default. That is a
-coherent state — an item without a value is untradable by design — but it means
-the loot a player accumulates cannot be sold, which is usually the point of
-loot. Pricing them is one balance pass over `content/core.dsl`.
+## Implement the economy
+Give most items a coin value. The important ones are items dropped by monsters. 
+The point is items should be tradeable, or intentionally untradable. 
+Should be one balance pass over `content/core.dsl`.
+
+## Improve the Mirror
+The mirror is a general purpose character customizer. It should be available as 
+many times as the player wants. It allows the player to change their name and their 
+race. It should be implemented such that playtesters don't assume using it multiple
+times is a problem. 
+
+The first time using the mirror is free. Subsequent uses require 1000 coins. 
+
+Each race gives a different permanent character bonus. +5% to a single stat.
+
+The mirror should be composed of two independent modals, one after the other. 
 
 ## A quest cannot hold all of its own state
 
@@ -77,13 +91,6 @@ is below is what a reading still has to settle.
   and Orb of Vitality must restore health. They are item modifiers. Their `examine:`
   lines were improved; whether that is enough is a reading question and was left
   for this pass deliberately.
-- **The mirror cannot offer a rename, and the writing now says so.** Two runs read
-  re-entering character creation as save corruption; the glass now says it does not
-  ask a second time, which matches what the engine does. But *renaming is allowed*
-  turns out not to be true through any content path: `character-creation`
-  (`src/runtime/modals.ts`) asks name **and** race together and writes both, so
-  re-opening it would re-pick race too. Offering a rename needs a name-only modal
-  screen. Whether the game should have one is the owner's call.
 
 The eight marks the corpus holds are `tulsa` entities waiting on quests that are
 not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
