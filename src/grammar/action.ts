@@ -2,8 +2,9 @@ import { ActionResult, actionResult, parseResultLine, resultGrammar, resultLines
 import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { filledBy } from './codec';
-import { list } from './list';
-import { Cursor, DslError, Filled, requireEnd, Span, Written } from './parser';
+import { paired } from './form';
+import { list, ListParser } from './list';
+import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './parser';
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { TagClause, tagClause } from './tagClause';
@@ -62,35 +63,63 @@ export const SIDES: readonly Side[] = ['my', 'their'];
 
 const SIDE = /(?:my|their)(?![\w-])/;
 
-function sided(cursor: Cursor): Sided {
+// A side is a closed set of words, and a set of words is a parser like any other, so what an author is offered is the set the engine reads.
+export const side: Parser<Side> = {
+  parse(cursor) {
+    const raw = cursor.take(SIDE);
+    if (raw === null) throw new DslError(`expected ${SIDES.join(' or ')}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    return raw as Side;
+  },
+  print: (value) => value,
+  forms: [...SIDES],
+  examples: [...SIDES],
+};
+
+const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
+
+const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${printSided(value.right)}`);
+
+function parseSided(cursor: Cursor): Sided {
   const marker = cursor.take(SIDE);
   if (marker === null) return { id: id.parse(cursor) };
   cursor.take(/[ \t]+/);
   return { side: marker as Side, id: id.parse(cursor) };
 }
 
-function contest(cursor: Cursor): Contest {
-  const left = sided(cursor);
+function parseContest(cursor: Cursor): Contest {
+  const left = parseSided(cursor);
   if (cursor.take(/[ \t]+vs[ \t]+/) === null) return { left };
-  return { left, right: sided(cursor) };
+  return { left, right: parseSided(cursor) };
 }
+
+// Half a contest, and a whole line where nothing stands opposite it: `vs` is what makes a line two-sided, so a line that leaves it out is a shape of its own rather than a half-written one.
+const sidedIn = (hole: string, examples: readonly string[]): Parser<Sided> => ({
+  parse: parseSided,
+  print: printSided,
+  holds: () => ({ side }),
+  forms: [`[<side> ]<${hole}>`],
+  examples,
+});
+
+const contest: Parser<Contest> = {
+  parse: parseContest,
+  print: printContest,
+  holds: () => ({ side }),
+  forms: ['[<side> ]<stat>[ vs [<side> ]<stat>]'],
+  examples: ['attack vs defence', 'my attack vs their defence', 'felling'],
+};
+
+const depleted = sidedIn('resource', ['their health', 'health']);
 
 type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
-const conditionValue: ActionValue = (cursor) => (cursor.done ? undefined : condition.parse(cursor));
-const contestValue =
-  (written: string): ActionValue =>
-  (cursor, line, label) =>
-    named(written, label, line, () => contest(cursor));
-const sidedValue =
-  (written: string): ActionValue =>
-  (cursor, line, label) =>
-    named(written, label, line, () => sided(cursor));
-const resultsValue: ActionValue = (cursor, line, label) => {
-  if (cursor.done) return hasBlock(line) ? results.parseBlock(takeBlock(line)) : undefined;
-  const inline = results.parse(cursor);
-  if (hasBlock(line)) throw new DslError(actionProblem(label, 'a result group is written inline and as a block; give it one'), line.span);
-  return inline;
+// A condition written into an action is one shape, and what a condition may be is the `<condition>` hole's business — the rule a result list already keeps. A keyword with nothing after it holds nothing, which is how a block overlaying another clears what it inherited.
+const optionalCondition: Parser<Condition | undefined> = {
+  parse: (cursor) => (cursor.done ? undefined : condition.parse(cursor)),
+  print: (value) => (value === undefined ? '' : condition.print(value)),
+  holds: () => ({ condition }),
+  forms: ['<condition>'],
+  examples: ['has-key'],
 };
 
 function named<T>(written: string, label: string, line: RawLine, read: () => T): T {
@@ -102,121 +131,67 @@ function named<T>(written: string, label: string, line: RawLine, read: () => T):
   }
 }
 
-const seconds: ActionValue = (cursor, line, label) => named('time', label, line, () => decimal.parse(cursor));
+const seconds: Parser<number> = { parse: (cursor) => decimal.parse(cursor), print: (value) => decimal.print(value), forms: ['<seconds>'], examples: ['3', '1.5'] };
 
-const perMinute: ActionValue = (cursor, line, label) =>
-  named('rate', label, line, () => {
+const perMinute: Parser<number | Sided> = {
+  parse(cursor) {
     const raw = cursor.take(DECIMAL);
-    return raw === null ? sided(cursor) : Number(raw);
-  });
+    return raw === null ? parseSided(cursor) : Number(raw);
+  },
+  print: (value) => (typeof value === 'number' ? String(value) : printSided(value)),
+  holds: () => ({ side }),
+  names: { 'per minute': 'stat' },
+  forms: ['<per minute>', '[<side> ]<stat>'],
+  examples: ['12', 'attack-speed'],
+};
 
-const positiveCount =
-  (written: string): ActionValue =>
-  (cursor, line, label) => {
+const positiveCount: Parser<number> = {
+  parse(cursor) {
     const raw = cursor.take(/\d+/);
-    if (raw === null || Number(raw) <= 0) throw new DslError(actionProblem(label, `${written} requires a positive integer`), line.span);
-    named(written, label, line, () => refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range'));
+    if (raw === null || Number(raw) <= 0) throw new DslError('requires a positive integer', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) });
+    refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range');
     return Number(raw);
+  },
+  print: (value) => String(value),
+  forms: ['<count>'],
+  examples: ['3'],
+};
+
+const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => ('element' in parser ? (parser as ListParser<unknown>) : undefined);
+
+// A field reads its value with the parser that shows its shapes, so what an author is offered and what the engine takes are one thing said once. A parser holding a list takes an indented block in place of its inline value, which is a fact about lists rather than about any one field.
+function readsWith(written: string, parser: Parser<unknown>): ActionValue {
+  const held = blockOf(parser);
+  if (held === undefined) return (cursor, line, label) => named(written, label, line, () => parser.parse(cursor));
+  return (cursor, line, label) => {
+    if (cursor.done) return hasBlock(line) ? held.parseBlock(takeBlock(line)) : undefined;
+    const inline = named(written, label, line, () => held.parse(cursor));
+    if (hasBlock(line)) throw new DslError(actionProblem(label, 'a result group is written inline and as a block; give it one'), line.span);
+    return inline;
   };
+}
 
 const ACTION_FIELDS: readonly (Filled & {
   written: string;
   label: RegExp;
   name: keyof Omit<Action, 'label' | 'results'>;
-  value: ActionValue;
-  form: string;
-  example: string;
+  parser: Parser<unknown>;
   family: string;
 })[] = [
-  {
-    written: 'requires',
-    label: /(?:requires|require):[ \t]*/,
-    name: 'requires',
-    value: conditionValue,
-    form: '<condition>',
-    example: 'has-key',
-    family: 'offered when',
-    holds: () => ({ condition }),
-  },
-  {
-    written: 'hidden if',
-    label: /hidden if:[ \t]*/,
-    name: 'hiddenIf',
-    value: conditionValue,
-    form: '<condition>',
-    example: 'found-key',
-    family: 'offered when',
-    holds: () => ({ condition }),
-  },
-  {
-    written: 'on success',
-    label: /on success:[ \t]*/,
-    name: 'onSuccess',
-    value: resultsValue,
-    form: '<result>, …',
-    example: 'give: plank',
-    family: 'and afterwards',
-    holds: () => ({ result: actionResult }),
-  },
-  {
-    written: 'on failure',
-    label: /on failure:[ \t]*/,
-    name: 'onFailure',
-    value: resultsValue,
-    form: '<result>, …',
-    example: 'say: nothing gives',
-    family: 'and afterwards',
-    holds: () => ({ result: actionResult }),
-  },
-  {
-    written: 'on unfinished',
-    label: /on unfinished:[ \t]*/,
-    name: 'onUnfinished',
-    value: resultsValue,
-    form: '<result>, …',
-    example: 'say: you break off',
-    family: 'and afterwards',
-    holds: () => ({ result: actionResult }),
-  },
-  { written: 'time', label: /time:[ \t]*/, name: 'time', value: seconds, form: '<seconds>', example: '3', family: 'how long it takes' },
-  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', value: perMinute, form: '<per minute>', example: '12', family: 'how long it takes', names: { 'per minute': 'stat' } },
-  {
-    written: 'accuracy',
-    label: /accuracy:[ \t]*/,
-    name: 'accuracy',
-    value: contestValue('accuracy'),
-    form: '[my ]<stat> vs [their ]<stat>',
-    example: 'accuracy vs evasion',
-    family: 'what it is contested on',
-  },
-  {
-    written: 'damage',
-    label: /damage:[ \t]*/,
-    name: 'damage',
-    value: contestValue('damage'),
-    form: '[my ]<stat> vs [their ]<stat>',
-    example: 'attack vs defence',
-    family: 'what it is contested on',
-  },
-  {
-    written: 'depletes',
-    label: /depletes:[ \t]*/,
-    name: 'depletes',
-    value: sidedValue('depletes'),
-    form: '[their ]<resource>',
-    example: 'their health',
-    family: 'what it is contested on',
-  },
-  {
-    written: 'attempts',
-    label: /attempts:[ \t]*/,
-    name: 'attempts',
-    value: positiveCount('attempts'),
-    form: '<count>',
-    example: '3',
-    family: 'how long it takes',
-  },
+  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when' },
+  { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', parser: optionalCondition, family: 'offered when' },
+  { written: 'on success', label: /on success:[ \t]*/, name: 'onSuccess', parser: results, family: 'and afterwards' },
+  { written: 'on failure', label: /on failure:[ \t]*/, name: 'onFailure', parser: results, family: 'and afterwards' },
+  { written: 'on unfinished', label: /on unfinished:[ \t]*/, name: 'onUnfinished', parser: results, family: 'and afterwards' },
+  { written: 'time', label: /time:[ \t]*/, name: 'time', parser: seconds, family: 'how long it takes' },
+  { written: 'rate', label: /rate:[ \t]*/, name: 'rate', parser: perMinute, family: 'how long it takes' },
+  { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', parser: contest, family: 'what it is contested on' },
+  { written: 'damage', label: /damage:[ \t]*/, name: 'damage', parser: contest, family: 'what it is contested on' },
+  { written: 'depletes', label: /depletes:[ \t]*/, name: 'depletes', parser: depleted, family: 'what it is contested on' },
+  { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes' },
 ];
+
+const ACTION_READERS = ACTION_FIELDS.map((field) => ({ ...field, read: readsWith(field.written, field.parser) }));
 
 const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   {
@@ -265,11 +240,11 @@ function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'l
   for (const retired of RETIRED_ACTION_FIELDS) {
     if (cursor.take(retired.label) !== null) throw new DslError(actionProblem(label, retired.message), line.span);
   }
-  for (const field of ACTION_FIELDS) {
+  for (const field of ACTION_READERS) {
     if (cursor.take(field.label) === null) continue;
     if (held[field.name] !== undefined) throw new DslError(actionProblem(label, `${field.written} is defined more than once`), line.span);
     if (appends && !APPENDABLE.has(field.written)) throw new DslError(actionProblem(label, `${field.written} holds one value, so + has nothing to add to — write it bare to replace what this block overlays`), line.span);
-    const value = field.value(cursor, line, label);
+    const value = field.read(cursor, line, label);
     if (value !== undefined) held[field.name] = value;
     if (appends) action.appended = (action.appended ?? []).concat(field.name);
     return;
@@ -357,17 +332,42 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
   if (problem !== undefined) throw new DslError(problem, span);
 }
 
-const STANDING_KINDS = TAGGED_ACTION_KINDS.filter((kind) => actionTableProblem({ label: '', kind, results: [] }) === undefined);
+// A pace an action may be written at, and where the engine takes that word only alongside another line, its own refusal is what the page says beside it. Filtering the word out instead left `continuous` in the corpus three times and on no page an author could read it off.
+const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => {
+  const caveat = actionTableProblem({ label: '', kind, results: [] });
+  return { form: kind, example: kind, family: 'how long it takes', ...(caveat === undefined ? {} : { note: caveat }) };
+});
 
+// A bare clause on an action holds on whoever is performing it while it runs. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
+const CLAUSE_NOTE = 'holds on whoever is performing the action, for as long as it is under way';
+
+const clauseLines = (): readonly Written[] =>
+  paired(tagClause.forms, tagClause.examples).flatMap((example, at) => {
+    if (example === undefined) return [];
+    try {
+      checkTags({ results: [], tags: tagClauses.parse(new Cursor(example)) }, '', undefined);
+    } catch {
+      return [];
+    }
+    return [{ form: tagClause.forms[at]!, example, family: 'while it is under way', note: CLAUSE_NOTE, ...filledBy(tagClause) }];
+  });
+
+// What a field's parser reads is what its lines offer. The shapes are the parser's own, so a shape the engine takes and the page will not show is not a thing that can be written here.
 const actionFieldLines = (): readonly Written[] =>
-  ACTION_FIELDS.flatMap((field) => [
-    { form: `${field.written}: ${field.form}`, example: `${field.written}: ${field.example}`, family: field.family, ...filledBy(field) },
-    ...(field.value === resultsValue ? [{ form: `${field.written}:`, example: `${field.written}:`, family: field.family, block: resultGrammar }] : []),
-  ]);
+  ACTION_FIELDS.flatMap((field) => {
+    // What the field says its placeholders hold stands over what the parser says, since one parser writes the values of fields that name different kinds.
+    const said = { family: field.family, ...filledBy(field.parser), ...filledBy(field) };
+    const held = blockOf(field.parser);
+    return [
+      ...paired(field.parser.forms, field.parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: `${field.written}: ${field.parser.forms[at]!}`, example: `${field.written}: ${example}`, ...said }])),
+      ...(held === undefined ? [] : [{ form: `${field.written}:`, example: `${field.written}:`, ...said, block: held.lines }]),
+    ];
+  });
 
 export const actionLinesWritten = (): readonly Written[] => [
   ...actionFieldLines(),
-  ...STANDING_KINDS.map((kind) => ({ form: kind, example: kind, family: 'how long it takes' })),
+  ...KIND_LINES,
+  ...clauseLines(),
   ...resultGrammar(),
 ];
 
@@ -397,10 +397,6 @@ function printResultBlock(lines: string[], label: string, values: readonly Actio
   if (!values || values.length === 0) return;
   lines.push(`${label}:`, ...indentLines(values.flatMap(resultLines), childSpaces));
 }
-
-const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
-
-const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${printSided(value.right)}`);
 
 export function actionLines(action: Action): string[] {
   const modifiers =

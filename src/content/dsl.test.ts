@@ -4,14 +4,15 @@ import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from
 import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
 import { CAPABILITY } from './refs';
 import { declaredBy } from './references';
-import { align, holeNames, holesIn, standingIn, valueIn } from '../grammar/form';
+import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
+import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
 import type { Written } from '../grammar/parser';
 import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
 import { memberKey, Namespace } from './namespace';
-import { formatModuleDiagnostic, mapOf } from './registry';
+import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
@@ -455,6 +456,44 @@ const declaredKeys = (held: Namespace): { kind: string; key: string }[] =>
 
 const names = (key: string, id: string): boolean => key.split('.').includes(id);
 
+// Every shape the page offers anywhere under an action, however deep the blocks go. A block reached twice holds the same lines, so it is walked once.
+const ACTION_SHAPES: readonly string[] = (() => {
+  const seen = new Set<string>();
+  const forms = new Set<string>();
+  const walk = (lines: readonly Written[]): void => {
+    const sign = lines.map((line) => line.form).join('|');
+    if (lines.length === 0 || seen.has(sign)) return;
+    seen.add(sign);
+    for (const line of lines) {
+      forms.add(line.form);
+      walk(line.block?.() ?? []);
+    }
+  };
+  walk([...actionBody.grammar, ...actionLinesWritten()]);
+  return [...forms];
+})();
+
+describe('an action the corpus writes', () => {
+  const actions = everyActionTable(loadUniverseWithDiagnostics(CORPUS).registry).flatMap(([kind, id, held]) => held.map((action) => ({ where: `# ${kind} ${id}`, action })));
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(actions.length).toBeGreaterThan(30);
+  });
+
+  // What the page offers and what the engine takes are one claim, and they came apart where a field restated its own parser's shapes beside it: `damage:` offered the `vs` shape alone while `contest()` read the unsided one too, so the corpus's one writing of it was a line the page would not have written.
+  it('prints back into shapes the page offers, so nothing the engine takes goes unoffered', () => {
+    const unoffered = actions.flatMap(({ where, action }) =>
+      actionLines(action)
+        // A `+` in front of a keyword says how a block overlaying another merges with it, which is not a shape anyone writes a value into. A `+` in front of a number is part of the clause.
+        .map((line) => line.trim().replace(/^\+(?=[a-z][a-z ]*:)/, ''))
+        .filter((line) => line !== '' && !ACTION_SHAPES.some((form) => matches(form, line)))
+        .map((line) => `${where}: ${line}`),
+    );
+
+    expect([...new Set(unoffered)]).toEqual([]);
+  });
+});
+
 describe('renaming a module', () => {
   const namespace = loadUniverseWithDiagnostics(CORPUS).registry.namespace;
   const declared = [...namespace.all].filter((each): each is string => each !== null).sort();
@@ -504,7 +543,16 @@ describe('every section kind', () => {
         const held = line.block?.();
         const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
         const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');
-        expect(() => owner.parse(splitSections(written)[0]!), written).not.toThrow();
+        // A line the engine will not take standing alone says why in the engine's own words, carried as its own note, so what the page says beside a line and what the engine says about it cannot come apart.
+        const refused = ((): string | undefined => {
+          try {
+            owner.parse(splitSections(written)[0]!);
+            return undefined;
+          } catch (error) {
+            return error instanceof Error ? error.message : String(error);
+          }
+        })();
+        expect(refused === undefined || (line.note !== undefined && refused.includes(line.note)), `${written}\n\n${refused}`).toBe(true);
         // The shape shown and the line shown are the same claim written twice, and a reader who cannot read one off the other has been told nothing.
         expect(align(line.form, line.example)?.complete, `# ${kind}: ${JSON.stringify(line.form)} does not read ${JSON.stringify(line.example)}`).toBe(true);
         checked += 1;

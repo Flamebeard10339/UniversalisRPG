@@ -149,12 +149,14 @@ describe('a line as the engine takes it', () => {
     expect(amissIn(RECIPE('oven'), known).flatMap((each) => each.undeclared)).toEqual([]);
   });
 
-  it.each(sections().map((each) => each.kind))('%s refuses none of the lines it writes out', (kind) => {
+  // A line the engine will not take standing alone says why in the engine's own words, carried as its own note, so what the page says beside a line and what it refuses that line for cannot come apart.
+  it.each(sections().map((each) => each.kind))('%s refuses none of the lines it writes out, but for one that says what it wants beside it', (kind) => {
     const owner = sectionFor(kind)!;
     for (const line of owner.grammar) {
       const head = `# ${kind} probe\n${line.example}`;
       const draft = line.block === undefined ? head : `${head}\n  ${line.block()[0]!.example}`;
-      expect(offeringAt(draft, head.length, KNOWN).refused, draft).toBeNull();
+      const refused = offeringAt(draft, head.length, KNOWN).refused;
+      expect(refused === null || (line.note !== undefined && refused.includes(line.note)), `${draft}\n\n${refused}`).toBe(true);
     }
   });
 });
