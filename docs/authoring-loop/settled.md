@@ -42,11 +42,12 @@ publishes it (`menuChoices` in `src/runtime/dialogue-runtime.ts`), and an answer
 that names nothing comes back with every entry the list held; the modal gate
 defers to it rather than keeping its own copy of the names.
 
-**`hint when <condition>: <text>`, and the last one whose condition holds wins.**
-So a plain `hint:` written above is the default and each conditional line below is
-an exception to it. It sits in a stage block and at a quest's top level, the same
-line in both. The condition goes before the colon because everything after a colon
-is the value. A stage's `log:` has **no** such form yet.
+**A journal is read out of `log:` lines alone.** `hint:` is gone — the field, its
+conditional form and the fourteen corpus lines with it. What a quest is standing on
+is `standingLine(entry)`, the one line not yet struck through, **derived from
+`lines` rather than held beside them**, so the journal and whatever asks a quest
+where it stands read the same words. The `journal:` test directive reads it. A
+stage's `log:` has no conditional form.
 
 **A line the game says may carry `@@@` and still be played, and may not be
 silence.** `@@@ <words>` means *unreviewed, or here is what I wanted and could not
@@ -56,13 +57,48 @@ line — so the mark goes beside the words, never in place of them. The sweep re
 `everySaid`, the same table `npm run notes` and `npm run review` read, so a kind or
 a field added next month is covered with no edit.
 
+**An `examine:` on an entity is an action, minted at registry-build time.**
+`mintedActions` in `src/content/sections/entity.ts` compiles it where an entity's
+actions are already assembled from its blocks and its `uses:`, so it is an ordinary
+action before any renderer sees it and **no renderer was edited to draw it**. The
+words are a pointer, not a copy — the minted `say:` reuses the entity's own
+`entity.<id>.examine` key, so `npm run review` gained no second row. Its address is
+`look` and its label has one home, `action.look.look`. A `# location`'s `examine:`
+already reaches the player as `location.description` and was deliberately left
+alone; two ways to the same prose would be the duplication.
+
+**An entity a location stands must offer a player something.** Refused at load
+naming the line, in the `unpriceableStock` shape: an action of its own or in
+`uses:`, `stations:`, `keeps shop:`, `stats:` to fight, or a `# dialogue` that owns
+it — and `examine:`, which counts because by then it *is* an action. `requires:`
+and `hidden if:` are not read, because a load-time check cannot know a flag is
+never set. The rule is over what a location **stands**, not over every entity,
+because `# entity player` offers a player nothing by design and is the one entity
+in the corpus standing nowhere — a derived rule with no exemption beat an
+unconditional one with a listed exception.
+
+**A race is content, and everything with an effect while it exists is one carrier
+list.** `# race <id>` declares its bonus as ordinary tag clauses (`+5% defense`);
+`modifierCarriers` in `src/runtime/stats.ts` folds the entity, its passives, its
+buffs, its worn items, those items' passives and its race through one shape. A
+skill level is simply a third `Counter` beside `resource` and `stack`, so a skill's
+old private `stat-id:`/`per-level:` pair is gone and `+1 attack per level of melee`
+is writable on an item, a passive, a buff or a race. **The performing action's tags
+are deliberately not in that list**: they are the same mechanism with a different
+source, and folding a verb into the carrier list would put it behind `hooks.ts`,
+which already rules that `on hit:` is carried by a character rather than by a verb.
+
 **`assert:` reads `xp`, `level`, `resource`, `inventory`, `stat`, flags, `time`,
 `visits` and `player.<field>`.** The resolver is a `Record` over the grammar's own
 roots, so a root added there does not compile until it reads something, and the
 shapes the oracle prints are derived from the same table, so it does not reach the
-page by hand either. An unknown id under a root is refused at load. `xp.<skill>` is
-the raw total and `level.<skill>` is what that total has bought — 1000 experience
-is level 2 — so *reach level N* is one root and never arithmetic on the other.
+page by hand either. An unknown id under a root is refused at load. **A root
+answers two questions and carries both**: `resolveReference` is identity, so a
+condition compares `core.elf`; `referenceWords` is locale-aware, so `{player.race}`
+in prose reads *Elf*. A root that does not say which of the two its answer is does
+not compile. `xp.<skill>` is the raw total and `level.<skill>` is what that total
+has bought — 1000 experience is level 2 — so *reach level N* is one root and never
+arithmetic on the other.
 
 **`until <done | condition>` runs an action to a terminator.** The condition is the
 same grammar `assert:` takes — no second predicate language. `done` means nothing
@@ -126,15 +162,58 @@ why no shop can trade the coin it counts in. The player pays what the shop round
 up and receives what it rounds down, so nothing can be bought and sold back at a
 profit. Stock is counted in the save and comes back by whole periods, never to the
 moment, or a shop bought from more often than its rate would restock never;
-nothing is written until somebody trades.
+nothing is written until somebody trades. **The scale is anchored, not invented**:
+`tulsa.a-bent-coin-becomes-a-cooked-herring` fixes bent-coin at 2 and herring at 5,
+so a meal is five and a day's worked good is twelve. Every cluster jewel, whetstone
+and orb is deliberately untradable — each comes out of a fixed one-shot cache, and
+a price would launder a build handout into free cash.
 
 **The journal is the player's own notebook.** First person, and it names no room,
-no route and no verb — working out what is next is the play. `log:` is what
-happened, `hint:` is what they are turning over, and the field's name is now a
-misnomer. The rule's home is the `JOURNAL_VOICE` note on both `hint:` lines in
-`src/content/sections/quest.ts`, which is what `npm run oracle -- quest` prints —
-the oracle's own examples used to be map instructions, so an agent authoring off
-the page learned the wrong voice from the grammar itself.
+no route and no verb — working out what is next is the play. The rule's home is the
+`JOURNAL_VOICE` note on both `log:` lines in `src/content/sections/quest.ts`, which
+is what `npm run oracle -- quest` prints — the oracle's own examples used to be map
+instructions, so an agent authoring off the page learned the wrong voice from the
+grammar itself.
+
+**A holding leaves the player only through a door that already answered whether it
+could.** `src/runtime/itemInstance.ts` holds one private writer and exactly two
+public doors: `receiveItem` for arrivals, and `handOver(state, parting: HandOver)`
+for departures, where `HandOver`'s constructor **and sole field** are private and
+can only be minted by `HandOver.asked(...)`, which returns `undefined` when the
+player is short. The guarantee is structural and was verified by compiling
+forgeries, not asserted — a private constructor alone was not enough, since a
+matching object literal got through. **A grown item is never spent**, which the
+engine says in its own words in `content/engine-en.dsl`; a shop once had its own
+answer and was wrong.
+
+**A dialogue node that takes more than the player holds is not offered.** Derived
+from the node's own `take:` in `openersNow`, so the author writes the cost once and
+never a matching `hidden if:`. An entity whose only node is unaffordable goes
+silent down the *same* path a fully-spent conversation takes, rather than a second
+one. A spent non-sticky node holds its `take:` back, so it costs nothing and stays
+offered. A `give:` into a full pack refuses at the moment instead of hiding the
+node — what you have not got is durable and reads as a quest not yet started, a
+full pack is transient and reversible, and an entity going silent over it tells the
+player nothing they could act on.
+
+**A pack holds twenty-eight rows, and `0` means unbounded.** `# variable
+inventory-slots` in `content/core.dsl` is the only place the number is written;
+`inventorySlots(registry)` names none, and a registry without the variable answers
+`0`, so infinite is the same expression rather than a second switch. A row is one
+line of the pack: a stack of 500 is one row and the 501st always fits, each grown
+copy is its own row, and worn gear is outside the count. `packRows(state)` is the
+one home and `carriedEntries` localizes *that* list, so what the player counts on
+screen and what the engine counts are the same list by construction. Nothing is
+lost and nothing is silent: every door refuses through its own existing channel,
+and an over-full `# save` loads whole and simply refuses arrivals until it is back
+under — destroying a player's holdings on load is the silent loss this exists to
+prevent.
+
+**`inventory-changed` fires off a comparison, not off whoever moved something.**
+`announceCarried` compares `heldSignature(state)` against what the player was last
+told, so a door built next month is covered with no edit and noticing twice over
+one act is impossible. `moments.test.ts` — the derived proof that every trigger the
+language has actually fires — caught two earlier designs of it.
 
 **The shipped corpus has one home: `src/content/shipped.ts`.** `shippedFiles()` and
 `shippedSources()` read `content/` fresh each call and exclude an author's own
@@ -195,6 +274,24 @@ stopping is the system working. It is not the bound above and must not be routed
 around. Note that a regenerating player may now never die, so death can no longer
 be relied on to end anything.
 
+**Fainting carries the player to `starting-location`, and that is what makes `stop`
+hold.** `openAggression` re-arms against whatever aggressive thing stands here at
+the end of every quiet segment, so before the move it routed straight around
+`stop`: four simulated hours in `tulsa.swamp-mire` were **4548 faints and 15,110
+log lines** down the wait-out path, and 95 faints of free respawning in place down
+the plain one. Both are one faint now. `stop` holds because the player is no longer
+standing where the aggression is, **not** because `stop` changed — a world whose
+*starting* location held an aggressive hostile would livelock again, and
+`fight.test.ts` proves the difference rather than asserting the good case.
+
+**`relocate: starting-location` is answered live by the engine**, not resolved at
+parse time, so `core` may write it without naming a module it does not depend on
+and a world that moves its start moves this with it. The spelling exists once, in
+`src/grammar/actionResult.ts` beside the parser that reads it; its answer is
+`startingLocationId`, which lives beside the registry it reads. A `# location` may
+not be *called* `starting-location`, because within a module an author writes bare
+local names and one would shadow it.
+
 **Nothing ends an action early unless the action names what does.** `stops on:
 <event>, …` is that naming and its default is none, so no action's behaviour moved
 when it landed. The test is made at `fireEvents`, which is the one place any event
@@ -203,6 +300,14 @@ events that fire **for the player**, since the action under way is the player's.
 `level-up` fires once per level crossed, carrying the level reached as its
 `amount`, so `gain 1 * amount experience on <event>` weighs by how far the skill
 got.
+
+**Two things end an action without it naming them, and both are the world failing
+to deliver rather than content**: the four-hour bound above, and a pack with no row
+left for what the action just found. **A terminator that was never reached is a
+third, and it is a failure** — `use: X until <condition>` that runs out of things
+to do reports `engine.stopped.short`, naming what ran out beside the condition that
+was asked for, where it used to report success. `done` is untouched: reading which
+terminator was given is the whole of the split.
 
 **A progress figure is published only when it has counted something.**
 `completion` is `number | null` and `stillToCount()` is the one home; a renderer
@@ -217,6 +322,23 @@ dead alder is the corpus's one writing of it — four swings of `damage: felling
 0.25 a swing for one log — so the terminal's `engine.repl.live.counting` line and
 `LiveSheet.tsx`'s implicit bar are lit by shipped content and are **not dead code
 to delete**.
+
+**An action that ran to a terminator reports what changed and what stopped it.**
+AFK is read off the terminator and nowhere else — `resolveUnderWay` takes the
+`Terminator` itself, so a directive handing the engine a stopping test reaches the
+summary and a plain `use:` never does. No flag, no caller decision. `span.ts` diffs
+with the same `diffState` that `serializeSave` uses, and `SPAN_VOICE` is a
+`Record<SaveField, …>`: **a field added to `GameState` does not compile until it
+says whether a span mentions it**, and each silent field says why. A `# resource`
+or `# skill` added next month is reported with no edit. `endAction(state, because)`
+makes every ender name a localized reason at the point of decision, and `fireEvents`
+names the event it is firing, so `on death: stop` and `stops on: X` come out as the
+same fact told apart by the event rather than by the authoring mechanism.
+
+**`travel: X` is not a journey.** `walkTo` walks the whole route synchronously
+inside the directive; only `begin: travel X` creates a `state.journey` a wait-out
+steps. So `travel: X until done` always reports that it finished, never that the
+player arrived.
 
 **Prune records are addressed to whoever loaded the save, not to the player.**
 They travel as `PruneWarning[]` — stderr and the run log for the playbot, a
@@ -264,6 +386,44 @@ loaded. `scripts/playbot.test.ts` asserts it.
 player's own `expected` and `confusion`, not the moves — a run recording only moves
 has produced nothing anyone can act on.
 
+**No play surface may draw less of a live view than the others, and a derived proof
+says so.** `scripts/viewSurfaces.test.ts` walks a live view into **leaf paths**
+(`journal[].lines[].said`), keeps only signatures the locale declares — so ids,
+enums and rounded figures drop out with no list — and requires **every** string at
+a path to appear. `unansweredCommands` derives its subjects off `COMMANDS`. Both
+name the path and the drivers that differ. The excuse list is **one list, not one
+per driver**: an excuse for a *difference* belongs to no single surface, and a path
+no driver draws is one decision made everywhere and needs no excuse at all.
+
+**A command answers all three drivers in the same words.** `scripts/lib/replLines.ts`
+is that one home; the playbot used to throw `result.output` away and keep only
+error-toned refusals, so `/quests`, `/state`, `/look` and `/inventory` were met with
+silence — while `play-cli` had the same drift on the journal screen, and
+`src/ui/transcript.ts` was a third formatter returning nothing for `status`. **The
+cost is zero on an ordinary turn**: a choice or directive returns a `view` output
+the playbot excuses by name, since the next turn renders the view in full anyway. A
+command pays only on the turn it is run and then rides the ten-turn window — worst
+case `/state`, about 620 tokens for ten turns.
+
+**A choice says what offers it.** `choice.detail` is the entity or location the
+choice hangs off, and every driver draws it; without it three things standing here
+that can each be looked at read as `Look`, `Look`, `Look`.
+
+## The world acting on its own
+
+**Aggression already is the target selector, and no selector is being built.**
+`aggressive` is a shipped `# entity` keyword; `openAggression` fires at the end of
+every quiet segment, walks what stands here, keeps what is aggressive and hostile
+by faction, and arms the player's own retaliation with no directive involved.
+Measured: standing still in `tulsa.swamp-mire` kills both aggressive bog-lurkers
+and never touches a passive mollusk. `wait: 1 until xp.core.melee >= 20` passes
+naming no target at all, because the world is what opens the fight.
+
+**`wait: until <condition>` deliberately does not exist.** `resolveUnderWay` steps
+what is *under way*, so with nothing under way it stops on the first iteration —
+the form could only ever succeed where the condition already held. The `1` in
+`wait: 1 until …` is not a wart concealing a useful form.
+
 ## What the loop keeps teaching
 
 **A claim that a shape is unbuildable is a measurement, not a reading.** The one
@@ -294,3 +454,20 @@ both were real findings — the words were doing something the author did not in
 suite went 14/32 failing then 32/32 minutes later with no edit between. Re-run
 before believing a failure, and never act on a red result while another lane holds
 a file the test path touches.
+
+**A ruling can rest on a premise that is not true, and measuring beats building.**
+*"An entity with no interactable actions (including examine) should be a syntax
+error"* would have refused nothing and left five invisible entities standing,
+because `examine:` reached no surface at all. The lane measured that and stopped
+before writing code. The same session, a lane declined to build `wait: until` and
+another declined a `testing.dsl`, each on a measurement rather than a taste.
+
+**A test declares what it swings with, so a rebalance cannot quiet it.**
+`# item million-attack-hammer` and `# item eight-a-swing-hammer` live in the module
+of the test that swings them — not in a testing module, because everything in
+`content/` ships bar `local-changes.dsl` and a second exclusion is a rule someone
+has to remember. `-100% attack` scales base *and* bonuses to nothing, so the swing
+is worth the engine's floor and an `on hit: drain:` is the whole damage: genuinely
+independent of any player-side balance, which `+N attack` could never be.
+`npm run mutate` is what proves a test discriminates — deleting `useFight`'s
+advance branch is killed by exactly one test in the suite.

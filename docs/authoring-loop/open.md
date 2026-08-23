@@ -11,52 +11,49 @@ without evidence is a hunch and does not belong here yet.
 
 ---
 
-## Three rulings left over from the journal and the shop
+## The next stretch of work, in order
 
-Both features landed. What is left under each is a decision the owner has to
-make, not work anybody is blocked on.
+Everything under this heading is the owner's, and the order is theirs.
 
-**`hint:` is now a misnomer.** The journal is written in the player's voice and
-names no room, route or verb, so the field holds what the player is turning over
-rather than a hint. Renaming it (`thinking:`, `wondering:`) touches every quest
-line in the corpus plus the oracle's note and the `journal:` directive's. Worth
-doing or worth dropping; not worth drifting.
-  RESPONSE: hint should be removed wholesale. 
+**1. A `DEBUG` key every kind supports.** A test-only section — the two hammers in
+`content/tutorial-quests.dsl` are the first of them — is shipped content today: it
+is localized, it appears on the review sheet, it is upkeep, and nothing stops a
+player finding it. A kind that could declare itself debug would carry all four
+answers at once. *Closes when:* `# <kind> <id>` can say it is debug, the locale and
+`npm run review` skip it, and the engine can state what a player may reach. The
+one-home question to settle first is whether this is a field per kind (which is
+seven copies) or one thing `section()` in `sections/define.ts` fills in, the way it
+already fills in the schema-driven half.
 
-**The playbot never sees a quest's `log:`.** `renderJournal`
-(`scripts/playbot.ts`) shows the title, the standing and the hint. A human player
-gets the log lines on the quest screen. Now that hints are deliberately vague,
-the bot has strictly less to go on than a person does, and the runs' `confusion`
-reports are the thing being calibrated. Against that: every line added is paid
-per turn, which is what the cost spec is about.
-  RESPONSE: The playbot has to have absolute parity with the other play surfaces. 
-  Otherwise it isn't effective at its job. We need to do a pass to make sure it is 
-  either impossible or very very difficult for the surfaces to drift in capability. 
+**2. A playtesting mode in the GUI.** A run the author plays in the browser,
+recorded whole, with the author's own notes attached at each step. There should be
+a button visible **only while the mode is active** that opens a modal for feedback
+after a given action, and a way to get the log out — extracted by hand, or written
+into the project where an agent can read it. *The unification is the point*: the
+playbot already has a vocabulary of what a player may do and a shape for what a run
+produces (`line`, `note`, `expected`, `confusion`), and the parity proof already
+forbids the surfaces differing in what they can do. A second recording format
+beside the playbot's would be the failure this repository keeps having. *Closes
+when:* an author can play a session in the browser and an agent can read what they
+did and what they thought about it, in the same shape a playbot run produces.
 
-## Implement the economy
-Give most items a coin value. The important ones are items dropped by monsters. 
-The point is items should be tradeable, or intentionally untradable. 
-Should be one balance pass over `content/core.dsl`.
+**3. The author's own playtest, and the list of problems it produces.** Nothing
+substitutes for it and nothing is in front of it. `npm run review` is the sheet for
+the writing; this is the sheet for the playing.
 
-## Improve the Mirror
-The mirror is a general purpose character customizer. It should be available as 
-many times as the player wants. It allows the player to change their name and their 
-race. It should be implemented such that playtesters don't assume using it multiple
-times is a problem. 
-
-The first time using the mirror is free. Subsequent uses require 1000 coins. 
-
-Each race gives a different permanent character bonus. +5% to a single stat.
-
-The mirror should be composed of two independent modals, one after the other. 
+**4. Then author each quest in order, with playbot testers in a loop.** Ten quest
+notes in `.planning/planning_quests/`, deliberately not levelled up before now —
+how much outline detail the loop actually needs is what the runs were meant to
+measure. The runs are cheap and the fixing is not, which is the asymmetry to plan
+around.
 
 ## A quest cannot hold all of its own state
 
-Ruled by the owner: **everything related to a quest belongs inside the quest
-file.** Nothing today lets it. `tulsa.mirror` sets `mirror-done` and
-`tulsa.giant-rat` sets `rats-killed`; both are read only by `tutorial-quests`,
-and neither can move there, because `tulsa` does not depend on `tutorial-quests`
-and the engine refuses the upward reference:
+**Deferred by the owner** in favour of the smaller members. The ruling stands:
+everything related to a quest belongs inside the quest file. Nothing today lets it.
+`tulsa.mirror` sets `mirror-done` and `tulsa.giant-rat` sets `rats-killed`; both
+are read only by `tutorial-quests`, and neither can move there, because `tulsa`
+does not depend on `tutorial-quests` and the engine refuses the upward reference:
 
     town [town] resolve: # entity town.mirror action "look in" set: names
     errand.mirror-done, but errand is not this module or one of its dependencies
@@ -66,92 +63,169 @@ A `# quest` hands **dialogue** to an upstream entity and cannot hand it an
 corpus has zero `+` field edits and this is not an argument for inventing one.
 
 *Closes when:* a quest module can own a whole interaction on an entity declared
-upstream of it — at which point the mirror's `look in:` and the rat's `on death:`
-go to the quest that is the only reader of what they set. Until then the two
-flags stay where they are. Entity-private flags (`tulsa.mirror.done`, the way
-`tulsa.front-door` owns `unlocked`) would work today and were rejected: they
-re-home the flag without re-homing the quest, which is the requirement.
+upstream of it. Until then the two flags stay where they are. Entity-private flags
+(`tulsa.mirror.done`) would work today and were rejected: they re-home the flag
+without re-homing the quest, which is the requirement.
 
 **`sewer-toll-paid` is read and never set.** `castle-yard`'s road to
 `sewer-entrance` is gated on it (`content/tulsa.dsl`) and nothing in the corpus
 sets it, so that road is unreachable. It is Larry's toll and belongs to a quest
 that is not written; it closes the same way.
 
+## Prose the engine carries and no player can reach
+
+The same defect that `examine:` on an entity had, in two more places. Both were
+found by the lane that fixed the first and were deliberately not widened.
+
+**44 items' `examine:` is unreachable.** `itemExamine()` in
+`src/runtime/localized.ts` has **zero non-test callers**, and its fallback key
+`engine.item.examine` ships a live English line nothing says. Minting a look action
+per item the way an entity got one is the wrong fix — it would put a "Look" per
+carried item into the room's choice list. The fallback's own wording (*"This is
+{article} {item}."*) suggests a per-item panel was the intended surface. *Closes
+when:* an item's prose reaches a player somewhere, and the derived proof covers it.
+
+**12 cluster jewels' `examine:` likewise.** `planeReport` reads `title` only.
+
+## Tests that would pass in a world where the mechanic did nothing
+
+**`combat-expansion.accelerated-vigor-stacks-behind-its-gate` rides a 1.08×
+margin.** `assert: stat.attack-rate > 40` where base 25 plus six flat instances
+alone reach 37 — so it would still pass if `quickening`, the passive whose entire
+point is reading how many are held, contributed nothing, given a rebalance of
+`accelerated-vigor` from +2 to +3 flat. Its own comment does the arithmetic that
+condemns it. *Closes when:* it declares its own payload the way the two hammers do,
+and the claim becomes a difference. It is `combat-expansion`'s content.
+
+Two lesser ones, listed rather than fixed because neither is the same defect:
+`xp.core.cooking > 0` could be exact the way `xp.thieving = 4` next door already
+is, and `tutorial-quests`' `resource.core.health <= 25` is a band whose comment
+defends it.
+
+**An emptied pool reaches the death event by two independent routes** — `felledBy`'s
+`emptied()` → `emptyPoolNow`, and the clamp in `settlePools`. Cutting either alone
+leaves every corpus test passing. That is redundancy in the engine rather than a
+gap in the suite, but no single-line mutation will ever see it.
+
 ## For the human review pass
 
-The long pole, and it is Yonatan's. `npm run review` is the sheet and
-`content/reviewed.tsv` makes it resumable. Nothing is in front of it.
-
-The agent pre-pass that was queued here is done: every room that named a thing and
-offered no way to touch it now either does something or has stopped promising it
-would, and `npm run notes` reports **no rough lines** where it reported five. What
-is below is what a reading still has to settle.
+The long pole, and it is the owner's. `npm run review` is the sheet and
+`content/reviewed.tsv` makes it resumable.
 
 - **The orbs read as healing items.** Two independent runs concluded Orb of Renewal
   and Orb of Vitality must restore health. They are item modifiers. Their `examine:`
-  lines were improved; whether that is enough is a reading question and was left
-  for this pass deliberately.
+  lines were improved; whether that is enough is a reading question.
+- **Fourteen lines of player-voice writing went with `hint:`.** None was folded into
+  a `log:`. Whether any of it should be is a writing decision.
+- **Miki says *"There's a mirror upstairs"* while standing in `guide-house`**, which
+  is where the mirror is (`content/tulsa.dsl:1032`). Pre-existing, and squarely the
+  kind of thing that made two runs think the mirror was broken.
+- **The player's death line changed** to cover being carried back to the start, so
+  it returns to the sheet marked CHANGED. That is the mechanism working.
+- **Five scenery entities became reachable** when `examine:` became an action —
+  `drunk-patron`, `outfall-grate`, `sewer-signs`, `sewer-hatch`, `dumped-crates`.
+  Their prose has never been read by a player and has never been read in place.
 
 The eight marks the corpus holds are `tulsa` entities waiting on quests that are
 not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
-hive mouth on Birds and the Bees. Those are notes, not rough writing, and they
-close when the quest modules arrive rather than in this pass. Each of them now has
-a mechanic behind it that works today; the mark records only what the quest will
-add.
+hive mouth on Birds and the Bees. Those close when the quest modules arrive.
 
-## The AFK model
+## Balance nobody has played against
 
-An action that runs to a terminator is the shape a player and an agent both spend
-most of their time in, and it is half-built. Rulings are the owner's, made
-2026-08-22; everything below is unbuilt unless it says otherwise.
+Every number here was reasoned about and none was played against.
 
-**A summary after an AFK session is required**, and AFK derives itself from the
-terminator rather than being declared: an explicit `use:` reports turn by turn, a
-`use ... until <condition>` or a `wait:` summarizes. No new flag, no author
-decision. The summary's content is undecided; the obvious body is what changed over
-the span and what stopped it.
+**28 slots has had no play behind it.** The fullest shipped `# save` is 13 rows.
 
-**Inventory-full has nowhere to fire from.** The rest of that ruling is built —
-an action names the events that end it (`stops on: <event>, …`, none by default)
-and `level-up` fires — but there is no carrying capacity anywhere in the engine:
-`stockItem` clamps only at zero, and no item, entity or stat declares a limit.
-*Closes when:* carrying capacity exists. The ruling to make first is whether it is
-a `# resource` with a `max:`, because if it is, `on full` already fires on it and a
-second trigger name would be the same fact twice.
+**`adder's-tongue` pays 45 coin a minute** against honeycomb and fen-root near 20 —
+a four-second pick on the corpus's most potent-sounding reagent. The value follows
+the fiction and the clock says it is out of band. Either lengthen the pick or drop
+the value to 2.
 
-**A target selector over a set.** *"Fight anything aggressive until X"* needs a
-predicate over what stands here. Fighting one *type* already works
-(`fight:core.melee-combat:tulsa.feral-rat`) and `until <condition>` already works;
-the selector does not exist.
+**Which stat each race raises is an agent's guess**, not a ruling: human
+max-health, elf accuracy, dwarf defense, orc attack. Evasion and regeneration were
+unusable at +5% of 0 and of 1.
 
-**The `@@@` in `tutorial-quests` is writable now and not yet written.** Miki's
-*"reach level 2 in any skill"* has its condition: `level.<skill> <comparison>
-<number>`, beside `xp`, which the mark's own words wrongly reported missing as
-well. What is left is a content edit and a balance call — level 2 in fishing is
-1000 experience, which is a longer errand than one fish, so the line the quest ends
-up asking for is the author's. *Closes when:* the `apologised` stage's second Miki
-node names a level instead of the fish, and the mark comes off the line above it.
-`npm run oracle -- --at` takes that edit clean today. It is the only mark left in
-`tutorial-quests`.
+**Fainting leaves the player at about zero health**, and `regeneration` base is 1 a
+minute, so the walk back costs roughly thirty simulated minutes of recovery on top
+of the trip. That reads like the price of dying; it is a consequence of the ruling
+rather than part of it.
 
-## Left by the core/tulsa split
+**`# skill melee` and `thieving` carried an inert `stat-id: attack`** with no
+`per-level:` anywhere, folding nothing. The dead declarations were deleted. Making
+either live is now one line (`tags: +1 attack per level of melee`) but it is a
+combat balance change.
 
-**`combat-expansion` and `tutorial-quests` now depend on `tulsa`.** Each names one
-thing that moved — a road to the beach, and Miki — so a module about archetypes and
-a module about a quest both load the whole town. It is what the engine requires;
-whether the beach is the right anchor for a proving ground is map churn for the
-hardening pass.
+**Weapon bases are untradable** — iron-sword, wooden-shield, heartwood-blade,
+proving-blade — on the argument that they are builds rather than goods. The shipped
+hand-axe at 12 is the counter-example. Worth a deliberate call now that a grown copy
+can no longer be sold twice.
 
 ## Ours, and small
 
-**A stage's `log:` has no conditional form**, so a stage that spans two beats reads
-as one constant where `hint when <condition>:` would read as two. A second
-unconditional `log:` is now refused rather than silently winning, so the shape is
-at least honest. Still no evidence that an author has wanted the conditional form.
+**`# modal`'s `screen:` field is dead.** `open modal: X` looks `X` up directly in
+the runtime's frame table and nothing reads `Modal.screen`. The corpus works only
+because every modal's id happens to equal its screen; `# modal foo / screen:
+carried-items` loads clean and throws the first time a player touches it. Pinned by
+a derived test that opens every `# modal` the corpus declares. *Closes when:* either
+the id resolves through `registry.modals` to its screen, or `screen:` is deleted and
+the id validated against `MODAL_SCREENS`.
 
-**`rats-fall-to-repeated-use` discriminates on a 3.3× margin.** Its claim is now
-one rat down, which survives a rebalance of base attack or a better weapon — but a
-one-shot rebalance would make even that stop telling advance from restart.
+**An `always` node with no `when:` that writes `take:` can leave an entity silent.**
+The offer gate is uniform and correct; that one shape is the softlock silhouette,
+because it is the fallback line and there is nothing behind it. Nothing in the
+corpus writes one. *Closes when:* it is refused at load, or ruled harmless.
+
+**An action refuses with a message where a dialogue node now hides.** `engine.inputs.short`
+is designed and authors have `hidden if:` explicitly, so this was left alone. Say if
+actions should follow dialogue.
+
+**`actionSlugProblem`'s `isProseField` guard is over-broad**, which is the only
+reason the examine choice reads *Look* rather than *Examine*. The collision it
+protects against can only happen for an action with **no declared id**; narrowing it
+to those would let the address be `examine`. Small, but it relaxes an existing
+refusal.
+
+**An entity writing both `examine:` and its own `look:` is refused with a confusing
+message** — it names `action "Look"`, the minted one the author never wrote. Honest,
+badly worded.
+
+**`goto: starting-location` is still refused at load.** It is the one other site
+that names a location and could resolve live; `adjacent:`/`relative:` genuinely
+cannot, since a road to "wherever the game starts" is not a coherent map. `goto:` is
+a `# test`-only teleport.
+
+**A repeating action with `attempts:` never reaches `on unfinished:` as a
+terminator** — it fires the handler and restarts, so `grind until done` runs to the
+four-hour bound. Only a non-repeating action ends by attempts.
+
+**`carriedCount` has no production caller.** It is the plausible-sounding count that
+caused the shop to sell grown copies for free, and it survives only in three test
+files where it correctly means "loose in the pack".
+
+**Two tests still live in the wrong module.** The hammers and their claims are in
+`content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
+claims about its rat and its `rats-killed`. A clean follow-up.
+
+**`src/ui/render.test.tsx`'s `stringsDrawn` is a hand-written list of view fields.**
+It could derive from the parity walk's `leaves()`.
+
+**The parity proof checks a path's strings against the whole rendered blob.** So a
+path whose words already appear elsewhere in the render passes without being drawn
+in its own right — which is how `choice.detail` went missing from the playbot while
+the entity's name showed in the `entities:` row. One level up from the hole the
+proof closed.
+
+**A GUI wiring line is untested and wants the author's eye** — the two identity rows
+at the top of the Stats page, in `App.tsx`.
+
+## Left by the core/tulsa split
+
+**`combat-expansion` and `tutorial-quests` depend on `tulsa`.** Each names one thing
+that moved — a road to the beach, and Miki — so a module about archetypes and a
+module about a quest both load the whole town. `combat-expansion.proving-ground`
+sits at `tulsa.market-square`'s own square and hangs off the beach for want of
+anywhere better. Map churn for the hardening pass; a playtest names it better than a
+reading does.
 
 ## Open questions, not yet work
 
@@ -159,9 +233,22 @@ one-shot rebalance would make even that stop telling advance from restart.
 says it, which is a bound stated twice rather than a bound. Whether that wants its
 own form is a question for whoever first writes a hundred of them.
 
-**A repeat-N form.** `until <condition>` finishes one action; nothing says *do this
-a hundred times*. Worth revisiting once `until` has been used in anger.
+**A repeat-N form.** `until <condition>` finishes one action and, since the
+terminator ruling, fails loudly when it cannot reach the condition — so *do this a
+hundred times* is still unsaid, and `tutorial-quests.dsl:189-191` still writes the
+same rat line three times. Re-engagement was offered and **not** taken: the owner
+chose the failure. Reopen when an author writes the fourth such line.
 
 **Should a foe ever have identity?** Ruled: no, a count is enough, and
 `EncounterFoe.remaining` is it. Reopen only if wanting to name one individual of a
 kind ever actually comes up in play.
+
+**What a shop pays for a grown copy.** Today it does not deal in them at all — not
+offered, not sold, `not-carried` if asked for by name. Making them sellable means
+the price answers to the instance's own modifiers and plane, and `Trade` carries no
+copy identity, so it is real design rather than a line change.
+
+**Should worn gear take a slot?** It does not. The ruling said "the length of the
+inventory list", `state.inventory` literally excludes worn and grown, and worn gear
+is drawn under its own heading. If it should, equipping one of a stack of three
+starts being refusable.

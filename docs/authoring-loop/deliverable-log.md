@@ -59,56 +59,58 @@ around: three runs cost minutes and produced a fortnight of work.
 
 ## The phase this is in
 
-**1. The region wall is down.** Adjacency is symmetric; Tulsa hangs off where every
-route out of Miki's house lands. See `settled.md`.
+**1. The engine work `open.md` was holding is done.** One orchestration session
+landed eleven lanes, each in its own worktree: the play surfaces can no longer
+drift in capability, `hint:` is gone, the AFK summary exists, the economy is
+priced, the pack is bounded, the mirror is a door anyone may walk back through,
+race is content, `examine:` is an action, and fainting no longer livelocks. What
+`open.md` holds now is the owner's own queue, the balance nobody has played
+against, and the small residue each of those lanes reported on its way out.
 
-**2. Module size is settled** — a removability unit, not a size unit. See
-`settled.md`.
+**2. What the lanes kept finding was second authorities, again.** The pattern from
+the previous session repeated exactly and at a higher rate. A shop that had written
+its own answer to how many copies may be handed over, while the engine's rule sat
+in `engine-en.dsl` in its own words. A player's race hardcoded in the runtime with
+its names in content. A skill's stat bonus on a private path beside the one every
+other carrier folds through. Three `CommandOutput` formatters. `stockItem`'s signed
+delta letting any caller write a holding without asking. **None was on anybody's
+list**, and every one was found by doing something else. Running `one-home` before
+the work rather than after is what this keeps arguing for.
 
-**3. The split is finished, and `core` stands nowhere in earnest.** Tulsa keeps two
-items, three droptables its own creatures leave, and four flags. Everything else
-that was in it — two skills, a stat, fourteen items, two recipes — is core's,
-moved by tools that refuse on registry drift rather than by hand. The last two
-sections could not move until a station stopped being a name minted by whichever
-entity happened to open one; `# station` is a kind now, so a recipe is generic
-knowledge and the oven it is worked on is still Tulsa's.
+**3. The measurements were worth more than the patches.** Three lanes were sent to
+build something and came back having established that it should not be built —
+`wait: until <condition>` has no behaviour behind it, a `testing.dsl` would need an
+exclusion someone has to remember, and a target selector is a second home because
+aggression already is one. A fourth stopped before writing code because the ruling
+it was given rested on a premise that was not true. That is the loop working, and
+it is cheaper than the alternative.
 
 **4. The writing is the long pole and nothing is in front of it.** `npm run review`
 is the sheet and `content/reviewed.tsv` makes it resumable. **This is Yonatan's and
-everything else is scheduled around it.** The agent pre-pass is done: every room
-that named a thing and offered no way to touch it now either does something or has
-stopped promising it would, and the corpus holds **no rough lines** where it held
-five. What is left under that heading in `open.md` is two readings, not a queue.
+everything else is scheduled around it.** Two lines came back to the sheet marked
+CHANGED this session, which is the mechanism working, and five scenery entities
+became reachable prose for the first time.
 
-**5. The hardening pass comes after that**, and the runs have already named what
-it is for: `confusion` reports say which lines are actually confusing, so reviewing
-blind and then hardening would do the same reading twice. The playbot's prompt now
-says a quest here is not meant to be trivial, so a `confusion` report should mean
-the writing is wrong rather than that the player was expected to think.
+**5. Then the author's own playtest, then the quests.** The order is in `open.md`
+under *the next stretch of work*: a debug key so test-only content stops being
+shipped content, a GUI playtesting mode unified with the playbot rather than beside
+it, the author's own playtest and the list it produces, and then the ten quest
+notes authored in order with playbot testers in a loop.
 
-**Map churn is deliberately deferred to that pass.** `combat-expansion.proving-ground`
-sits at x:3,y:0, which is `tulsa.market-square`'s own square, and it hangs off the
-beach for want of anywhere better. Whether the beach still makes sense as the road
-into town is the same question. Neither is worth a hand-fix while the map is
-moving — a playtest names them better than a reading does.
-
-**What the loop keeps turning up is second authorities.** Six landed in one
-session, each found by doing something else: the station vocabulary swept off
-every entity, twenty-seven registry maps classified to name one exception, the
-shipped corpus spelled out in ten files and derived in fourteen more, an exemption
-letting a `names:` value be a kind nothing declared, the condition roots restated
-for the oracle, and a menu entry's kind read back off the shape of its own string.
-None was on anybody's list. The rate at which they turn up is the argument for
-running `one-home` before the work rather than after.
+**Map churn is still deliberately deferred.** `combat-expansion.proving-ground`
+sits at `tulsa.market-square`'s own square and hangs off the beach for want of
+anywhere better. Not worth a hand-fix while the map is moving — a playtest names it
+better than a reading does.
 
 ## What Yonatan has to deliver
 
-1. **Corrections to a town outline**, which is extracted from the cast and places
-   the quest notes already name. Correcting is cheaper than authoring, and the
-   corrections are the specimen the outline format is read off. **Done** — the
-   corrections are what `content/tulsa.dsl` was authored from.
-2. **The review pass over the writing.** Open.
-3. Nothing else. The reload question is closed and the quest notes stay as they are.
+1. **The review pass over the writing.** `npm run review`, resumable through
+   `content/reviewed.tsv`.
+2. **A playtest of his own, and the list of problems it produces.** Nothing
+   substitutes for it. It is what the GUI playtesting mode in `open.md` exists to
+   record.
+3. Nothing else. The reload question is closed and the quest notes stay as they are
+   until the town has been played.
 
 ## The ordering, which the corpus decided
 
