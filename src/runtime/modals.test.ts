@@ -2,7 +2,8 @@ import type { ModalChoice, ModalOption } from './modalOption';
 import { type ModalFrame } from './state';
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { Registry } from '../content/registry';
+import { mapOf, Registry } from '../content/registry';
+import { contentSectionMaps, sectionOf, visitSection } from '../content/sections';
 import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
@@ -188,6 +189,20 @@ node greeting:
   -> Say nothing.
 `;
 
+// Every modal the corpus names, wherever any kind names one: the reference walk reports the site under the kind's own word for it, so a kind that gains an `open modal:` next month is asked for with no edit.
+function modalsNamed(registry: Registry): { id: string; where: string }[] {
+  const named: { id: string; where: string }[] = [];
+  for (const [kind, primary] of contentSectionMaps()) {
+    for (const value of mapOf(registry, primary).values()) {
+      visitSection(sectionOf(kind, { ...value }), `# ${kind} ${value.id}`, (referenced, id, where) => {
+        if (referenced === 'modal') named.push({ id, where });
+        return id;
+      });
+    }
+  }
+  return named;
+}
+
 function stackingSession(): PlaySession {
   return startSession(loadInEnglish(STACKING_MODULE));
 }
@@ -302,6 +317,14 @@ describe('opening and answering', () => {
 
     expect(shipped.modals.size).toBeGreaterThan(0);
     for (const id of shipped.modals.keys()) expect(() => openModalNamed(createGameState(), id), id).not.toThrow();
+  });
+
+  // Nothing refuses an `open modal:` at load — a modal is a global id, so the reference walk resolves nothing and checks nothing — and the first thing that reads the name is the player raising the screen.
+  it('opens every modal the shipped corpus names, wherever a section names one', () => {
+    const named = modalsNamed(loadUniverse(shippedSources()));
+
+    expect(named.length).toBeGreaterThan(0);
+    for (const { id, where } of named) expect(() => openModalNamed(createGameState(), id), `${where} ${id}`).not.toThrow();
   });
 
   it('refuses an option it does not have, a value it does not take, and an answer with nothing open', () => {
