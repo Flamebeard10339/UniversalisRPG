@@ -1,5 +1,5 @@
 import { RuntimeError } from './error';
-import { ActionResult } from '../grammar/actionResult';
+import { ActionResult, itemCost } from '../grammar/actionResult';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
@@ -43,14 +43,6 @@ export function actionVisible(action: Action, state: GameState, registry: Regist
   return !action.hiddenIf || !evaluateCondition(action.hiddenIf, state, registry);
 }
 
-export function perCompletionCost(action: Action): Map<string, number> {
-  const cost = new Map<string, number>();
-  for (const result of action.results) {
-    if (result.kind === 'take') cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
-  }
-  return cost;
-}
-
 export interface InputLimit {
   completions: number;
   short?: string;
@@ -58,10 +50,17 @@ export interface InputLimit {
 }
 
 export function inputLimit(action: Action, state: GameState): InputLimit {
+  return costLimit(itemCost(action.results), state);
+}
+
+// How many times over the player can pay what a list of results asks of them, and — when the answer
+// is none — why. Everything that has to know before it acts reads this: an action arming, a
+// dialogue node being offered, a line in a menu.
+export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): InputLimit {
   let completions = Infinity;
   let short: string | undefined;
   let unspendable: InputLimit['unspendable'];
-  for (const [item, need] of perCompletionCost(action)) {
+  for (const [item, need] of cost) {
     if (need <= 0) continue;
     const copies = copiesOf(state, item);
     if (copies.stack + copies.grown + copies.worn < need) short ??= item;

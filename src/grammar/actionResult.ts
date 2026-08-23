@@ -45,6 +45,19 @@ export interface DropRow {
   results: ActionResult[];
 }
 
+// What running this list once will certainly take from the player, item by item. Only what is
+// written at the top level counts: everything nested sits under a chance, a contest, a gate or a
+// roll and may not happen at all, so it is answered for at the moment it is reached rather than
+// weighed beforehand. Everything that asks whether a list can be afforded — an action arming, a
+// dialogue node being offered, a line in a menu — reads this one answer.
+export function itemCost(results: readonly ActionResult[]): Map<string, number> {
+  const cost = new Map<string, number>();
+  for (const result of results) {
+    if (result.kind === 'take') cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
+  }
+  return cost;
+}
+
 export function nestedResults(result: ActionResult): ActionResult[][] {
   if (result.kind === 'one-of') return result.rows.map((row) => row.results);
   if (result.kind === 'chance' || result.kind === 'contest' || result.kind === 'gate' || result.kind === 'credit') return [result.results];

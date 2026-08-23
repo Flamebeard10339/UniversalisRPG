@@ -11,7 +11,7 @@ import { evaluateCondition } from './conditions';
 import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
-import { heldSignature, NOTHING_HELD, stockItem } from './itemInstance';
+import { handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem } from './itemInstance';
 import { openModalNamed } from './modalStack';
 import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
@@ -198,18 +198,28 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     }
     case 'give': {
       // The one arrival that happens while the world is running on the player's behalf. A pack with
-      // no room for it does not swallow it quietly: `stockItem` says so, and what is under way stops
-      // with a reason, because carrying on would produce nothing.
+      // no room for it does not swallow it quietly: `receiveItem` says so, and what is under way
+      // stops with a reason, because carrying on would produce nothing.
       const wanted = drawCount(state, result.amount) * count;
-      const moved = stockItem(state, registry, result.item, wanted);
+      const moved = receiveItem(state, registry, result.item, wanted);
       announceCarried(segment, Math.abs(moved));
       if (moved < wanted) segment.stopped = localizerOf(registry, state).engine('engine.stopped.pack-full');
       return moved;
     }
     case 'take': {
-      const moved = stockItem(state, registry, result.item, -(result.amount ?? 1) * count);
-      announceCarried(segment, Math.abs(moved));
-      return moved;
+      // Nothing partial and nothing silent: a hand-over the player cannot make takes none of what
+      // they do have and says so. It ends nothing — a take reached from a handler or from under a
+      // roll is a loss nobody could weigh beforehand, and only what an action names ends it.
+      const wanted = (result.amount ?? 1) * count;
+      const parting = HandOver.asked(state, result.item, wanted);
+      if (!parting) {
+        const say = localizerOf(registry, state);
+        state.log.push(say.engine('engine.inputs.short', { item: say.title('item', result.item) }));
+        return 0;
+      }
+      const gone = handOver(state, parting);
+      announceCarried(segment, gone);
+      return -gone;
     }
     case 'xp': {
       const amount = drawCount(state, result.amount) * count;

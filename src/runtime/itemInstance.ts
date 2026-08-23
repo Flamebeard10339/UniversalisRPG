@@ -111,7 +111,7 @@ export function copiesOf(state: GameState, itemId: string): Copies {
   return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
-// A grown copy is a thing in its own right and a worn one is on the player, so neither is a unit of the stack and neither can be handed over by name — which is the count `stockItem` moves and the only count anything parting with an item may ask for.
+// A grown copy is a thing in its own right and a worn one is on the player, so neither is a unit of the stack and neither can be handed over by name — which is the count `handOver` moves and the only count anything parting with an item may ask for.
 export function spendable(copies: Copies): number {
   return copies.stack;
 }
@@ -165,18 +165,46 @@ export function packFull(state: GameState, registry: Registry, itemId: string): 
   state.log.push(say.engine('engine.pack.full', { item: say.title('item', itemTemplate(state, itemId)) }));
 }
 
-// The one writer of the stack, so the one place an arrival can be turned away: a stack that is
-// already open takes any depth, and a first copy needs a row the pack may not have. Nothing is lost
-// silently — what could not arrive is said in the log, and the caller reads the count that moved.
-export function stockItem(state: GameState, registry: Registry, itemId: string, delta: number): number {
+// The one writer of the stack. Neither door below reaches it without having answered for what it
+// moves, and no third door exists.
+function writeStack(state: GameState, itemId: string, delta: number): number {
   const before = copiesOf(state, itemId).stack;
-  if (delta > 0 && before === 0 && !packHasRoom(state, registry)) {
-    packFull(state, registry, itemId);
-    return 0;
-  }
   const after = Math.max(0, before + delta);
   state.inventory[itemId] = after;
   return after - before;
+}
+
+// The one arrival, so the one place an arrival can be turned away: a stack that is already open
+// takes any depth, and a first copy needs a row the pack may not have. Nothing is lost silently —
+// what could not arrive is said in the log, and the caller reads the count that moved.
+export function receiveItem(state: GameState, registry: Registry, itemId: string, count: number): number {
+  if (count <= 0) return 0;
+  if (copiesOf(state, itemId).stack === 0 && !packHasRoom(state, registry)) {
+    packFull(state, registry, itemId);
+    return 0;
+  }
+  return writeStack(state, itemId, count);
+}
+
+// What `canHandOver` answered with, and the only thing `handOver` takes. Its constructor is private
+// to this class, so nothing anywhere else can make one and no departure from the pack can be
+// written that has not first asked whether the player can part with what it names. That is the
+// whole of the guarantee: the check is not a convention a caller has to remember, it is how the
+// write is spelled.
+export class HandOver {
+  private constructor(
+    readonly item: string,
+    readonly count: number,
+  ) {}
+
+  static asked(state: GameState, itemId: string, count: number): HandOver | undefined {
+    if (count <= 0 || spendableCount(state, itemId) < count) return undefined;
+    return new HandOver(itemId, count);
+  }
+}
+
+export function handOver(state: GameState, parting: HandOver): number {
+  return -writeStack(state, parting.item, -parting.count);
 }
 
 // What the player is holding, in the terms a change to it would have to move. Compared against what
@@ -211,7 +239,7 @@ export function hasStackCopy(state: GameState, id: string): boolean {
   return stackCopy(state, id) !== undefined;
 }
 
-export function destroyItem(state: GameState, registry: Registry, id: string): Destruction {
+export function destroyItem(state: GameState, id: string): Destruction {
   const copy = named(state, id);
   const standing = grown(state, copy);
   if (standing) {
@@ -224,7 +252,9 @@ export function destroyItem(state: GameState, registry: Registry, id: string): D
   const template = itemTemplate(state, id);
   if (source.from === 'slot') delete state.equipped[source.slot];
   else {
-    stockItem(state, registry, template, -1);
+    const parting = HandOver.asked(state, template, 1);
+    if (!parting) return refused(says('engine.growth.no-copy', { item: anId(template) }));
+    handOver(state, parting);
     if (state.inventory[template] === 0) delete state.inventory[template];
   }
   return { ok: true, item: template };
@@ -244,7 +274,12 @@ interface Growing {
   change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
-const take = (state: GameState, registry: Registry, itemId: string): void => void stockItem(state, registry, itemId, -1);
+// Every caller below has already been refused if the copy is not there, so the answer is never
+// undefined here — and it still has to be held before the stack can be written.
+const take = (state: GameState, itemId: string): void => {
+  const parting = HandOver.asked(state, itemId, 1);
+  if (parting) handOver(state, parting);
+};
 
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
@@ -269,9 +304,9 @@ export function growItem(state: GameState, registry: Registry, growing: Growing)
   const problem = growing.change(payload, item);
   if (problem) return refused(problem);
 
-  if (consumes !== undefined) take(state, registry, consumes);
+  if (consumes !== undefined) take(state, consumes);
   if (!source) return { ok: true, instance: copy };
-  if (source.from === 'stack') take(state, registry, template);
+  if (source.from === 'stack') take(state, template);
   const minted = createInstance(state, ITEM_INSTANCE, template, payload);
   if (source.from === 'slot') state.equipped[source.slot] = minted;
   return { ok: true, instance: minted };
