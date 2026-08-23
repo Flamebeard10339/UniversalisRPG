@@ -69,7 +69,7 @@ function published(view: PlayView): string[] {
   return [
     view.location.title,
     view.location.description ?? '',
-    ...view.entities.flatMap((entity) => [entity.title, entity.examine ?? '']),
+    ...view.entities.map((entity) => entity.title),
     ...view.choices.flatMap((choice) => [choice.label, choice.detail ?? '']),
     ...view.resources.map((resource) => resource.title),
     ...view.modals.flatMap((modal) => modal.options.flatMap((option) => [option.label as string, ...(option.values ?? []).map((choice) => choice.shown as string)])),
