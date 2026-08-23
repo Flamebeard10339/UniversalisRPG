@@ -207,7 +207,7 @@ function renderResources(v: PlayView): string[] {
 }
 
 function renderCarried(v: PlayView): string[] {
-  return v.carried.map((each) => `${each.id} (${each.shown})${each.count > 1 ? ` x${each.count}` : ''}${each.worn ? ` worn:${each.worn.slot}` : ''}`);
+  return v.carried.map((each) => `${each.id} (${each.shown})${each.worn ? ` worn:${each.worn.slot}` : ''}`);
 }
 
 function renderEquipment(v: PlayView): string[] {
