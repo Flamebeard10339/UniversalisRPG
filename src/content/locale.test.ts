@@ -34,6 +34,7 @@ const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
   stats: 'content',
   skills: 'content',
   slots: 'content',
+  shops: 'content',
   recipes: 'content',
   recipeActions: 'content',
   resources: 'content',

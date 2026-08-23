@@ -26,6 +26,7 @@ export interface Item extends HookCarrier {
   clusterEffect?: ClusterEffect;
   itemExperience?: number;
   maxLevel: number;
+  value?: number;
 }
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
@@ -51,6 +52,9 @@ export const DEFAULT_MAX_LEVEL = 99;
 export const isBase = (item: Item): boolean => item.slot !== undefined;
 
 function roleProblem(item: Item): string | undefined {
+  if (item.value !== undefined && item.value <= 0) {
+    return `value: is what a shop prices one of these at, and ${item.value} prices it at nothing: leave the line out and ${item.id} is untradable`;
+  }
   if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
     return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
   }
@@ -79,6 +83,7 @@ export const item = section<Item, never, 'actions'>()({
     originCluster: { parser: id, keyword: 'origin-cluster', names: { id: 'cluster-jewel' }, standsWithout: true },
     clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
     itemExperience: { parser: number, keyword: 'item-experience' },
+    value: { parser: number, note: 'what one of these is worth in coin, and the only thing that makes it tradable: an item declaring no value is one no shop will price' },
     maxLevel: {
       parser: number,
       default: () => DEFAULT_MAX_LEVEL,
