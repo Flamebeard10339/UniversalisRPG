@@ -169,6 +169,7 @@ depletes: their health
 
 # item cooked-shrimp
 examine: A simple meal.
+value: 7
 food, +3 regeneration, 60s
 eat:
   instant
@@ -200,6 +201,7 @@ value: 20
 
 # item fish
 examine: Whatever came up in the net. Bright, cold, and still working its gills.
+value: 3
 
 # item jug-of-water
 examine: A clay jug of clean water.
@@ -211,18 +213,23 @@ value: 3
 
 # item dough
 examine: A ball of raw dough, ready for the oven.
+value: 5
 
 # item raw-chestnut
 examine: A hard brown nut, its shell scored ready for the embers.
+value: 2
 
 # item roasted-chestnut
 examine: A chestnut roasted soft and sweet in the oven's embers.
+value: 5
 
 # item rat-bone
 examine: A thin bone, picked clean.
+value: 2
 
 # item rat-tail
 examine: Still twitching, faintly.
+value: 4
 
 # item bent-coin
 examine: A copper coin someone stepped on.
@@ -230,6 +237,7 @@ value: 2
 
 # item rats-eye-gem
 examine: A red stone the size of a thumbnail. It does not warm in your hand.
+value: 60
 
 // --- passives ---
 //
@@ -458,26 +466,32 @@ value: 5
 
 # item honeycomb
 examine: A slab of comb, heavy and dripping.
+value: 4
 
 # item royal-jelly
 title: Royal Jelly
 examine: A spoonful of something pale and faintly warm. It comes from a princess cell and nowhere else.
+value: 120
 
 # item mollusk-venom
 title: Mollusk Venom
 examine: A thumb of cloudy resin scraped from a swamp mollusk's foot.
+value: 14
 
 # item marsh-thistle
 title: Marsh Thistle
 examine: A grey-headed thistle that grows where the water stands.
+value: 2
 
 # item fen-root
 title: Fen Root
 examine: A knuckle of root pulled from black mud. It smells of nothing at all.
+value: 3
 
 # item adders-tongue
 title: Adder's Tongue
 examine: A single split leaf. It is the last thing on every list that has one, and there is a reason it is last.
+value: 5
 
 # item hand-axe
 title: Hand Axe
@@ -494,13 +508,16 @@ value: 12
 # item log
 title: Log
 examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so a bundle of firewood is a thing that can be sold and not made.
+value: 6
 
 # item rat-pelt
 title: Rat Pelt
 examine: Hairless in patches, and weeping where it is not.
+value: 4
 
 # item bread
 examine: A warm, golden loaf.
+value: 12
 food, +5 regeneration, 90s
 eat:
   instant
@@ -510,6 +527,7 @@ eat:
 # item cooked-herring
 title: Cooked Herring
 examine: Grilled through and smelling of the docks. Larry on the sewer door has a nose for these.
+value: 9
 food, +2 regeneration, 45s
 eat:
   instant
