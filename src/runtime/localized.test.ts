@@ -85,7 +85,6 @@ island.item.apple.examine: Verde, y sonrojada por un lado.`,
     expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBe('Verde, y sonrojada por un lado.');
   });
 
-  // The panel that says these words has the item’s name beside them, so a sentence the engine made up out of that name would read the name back twice and tell a player nothing.
   it('are nothing at all where the author wrote none, rather than a sentence the engine made up', () => {
     expect(itemExamine(english(), 'island.rope')).toBeUndefined();
     expect(itemExamine(spanish(), 'island.rope')).toBeUndefined();
