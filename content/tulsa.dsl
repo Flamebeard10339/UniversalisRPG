@@ -45,6 +45,25 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
 
+// Two hammers whose numbers this file declares, so that what the tests swinging
+// them prove is proved about the engine rather than about what the last balance
+// pass did to base attack or to the rat's sheet: a million is more than any of
+// that will ever move, and `-100% attack` scales the whole stat — base, bonuses
+// and all — to nothing, so the second hammer's own swing is worth the least the
+// engine lets a landed hit be worth and the eight it drains is the whole of what
+// it does.
+# item million-attack-hammer
+DEBUG
+slot: mainhand
+weapon, +1000000 attack, +1000000 accuracy
+
+# item eight-a-swing-hammer
+DEBUG
+slot: mainhand
+weapon, -100% attack, +1000000 accuracy
+on hit:
+  drain: 8 health from them
+
 // --- drop tables ---
 
 # droptable feral-rat-remains
@@ -671,8 +690,10 @@ pull root:
   time: 6
   give: 1 fen-root
   say: The root comes out of the mud with a sound you would rather not have heard.
+// One hummock and three plants, and it pays about the same by the minute
+// whichever is taken: the leaf is worth twice the root and is twice the work.
 take the leaf:
-  time: 4
+  time: 12
   give: 1 adders-tongue
   say: One split leaf, taken whole.
 
@@ -1036,6 +1057,11 @@ node greeting:
 # save in-town
 {"version":12,"location":"tulsa.market-square"}
 
+// What the tutorial puts in a player's hands and nothing takes back off them,
+// standing in the row that would buy either.
+# save in-town-with-mikis-sword-and-shield
+{"version":12,"location":"tulsa.market-row","inventory":{"core.iron-sword":1,"core.wooden-shield":1}}
+
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
@@ -1088,6 +1114,14 @@ node greeting:
 
 # save named-once-with-nine-hundred-and-ninety-nine-coin
 {"version":12,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
+
+# save armed-with-a-million-attack-hammer
+DEBUG
+{"version":12,"inventory":{"tulsa.million-attack-hammer":1}}
+
+# save armed-with-an-eight-a-swing-hammer
+DEBUG
+{"version":12,"inventory":{"tulsa.eight-a-swing-hammer":1}}
 
 // --- tests ---
 
@@ -1189,7 +1223,24 @@ travel: tavern-street
 travel: sha-dynastys
 craft: cooked-herring
 assert: has cooked-herring
-assert: xp.core.cooking > 0
+assert: xp.core.cooking = 3
+
+// A weapon base is a good like any other, which is a thing the counter can only
+// say by paying for one: a shop takes anything tradable it is offered, and what
+// makes these tradable is the `value:` each declares. Twenty-eight is what the
+// store's own rate leaves of a twenty-four and a twelve, rounded its way both
+// times.
+# test a-sword-and-a-shield-are-goods-at-a-counter
+load: in-town-with-mikis-sword-and-shield
+shop: general-store
+submit-modal: item=sell:core.iron-sword
+submit-modal: count=1
+submit-modal: item=sell:core.wooden-shield
+submit-modal: count=1
+submit-modal: item=close
+assert: inventory.coin = 28
+assert: not has core.iron-sword
+assert: not has core.wooden-shield
 
 // The two things in the market a light hand gets, and fifteen is the whole of
 // what they are worth: three at the grate and twelve off the rack. Each sets
@@ -1455,3 +1506,33 @@ submit-modal: item=close
 // two hexes out. Nothing else on this route touches attack.
 assert: stat.attack = 14
 expect only: growing-through-the-inventory-screen-end
+
+// Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
+// which is what `rats-killed` counts; one swing does it because the hammer says
+// it does, and nothing about the rat's twenty health is being relied on.
+# test one-swing-of-a-million-attack-hammer-fells-a-rat
+DEBUG
+load: armed-with-a-million-attack-hammer
+equip: million-attack-hammer
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 1
+
+// The stages of a fight. A `use:` that finds its own action already under way
+// against the same target advances a cycle of the fight in progress; one that
+// re-armed would snapshot the rat at full health every time, so at eight a
+// swing against twenty no run of them, however long, would ever empty the pool.
+// Two swings are sixteen and three are twenty-four, so the third is the one
+// that lands the kill and the second must not — and it is the second assertion
+// that makes a rebalance of the rat fail this loudly, rather than quietly
+// leaving behind a claim about one swing that a re-arming `use:` would pass too.
+# test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
+DEBUG
+load: armed-with-an-eight-a-swing-hammer
+equip: eight-a-swing-hammer
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 0
+use: melee-combat on giant-rat
+assert: tulsa.rats-killed = 1

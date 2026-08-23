@@ -196,15 +196,23 @@ eat:
 // carrying one east jewel slot: the on-ramp every base has when it declares
 // nothing. `max-level:` is where a base is tiered, and this one is a starter
 // forever.
+//
+// A base is a good, and what a counter pays for is the thing on the table: the
+// steel and the days in it, never the plane it carries or how far it grows. A
+// price that read the ceiling would turn the one-shot caches these come out of
+// into purses, which is the same reason nothing that is spent on a plane —
+// jewel, whetstone or orb — declares a value at all.
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
 slot: mainhand
+value: 24
 weapon, +2 attack
 max-level: 10
 
 # item wooden-shield
 examine: A sturdy shield of banded oak.
 slot: offhand
+value: 12
 shield, +2 defense
 
 # item lockpick
@@ -467,6 +475,7 @@ cluster-effect: +25% regeneration
 # item heartwood-blade
 examine: The grain still moves, slowly, when you are not looking.
 slot: mainhand
+value: 30
 weapon, +4 attack
 max-level: 40
 origin-cluster: heartwood-core
