@@ -11,6 +11,32 @@ without evidence is a hunch and does not belong here yet.
 
 ---
 
+## Refactor quest journal
+Refactor the quest journal. It should be written from the player's perspective. No hints or handholding. Just thoughts of what I should do next. If a player wants information, they should talk to people in the world which should update the notes. The journal is useful for remembering what happened and general information. It should not guide the player to the next step.
+
+Part of the fun is figuring out what is the next thing that you need to do. This game will not have a dotted yellow line for players to mindlessly follow. 
+
+## Proper shop with modal
+Create a proper shop modal instead of listing specific buy actions at specific entities. The modal has a list of items it sells. And a bool of whether they accept any item or just items they stock (Default true). The modal shows all items the store currently has in stock. Allows selling any tradable item in the inventory, and buying any item currently in stock. Can buy/sell multiples (buy 23), but can't go below the shops stock. Shops don't have a maximum stock. 
+
+Shops keep a running tally of how much stock they currently have, and regenerate stock with a rate. 1 item per minute is the default. The replenish brings the item total toward what the shop stocks, so an unstocked item moves to 0 and gets deleted. 
+
+Shops have an efficiency value for selling and buying. Each one is a multiplier on how much coin a player gets or needs compared to the default value of an item. Buying and selling always uses integer coin values. 
+Defaults: buying=1.2, selling=0.8
+
+Shops only interact with items that define a value in coins. Otherwise, the item is untradable. 
+
+It goes without saying, but coins don't have a value and can't be bought or sold. This doesn't need a rule, just don't give coins a value and it won't create an infinite loop. 
+
+## Tulsa still contains non-tulsa related content
+- Tulsa has skills and stats and recipes that work everywhere, not just tulsa. 
+- It has flags that only matter for a specific quest. 
+- It has items that are independent of the location. (This is the most defensible one, but a cooked-herring is a fishing/cooking related item, not an item exclusive to Tulsa)
+- The sewer-key is an example that does belong. 
+- The bottle of vodka is not. It either should be sunny-s-bottle-of-vodka, or the examine text should be generic. (On second look, the item is referenced as tulsa.bottle-of-vodka which is a unique item in tulsa.)
+- Mostly, locations, entities, and dialogue are okay. Everything else technically needs a different home. 
+- Everything else can go into core. If core gets unreasonable, we can split it later. 
+
 ## The oracle is too long and contains one-home violations. 
 The oracle dumps thousands of lines onto a user. That seems excessive, and considering that this same tool is shown in the EDIT pane in the GUI (which is small and used by humans), it can't be that long. We need to review what it actually prints and see how much of it is duplicates. What can be slimmed down without losing functionality. 
 
