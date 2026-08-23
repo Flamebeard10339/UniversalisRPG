@@ -26,6 +26,12 @@ value: 5
 # variable default-action-duration
 value: 0
 
+// How many things the player's pack holds. A stack counts once however deep it is, and anything
+// grown into a copy of its own counts as itself; what is worn is on the player rather than in the
+// pack. At 0 a world hands out an endless pack instead.
+# variable inventory-slots
+value: 28
+
 // --- stats ---
 
 // What a stat is worth to anything that does not name its own. A fighter names

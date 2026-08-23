@@ -53,7 +53,7 @@ export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
 export { actionVisible, requiresMet } from './actions';
 export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';
-export { applyResultsNow, initResources } from './effects';
+export { applyResultsNow, initResources, settleCarried } from './effects';
 export { encounterView } from './encounter';
 export { equip, unequip } from './equipment';
 export type { EncounterFoe, EncounterView } from './encounter';

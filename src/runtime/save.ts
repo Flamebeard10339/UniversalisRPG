@@ -12,7 +12,7 @@ import { parseOwnerRef } from './actions';
 import { findActionOwner, travelEndProblem, TRAVEL_PAIR } from './actionLookup';
 import { isBuffList, pruneBuffs } from './buffs';
 import { isInstanceTable, pruneInstances } from './instances';
-import { itemTemplate } from './itemInstance';
+import { heldSignature, itemTemplate } from './itemInstance';
 import { isPopulations, prunePopulations } from './population';
 import { isShopStock } from './trade';
 import { isModalFrame, pruneModals } from './modals';
@@ -22,7 +22,7 @@ import { PLAYER, templateOf } from './state';
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 12;
 
-export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause'>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'carriedTold'>;
 
 export type SaveDiff = Partial<Pick<GameState, SaveField>>;
 
@@ -296,6 +296,7 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
   }
   state.log = base.log;
   state.endedBecause = base.endedBecause;
+  state.carriedTold = heldSignature(state);
   return pruned(state, registry);
 }
 

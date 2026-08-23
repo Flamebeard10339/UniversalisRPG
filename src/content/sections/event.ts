@@ -14,6 +14,7 @@ export const EVENT_TRIGGERS = {
   completed: 'none',
   unfinished: 'none',
   'level-up': 'none',
+  'inventory-changed': 'none',
 } as const;
 
 export type EventTrigger = keyof typeof EVENT_TRIGGERS;

@@ -11,7 +11,7 @@ import { evaluateCondition } from './conditions';
 import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
-import { stockItem } from './itemInstance';
+import { heldSignature, NOTHING_HELD, stockItem } from './itemInstance';
 import { openModalNamed } from './modalStack';
 import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
@@ -196,10 +196,21 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       spreadDiscovery(state, registry);
       return amount;
     }
-    case 'give':
-      return stockItem(state, result.item, drawCount(state, result.amount) * count);
-    case 'take':
-      return stockItem(state, result.item, -(result.amount ?? 1) * count);
+    case 'give': {
+      // The one arrival that happens while the world is running on the player's behalf. A pack with
+      // no room for it does not swallow it quietly: `stockItem` says so, and what is under way stops
+      // with a reason, because carrying on would produce nothing.
+      const wanted = drawCount(state, result.amount) * count;
+      const moved = stockItem(state, registry, result.item, wanted);
+      announceCarried(segment, Math.abs(moved));
+      if (moved < wanted) segment.stopped = localizerOf(registry, state).engine('engine.stopped.pack-full');
+      return moved;
+    }
+    case 'take': {
+      const moved = stockItem(state, registry, result.item, -(result.amount ?? 1) * count);
+      announceCarried(segment, Math.abs(moved));
+      return moved;
+    }
     case 'xp': {
       const amount = drawCount(state, result.amount) * count;
       const before = state.xp[result.skill] ?? 0;
@@ -344,6 +355,28 @@ export function fireEvents(segment: Segment, actorId: string, trigger: EventTrig
     segment.firing = outer;
     if (ends.includes(event.id)) segment.stopped = happened;
   }
+}
+
+// What the player carries changing is news, and news is an event. Nothing here asks who moved it or
+// what they moved: the fact is a difference between what the player holds and what they were last
+// told they hold, so a hand that reaches the inventory by a door nobody has built yet is still
+// news, and noticing twice over one act is not.
+// It counts things the way a batched swing counts hits: a cycle that settled ten completions at
+// once moved ten things, and ten cycles settled one at a time moved the same ten, so what an author
+// hangs on the event does not read differently for having been away.
+export function announceCarried(segment: Segment, moved = 1): void {
+  const now = heldSignature(segment.state);
+  if ((segment.state.carriedTold ?? NOTHING_HELD) === now) return;
+  segment.state.carriedTold = now;
+  fireEvents(segment, PLAYER, 'inventory-changed', undefined, Math.max(1, moved));
+}
+
+// The same notice for whoever is not already inside a segment — a command the player gave rather
+// than a world running on their behalf.
+export function settleCarried(state: GameState, registry: Registry): void {
+  const segment = newSegment(state, registry);
+  announceCarried(segment);
+  settleHandlerDeltas(state, registry, segment);
 }
 
 export function requireResource(registry: Registry, resourceId: string): Resource {

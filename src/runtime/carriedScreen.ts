@@ -46,8 +46,8 @@ const VERBS: readonly CarriedVerb[] = [
     shown: 'engine.carried.verb.unequip',
     applies: (_item, entry) => entry.worn !== undefined,
     confirms: () => false,
-    take: (entry, state) => {
-      if (entry.worn) unequip(state, entry.worn.slot);
+    take: (entry, state, registry) => {
+      if (entry.worn) unequip(state, registry, entry.worn.slot);
       return null;
     },
   },
@@ -56,8 +56,8 @@ const VERBS: readonly CarriedVerb[] = [
     shown: 'engine.carried.verb.destroy',
     applies: () => true,
     confirms: (entry) => entry.grown,
-    take: (entry, state) => {
-      destroyItem(state, entry.id);
+    take: (entry, state, registry) => {
+      destroyItem(state, registry, entry.id);
       return null;
     },
   },

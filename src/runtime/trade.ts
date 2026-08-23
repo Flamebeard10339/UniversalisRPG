@@ -2,7 +2,7 @@ import { Registry } from '../content/registry';
 import { Item } from '../content/sections/item';
 import { buyPrice, declaredStock, replenished, replenishSteps, sellPrice, Shop, takesItem } from '../content/sections/shop';
 import { RuntimeError } from './error';
-import { spendableCount, stockItem } from './itemInstance';
+import { roomToPack, spendableCount, stockItem } from './itemInstance';
 import { GameState, ShopStock } from './state';
 
 export const isShopStock = (value: unknown): boolean => {
@@ -64,7 +64,7 @@ export function wanted(shop: Shop, state: GameState, registry: Registry): Trade[
 
 export const coinHeld = (shop: Shop, state: GameState): number => spendableCount(state, shop.coin);
 
-export type Refusal = 'unknown-item' | 'untradable' | 'out-of-stock' | 'not-carried' | 'not-afforded' | 'not-a-count';
+export type Refusal = 'unknown-item' | 'untradable' | 'out-of-stock' | 'not-carried' | 'not-afforded' | 'not-a-count' | 'pack-full';
 
 export function countProblem(written: string): Refusal | undefined {
   return /^\d+$/.test(written.trim()) && Number(written.trim()) > 0 ? undefined : 'not-a-count';
@@ -78,6 +78,7 @@ export function buyProblem(shop: Shop, state: GameState, registry: Registry, ite
   if (price === undefined || itemId === shop.coin) return 'untradable';
   if ((stockNow(shop, state)[itemId] ?? 0) < count) return 'out-of-stock';
   if (coinHeld(shop, state) < price * count) return 'not-afforded';
+  if (!roomToPack(state, registry, itemId)) return 'pack-full';
   return undefined;
 }
 
@@ -86,6 +87,9 @@ export function sellProblem(shop: Shop, state: GameState, registry: Registry, it
   if (!item) return 'unknown-item';
   if (!takesItem(shop, item)) return 'untradable';
   if (spendableCount(state, itemId) < count) return 'not-carried';
+  // What is paid for the goods has to have somewhere to land too, or the sale would take the item
+  // and hand back nothing.
+  if (!roomToPack(state, registry, shop.coin)) return 'pack-full';
   return undefined;
 }
 
@@ -98,8 +102,8 @@ export function buy(shop: Shop, state: GameState, registry: Registry, itemId: st
   if (left > 0) counts[itemId] = left;
   else delete counts[itemId];
   write(state, shop, settled, counts);
-  stockItem(state, shop.coin, -buyPrice(shop, itemOf(registry, itemId))! * count);
-  stockItem(state, itemId, count);
+  stockItem(state, registry, shop.coin, -buyPrice(shop, itemOf(registry, itemId))! * count);
+  stockItem(state, registry, itemId, count);
   return undefined;
 }
 
@@ -109,8 +113,8 @@ export function sell(shop: Shop, state: GameState, registry: Registry, itemId: s
   if (refusal) return refusal;
   const settled = settle(shop, state);
   write(state, shop, settled, { ...settled.counts, [itemId]: (settled.counts[itemId] ?? 0) + count });
-  stockItem(state, itemId, -count);
-  stockItem(state, shop.coin, sellPrice(shop, itemOf(registry, itemId))! * count);
+  stockItem(state, registry, itemId, -count);
+  stockItem(state, registry, shop.coin, sellPrice(shop, itemOf(registry, itemId))! * count);
   return undefined;
 }
 

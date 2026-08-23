@@ -215,7 +215,7 @@ describe('a hook is gathered the way a stat bonus is (c2)', () => {
     resolve(state, registry, secondsToMs(1));
     expect(foeHealth(state, 'dummy')).toBe(16);
 
-    unequip(state, 'mainhand');
+    unequip(state, registry, 'mainhand');
     resolve(state, registry, secondsToMs(2));
     expect(foeHealth(state, 'dummy')).toBe(15);
   });

@@ -53,6 +53,7 @@ engine.growth.unknown-item: there is no item or item instance called {item}
 engine.growth.not-a-base: {item} is not a base: only an item you can wear has a plane to grow
 engine.growth.no-experience: {item} grants no item experience
 engine.growth.not-a-jewel: {item} is not a cluster jewel
+engine.pack.full: Your pack is full, so the {item} stays where it is.
 engine.plane.base: Base
 engine.plane.go: Go to {hex}
 engine.plane.slot: slot: {direction} with {jewel}
@@ -97,6 +98,7 @@ engine.shop.refused.out-of-stock: They do not have that many.
 engine.shop.refused.not-carried: You are not carrying that many.
 engine.shop.refused.not-afforded: You cannot afford that.
 engine.shop.refused.not-a-count: That is not a number of things to trade.
+engine.shop.refused.pack-full: Your pack is full — there is nowhere to put it.
 engine.modal.opened: modal:{modal}
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.
@@ -253,4 +255,5 @@ engine.stopped.no-road: the way on was closed
 engine.stopped.called-off: you called it off
 engine.stopped.bound: the world had already run {hours} hours on your behalf, which is as far as it will run unattended
 engine.stopped.still: what was under way advances by nothing, so waiting it out would never end
+engine.stopped.pack-full: your pack was full and there was nowhere to put what you found
 engine.stopped.unloadable: what was under way could not be picked up again

@@ -2,7 +2,7 @@ import { endJourney } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
-import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
@@ -550,6 +550,7 @@ export function cancelAction(session: PlaySession): PlayView {
 
 export function submitModal(session: PlaySession, answers: Record<string, string>): PlayView {
   answerModal(stateOf(session), session.registry, answers);
+  settleCarried(stateOf(session), session.registry);
   pruneModals(stateOf(session), session.registry);
   return view(session);
 }
@@ -581,6 +582,7 @@ export interface DirectiveOutcome {
 
 export function applyDirective(session: PlaySession, directive: Directive): DirectiveOutcome {
   const outcome = performDirective(session, directive);
+  settleCarried(stateOf(session), session.registry);
   pruneModals(stateOf(session), session.registry);
   return outcome;
 }
@@ -677,7 +679,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       equip(state, registry, directive.item);
       return {};
     case 'unequip':
-      unequip(state, directive.slot);
+      unequip(state, registry, directive.slot);
       return {};
     case 'feed':
     case 'slot':

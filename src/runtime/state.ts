@@ -108,6 +108,9 @@ export interface GameState extends RngCursor {
   log: Localized[];
   // Why what was last under way stopped, in the words the player reads, written by whoever ends it.
   endedBecause: Localized | null;
+  // What the player was last told they are holding. Not saved and not compared: it is what makes a
+  // change news exactly once, and coming back to a save is not news.
+  carriedTold: string | null;
   time: number;
   activeAction: ActiveAction | null;
   journey: Journey | null;
@@ -123,7 +126,7 @@ export interface GameState extends RngCursor {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {
