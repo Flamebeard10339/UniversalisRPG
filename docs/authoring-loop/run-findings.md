@@ -166,7 +166,7 @@ every turn was spent in the guide house and the basement. Each of its two findin
 was reproduced here before being written down, and in both cases the symptom was
 real and the cause it named was wrong.
 
-### Swinging again never kills anything, and swinging then waiting does
+### ~~Swinging again never kills anything~~ — closed, and it was narrower than first written
 
 Measured, three swings at the basement rats each way:
 
@@ -184,11 +184,37 @@ the `wait:` lets it play out"*. So the corpus's own test passes, and a player do
 the one obvious thing — hit it again — can never win a fight. Every renderer offers
 that button and none of them says waiting is what resolves it.
 
-**The decision this needs is whose bug it is.** Either re-issuing an action already
-under way against the same target is a no-op rather than a restart, or the view has
-to say a swing is in flight and how long it needs. The first is an engine rule and
-would fix every renderer at once; the second is presentation and leaves the trap in
-place for anyone not reading carefully.
+**Closed by the engine rule: issuing an action carries it to the end of one of its
+own cycles.** Re-issuing the same action against the same target advances it
+instead of re-arming it, reusing the one cycle-stepping primitive `wait: done`
+already had. Control still returns after each cycle, which is what keeps breaking
+off mid-fight possible — that case is the whole reason it does not simply run the
+fight. Measured after:
+
+    3 swings, no wait     rats-killed 1   melee 5    time 7200
+    8 swings, no wait     rats-killed 3   melee 16   time 16800
+
+No fixture moved. Every existing route that fights already separates
+re-engagement with a `wait:`, so the new branch is unreachable from anything
+written before it, and `# test tutorial-quests.rats-fall-to-repeated-use` — ten
+`use:` lines and no `wait:` anywhere — is the claim that would have caught it.
+
+**The severity was overstated when first written, and the correction is worth
+keeping.** "Every renderer offers that button and none says waiting resolves it"
+is not true: `src/runtime/command.ts:674` picks `driveChoice` when the context can
+drive live and `applyChoice` when it cannot, and the GUI always sets
+`driving: true` (`src/ui/driver.ts:76`). A live driver ticks the action to
+completion on its own, so **the GUI never had this bug**. What had it was every
+non-driving context — the playbot, and `play-cli` outside live mode.
+
+That is still worth the fix and arguably more interesting than the original
+reading: the same button meant two different things depending on who was holding
+it, and only one of them was any good. It now advances the action either way, live
+or a cycle at a time.
+
+A setting was considered and refused. A mode is two behaviours to keep in step,
+and "wait five seconds" is a cap nobody declared — the same reasoning that
+produced `wait: done` instead of `wait: 30` in `loop-backlog.md` item 5.
 
 ### Miki's apology branch says nothing, and reads as a softlock
 
