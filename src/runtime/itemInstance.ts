@@ -192,14 +192,21 @@ export function receiveItem(state: GameState, registry: Registry, itemId: string
 // whole of the guarantee: the check is not a convention a caller has to remember, it is how the
 // write is spelled.
 export class HandOver {
-  private constructor(
-    readonly item: string,
-    readonly count: number,
-  ) {}
+  // What it holds is private and its constructor is private with it, which is the whole of why an
+  // object of the same shape is not one and no caller can write itself the answer.
+  private constructor(private readonly parting: { readonly item: string; readonly count: number }) {}
 
   static asked(state: GameState, itemId: string, count: number): HandOver | undefined {
     if (count <= 0 || spendableCount(state, itemId) < count) return undefined;
-    return new HandOver(itemId, count);
+    return new HandOver({ item: itemId, count });
+  }
+
+  get item(): string {
+    return this.parting.item;
+  }
+
+  get count(): number {
+    return this.parting.count;
   }
 }
 
