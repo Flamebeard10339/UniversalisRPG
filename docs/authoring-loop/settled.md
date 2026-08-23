@@ -154,10 +154,12 @@ anywhere — whose plain `damage:` reads under 1, so its cycle takes several att
 and `implicitTarget` sits below full while control is out. Every other shape either
 deplete-counts a named pool instead, or resolves in one attempt and is back at full
 before anyone can look. A **side-naming** action with nothing to deplete is refused
-outright, which is why `resolvesPerAttempt` is exactly targetedness. No shipped
-module writes the counting shape, so `command.test.ts` is its only witness — the
-terminal's `engine.repl.live.counting` line and `LiveSheet.tsx`'s implicit bar are
-live code the corpus never lights, **not dead code to delete**.
+outright, which is why `resolvesPerAttempt` is exactly targetedness. `tulsa`'s
+dead alder is the corpus's one writing of it — four swings of `damage: felling` at
+0.25 a swing for one log — so the terminal's `engine.repl.live.counting` line and
+`LiveSheet.tsx`'s implicit bar are lit by shipped content and are **not dead code
+to delete**. The unsided `damage:` that makes the cycle multi-attempt is a form
+`npm run oracle` does not print; see `open.md`.
 
 **Prune records are addressed to whoever loaded the save, not to the player.**
 They travel as `PruneWarning[]` — stderr and the run log for the playbot, a

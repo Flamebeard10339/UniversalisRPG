@@ -102,6 +102,21 @@ hardening pass.
 
 ## Ours, and small
 
+**The oracle's printed grammar is a second authority, and it has already drifted.**
+Each action field in `src/grammar/action.ts` carries a hand-written `form:` string
+beside the parser that actually reads it, and `damage:`'s says
+`[my ]<stat> vs [their ]<stat>` while `contest()` makes the right half optional.
+So the page never offers `damage: felling` — the unsided form, and the *only* one
+that makes a cycle take more than one attempt — and `--walk` compounds it by
+telling an author that a written `damage: felling` "reads as" the `vs` shape it
+plainly is not. `--at` accepts the line the page will not offer, so the oracle's
+two halves disagree about the same file. `content/tulsa.dsl`'s alder had to be
+written off a test fixture and a live probe instead. This is the same gap that got
+the implicit countdown queued for deletion as dead code — nobody could find the
+shape, so everybody concluded there wasn't one. *Closes when:* a field's writable
+forms are derived from its parser rather than restated beside it, so the page
+cannot say less than `--at` accepts.
+
 **`remaining` does not reach the GUI.** `livePools()`
 (`src/runtime/command.ts:1129`) projects title, current and max, so the count that
 stops three rats reading as one that healed is shown in the terminal and the

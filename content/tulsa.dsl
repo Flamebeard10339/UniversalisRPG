@@ -29,6 +29,15 @@ dependencies:
 
 # skill woodcutting
 
+// --- stats ---
+
+// What one swing of an axe takes off a trunk. An action with nothing to
+// deplete counts down a whole of its own instead of anybody's pool, so this is
+// a fraction of one felling and the swings it costs are read off it — the
+// number lives here and is written nowhere else, in prose least of all.
+# stat felling
+base: 0.25
+
 // --- flags ---
 //
 // World state no single prop owns. A flag that belongs to one door or one
@@ -101,6 +110,10 @@ weapon, +1 attack
 # item bundle-of-firewood
 title: Bundle of Firewood
 examine: Split logs, roped together. The bar buys these by the armful.
+
+# item log
+title: Log
+examine: A round of alder, cut green and heavier than it looks. @@@ Nothing splits a log into firewood yet, so the stall that buys firewood buys nothing anybody can make.
 
 # item rat-pelt
 title: Rat Pelt
@@ -404,6 +417,8 @@ examine: Where the road gives up and the ground starts drinking. Everything past
 adjacent:
   market-square
   swamp-mire
+entities:
+  dead-alder
 
 # location swamp-mire
 x: 7, y: -5
@@ -706,6 +721,25 @@ harvest comb:
   time: 8
   give: 1 honeycomb
   say: You cut what you came for and step back before they mind.
+
+// The one thing in town that takes more than one swing and is not a fight.
+// `damage:` with no `depletes:` counts down a whole of the action's own, so a
+// swing is a quarter of a trunk and the log comes at the end of four of them.
+// Continuous, so a pack is filled by standing there rather than by asking
+// again — which is also the only place in the corpus that lights the live
+// countdown a driver draws beside the progress bar.
+# entity dead-alder
+title: Dead Alder
+examine: An alder leaning out over the water, dead and dry all the way through. Someone has already had the low branches.
+chop a log:
+  continuous
+  requires: has hand-axe
+  time: 3
+  damage: felling
+  give: 1 log
+  xp: woodcutting 40
+  on success:
+    say: The trunk gives, and a round of alder rolls clear.
 
 # entity herb-patch
 title: Herb Patch
@@ -1102,6 +1136,9 @@ node greeting:
 # save chestnuts-in-hand
 {"version":11,"inventory":{"core.raw-chestnut":3}}
 
+# save axe-at-the-swamp-edge
+{"version":11,"location":"tulsa.swamp-edge","inventory":{"tulsa.hand-axe":1}}
+
 # save growing-a-heartwood-blade-start
 {"version":11,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
 
@@ -1209,6 +1246,18 @@ use: entity.bench.sit-down
 assert: resource.core.health = 23
 wait: 60
 assert: resource.core.health = 30
+
+// The only action in the corpus that takes more than one swing without being a
+// fight. Four swings of three seconds is where the twelve comes from, and the
+// twelve is the claim: an assertion on the log alone would also hold in a world
+// where one swing felled the tree. What the four swings cost is read off
+// `felling` and nothing here restates it.
+# test a-log-costs-four-swings-of-an-axe
+load: axe-at-the-swamp-edge
+use: entity.dead-alder.chop-a-log
+assert: time = 12
+assert: inventory.tulsa.log = 1
+assert: xp.tulsa.woodcutting = 40
 
 // Sunny keeps three threads open at once, so talking to her is the list and
 // not a line, and a thread taken stays open because each is sticky — the third
