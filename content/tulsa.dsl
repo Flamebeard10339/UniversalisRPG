@@ -690,8 +690,10 @@ pull root:
   time: 6
   give: 1 fen-root
   say: The root comes out of the mud with a sound you would rather not have heard.
+// One hummock and three plants, and it pays about the same by the minute
+// whichever is taken: the leaf is worth twice the root and is twice the work.
 take the leaf:
-  time: 4
+  time: 12
   give: 1 adders-tongue
   say: One split leaf, taken whole.
 
