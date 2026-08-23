@@ -448,6 +448,14 @@ walk the parity proof uses — every string the view holds, less the addresses
 `addressable(sources)` derives off the driver's own sources — and the two
 hand-written lists it used to carry are gone.
 
+**`leaves()` keeps every string, and the parity question drops the short ones.** A
+signature of two characters or fewer turns up everywhere by coincidence, so it can
+settle nothing about *which surface drew what* — but the view published it all the
+same, and `render.test.tsx` asks the other question, *what did the engine publish*.
+The filter therefore lives in `driftingPaths` and not in the walk. Moving it back
+into `leaves()` silently stops a two-letter word counting as published, which is
+how a settings choice shown as `On` read as a word no engine value produced.
+
 **A counter pays for the thing on the table.** The steel and the days in it, never
 the plane an item carries or how far it grows — which is why the four weapon bases
 are priced in band with the hand-axe at 12 while every jewel, whetstone and orb
