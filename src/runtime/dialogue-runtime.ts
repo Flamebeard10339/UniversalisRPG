@@ -1,6 +1,8 @@
 import { RuntimeError } from './error';
+import { costLimit } from './actions';
+import { ActionResult, itemCost } from '../grammar/actionResult';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, isThread, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
+import { Choice, Dialogue, DialogueNode, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -76,13 +78,26 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
   return null;
 }
 
+// Whether the visit a node is standing at says everything it holds again — which is also what decides whether it will run what it takes, since a node that holds its effects back costs nothing.
+const replaying = (node: DialogueNode, visit: number): boolean => visit === 1 || node.sticky === true;
+
+const nextVisit = (dialogue: Dialogue, node: DialogueNode, state: GameState): number => (state.visits[visitCounter(dialogue, node)] ?? 0) + 1;
+
 function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, state: GameState): DialogueCursor | null {
   const counter = visitCounter(dialogue, node);
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
-  const replay = visit === 1 || node.sticky === true;
+  const replay = replaying(node, visit);
   if (!replay && node.again) state.log.push(spokenLine(registry, state, node.again));
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
+
+// A node that would take something the player has not got is not put in front of them, the way an
+// action writing `hidden if:` is not — and the author writes the fact once, in the `take:` itself.
+// What it would cost is the same answer an action arming reads.
+const affordable = (results: readonly ActionResult[], state: GameState): boolean => costLimit(itemCost(results), state).completions > 0;
+
+const nodeAffordable = (dialogue: Dialogue, node: DialogueNode, state: GameState): boolean =>
+  !replaying(node, nextVisit(dialogue, node, state)) || affordable(nodeEffects(node), state);
 
 // Whether entering this node now would put anything in front of the player. A node already visited that neither replays nor writes an `again:` holds back everything it says, and offering the conversation anyway is how a player comes to click talk and watch the view redraw with nothing new in it.
 const speaksNow = (dialogue: Dialogue, node: DialogueNode, state: GameState): boolean =>
@@ -110,6 +125,7 @@ export function openersNow(registry: Registry, state: GameState, entityId: strin
     for (const node of dialogue.nodes) {
       if (!offering(node) || !speaksNow(dialogue, node, state)) continue;
       if (node.when !== undefined && !evaluateCondition(node.when, state, registry)) continue;
+      if (!nodeAffordable(dialogue, node, state)) continue;
       (isThread(node) ? threads : otherwise).push({ dialogue, node, shown: openerShown(registry, state, node) });
     }
   }
@@ -134,7 +150,8 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
 function offered(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ choice: Choice; index: number }> {
   return resolveMenu(cursor, registry)
     .choices.map((choice, index) => ({ choice, index }))
-    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state, registry));
+    .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state, registry))
+    .filter((entry) => affordable(entry.choice.effects, state));
 }
 
 // One entry of the list the player is looking at. `display` is what they read and moves with the language; `name` does not — a thread is named by the node it opens, under the same name `visits` counts it, and a line in a menu by the words it was authored with. That is what lets a recording name the entry it takes rather than the place it stands in, since threads are ordered by the words a player reads.
