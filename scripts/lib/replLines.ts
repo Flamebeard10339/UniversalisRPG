@@ -172,6 +172,14 @@ const field = (name: keyof PlayStatus, held: string, indent = 0): ToolLine => no
 // says: what a thing is called is content, and dropping it is dropping half the sheet.
 const named = (title: Localized, id: string): string => `${title} (${id})`;
 
+// Who the player is, ahead of everything they are carrying. Each row is labelled with the words the
+// engine calls that field by rather than with a second English word for it, so a field the sheet
+// grows arrives here named with nothing edited.
+const formatSheet = (status: PlayStatus): ToolLine[] => {
+  const rows = Object.values(status.player).flatMap((row) => (row === null ? [] : [`${row.label}: ${named(row.title, row.id)}`]));
+  return rows.length === 0 ? [] : [field('player', rows.join(', '))];
+};
+
 function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   const lines = [dumped(localizer, 'engine.repl.state.inventory', status.inventory)];
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
@@ -208,6 +216,7 @@ function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
     note(localizer.engine('engine.repl.state.location', { location: localizer.identifier(status.location.id) })),
     note(localizer.engine('engine.repl.state.time', { time: status.time })),
     dumped(localizer, 'engine.repl.state.flags', status.flags),
+    ...formatSheet(status),
     ...formatInventory(status, localizer),
     ...formatResources(status.resources, localizer),
     ...formatEncounter(status.encounter, localizer),

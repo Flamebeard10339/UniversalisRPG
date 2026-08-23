@@ -706,7 +706,7 @@ describe('a modal is driven by its published name and options', () => {
     expect(statusOf(runLine(ctx, '/state')).status.location.id).toBe('camp');
 
     const still = sessionStatus(session);
-    expect(still.player).toEqual({ name: '', race: '' });
+    expect(still.player).toEqual({ name: null, race: null });
     expect(still.modals.map((modal) => modal.name)).toEqual(['character-creation']);
     expect(recorder.history).toEqual(['use: entity.mirror.look-in']);
   });
@@ -728,7 +728,7 @@ describe('a modal is driven by its published name and options', () => {
     runLine(ctx, 'use: entity.mirror.look-in');
     runLine(ctx, 'submit-modal: name=Rowan');
     const done = runLine(ctx, 'submit-modal: race=elf');
-    expect(done.view?.player).toEqual({ name: 'Rowan', race: 'elf' });
+    expect(done.view?.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: { id: 'elf', label: 'Race', title: 'Elf' } });
 
     const created = runLine(ctx, '/create-valid-test crossed');
     const blocks = created.output.find((out) => out.kind === 'authored');

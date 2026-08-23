@@ -17,6 +17,13 @@ type Contribution = Plane['contributions'][number];
 const byName = (left: Entry, right: Entry): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : (left.id ?? '') < (right.id ?? '') ? -1 : (left.id ?? '') > (right.id ?? '') ? 1 : 0;
 
+// Who the player is, as sheet rows: the words the field is called by against the words its answer
+// reads as. Written in the sheet's own order rather than sorted, so the questions stand as they were
+// asked; a field nobody has answered draws nothing.
+export function identity(rows: PlayStatus['player']): Entry[] {
+  return Object.values(rows).flatMap((row) => (row === null ? [] : [{ id: row.id, name: row.label, value: row.title }]));
+}
+
 export function counted(rows: readonly CountedRow[], localizer: Localizer): Entry[] {
   return rows.map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)) })).sort(byName);
 }

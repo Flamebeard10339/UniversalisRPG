@@ -225,7 +225,7 @@ describe('the modal stack', () => {
     submitModal(session, { name: 'Rowan' });
     v = submitModal(session, { race: 'dwarf' });
     expect(v.modals).toEqual([]);
-    expect(v.player).toEqual({ name: 'Rowan', race: 'dwarf' });
+    expect(v.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: { id: 'dwarf', label: 'Race', title: 'Dwarf' } });
   });
 
   it('offers only the options still to be answered, and nothing about how to draw them', () => {
@@ -1000,7 +1000,7 @@ describe('a recorded answer is the value and never where it sat (c2)', () => {
       ['race', false],
     ]);
     expect(submitModal(session, { choice: '1' }).modals[0].options[0].values).toBeNull();
-    expect(submitModal(session, { name: 'Rowan' }).player.name).toBe('');
-    expect(submitModal(session, { race: 'orc' }).player).toEqual({ name: 'Rowan', race: 'orc' });
+    expect(submitModal(session, { name: 'Rowan' }).player.name).toBeNull();
+    expect(submitModal(session, { race: 'orc' }).player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: { id: 'orc', label: 'Race', title: 'Orc' } });
   });
 });

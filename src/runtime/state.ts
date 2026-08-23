@@ -1,6 +1,7 @@
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import type { TagClause } from '../grammar/tagClause';
 import { RuntimeError } from './error';
+import type { EngineKey } from '../content/locale';
 import type { Answer, Localized } from './localized';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { Said } from './said';
@@ -118,12 +119,35 @@ export interface GameState extends RngCursor {
   instances: InstanceTable;
   populations: Populations;
   shops: Record<string, ShopStock>;
-  player: { name: string; race: string };
+  player: PlayerSheet;
   modals: readonly ModalFrame[];
 }
 
+// The player's own sheet: for each field, the kind whose id it holds — or null where the field is the
+// player's own writing and is already the words — and the words the field is called by, which are the
+// words the question that filled it was asked in. The sheet's fields are these keys, so a field added
+// here cannot reach the state without answering both, and everything that reads one out to somebody —
+// a sentence, a view, a save that drops what the world stopped declaring — derives the answer here
+// rather than knowing about race.
+export const PLAYER_SHEET = {
+  name: { names: null, asked: 'engine.modal.name' },
+  race: { names: 'race', asked: 'engine.modal.race' },
+} as const satisfies Readonly<Record<string, { names: string | null; asked: EngineKey }>>;
+
+export type PlayerField = keyof typeof PLAYER_SHEET;
+
+export type PlayerSheet = Record<PlayerField, string>;
+
+export const PLAYER_FIELDS = Object.keys(PLAYER_SHEET) as PlayerField[];
+
+export function emptyPlayerSheet(): PlayerSheet {
+  const sheet = {} as PlayerSheet;
+  for (const field of PLAYER_FIELDS) sheet[field] = '';
+  return sheet;
+}
+
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: { name: '', race: '' }, modals: [] };
+  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

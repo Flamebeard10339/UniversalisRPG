@@ -17,7 +17,7 @@ import { isPopulations, prunePopulations } from './population';
 import { isShopStock } from './trade';
 import { isModalFrame, pruneModals } from './modals';
 import { Localized, Localizer, localizerOf } from './localized';
-import { PLAYER, templateOf } from './state';
+import { emptyPlayerSheet, PLAYER, PLAYER_FIELDS, templateOf } from './state';
 
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 12;
@@ -75,7 +75,7 @@ const isActiveAction = (value: unknown): boolean =>
 
 const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(value, 'legs', (held) => Array.isArray(held) && held.every(isText));
 
-const isPlayer = (value: unknown): boolean => at(value, 'name', isText) && at(value, 'race', isText);
+const isPlayer = (value: unknown): boolean => PLAYER_FIELDS.every((field) => at(value, field, isText));
 
 export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
@@ -94,7 +94,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } },
   time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
   rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
-  player: { shape: 'scalar', holds: isPlayer, sparsest: { name: '', race: '' }, prune: 'pruned by a rule of its own' },
+  player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' },
   modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
 };
 

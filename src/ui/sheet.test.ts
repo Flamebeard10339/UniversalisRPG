@@ -3,7 +3,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { CountedRow, PlayStatus } from '../runtime/session';
-import { carried, contributionText, counted, worn } from './sheet';
+import { carried, contributionText, counted, identity, worn } from './sheet';
 
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
@@ -161,5 +161,24 @@ describe('what the player is wearing, as rows', () => {
 
     expect(carried(rows, [], localizer).map((entry) => entry.id)).toEqual(['blade']);
     expect(worn([slot('mainhand', 'Main Hand')], rows, [], localizer, EMPTY)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade' }]);
+  });
+});
+
+describe('the sheet says who the player is', () => {
+  const rows = (over: Partial<PlayStatus['player']> = {}): PlayStatus['player'] => ({
+    name: { id: 'Rowan', label: asLocalized('Name'), title: asLocalized('Rowan') },
+    race: { id: 'core.elf', label: asLocalized('Race'), title: asLocalized('Elf') },
+    ...over,
+  });
+
+  it('draws two rows against the words the world has for them, and never the race id', () => {
+    expect(identity(rows())).toEqual([
+      { id: 'Rowan', name: 'Name', value: 'Rowan' },
+      { id: 'core.elf', name: 'Race', value: 'Elf' },
+    ]);
+  });
+
+  it('draws one row for a player who has answered one question of the two', () => {
+    expect(identity(rows({ race: null })).map((entry) => entry.name)).toEqual(['Name']);
   });
 });

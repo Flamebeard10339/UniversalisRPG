@@ -178,7 +178,7 @@ function walkType(node: ts.TypeNode, file: string, where: string, walk: Walk): v
   }
 
   if (ts.isParenthesizedTypeNode(node)) return walkType(node.type, file, where, walk);
-  if (ts.isTypeOperatorNode(node)) return walkType(node.type, file, where, walk);
+  if (ts.isTypeOperatorNode(node)) return node.operator === ts.SyntaxKind.KeyOfKeyword && isConstantKeys(node.type, file) ? undefined : walkType(node.type, file, where, walk);
   if (ts.isArrayTypeNode(node)) return walkType(node.elementType, file, `${where}[]`, walk);
   if (ts.isUnionTypeNode(node) || ts.isIntersectionTypeNode(node)) {
     for (const each of node.types) walkType(each, file, where, walk);
@@ -203,6 +203,27 @@ function walkIndexedAccess(node: ts.IndexedAccessTypeNode, file: string, where: 
     if (listed?.every((element) => ts.isStringLiteral(element))) return;
   }
   walk.unread.push(`${where}: ${ts.SyntaxKind[node.kind]}`);
+}
+
+// `keyof typeof <a constant object>` is the set of names that object is written with, which are
+// machine names an author never reads — the same answer `Answer` gives, arrived at by deriving the
+// set rather than by writing it out as a union nobody may forget to extend.
+function isConstantKeys(node: ts.TypeNode, file: string): boolean {
+  if (!ts.isTypeQueryNode(node) || !ts.isIdentifier(node.exprName)) return false;
+  const held = constantValue(node.exprName.text, file);
+  return held !== undefined && ts.isObjectLiteralExpression(held) && held.properties.every((property) => ts.isPropertyAssignment(property) && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)));
+}
+
+function constantValue(name: string, file: string): ts.Expression | undefined {
+  const module = moduleAt(file);
+  const local = module.values.get(name);
+  if (!local) {
+    const brought = module.imported.get(name);
+    return brought ? constantValue(brought.exported, brought.file) : undefined;
+  }
+  let held = local.initializer;
+  while (held && (ts.isAsExpression(held) || ts.isSatisfiesExpression(held) || ts.isParenthesizedExpression(held))) held = held.expression;
+  return held;
 }
 
 function constantList(name: string, file: string): ts.NodeArray<ts.Expression> | undefined {

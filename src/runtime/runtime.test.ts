@@ -5,7 +5,9 @@ import {
   actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSecondsPerUnit, useAction } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { restorePools } from './effects';
+import type { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { PLAYER_FIELDS, PLAYER_SHEET } from './state';
 import { secondsToMs, toMilliUnits } from './units';
 import { runTest } from './session';
 
@@ -343,10 +345,8 @@ describe('renderSegments', () => {
     expect(rendered).toBe('Hello  already answered');
   });
 
-  it('interpolates player.name and player.race from state.player', () => {
-    const state = createGameState();
-    state.player = { name: 'Rowan', race: 'Elf' };
-    const rendered = renderSegments(
+  const sheetLine = (state: GameState, held: Registry): string =>
+    renderSegments(
       [
         { kind: 'literal', text: 'There you are, ' },
         { kind: 'interpolate', reference: { path: ['player', 'name'] } },
@@ -355,10 +355,34 @@ describe('renderSegments', () => {
         { kind: 'literal', text: '.' },
       ],
       state,
-      registry,
+      held,
     );
-    expect(rendered).toBe('There you are, Rowan, Elf.');
+
+  it('writes the name the player typed and the words the world titles their race, never the race id', () => {
+    const held = loadInEnglish(['# race high-elf', 'title: Elf of the High Wood'].join('\n'));
+    const state = createGameState();
+    state.player = { name: 'Rowan', race: 'high-elf' };
+    expect(sheetLine(state, held)).toBe('There you are, Rowan, Elf of the High Wood.');
+    expect(evaluateCondition({ kind: 'reference', reference: { path: ['player', 'race'] } }, state, held)).toBe(true);
   });
+
+  it('writes nothing at all for a race nobody has been asked for yet', () => {
+    expect(sheetLine(createGameState(), registry)).toBe('There you are, , .');
+  });
+
+  // Subjects off the sheet's own declaration, so a field it grows next month is held to the same
+  // rule with nothing edited: a field naming a kind is read out as that kind's words, and a field
+  // the player wrote themselves is read out as what they wrote.
+  for (const field of PLAYER_FIELDS) {
+    const { names } = PLAYER_SHEET[field];
+    it(`reads player.${field} out as ${names === null ? 'the words the player typed' : `the words the world titles a ${names}`}`, () => {
+      const held = names === null ? registry : loadInEnglish([`# ${names} a-sample`, 'title: Words The World Owns'].join('\n'));
+      const state = createGameState();
+      state.player[field] = names === null ? 'Words The Player Typed' : 'a-sample';
+      const rendered = renderSegments([{ kind: 'interpolate', reference: { path: ['player', field] } }], state, held);
+      expect(rendered).toBe(names === null ? 'Words The Player Typed' : 'Words The World Owns');
+    });
+  }
 
   it('renders an unset player.name as empty text', () => {
     const state = createGameState();

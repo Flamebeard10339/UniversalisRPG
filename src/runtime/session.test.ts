@@ -141,18 +141,18 @@ node greeting:
       { key: 'name', label: 'Name', values: null },
       { key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) },
     ] }]);
-    expect(v.player).toEqual({ name: '', race: '' });
+    expect(v.player).toEqual({ name: null, race: null });
 
     v = submitModal(session, { name: 'Rowan' });
     expect(v.modals[0].options.map((option) => option.key)).toEqual(['race']);
-    expect(v.player).toEqual({ name: '', race: '' });
+    expect(v.player).toEqual({ name: null, race: null });
 
     v = submitModal(session, { race: 'elf' });
     expect(v.modals).toEqual([]);
-    expect(v.player).toEqual({ name: 'Rowan', race: 'elf' });
+    expect(v.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: { id: 'elf', label: 'Race', title: 'Elf' } });
 
     v = apply(session, 'talk:mirror');
-    expect(v.said).toContain('There you are, Rowan, elf.');
+    expect(v.said).toContain('There you are, Rowan, Elf.');
   });
 
   it('reports a prune to whoever asked for the load and says nothing about it to the player', () => {
@@ -1084,10 +1084,10 @@ roast:
     registry.saves.set('forged', { version: SAVE_VERSION, diff: { player: mine } });
 
     applyDirective(session, { kind: 'load', save: 'forged' });
-    expect(sessionStatus(session).player.name).toBe('Rowan');
+    expect(sessionStatus(session).player.name?.title).toBe('Rowan');
 
     mine.name = 'MUTATED';
-    expect(sessionStatus(session).player.name).toBe('Rowan');
+    expect(sessionStatus(session).player.name?.title).toBe('Rowan');
   });
 
   it('does not let play rewrite the save it was loaded from', () => {

@@ -39,7 +39,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
         flags: {},
       discovered: [{ id: 'start', title: asLocalized('Start'), x: 0, y: 0, z: 0, adjacent: [{ to: 'yard', open: true }] }],
       locations: [{ id: 'start', title: asLocalized('Start') }, { id: 'yard', title: asLocalized('Yard') }],
-      player: { name: 'Miri', race: 'human' },
+      player: { name: { id: 'Miri', label: asLocalized('Name'), title: asLocalized('Miri') }, race: { id: 'human', label: asLocalized('Race'), title: asLocalized('Human') } },
       action: null,
       said: [],
     },
@@ -85,7 +85,7 @@ describe('the browser test harness', () => {
       ['travel:yard', 2],
     ]);
     expect(state.view.resources[0].title).toBe('Energy');
-    expect(state.view.player.name).toBe('Miri');
+    expect(state.view.player.name?.title).toBe('Miri');
     expect(state.view.journey).toBeNull();
     expect(state.view.inventory).toEqual({});
   });
