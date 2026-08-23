@@ -7,7 +7,8 @@ import { VISITS } from '../grammar/condition';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { ACTION_MEMBER, Namespace, qualify } from './namespace';
 import { isNamespacedKind } from './sections';
-import { isActionOwnerKind, sectionFor } from './sections';
+import { contentSectionMaps, isActionOwnerKind, sectionFor } from './sections';
+import { MemberName } from './sections/define';
 import { ParsedModule } from './universe';
 import { ReferenceKind } from './refs';
 import { visitSection } from './sections';
@@ -67,7 +68,6 @@ const addedMembers = <T>(value: unknown): T[] => (isFieldEdits(value) ? value.op
 export interface MemberOwner {
   id: string;
   flags?: unknown;
-  nodes?: { name: string }[];
   actions?: unknown;
   blocks?: unknown;
   uses?: unknown;
@@ -83,6 +83,36 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
   const used = addedMembers<string>(value.uses).map(lastSegment);
   const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
   return [...used, ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
+}
+
+type Members = (value: { id: string }) => readonly MemberName[];
+
+let bearing: ReadonlyMap<string, Members> | undefined;
+
+// Which registry map holds values carrying names of their own, and the kind those names are read off. A # quest declares the nodes it hands out because it fills `dialogues`, not because anything here names quest beside dialogue.
+const memberBearingMaps = (): ReadonlyMap<string, Members> =>
+  (bearing ??= new Map(
+    contentSectionMaps().flatMap(([kind, map]) => {
+      const members = sectionFor(kind)?.members as Members | undefined;
+      return members === undefined ? [] : [[map, members] as const];
+    }),
+  ));
+
+// A member is declared beneath the section that landed it, which is what lets removing that section take its members with it. A value a section lands under another kind's map carries its own id, and that id sits under the section's.
+const beneath = (owner: string, id: string, name: string): string => (id === owner ? name : `${id.slice(owner.length + 1)}.${name}`);
+
+function landedMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
+  const declared: Member[] = [];
+  for (const [map, lands] of Object.entries(sectionFor(kind)?.maps ?? {})) {
+    const members = memberBearingMaps().get(map);
+    if (members === undefined) continue;
+    for (const [id, landed] of lands(value)) {
+      for (const member of members(landed as { id: string })) {
+        declared.push({ kind: member.kind, key: namespace.declareMember(member.kind, kind, value.id, beneath(value.id, id, member.name)) });
+      }
+    }
+  }
+  return declared;
 }
 
 export function declareMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
@@ -102,12 +132,7 @@ export function declareMembers(namespace: Namespace, kind: string, value: Member
       kind: ACTION_MEMBER,
       key: namespace.declareMember(ACTION_MEMBER, kind, value.id, address),
     });
-  if (kind === 'dialogue')
-    for (const node of value.nodes ?? [])
-      declared.push({
-        kind: 'node',
-        key: namespace.declareMember('node', kind, value.id, node.name),
-      });
+  declared.push(...landedMembers(namespace, kind, value));
   return declared;
 }
 

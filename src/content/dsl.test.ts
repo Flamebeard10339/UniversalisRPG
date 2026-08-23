@@ -10,7 +10,7 @@ import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
-import { Namespace } from './namespace';
+import { memberKey, Namespace } from './namespace';
 import { formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
@@ -392,6 +392,35 @@ describe('the shipped corpus', () => {
       const intruded = [written, 'nonsense-nobody-declares:', ...indentLines(['nonsense-nobody-reads'])].join('\n');
       expect(() => owner.parse(splitSections(intruded)[0]!), `# ${section.kind} ${section.id ?? ''}`).toThrow();
     }
+  });
+});
+
+describe('a name a value in the corpus carries', () => {
+  const { registry } = loadUniverseWithDiagnostics(CORPUS);
+
+  // Every name every landed value carries, taken from the kinds that say they carry names and from the map each of those owns — so a kind that lands dialogues next month is held to this with no edit, whether it wrote them itself or was handed them.
+  const CARRIED = contentSectionMaps().flatMap(([kind, primary]) => {
+    const members = sectionFor(kind)!.members;
+    if (members === undefined) return [];
+    return [...mapOf(registry, primary)].flatMap((entry) =>
+      members(entry[1] as { id: string }).map((member) => ({ kind: member.kind, key: memberKey(member.kind, kind, entry[0], member.name), where: `# ${kind} ${entry[0]}` })),
+    );
+  });
+
+  it('is carried by enough of it for what is below to mean something', () => {
+    expect(CARRIED.length).toBeGreaterThan(20);
+    expect(new Set(CARRIED.map((each) => each.where.split('.')[0])).size).toBeGreaterThan(1);
+  });
+
+  it('is a member of the namespace, whichever kind of section landed the value', () => {
+    expect(CARRIED.filter((each) => !registry.namespace.has(each.kind, each.key)).map((each) => `${each.where} carries ${each.kind} ${each.key}, which nothing declares`)).toEqual([]);
+  });
+
+  // The namespace is settled before anything is built, so a kind landing into one of these maps has to land the same values from what an author wrote. A kind whose fields are a schema does not: its values arrive hydrated.
+  it('is read off values their kinds land without hydrating first', () => {
+    const bearing = new Set(contentSectionMaps().flatMap(([kind, primary]) => (sectionFor(kind)!.members === undefined ? [] : [primary])));
+    expect(bearing.size).toBeGreaterThan(0);
+    expect(sections().filter((each) => each.schema !== undefined && Object.keys(each.maps).some((name) => bearing.has(name))).map((each) => each.kind)).toEqual([]);
   });
 });
 

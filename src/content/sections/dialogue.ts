@@ -5,6 +5,7 @@ import { moduleLocalId } from '../../grammar/section';
 import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
 import { overlay } from '../merge';
+import { DIALOGUE_NODE } from '../namespace';
 import { section } from './define';
 import { condition as visitCondition, put, results, segments, type Visit } from '../refs';
 
@@ -181,6 +182,7 @@ export const dialogue = section<Dialogue>()({
   ids: 'owned',
   validate: unknownNode,
   map: 'dialogues',
+  members: (value) => value.nodes.map((node) => ({ kind: DIALOGUE_NODE, name: node.name })),
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
     { form: 'node <name>:', example: 'node greet:', block: () => nodeGrammar() },

@@ -17,6 +17,12 @@ export type Ids = 'owned' | 'global' | 'none';
 
 export type Maps = Record<string, Map<string, never>>;
 
+// A name the namespace holds under one value of this kind, wherever that value came from. A kind declaring this is answering for every value that lands in its map, including the ones another kind put there.
+export interface MemberName {
+  kind: string;
+  name: string;
+}
+
 export type Lands<V, M extends Record<string, unknown>> = {
   [K in keyof M]: (value: V) => readonly (readonly [string, M[K]])[];
 };
@@ -31,6 +37,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   names: readonly Named[];
   grammar: readonly Written[];
   says?: (value: V) => ActionResult[][];
+  members?: (value: V) => readonly MemberName[];
   text: readonly string[];
   schema?: AnySchema;
   parse(raw: RawSection): object;
@@ -49,6 +56,8 @@ interface Common<V extends { id: string }> {
   flags?: readonly string[];
   // The result lists an author wrote here, whose spoken lines key under this id.
   says?: (value: V) => ActionResult[][];
+  // The names one of these holds that anything may address, which the namespace declares beneath whatever section landed the value.
+  members?: (value: V) => readonly MemberName[];
   text?: readonly string[];
   validate?: (value: V) => string | undefined;
   visit?: (value: V, where: string, visit: Visit) => void;
@@ -142,7 +151,7 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions = false, flags = [], says, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, map, maps, nestsActions = false, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions) ACTION_OWNERS.add(kind);
@@ -198,6 +207,7 @@ export const section =
       names,
       grammar: schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar,
       says,
+      members,
       text,
       schema,
       parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),
