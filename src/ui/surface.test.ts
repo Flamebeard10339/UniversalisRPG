@@ -70,9 +70,11 @@ const DISPATCHES = [
   'NO_NOTES',
   'NOTE_FIELDS',
   'parseRun',
+  'outcomeOf',
   'PLAYTEST_SLOT',
   'refusedLine',
   'serializeRun',
+  'turnRecord',
 ];
 
 const STYLESHEET = readFileSync(resolve(here, '..', 'index.css'), 'utf8');
