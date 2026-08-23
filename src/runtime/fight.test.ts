@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS } from './runtime';
+import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS, WaitedOut } from './runtime';
+import { condition } from '../grammar/condition';
+import { parseWhole } from '../grammar/parser';
 import { hostile, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
@@ -558,5 +560,105 @@ describe('an action under way is bounded in the time of the world it runs in', (
     expect(waited).toEqual({ ended: true });
     expect(state.activeAction).toBeNull();
     expect(state.time).toBeLessThan(UNDER_WAY_LIMIT_MS);
+  });
+});
+
+const FAINTS = `
+# stat attack
+base: 4
+
+# stat dr
+
+# stat attack-rate
+base: 60
+
+# stat regeneration
+
+# stat max-health
+
+# resource health
+rate: regeneration
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# faction world
+
+# faction player
+
+# action swing
+title: swing
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+faction: player
+stats: max-health 10, attack 1, attack-rate 60
+uses: swing
+on death:
+  relocate: starting-location
+  stop
+
+# entity limpet
+faction: world
+stats: max-health 1000, attack 4, attack-rate 60
+uses: swing
+aggressive
+respawn after: 2s
+
+# location shore
+x: 0, y: 0
+starting
+title: Shore
+
+# location tidepool
+x: 1, y: 0
+title: Tidepool
+entities: 3 limpet
+`;
+
+const STAYS_PUT = FAINTS.replace('  relocate: starting-location\n', '');
+
+const fainting = (source: string): { waited: WaitedOut; state: GameState } => {
+  const registry = loadInEnglish(source);
+  const state = standing(registry, 'tidepool');
+  resolve(state, registry, secondsToMs(1));
+  expect(state.activeAction, 'the limpets never opened on the player, so there was nothing to wait out').not.toBeNull();
+  return { waited: resolveUnderWay(state, registry), state };
+};
+
+describe('falling in a room that never goes quiet ends the sitting once fainting moves the player', () => {
+  it('gives the loop back inside a minute where the same room without the move spends the whole four hours', () => {
+    const moved = fainting(FAINTS);
+    const pinned = fainting(STAYS_PUT);
+
+    expect(moved.waited).toEqual({ ended: true });
+    expect(moved.state.location, 'the reserved name landed the player on whichever location is marked starting').toBe('shore');
+    expect(moved.state.time).toBeLessThan(secondsToMs(60));
+
+    expect(pinned.waited.ended, 'standing still, the same fight is re-armed every tick and only the bound stops it').toBe(false);
+    expect(pinned.state.time).toBeGreaterThanOrEqual(UNDER_WAY_LIMIT_MS);
+    expect(pinned.state.location).toBe('tidepool');
+  });
+});
+
+describe('a condition terminator that was never reached is a failure', () => {
+  const until = (written: string): WaitedOut => {
+    const registry = loadInEnglish(MODULE);
+    const state = standing(registry, 'camp');
+    armFightAction('swing', 'bandit-leader', registry, state);
+    return resolveUnderWay(state, registry, parseWhole(condition, written, 0, 'a condition'));
+  };
+
+  it('fails on the condition the leader’s death never met, and passes on the one it did', () => {
+    const met = until('has token');
+    expect(met).toEqual({ ended: true });
+
+    const short = until('gave-up');
+    expect(short.ended).toBe(false);
+    expect(short.reason, 'the reason names the condition that was asked for, not only what ran out').toContain('gave-up');
   });
 });

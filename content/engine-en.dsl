@@ -257,3 +257,4 @@ engine.stopped.bound: the world had already run {hours} hours on your behalf, wh
 engine.stopped.still: what was under way advances by nothing, so waiting it out would never end
 engine.stopped.pack-full: your pack was full and there was nowhere to put what you found
 engine.stopped.unloadable: what was under way could not be picked up again
+engine.stopped.short: {because}, and {condition} never came true
