@@ -122,8 +122,8 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: You thought better of turning Miki down. He is showing you the ropes after all, in his own good time. @@@ rough
-  hint: Miki handed you a fishing net. Catch something with it and bring it back to him. @@@ rough
+  log: You thought better of turning Miki down. He is showing you the ropes after all, in his own good time. @@@
+  hint: Miki handed you a fishing net. Catch something with it and bring it back to him. @@@
   tutorial-island.miki says:
     always
     sticky
@@ -131,7 +131,7 @@ stage apologised:
     Take the net. Catch me one fish with it and I will call your apology accepted. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   tutorial-island.miki says:
     when: has tutorial-island.fish
-    A fish. An actual fish. Fine — you will do. The front door is open; go and see the island. @@@ rough
+    A fish. An actual fish. Fine — you will do. The front door is open; go and see the island. @@@
     set: tutorial-island.front-door.unlocked
     goto sendoff
 
@@ -150,12 +150,12 @@ stage apologised:
 // you come back for one more word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
-log: You have seen what the island has to show. Whatever comes next is across the water. @@@ rough
-hint: Miki has one more word for you, if you go back for it. @@@ rough
+log: You have seen what the island has to show. Whatever comes next is across the water. @@@
+hint: Miki has one more word for you, if you go back for it. @@@
 
 stage adrift:
-  log: Miki has said his piece about your leaving, and will say it again as often as you care to hear it. @@@ rough
-  hint: Nothing here needs doing. The island is behind you. @@@ rough
+  log: Miki has said his piece about your leaving, and will say it again as often as you care to hear it. @@@
+  hint: Nothing here needs doing. The island is behind you. @@@
   tutorial-island.miki says:
     when: tutorial-island.market-district.discovered
     sticky
@@ -164,7 +164,7 @@ stage adrift:
   tutorial-island.miki says:
     when: tutorial-island.miki.angered
     sticky
-    Picked the lock, did you. I would be angrier if it had not worked. Go on then; the boat will not ask how you got to it. @@@ rough
+    Picked the lock, did you. I would be angrier if it had not worked. Go on then; the boat will not ask how you got to it. @@@
     goto adrift
 
 // --- tests ---

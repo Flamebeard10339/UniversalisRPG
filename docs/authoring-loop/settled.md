@@ -18,13 +18,18 @@ corpus runs both ways — there is deliberately **no `one-way` keyword** until
 something needs one.
 
 **`sticky` replays a node whole; `again:` is what a non-sticky node says on a later
-visit.** They are mutually exclusive: `again:` is unreachable on a `sticky` node.
-Without either, a node is said once and then falls silent.
+visit.** The engine refuses both on one node, since `again:` is unreachable on a
+`sticky` one. Without either, a node is said once and then falls silent — and a
+conversation whose every node has fallen silent is no longer offered at all, so
+`reachedNow` returns nothing rather than a node that would say nothing.
 
-**A line the game says may carry `@@@` and still be played.** `@@@ <words>` means
-*unreviewed, or here is what I wanted and could not get*; the engine drops the note
-and says the rest. It does **not** mean "leave it blank" — a bare mark on an
-otherwise empty line is a line the game says as nothing.
+**A line the game says may carry `@@@` and still be played, and may not be
+silence.** `@@@ <words>` means *unreviewed, or here is what I wanted and could not
+get*; the engine drops the note and says the rest. Because the note is dropped, a
+line that is *only* a mark is silence, and the engine refuses it at load naming the
+line — so the mark goes beside the words, never in place of them. The sweep reads
+`everySaid`, the same table `npm run notes` and `npm run review` read, so a kind or
+a field added next month is covered with no edit.
 
 **`assert:` reads `xp`, `resource`, `inventory`, `stat`, flags, `time`, `visits`
 and `player.<field>`.** The resolver is a `Record` over the grammar's own roots, so

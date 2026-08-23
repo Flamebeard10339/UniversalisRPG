@@ -11,29 +11,16 @@ without evidence is a hunch and does not belong here yet.
 
 ---
 
+## Core DSL
+Create a core.dsl file which contains all skills and basic mechanics. So that Tulsa doesn't have non tulsa related things in it. This means splitting tutorial-island.dsl into miki's house which goes into tulsa, and core stuff which goes into core.dsl. 
+
 ## Blocking the writing pass
 
-**Empty prose is said as silence, and reads as a broken engine.** Twice a
-playtesting bot has filed an engine bug against a line nobody wrote: Miki's
-apology branch says `[""]`, and a spent dialogue node says nothing at all while
-the view re-renders as the location's arrival text. *Closes when:* a line the game
-would say cannot be empty — the engine refuses it at load, naming the field — and
-a conversation with nothing to say either says something or is not offered.
-`@@@ <words>` stays legal and playable; only nothing at all is refused.
-
-**`sticky` and `again:` contradict each other and the corpus writes both.**
-`enterNode` (`src/runtime/dialogue-runtime.ts:65`) sets `replay = visit === 1 ||
-node.sticky`, and `again:` is only reached when `!replay` — so `again:` is dead on
-any node that is `sticky`. Six pairings in `content/tutorial-quests.dsl` do this,
-and each dead `again:` is a bare `@@@`, which is why they read as unwritten rather
-than as unreachable. *Closes when:* the engine refuses the combination, which
-deletes those six marks rather than writing them.
-
-**Twenty-odd bare `@@@` in `content/tutorial-quests.dsl`.** Miki's *snubbed* and
-*apologised* routes have empty `log:`, `hint:` and dialogue lines, so a player who
-turns her down walks into blank text repeatedly. Six of them are the dead `again:`
-lines above and want deleting; the rest want writing. *Closes when:*
-`npm run notes` reports no bare mark in that module.
+**Twelve rough lines in `content/tutorial-quests.dsl`.** Miki's *snubbed*,
+*apologised* and *adrift* routes and four quest `log:`/`hint:` lines were written
+in one pass to get the module past the silence refusal, and none of them has had a
+second thought. Three carry what they are reaching for; the rest are bare marks.
+*Closes when:* `npm run notes` reports no mark in that module.
 
 ## Reported by a player, not yet diagnosed
 
@@ -48,9 +35,12 @@ the tracker pointed at Miki throughout a walk across Tulsa.
 
 **The oven offers a recipe whose ingredient the player cannot have.** *"'roast
 chestnuts' is available but I have no chestnuts."*
+  RESPONSE: remove roast chestnuts. It was a debugging action added to test things
 
 **No way to rest or heal.** Run 4 noticed it at 14/30 health with nothing to do
 about it anywhere in the town.
+  RESPONSE: We need to teach agents about the wait action available everywhere 
+  which passes time and allows regeneration to work. 
 
 ## Ours, and small
 
