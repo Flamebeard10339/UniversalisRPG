@@ -76,10 +76,12 @@ export const blocking = (entry: RunLogEntry): string => (isPlayed(entry) ? entry
 
 // A turn as one of the two harnesses settles it: what the line was, whether the engine took it,
 // and what it answered with in the words that harness's own player read.
-export function turnRecord(turn: number, line: string, result: CommandResult, detail: readonly string[], notes: RunNotes = NO_NOTES): PlayedTurn {
+export function turnRecord(turn: number, line: string, outcome: PlayedTurn['outcome'], detail: readonly string[], notes: RunNotes = NO_NOTES): PlayedTurn {
   const said = detail.filter((each) => each.trim() !== '').join('\n');
-  return { ...notes, turn, line, outcome: refusedLine(result) ? 'refused' : 'applied', detail: said === '' ? 'nothing happened' : said };
+  return { ...notes, turn, line, outcome, detail: said === '' ? 'nothing happened' : said };
 }
+
+export const outcomeOf = (result: CommandResult): PlayedTurn['outcome'] => (refusedLine(result) ? 'refused' : 'applied');
 
 // The engine, not a harness, decides what a line refuses: an error-toned message is the one signal
 // command.ts already gives every driver, so this is not a second validation layer beside runLine.

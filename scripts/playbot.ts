@@ -12,7 +12,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { blocking, describeEntry, journalWindowText, NOTE_FIELDS, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
+import { blocking, describeEntry, journalWindowText, NOTE_FIELDS, outcomeOf, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
@@ -357,7 +357,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error };
 
   const result = runLine(deps.ctx, parsed.reply.line);
-  return turnRecord(deps.turn, parsed.reply.line, result, answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
+  return turnRecord(deps.turn, parsed.reply.line, outcomeOf(result), answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
 }
 
 export interface PlaybotOptions {

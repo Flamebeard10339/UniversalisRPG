@@ -1,4 +1,4 @@
-import { describeRun, isPlayed, NO_NOTES, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, refusedLine, serializeRun, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { describeRun, isPlayed, NOTE_FIELDS, outcomeOf, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import type { CommandResult } from '../runtime/command';
 import type { SlotStore } from '../runtime/store';
 
@@ -31,7 +31,7 @@ export function attached(log: readonly RunLogEntry[], turn: number, notes: RunNo
 
 export const edited = (held: RunNotes, field: 'note' | 'expected' | 'confusion' | 'blocked', said: string): RunNotes => ({ ...held, [field]: said });
 
-export const emptyNotes = (): RunNotes => ({ ...NO_NOTES });
+export const emptyNotes = (): RunNotes => Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, ''])) as RunNotes;
 
 export const turnsPlayed = (log: readonly RunLogEntry[]): number => log.filter(isPlayed).length;
 
@@ -83,16 +83,15 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
     opened: (line, result, from) => {
       if (log === null) return;
       answering = from;
-      log = [...log, { ...NO_NOTES, turn: log.length + 1, line, outcome: refusedLine(result) ? 'refused' : 'applied', detail: 'nothing happened' }];
+      log = [...log, turnRecord(log.length + 1, line, outcomeOf(result), [])];
     },
     settle: (said) => {
       if (log === null || log.length === 0) return false;
       const open = log[log.length - 1];
       if (!isPlayed(open)) return false;
-      const answered = said(answering).filter((each) => each.trim() !== '').join('\n');
-      const detail = answered === '' ? 'nothing happened' : answered;
-      if (open.detail === detail) return false;
-      log = [...log.slice(0, -1), { ...open, detail }];
+      const settled = turnRecord(open.turn, open.line, open.outcome, said(answering), open);
+      if (open.detail === settled.detail) return false;
+      log = [...log.slice(0, -1), settled];
       keep();
       return true;
     },
