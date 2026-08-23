@@ -198,16 +198,11 @@ assert: has tutorial-island.bread
 talk: tutorial-island.miki
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
-// rather than through the floor. A rat takes a few swings to put down, so each
-// `use:` starts the fight and the `wait:` lets it play out — 30s is far longer
-// than the ~6s it actually needs.
+// rather than through the floor.
 use: entity.stairs.descend
-use: melee-combat on giant-rat
-wait: 30
-use: melee-combat on giant-rat
-wait: 30
-use: melee-combat on giant-rat
-wait: 30
+use: melee-combat on giant-rat until done
+use: melee-combat on giant-rat until done
+use: melee-combat on giant-rat until done
 assert: tutorial-island.rats-killed >= 3
 use: entity.stairs-up.ascend
 talk: tutorial-island.miki
@@ -320,7 +315,7 @@ assert: tutorial-island.rats-killed >= 3
 {"version":11}
 
 # save miki-route-end
-{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":117200,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
+{"version":11,"inventory":{"tutorial-island.jug-of-water":0,"tutorial-island.pot-of-flour":0,"tutorial-island.dough":0,"tutorial-island.bread":1,"tutorial-island.iron-sword":1,"tutorial-island.wooden-shield":1,"tutorial-island.rat-bone":7},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tutorial-island.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tutorial-island.rats-killed":3,"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tutorial-island.market-district.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"tutorial-island.cooking":6,"tutorial-island.melee":16},"resources":{"tutorial-island.health":21000},"location":"tutorial-island.beach","populations":{"tutorial-island.basement":{"tutorial-island.giant-rat":{"down":3,"due":[]}}},"time":36800,"rng":2776008081,"player":{"name":"Rowan","race":"elf"}}
 
 // The thief's own closing sheet — not the door route's. `expect:` is a whole
 // save compared exactly, so a route that never bakes or fights has no way to
