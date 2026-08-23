@@ -19,7 +19,6 @@ export function QuestBody({ entry, words }: { entry: JournalEntry; words: Words 
           </li>
         ))}
       </ol>
-      {entry.hint ? <p className="mt-3 text-xs text-accent">{entry.hint}</p> : null}
     </div>
   );
 }

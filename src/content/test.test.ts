@@ -343,7 +343,7 @@ describe('refuse: the outcome under test', () => {
   });
 });
 
-describe('journal: pins the hint a quest currently shows', () => {
+describe('journal: pins the line a quest is standing on', () => {
   it('reads the quest id up to the first "says" and the rest of the line as the words', () => {
     expect(parseDirectiveLine('journal: finding-your-feet says Talk to Miki in the guide house.')).toEqual({
       kind: 'journal',

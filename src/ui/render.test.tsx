@@ -78,7 +78,7 @@ function published(view: PlayView): string[] {
     ...view.stats.map((row) => row.title),
     ...view.xp.map((row) => row.title),
     ...view.equipment.flatMap((row) => (row.name === null ? [row.title] : [row.title, row.name])),
-    ...view.journal.flatMap((entry) => [entry.title, entry.hint ?? '', ...entry.lines.map((line) => line.said)]),
+    ...view.journal.flatMap((entry) => [entry.title, ...entry.lines.map((line) => line.said)]),
     ...view.said,
   ];
 }

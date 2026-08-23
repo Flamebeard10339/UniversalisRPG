@@ -1,7 +1,7 @@
 import type { ActionResult } from '../grammar/actionResult';
 import type { Condition } from '../grammar/condition';
 import type { Registry } from '../content/registry';
-import { begun, hintNow, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
+import { begun, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
 import { evaluateCondition, renderSegments } from './conditions';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import type { GameState } from './state';
@@ -23,9 +23,10 @@ export interface JournalEntry {
   standing: QuestStanding;
   // One line to each stage the quest has been through. A quest nobody has begun has been through nothing and reads as nothing, rather than reading out what has not happened yet.
   lines: JournalLine[];
-  // What the player is turning over, which is nothing for a quest not under way.
-  hint: Localized | null;
 }
+
+// The one line a quest is standing on: the only one not struck through, and nothing once the quest is over. Derived from the lines rather than held beside them, so the journal and whatever asks it where a quest stands read the same words.
+export const standingLine = (entry: JournalEntry): Localized | null => entry.lines.find((line) => !line.struck)?.said ?? null;
 
 const spoken = (localizer: Localizer, state: GameState, registry: Registry, result: ActionResult | undefined): Localized | null =>
   result === undefined || result.kind !== 'say' || result.key === undefined ? null : localizer.line(result.key, (segments) => renderSegments(segments, state, registry));
@@ -50,9 +51,7 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
           const said = spoken(localizer, state, registry, stage.log);
           return said === null ? [] : [{ stage: stage.name as Answer, said, struck: standing === 'complete' || stage !== at }];
         });
-  // Read off live state on every read, the way the standing and the lines are: a stage left by something an entity says spans more than one beat, so which hint applies is a question and not a constant.
-  const hint = standing === 'complete' ? null : spoken(localizer, state, registry, hintNow(standing === 'unstarted' ? quest.hints : at.hints, holds));
-  return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, lines, hint };
+  return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, lines };
 }
 
 // Every quest the world declares, touched or not, in the order the world declares them. A journal that listed only what had been started would be a list of what the player already knows.

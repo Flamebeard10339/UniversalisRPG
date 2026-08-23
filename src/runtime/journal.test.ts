@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { stageNow } from '../content/sections/quest';
 import { evaluateCondition } from './conditions';
-import { journal } from './journal';
+import { journal, standingLine } from './journal';
 import { createGameState } from './runtime';
 import { runTest } from './session';
 import type { GameState } from './state';
@@ -15,7 +15,6 @@ const QUEST = [
   '',
   'stage offered:',
   '  log: Miki offered to show you the ropes.',
-  '  hint: Talk to Miki.',
   '  miki says:',
   '    Welcome to the island.',
   '    -> Sounds good.',
@@ -61,7 +60,7 @@ describe('the journal', () => {
 
   // Every quest the world declares is in the list, whether or not the player has touched it: that is how they learn there is one.
   it('holds a quest nobody has begun, saying so rather than reading out what has not happened', () => {
-    expect(shown()).toEqual([{ quest: 'finding-your-feet', title: 'Finding Your Feet', stage: 'offered', standing: 'unstarted', lines: [], hint: null }]);
+    expect(shown()).toEqual([{ quest: 'finding-your-feet', title: 'Finding Your Feet', stage: 'offered', standing: 'unstarted', lines: [] }]);
   });
 
   it('reads a line for each stage the quest has been through, crossing off all but the one it stands on', () => {
@@ -70,7 +69,6 @@ describe('the journal', () => {
         standing: 'started',
         stage: 'offered',
         lines: [{ stage: 'offered', said: 'Miki offered to show you the ropes.', struck: false }],
-        hint: 'Talk to Miki.',
       },
     ]);
     expect(shown('finding-your-feet.offered', 'finding-your-feet.name-yourself')).toMatchObject([
@@ -88,24 +86,20 @@ describe('the journal', () => {
   it('crosses off everything once the quest is done, and offers nothing further to do', () => {
     const [over] = shown('finding-your-feet.offered', 'finding-your-feet.name-yourself', 'mirror-done');
 
-    expect(over).toMatchObject({ standing: 'complete', stage: 'sendoff', hint: null });
+    expect(over).toMatchObject({ standing: 'complete', stage: 'sendoff' });
     expect(over!.lines.every((line) => line.struck)).toBe(true);
     expect(over!.lines.map((line) => line.stage)).toEqual(['offered', 'name-yourself', 'sendoff']);
   });
 });
 
-// A stage left by a line an entity says stands over more than one beat — bake the loaf, then carry it back — so no one string is right for the whole of it. The same is true of a quest nobody has begun, whose hint has to survive until whatever begins it comes round.
+// A stage left by a line an entity says stands over more than one beat — bake the loaf, then carry it back — so the line the player is standing on has to survive both.
 const TWO_BEATS = [
   '# quest fetch-the-loaf',
   'title: Fetch the Loaf',
   'log: Someone in the house is asking after bread.',
-  'hint: Find whoever is asking.',
-  'hint when met-someone: They want a loaf. Go back and say yes.',
   '',
   'stage baking:',
   '  log: You said you would bake a loaf.',
-  '  hint: Knead the dough, then bake it in the oven.',
-  '  hint when loaf-baked: Take the loaf back to Miki.',
   '  miki says:',
   '    Well?',
   '    -> Here it is.',
@@ -116,32 +110,34 @@ const TWO_BEATS = [
   '  complete',
 ].join('\n');
 
-describe('what the journal says there is left to do', () => {
+describe('the line a quest is standing on', () => {
   const twoBeats = loadInEnglish([WORLD, TWO_BEATS].join('\n\n'));
-  const hintOf = (...set: string[]): string | null => journal(twoBeats, held(...set))[0]!.hint;
+  const standingOn = (...set: string[]): string | null => {
+    const line = standingLine(journal(twoBeats, held(...set))[0]!);
+    return line === null ? null : String(line);
+  };
 
-  it('is the last hint whose condition holds, so a plain hint: is the default and each hint when under it is an exception', () => {
-    expect(hintOf('fetch-the-loaf.baking')).toBe('Knead the dough, then bake it in the oven.');
-    expect(hintOf('fetch-the-loaf.baking', 'loaf-baked')).toBe('Take the loaf back to Miki.');
+  it("is the log of the stage the quest stands on, and holds across both beats of a stage that spans two", () => {
+    expect(standingOn('fetch-the-loaf.baking')).toBe('You said you would bake a loaf.');
+    expect(standingOn('fetch-the-loaf.baking', 'loaf-baked')).toBe('You said you would bake a loaf.');
   });
 
-  // The same gap, one level up: a quest nobody has begun reads its own hint, and that hint has to survive until whatever begins it comes round.
-  it('reads the quest own hints the same way before anything of it has happened', () => {
-    expect(hintOf()).toBe('Find whoever is asking.');
-    expect(hintOf('met-someone')).toBe('They want a loaf. Go back and say yes.');
+  // A quest nobody has begun reads its own log, which has to survive until whatever begins it comes round.
+  it("is the quest's own log before anything of it has happened", () => {
+    expect(standingOn()).toBe('Someone in the house is asking after bread.');
   });
 
-  // What a hint is gated on says nothing about a quest that is over: there is nothing left to do, whatever still holds.
-  it('offers nothing once the quest is finished, whatever a hint of it was gated on', () => {
-    expect(hintOf('fetch-the-loaf.baking', 'fetch-the-loaf.handed-over', 'loaf-baked')).toBeNull();
+  // A finished quest has everything crossed off, so there is no line left standing.
+  it('is nothing once the quest is finished, because every line of it is crossed off', () => {
+    expect(standingOn('fetch-the-loaf.baking', 'fetch-the-loaf.handed-over')).toBeNull();
   });
 });
 
 describe('journal: lets a # test claim what the journal currently reads', () => {
   const withTest = (id: string, ...lines: string[]) => loadInEnglish([WORLD, TWO_BEATS, '', `# test ${id}`, ...lines].join('\n\n'));
 
-  it('passes when the words match the hint the journal is currently showing', () => {
-    const played = withTest('matches', 'journal: fetch-the-loaf says Find whoever is asking.');
+  it('passes when the words match the line the journal is standing on', () => {
+    const played = withTest('matches', 'journal: fetch-the-loaf says Someone in the house is asking after bread.');
     expect(runTest('matches', played, createGameState())).toEqual({ passed: true });
   });
 
@@ -150,12 +146,12 @@ describe('journal: lets a # test claim what the journal currently reads', () => 
     const result = runTest('mismatch', played, createGameState());
 
     expect(result.passed).toBe(false);
-    expect(result.failure).toContain('Find whoever is asking.');
+    expect(result.failure).toContain('Someone in the house is asking after bread.');
   });
 
-  it('reads the hint a `hint when` condition picked, once state holds it', () => {
-    const played = withTest('after-flag', 'journal: fetch-the-loaf says They want a loaf. Go back and say yes.');
-    expect(runTest('after-flag', played, held('met-someone'))).toEqual({ passed: true });
+  it('moves to the new line once the quest has moved on, leaving the one behind it crossed off', () => {
+    const played = withTest('after-stage', 'journal: fetch-the-loaf says You said you would bake a loaf.');
+    expect(runTest('after-stage', played, held('fetch-the-loaf.baking'))).toEqual({ passed: true });
   });
 
   it('rejects an unknown quest id at load, the way every other directive names its reference', () => {

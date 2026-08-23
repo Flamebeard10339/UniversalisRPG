@@ -14,17 +14,10 @@ export interface QuestSpeech {
   node: DialogueNode;
 }
 
-// What the player is turning over, and when that is what they are turning over. A stage is left by a line an entity says as often as by a `done when:`, so one stage spans more than one beat — do the thing, then go back and tell them — and no single string is right in both.
-export interface QuestHint {
-  when?: Condition;
-  said: ActionResult;
-}
-
 export interface QuestStage {
   name: string;
   // Held as spoken lines rather than as plain strings: a journal entry is said to a player, so it is addressed and translated like every other line the game says.
   log?: ActionResult;
-  hints: QuestHint[];
   doneWhen?: Condition;
   goto?: string;
   complete?: boolean;
@@ -36,7 +29,6 @@ export interface Quest {
   title?: string;
   // What the journal reads before the quest has begun. A stage's own log says what has happened; these say what has not.
   log?: ActionResult;
-  hints: QuestHint[];
   stages: QuestStage[];
   // A flag per stage, which is how the rest of the world names where a quest has got to. Derived from the stages, so nothing declares it twice.
   flags: string[];
@@ -45,9 +37,6 @@ export interface Quest {
 const TITLE = /^title:[ \t]?(?<said>.*)$/;
 const STAGE = /^stage[ \t]+(?<name>[a-z][a-z0-9-]*):$/;
 const LOG = /^log:[ \t]?(?<said>.*)$/;
-const HINT = /^hint:[ \t]?(?<said>.*)$/;
-// The condition sits before the colon because everything after a colon in this language is the value, and a hint's value is the words. No condition holds a colon, so the first one splits the line.
-const HINT_WHEN = /^hint when[ \t]+(?<cond>[^:]+):[ \t]?(?<said>.*)$/;
 const DONE = /^done when:[ \t]*(?<cond>.+)$/;
 const GOTO = /^goto[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
 const SAYS = /^(?<owner>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]+says:$/;
@@ -55,23 +44,9 @@ const SAYS = /^(?<owner>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]+says:$/;
 const spoken = (said: string): ActionResult => ({ kind: 'say', text: said });
 
 // Every line the journal can read off a quest or off one of its stages, in the order it is written, which is the order they are keyed and reviewed in.
-const spokenHere = (held: { log?: ActionResult; hints: readonly QuestHint[] }): ActionResult[] => [...(held.log === undefined ? [] : [held.log]), ...held.hints.map((hint) => hint.said)];
+const spokenHere = (held: { log?: ActionResult }): ActionResult[] => (held.log === undefined ? [] : [held.log]);
 
-// A hint line, wherever it is written: the quest's own and a stage's are the same line and answer the same question, one about a quest nobody has begun and one about where it stands. A second unconditional one would leave nothing saying which is the default, so it is refused rather than silently winning over the first.
-function takeHint(line: RawLine, into: QuestHint[]): boolean {
-  const plain = HINT.exec(line.text)?.groups;
-  if (plain) {
-    if (into.some((hint) => hint.when === undefined)) throw new DslError('hint: with no condition is defined more than once', line.span);
-    into.push({ said: spoken(plain.said!) });
-    return true;
-  }
-  const gated = HINT_WHEN.exec(line.text)?.groups;
-  if (!gated) return false;
-  into.push({ when: parseWhole(condition, gated.cond!.trim(), line.span.start, 'a hint when'), said: spoken(gated.said!) });
-  return true;
-}
-
-// `log:` is one line, wherever it is written; a second would only ever silently replace the first, so it is refused for the same reason a second unconditional hint is.
+// `log:` is one line, wherever it is written; a second would only ever silently replace the first, so it is refused rather than letting an author lose one without being told.
 function takeLog(line: RawLine, held: { log?: ActionResult }): boolean {
   const log = LOG.exec(line.text)?.groups;
   if (!log) return false;
@@ -81,9 +56,8 @@ function takeLog(line: RawLine, held: { log?: ActionResult }): boolean {
 }
 
 function parseStage(name: string, source: RawLine): QuestStage {
-  const stage: QuestStage = { name, hints: [], speech: [] };
+  const stage: QuestStage = { name, speech: [] };
   for (const line of takeBlock(source)) {
-    if (takeHint(line, stage.hints)) continue;
     if (takeLog(line, stage)) continue;
     const done = DONE.exec(line.text)?.groups;
     const goto = GOTO.exec(line.text)?.groups;
@@ -99,12 +73,9 @@ function parseStage(name: string, source: RawLine): QuestStage {
 
 const said = (result: ActionResult): string => (result.kind === 'say' ? result.text : '');
 
-const hintLines = (hints: readonly QuestHint[]): string[] => hints.map((hint) => (hint.when === undefined ? `hint: ${said(hint.said)}` : `hint when ${condition.print(hint.when)}: ${said(hint.said)}`));
-
 const stageLines = (stage: QuestStage): string[] => [
   `stage ${stage.name}:`,
-  ...(stage.log === undefined ? [] : [`  log: ${stage.log.kind === 'say' ? stage.log.text : ''}`]),
-  ...indentLines(hintLines(stage.hints), 2),
+  ...(stage.log === undefined ? [] : [`  log: ${said(stage.log)}`]),
   ...(stage.doneWhen === undefined ? [] : [`  done when: ${condition.print(stage.doneWhen)}`]),
   ...(stage.goto === undefined ? [] : [`  goto ${stage.goto}`]),
   ...(stage.complete ? ['  complete'] : []),
@@ -164,17 +135,13 @@ export function stagesReached(quest: Quest, holds: (asked: Condition) => boolean
   });
 }
 
-// What there is left to do, out of every hint written where the game is standing: the last one whose condition holds, so a plain `hint:` is the default and each `hint when` under it is an exception to it. Asked the same way `stageNow` is asked, because it is the same question about a smaller thing.
-export const hintNow = (hints: readonly QuestHint[], holds: (asked: Condition) => boolean): ActionResult | undefined =>
-  hints.reduce<ActionResult | undefined>((held, hint) => (hint.when === undefined || holds(hint.when) ? hint.said : held), undefined);
-
 // Whether anything about this quest has happened yet. A quest nobody has touched is not a journal entry; its first stage stands from the outset, so standing anywhere else is enough, and so is any stage having been reached outright — which is how a quest driven by nothing but its own `done when:` lines comes to be in the journal at all.
 export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: string) => boolean): boolean => (at !== undefined && at !== quest.stages[0]) || quest.stages.some((stage) => set(flagOf(quest, stage.name)));
 
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
 
-// A line an entity is given here with no `when:` and no `ask:` of its own is what they say at this stage while none of their other lines here applies — the same rule a plain `hint:` follows against the `hint when` lines beside it. Written into the condition rather than settled when it is asked, so nothing downstream has to know a stage wrote two lines for one mouth.
+// A line an entity is given here with no `when:` and no `ask:` of its own is what they say at this stage while none of their other lines here applies. Written into the condition rather than settled when it is asked, so nothing downstream has to know a stage wrote two lines for one mouth.
 const otherwise = (stage: QuestStage, speech: QuestSpeech): Condition[] =>
   speech.node.when !== undefined || speech.node.ask !== undefined
     ? []
@@ -220,16 +187,13 @@ const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
   return leaves.length === 0 ? `nothing leaves stage ${stage.name}: give it a goto, a line that goes somewhere, or \`complete\`` : undefined;
 };
 
-// One line, said in both places a hint can be written, because it is the same rule in both.
-const HINT_WHEN_NOTE = 'the last hint whose condition holds is the one shown, so a plain `hint:` written above is the default and each of these is an exception to it';
-
-// The journal is the player's own notebook and is written in their voice, which is the whole of what tells a hint from a walkthrough. Said on both `hint:` lines, since that is the line an author reaches for a direction on.
-const JOURNAL_VOICE = 'the player thinking, not the game instructing: what they are wondering or have not managed yet, in their own words. Never a route, a room or a step to take — working out what is next is the play, and a quest is allowed to be hard';
+// The journal is the player's own notebook and is written in their voice, which is the whole of what tells it from a walkthrough. Said on both `log:` lines, since that is the line an author reaches for a direction on.
+const JOURNAL_VOICE = 'the player writing, not the game instructing: what happened and what they made of it, in their own words. Never a route, a room or a step to take — working out what is next is the play, and a quest is allowed to be hard';
 
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
 const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored`;
 
-// The same rule the hints follow, said where a stage writes more than one line for one mouth.
+// Said where a stage writes more than one line for one mouth.
 const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
 
 // A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, said out of that grammar's own forms so a form added to it is said here too.
@@ -256,17 +220,13 @@ export const quest = section<Quest>()({
   says: (value) => [spokenHere(value), ...value.stages.map(spokenHere)],
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
-    { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
-    { form: 'hint: <text>', example: 'hint: I should find out who keeps this house.', family: 'before it begins', note: JOURNAL_VOICE },
-    { form: 'hint when <condition>: <text>', example: 'hint when has core.lockpick: The front door is locked, and this thing opens locks.', family: 'before it begins', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
+    { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: `what the journal reads before the quest has begun — ${JOURNAL_VOICE}` },
     {
       form: 'stage <name>:',
       example: 'stage offered:',
       note: STAGE_NOTE,
       block: (): Written[] => [
-        { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: "the player's own note of what happened while the quest stood here, kept to a line or two" },
-        { form: 'hint: <text>', example: 'hint: I have not given him an answer.', family: 'what the journal says', note: JOURNAL_VOICE },
-        { form: 'hint when <condition>: <text>', example: 'hint when has core.bread: The loaf came out warm. Miki said he would wait.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
+        { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: `the player's own note of what happened while the quest stood here, kept to a line or two — ${JOURNAL_VOICE}` },
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },
@@ -277,9 +237,8 @@ export const quest = section<Quest>()({
   validate: questProblem,
   parse: (raw) => {
     if (!raw.id) throw new DslError('# quest requires an id', raw.span);
-    const parsed: Quest = { id: raw.id, hints: [], stages: [], flags: [] };
+    const parsed: Quest = { id: raw.id, stages: [], flags: [] };
     for (const line of raw.body) {
-      if (takeHint(line, parsed.hints)) continue;
       if (takeLog(line, parsed)) continue;
       const title = TITLE.exec(line.text)?.groups;
       const stage = STAGE.exec(line.text)?.groups;
@@ -293,17 +252,14 @@ export const quest = section<Quest>()({
   print: (value, { moduleId }) => [
     `# quest ${moduleLocalId(moduleId, value.id)}`,
     ...(value.title === undefined ? [] : [`title: ${value.title}`]),
-    ...(value.log === undefined ? [] : [`log: ${value.log.kind === 'say' ? value.log.text : ''}`]),
-    ...hintLines(value.hints),
+    ...(value.log === undefined ? [] : [`log: ${said(value.log)}`]),
     ...value.stages.flatMap((stage) => ['', ...stageLines(stage)]),
   ],
   visit: (value, where, visit: Visit) => {
-    for (const hint of value.hints) visitCondition(hint.when, `${where} hint when`, visit);
     results(spokenHere(value), where, visit);
     for (const stage of value.stages) {
       const at = `${where} stage ${stage.name}`;
       visitCondition(stage.doneWhen, `${at} done when:`, visit);
-      for (const hint of stage.hints) visitCondition(hint.when, `${at} hint when`, visit);
       results(spokenHere(stage), at, visit);
       for (const speech of stage.speech) {
         put(speech as unknown as Record<string, unknown>, 'owner', 'entity', `${at} says`, visit);

@@ -11,7 +11,6 @@ const entry = (quest: string, standing: Entry['standing'], lines: Array<[string,
   stage: 'a-stage' as Answer,
   standing,
   lines: lines.map(([said, struck]) => ({ stage: 'a-stage' as Answer, said: said as Localized, struck })),
-  hint: standing === 'started' ? ('Go and see.' as Localized) : null,
 });
 
 describe('the journal as a page reads it', () => {
@@ -30,15 +29,13 @@ describe('the journal as a page reads it', () => {
     for (const standing of standings) expect(TONES[standing]).toBeTruthy();
   });
 
-  it('carries the lines and which of them are crossed off, and the hint only while there is one', () => {
+  it('carries the lines and which of them are crossed off', () => {
     const [row] = journalRows([entry('going', 'started', [['done that', true], ['doing this', false]])]);
 
     expect(row!.lines).toEqual([
       { stage: 'a-stage', said: 'done that', struck: true },
       { stage: 'a-stage', said: 'doing this', struck: false },
     ]);
-    expect(row!.hint).toBe('Go and see.');
-    expect(journalRows([entry('over', 'complete')])[0]!.hint).toBeNull();
   });
 
   it('finds the quest a reader opened, and nothing for one that has gone', () => {

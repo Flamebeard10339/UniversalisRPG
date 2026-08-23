@@ -9,9 +9,11 @@ import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { ParsedSave } from '../src/content/sections/save';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
-import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
+import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
+import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { adoptRegistry, loadSaved, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { adoptRegistry, loadSaved, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
@@ -200,34 +202,24 @@ export function journalWindowText(log: readonly RunLogEntry[]): string {
   return windowed.map(describeEntry).join('\n');
 }
 
-// A player who cannot see what it holds reports the world as poorer than it is: the first spike
-// blamed content four times over an object it was carrying and could not find. The claim in
-// scripts/playbot.test.ts reads its subjects off a live view, so a field added to PlayStatus
-// cannot go unshown here without something saying so.
-export const NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }> = [
-  { field: 'inventory', why: 'the same holdings as `carried`, keyed by id and without names or counts, so showing both states one fact twice' },
-  { field: 'grown', why: 'which held items are instances, which `carried` already reports as its own `grown` flag' },
-  { field: 'planes', why: 'the jewel plane of an item, reached through a modal and published as one for as long as it is open' },
-  { field: 'focus', why: 'which screen is being shown, which the open-screen line already says in the words the player reads' },
-  { field: 'modals', why: 'rendered as the open screen, carrying the key and the values this turn has to answer' },
-  { field: 'flags', why: 'the engine bookkeeping behind what the world says. A player learns a quest has moved by being told so, and reading the flags would let it act on content it has not met' },
-  { field: 'locations', why: 'every location the registry holds, discovered or not. `discovered` is the half the player has walked to, and handing over the rest is what c9 exists to refuse' },
-];
-
 function renderResources(v: PlayView): string[] {
   return v.resources.map((each) => `${each.title} ${each.current}/${each.max}`);
 }
 
 function renderCarried(v: PlayView): string[] {
-  return v.carried.map((each) => `${each.id} (${each.shown})${each.count > 1 ? ` x${each.count}` : ''}${each.worn ? ` worn:${each.worn.slot}` : ''}`);
+  return v.carried.map((each) => `${each.id} (${each.shown})${each.worn ? ` worn:${each.worn.slot}` : ''}`);
 }
 
 function renderEquipment(v: PlayView): string[] {
   return v.equipment.map((row) => (row.name === null ? String(row.title) : `${row.title}: ${row.name}`));
 }
 
+// One line to a quest, the way a person glancing at a shelf of notebooks gets the spines. The whole of what any of them says is what /quests answers with, which is where a terminal player reads it too.
 function renderJournal(v: PlayView): string[] {
-  return v.journal.map((entry) => `${entry.title} [${entry.standing}]${entry.hint === null ? '' : ` — ${entry.hint}`}`);
+  return v.journal.map((entry) => {
+    const standing = standingLine(entry);
+    return `${entry.title} [${entry.standing}]${standing === null ? '' : ` — ${String(standing)}`}`;
+  });
 }
 
 function renderDiscovered(v: PlayView): string[] {
@@ -256,7 +248,7 @@ function labelled(field: keyof PlayView, held: readonly string[]): string[] {
   return held.length === 0 ? [] : [`${field}: ${held.join(', ')}`];
 }
 
-export function renderView(v: PlayView): string {
+export function renderView(v: PlayView, localizer: Localizer): string {
   const parts: string[] = [
     ...labelled('said', v.said.map((line) => String(line))),
     `location: ${v.location.title} (${v.location.id})${v.location.description ? ` — ${v.location.description}` : ''}`,
@@ -276,7 +268,12 @@ export function renderView(v: PlayView): string {
 
   const asking = askedOption(v.modals);
   if (asking) {
-    parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — asks ${asking.key}:`);
+    // What the open screen is reading, where it is about something drawn beside the question
+    // rather than in it — a quest's own notebook page, a jewel plane. Drawn through the same
+    // function scripts/play-cli.ts draws it with, so a screen a player can read cannot be one
+    // this player reaches and finds blank.
+    parts.push(...formatFocus(v, localizer).map(printed));
+    parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — ${String(asking.label)}, answered as ${asking.key}:`);
     if (asking.values) for (const choice of asking.values) parts.push(`  value=${choice.value} :: ${String(choice.shown)}`);
     else parts.push('  value=<free text>');
   } else if (v.choices.length > 0) {
@@ -335,14 +332,30 @@ function summarize(v: PlayView): string {
 // is the one signal command.ts already gives every driver, so reading it is not a second
 // validation layer beside runLine — it is how the CLI and the GUI already tell success from
 // refusal too.
-function refusalMessages(result: CommandResult): string[] {
-  return result.output.flatMap((output) => (output.kind === 'message' && output.tone === 'error' ? [String(output.text)] : []));
+function refused(result: CommandResult): boolean {
+  return result.output.some((output) => output.kind === 'message' && output.tone === 'error');
 }
 
-function settleTurn(result: CommandResult, before: PlayView): { outcome: 'applied' | 'refused'; detail: string } {
-  const refusals = refusalMessages(result);
-  if (refusals.length > 0) return { outcome: 'refused', detail: refusals.join('; ') };
-  return { outcome: 'applied', detail: summarize(result.view ?? before) };
+// A view output is the only kind this reads nothing out of, because runTurn renders the view
+// itself at the top of the very next turn: printing it here as well would put a second copy of the
+// same screen into every entry the journal window carries.
+export const ANSWER_NOT_SHOWN: ReadonlyArray<{ kind: CommandOutput['kind']; why: string }> = [
+  { kind: 'view', why: 'the screen the next turn opens with, which runTurn renders in full before the model is asked anything; a copy of it here would ride in the journal window for ten turns after' },
+];
+
+const excusedKinds = new Set(ANSWER_NOT_SHOWN.map((each) => each.kind));
+
+// What the line answered with, in the same words a player at scripts/play-cli.ts reads. Silence
+// here is the capability gap this exists to close: a bot that types /quests and is told nothing
+// has strictly less to go on than a person at the same command line.
+export function answerLines(result: CommandResult, localizer: Localizer): string[] {
+  const moved = result.view === undefined ? [] : [summarize(result.view)];
+  return [...moved, ...result.output.flatMap((output) => (excusedKinds.has(output.kind) ? [] : formatOutput(output, localizer).map(printed)))];
+}
+
+function settleTurn(result: CommandResult, localizer: Localizer): { outcome: 'applied' | 'refused'; detail: string } {
+  const detail = answerLines(result, localizer).join('\n');
+  return { outcome: refused(result) ? 'refused' : 'applied', detail: detail === '' ? 'nothing happened' : detail };
 }
 
 export type ContentReader = () => readonly ModuleSource[];
@@ -379,7 +392,8 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   for (const warning of reloaded.pruned) deps.report(`turn ${deps.turn} [pruned] ${warning.message}`);
 
   deps.ctx.view = view(deps.ctx.session);
-  const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view) };
+  const localizer = sessionLocalizer(deps.ctx.session);
+  const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };
 
   let raw: unknown;
   try {
@@ -391,9 +405,8 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   const parsed = parseReply(raw);
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error };
 
-  const before = deps.ctx.view;
   const result = runLine(deps.ctx, parsed.reply.line);
-  const { outcome, detail } = settleTurn(result, before);
+  const { outcome, detail } = settleTurn(result, sessionLocalizer(deps.ctx.session));
 
   return { turn: deps.turn, outcome, line: parsed.reply.line, note: parsed.reply.note, expected: parsed.reply.expected, confusion: parsed.reply.confusion, blocked: parsed.reply.blocked, detail };
 }
