@@ -1,16 +1,31 @@
-# Delegation experiments
+# Delegation experiments — CLOSED 2026-08-23
 
-A running log of subagent delegations on the DSL rewrite, kept so a real
-conclusion about *when delegation pays off* can be drawn once there are many
-data points. Any single row proves little; append to it, don't reason from n=3.
+**Do not append to this file.** It ran for four months and about ninety-nine
+delegations, and it has answered the question it was opened to answer. The
+conclusions are settled and live in the `delegation-doctrine` memory; what is here
+is the evidence behind them, kept because a conclusion whose measurements have been
+thrown away cannot be re-argued.
 
-## How to add a data point
+Four things it settled, in short: **agent count buys judgement, not throughput** —
+one auditor graded a branch 16/16 met, three independent auditors on the same branch
+found a HIGH and overturned two verdicts, while no row shows two agents beating one
+on a task that *produces* something. **For implementation a subagent is a
+context-saving move** — total tokens rise, main-context tokens fall. **The brief,
+not the model or the count, predicted the outcome** — dispatches that stated an
+invariant came back right and dispatches that stated a task came back wrong the same
+way each time. And **the constraint is the author's endurance**, not the token bill,
+which is why the run in `../specs/run-an-orchestrator-over-three-parallel-tasks.md`
+measured interruptions rather than wall-clock.
 
-After delegating a task to a subagent, record: the model, a one-line task
-description, the subagent token count + tool calls + wall time (from the Agent
-tool's usage footer), how heavily the task was pre-specified (this is a major
-confound — a task handed the exact edit measures typing, not design), whether
-the result was correct, and what the review caught.
+If a delegation teaches something genuinely new, edit the doctrine. A new row here
+buys nothing.
+
+## How the rows below were recorded
+
+Each row carries the model, a one-line task description, the subagent token count +
+tool calls + wall time (from the Agent tool's usage footer), how heavily the task was
+pre-specified (a major confound — a task handed the exact edit measures typing, not
+design), whether the result was correct, and what the review caught.
 
 ## Data points
 
@@ -399,7 +414,13 @@ eight proof clauses rather than auditing a system.
   as intermittent; the one that ran it 9 times across three conditions (row 35)
   established it was deterministic. Brief auditors to distinguish the two.
 
-## Open experiments
+## Open experiments (abandoned when the log closed)
+
+Two were never run. The low-spec Haiku probe was overtaken by rows 86-89, which put
+Haiku on blind authoring trials and found it competent at the diagnosis and weak at
+the prescription, same as every other tier. The rework-rate count stopped mattering
+once the finding settled that the brief, not the agent, predicted rework.
+
 
 - [ ] Low-spec Haiku probe (intent-only small task) — find the reliability edge.
 - [x] Warm-swarm probe (rows 10→11): `SendMessage` continuation is *not* cheaper
