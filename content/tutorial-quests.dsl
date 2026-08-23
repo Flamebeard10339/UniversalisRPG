@@ -287,6 +287,24 @@ expect only: left-mikis-house
 // purpose. See apology-route-full-end for why this isn't miki-route-end.
 expect: apology-route-full-end
 
+// A `use:` that finds its own action already under way against the same
+// target advances one cycle of the fight in progress instead of restarting
+// it, so repeated `use:` with no `wait:` anywhere still puts the rats down.
+# test rats-fall-to-repeated-use
+load: miki-route-start
+use: entity.stairs.descend
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+use: melee-combat on giant-rat
+assert: tutorial-island.rats-killed >= 3
+
 // --- saves ---
 
 // What all three routes out of the house genuinely land on, named once
