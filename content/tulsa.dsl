@@ -740,6 +740,7 @@ owner = mouse
 
 node forlorn:
   always
+  again: It is still down there. He does not look up.
   I lost it. It went down there.
   He does not say what, and he does not look up.
 
@@ -748,6 +749,7 @@ owner = town-crier
 
 node holding-forth:
   always
+  again: Same offer. I am still right about everything, and still free.
   You want to know a thing? Ask me. I am right about everything and I am free.
 
 # dialogue charlie
@@ -755,6 +757,7 @@ owner = charlie-the-tramp
 
 node the-back-way:
   always
+  again: The wall's still there. I already told you where.
   Everyone wants in the front. There is a wall down in the old witch's cellar and nobody minding it.
   set: heard-of-the-back-way
 
@@ -763,6 +766,7 @@ owner = sunny
 
 node behind-the-bar:
   always
+  again: Stove's still there. Rest of it, ask properly — same as I said.
   Stove is over there, and I do not care what you cook on it. Anything else, you will have to ask properly.
 
 # dialogue larry
@@ -770,6 +774,7 @@ owner = larry
 
 node on-the-hatch:
   always
+  again: Still nobody goes down. Still the duke's word, not mine.
   Nobody goes down. Duke's word, not mine.
   He shifts his weight and does not sound especially certain about the duke.
 
@@ -778,6 +783,7 @@ owner = castle-guard
 
 node on-the-gate:
   always
+  again: Move along. Captain's round the side, same as I said.
   Move along. If it is trouble, it is the captain's, and she is round the side.
 
 # dialogue guard-captain
@@ -785,6 +791,7 @@ owner = guard-captain
 
 node reading:
   always
+  again: Still nothing. I would have sent for you.
   If I have not sent for you, I have not got anything for you. Come back when I have.
 
 # dialogue the-duke
@@ -792,6 +799,7 @@ owner = the-duke
 
 node in-the-solar:
   always
+  again: Say it or don't. I haven't got longer for you than that.
   You are here, so somebody let you be here. Say your piece.
 
 # dialogue oolga
@@ -799,6 +807,7 @@ owner = oolga
 
 node complaining:
   always
+  again: Still was. Still wouldn't.
   It was better before. All of it. You would not remember.
 
 # dialogue kelsa
@@ -806,6 +815,7 @@ owner = kelsa
 
 node blunt:
   always
+  again: Bees, or the door. I already told you which.
   If you are here about the bees, say so. If you are not, there is the door and it is a nice one.
 
 # dialogue george
@@ -813,6 +823,7 @@ owner = george
 
 node helpful:
   always
+  again: Still like that. Still right, mostly.
   Do not mind her. She is like that with everyone, and she is right about most of it.
 
 # dialogue bladesmiths-son
@@ -820,6 +831,7 @@ owner = bladesmiths-son
 
 node at-the-cold-forge:
   always
+  again: Still just the noise. Nothing's changed that.
   My father made blades. I make a noise like somebody making blades.
 
 # dialogue border-guard
@@ -827,6 +839,7 @@ owner = border-guard
 
 node at-the-stakes:
   always
+  again: Same as before. We watch. We do not go in.
   Past the stakes is theirs. We watch it. We do not go in.
 
 // --- saves ---
