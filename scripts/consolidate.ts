@@ -7,6 +7,7 @@ import { declaredKey } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiff } from '../src/content/registryDiff';
+import { CORPUS_DIR } from '../src/content/shipped';
 import type { Removal } from '../src/content/sections/remove';
 import type { ModuleSource, ParsedModule } from '../src/content/universe';
 
@@ -188,8 +189,8 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
 }
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultLocal = 'content/local-changes.dsl';
-const contentDirectory = 'content';
+const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
+const contentDirectory = CORPUS_DIR;
 
 export interface Args {
   contentFiles: string[] | null;

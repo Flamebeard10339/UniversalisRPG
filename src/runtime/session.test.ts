@@ -1,5 +1,4 @@
 import type { ModalChoice } from './modalOption';
-import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
@@ -7,6 +6,7 @@ import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
+import { standingSources } from '../content/shipped';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
@@ -14,11 +14,8 @@ import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 
-const source = readFileSync('content/core.dsl', 'utf8');
-const town: ModuleSource = { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') };
-
 // The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
-const tutorial = (): Registry => loadUniverse(withEngineLocale([{ name: 'core', text: source }, town]));
+const tutorial = (): Registry => loadUniverse(withEngineLocale(standingSources()));
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });

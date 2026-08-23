@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DIRECTIONS } from '../src/content/hex';
-import { loadInEnglish } from '../src/content/engineLocale';
+import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse } from '../src/content/load';
+import { standingSources } from '../src/content/shipped';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../src/content/translation';
 import { BASE_LANGUAGE, localizerFor } from '../src/runtime/localized';
 import { COMMANDS, newContext, runLine, type CommandContext } from '../src/runtime/command';
@@ -50,7 +51,7 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
   });
 });
 
-const sources = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }, { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') }];
+const sources = withEngineLocale(standingSources());
 const registry = loadUniverse([...sources, translationOf(loadUniverse(sources))]);
 
 const RUN = /[A-Za-z][A-Za-z0-9._-]*/g;

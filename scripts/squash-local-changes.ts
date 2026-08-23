@@ -2,13 +2,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
+import { CORPUS_DIR } from '../src/content/shipped';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
 import { sourceFiles } from './probe';
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content';
-const defaultLocal = 'content/local-changes.dsl';
+const defaultContent = CORPUS_DIR;
+const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
 
 interface Args {
   contentFiles: string[];

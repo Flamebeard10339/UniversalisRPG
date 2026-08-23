@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -9,6 +9,7 @@ import { initialLocalChangesModule, localSectionHeadings, LOCAL_CHANGES_MODULE_I
 import { type Registry } from '../src/content/registry';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiff } from '../src/content/registryDiff';
+import { CORPUS_DIR, shippedFiles } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { runLine, type AuthoringContext } from '../src/runtime/command';
 import { createGameState } from '../src/runtime/runtime';
@@ -106,7 +107,7 @@ describe('a consolidation that would change the universe writes nothing', () => 
   });
 });
 
-const shippedNames = (): string[] => readdirSync('content').filter((name) => name.endsWith('.dsl') && name !== `${LOCAL_CHANGES_MODULE_ID}.dsl`);
+const shippedNames = (): string[] => [...shippedFiles()];
 
 interface Tree {
   dir: string;
@@ -119,7 +120,7 @@ function copiedTree(): Tree {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-consolidate-'));
   const before: Record<string, string> = {};
   for (const name of shippedNames()) {
-    before[name] = readFileSync(`content/${name}`, 'utf8');
+    before[name] = readFileSync(`${CORPUS_DIR}/${name}`, 'utf8');
     writeFileSync(path.join(dir, name), before[name], 'utf8');
   }
   return { dir, files: shippedNames().map((name) => path.join(dir, name)), localFile: path.join(dir, `${LOCAL_CHANGES_MODULE_ID}.dsl`), before };
@@ -215,15 +216,15 @@ describe('a consolidation whose result does not load writes nothing either', () 
 
 describe('the command surface', () => {
   it('defaults to every .dsl under content/ but the local file, and takes an override', () => {
-    expect(contentFiles(parseArgs([]))).toEqual(shippedNames().map((name) => `content/${name}`));
-    expect(contentFiles(parseArgs([`local=content/${LOCAL_CHANGES_MODULE_ID}.dsl`]))).not.toContain(`content/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+    expect(contentFiles(parseArgs([]))).toEqual(shippedNames().map((name) => `${CORPUS_DIR}/${name}`));
+    expect(contentFiles(parseArgs([`local=${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`]))).not.toContain(`${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`);
     expect(contentFiles(parseArgs(['content=a.dsl, b.dsl']))).toEqual(['a.dsl', 'b.dsl']);
   });
 
   it('reads the flags it documents', () => {
     expect(parseArgs(['--dry-run']).dryRun).toBe(true);
     expect(parseArgs(['local=x.dsl']).localFile).toBe('x.dsl');
-    expect(parseArgs([]).localFile).toBe(`content/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+    expect(parseArgs([]).localFile).toBe(`${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`);
   });
 
   const said = (argv: readonly string[]): { out: string[]; err: string[]; code: number | undefined } => {

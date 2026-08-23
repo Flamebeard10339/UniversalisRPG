@@ -7,6 +7,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { ParsedSave } from '../src/content/sections/save';
+import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { PruneWarning } from '../src/runtime/pruning';
@@ -492,7 +493,7 @@ export function createSdkModelClient(cwd: string): ModelClient {
   };
 }
 
-export const DEFAULT_SOURCES = ['content'];
+export const DEFAULT_SOURCES = [CORPUS_DIR];
 const DEFAULT_TURNS = 100;
 
 // A directory is expanded on every read, not once at startup, so a module authored while the run

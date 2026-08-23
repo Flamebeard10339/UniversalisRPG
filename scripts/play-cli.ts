@@ -7,6 +7,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 import { sourceFiles } from './probe';
 import { initialLocalChangesModule } from '../src/content/localChanges';
+import { CORPUS_DIR } from '../src/content/shipped';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import { fileSlots } from './lib/slotFile';
 import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
@@ -42,7 +43,7 @@ export const CLI_NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }
 ];
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content';
+const defaultContent = CORPUS_DIR;
 const defaultLocalChanges = 'content/local-changes.dsl';
 const defaultSaves = '.saves';
 
@@ -119,8 +120,11 @@ function formatResources(resources: PlayView['resources'], localizer: Localizer)
 // A location holds a count of its kind and not a roster, so the foe standing after a kill wears the
 // id of the one that fell. `×3` beside the bar is how a reader tells a fresh foe at full health from
 // the one they were hitting healing itself back up. It rides in as part of the meter because a
-// numeral is the same in every language the pool line is written in.
-const meterFor = (foe: EncounterFoe): string => `${fullBar(foe.current, foe.max)}${foe.remaining === null ? '' : `  ×${foe.remaining}`}`;
+// numeral is the same in every language the pool line is written in, and every meter a fight is
+// read off — the encounter view and the live tick both — asks withCount for it.
+const withCount = (meter: string, remaining: number | null): string => (remaining === null ? meter : `${meter}  ×${remaining}`);
+
+const meterFor = (foe: EncounterFoe): string => withCount(fullBar(foe.current, foe.max), foe.remaining);
 
 function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer): PlayerLine[] {
   if (!encounter) return [];
@@ -288,7 +292,9 @@ export function formatLive(progress: LiveProgress, localizer: Localizer): Player
   const clock = localizer.engine('engine.repl.clock', { time: localizer.identifier(progress.time.toFixed(1)) });
   if (!progress.active) return say(localizer.engine('engine.repl.live.done', { action: progress.label, clock }));
   const pools = progress.pools.map((each) =>
-    localizer.engine('engine.repl.live.pool', { resource: each.title, current: localizer.identifier(tidy(each.current)), max: localizer.identifier(tidy(each.max)) }),
+    localizer.identifier(
+      withCount(localizer.engine('engine.repl.live.pool', { resource: each.title, current: localizer.identifier(tidy(each.current)), max: localizer.identifier(tidy(each.max)) }), each.remaining),
+    ),
   );
   const counting = progress.implicit
     ? [localizer.engine('engine.repl.live.counting', { attempts: progress.implicit.attempts, completion: localizer.identifier(progress.implicit.completion.toFixed(1)) })]

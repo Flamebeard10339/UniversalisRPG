@@ -1,9 +1,9 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
+import { moduleSource, shippedFiles } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
@@ -32,17 +32,17 @@ import {
   type TurnRequest,
 } from './playbot';
 
-const source = readFileSync('content/core.dsl', 'utf8');
-const town = readFileSync('content/tulsa.dsl', 'utf8');
-const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
+// The island and quest actually played: standing Tulsa, plus the tutorial quest module —
+// deliberately not the whole shipped corpus, so a run here never meets combat-expansion.
+const PLAYED_MODULES = ['core', 'tulsa', 'tutorial-quests'];
 
 // The island and quest actually played, same corpus session.test.ts drives.
-const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), { name: 'core', text: source }, { name: 'tulsa', text: town }, { name: 'tutorial-quests', text: quests }];
+const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), ...PLAYED_MODULES.map(moduleSource)];
 const played = (): Registry => loadUniverse(PLAYED_SOURCES);
 
 const constantReader = (sources: readonly ModuleSource[]): ContentReader => () => sources;
 
-const tutorialReader: ContentReader = () => withEngineLocale([{ name: 'core', text: source }, { name: 'tulsa', text: town }, { name: 'tutorial-quests', text: quests }]);
+const tutorialReader: ContentReader = () => withEngineLocale(PLAYED_MODULES.map(moduleSource));
 
 // A well-behaved reply, built by peeking the session's own status rather than by guessing —
 // this is what "derives its own subjects" looks like for a fake client.
@@ -434,10 +434,7 @@ adjacent:
   it('[--save] the default sources are the whole shipped corpus, and every fixture in it opens', () => {
     const read = fileContentReader(DEFAULT_SOURCES);
     const named = read().map((source) => source.name).sort();
-    const shipped = readdirSync('content')
-      .filter((name) => name.endsWith('.dsl'))
-      .map((name) => name.replace(/\.dsl$/, ''))
-      .sort();
+    const shipped = shippedFiles().map((file) => file.replace(/\.dsl$/, '')).sort();
     expect(named).toEqual(shipped);
 
     const loaded = loadUniverseWithDiagnostics(read());

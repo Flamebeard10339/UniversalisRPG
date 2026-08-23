@@ -5,6 +5,7 @@ import { qualify } from '../src/content/namespace';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { parseSaveSection } from '../src/content/sections/save';
+import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
 import type { Span } from '../src/grammar/parser';
@@ -205,7 +206,7 @@ function main(): void {
     console.error(`migrate-saves takes at most one directory\n\n${usage}`);
     process.exit(2);
   }
-  const report = migrate(readContent(args[0] ?? 'content'), SHAPE_CHANGE);
+  const report = migrate(readContent(args[0] ?? CORPUS_DIR), SHAPE_CHANGE);
   console.log(report.lines.join('\n'));
   writeMigration(report);
   if (!report.ok) process.exit(1);

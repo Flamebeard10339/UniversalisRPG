@@ -5,24 +5,18 @@ import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, statVa
 import { restorePools } from './effects';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
-import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { ownedSectionKinds } from '../content/sections';
 import { MEMBER_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/load';
+import { moduleSource, shippedSources } from '../content/shipped';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-const source = readFileSync('content/core.dsl', 'utf8');
-const town = { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') };
+const source = moduleSource('core').text;
+const town = moduleSource('tulsa');
 const island = (text: string) => loadUniverse([engineLocale(), { name: 'core', text }, town]);
 const registry = island(source);
-
-const shippedSources = () =>
-  readdirSync('content')
-    .filter((name) => name.endsWith('.dsl'))
-    .map((name) => ({ name: name.replace(/\.dsl$/, ''), text: readFileSync(`content/${name}`, 'utf8') }))
-    .filter((each) => each.name !== LOCAL_CHANGES_MODULE_ID);
 
 const shipped = loadUniverse(withEngineLocale(shippedSources()));
 

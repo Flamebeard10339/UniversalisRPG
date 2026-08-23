@@ -1,7 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { shippedSources } from '../src/content/shipped';
 import { parseLedger, printLedger, sheetFor, sheetLines, through } from './review';
 
 const town = (...lines: string[]): string => ['# info town', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', ...lines].join('\n');
@@ -11,10 +10,7 @@ const sheet = (text: string) => {
   return sheetFor(registry, 'town', 'content/town.dsl', text);
 };
 
-const shipped = () =>
-  readdirSync('content')
-    .filter((name) => name.endsWith('.dsl'))
-    .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
+const shipped = shippedSources;
 
 describe('the sheet a reviewer reads', () => {
   it('puts every line a section says under that section, at the line the section is written on', () => {

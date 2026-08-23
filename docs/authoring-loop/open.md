@@ -133,15 +133,6 @@ has no xp-threshold predicate. It is one cause filed twice, in two vocabularies.
 
 ## Left by the core/tulsa split
 
-**The shipped world is hand-listed in ten test files.** `src/runtime/session.test.ts`,
-`integration.test.ts`, `translationSurvival.test.ts`, `equipment.test.ts`,
-`localized.test.ts`, `src/content/locale.test.ts`, `scripts/play-cli.test.ts`,
-`playbot.test.ts` and `printedWords.test.ts` each name `content/core.dsl` and now
-`content/tulsa.dsl` beside it to get a world with somewhere to stand; four more
-derive the same set with their own `readdirSync('content')`. Splitting a module
-again edits all ten. *Closes when:* one thing at or below the content layer says
-what the shipped corpus is, and the ten read it.
-
 **`combat-expansion` and `tutorial-quests` now depend on `tulsa`.** Each names one
 thing that moved — a road to the beach, and Miki — so a module about archetypes and
 a module about a quest both load the whole town. It is what the engine requires;

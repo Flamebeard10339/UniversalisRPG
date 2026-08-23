@@ -1,16 +1,11 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { offering, spokenBy } from '../content/sections/dialogue';
+import { shippedSources } from '../content/shipped';
 import { initialState } from './save';
 import { menuChoices, openersNow, reachedNow, talk } from './dialogue-runtime';
 
-const CORPUS = readdirSync('content')
-  .filter((name) => name.endsWith('.dsl'))
-  .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
-
-const { registry } = loadUniverseWithDiagnostics(CORPUS);
+const { registry } = loadUniverseWithDiagnostics(shippedSources());
 
 const owners = [...new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined))];
 

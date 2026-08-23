@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
@@ -16,11 +15,10 @@ import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
+import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
 
-const CORPUS = readdirSync('content')
-  .filter((name) => name.endsWith('.dsl'))
-  .map((name) => ({ name, text: readFileSync(`content/${name}`, 'utf8') }));
+const CORPUS = shippedSources();
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
@@ -388,7 +386,7 @@ describe('the shipped corpus', () => {
   // A directive that reaches a state someone else's route already reached, rather than walking one of its own: it has nothing to claim beyond what it re-runs or re-checks.
   const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
   // Where a test's claim is written in words. `refuse:` is one: it names the growth that must not take, which is as readable as an assertion and is how the growth routes state theirs.
-  const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse'];
+  const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse', 'journal'];
 
   it('says in words what each test it holds walked a route to prove, rather than only in a save body', () => {
     const { registry } = loadUniverseWithDiagnostics(CORPUS);

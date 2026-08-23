@@ -8,6 +8,7 @@ import { ENGINE_KEYS } from '../src/content/locale';
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
+import { standingSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
@@ -25,9 +26,7 @@ const drawn = (output: Parameters<typeof formatOutput>[0]): string[] => asPrinte
 const live = (progress: Parameters<typeof formatLive>[0]): string => printed(formatLive(progress, localizer));
 const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
-const source = readFileSync('content/core.dsl', 'utf8');
-const town = readFileSync('content/tulsa.dsl', 'utf8');
-const TUTORIAL: readonly ModuleSource[] = [{ name: 'core', text: source }, { name: 'tulsa', text: town }];
+const TUTORIAL: readonly ModuleSource[] = standingSources();
 
 const PLANE_SOURCE = `
 # location camp
@@ -92,7 +91,7 @@ describe('play-cli renders what a command result says happened', () => {
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {
-    const opening = openRepl([{ name: 'core', text: source }, { name: 'tulsa', text: town }]).opening.map(printed);
+    const opening = openRepl(TUTORIAL).opening.map(printed);
 
     expect(ENGINE_KEYS.filter((key) => opening.some((line) => line.includes(key)))).toEqual([]);
     expect(opening.length).toBeGreaterThan(5);
@@ -385,7 +384,7 @@ describe('play-cli renders the live clock', () => {
     ]);
   });
 
-  it('narrates the pools of a fight in place of the completion countdown', () => {
+  it('narrates the pools of a fight in place of the completion countdown, and says the one rat still standing', () => {
     const ctx = driver(`
 # stat attack
 base: 6
@@ -442,8 +441,8 @@ stats: max-health 12, attack 0, defense 0, attack-rate 6, accuracy 0, evasion 0
 uses: swing
 `, 1, true);
     const started = armed(ctx, 'fight:swing:rat');
-    expect(live(started.live!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  [time: 0.9s]');
-    expect(live(started.live!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  [time: 1.8s]');
+    expect(live(started.live!.tick(900))).toBe('Swing... [##################--] Health 30/30 Rat 12/12  ×1  [time: 0.9s]');
+    expect(live(started.live!.tick(900))).toBe('Swing... [################----] Health 30/30 Rat 6/12  ×1  [time: 1.8s]');
   });
 
   it('prefers the pools to the countdown when a run has both, so a fight is never narrated as a tally', () => {
@@ -452,7 +451,7 @@ uses: swing
       active: true,
       time: 2,
       progress: 0.5,
-      pools: [{ title: asLocalized('Health'), current: 21, max: 30 }],
+      pools: [{ title: asLocalized('Health'), current: 21, max: 30, remaining: null }],
       implicit: { attempts: 3, completion: 0.4 },
       view: undefined as never,
     };

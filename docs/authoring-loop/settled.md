@@ -100,6 +100,19 @@ only claim that can be made without walking anywhere.
 opens that station**, so a recipe lives with whatever opens it: `bread` went to
 `tulsa` with the oven, `dough` stayed in `core` because it names no station.
 
+**The shipped corpus has one home: `src/content/shipped.ts`.** `shippedFiles()` and
+`shippedSources()` read `content/` fresh each call and exclude an author's own
+`local-changes.dsl`, which is legal to run `npm run play` against but is not itself
+shipped. `standingSources()` is the minimum world with somewhere to stand — today
+`core` and `tulsa` — and it is not a written-down pair: it finds whichever shipped
+module's own text marks a `# location` `starting`, then closes over the
+dependencies it cannot load without. `src/content/shipped.test.ts` proves that
+answer against an independent brute-force reading of the same corpus, so a module
+split that moves the starting location is caught rather than silently believed. A
+site that wants one deliberate module or a handful (not "the whole corpus" and not
+"the standing minimum") calls `moduleSource(id)` rather than spelling
+`readFileSync('content/<id>.dsl')` again.
+
 **A bulk id move is done by `npm run move-sections`, never by hand.** It lifts
 named sections out of one module into another, writes every machine form of their
 ids across `content/`, `src/` and `scripts/`, and refuses unless the reloaded

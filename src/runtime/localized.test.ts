@@ -1,12 +1,12 @@
 import { RuntimeError } from './error';
-import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { actionAddress } from '../content/sections/action';
 import { declaredId } from '../content/sections/entity';
 import { everyActionTable } from '../content/registry';
-import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
+import { moduleSource } from '../content/shipped';
 import { NOTE_MARK } from '../grammar/note';
 import { everyKey, englishOf } from '../content/translation';
 import { hasNote, withoutNote } from '../grammar/note';
@@ -151,7 +151,7 @@ describe('an action is displayed under the address it is identified by', () => {
 });
 
 describe('one line translates an action for every owner that performs it (c7)', () => {
-  const source = readFileSync('content/core.dsl', 'utf8');
+  const source = moduleSource('core').text;
   const english = loadUniverse([engineLocale(), { name: 'core', text: source }]);
   const declarations = [...english.actions.keys()];
   const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  core', '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
@@ -191,7 +191,7 @@ describe('a note an author left is dropped from every line the game says', () =>
 
   // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit. What a key is measured against is the English with any note the author already left taken off it — a corpus that ships its own rough lines is the point of the mark, and comparing against the raw declaration would fail the moment one appeared.
   it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
-    const shipped = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }];
+    const shipped = withEngineLocale([moduleSource('core')]);
     const plain = loadUniverse(shipped);
     const keys = everyKey(plain.locales);
     const notes = { name: 'noted', text: ['# info noted', 'version: 1.0.0', '', '# locale en', ...keys.map((key) => `${key}: ${marked(englishOf(plain.locales, key))}`)].join('\n') };

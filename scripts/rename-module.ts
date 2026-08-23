@@ -2,13 +2,14 @@ import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
+import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { covers } from './lib/layers';
 import { posix, trackedFiles } from './lib/sourceFiles';
 
-export const SCOPE: readonly string[] = ['content', 'src', 'scripts', 'package.json'];
+export const SCOPE: readonly string[] = [CORPUS_DIR, 'src', 'scripts', 'package.json'];
 
-const CORPUS = 'content';
+const CORPUS = CORPUS_DIR;
 const MODULE_EXTENSION = '.dsl';
 
 export interface TextFile {

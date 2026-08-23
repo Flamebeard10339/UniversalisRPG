@@ -1,13 +1,13 @@
-import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { engineLocale } from '../content/engineLocale';
+import { withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
+import { standingSources } from '../content/shipped';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { createGameState } from './runtime';
 import { runTest, type TestResult } from './session';
 
-const sources = [engineLocale(), { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }, { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') }];
+const sources = withEngineLocale(standingSources());
 const shipped = loadUniverse(sources);
 const registry = loadUniverse([...sources, translationOf(shipped)]);
 

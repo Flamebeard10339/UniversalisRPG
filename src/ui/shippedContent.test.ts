@@ -1,13 +1,12 @@
-import { readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { shippedFiles } from '../content/shipped';
 import { createDriver } from './driver';
 import { SHIPPED_SOURCES } from './shippedContent';
 
-const authored = readdirSync('content')
-  .filter((name) => name.endsWith('.dsl'))
+// The bridge between the bundler's answer (import.meta.glob, in shippedContent.ts, which the
+// browser build needs and content/shipped.ts must stay out of) and the filesystem's answer.
+const authored = shippedFiles()
   .map((name) => name.replace(/\.dsl$/, ''))
-  .filter((name) => name !== LOCAL_CHANGES_MODULE_ID)
   .sort();
 
 describe('the content the build carries', () => {

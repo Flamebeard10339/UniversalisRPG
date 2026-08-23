@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { contentSectionMaps } from '../src/content/sections';
+import { CORPUS_DIR, moduleSource, shippedFiles, shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
@@ -182,7 +182,7 @@ describe('probe: --round-trip', () => {
   });
 
   it('round-trips the shipped content clean', () => {
-    const result = report([{ name: 'core', text: readFileSync('content/core.dsl', 'utf8') }], { show: [], roundTrip: true });
+    const result = report([moduleSource('core')], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('round-trips clean');
     expect(result.ok).toBe(true);
   });
@@ -352,18 +352,21 @@ describe('probe: the command seam', () => {
   });
 
   it('reads a file from the repository', () => {
-    const result = run(['content/core.dsl']);
+    const result = run([`${CORPUS_DIR}/core.dsl`]);
     expect(result.status).toBe(0);
     expect(result.out).toContain('core');
   });
 
+  // sourceFiles is a generic any-directory reader, one layer above content and unaware of the
+  // shipped corpus; shippedFiles is content's own answer, which also excludes an author's local
+  // changes. This is the guard that the two agree on what content/ itself holds.
   it('reads a directory as the .dsl files in it, so the corpus is nameable where no glob expands', () => {
-    expect(sourceFiles('content')).toEqual(readdirSync('content').filter((name) => name.endsWith('.dsl')).sort().map((name) => path.join('content', name)));
+    expect(sourceFiles(CORPUS_DIR)).toEqual(shippedFiles().map((file) => path.join(CORPUS_DIR, file)));
   });
 
   it('runs one shipped # test by name and exits 0', () => {
-    const id = [...loadUniverseWithDiagnostics(readdirSync('content').filter((name) => name.endsWith('.dsl')).map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }))).registry.tests.keys()][0];
-    const result = run(['content', '--test', id]);
+    const id = [...loadUniverseWithDiagnostics(shippedSources()).registry.tests.keys()][0];
+    const result = run([CORPUS_DIR, '--test', id]);
     expect(result.status).toBe(0);
     expect(result.out).toContain(`${id}: PASSED`);
   });

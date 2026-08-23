@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK, noteIn, withoutNote } from '../src/grammar/note';
 import { localeKey, moduleLocaleSections } from '../src/content/locale';
@@ -7,6 +7,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import type { Registry } from '../src/content/registry';
 import { contentSectionMaps, globalSectionKinds, textFieldsOf } from '../src/content/sections';
+import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 
 export interface Said {
@@ -206,10 +207,7 @@ export function through(sheet: Sheet, id: string): Spoken[] {
   return sheet.sections.slice(0, at + 1);
 }
 
-const shipped = (): ModuleSource[] =>
-  readdirSync('content')
-    .filter((name) => name.endsWith('.dsl'))
-    .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
+const shipped = (): ModuleSource[] => [...shippedSources()];
 
 interface Asked {
   modules: string[];

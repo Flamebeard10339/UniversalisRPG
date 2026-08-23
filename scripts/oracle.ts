@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Written } from '../src/grammar/parser';
 import { align, type Hole } from '../src/grammar/form';
@@ -6,6 +6,7 @@ import { NOTE_MARK } from '../src/grammar/note';
 import { amissIn, fillingWords, namesKind, offeringAt, said, type Addressed, type Amiss } from '../src/content/completion';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type ModuleDiagnostic } from '../src/content/registry';
+import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
 import { splitSections, type RawLine, type RawSection } from '../src/grammar/structure';
@@ -35,10 +36,7 @@ const usage = [
   'An answer given once is pointed back at rather than written out again.',
 ].join('\n');
 
-const corpus = (): ModuleSource[] =>
-  readdirSync('content')
-    .filter((name) => name.endsWith('.dsl'))
-    .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
+const corpus = (): ModuleSource[] => [...shippedSources()];
 
 // One reading of the draft beside the world, which both the per-line pass and the whole-file verdict are about. A draft stands in the world it declares as well as in the one already loaded, so an id it declares on one line is declared for every other line that names it; a draft the engine will not take is not in that world at all, and then nothing it declares is known. A draft that is a version of a module already loaded takes that module's place in the world rather than standing beside it, since both answers an author wants are about the world their edit would make.
 export interface Reading {

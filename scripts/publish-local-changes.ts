@@ -8,12 +8,13 @@ import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { MOD_PENDING_LABEL } from '../src/content/modportal';
+import { CORPUS_DIR } from '../src/content/shipped';
 import { ModuleSource } from '../src/content/universe';
 import { sourceFiles } from './probe';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content';
-const defaultLocal = 'content/local-changes.dsl';
+const defaultContent = CORPUS_DIR;
+const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
 
 interface Args {
   contentFiles: string[];

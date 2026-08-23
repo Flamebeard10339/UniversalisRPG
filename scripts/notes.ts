@@ -1,9 +1,10 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK, noteIn, withoutNote } from '../src/grammar/note';
 import { everySaid, type Locales } from '../src/content/locale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
+import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 
 const usage = [
@@ -47,10 +48,7 @@ export function noteLines(locales: Locales): string[] {
   ];
 }
 
-const shipped = (): ModuleSource[] =>
-  readdirSync('content')
-    .filter((name) => name.endsWith('.dsl'))
-    .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
+const shipped = (): ModuleSource[] => [...shippedSources()];
 
 function main(): void {
   const args = process.argv.slice(2);
