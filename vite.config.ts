@@ -26,6 +26,15 @@ export default defineConfig({
     // Every route into the suite — `npm test`, CI, merge-ready — reads its
     // clock and worker count from here, unqualified, so no route can run a
     // gentler suite than the one it claims to predict.
+    //
+    // This is how long the runner waits for a test that will never finish, and
+    // it is not a budget for how long a test may take. Several agents run this
+    // suite on one machine at once, so a wall-clock number tight enough to
+    // police a test's cost measures who else was running instead — every red
+    // it produced here was a timeout and none was an assertion. What the suite
+    // costs is read off the run's own Duration.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
     projects: [
       {
         extends: true,

@@ -112,5 +112,5 @@ describe('the bundle a release ships', () => {
         ).toEqual([]);
       }
     }
-  }, 120_000);
+  });
 });
