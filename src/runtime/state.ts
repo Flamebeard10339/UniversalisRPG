@@ -1,4 +1,5 @@
 import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { standingSettings, type SettingSheet } from './settings';
 import type { TagClause } from '../grammar/tagClause';
 import { RuntimeError } from './error';
 import type { EngineKey } from '../content/locale';
@@ -124,6 +125,7 @@ export interface GameState extends RngCursor {
   populations: Populations;
   shops: Record<string, ShopStock>;
   player: PlayerSheet;
+  settings: SettingSheet;
   modals: readonly ModalFrame[];
 }
 
@@ -151,7 +153,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), modals: [] };
+  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

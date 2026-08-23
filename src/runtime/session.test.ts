@@ -996,6 +996,7 @@ describe('what the engine withholds', () => {
       resources: 'published',
       modals: 'published',
       player: 'published',
+      settings: 'published',
       activeAction: 'published',
       journey: 'published',
       log: 'withheld',

@@ -79,12 +79,13 @@ function published(view: PlayView): string[] {
     ...view.xp.map((row) => row.title),
     ...view.equipment.flatMap((row) => (row.name === null ? [row.title] : [row.title, row.name])),
     ...view.journal.flatMap((entry) => [entry.title, ...entry.lines.map((line) => line.said)]),
+    ...view.settings.flatMap((row) => [row.title as string, row.note as string, ...row.choices.map((choice) => choice.shown as string)]),
     ...view.said,
   ];
 }
 
 function pagesDrawn(view: PlayView): Record<string, number> {
-  return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length };
+  return { stats: view.stats.length, skills: view.xp.length, equipment: view.equipment.length, carried: view.carried.length, map: view.discovered.length, settings: view.settings.length };
 }
 
 function idsPublished(view: PlayView): string[] {

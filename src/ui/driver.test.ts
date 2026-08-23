@@ -247,7 +247,7 @@ describe('the GUI driver', () => {
   it('reaches the state the REPL live path reaches over the same elapsed span', () => {
     const spans = [200, 200, 750, 3_000, 200];
 
-    const session = startSession(loadUniverseWithDiagnostics([WORKSHOP]).registry);
+    const session = startSession(loadUniverseWithDiagnostics(LATHE).registry);
     const repl = newContext(session, view(session), { driving: true });
     const armed = runLine(repl, '1');
     for (const span of spans) armed.live!.tick(span);

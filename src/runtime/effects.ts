@@ -11,7 +11,7 @@ import { evaluateCondition } from './conditions';
 import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
-import { handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem } from './itemInstance';
+import { handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem, stripHoldings } from './itemInstance';
 import { openModalNamed } from './modalStack';
 import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
@@ -257,6 +257,21 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const milliAmount = toMilliUnits(drawAmount(state, result.delta)) * count;
       addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
+    }
+    case 'fill': {
+      const resource = requireResource(registry, result.resource);
+      const subject = subjectOf(segment, result.party, actor);
+      const store = poolStores(state).find((each) => each.actorId === subject);
+      if (!store) return 0;
+      const room = toMilliUnits(statValue(resource.max, state, registry, subject)) - (store.levels[resource.id] ?? 0);
+      if (room <= 0) return 0;
+      addDelta(segment.deltas, subject, result.resource, room);
+      return room;
+    }
+    case 'strip': {
+      const gone = stripHoldings(state);
+      if (gone > 0) announceCarried(segment, gone);
+      return -gone;
     }
     case 'inflict': {
       const source = registry.items.get(result.buff);

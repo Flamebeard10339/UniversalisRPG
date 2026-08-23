@@ -144,6 +144,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'pool':
         put(result, 'resource', 'resource', `${where} ${result.delta.max < 0 ? 'drain' : 'restore'}:`, visit);
         break;
+      case 'fill':
+        put(result, 'resource', 'resource', `${where} restore:`, visit);
+        break;
       case 'set':
       case 'unset':
       case 'add':
@@ -152,6 +155,7 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'say':
       case 'open-modal':
       case 'stop':
+      case 'strip':
       case 'chance':
       case 'credit':
         break;

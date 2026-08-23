@@ -53,6 +53,7 @@ import {
   type PlaySession,
   type PlayStatus,
   type PlayView,
+  type SettingRow,
 } from './session';
 
 export type MessageTone = 'plain' | 'ok' | 'warn' | 'error';
@@ -143,6 +144,8 @@ export interface LocalDelete {
 
 export type LocalOp = { op: 'list' } | { op: 'show' } | { op: 'clear' } | LocalDelete;
 
+export type SettingOp = { op: 'list' } | { op: 'set'; name: string; directive: Directive };
+
 export interface SectionArg {
   kind: string;
   id: string;
@@ -156,6 +159,7 @@ interface ArgTypes {
   directive: Directive;
   section: SectionArg;
   local: LocalOp;
+  setting: SettingOp;
   choice: number;
 }
 
@@ -634,6 +638,29 @@ function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
   return { ...result, output: [...result.output, note('warn', `Dev mode off, but this session could not be put back to what it was before dev, so it will not be written to a slot. Slot ${DEV_SLOT} still holds what dev did.`)] };
 }
 
+// Every setting, in the words the live view already publishes them in, so the terminal and the
+// settings page are reading one list rather than two.
+function settingStanding(ctx: CommandContext, row: SettingRow): PlayerMessage {
+  const localizer = sessionLocalizer(ctx.session);
+  return {
+    kind: 'message',
+    words: 'player',
+    tone: 'plain',
+    text: localizer.engine('engine.setting.stands', { setting: row.title, value: row.choices.find((each) => each.written === row.standing)?.shown ?? localizer.identifier(row.standing) }),
+    detail: [row.note, localizer.engine('engine.setting.takes', { choices: localizer.identifier(row.choices.map((each) => `${each.written} (${each.shown})`).join(', ')) })],
+  };
+}
+
+function listSettings(ctx: CommandContext): CommandResult {
+  return { output: ctx.view.settings.map((row) => settingStanding(ctx, row)), quit: false, recorded: [] };
+}
+
+function playBy(ctx: CommandContext, name: string, directive: Directive): CommandResult {
+  const result = runDirective(ctx, directive);
+  const row = result.view?.settings.find((each) => each.name === name);
+  return row === undefined ? result : { ...result, output: [settingStanding(ctx, row), ...result.output] };
+}
+
 function requireId(name: string): (rest: string) => string | CommandProblem {
   return (rest) => (rest === '' ? { problem: `${name} requires an id` } : rest);
 }
@@ -932,6 +959,20 @@ export const COMMANDS: readonly CommandSpec[] = [
         setAutosaveSeconds(save, seconds);
         return noted('ok', seconds === 0 ? 'Autosave off.' : `Autosave every ${seconds}s.`);
       }),
+  }),
+  define({
+    name: '/settings',
+    arg: 'setting',
+    argHint: '[<setting> <value>]',
+    summary: 'list what this run is played by and where each stands, or play the rest of it by another',
+    parse: (rest, ctx) => {
+      if (rest === '') return { op: 'list' };
+      const directive = parseDirective(`setting: ${rest}`, ctx);
+      if (isProblem(directive)) return directive;
+      if (!directive) return { problem: `/settings takes a setting and one of the words it is played by, as in /settings hardcore on, or nothing at all to list them` };
+      return { op: 'set', name: rest.split(/[ 	]+/)[0], directive };
+    },
+    run: (ctx, op) => (op.op === 'list' ? listSettings(ctx) : playBy(ctx, op.name, op.directive)),
   }),
   define({
     name: '/dev',

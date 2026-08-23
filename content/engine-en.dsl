@@ -100,6 +100,7 @@ engine.shop.refused.not-a-count: That is not a number of things to trade.
 engine.shop.refused.pack-full: Your pack is full — there is nowhere to put it.
 engine.modal.opened: modal:{modal}
 engine.prune.race: Cleared the player's race because {race} is not loaded.
+engine.prune.setting: Put setting {setting} back where it stands because {value} is not one of the ways it can be played.
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.
 engine.prune.location: Moved from unavailable location {from} to {to}.
 engine.prune.nowhere: (nowhere)
@@ -272,3 +273,9 @@ engine.stopped.still: what was under way advances by nothing, so waiting it out 
 engine.stopped.pack-full: your pack was full and there was nowhere to put what you found
 engine.stopped.unloadable: what was under way could not be picked up again
 engine.stopped.short: {because}, and {condition} never came true
+engine.setting.stands: {setting}: {value}
+engine.setting.takes: takes {choices}
+engine.setting.on: On
+engine.setting.off: Off
+engine.setting.hardcore: Hardcore
+engine.setting.hardcore.note: Fainting costs you everything you were carrying and wearing.

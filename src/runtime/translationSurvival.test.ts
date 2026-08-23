@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { withEngineLocale } from '../content/engineLocale';
+import { isDebug } from '../content/sections/define';
 import { loadUniverse } from '../content/load';
 import { standingSources } from '../content/shipped';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
@@ -58,7 +59,9 @@ describe('a universe with every word replaced', () => {
 
   it('says nothing a shipped title says', () => {
     const asShipped = localizerFor(shipped, BASE_LANGUAGE);
-    const ids = [...shipped.items.keys()];
+    // A section written to prove something about the engine says nothing in any language, so it has
+    // no title for a translation to move; the claim is about what a player reads.
+    const ids = [...shipped.items.values()].filter((item) => !isDebug(item)).map((item) => item.id);
 
     expect(ids.length).toBeGreaterThan(5);
     for (const language of PLAYED) {

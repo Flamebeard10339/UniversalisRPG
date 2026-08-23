@@ -1371,6 +1371,7 @@ const ACTS_ON: Record<string, string> = {
   '/create-valid-test': 'made-valid',
   '/import': SOMEONE_ELSES_SAVE,
   '/autosave': '1',
+  '/settings': 'hardcore on',
   '/dev': 'off',
 };
 

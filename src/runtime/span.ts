@@ -69,6 +69,7 @@ const SPAN_VOICE: Record<SaveField, SpanVoice> = {
   shops: 'nothing a player counts',
   rng: 'nothing a player counts',
   player: 'nothing a player counts',
+  settings: 'nothing a player counts',
   modals: 'nothing a player counts',
 };
 

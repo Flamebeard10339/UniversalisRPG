@@ -197,6 +197,7 @@ export function App({
         <SettingsPane
           dev={dev}
           speed={snapshot.speed}
+          settings={view.settings}
           commandLine={editing.commandLine}
           words={words}
           onSend={driver.send}

@@ -606,6 +606,10 @@ uses: melee-combat
 on death:
   say: You slump to the floor, spent, and come to a long while later back where you started out. (You should have eaten something.)
   set: fainted
+  restore: health
+  if setting.hardcore:
+    say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
+    take: everything
   relocate: starting-location
   stop
 
@@ -643,4 +647,44 @@ say: You grill the herring through, which is the only way it is worth eating.
 // resource reads the entity rather than the stat table.
 # test the-players-own-sheet-is-what-the-engine-reads
 assert: stat.max-health = 30
+assert: resource.health = 30
+
+// The one thing in the corpus that empties the player's own pool on purpose. A
+// claim about what fainting does needs a faint, and the only other way to one is
+// a fight somewhere, which would make this a claim about that fight's numbers as
+// much as about the death handler. A thousand is more than any sheet will carry.
+# item deaths-door
+DEBUG
+step-through:
+  drain: 1000 health
+
+// Every shape a holding takes: a stack, two things standing alone, a whetstone
+// to grow a copy with, and a blade on the arm rather than in the pack.
+# save four-rows-a-whetstone-and-a-blade-worn
+DEBUG
+{"version":12,"inventory":{"core.bent-coin":2,"core.rats-eye-gem":1,"core.deaths-door":1,"core.iron-sword":1,"core.whetstone":1},"equipped":{"mainhand":"core.iron-sword"}}
+
+// The difference hardcore makes, stated as a difference: the same faint down the
+// same handler leaves all five holdings standing with it off and none of them
+// with it on, and the player comes back at the full thirty either way. A run
+// that asserted only the empty pack would pass in a world where fainting always
+// emptied it. `inventory.<item>` counts a stack, a grown copy and a worn one
+// alike, so the two blades are the fed copy and the one on the arm.
+# test hardcore-death-empties-five-holdings-a-plain-faint-leaves-standing
+DEBUG
+load: four-rows-a-whetstone-and-a-blade-worn
+feed: iron-sword with whetstone
+use: item.deaths-door.step-through
+assert: inventory.bent-coin = 2
+assert: inventory.rats-eye-gem = 1
+assert: inventory.iron-sword = 2
+assert: resource.health = 30
+load: four-rows-a-whetstone-and-a-blade-worn
+setting: hardcore on
+feed: iron-sword with whetstone
+use: item.deaths-door.step-through
+assert: inventory.bent-coin = 0
+assert: inventory.rats-eye-gem = 0
+assert: inventory.iron-sword = 0
+assert: inventory.deaths-door = 0
 assert: resource.health = 30

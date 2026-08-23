@@ -49,6 +49,7 @@ export type Directive =
   | { kind: 'refuse'; inner: GrowthDirective }
   | { kind: 'until'; inner: Directive; until: Terminator }
   | { kind: 'open-modal'; modal: ModalScreen }
+  | { kind: 'setting'; setting: string; value: string }
   | { kind: 'submit-modal'; key: string; value: string };
 
 export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
@@ -88,6 +89,7 @@ const JOURNAL = new RegExp(`^journal:[ \\t]*(?<quest>${PATH})[ \\t]+says[ \\t]+(
 const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
+const SETTING = /^setting:[ 	]*(?<setting>[a-z][a-z0-9-]*)[ 	]+(?<value>[a-z0-9][a-z0-9-]*)$/;
 const CANCEL = /^cancel$/;
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 const WAIT_OUT = /^wait:[ \t]*done$/;
@@ -275,6 +277,9 @@ export function parseDirectiveLine(text: string): Directive | null {
   const load = LOAD.exec(text)?.groups;
   if (load) return { kind: 'load', save: load.id };
 
+  const setting = SETTING.exec(text)?.groups;
+  if (setting) return { kind: 'setting', setting: setting.setting, value: setting.value };
+
   if (CANCEL.test(text)) return { kind: 'cancel' };
 
   const wait = WAIT.exec(text)?.groups;
@@ -355,6 +360,8 @@ export function printDirective(value: Directive): string {
       return `expect only: ${value.save}`;
     case 'load':
       return `load: ${value.save}`;
+    case 'setting':
+      return `setting: ${value.setting} ${value.value}`;
     case 'cancel':
       return 'cancel';
     case 'wait':
@@ -428,6 +435,7 @@ export const test = section<Test>()({
     { form: 'expect: <save>', example: 'expect: after-intro' },
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
+    { form: 'setting: <setting> <value>', example: 'setting: hardcore on', note: 'plays the rest of the run by that preference, as the settings page and /settings do — a claim about what a setting changes starts by writing it' },
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
     { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
@@ -543,6 +551,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       if (value.until !== 'done') visitCondition(value.until, `${where} until:`, visit);
       return;
     case 'unequip':
+    case 'setting':
     case 'open-modal':
     case 'submit-modal':
     case 'choose':
