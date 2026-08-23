@@ -17,7 +17,7 @@ import {
   relocateTo,
   settlePools,
 } from './effects';
-import { damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
+import { actorTitle, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
 import { armedAction, Participant, participants, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
@@ -335,6 +335,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     for (const actorId of outcome.felled) {
       if (actorId === PLAYER) continue;
+      state.log.push(localizerOf(registry, state).engine('engine.combat.felled', { target: actorTitle(actorId, registry, state) }));
       emptyPoolNow(segment, actorId, next.action.depletes!.id, segment.causedBy.get(actorId) ?? next.self);
       downOne(state, registry, state.location, actorId);
       leaveFight(active, actorId);

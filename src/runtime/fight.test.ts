@@ -4,6 +4,8 @@ import { hostile, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { logSwing } from './encounter';
+import { declaredId } from '../content/sections/entity';
+import { localizerOf } from './localized';
 import { isPopulations } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
@@ -424,6 +426,43 @@ describe('the populations save field', () => {
     const registry = loaded();
     const state = createGameState();
     expect(() => loadSave(state, { version: SAVE_VERSION, diff: { populations: { shore: { crab: { down: 'lots' } } } } as never }, registry)).toThrow(/save field populations/);
+  });
+});
+
+describe('a foe going down is said', () => {
+  // Every fight the module can seat, so a foe or an action added below is a subject with no edit here.
+  function fellable(registry: Registry): Array<{ where: string; foe: string; action: string }> {
+    const subjects: Array<{ where: string; foe: string; action: string }> = [];
+    for (const location of registry.locations.values()) {
+      for (const { entity: foe } of location.entities) {
+        for (const action of registry.entities.get(foe)?.actions ?? []) {
+          const id = declaredId(action);
+          if (id === undefined || !action.depletes || action.requires !== undefined) continue;
+          subjects.push({ where: location.id, foe, action: id });
+        }
+      }
+    }
+    return subjects;
+  }
+
+  it('names the fallen, in every fight that puts one down', () => {
+    const registry = loaded();
+    let announced = 0;
+
+    for (const { where, foe, action } of fellable(registry)) {
+      const state = standing(registry, where);
+      armFightAction(action, foe, registry, state);
+      resolve(state, registry, secondsToMs(20));
+      if ((state.populations[where]?.[foe]?.down ?? 0) === 0) continue;
+
+      const localizer = localizerOf(registry, state);
+      const said = localizer.engine('engine.combat.felled', { target: localizer.title('entity', foe) });
+      expect(said, 'the engine says nothing of its own for a fall').not.toBe('engine.combat.felled');
+      expect(state.log, `${where}: ${foe} felled by ${action}`).toContain(said);
+      announced++;
+    }
+
+    expect(announced, 'no fight in the module put anything down').toBeGreaterThan(0);
   });
 });
 

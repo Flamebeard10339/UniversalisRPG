@@ -26,6 +26,7 @@ engine.combat.foe.hit: The {attacker} hits you for {damage}.
 engine.combat.foe.miss: The {attacker} misses you.
 engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
 engine.combat.other.miss: The {attacker} misses the {target}.
+engine.combat.felled: The {target} falls.
 engine.item.examine: This is {article} {item}.
 engine.item.modified: Modified {item}
 engine.carried.stack: {item} x{count}
