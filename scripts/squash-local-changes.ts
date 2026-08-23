@@ -6,7 +6,7 @@ import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/un
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/tutorial-island.dsl';
+const defaultContent = 'content/core.dsl';
 const defaultLocal = 'content/local-changes.dsl';
 
 interface Args {

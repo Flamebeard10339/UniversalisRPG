@@ -286,13 +286,13 @@ describe('narrowing the list to the sections being looked for', () => {
   const kept = (query: string): Section[] => addressed.filter((section) => searching(query).holds(section));
 
   it('holds every section back until each term matches it, so a module and a word narrow together', () => {
-    const both = kept('tutorial-island sword');
+    const both = kept('core sword');
 
     // A term is looked for in everything a section is searched by, its module among it, so a section of another module that names this one is a match and not a leak.
     expect(both.length).toBeGreaterThan(0);
-    expect(both.every((section) => /tutorial-island/i.test(`${section.module} ${section.kind} ${section.address} ${section.text}`))).toBe(true);
+    expect(both.every((section) => /core/i.test(`${section.module} ${section.kind} ${section.address} ${section.text}`))).toBe(true);
     expect(both.every((section) => /sword/i.test(`${section.address} ${section.text}`))).toBe(true);
-    expect(both.length).toBeLessThan(kept('tutorial-island').length);
+    expect(both.length).toBeLessThan(kept('core').length);
     expect(both.length).toBeLessThanOrEqual(kept('sword').length);
   });
 

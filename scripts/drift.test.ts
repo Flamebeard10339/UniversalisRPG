@@ -85,12 +85,12 @@ function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = ()
 const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
   ['verb', 'grow'],
   ['plane', 'allocate: slot e'],
-  ['plane', 'slot: e with tutorial-island.crossroads-jewel'],
-  ['plane', "feed: with tutorial-island.masters-whetstone"],
+  ['plane', 'slot: e with core.crossroads-jewel'],
+  ['plane', "feed: with core.masters-whetstone"],
   ['plane', 'go: 1,0'],
   ['plane', 'allocate: position 1'],
   ['plane', 'allocate: slot ne'],
-  ['plane', 'slot: ne with tutorial-island.keen-edge-jewel'],
+  ['plane', 'slot: ne with core.keen-edge-jewel'],
   ['plane', 'go: 2,-1'],
   ['plane', 'allocate: position 1'],
   ['plane', 'back'],
@@ -115,7 +115,7 @@ describe('the two drivers cannot drift', () => {
       '/bogus',
       '/assert time >= 3',
       '/expect empty',
-      '/dsl location tutorial-island.guide-house x: 9, y: 9',
+      '/dsl location core.guide-house x: 9, y: 9',
       '/local list',
       '/local show',
       '/reload',
@@ -155,7 +155,7 @@ describe('the two drivers cannot drift', () => {
 
   it('answers a modal through the shared table, by the line the table parses', () => {
     const { repl, gui } = bothDrivers();
-    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:tutorial-island.miki') + 1);
+    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:core.miki') + 1);
     inStep(repl, gui, talk);
 
     const asked = gui.snapshot().view.modals[0].options[0];
@@ -166,8 +166,8 @@ describe('the two drivers cannot drift', () => {
 
   it('walks the crafting route through both drivers, gesture against typed line', () => {
     const { repl, gui } = bothDrivers();
-    inStep(repl, gui, 'use: entity.tutorial-island.smiths-chest.open');
-    inStep(repl, gui, '/inv tutorial-island.iron-sword', () => gui.open('tutorial-island.iron-sword'));
+    inStep(repl, gui, 'use: entity.core.smiths-chest.open');
+    inStep(repl, gui, '/inv core.iron-sword', () => gui.open('core.iron-sword'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 
     expect(gui.snapshot().view.modals).toEqual([]);

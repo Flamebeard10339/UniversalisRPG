@@ -11,7 +11,7 @@ import { MOD_PENDING_LABEL } from '../src/content/modportal';
 import { ModuleSource } from '../src/content/universe';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/tutorial-island.dsl';
+const defaultContent = 'content/core.dsl';
 const defaultLocal = 'content/local-changes.dsl';
 
 interface Args {

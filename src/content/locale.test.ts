@@ -151,8 +151,8 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
 describe('an action declared once carries one key, however many owners perform it (c7)', () => {
   const island = loadUniverse([
     {
-      name: 'tutorial-island',
-      text: readFileSync('content/tutorial-island.dsl', 'utf8'),
+      name: 'core',
+      text: readFileSync('content/core.dsl', 'utf8'),
     },
   ]);
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));

@@ -50,7 +50,7 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
   });
 });
 
-const sources = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }];
+const sources = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }];
 const registry = loadUniverse([...sources, translationOf(loadUniverse(sources))]);
 
 const RUN = /[A-Za-z][A-Za-z0-9._-]*/g;
@@ -124,13 +124,13 @@ const SCRIPT: readonly string[] = [
     const bare = SHAPED[spec.name] ?? spec.name;
     return [bare, `${bare} 1`];
   }),
-  'use: entity.tutorial-island.smiths-chest.open',
-  '/inv tutorial-island.iron-sword',
+  'use: entity.core.smiths-chest.open',
+  '/inv core.iron-sword',
   ...[
     ['verb', 'grow'],
     ['plane', 'allocate: slot e'],
-    ['plane', 'slot: e with tutorial-island.crossroads-jewel'],
-    ['plane', 'feed: with tutorial-island.masters-whetstone'],
+    ['plane', 'slot: e with core.crossroads-jewel'],
+    ['plane', 'feed: with core.masters-whetstone'],
     ['plane', 'go: 1,0'],
     ['plane', 'allocate: position 1'],
     ['plane', 'allocate: slot ne'],
@@ -170,10 +170,10 @@ describe('what the REPL puts on the terminal (c10)', () => {
   });
 
   it('grants that permission to a place drawn beside its own name', () => {
-    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('tutorial-island.guide-house')));
+    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('core.guide-house')));
     const words = vocabulary(base[at].view, other[at].view);
 
     expect(at).toBeGreaterThan(-1);
-    expect([...(words.beside.get('tutorial-island.guide-house') ?? [])]).toContain(base[at].view.location.title);
+    expect([...(words.beside.get('core.guide-house') ?? [])]).toContain(base[at].view.location.title);
   });
 });

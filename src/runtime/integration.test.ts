@@ -13,8 +13,8 @@ import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-const source = readFileSync('content/tutorial-island.dsl', 'utf8');
-const island = (text: string) => loadUniverse([engineLocale(), { name: 'tutorial-island', text }]);
+const source = readFileSync('content/core.dsl', 'utf8');
+const island = (text: string) => loadUniverse([engineLocale(), { name: 'core', text }]);
 const registry = island(source);
 
 const shippedSources = () =>
@@ -25,7 +25,7 @@ const shippedSources = () =>
 
 const shipped = loadUniverse(withEngineLocale(shippedSources()));
 
-describe('tutorial-island content', () => {
+describe('core content', () => {
   it('loads identically from a CRLF checkout, with or without a BOM', () => {
     const crlf = source.replace(/\n/g, '\r\n');
     for (const text of [crlf, `\uFEFF${crlf}`]) {
@@ -76,21 +76,21 @@ describe('combat-expansion, read off the routes it ships', () => {
     const empty = sheet(state, shipped);
 
     const moved = [...shipped.stats.keys()].filter((statId) => full[statId] !== empty[statId]);
-    expect(moved).toEqual(['tutorial-island.attack']);
+    expect(moved).toEqual(['core.attack']);
 
     restorePools(state, { 'combat-expansion.rage': 10000 });
     const half = sheet(state, shipped);
-    expect(half['tutorial-island.attack'] - empty['tutorial-island.attack']).toBeCloseTo(full['tutorial-island.attack'] - half['tutorial-island.attack'], 10);
+    expect(half['core.attack'] - empty['core.attack']).toBeCloseTo(full['core.attack'] - half['core.attack'], 10);
   });
 
   it('separates what a stack pays from what the count is worth', () => {
     const reading = (testId: string, stacks: number): number => {
       const state = played(testId);
       clearBuffs(state, [PLAYER]);
-      const bare = statValue('tutorial-island.attack-rate', state, shipped);
+      const bare = statValue('core.attack-rate', state, shipped);
       const vigor = shipped.items.get('combat-expansion.accelerated-vigor')!;
       for (let held = 0; held < stacks; held += 1) grantBuff(state, PLAYER, vigor, state.time + secondsToMs(60));
-      return statValue('tutorial-island.attack-rate', state, shipped) - bare;
+      return statValue('core.attack-rate', state, shipped) - bare;
     };
 
     expect(reading('combat-expansion.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
@@ -107,12 +107,12 @@ describe('combat-expansion, read off the routes it ships', () => {
 
     expect(buffsOf(state, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
     expect(buffsOf(state, PLAYER)).toEqual([]);
-    expect(statValue('tutorial-island.regeneration', state, shipped, POST)).toBe(-30);
+    expect(statValue('core.regeneration', state, shipped, POST)).toBe(-30);
 
     const poisoned = played('combat-expansion.poison-holds-the-struck-enemy');
     const clean = played('combat-expansion.poison-holds-the-struck-enemy');
     clearBuffs(clean, [POST]);
-    const health = (each: GameState): number => each.activeAction!.actors![POST].resources['tutorial-island.health'];
+    const health = (each: GameState): number => each.activeAction!.actors![POST].resources['core.health'];
     const before = health(clean);
     expect(health(poisoned)).toBe(before);
 
@@ -130,7 +130,7 @@ describe('combat-expansion, read off the routes it ships', () => {
     const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
 
     expect(shipped.entities.get('combat-expansion.spined-urchin')!.actions).toEqual([]);
-    expect(toMilliUnits(30) - state.resources['tutorial-island.health']).toBe(toMilliUnits(5) * attempts);
+    expect(toMilliUnits(30) - state.resources['core.health']).toBe(toMilliUnits(5) * attempts);
   });
 });
 
@@ -214,7 +214,7 @@ describe('no shipped identifier is named after this content', () => {
 
   it('finds no id this module declares', () => {
     const mine = declaredIds(shipped, 'combat-expansion');
-    const shared = declaredIds(shipped, 'tutorial-island');
+    const shared = declaredIds(shipped, 'core');
     const named = [...mine].filter((word) => !shared.has(word));
     expect(named.length).toBeGreaterThan(20);
     expect(sweep(named)).toEqual([]);
@@ -231,24 +231,24 @@ describe('no shipped identifier is named after this content', () => {
   });
 });
 
-describe('tutorial-island health resource (Pass 2 end-to-end)', () => {
+describe('core health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
-    expect(state.resources['tutorial-island.health']).toBe(toMilliUnits(30));
+    expect(state.resources['core.health']).toBe(toMilliUnits(30));
 
-    state.location = 'tutorial-island.basement';
-    useFight('tutorial-island.melee-combat', 'tutorial-island.giant-rat', registry, state);
+    state.location = 'core.basement';
+    useFight('core.melee-combat', 'core.giant-rat', registry, state);
     expect(state.time).toBe(secondsToMs(2.4));
 
     resolve(state, registry, secondsToMs(120));
-    const afterFighting = state.resources['tutorial-island.health'];
-    expect(state.flags['tutorial-island.rats-killed']).toBe(1);
+    const afterFighting = state.resources['core.health'];
+    expect(state.flags['core.rats-killed']).toBe(1);
     expect(afterFighting).toBeLessThan(toMilliUnits(30));
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
-    grantBuff(state, PLAYER, registry.items.get('tutorial-island.cooked-shrimp')!, state.time + secondsToMs(60));
+    grantBuff(state, PLAYER, registry.items.get('core.cooked-shrimp')!, state.time + secondsToMs(60));
     resolve(state, registry, state.time + secondsToMs(60));
-    expect(state.resources['tutorial-island.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
+    expect(state.resources['core.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
   });
 });

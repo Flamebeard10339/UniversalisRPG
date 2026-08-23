@@ -13,7 +13,7 @@ const OPENING = [
   'load: growing-a-heartwood-blade-start',
   'use: entity.smiths-chest.open',
   'open-modal: carried-items',
-  'submit-modal: item=tutorial-island.iron-sword',
+  'submit-modal: item=core.iron-sword',
   'submit-modal: verb=grow',
 ];
 
@@ -59,7 +59,7 @@ describe('the plane a player drags', () => {
   });
 
   it('draws no hexagon and no direction, whichever way the plane has been grown', () => {
-    for (const driver of [opened(), opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel')]) {
+    for (const driver of [opened(), opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel')]) {
       const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
       for (const run of runs) {
@@ -139,7 +139,7 @@ describe('a socket with nothing through it', () => {
   });
 
   it('offers no jewels once one has gone through it, and says what it holds instead', () => {
-    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel');
+    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel');
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const filled = graph.nodes.find((node) => node.socket && node.holds !== null)!;
@@ -159,7 +159,7 @@ describe('a socket with nothing through it', () => {
 
 describe('a node of a cluster the screen is not standing on', () => {
   it('is walked to by a published move, so one press reaches any node the graph draws', () => {
-    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with tutorial-island.crossroads-jewel');
+    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel');
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const elsewhere = graph.nodes.filter((node) => node.hex !== planeRead(view).hex);

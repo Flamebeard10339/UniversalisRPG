@@ -19,8 +19,8 @@ describe('module identity', () => {
   });
 
   it('falls back to the source name, with a zero version and no dependencies', () => {
-    const parsed = parseModuleSource(module('tutorial-island', '# stat attack'));
-    expect(parsed.info.id).toBe('tutorial-island');
+    const parsed = parseModuleSource(module('core', '# stat attack'));
+    expect(parsed.info.id).toBe('core');
     expect(parsed.info.version).toEqual([0, 0, 0]);
     expect(parsed.info.dependencies).toEqual([]);
   });

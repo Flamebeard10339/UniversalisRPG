@@ -36,7 +36,7 @@ describe('layerOf', () => {
     expect(layerOf('src/runtime')).toBe('runtime');
     expect(layerOf('src/runtime/save')).toBe('runtime');
     expect(layerOf('src/runtimes/save')).toBeNull();
-    expect(layerOf('content/tutorial-island.dsl')).toBeNull();
+    expect(layerOf('content/core.dsl')).toBeNull();
   });
 
   it('places the browser driver’s entry point at ui, where a root names a file rather than a directory', () => {

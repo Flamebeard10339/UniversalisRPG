@@ -23,6 +23,7 @@
     "inspect": "tsx scripts/inspect.ts",
     "mutate": "tsx scripts/mutate.ts",
     "migrate-saves": "tsx scripts/migrate-saves.ts",
+    "rename-module": "tsx scripts/rename-module.ts",
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
     "contribution:consolidate": "tsx scripts/consolidate.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",

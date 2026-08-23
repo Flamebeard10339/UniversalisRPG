@@ -86,16 +86,16 @@ const SHARED_EXAMPLE = `## A worked example
 
 Suppose the view shows:
 
-  location: The Guide House (tutorial-island.guide-house)
+  location: The Guide House (core.guide-house)
   here: Miki, the front door, a mirror
   choices:
-    id=talk:tutorial-island.miki :: Talk to Miki
-    id=use:entity.tutorial-island.mirror.look-in :: Look in the mirror
-    id=travel:tutorial-island.beach :: Travel to the beach
+    id=talk:core.miki :: Talk to Miki
+    id=use:entity.core.mirror.look-in :: Look in the mirror
+    id=travel:core.beach :: Travel to the beach
 
 A reasonable reply is:
 
-  {"line":"use:entity.tutorial-island.mirror.look-in","note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
+  {"line":"use:entity.core.mirror.look-in","note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
 
 If that opens a screen asking for a name, the next turn's view shows a modal instead of choices, something like:
 
@@ -477,7 +477,7 @@ export function createSdkModelClient(cwd: string): ModelClient {
   };
 }
 
-const DEFAULT_FILES = ['content/tutorial-island.dsl', 'content/tutorial-quests.dsl'];
+const DEFAULT_FILES = ['content/core.dsl', 'content/tutorial-quests.dsl'];
 const DEFAULT_TURNS = 100;
 
 function fileContentReader(files: readonly string[]): ContentReader {

@@ -107,7 +107,7 @@ describe('the GUI driver', () => {
 
     expect(driver.snapshot().problems).toEqual([]);
     const view = shown(driver);
-    expect(view.location.id).toBe('tutorial-island.guide-house');
+    expect(view.location.id).toBe('core.guide-house');
     expect(texts(driver)).toEqual([view.location.title, view.location.description]);
     expect(view.choices.length).toBeGreaterThan(0);
   });
@@ -312,7 +312,7 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
     reopened.send('/local list');
 
     expect(shown(reopened).discovered.find((place) => place.id === STARTING_LOCATION)).toMatchObject({ x: 7, y: 7 });
-    expect(sourceLines(reopened)).toEqual([`# location ${STARTING_LOCATION} — also in tutorial-island`, ...sourceLines(first)]);
+    expect(sourceLines(reopened)).toEqual([`# location ${STARTING_LOCATION} — also in core`, ...sourceLines(first)]);
     expect(reopened.localChanges()).toBe(first.localChanges());
   });
 

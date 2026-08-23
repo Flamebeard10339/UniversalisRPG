@@ -213,19 +213,19 @@ describe('what the page draws, assembled once', () => {
 });
 
 describe('narrowing the list by what is true of a section', () => {
-  const shipped = { kind: 'item', address: 'tutorial-island.sword', text: '# item tutorial-island.sword', module: 'tutorial-island', staged: false };
-  const mine = { kind: 'item', address: 'tutorial-island.sword', text: '# item tutorial-island.sword', module: 'local-changes', staged: true };
+  const shipped = { kind: 'item', address: 'core.sword', text: '# item core.sword', module: 'core', staged: false };
+  const mine = { kind: 'item', address: 'core.sword', text: '# item core.sword', module: 'local-changes', staged: true };
   const fresh = { kind: 'item', address: 'local-changes.torch', text: '# item local-changes.torch', module: 'local-changes', staged: true };
   const broken = { kind: 'item', address: 'local-changes.rope', text: '# item local-changes.rope\nnonsense: 3', module: 'local-changes', staged: true };
   const all = [shipped, mine, fresh, broken];
   const kept = (query: string): string[] => all.filter((each) => searching(query, all).holds(each)).map((each) => each.module + ' ' + each.address);
 
   it('keeps what an author has changed', () => {
-    expect(kept('is:changed')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.torch', 'local-changes local-changes.rope']);
+    expect(kept('is:changed')).toEqual(['local-changes core.sword', 'local-changes local-changes.torch', 'local-changes local-changes.rope']);
   });
 
   it('keeps only what stands over something shipped', () => {
-    expect(kept('is:shadowed')).toEqual(['local-changes tutorial-island.sword']);
+    expect(kept('is:shadowed')).toEqual(['local-changes core.sword']);
   });
 
   it('keeps what the engine will not read', () => {
@@ -246,11 +246,11 @@ describe('narrowing the list by what is true of a section', () => {
   });
 
   it('widens to either side of ||', () => {
-    expect(kept('is:amiss || is:shadowed')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.rope']);
+    expect(kept('is:amiss || is:shadowed')).toEqual(['local-changes core.sword', 'local-changes local-changes.rope']);
   });
 
   it('narrows within a side before widening across them', () => {
-    expect(kept('is:changed sword || rope')).toEqual(['local-changes tutorial-island.sword', 'local-changes local-changes.rope']);
+    expect(kept('is:changed sword || rope')).toEqual(['local-changes core.sword', 'local-changes local-changes.rope']);
   });
 
   it('leaves a single | to the pattern it is written in', () => {

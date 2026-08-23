@@ -10,7 +10,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/tutorial-island.dsl';
+const defaultContent = 'content/core.dsl';
 
 type Command = 'sync' | 'list' | 'enable' | 'disable' | 'sources' | 'show';
 

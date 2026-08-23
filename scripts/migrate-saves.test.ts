@@ -124,11 +124,11 @@ describe('c1: the body, and nothing else', () => {
   });
 
   it('returns the shipped content unchanged when the only thing behind it is the version stamp', () => {
-    const shipped = readFileSync('content/tutorial-island.dsl', 'utf8');
+    const shipped = readFileSync('content/core.dsl', 'utf8');
     const behind = shipped.replace(new RegExp(`\\{"version":${SAVE_VERSION},`, 'g'), `{"version":${BEHIND},`);
     expect(behind).not.toBe(shipped);
 
-    const report = migrate(files(['content/tutorial-island.dsl', behind]), nothingMoved);
+    const report = migrate(files(['content/core.dsl', behind]), nothingMoved);
 
     const stamped = shipped.split(`{"version":${SAVE_VERSION},`).length - 1;
     expect(report.lines.filter((line) => line.includes(`version ${BEHIND} rewritten`))).toHaveLength(stamped);
@@ -159,7 +159,7 @@ describe('c2: running it twice is running it once', () => {
   });
 
   it('has nothing to do against shipped content, which is already at SAVE_VERSION', () => {
-    const report = migrate(files(['content/tutorial-island.dsl', readFileSync('content/tutorial-island.dsl', 'utf8')]), addsRng);
+    const report = migrate(files(['content/core.dsl', readFileSync('content/core.dsl', 'utf8')]), addsRng);
 
     expect(report.ok).toBe(true);
     expect(report.files).toEqual([]);

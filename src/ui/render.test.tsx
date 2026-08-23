@@ -30,8 +30,8 @@ const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, 
 
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'use:entity.tutorial-island.oven.roast-chestnuts';
-const TALK = 'talk:tutorial-island.miki';
+const ROAST = 'use:entity.core.oven.roast-chestnuts';
+const TALK = 'talk:core.miki';
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
@@ -282,7 +282,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, ROAST));
     step();
     driver.cancel();
-    driver.choose(position(driver, 'use:entity.tutorial-island.mirror.look-in'));
+    driver.choose(position(driver, 'use:entity.core.mirror.look-in'));
     step();
 
     expect(seen).toBeGreaterThan(20);
@@ -534,7 +534,7 @@ describe('what the shell puts on the screen', () => {
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
     const driver = createDriver(SHIPPED_SOURCES);
-    driver.choose(position(driver, 'talk:tutorial-island.miki'));
+    driver.choose(position(driver, 'talk:core.miki'));
     const menu = driver.snapshot().view.modals[0].options[0];
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
@@ -666,10 +666,10 @@ describe('what the editing page says about a section', () => {
   it('tells a staged section from a shipped one by its colour rather than by a slant', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
     driver.send(devLine(true));
-    driver.send('/dsl entity tutorial-island.miki title: Miki');
+    driver.send('/dsl entity core.miki title: Miki');
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
-    const staged = rowClass(html, 'entity tutorial-island.miki');
-    const shipped = rowClass(html, 'entity tutorial-island.oven');
+    const staged = rowClass(html, 'entity core.miki');
+    const shipped = rowClass(html, 'entity core.oven');
 
     expect(staged, 'the editing page drew no row for the staged section').not.toBe('');
     expect(staged).not.toBe(shipped);

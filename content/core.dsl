@@ -1,9 +1,11 @@
-// Tutorial Island — Miki route (Path 1), end to end.
-// Guide house (ground floor, upstairs, basement) + the beach beyond the front door.
-// Paths 2/3 (thieving, fishing) are only stubbed where Path 1 shares their props
-// (front door, dresser, lockpick) so the world stays internally consistent.
+// The engine's own furniture, which every region depends on: the stat bases, the
+// health pool and its regeneration, the factions, the skills, the equipment slots
+// and the modals, the passives and cluster jewels, the droptables, the generic
+// items, and melee-combat.
+// It also still holds Miki's house and the beach, which belong to a region and are
+// waiting to be moved into one.
 
-# info tutorial-island
+# info core
 version: 1.0.0
 
 // --- variables ---
@@ -671,10 +673,10 @@ node greeting:
 // --- saves ---
 
 # save dresser-trinket-end
-{"version":11,"inventory":{"tutorial-island.lockpick":1},"flags":{"tutorial-island.dresser.searched":true,"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true},"resources":{},"location":"tutorial-island.guide-house-upstairs","rng":2617077404}
+{"version":11,"inventory":{"core.lockpick":1},"flags":{"core.dresser.searched":true,"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true},"resources":{},"location":"core.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":11,"flags":{"tutorial-island.front-door.unlocked":true,"tutorial-island.beach.discovered":true}}
+{"version":11,"flags":{"core.front-door.unlocked":true,"core.beach.discovered":true}}
 
 // The drawer's contested roll over shipped content. On the default seed this
 // search comes up empty behind the lockpick, so an assertion over inventory
@@ -778,10 +780,10 @@ slot: 2 at 0,0 e with causeway-jewel
 expect: growing-a-heartwood-blade-end
 
 # save growing-a-heartwood-blade-start
-{"version":11,"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}}
+{"version":11,"flags":{"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":11,"inventory":{"tutorial-island.heartwood-blade":0,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":2,"tutorial-island.masters-whetstone":1,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":0,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":0,"tutorial-island.orb-of-the-edge":1,"tutorial-island.lesser-orb-of-the-edge":0,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"tutorial-island.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"tutorial-island.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["tutorial-island.orb-of-vitality"]},"1,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["tutorial-island.orb-of-the-edge","tutorial-island.lesser-orb-of-the-edge"]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":11,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"core.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // --- growing an item through the inventory screen ---
 //
@@ -801,17 +803,17 @@ expect: growing-a-heartwood-blade-end
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 open-modal: carried-items
-submit-modal: item=tutorial-island.iron-sword
+submit-modal: item=core.iron-sword
 submit-modal: verb=grow
 submit-modal: plane=allocate: slot e
-submit-modal: plane=slot: e with tutorial-island.crossroads-jewel
+submit-modal: plane=slot: e with core.crossroads-jewel
 // A base still in its stack is minted by the first growth, so the level the
 // next allocation spends is bought after the copy exists rather than before.
-submit-modal: plane=feed: with tutorial-island.masters-whetstone
+submit-modal: plane=feed: with core.masters-whetstone
 submit-modal: plane=go: 1,0
 submit-modal: plane=allocate: position 1
 submit-modal: plane=allocate: slot ne
-submit-modal: plane=slot: ne with tutorial-island.keen-edge-jewel
+submit-modal: plane=slot: ne with core.keen-edge-jewel
 submit-modal: plane=go: 2,-1
 submit-modal: plane=allocate: position 1
 submit-modal: plane=back
@@ -821,4 +823,4 @@ submit-modal: item=close
 expect: growing-through-the-inventory-screen-end
 
 # save growing-through-the-inventory-screen-end
-{"version":11,"inventory":{"tutorial-island.heartwood-blade":1,"tutorial-island.iron-sword":0,"tutorial-island.whetstone":6,"tutorial-island.masters-whetstone":3,"tutorial-island.keen-edge-jewel":0,"tutorial-island.stout-heart-jewel":1,"tutorial-island.tempered-will-jewel":1,"tutorial-island.great-work-jewel":1,"tutorial-island.causeway-jewel":1,"tutorial-island.crossroads-jewel":0,"tutorial-island.orb-of-vitality":1,"tutorial-island.orb-of-the-edge":2,"tutorial-island.lesser-orb-of-the-edge":1,"tutorial-island.orb-of-the-bulwark":1,"tutorial-island.orb-of-renewal":1},"flags":{"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true,"tutorial-island.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"tutorial-island.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"tutorial-island.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"tutorial-island.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":11,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true,"core.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}

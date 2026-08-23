@@ -182,7 +182,7 @@ describe('probe: --round-trip', () => {
   });
 
   it('round-trips the shipped content clean', () => {
-    const result = report([{ name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }], { show: [], roundTrip: true });
+    const result = report([{ name: 'core', text: readFileSync('content/core.dsl', 'utf8') }], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('round-trips clean');
     expect(result.ok).toBe(true);
   });
@@ -352,9 +352,9 @@ describe('probe: the command seam', () => {
   });
 
   it('reads a file from the repository', () => {
-    const result = run(['content/tutorial-island.dsl']);
+    const result = run(['content/core.dsl']);
     expect(result.status).toBe(0);
-    expect(result.out).toContain('tutorial-island');
+    expect(result.out).toContain('core');
   });
 
   it('reads a directory as the .dsl files in it, so the corpus is nameable where no glob expands', () => {

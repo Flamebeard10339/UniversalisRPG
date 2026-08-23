@@ -44,25 +44,25 @@ describe('the grammar tree', () => {
 
 describe('a draft read back', () => {
   const KNOWN = [
-    { kind: 'flag', address: 'tutorial-island.quest-given' },
-    { kind: 'location', address: 'tutorial-island.beach' },
+    { kind: 'flag', address: 'core.quest-given' },
+    { kind: 'location', address: 'core.beach' },
   ];
 
   it('says everything the engine has to say about the draft before saying anything about a line of it', () => {
-    const draft = ['# location tutorial-island.beach', 'entities: tutorial-island.giant-rt', 'xppp: 3'].join('\n');
-    const read = amissLines(draft, [{ kind: 'entity', address: 'tutorial-island.giant-rat' }]).join('\n');
+    const draft = ['# location core.beach', 'entities: core.giant-rt', 'xppp: 3'].join('\n');
+    const read = amissLines(draft, [{ kind: 'entity', address: 'core.giant-rat' }]).join('\n');
 
     expect(read).toContain('2 line(s)');
-    expect(read).toContain('one letter from tutorial-island.giant-rat');
+    expect(read).toContain('one letter from core.giant-rat');
     expect(read).toContain('will not read this line');
   });
 
   it('says so where there is nothing to say', () => {
-    expect(amissLines('# location tutorial-island.beach\ntitle: The Beach', KNOWN)[0]).toContain('nothing here is refused');
+    expect(amissLines('# location core.beach\ntitle: The Beach', KNOWN)[0]).toContain('nothing here is refused');
   });
 
   it('writes an answer out where it is first met and points back at it after', () => {
-    const draft = ['# location tutorial-island.beach', 'adjacent: tutorial-island.beach while quest-given', 'adjacent: tutorial-island.beach while quest-given'].join('\n');
+    const draft = ['# location core.beach', 'adjacent: core.beach while quest-given', 'adjacent: core.beach while quest-given'].join('\n');
     const read = offeringLines(draft, KNOWN);
 
     expect(read.filter((line) => line.trim() === '<operators>')).toHaveLength(1);

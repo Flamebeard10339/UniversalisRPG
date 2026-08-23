@@ -14,7 +14,7 @@ import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 
-const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+const source = readFileSync('content/core.dsl', 'utf8');
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
@@ -78,8 +78,8 @@ stats: attack 0, max-health 10, swings-per-minute 60
   it('throws a clear error on an unavailable or unknown choice id', () => {
     const registry = loadInEnglish(source);
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.tutorial-island.front-door.pick-lock')).toThrow();
-    expect(() => apply(session, 'travel:tutorial-island.beach')).toThrow();
+    expect(() => apply(session, 'use:entity.core.front-door.pick-lock')).toThrow();
+    expect(() => apply(session, 'travel:core.beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
 
@@ -344,10 +344,10 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
-    expect(choiceIds).toContain('use:entity.tutorial-island.stairs.ascend');
-    expect(choiceIds).toContain('use:entity.tutorial-island.stairs.descend');
-    expect(choiceIds).not.toContain('travel:tutorial-island.basement');
-    expect(choiceIds).not.toContain('travel:tutorial-island.guide-house-upstairs');
+    expect(choiceIds).toContain('use:entity.core.stairs.ascend');
+    expect(choiceIds).toContain('use:entity.core.stairs.descend');
+    expect(choiceIds).not.toContain('travel:core.basement');
+    expect(choiceIds).not.toContain('travel:core.guide-house-upstairs');
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
@@ -385,17 +385,17 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(loadInEnglish(source), { inventory: { 'tutorial-island.dough': 2 } });
+    const session = primed(loadInEnglish(source), { inventory: { 'core.dough': 2 } });
 
-    beginAction(session, 'craft:tutorial-island.bread');
+    beginAction(session, 'craft:core.bread');
     const baked = wait(session, 4);
-    expect(baked.inventory['tutorial-island.bread']).toBe(1);
+    expect(baked.inventory['core.bread']).toBe(1);
     expect(baked.action).not.toBeNull();
 
     const v = cancelAction(session);
     expect(v.action).toBeNull();
-    expect(v.inventory['tutorial-island.bread']).toBe(1);
-    expect(v.inventory['tutorial-island.dough']).toBe(1);
+    expect(v.inventory['core.bread']).toBe(1);
+    expect(v.inventory['core.dough']).toBe(1);
     expect(v.choices.length).toBeGreaterThan(0);
   });
 

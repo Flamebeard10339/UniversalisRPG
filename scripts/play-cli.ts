@@ -44,7 +44,7 @@ export const CLI_NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }
 ];
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/tutorial-island.dsl';
+const defaultContent = 'content/core.dsl';
 const defaultLocalChanges = 'content/local-changes.dsl';
 const defaultSaves = '.saves';
 

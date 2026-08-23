@@ -57,12 +57,18 @@ export class Namespace {
   // The same declarations under another module's name. What a key looks like is this class's to know, so renaming one is too — a caller that rewrote the registry's maps and left this behind would hold a registry whose two halves disagree about what exists.
   renamed(from: string, to: string): Namespace {
     const under = (key: string): string => (key === from ? to : key.startsWith(`${from}.`) ? `${to}${key.slice(from.length)}` : key);
+    // A member keyed under its owner's kind carries the module name one segment in, so the prefix a rename rewrites starts after that word.
+    const beneath = (kind: string, key: string): string => {
+      if (!OWNER_KINDED.has(kind)) return under(key);
+      const at = key.indexOf('.');
+      return at < 0 ? key : `${key.slice(0, at + 1)}${under(key.slice(at + 1))}`;
+    };
     const next = new Namespace();
     next.declareModules([...this.modules].map(under));
     for (const held of this.all) next.all.add(held === from ? to : held);
     for (const [kind, keys] of this.declared) {
       const into = next.keys(kind);
-      for (const [key, namespace] of keys) into.set(under(key), namespace === from ? to : namespace);
+      for (const [key, namespace] of keys) into.set(beneath(kind, key), namespace === from ? to : namespace);
     }
     return next;
   }

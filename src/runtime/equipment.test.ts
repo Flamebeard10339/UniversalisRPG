@@ -132,31 +132,31 @@ describe('equipment', () => {
   });
 
   it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
-    const tutorial = loadInEnglish(readFileSync('content/tutorial-island.dsl', 'utf8'));
-    const sword = 'tutorial-island.iron-sword';
-    const shield = 'tutorial-island.wooden-shield';
+    const tutorial = loadInEnglish(readFileSync('content/core.dsl', 'utf8'));
+    const sword = 'core.iron-sword';
+    const shield = 'core.wooden-shield';
 
     expect(tutorial.items.get(sword)!.slot).toBe('mainhand');
     expect(tutorial.items.get(shield)!.slot).toBe('offhand');
 
-    const state = createGameState('tutorial-island.beach');
+    const state = createGameState('core.beach');
     initResources(state, tutorial);
-    const bareAttack = statValue('tutorial-island.attack', state, tutorial);
-    const bareDefense = statValue('tutorial-island.defense', state, tutorial);
+    const bareAttack = statValue('core.attack', state, tutorial);
+    const bareDefense = statValue('core.defense', state, tutorial);
 
     state.inventory[sword] = 1;
     state.inventory[shield] = 1;
-    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
-    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense);
+    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
+    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense);
 
     equip(state, tutorial, sword);
     equip(state, tutorial, shield);
-    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack + 2);
-    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
+    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack + 2);
+    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
 
     unequip(state, 'mainhand');
-    expect(statValue('tutorial-island.attack', state, tutorial)).toBe(bareAttack);
-    expect(statValue('tutorial-island.defense', state, tutorial)).toBe(bareDefense + 2);
+    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
+    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
   });
 
   it('equipment-slots: a worn copy contributes on the strength of being worn, with no stack behind it', () => {

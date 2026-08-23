@@ -10,6 +10,7 @@ import { text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
+import { Namespace } from './namespace';
 import { formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
@@ -391,6 +392,29 @@ describe('the shipped corpus', () => {
       const intruded = [written, 'nonsense-nobody-declares:', ...indentLines(['nonsense-nobody-reads'])].join('\n');
       expect(() => owner.parse(splitSections(intruded)[0]!), `# ${section.kind} ${section.id ?? ''}`).toThrow();
     }
+  });
+});
+
+const declaredKeys = (held: Namespace): { kind: string; key: string }[] =>
+  held
+    .kinds()
+    .sort()
+    .flatMap((kind) => held.declaredKeys(kind).sort().map((key) => ({ kind, key })));
+
+const names = (key: string, id: string): boolean => key.split('.').includes(id);
+
+describe('renaming a module', () => {
+  const namespace = loadUniverseWithDiagnostics(CORPUS).registry.namespace;
+  const declared = [...namespace.all].filter((each): each is string => each !== null).sort();
+
+  it.each(declared)('writes %s out of every key that named it and leaves every other key alone', (module) => {
+    const to = `${module}-somewhere-else`;
+    const before = declaredKeys(namespace);
+    const after = declaredKeys(namespace.renamed(module, to));
+    expect(before.filter((each) => names(each.key, module)).length).toBeGreaterThan(0);
+    expect(after.filter((each) => names(each.key, module))).toEqual([]);
+    expect(after.filter((each) => !names(each.key, to))).toEqual(before.filter((each) => !names(each.key, module)));
+    expect(after).toHaveLength(before.length);
   });
 });
 

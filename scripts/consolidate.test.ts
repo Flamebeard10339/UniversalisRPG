@@ -140,7 +140,7 @@ function consolidateTree(tree: Tree): void {
   }
 }
 
-const STAGED = '/dsl item tutorial-island.lockpick examine: A bent sliver of metal, freshly filed. | thieving-tool';
+const STAGED = '/dsl item core.lockpick examine: A bent sliver of metal, freshly filed. | thieving-tool';
 
 function stage(tree: Tree, line: string): void {
   const baseSources = sourcesOf(tree);
@@ -184,8 +184,8 @@ describe('the round trip is closed, on the content that ships', () => {
 
   it('wrote the edit into the file that declared the id, and touched no other file', () => {
     const written = now(tree);
-    expect(written['tutorial-island.dsl']).toBe(tree.before['tutorial-island.dsl'].replace('worn smooth from use.', 'freshly filed.'));
-    for (const name of shippedNames().filter((each) => each !== 'tutorial-island.dsl')) expect(written[name], name).toBe(tree.before[name]);
+    expect(written['core.dsl']).toBe(tree.before['core.dsl'].replace('worn smooth from use.', 'freshly filed.'));
+    for (const name of shippedNames().filter((each) => each !== 'core.dsl')) expect(written[name], name).toBe(tree.before[name]);
   });
 
   it('passes every # test the consolidated tree declares', () => {
@@ -249,7 +249,7 @@ describe('the command surface', () => {
       expect(missing.out.join(' ')).toContain('does not exist');
       expect(missing.code).toBeUndefined();
 
-      writeFileSync(tree.localFile, initialLocalChangesModule(['tutorial-island']), 'utf8');
+      writeFileSync(tree.localFile, initialLocalChangesModule(['core']), 'utf8');
       const empty = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
       expect(empty.out.join(' ')).toContain('Nothing staged in');
       expect(now(tree)).toEqual(tree.before);
@@ -264,7 +264,7 @@ describe('the command surface', () => {
       stage(tree, STAGED);
       const staged = readFileSync(tree.localFile, 'utf8');
       const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`, '--dry-run']);
-      expect(result.out.join(' ')).toContain('Would write # item tutorial-island.lockpick into tutorial-island.dsl');
+      expect(result.out.join(' ')).toContain('Would write # item core.lockpick into core.dsl');
       expect(now(tree)).toEqual(tree.before);
       expect(readFileSync(tree.localFile, 'utf8')).toBe(staged);
     } finally {
@@ -290,7 +290,7 @@ describe('a refused consolidation writes no file', () => {
   it('leaves every byte on disk where it was', () => {
     const tree = copiedTree();
     try {
-      stage(tree, '/dsl item tutorial-island.lockpick examine: Only this line.');
+      stage(tree, '/dsl item core.lockpick examine: Only this line.');
       const staged = readFileSync(tree.localFile, 'utf8');
       consolidateTree(tree);
       expect(now(tree)).toEqual(tree.before);

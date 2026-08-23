@@ -24,7 +24,7 @@
 
 # info combat-expansion
 version: 1.0.0
-dependencies: tutorial-island
+dependencies: core
 
 // --- rage ---
 //
@@ -157,11 +157,11 @@ passives:
   1 goring-edge
   2 bloodlust
   3 goring-edge
-  4 tutorial-island.flurry
+  4 core.flurry
   5 bloodlust
-  6 tutorial-island.swift-hands
+  6 core.swift-hands
   7 goring-edge
-  10 tutorial-island.flurry
+  10 core.flurry
 
 // INCREASED. The hub is two points from any edge and holds the signature
 // passive, so the jewel is a decision about how deep to go rather than a row
@@ -173,7 +173,7 @@ title: Wrath
 examine: Every blow lands harder than the one before it.
 shape: wheel
 open-connections: e
-passives: 1 reckless, 2 quickening, 3 tutorial-island.frenzied, 4 reckless, 5 spurred, 6 tutorial-island.brutal, 7 rising-fury
+passives: 1 reckless, 2 quickening, 3 core.frenzied, 4 reckless, 5 spurred, 6 core.brutal, 7 rising-fury
 
 // ADDED. Twelve positions of flat mass and two exits, with the curated
 // downside authored as a real passive that costs something real.
@@ -183,14 +183,14 @@ examine: Banding over banding, until the shape stops mattering.
 shape: double-ring
 open-connections: e, sw
 passives:
-  1 tutorial-island.warded
+  1 core.warded
   2 iron-carapace
   3 immovable
-  4 tutorial-island.plated
+  4 core.plated
   5 immovable
   6 iron-carapace
   7 slow-and-certain
-  10 tutorial-island.constitution
+  10 core.constitution
 
 // INCREASED. A ring, so the thorns passive sits opposite the entry and costs
 // three points either way round.
@@ -199,7 +199,7 @@ title: Retribution
 examine: Striking it is its own punishment.
 shape: ring
 open-connections: ne, se
-passives: 1 tutorial-island.warded, 2 tutorial-island.hardened, 3 tutorial-island.tempered-frame, 4 retribution, 5 tutorial-island.hardened, 6 tutorial-island.tempered-frame
+passives: 1 core.warded, 2 core.hardened, 3 core.tempered-frame, 4 retribution, 5 core.hardened, 6 core.tempered-frame
 
 // ADDED. Flat precision and evasion, two exits.
 # cluster-jewel wracking-blades
@@ -207,7 +207,7 @@ title: Wracking Blades
 examine: Fast, accurate, and not interested in a long fight.
 shape: ring
 open-connections: e, ne
-passives: 1 tutorial-island.keen-eye, 2 wracking-blades, 3 silent-step, 4 tutorial-island.marksman, 5 exposed-throat, 6 tutorial-island.quickstep
+passives: 1 core.keen-eye, 2 wracking-blades, 3 silent-step, 4 core.marksman, 5 exposed-throat, 6 core.quickstep
 
 // INCREASED. One exit, deep: the hub is the whole point of the jewel and costs
 // two points to reach from the only edge that opens.
@@ -216,7 +216,7 @@ title: Creeping Rot
 examine: The cut is the smallest part of it.
 shape: wheel
 open-connections: se
-passives: 1 tutorial-island.keen-eye, 3 tutorial-island.deadly-precision, 5 tutorial-island.evasive, 7 envenom
+passives: 1 core.keen-eye, 3 core.deadly-precision, 5 core.evasive, 7 envenom
 
 // --- the items that carry them ---
 
@@ -254,7 +254,7 @@ max-level: 40
 
 # droptable archetype-cache
 give: 1 proving-blade
-give: 6 tutorial-island.masters-whetstone
+give: 6 core.masters-whetstone
 give: 1 blood-frenzy-jewel
 give: 1 wrath-jewel
 give: 1 iron-bulwark-jewel
@@ -294,7 +294,7 @@ passives: retribution
 x: 3, y: 0
 examine: A walled yard behind the armoury, sand raked flat and stained.
 adjacent:
-  tutorial-island.beach
+  core.beach
 entities:
   armourers-chest, proving-post, spined-urchin
 
@@ -322,8 +322,8 @@ entities:
 # test rage-rises-as-swings-land
 load: at-the-proving-ground
 use: entity.armourers-chest.open
-feed: proving-blade with tutorial-island.masters-whetstone
-feed: 1 with tutorial-island.masters-whetstone
+feed: proving-blade with core.masters-whetstone
+feed: 1 with core.masters-whetstone
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with wrath-jewel
 // Position 1 is the entry the slot put the jewel's root on; the hub is one
@@ -331,7 +331,7 @@ slot: 1 at 0,0 e with wrath-jewel
 allocate: 1 at 1,0 position 1
 allocate: 1 at 1,0 position 7
 equip: 1
-use: tutorial-island.melee-combat on proving-post
+use: core.melee-combat on proving-post
 wait: 30
 // rising-fury is the only source of max-rage on this route, so the stat root
 // reading 20 back is the jewel's allocation and nothing else.
@@ -353,8 +353,8 @@ expect: rage-drains-when-the-swinging-stops-end
 # test accelerated-vigor-stacks-behind-its-gate
 load: at-the-proving-ground
 use: entity.armourers-chest.open
-feed: proving-blade with tutorial-island.masters-whetstone
-feed: 1 with tutorial-island.masters-whetstone
+feed: proving-blade with core.masters-whetstone
+feed: 1 with core.masters-whetstone
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with wrath-jewel
 // Round the outer ring rather than across the hub, so the rage passive is not
@@ -364,7 +364,7 @@ allocate: 1 at 1,0 position 2
 allocate: 1 at 1,0 position 6
 allocate: 1 at 1,0 position 5
 equip: 1
-use: tutorial-island.melee-combat on proving-post
+use: core.melee-combat on proving-post
 wait: 60
 expect: accelerated-vigor-stacks-behind-its-gate-end
 
@@ -374,14 +374,14 @@ expect: accelerated-vigor-stacks-behind-its-gate-end
 # test poison-holds-the-struck-enemy
 load: at-the-proving-ground
 use: entity.armourers-chest.open
-feed: proving-blade with tutorial-island.masters-whetstone
-feed: 1 with tutorial-island.masters-whetstone
+feed: proving-blade with core.masters-whetstone
+feed: 1 with core.masters-whetstone
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with creeping-rot-jewel
 allocate: 1 at 1,0 position 1
 allocate: 1 at 1,0 position 7
 equip: 1
-use: tutorial-island.melee-combat on proving-post
+use: core.melee-combat on proving-post
 wait: 10
 expect: poison-holds-the-struck-enemy-end
 
@@ -398,27 +398,27 @@ expect: poison-lifts-when-its-own-duration-runs-out-end
 // every swing that landed cost five.
 # test striking-a-thorned-enemy-costs-the-striker
 load: at-the-proving-ground
-use: tutorial-island.melee-combat on spined-urchin
+use: core.melee-combat on spined-urchin
 wait: 10
 expect: striking-a-thorned-enemy-costs-the-striker-end
 
 // --- the sheets those routes ended on ---
 
 # save rage-rises-as-swings-land-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1825520,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":2882385315}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1825520,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":2882385315}
 
 # save rage-drains-when-the-swinging-stops-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":92400,"rng":2882385315}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resourceRateRemainders":{"combat-expansion.rage":0},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":92400,"rng":2882385315}
 
 # save accelerated-vigor-stacks-behind-its-gate-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":69600},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101955},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":109759},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":111534},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":114780},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"tutorial-island.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":117760}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":518,"attemptsMade":31}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1617680,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2103776196}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":0,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":69600},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101955},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":109759},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":111534},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":114780},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":117760}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":518,"attemptsMade":31}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1617680,"combat-expansion.rage":0},"rateRemainders":{}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2103776196}
 
 # save poison-holds-the-struck-enemy-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"tutorial-island.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"tutorial-island.health":1935000,"combat-expansion.rage":0},"rateRemainders":{"tutorial-island.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":278522923}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1935000,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":278522923}
 
 # save poison-lifts-when-its-own-duration-runs-out-end
-{"version":11,"inventory":{"combat-expansion.proving-blade":0,"tutorial-island.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":278522923}
+{"version":11,"inventory":{"combat-expansion.proving-blade":0,"core.masters-whetstone":4,"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":0},"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":278522923}
 
 # save striking-a-thorned-enemy-costs-the-striker-end
-{"version":11,"flags":{"combat-expansion.proving-ground.discovered":true,"tutorial-island.beach.discovered":true},"resources":{"tutorial-island.health":5000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.tutorial-island.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"tutorial-island.health":1950000,"combat-expansion.rage":0},"rateRemainders":{}}}},"time":12400,"rng":278522923}
+{"version":11,"flags":{"combat-expansion.proving-ground.discovered":true,"core.beach.discovered":true},"resources":{"core.health":5000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"core.health":1950000,"combat-expansion.rage":0},"rateRemainders":{}}}},"time":12400,"rng":278522923}
 

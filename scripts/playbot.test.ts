@@ -30,16 +30,16 @@ import {
   type TurnRequest,
 } from './playbot';
 
-const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+const source = readFileSync('content/core.dsl', 'utf8');
 const quests = readFileSync('content/tutorial-quests.dsl', 'utf8');
 
 // The island and quest actually played, same corpus session.test.ts drives.
-const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), { name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }];
+const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), { name: 'core', text: source }, { name: 'tutorial-quests', text: quests }];
 const played = (): Registry => loadUniverse(PLAYED_SOURCES);
 
 const constantReader = (sources: readonly ModuleSource[]): ContentReader => () => sources;
 
-const tutorialReader: ContentReader = () => withEngineLocale([{ name: 'tutorial-island', text: source }, { name: 'tutorial-quests', text: quests }]);
+const tutorialReader: ContentReader = () => withEngineLocale([{ name: 'core', text: source }, { name: 'tutorial-quests', text: quests }]);
 
 // A well-behaved reply, built by peeking the session's own status rather than by guessing —
 // this is what "derives its own subjects" looks like for a fake client.
@@ -275,7 +275,7 @@ describe('playbot', () => {
   // have honoured it.
   it("[c9] a line naming a command outside this player's audience is refused before runLine runs it", async () => {
     const session = startSession(played());
-    const client: ModelClient = { send: async () => ({ line: '/dsl location tutorial-island.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
+    const client: ModelClient = { send: async () => ({ line: '/dsl location core.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
     const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
     expect(log[0].outcome).toBe('invalid-reply');
     expect(log[0].detail).toMatch(/\/dsl is not a command this player may run/);
@@ -419,14 +419,14 @@ adjacent:
   // the # test 'load' directive already uses (session.ts), read here instead of re-derived.
   it('[--save] a run opens in the state a named save describes', () => {
     const registry = played();
-    const { session, warnings } = openSession(registry, 'tutorial-island.dresser-trinket-end');
+    const { session, warnings } = openSession(registry, 'core.dresser-trinket-end');
     expect(warnings).toEqual([]);
-    expect(view(session).location.id).toBe('tutorial-island.guide-house-upstairs');
+    expect(view(session).location.id).toBe('core.guide-house-upstairs');
   });
 
   it('[--save] an id naming no save is refused with a message listing what exists, not a stack trace', () => {
     const registry = played();
-    expect(() => resolveSave(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id\. Defined: tutorial-island\.dresser-trinket-end/);
+    expect(() => resolveSave(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id\. Defined: core\.dresser-trinket-end/);
     expect(() => openSession(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id/);
   });
 

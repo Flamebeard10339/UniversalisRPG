@@ -38,15 +38,15 @@ function renderIssueForm(values: Record<string, string>): string {
 const MODULE = `# info local-changes
 version: 0.0.0
 dependencies:
-  tutorial-island
+  core
 
 # item gem
 title: Gem`;
 
 const SUBMITTED = {
-  universe: 'tutorial-island',
+  universe: 'core',
   summary: 'Adds a gem.',
-  validation: 'Loaded modules: tutorial-island, local-changes\nDiagnostics: none',
+  validation: 'Loaded modules: core, local-changes\nDiagnostics: none',
   dsl: MODULE,
 };
 
@@ -76,7 +76,7 @@ describe('the shipped issue form is a first-class ingestion format', () => {
   });
 
   it('reads the universe the contributor says they targeted', () => {
-    expect(contributionBase(renderIssueForm(SUBMITTED)).universe).toBe('tutorial-island');
+    expect(contributionBase(renderIssueForm(SUBMITTED)).universe).toBe('core');
     expect(contributionBase(renderIssueForm(SUBMITTED)).contentFiles).toEqual([]);
   });
 });

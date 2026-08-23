@@ -119,50 +119,50 @@ describe('test: composable in-game scripts', () => {
   it('accepts fully-qualified names emitted by CLI authoring and recording', () => {
     const source = [
       '# test replay',
-      'run: tutorial-island.intro',
-      'talk: tutorial-island.miki',
-      'use: entity.tutorial-island.front-door.pick-lock',
-      'travel: tutorial-island.beach',
-      'craft: tutorial-island.bread',
-      'load: tutorial-island.start',
-      'expect: tutorial-island.end',
-      'begin: use entity.tutorial-island.oven.roast-chestnuts',
-      'begin: travel tutorial-island.basement',
-      'begin: craft tutorial-island.dough',
+      'run: core.intro',
+      'talk: core.miki',
+      'use: entity.core.front-door.pick-lock',
+      'travel: core.beach',
+      'craft: core.bread',
+      'load: core.start',
+      'expect: core.end',
+      'begin: use entity.core.oven.roast-chestnuts',
+      'begin: travel core.basement',
+      'begin: craft core.dough',
     ].join('\n');
 
     const [section] = parseModule(source) as {
       value: { directives: unknown[] };
     }[];
     expect(section.value.directives).toEqual([
-      { kind: 'run', test: 'tutorial-island.intro' },
-      { kind: 'talk', entity: 'tutorial-island.miki' },
+      { kind: 'run', test: 'core.intro' },
+      { kind: 'talk', entity: 'core.miki' },
       {
         kind: 'use',
         obj: 'entity',
-        objId: 'tutorial-island.front-door',
+        objId: 'core.front-door',
         actionId: 'pick-lock',
       },
-      { kind: 'travel', location: 'tutorial-island.beach' },
-      { kind: 'craft', recipe: 'tutorial-island.bread' },
-      { kind: 'load', save: 'tutorial-island.start' },
-      { kind: 'expect', save: 'tutorial-island.end' },
+      { kind: 'travel', location: 'core.beach' },
+      { kind: 'craft', recipe: 'core.bread' },
+      { kind: 'load', save: 'core.start' },
+      { kind: 'expect', save: 'core.end' },
       {
         kind: 'begin',
         inner: {
           kind: 'use',
           obj: 'entity',
-          objId: 'tutorial-island.oven',
+          objId: 'core.oven',
           actionId: 'roast-chestnuts',
         },
       },
       {
         kind: 'begin',
-        inner: { kind: 'travel', location: 'tutorial-island.basement' },
+        inner: { kind: 'travel', location: 'core.basement' },
       },
       {
         kind: 'begin',
-        inner: { kind: 'craft', recipe: 'tutorial-island.dough' },
+        inner: { kind: 'craft', recipe: 'core.dough' },
       },
     ]);
   });

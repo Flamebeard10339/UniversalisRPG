@@ -151,11 +151,11 @@ describe('an action is displayed under the address it is identified by', () => {
 });
 
 describe('one line translates an action for every owner that performs it (c7)', () => {
-  const source = readFileSync('content/tutorial-island.dsl', 'utf8');
-  const english = loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }]);
+  const source = readFileSync('content/core.dsl', 'utf8');
+  const english = loadUniverse([engineLocale(), { name: 'core', text: source }]);
   const declarations = [...english.actions.keys()];
-  const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  tutorial-island', '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
-  const registry = loadUniverse([engineLocale(), { name: 'tutorial-island', text: source }, { name: 'isla-es', text: locale.join('\n') }]);
+  const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  core', '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
+  const registry = loadUniverse([engineLocale(), { name: 'core', text: source }, { name: 'isla-es', text: locale.join('\n') }]);
   const say = localizerFor(registry, 'es');
   const performed = everyActionTable(registry).flatMap(([kind, ownerId, actions]) => actions.filter((action) => declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
 
@@ -191,7 +191,7 @@ describe('a note an author left is dropped from every line the game says', () =>
 
   // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit. What a key is measured against is the English with any note the author already left taken off it — a corpus that ships its own rough lines is the point of the mark, and comparing against the raw declaration would fail the moment one appeared.
   it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
-    const shipped = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'tutorial-island', text: readFileSync('content/tutorial-island.dsl', 'utf8') }];
+    const shipped = [{ name: 'engine-en', text: readFileSync('content/engine-en.dsl', 'utf8') }, { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }];
     const plain = loadUniverse(shipped);
     const keys = everyKey(plain.locales);
     const notes = { name: 'noted', text: ['# info noted', 'version: 1.0.0', '', '# locale en', ...keys.map((key) => `${key}: ${marked(englishOf(plain.locales, key))}`)].join('\n') };

@@ -8,15 +8,14 @@
 // its own that gives these entities more to say — take those modules away and
 // Tulsa still loads, and everyone here still has a word for a traveller.
 //
-// It depends on tutorial-island for the engine's own furniture: the stat
-// bases, the health pool, the death event, the factions, melee-combat, and the
-// market district that all three routes out of Miki's house converge on. That
-// module's id is machine-facing and outlives the fiction it was named for.
+// It depends on core for the engine's own furniture: the stat bases, the health
+// pool, the death event, the factions, melee-combat, and the market district that
+// all three routes out of Miki's house converge on.
 
 # info tulsa
 version: 1.0.0
 dependencies:
-  tutorial-island
+  core
 
 // --- skills ---
 //
@@ -131,7 +130,7 @@ x: 3, y: 0
 title: Market Square
 examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it.
 adjacent:
-  tutorial-island.market-district
+  core.market-district
   market-row
   tavern-street
   castle-gate
@@ -491,21 +490,21 @@ title: General Store
 examine: Flour, water, rope, and a jar by the till for coins too bent to spend elsewhere.
 sell bent coins:
   instant
-  requires: has tutorial-island.bent-coin
-  take: 1 tutorial-island.bent-coin
+  requires: has core.bent-coin
+  take: 1 core.bent-coin
   give: 1 coin
   say: The grocer weighs it, shrugs, and gives you a good one.
 buy flour:
   instant
   requires: has 4 coin
   take: 4 coin
-  give: 1 tutorial-island.pot-of-flour
+  give: 1 core.pot-of-flour
   say: A pot of milled flour, four coins.
 buy water:
   instant
   requires: has 2 coin
   take: 2 coin
-  give: 1 tutorial-island.jug-of-water
+  give: 1 core.jug-of-water
   say: A jug off the rack, two coins.
 
 # entity fishing-supplies
@@ -515,7 +514,7 @@ buy net:
   instant
   requires: has 25 coin
   take: 25 coin
-  give: 1 tutorial-island.fishing-net
+  give: 1 core.fishing-net
   say: A net, twenty-five coins, and she throws in the advice for free.
 buy herring:
   instant
@@ -580,7 +579,7 @@ examine: A barred door where the water goes, and the lock is old enough to be pi
 flags: unlocked
 pick lock:
   hidden if: unlocked
-  requires: has tutorial-island.lockpick
+  requires: has core.lockpick
   time: 6
   xp: thieving 15
   on success:
@@ -661,63 +660,63 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
 stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
-uses: tutorial-island.melee-combat
+uses: core.melee-combat
 faction: world
 aggressive
 respawn after: 3m
 on death:
   credit:
-    xp: tutorial-island.melee 6-9
+    xp: core.melee 6-9
     roll: feral-rat-remains
 
 # entity ratman
 title: Ratman
 examine: A man's frame, a rat's head, and the join between them done badly on purpose.
 stats: attack 14, defense 4, max-health 60, attack-rate 20, accuracy 85, evasion 40
-uses: tutorial-island.melee-combat
+uses: core.melee-combat
 faction: world
 aggressive
 respawn after: 10m
 on death:
   credit:
-    xp: tutorial-island.melee 40-55
+    xp: core.melee 40-55
     roll: ratman-remains
 
 # entity drone-bee
 title: Drone Bee
 examine: A drone off one of Kelsa's hives, and it should not be this angry.
 stats: attack 6, defense 0, max-health 14, attack-rate 30, accuracy 70, evasion 55
-uses: tutorial-island.melee-combat
+uses: core.melee-combat
 faction: world
 aggressive
 respawn after: 2m
 on death:
   credit:
-    xp: tutorial-island.melee 4-6
+    xp: core.melee 4-6
 
 # entity swamp-mollusk
 title: Swamp Mollusk
 examine: A shell the size of a shield, and the foot under it is wet with something you would not touch.
 stats: attack 11, defense 8, max-health 45, attack-rate 10, accuracy 60, evasion 5
-uses: tutorial-island.melee-combat
+uses: core.melee-combat
 faction: world
 respawn after: 5m
 on death:
   credit:
-    xp: tutorial-island.melee 18-24
+    xp: core.melee 18-24
     give: 1 mollusk-venom
 
 # entity bog-lurker
 title: Bog Lurker
 examine: Something long standing very still in water that is not deep enough to hide it.
 stats: attack 16, defense 3, max-health 50, attack-rate 22, accuracy 80, evasion 45
-uses: tutorial-island.melee-combat
+uses: core.melee-combat
 faction: world
 aggressive
 respawn after: 5m
 on death:
   credit:
-    xp: tutorial-island.melee 25-35
+    xp: core.melee 25-35
     roll: swamp-pickings
 
 // --- recipes ---
@@ -851,12 +850,12 @@ node at-the-stakes:
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
 # save in-town-with-bent-coins
-{"version":11,"location":"tulsa.market-square","inventory":{"tutorial-island.bent-coin":8}}
+{"version":11,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
 // Down the back way with the lockpick from Miki's dresser, which is what
 // anybody who came here for the barred door would be carrying.
 # save at-the-sewer-junction
-{"version":11,"location":"tulsa.sewer-junction","inventory":{"tutorial-island.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
+{"version":11,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
 // --- tests ---
 
@@ -889,11 +888,11 @@ travel: hive-mouth
 travel: tunnel-mouth
 travel: market-square
 travel: swamp-edge
-travel: tutorial-island.market-district
+travel: core.market-district
 assert: market-rooftops.discovered
 assert: castle-solar.discovered
 assert: hive-mouth.discovered
-assert: tutorial-island.market-district.discovered
+assert: core.market-district.discovered
 
 // The economy, end to end and in the smallest amount that closes: a curio the
 // tutorial's rats drop becomes coin, coin becomes a herring, and the herring
@@ -908,7 +907,7 @@ use: entity.general-store.sell-bent-coins
 use: entity.general-store.sell-bent-coins
 use: entity.general-store.sell-bent-coins
 assert: inventory.coin = 6
-assert: inventory.tutorial-island.bent-coin = 2
+assert: inventory.core.bent-coin = 2
 use: entity.fishing-supplies.buy-herring
 assert: has herring
 assert: inventory.coin = 0
@@ -916,7 +915,7 @@ travel: tavern-street
 travel: sha-dynastys
 craft: cooked-herring
 assert: has cooked-herring
-assert: xp.tutorial-island.cooking > 0
+assert: xp.core.cooking > 0
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
 // notes say several people know about, and it puts you in among the rats
@@ -938,7 +937,7 @@ assert: sewer-junction.discovered
 load: at-the-sewer-junction
 wait: 1
 wait: done
-assert: resource.tutorial-island.health < 30
+assert: resource.core.health < 30
 
 // Two ways past the barred door, and the door is the same door either way.
 # test the-key-opens-the-barred-door
@@ -947,7 +946,7 @@ travel: sewer-outfall
 wait: done
 use: entity.barred-door.pick-lock
 assert: barred-door.unlocked
-assert: xp.tutorial-island.thieving = 15
+assert: xp.core.thieving = 15
 travel: sewer-locked-room
 wait: done
 use: entity.key-table.take-the-key

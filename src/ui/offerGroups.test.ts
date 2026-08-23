@@ -26,15 +26,15 @@ describe('what the grammar offers', () => {
   const id = (address: string, module: string | null, kind = 'flag'): Offer => ({ form: address, insert: address, kind, module });
 
   it('stands ids under the module that declared them', () => {
-    const groups = only([id('tutorial-island.made-bread', 'tutorial-island'), id('combat-expansion.rage', 'combat-expansion'), id('tutorial-island.fainted', 'tutorial-island')]);
-    expect(groups.map((group) => group.head)).toEqual(['tutorial-island', null]);
+    const groups = only([id('core.made-bread', 'core'), id('combat-expansion.rage', 'combat-expansion'), id('core.fainted', 'core')]);
+    expect(groups.map((group) => group.head)).toEqual(['core', null]);
     expect(groups[0].offers.map((each) => shownIn(groups[0], each))).toEqual(['made-bread', 'fainted']);
   });
 
   it('leaves an id its whole address where the module is not the front of it', () => {
-    const groups = only([id('on tutorial-island.death:', 'tutorial-island', 'event'), id('on tutorial-island.dawn:', 'tutorial-island', 'event')]);
+    const groups = only([id('on core.death:', 'core', 'event'), id('on core.dawn:', 'core', 'event')]);
     expect(groups.map((group) => group.head)).toEqual([null, null]);
-    expect(groups.map((group) => shownIn(group, group.offers[0]))).toEqual(['on tutorial-island.death:', 'on tutorial-island.dawn:']);
+    expect(groups.map((group) => shownIn(group, group.offers[0]))).toEqual(['on core.death:', 'on core.dawn:']);
   });
 
   it('leaves an id declared under no module standing on its own', () => {

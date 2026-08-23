@@ -25,7 +25,7 @@ const drawn = (output: Parameters<typeof formatOutput>[0]): string[] => asPrinte
 const live = (progress: Parameters<typeof formatLive>[0]): string => printed(formatLive(progress, localizer));
 const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
-const source = readFileSync('content/tutorial-island.dsl', 'utf8');
+const source = readFileSync('content/core.dsl', 'utf8');
 
 const PLANE_SOURCE = `
 # location camp
@@ -81,7 +81,7 @@ describe('play-cli renders what a command result says happened', () => {
     const ctx = driver(source);
     const lines = shown(runLine(ctx, '/look'));
 
-    expect(lines[0]).toBe('Guide House (tutorial-island.guide-house)');
+    expect(lines[0]).toBe('Guide House (core.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe("Here: Miki, Front Door, Stairs, Mirror, Oven, Smith's Chest");
     expect(lines[3]).toBe('Health: ██████████ 30/30');
@@ -90,7 +90,7 @@ describe('play-cli renders what a command result says happened', () => {
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {
-    const opening = openRepl([{ name: 'tutorial-island', text: source }]).opening.map(printed);
+    const opening = openRepl([{ name: 'core', text: source }]).opening.map(printed);
 
     expect(ENGINE_KEYS.filter((key) => opening.some((line) => line.includes(key)))).toEqual([]);
     expect(opening.length).toBeGreaterThan(5);
@@ -146,14 +146,14 @@ starting
     const ctx = driver(source);
     runLine(ctx, '/wait 7');
     expect(shown(runLine(ctx, '/state'))).toEqual([
-      'Location: tutorial-island.guide-house',
+      'Location: core.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {"tutorial-island.guide-house.discovered":true,"tutorial-island.guide-house-upstairs.discovered":true,"tutorial-island.basement.discovered":true}',
+      'Flags: {"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true}',
       'Inventory: {}',
-      'XP: {"tutorial-island.thieving":0,"tutorial-island.melee":0,"tutorial-island.cooking":0}',
+      'XP: {"core.thieving":0,"core.melee":0,"core.cooking":0}',
       'Health: ██████████ 30/30',
     ]);
-    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tutorial-island.guide-house');
+    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: core.guide-house');
   });
 
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
@@ -161,8 +161,8 @@ starting
     const status = runLine(ctx, '/state').output.find((out) => out.kind === 'status')!.status;
 
     expect(drawn({ kind: 'status', status })).not.toContain('Grown: {}');
-    expect(drawn({ kind: 'status', status: { ...status, grown: { '1': 'tutorial-island.iron-sword' } } })).toContain(
-      'Grown: {"1":"tutorial-island.iron-sword"}',
+    expect(drawn({ kind: 'status', status: { ...status, grown: { '1': 'core.iron-sword' } } })).toContain(
+      'Grown: {"1":"core.iron-sword"}',
     );
   });
 
