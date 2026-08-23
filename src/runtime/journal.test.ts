@@ -7,7 +7,7 @@ import { createGameState } from './runtime';
 import { runTest } from './session';
 import type { GameState } from './state';
 
-const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# flag mirror-done', '', '# entity miki', 'title: Miki'].join('\n');
+const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# flag mirror-done', '', '# flag loaf-baked', '', '# flag met-someone', '', '# entity miki', 'title: Miki'].join('\n');
 
 const QUEST = [
   '# quest finding-your-feet',
@@ -91,6 +91,49 @@ describe('the journal', () => {
     expect(over).toMatchObject({ standing: 'complete', stage: 'sendoff', hint: null });
     expect(over!.lines.every((line) => line.struck)).toBe(true);
     expect(over!.lines.map((line) => line.stage)).toEqual(['offered', 'name-yourself', 'sendoff']);
+  });
+});
+
+// A stage left by a line an entity says stands over more than one beat — bake the loaf, then carry it back — so no one string is right for the whole of it. The same is true of a quest nobody has begun, whose hint has to survive until whatever begins it comes round.
+const TWO_BEATS = [
+  '# quest fetch-the-loaf',
+  'title: Fetch the Loaf',
+  'log: Someone in the house is asking after bread.',
+  'hint: Find whoever is asking.',
+  'hint when met-someone: They want a loaf. Go back and say yes.',
+  '',
+  'stage baking:',
+  '  log: You said you would bake a loaf.',
+  '  hint: Knead the dough, then bake it in the oven.',
+  '  hint when loaf-baked: Take the loaf back to Miki.',
+  '  miki says:',
+  '    Well?',
+  '    -> Here it is.',
+  '      goto handed-over',
+  '',
+  'stage handed-over:',
+  '  log: The loaf changed hands.',
+  '  complete',
+].join('\n');
+
+describe('what the journal says there is left to do', () => {
+  const twoBeats = loadInEnglish([WORLD, TWO_BEATS].join('\n\n'));
+  const hintOf = (...set: string[]): string | null => journal(twoBeats, held(...set))[0]!.hint;
+
+  it('is the last hint whose condition holds, so a plain hint: is the default and each hint when under it is an exception', () => {
+    expect(hintOf('fetch-the-loaf.baking')).toBe('Knead the dough, then bake it in the oven.');
+    expect(hintOf('fetch-the-loaf.baking', 'loaf-baked')).toBe('Take the loaf back to Miki.');
+  });
+
+  // The same gap, one level up: a quest nobody has begun reads its own hint, and that hint has to survive until whatever begins it comes round.
+  it('reads the quest own hints the same way before anything of it has happened', () => {
+    expect(hintOf()).toBe('Find whoever is asking.');
+    expect(hintOf('met-someone')).toBe('They want a loaf. Go back and say yes.');
+  });
+
+  // What a hint is gated on says nothing about a quest that is over: there is nothing left to do, whatever still holds.
+  it('offers nothing once the quest is finished, whatever a hint of it was gated on', () => {
+    expect(hintOf('fetch-the-loaf.baking', 'fetch-the-loaf.handed-over', 'loaf-baked')).toBeNull();
   });
 });
 

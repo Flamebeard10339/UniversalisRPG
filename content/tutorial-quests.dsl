@@ -38,6 +38,7 @@ stage offered:
 stage name-yourself:
   log: Miki wants you to find the mirror and say who you are.
   hint: The mirror stands in the guide house, in the room Miki is in.
+  hint when core.mirror-done: You have a name. Miki is in the same room, waiting to hear it.
   core.miki says:
     always
     again: The mirror's still waiting. Name yourself first, then we'll talk.
@@ -55,6 +56,7 @@ stage name-yourself:
 stage bake-bread:
   log: Water and flour make dough, and the oven makes bread of it.
   hint: Knead the dough, then bake it in the oven.
+  hint when has core.bread: Take the loaf back to Miki.
   core.miki says:
     always
     sticky
@@ -73,6 +75,7 @@ stage bake-bread:
 stage clear-the-rats:
   log: Miki wants three giant rats put down.
   hint: The basement, below the guide house.
+  hint when core.rats-killed >= 3: Three down. Back up the stairs to Miki.
   core.miki says:
     always
     sticky
@@ -124,6 +127,7 @@ stage snubbed:
 stage apologised:
   log: You went back and apologised. Miki took it, and set a price on it.
   hint: Miki handed you a fishing net. The window upstairs looks out over the water.
+  hint when has core.fish: One fish, caught. Take it down to Miki.
   core.miki says:
     always
     sticky
@@ -151,7 +155,8 @@ stage apologised:
 # quest leave-tutorial-island
 title: Leave Tutorial Island
 log: There is a town east of the sand, and it goes on a while. Miki still calls this an island.
-hint: Go back to the guide house. Miki will have something to say about it.
+hint: East, past the sand. See the town first.
+hint when core.market-district.discovered: Go back to the guide house. Miki will have something to say about it.
 
 stage adrift:
   log: Miki said his piece about your leaving. Neither of you has moved.
@@ -275,6 +280,23 @@ expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See apology-route-full-end for why this isn't miki-route-end.
 expect: apology-route-full-end
+
+// bake-bread is left by a line Miki says and not by a `done when:`, so one
+// stage stands over two beats: bake the loaf, then carry it back. This is the
+// state each of that stage's two hints is gated on — the plain one while there
+// is no loaf, `hint when has core.bread` once there is — and the proof that no
+// single hint could be right in both.
+# test bake-bread-spans-two-beats
+load: miki-route-start
+run: quest-offered
+use: entity.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=elf
+talk: core.miki
+assert: finding-your-feet.bake-bread and not has core.bread
+craft: dough
+craft: bread
+assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 
 // A `use:` that finds its own action already under way against the same
 // target advances one cycle of the fight in progress instead of restarting

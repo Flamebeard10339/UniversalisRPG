@@ -1,7 +1,7 @@
 import type { ActionResult } from '../grammar/actionResult';
 import type { Condition } from '../grammar/condition';
 import type { Registry } from '../content/registry';
-import { begun, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
+import { begun, hintNow, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
 import { evaluateCondition, renderSegments } from './conditions';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import type { GameState } from './state';
@@ -50,7 +50,8 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
           const said = spoken(localizer, state, registry, stage.log);
           return said === null ? [] : [{ stage: stage.name as Answer, said, struck: standing === 'complete' || stage !== at }];
         });
-  const hint = standing === 'unstarted' ? spoken(localizer, state, registry, quest.hint) : standing === 'started' ? spoken(localizer, state, registry, at.hint) : null;
+  // Read off live state on every read, the way the standing and the lines are: a stage left by something an entity says spans more than one beat, so which hint applies is a question and not a constant.
+  const hint = standing === 'complete' ? null : spoken(localizer, state, registry, hintNow(standing === 'unstarted' ? quest.hints : at.hints, holds));
   return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, lines, hint };
 }
 
