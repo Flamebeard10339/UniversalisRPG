@@ -5,7 +5,7 @@ dependencies:
 
 // The whole of the tutorial quest: what the journal reads at each stage, what
 // Miki says while the quest stands there, and what moving on does. Nothing else
-// in the world knows this quest exists — take this module out and the island
+// in the world knows this quest exists — take this module out and the house
 // still loads, Miki still has a word for a traveller, and the mirror, the oven
 // and the rats are all still there to be found.
 //
@@ -19,7 +19,7 @@ dependencies:
 
 # quest finding-your-feet
 title: Finding Your Feet
-log: They say a guide keeps an eye on this island, and takes newcomers in hand.
+log: They say a guide keeps this house, and takes newcomers in hand.
 hint: Talk to Miki, in the guide house you woke in.
 
 stage offered:
@@ -81,22 +81,22 @@ stage clear-the-rats:
     when: core.rats-killed >= 3
     Ha! Barely a scratch on you. You're a natural.
     Truth be told, there's little left I can teach you.
-    So here's the last of it: get off this island. There's a boat to the mainland, and a whole world of skills waiting past it.
+    So here's the last of it: get off this island. East, past the sand, and keep going - there's a whole world of skills out that way.
     set: core.front-door.unlocked
     Go on. Make some trouble worth telling stories about.
     goto sendoff
 
 stage sendoff:
-  log: You have the measure of the place. There is a boat to the mainland.
+  log: You have the measure of the place. Miki says the way off is east, past the sand.
   complete
   core.miki says:
     always
     sticky
-    Still here? The boat to the mainland won't wait forever.
+    Still here? East, past the sand. I've nothing else for you.
 
 stage snubbed:
   log: You turned Miki down, and found your own way.
-  hint: Miki is still in the guide house, if you think better of it. Otherwise the front door is locked and something will have to open it. @@@ rough — wants rewriting once the lockpick route is settled
+  hint: Miki is still in the guide house, if you think better of it. Otherwise the front door is locked, and nothing on this floor opens it.
   core.miki says:
     always
     sticky
@@ -113,7 +113,7 @@ stage snubbed:
   core.miki says:
     when: core.rats-killed >= 3
     sticky
-    So the rats are dealt with. Nobody had to show you how, obviously. @@@ rough — wants the sting without repeating the snub line above
+    Rats are dealt with, then. That was never the hard part.
     if has core.lockpick:
       set: core.miki.angered
     -> Actually - sorry. Show me the ropes after all.
@@ -122,16 +122,16 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: You thought better of turning Miki down. He is showing you the ropes after all, in his own good time. @@@
-  hint: Miki handed you a fishing net. Catch something with it and bring it back to him. @@@
+  log: You went back and apologised. Miki took it, and set a price on it.
+  hint: Miki handed you a fishing net. The window upstairs looks out over the water.
   core.miki says:
     always
     sticky
     give: core.fishing-net
-    Take the net. Catch me one fish with it and I will call your apology accepted. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
+    Take the net. Bring me one fish out of it and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   core.miki says:
     when: has core.fish
-    A fish. An actual fish. Fine — you will do. The front door is open; go and see the island. @@@
+    A fish. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
     set: core.front-door.unlocked
     goto sendoff
 
@@ -150,21 +150,21 @@ stage apologised:
 // you come back for one more word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
-log: You have seen what the island has to show. Whatever comes next is across the water. @@@
-hint: Miki has one more word for you, if you go back for it. @@@
+log: There is a town east of the sand, and it goes on a while. Miki still calls this an island.
+hint: Go back to the guide house. Miki will have something to say about it.
 
 stage adrift:
-  log: Miki has said his piece about your leaving, and will say it again as often as you care to hear it. @@@
-  hint: Nothing here needs doing. The island is behind you. @@@
+  log: Miki said his piece about your leaving. Neither of you has moved.
+  hint: Nothing here needs doing. The town is east, and Miki is not going anywhere.
   core.miki says:
     when: core.market-district.discovered
     sticky
-    So you found the market. That is the whole island, then — and the boat is still where I said it was. @@@ rough — wants to sound like a goodbye that never quite happens
+    So you found the market. That's the far side of the island, near enough. Off you go, then. I'll be here.
     goto adrift
   core.miki says:
     when: core.miki.angered
     sticky
-    Picked the lock, did you. I would be angrier if it had not worked. Go on then; the boat will not ask how you got to it. @@@
+    Went through my dresser, did you. Keep them - they'll get you further than I would have. I'll be here.
     goto adrift
 
 // --- tests ---
