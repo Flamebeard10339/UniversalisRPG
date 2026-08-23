@@ -1163,15 +1163,14 @@ assert: xp.core.thieving = 15
 
 // Kelsa asks a question and the player can answer it, which is the whole of
 // this: the answer is a choice on her own line, and where it lands is George,
-// who her line says has the patience she has not. The index is safe to name
-// here in a way `sunny-has-three-things-to-say` had to avoid — a menu under
-// one node is offered in the order it is written, and only threads are sorted
-// by the words the player reads.
+// who her line says has the patience she has not. The answer is named by the
+// words it is written with here, so it stays the same answer in a language
+// that has moved every word she says.
 # test kelsa-takes-the-answer-she-asks-for
 load: in-town
 travel: kelsa-farmhouse
 talk: kelsa
-choose: 0
+choose: I am here about the bees.
 assert: kelsa.the-third-hive.visits = 1
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
@@ -1225,21 +1224,21 @@ assert: xp.core.woodcutting = 40
 
 // Sunny keeps three threads open at once, so talking to her is the list and
 // not a line, and a thread taken stays open because each is sticky — the third
-// talk still finds all three there, which is what taking three different ones
-// off three consecutive lists proves. Which index reads which is deliberately
-// not claimed here: the list is ordered by the words a player reads, so the
-// three land in a different order in every language, and this route is replayed
-// in a translated universe. That ordering is `conversation.test.ts`'s to pin.
+// talk still finds all three there, which is what taking three named ones off
+// three consecutive lists proves. Each is named rather than counted to: the
+// list is ordered by the words a player reads, so the three stand in a
+// different order in every language, and this route is replayed in a
+// translated universe. That ordering is `conversation.test.ts`'s to pin.
 # test sunny-has-three-things-to-say
 load: in-town
 travel: tavern-street
 travel: sha-dynastys
 talk: sunny
-choose: 0
+choose: sunny.the-stove
 talk: sunny
-choose: 1
+choose: sunny.the-bottle
 talk: sunny
-choose: 2
+choose: sunny.the-animals
 assert: sunny.the-stove.visits = 1
 assert: sunny.the-bottle.visits = 1
 assert: sunny.the-animals.visits = 1

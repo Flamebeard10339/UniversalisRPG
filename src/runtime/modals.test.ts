@@ -226,7 +226,7 @@ describe('the modal stack', () => {
     const dialogue = v.modals[1];
 
     expect(dialogue.name).toBe('dialogue');
-    expect(answered(dialogue.options)).toEqual([{ key: 'choice', label: 'Choice', values: ['0', '1'] }]);
+    expect(answered(dialogue.options)).toEqual([{ key: 'choice', label: 'Choice', values: ['0', '1'], takesMore: true }]);
   });
 
   it('withdraws every world choice while a modal is open, and gives them back once it closes', () => {
@@ -359,7 +359,7 @@ describe('opening and answering', () => {
 
     const gated = apply(session, 'talk:sage');
     expect(takes(gated.modals[0].options[0])).toEqual(['0']);
-    expect(() => submitModal(session, { choice: '1' })).toThrow(/has no choice that takes "1"/);
+    expect(() => submitModal(session, { choice: '1' })).toThrow('no choice matches "1": this list offers 0 "Leave the sage."');
 
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'rumour', actionId: 'tell' });
     expect(takes(view(session).modals[0].options[0])).toEqual(['0', '1']);
@@ -423,7 +423,7 @@ describe('opening and answering', () => {
     const state = talking(registry);
     const { cursor } = state.modals[1] as { cursor: DialogueCursor };
 
-    expect(() => choose('7', cursor, registry, state)).toThrow(/no choice matches: "7"/);
+    expect(() => choose('7', cursor, registry, state)).toThrow(/^no choice matches "7": this list offers 0 /);
     expect(choose('1', cursor, registry, state)).toBeNull();
   });
 

@@ -177,7 +177,7 @@ stage adrift:
 
 # test quest-offered
 talk: tulsa.miki
-choose: 0
+choose: Sounds good. Teach me.
 assert: finding-your-feet.name-yourself
 
 // Opens on a save so the route is walked with the pools a played game has.
@@ -214,7 +214,7 @@ travel: beach
 // still inside the house would only repeat the ordinary sendoff.
 travel: guide-house
 talk: tulsa.miki
-choose: 0
+choose: leave-tutorial-island.adrift.miki.0.said
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
@@ -232,7 +232,7 @@ expect only: miki-route-end
 
 # test thieving-route-full
 talk: tulsa.miki
-choose: 1
+choose: I'd rather find my own way.
 use: entity.stairs.ascend
 use: entity.dresser.search-drawer
 assert: has core.lockpick
@@ -241,12 +241,12 @@ use: entity.stairs-down.descend
 // reads to get angry; declining to apologise is what closes that
 // conversation back up, since a test (like a player) can't leave one hanging.
 talk: tulsa.miki
-choose: 1
+choose: Not a chance.
 assert: tulsa.miki.angered
 // A second, separate talk: same as the door route above, a quest whose own
 // condition just turned true does not pick it up until asked again.
 talk: tulsa.miki
-choose: 1
+choose: leave-tutorial-island.adrift.miki.1.said
 assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
@@ -266,9 +266,9 @@ expect only: thieving-route-full-end
 
 # test apology-route-full
 talk: tulsa.miki
-choose: 1
+choose: I'd rather find my own way.
 talk: tulsa.miki
-choose: 0
+choose: Actually - sorry. Show me the ropes after all.
 talk: tulsa.miki
 assert: has core.fishing-net
 use: entity.stairs.ascend

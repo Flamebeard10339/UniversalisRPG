@@ -382,7 +382,21 @@ export const test = section<Test>()({
   grammar: [
     { form: 'run: <test>', example: 'run: opening' },
     { form: 'talk: <entity>', example: 'talk: guide' },
-    { form: 'choose: <what the choice reads>', example: 'choose: Tell me more' },
+    {
+      form: 'choose: <the words the line is written with>',
+      example: 'choose: I am here about the bees.',
+      note: 'the choice as this file writes it, not as the screen now reads it — a translated world moves the words on the screen and leaves the line here alone',
+    },
+    {
+      form: 'choose: <thread>',
+      example: 'choose: sunny.the-stove',
+      note: 'the node a thread opens, under the name `visits` counts it by, and answerable by any tail of that name — what to write when talking to somebody put up a list, since that list is ordered by the words the player reads and reorders itself in another language',
+    },
+    {
+      form: 'choose: <position>',
+      example: 'choose: 0',
+      note: 'where it stands in the list, counting from nothing — safe under one node, whose choices stand in the order they are written, and not safe for a list of threads',
+    },
     { form: 'use: <kind>.<id>.<action>', example: 'use: item.rusty-sword.swing', ...USED },
     { form: 'use: <action> on <entity>', example: 'use: chop on oak' },
     { form: 'travel: <location>', example: 'travel: camp' },

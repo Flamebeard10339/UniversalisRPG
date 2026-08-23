@@ -69,7 +69,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
   dialogue: {
     options: (frame, state, registry) => [
-      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((choice) => ({ value: String(choice.index), shown: choice.display })) },
+      { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((entry) => ({ value: String(entry.index), shown: entry.display })), takesMore: true },
     ],
     submit: (frame, state, registry) => {
       const cursor = choose(frame.answers.choice, frame.cursor, registry, state);
@@ -161,7 +161,7 @@ function isCursor(value: unknown): boolean {
 function optionRefusal(localizer: Localizer, options: readonly ModalOption[], key: string, value: string): Localized | null {
   const option = options.find((each) => each.key === key);
   if (!option) return localizer.engine('engine.modal.stale.no-option', { option: localizer.identifier(key) });
-  if (option.values && !option.values.some((choice) => choice.value === value)) return localizer.engine('engine.modal.stale.no-value', { option: localizer.identifier(key), value: localizer.identifier(JSON.stringify(value)) });
+  if (option.values && !option.takesMore && !option.values.some((choice) => choice.value === value)) return localizer.engine('engine.modal.stale.no-value', { option: localizer.identifier(key), value: localizer.identifier(JSON.stringify(value)) });
   return null;
 }
 

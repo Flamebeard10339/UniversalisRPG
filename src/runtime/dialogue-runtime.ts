@@ -4,6 +4,8 @@ import { Choice, Dialogue, DialogueNode, isThread, NodeStep, offering, Spoken, s
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
+import { withoutNote } from '../grammar/note';
+import { printSegments } from '../grammar/segment';
 import { type DialogueCursor, GameState } from './state';
 
 function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
@@ -135,22 +137,46 @@ function offered(cursor: DialogueCursor, registry: Registry, state: GameState): 
     .filter((entry) => !entry.choice.when || evaluateCondition(entry.choice.when, state, registry));
 }
 
-export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): Array<{ index: number; display: Localized }> {
+// One entry of the list the player is looking at. `display` is what they read and moves with the language; `name` does not — a thread is named by the node it opens, under the same name `visits` counts it, and a line in a menu by the words it was authored with. That is what lets a recording name the entry it takes rather than the place it stands in, since threads are ordered by the words a player reads.
+export interface MenuEntry {
+  readonly index: number;
+  readonly display: Localized;
+  readonly name: string;
+  // Whether `name` is an id, and so answerable by a tail the way an id is everywhere else here. Whoever built the entry knows; reading it back off the shape of the string does not work, because a node a quest gave an entity is named `<quest>.<stage>.<entity>.<n>.said` and the `<n>` makes it look like prose.
+  readonly named: boolean;
+}
+
+// An id is answerable whole or by any tail of itself, the way an id is written everywhere else here; authored words are answerable only whole.
+const spellings = (entry: MenuEntry): string[] => (entry.named ? entry.name.split('.').map((_, at, all) => all.slice(at).join('.')) : [entry.name]);
+
+const picks = (answer: string, entry: MenuEntry): boolean => answer === String(entry.index) || spellings(entry).includes(answer);
+
+// What the .dsl writes on the line, which is what an author reading their own file has in front of them — not what the locale table now says, and without a note the engine drops anyway.
+const authoredWords = (line: Spoken): string => withoutNote(printSegments(line.segments)).trim();
+
+export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): MenuEntry[] {
   const asked = askedOf(cursor);
-  if (asked !== null) return openersNow(registry, state, asked).map((opener, index) => ({ index, display: openerShown(registry, state, opener.node) }));
-  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice) }));
+  if (asked !== null) return openersNow(registry, state, asked).map((opener, index) => ({ index, display: openerShown(registry, state, opener.node), name: visitCounter(opener.dialogue, opener.node), named: true }));
+  return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice), name: authoredWords(entry.choice), named: false }));
+}
+
+function noneMatches(answer: string, entries: readonly MenuEntry[]): RuntimeError {
+  const offering = entries.map((entry) => `${entry.index} ${JSON.stringify(entry.display)}${entry.name === entry.display ? '' : ` (${entry.name})`}`);
+  return new RuntimeError(`no choice matches ${JSON.stringify(answer)}: this list offers ${offering.length === 0 ? 'nothing' : offering.join(', ')}`);
 }
 
 export function choose(answer: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
+  const entries = menuChoices(cursor, registry, state);
+  const at = entries.findIndex((entry) => picks(answer, entry));
+  if (at === -1) throw noneMatches(answer, entries);
+
   const asked = askedOf(cursor);
   if (asked !== null) {
-    const opener = openersNow(registry, state, asked).find((_, index) => String(index) === answer);
-    if (!opener) throw new RuntimeError(`no choice matches: ${JSON.stringify(answer)}`);
+    const opener = openersNow(registry, state, asked)[at];
     return enterNode(opener.dialogue, opener.node, registry, state);
   }
   const { dialogue, node } = resolveMenu(cursor, registry);
-  const match = offered(cursor, registry, state).find((entry) => String(entry.index) === answer)?.choice;
-  if (!match) throw new RuntimeError(`no choice matches: ${JSON.stringify(answer)}`);
+  const match = offered(cursor, registry, state)[at].choice;
 
   applyResultsNow(state, registry, match.effects);
   if (match.goto) return enterNode(dialogue, findNode(dialogue, match.goto), registry, state);

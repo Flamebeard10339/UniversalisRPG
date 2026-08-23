@@ -82,6 +82,60 @@ describe('every thread an entity holds open is put to the player at once', () =>
   });
 });
 
+// The list moves with the words in it; what an author writes to pick out of it must not.
+describe('picking an entry out of a list', () => {
+  const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
+  const menu = ['# dialogue miki', 'owner = miki', '', 'node idle:', '  always', '  Fine weather for it.', '  -> Tell me more', '    goto more', '  -> Nothing.', '', 'node more:', '  There is not much more.'].join('\n');
+
+  it('takes a thread by the node it opens, under the name visits counts it by, whole or by any tail of it', () => {
+    for (const named of ['an-errand.offer', 'offer']) {
+      const state = createGameState();
+      const registry = loaded(own, both);
+      choose(named, talk('miki', registry, state)!, registry, state);
+      expect(Object.keys(state.visits)).toEqual(['an-errand.offer']);
+    }
+  });
+
+  // A quest names the node it hands over `<quest>.<stage>.<entity>.<n>.said`, and that numeral is why
+  // the shape of the string cannot be read back to tell an id from a line somebody says. Every thread
+  // the shipped corpus offers is one of these.
+  it('takes a thread a quest gave an entity by a tail, though its name carries a numeral', () => {
+    const quest = ['# quest an-errand', 'title: An Errand', 'stage asking:', '  log: Asked.', '  miki says:', '    ask: About the thing.', '    There is a thing I need.', '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
+    const state = createGameState();
+    const registry = loaded(own, quest);
+
+    choose('asking.miki.0.said', talk('miki', registry, state)!, registry, state);
+
+    expect(Object.keys(state.visits)).toEqual(['an-errand.asking.miki.0.said']);
+  });
+
+  it('takes a line in one node by the words it is written with, and by the place it stands in', () => {
+    for (const answer of ['Tell me more', '0']) {
+      const state = createGameState();
+      const registry = loaded(menu);
+      choose(answer, talk('miki', registry, state)!, registry, state);
+      expect(state.log).toEqual(['Fine weather for it.', 'There is not much more.']);
+    }
+  });
+
+  it('names what it does offer when an answer picks out nothing, so an author sees what they could have written', () => {
+    const state = createGameState();
+    const registry = loaded(menu);
+    const cursor = talk('miki', registry, state)!;
+
+    expect(() => choose('more', cursor, registry, state)).toThrow(new RuntimeError('no choice matches "more": this list offers 0 "Tell me more", 1 "Nothing."'));
+  });
+
+  it('names a thread by the node and not by the phrase it is picked with, since the phrase is what moves', () => {
+    const state = createGameState();
+    const registry = loaded(own, both);
+
+    expect(() => choose('Fine weather for it.', talk('miki', registry, state)!, registry, state)).toThrow(
+      new RuntimeError('no choice matches "Fine weather for it.": this list offers 0 "Fine weather for it." (miki.idle), 1 "Since you are here — there is a thing I need." (an-errand.offer)'),
+    );
+  });
+});
+
 // A node said once and fallen silent is still a node whose `when:` holds, and offering the conversation anyway is how a player comes to click talk and watch the view redraw with nothing new in it.
 describe('a conversation with nothing left to say is not offered', () => {
   const spent = (...lines: string[]) => loaded(['# dialogue miki', 'owner = miki', '', 'node idle:', '  always', ...lines].join('\n'));

@@ -3,6 +3,7 @@ import { withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import { standingSources } from '../content/shipped';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
+import { choose, openerShown, openersNow, talk } from './dialogue-runtime';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { createGameState } from './runtime';
 import { runTest, type TestResult } from './session';
@@ -75,4 +76,45 @@ describe('a recording survives translation', () => {
       });
     }
   }
+});
+
+// Every entity anybody has written a word for, which is where a list of threads comes from.
+const owners = [...new Set([...registry.dialogues.values()].flatMap((dialogue) => (dialogue.owner === undefined ? [] : [dialogue.owner])))];
+
+const threadsOf = (entityId: string, language: string): string[] => openersNow(registry, createGameState('', language), entityId).map((opener) => `${opener.dialogue.id}.${opener.node.name}`);
+
+const readsAs = (entityId: string, language: string): string[] => {
+  const state = createGameState('', language);
+  return openersNow(registry, state, entityId).map((opener) => openerShown(registry, state, opener.node) as string);
+};
+
+describe('a list of threads', () => {
+  // The lists the corpus actually puts up, rather than the entity that says one thing and is entered outright.
+  const listing = owners.filter((owner) => threadsOf(owner, BASE_LANGUAGE).length > 1);
+
+  it('is something the corpus puts up, so there is a list here to pick out of at all', () => {
+    expect(listing.length).toBeGreaterThan(0);
+  });
+
+  it('reads as different words in each language, and still gives whoever names a thread that same thread', () => {
+    for (const owner of listing) {
+      expect(readsAs(owner, BASE_LANGUAGE)).not.toEqual(readsAs(owner, TRANSLATED_LANGUAGE));
+      for (const thread of threadsOf(owner, BASE_LANGUAGE)) {
+        for (const language of PLAYED) {
+          const state = createGameState('', language);
+          choose(thread, talk(owner, registry, state)!, registry, state);
+          expect([owner, language, Object.keys(state.visits)[0]]).toEqual([owner, language, thread]);
+        }
+      }
+    }
+  });
+});
+
+// The claim above is about the engine; this one is about whether the corpus uses it. A recording that counts to its choice takes a different one in another language, so the shipped ones name theirs, and both routes that pick from a list are replayed in both languages by the recording sweep above. The subjects derive from the recordings themselves, so one converted next month needs no edit here and one converted back is caught.
+describe('a recording the corpus ships', () => {
+  it('names the choice it takes rather than counting to it', () => {
+    const counting = [...registry.tests.values()].filter((test) => test.directives.some((directive) => directive.kind === 'choose' && /^\d+$/.test(directive.text)));
+
+    expect(counting.map((test) => test.id)).toEqual([]);
+  });
 });
