@@ -11,6 +11,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { PruneWarning } from '../src/runtime/pruning';
 import { adoptRegistry, loadSaved, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { sourceFiles } from './probe';
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
 // docs/specs/a-turn-costs-what-the-last-turn-did.md, whose clauses this file exists to satisfy.
@@ -60,7 +61,7 @@ Beyond those two shapes, the command line also answers to a small set of direct 
 
 ${playerVocabularyBlock()}
 
-Reach for one of these only when it is the clearest way to say what you are doing (an "equip: <item>" once an item is in hand, a "/wait <seconds>" to let something finish); the choice ids and modal answers above are how most turns are spent. A reply naming anything this turn's view did not offer, or a line this game's own command line refuses for any reason, is refused outright and the turn ends without your action having any effect — the loop does not try to guess what you meant, and does not fall back to the closest match. If you are unsure what is available, re-read the view rather than reusing something you remember from an earlier turn: ids can stop existing when an author edits the world mid-run, and a dialogue option's value is only ever its current position, not a name that survives being reordered.`;
+Every one of those is available on every turn, in every location, whether or not this turn's view mentions it — the view lists what this place is offering you, never the whole of what you are able to do — and each one's own summary above is the complete account of what it does, so do not narrow it to the one use you have already seen it put to. Most turns are still spent on a choice id or a modal answer. But the view reports state as well as choices, and when its state is the thing that needs answering and no offered choice answers it — a pool sitting low, an action part-way through, an item in hand that nothing here invites you to use — the right turn is a direct action from that list, not a choice picked because it was printed. A reply naming anything this turn's view did not offer, or a line this game's own command line refuses for any reason, is refused outright and the turn ends without your action having any effect — the loop does not try to guess what you meant, and does not fall back to the closest match. If you are unsure what is available, re-read the view rather than reusing something you remember from an earlier turn: ids can stop existing when an author edits the world mid-run, and a dialogue option's value is only ever its current position, not a name that survives being reordered.`;
 
 const SHARED_PRODUCT = `## What your reply is for
 
@@ -477,23 +478,28 @@ export function createSdkModelClient(cwd: string): ModelClient {
   };
 }
 
-const DEFAULT_FILES = ['content/core.dsl', 'content/tutorial-quests.dsl'];
+export const DEFAULT_SOURCES = ['content'];
 const DEFAULT_TURNS = 100;
 
-function fileContentReader(files: readonly string[]): ContentReader {
+// A directory is expanded on every read, not once at startup, so a module authored while the run
+// is in flight arrives the same turn an edit to an already-named one does.
+export function fileContentReader(sources: readonly string[]): ContentReader {
   return () =>
     withEngineLocale(
-      files.map((file) => ({
-        name: path.basename(file).replace(/\.[^.]*$/, ''),
-        text: readFileSync(path.resolve(repoRoot, file), 'utf8'),
-      })),
+      sources
+        .flatMap((source) => sourceFiles(path.resolve(repoRoot, source)))
+        .map((file) => ({
+          name: path.basename(file).replace(/\.[^.]*$/, ''),
+          text: readFileSync(file, 'utf8'),
+        })),
     );
 }
 
 const usage = [
   'Usage: npm run playbot -- [<source>...] [--mode author|bughunt] [--turns <n>] [--save <id>]',
   '',
-  '  <source>   a DSL file to load; with none, the tutorial corpus',
+  '  <source>   a DSL file to load, or a directory standing for the .dsl files in',
+  '             it; with none, the content/ directory — the shipped corpus',
   '  --mode     author (default) or bughunt — which framing the system prompt uses',
   '  --turns    how many turns to play, default 100',
   '  --save     open the run on a named # save fixture instead of a fresh session',
@@ -503,7 +509,7 @@ const usage = [
 ].join('\n');
 
 interface CliArgs {
-  readonly files: readonly string[];
+  readonly sources: readonly string[];
   readonly mode: PlaybotMode;
   readonly turns: number;
   readonly save: string | undefined;
@@ -530,7 +536,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
   let mode: PlaybotMode = 'author';
   let turns = DEFAULT_TURNS;
   let save: string | undefined;
-  const files: string[] = [];
+  const sources: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') {
@@ -563,9 +569,9 @@ function parseArgs(argv: readonly string[]): CliArgs {
     if (arg.startsWith('--')) {
       throw new Error(`unknown flag ${arg}\n\n${usage}`);
     }
-    files.push(arg);
+    sources.push(arg);
   }
-  return { files: files.length > 0 ? files : DEFAULT_FILES, mode, turns, save };
+  return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, turns, save };
 }
 
 // The one place a save id becomes a fixture: read off registry.saves the same way the # test
@@ -600,7 +606,7 @@ async function main(): Promise<void> {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const read = fileContentReader(args.files);
+  const read = fileContentReader(args.sources);
   const loaded = loadUniverseWithDiagnostics(read());
   for (const diagnostic of loaded.diagnostics) console.error(formatModuleDiagnostic(diagnostic));
 

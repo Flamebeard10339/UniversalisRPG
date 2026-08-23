@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
@@ -9,6 +9,8 @@ import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/c
 import { sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
 import { excusedFieldsAreReal, unaccountedFields } from './lib/viewCoverage';
 import {
+  DEFAULT_SOURCES,
+  fileContentReader,
   isolatedCwd,
   journalWindowText,
   openSession,
@@ -422,6 +424,28 @@ adjacent:
     const { session, warnings } = openSession(registry, 'core.dresser-trinket-end');
     expect(warnings).toEqual([]);
     expect(view(session).location.id).toBe('core.guide-house-upstairs');
+  });
+
+  // --save implies its own sources: with nothing named positionally, the default reader stands for
+  // the shipped corpus, so every fixture the corpus declares can be opened by --save alone. Both
+  // halves derive their subjects — the files from the directory, the fixtures from the registry —
+  // so a module or a # save added next month is covered with no edit here.
+  it('[--save] the default sources are the whole shipped corpus, and every fixture in it opens', () => {
+    const read = fileContentReader(DEFAULT_SOURCES);
+    const named = read().map((source) => source.name).sort();
+    const shipped = readdirSync('content')
+      .filter((name) => name.endsWith('.dsl'))
+      .map((name) => name.replace(/\.dsl$/, ''))
+      .sort();
+    expect(named).toEqual(shipped);
+
+    const loaded = loadUniverseWithDiagnostics(read());
+    expect(loaded.diagnostics.map(String)).toEqual([]);
+    const fixtures = [...loaded.registry.saves.keys()];
+    expect(fixtures.length).toBeGreaterThan(0);
+    for (const id of fixtures) {
+      expect(() => openSession(loaded.registry, id), id).not.toThrow();
+    }
   });
 
   it('[--save] an id naming no save is refused with a message listing what exists, not a stack trace', () => {
