@@ -492,6 +492,23 @@ examine: A round of alder, cut green and heavier than it looks. @@@ Nothing spli
 title: Rat Pelt
 examine: Hairless in patches, and weeping where it is not.
 
+# item bread
+examine: A warm, golden loaf.
+food, +5 regeneration, 90s
+eat:
+  instant
+  take: 1 bread
+  say: You tear into the warm loaf - simple, filling, and worth the trouble.
+
+# item cooked-herring
+title: Cooked Herring
+examine: Grilled through and smelling of the docks. Larry on the sewer door has a nose for these.
+food, +2 regeneration, 45s
+eat:
+  instant
+  take: 1 cooked-herring
+  say: You eat the herring off your fingers. Salt, smoke, and small bones.
+
 // --- drop tables ---
 
 // A table is a named result list, so what a rat leaves behind reads as two
@@ -558,6 +575,22 @@ out: dough
 skill: cooking 2
 time: 2
 say: You knead water and flour into a ball of dough.
+
+# recipe bread
+station: oven
+in: dough
+out: bread
+skill: cooking 4
+time: 3
+say: The oven bakes your dough into a golden loaf.
+
+# recipe cooked-herring
+station: stove
+in: herring
+out: cooked-herring
+skill: cooking 3
+time: 4
+say: You grill the herring through, which is the only way it is worth eating.
 
 // --- tests ---
 

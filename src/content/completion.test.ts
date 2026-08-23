@@ -136,16 +136,16 @@ describe('a line as the engine takes it', () => {
     expect(taken('# location tulsa.beach\nadjacent: tulsa.guide-house|').undeclared).toEqual([]);
   });
 
-  const RECIPE = (station: string): string => `# recipe tulsa.bread\nstation: ${station}\nout: 1 tulsa.bread`;
+  const RECIPE = (station: string): string => `# recipe core.bread\nstation: ${station}\nout: 1 core.bread`;
 
   it('answers for a name no section carries, where the universe declares that kind of name at all', () => {
-    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }, { kind: 'station', address: 'oven' }];
+    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'core.bread' }, { kind: 'station', address: 'oven' }];
     expect(amissIn(RECIPE('oven'), stations).flatMap((each) => each.undeclared)).toEqual([]);
     expect(amissIn(RECIPE('forge'), stations).flatMap((each) => each.undeclared)).toEqual([{ kind: 'station', id: 'forge' }]);
   });
 
   it('says nothing of a kind of name the universe declares none of, rather than calling every one of them undeclared', () => {
-    const known: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }];
+    const known: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'core.bread' }];
     expect(amissIn(RECIPE('oven'), known).flatMap((each) => each.undeclared)).toEqual([]);
   });
 

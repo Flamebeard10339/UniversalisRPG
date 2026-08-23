@@ -37,15 +37,6 @@ dependencies:
 
 // --- items ---
 
-# item cooked-herring
-title: Cooked Herring
-examine: Grilled through and smelling of the docks. Larry on the sewer door has a nose for these.
-food, +2 regeneration, 45s
-eat:
-  instant
-  take: 1 cooked-herring
-  say: You eat the herring off your fingers. Salt, smoke, and small bones.
-
 # item bottle-of-vodka
 title: Bottle of Vodka
 examine: Sunny's own. The label is hand-written and does not say what is in it.
@@ -53,14 +44,6 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 # item sewer-key
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
-
-# item bread
-examine: A warm, golden loaf.
-food, +5 regeneration, 90s
-eat:
-  instant
-  take: 1 bread
-  say: You tear into the warm loaf - simple, filling, and worth the trouble.
 
 // --- drop tables ---
 
@@ -905,22 +888,6 @@ on death:
       roll: trinket
 
 // --- recipes ---
-
-# recipe cooked-herring
-station: stove
-in: herring
-out: cooked-herring
-skill: cooking 3
-time: 4
-say: You grill the herring through, which is the only way it is worth eating.
-
-# recipe bread
-station: oven
-in: dough
-out: bread
-skill: cooking 4
-time: 3
-say: The oven bakes your dough into a golden loaf.
 
 // --- dialogue ---
 //

@@ -184,7 +184,7 @@ const RULES: readonly string[] = [
   `${PART}a line marked like this names a part of the kind and is not written`,
   `${PART}a keyword whose shape trails off in \`, …\` takes a list, and may instead hold it one value to a line, indented under the bare \`keyword:\``,
   `${PART}an \`e.g.\` shows one line of that shape written out; the ids in it stand for ids and are not ids anything declares`,
-  `${PART}an id may be written whole, as \`tulsa.bread\`, or by the name its own module gave it, as \`bread\``,
+  `${PART}an id may be written whole, as \`core.bread\`, or by the name its own module gave it, as \`bread\``,
   `${PART}an answer given once is pointed back at rather than written out again: \`as under X\` and \`what X holds\` both say to read it there`,
   `${PART}in a line the game says to a player, a \`${NOTE_MARK}\` and everything after it is a note the engine drops: write what you can say now, then \`${NOTE_MARK}\` alone to mark it rough, or \`${NOTE_MARK} <what you wanted>\` where the engine cannot do what was asked. \`npm run notes\` lists them`,
 ];

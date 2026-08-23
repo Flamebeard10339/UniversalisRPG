@@ -57,13 +57,13 @@ stage name-yourself:
 stage bake-bread:
   log: Water and flour make dough, and the oven makes bread of it.
   hint: Knead the dough, then bake it in the oven.
-  hint when has tulsa.bread: Take the loaf back to Miki.
+  hint when has core.bread: Take the loaf back to Miki.
   tulsa.miki says:
     always
     sticky
     Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
   tulsa.miki says:
-    when: has tulsa.bread
+    when: has core.bread
     A warm loaf! Well done, {player.name}.
     Keep it in your pack - eat it whenever you're hungry.
     Every swing and catch builds a skill, and skills raise your stats.
@@ -194,7 +194,7 @@ assert: has core.jug-of-water
 craft: dough
 assert: has core.dough
 craft: bread
-assert: has tulsa.bread
+assert: has core.bread
 talk: tulsa.miki
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
@@ -294,7 +294,7 @@ expect only: apology-route-full-end
 // bake-bread is left by a line Miki says and not by a `done when:`, so one
 // stage stands over two beats: bake the loaf, then carry it back. This is the
 // state each of that stage's two hints is gated on — the plain one while there
-// is no loaf, `hint when has tulsa.bread` once there is — and the proof that no
+// is no loaf, `hint when has core.bread` once there is — and the proof that no
 // single hint could be right in both.
 # test bake-bread-spans-two-beats
 load: miki-route-start
@@ -303,10 +303,10 @@ use: entity.mirror.look-in
 submit-modal: name=Rowan
 submit-modal: race=elf
 talk: tulsa.miki
-assert: finding-your-feet.bake-bread and not has tulsa.bread
+assert: finding-your-feet.bake-bread and not has core.bread
 craft: dough
 craft: bread
-assert: finding-your-feet.bake-bread and has tulsa.bread and not finding-your-feet.clear-the-rats
+assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 
 // A `use:` that finds its own action already under way against the same target
 // advances one cycle of the fight in progress instead of restarting it, so
@@ -355,7 +355,7 @@ assert: tulsa.rats-killed >= 1
 {"version":11}
 
 # save miki-route-end
-{"version":11,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"tulsa.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7,"core.bent-coin":3,"core.rat-tail":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":21570},"location":"tulsa.beach","populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":41600,"rng":1706300260,"player":{"name":"Rowan","race":"elf"}}
+{"version":11,"inventory":{"core.jug-of-water":0,"core.pot-of-flour":0,"core.dough":0,"core.bread":1,"core.iron-sword":1,"core.wooden-shield":1,"core.rat-bone":7,"core.bent-coin":3,"core.rat-tail":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":21570},"location":"tulsa.beach","populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":41600,"rng":1706300260,"player":{"name":"Rowan","race":"elf"}}
 
 // The thief's own closing sheet — not the door route's. A route that never
 // bakes or fights lands on different holdings, a different clock and a

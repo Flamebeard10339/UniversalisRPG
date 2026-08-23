@@ -123,7 +123,7 @@ describe('test: composable in-game scripts', () => {
       'talk: tulsa.miki',
       'use: entity.tulsa.front-door.pick-lock',
       'travel: tulsa.beach',
-      'craft: tulsa.bread',
+      'craft: core.bread',
       'load: core.start',
       'expect: core.end',
       'begin: use entity.tulsa.oven.roast-chestnuts',
@@ -144,7 +144,7 @@ describe('test: composable in-game scripts', () => {
         actionId: 'pick-lock',
       },
       { kind: 'travel', location: 'tulsa.beach' },
-      { kind: 'craft', recipe: 'tulsa.bread' },
+      { kind: 'craft', recipe: 'core.bread' },
       { kind: 'load', save: 'core.start' },
       { kind: 'expect', save: 'core.end' },
       {

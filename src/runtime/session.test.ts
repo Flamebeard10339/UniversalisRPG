@@ -390,14 +390,14 @@ describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
     const session = primed(tutorial(), { inventory: { 'core.dough': 2 } });
 
-    beginAction(session, 'craft:tulsa.bread');
+    beginAction(session, 'craft:core.bread');
     const baked = wait(session, 4);
-    expect(baked.inventory['tulsa.bread']).toBe(1);
+    expect(baked.inventory['core.bread']).toBe(1);
     expect(baked.action).not.toBeNull();
 
     const v = cancelAction(session);
     expect(v.action).toBeNull();
-    expect(v.inventory['tulsa.bread']).toBe(1);
+    expect(v.inventory['core.bread']).toBe(1);
     expect(v.inventory['core.dough']).toBe(1);
     expect(v.choices.length).toBeGreaterThan(0);
   });

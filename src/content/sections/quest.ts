@@ -263,7 +263,7 @@ export const quest = section<Quest>()({
       block: (): Written[] => [
         { form: 'log: <text>', example: 'log: Miki offered to show you the ropes.', family: 'what the journal says', note: 'what the journal reads while the quest stands here' },
         { form: 'hint: <text>', example: 'hint: Talk to Miki in the guide house.', family: 'what the journal says' },
-        { form: 'hint when <condition>: <text>', example: 'hint when has tulsa.bread: Take the loaf back to Miki.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
+        { form: 'hint when <condition>: <text>', example: 'hint when has core.bread: Take the loaf back to Miki.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },

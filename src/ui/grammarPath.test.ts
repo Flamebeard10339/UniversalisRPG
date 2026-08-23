@@ -4,7 +4,7 @@ import { pathOf } from './grammarPath';
 
 const KNOWN: readonly Addressed[] = [
   { kind: 'flag', address: 'core.made-bread', module: 'core' },
-  { kind: 'item', address: 'tulsa.bread', module: 'tulsa' },
+  { kind: 'item', address: 'tulsa.sewer-key', module: 'tulsa' },
   { kind: 'event', address: 'core.death', module: 'core' },
 ];
 
