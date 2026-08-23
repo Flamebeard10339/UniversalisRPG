@@ -1,4 +1,3 @@
-import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import { declaredId } from './sections/entity';
 import { actionAddress } from './sections/action';
@@ -8,6 +7,7 @@ import { everyActionTable, mapOf, type Registry } from './registry';
 import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { sameValue } from './registryDiff';
 import { roundTripModule } from './serialize';
+import { standingSources } from './shipped';
 import type { ModuleSource } from './universe';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', '', '# entity crab', 'title: Giant Crab', 'pick up:', '  instant', '  say: It pinches.', '', '# item rope', 'title: Rope'].join('\n');
@@ -20,37 +20,12 @@ const SPANISH: ModuleSource = {
 const base = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }]);
 const translated = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }, SPANISH]);
 
-const FIELDS: Record<keyof Registry, 'content' | 'the locale table'> = {
-  entities: 'content',
-  actions: 'content',
-  events: 'content',
-  factions: 'content',
-  factionBits: 'content',
-  player: 'content',
-  locations: 'content',
-  items: 'content',
-  passives: 'content',
-  clusterJewels: 'content',
-  stats: 'content',
-  skills: 'content',
-  slots: 'content',
-  recipes: 'content',
-  recipeActions: 'content',
-  resources: 'content',
-  dropTables: 'content',
-  dialogues: 'content',
-  quests: 'content',
-  tests: 'content',
-  flags: 'content',
-  variables: 'content',
-  modals: 'content',
-  saves: 'content',
-  namespace: 'content',
-  roads: 'content',
-  locales: 'the locale table',
-};
+// A translation may move nothing but the locale table. The subjects derive themselves from a
+// loaded registry rather than being listed, so a map added next month is swept without an edit
+// here; `locales` is named because it is the exception, and `keyof Registry` still refuses a typo.
+const NOT_CONTENT: ReadonlySet<keyof Registry> = new Set<keyof Registry>(['locales']);
 
-const contentFields = (Object.keys(FIELDS) as (keyof Registry)[]).filter((field) => FIELDS[field] === 'content');
+const contentFields = (Object.keys(base()) as (keyof Registry)[]).filter((field) => !NOT_CONTENT.has(field));
 
 const readable = (registry: Registry, field: keyof Registry): unknown => {
   const held = registry[field];
@@ -59,6 +34,13 @@ const readable = (registry: Registry, field: keyof Registry): unknown => {
 };
 
 describe('# locale is a section of key/value pairs (c6)', () => {
+  it('sweeps every map the registry holds but the locale table, so a map added later is covered', () => {
+    const held = Object.keys(base()) as (keyof Registry)[];
+    expect(held).toContain('locales');
+    expect(contentFields).not.toContain('locales');
+    expect(contentFields.length).toBe(held.length - 1);
+  });
+
   it('leaves every content map identical to loading without it', () => {
     const without = base();
     const with_ = translated();
@@ -149,16 +131,7 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
 });
 
 describe('an action declared once carries one key, however many owners perform it (c7)', () => {
-  const island = loadUniverse([
-    {
-      name: 'core',
-      text: readFileSync('content/core.dsl', 'utf8'),
-    },
-    {
-      name: 'tulsa',
-      text: readFileSync('content/tulsa.dsl', 'utf8'),
-    },
-  ]);
+  const island = loadUniverse(standingSources());
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
 
   it('has shipped content that hands one declaration to several owners', () => {

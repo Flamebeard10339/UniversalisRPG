@@ -23,6 +23,8 @@ examine: A warm loaf.
 
 # skill cooking
 
+# station oven
+
 # entity oven
 examine: A stone oven.
 stations: oven
@@ -157,6 +159,8 @@ examine: A splash of water.
 
 # item broth
 examine: A simple vegetable broth.
+
+# station stove
 
 # entity stovetop
 examine: A small camp stove.

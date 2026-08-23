@@ -28,23 +28,27 @@ Shops only interact with items that define a value in coins. Otherwise, the item
 
 It goes without saying, but coins don't have a value and can't be bought or sold. This doesn't need a rule, just don't give coins a value and it won't create an infinite loop. 
 
-## A station has no declaration of its own
+## The two recipes still pinned to tulsa by a station that has moved
 
-`stations: oven` on an entity is the only thing in the language that creates the
-name `oven`, and `validateRecipeReferences` (`src/content/references.ts:67`)
-refuses any recipe naming a station no *loaded* entity opens. So a recipe is
-pinned to the module holding the thing it is cooked on, not because a recipe is
-local knowledge but because the oven entity is the oven's only declaration. That
-is a name minted by a side effect, which is the failure mode CLAUDE.md's mission
-paragraph names.
+`# station <id>` is now a kind, `core` declares `anvil`, `oven` and `stove`, and
+both `stations:` on an entity and `station:` on a recipe resolve through the
+namespace. A recipe is no longer pinned to whatever opens its station, and
+`src/content/shipped.test.ts` holds core to loading clean alone while declaring
+station names nothing in it opens.
 
-*Closes when:* `# station <id>` is a kind of its own — core names it, the entity
-that opens it lists it, the recipe that needs it resolves it through the
-namespace like every other id, and the refusal becomes *names an undeclared
-station*. `bread` and `cooked-herring` follow their recipes into core when it
-lands; they are the two sections the tulsa/core split could not move. Five sites
-load `core` alone and are the proof it worked: `src/runtime/localized.test.ts`
-(three), `scripts/probe.test.ts` (two).
+*Closes when:* `# recipe bread` and `# recipe cooked-herring` move from `tulsa`
+into `core` — with `# item bread` and `# item cooked-herring`, which are theirs —
+by `npm run move-sections` on a quiet tree. They are the two sections the
+tulsa/core split could not move.
+
+Left behind by the kind landing, and blocked on the files their owners hold:
+
+- `src/content/locale.test.ts`'s `FIELDS` is a hand-listed `Record<keyof
+  Registry, …>`; `stations` has to be added by hand, which is why `tsc` is red.
+  The file already imports `contentSectionMaps` — the table should derive.
+- `CAPABILITY` in `src/content/refs.ts` has no reader left but
+  `src/content/dsl.test.ts`, whose `|| said === CAPABILITY` is a one-entry table
+  of kinds nothing declares. Both go together.
 
 ## A quest cannot hold all of its own state
 

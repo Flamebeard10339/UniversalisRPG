@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
-import { CAPABILITY } from './refs';
 import { declaredBy } from './references';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
@@ -77,7 +76,7 @@ describe('a hole of every line of every kind', () => {
       GRAMMAR.flatMap(({ kind, line }) =>
         Object.entries(line.names ?? {}).flatMap(([hole, said]) => {
           if (said === null || (POINTS.test(said) && holeNames(line.form).includes(said.slice(1, -1)))) return [];
-          return held.has(said) || said === CAPABILITY ? [] : [`# ${kind} ${line.form} says <${hole}> names a # ${said}`];
+          return held.has(said) ? [] : [`# ${kind} ${line.form} says <${hole}> names a # ${said}`];
         }),
       ),
     ).toEqual([]);

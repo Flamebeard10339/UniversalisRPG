@@ -5,7 +5,7 @@ import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
 import { decimal, humanizeEn, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
-import { CAPABILITY, put, quantified as quantifiedItems, type Loose } from '../refs';
+import { put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
 
@@ -110,7 +110,7 @@ export const recipe = section<Recipe>()({
   },
   text: ['title'],
   fields: {
-    requiresCapability: { parser: id, keyword: 'station', names: { id: CAPABILITY } },
+    requiresCapability: { parser: id, keyword: 'station', names: { id: 'station' } },
     in: { parser: list(quantified), default: () => [], block: true },
     out: { parser: list(produced), default: () => [], block: true },
     skill: { parser: recipeSkillValue },

@@ -96,9 +96,13 @@ those belong to the region they happen in, which is why Miki's house, the beach
 and everything standing in them are `tulsa`'s. The one `# test` core owns is the
 only claim that can be made without walking anywhere.
 
-**A recipe naming a `station:` is refused unless something in the loaded universe
-opens that station**, so a recipe lives with whatever opens it: `bread` went to
-`tulsa` with the oven, `dough` stayed in `core` because it names no station.
+**A station is `# station <id>`, and a station's name is core's furniture.** The
+name is declared where the world's vocabulary is declared, the entity that opens
+one lists it in `stations:`, and the recipe that needs one names it in
+`station:`; both are ordinary namespaced references, so an undeclared station is
+refused at load naming the line and a declared one nothing opens loads clean. A
+recipe is therefore generic knowledge and lives wherever it wants, while the
+oven that opens `oven` stays in the region it stands in.
 
 **The shipped corpus has one home: `src/content/shipped.ts`.** `shippedFiles()` and
 `shippedSources()` read `content/` fresh each call and exclude an author's own

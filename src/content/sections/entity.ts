@@ -122,6 +122,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       keyword: 'stations',
       default: () => [],
       block: true,
+      names: { id: 'station' },
     },
     stats: {
       parser: list(statAssignmentValue),

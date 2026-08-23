@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { formatModuleDiagnostic } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { moduleSource, shippedFiles, standingSources } from './shipped';
+import { parseModuleSource } from './universe';
 
 const ids = (): string[] => shippedFiles().map((file) => file.replace(/\.dsl$/, ''));
 
@@ -41,5 +43,32 @@ describe('the standing world is derived, not listed', () => {
 
     expect(smallest).toBeDefined();
     expect(new Set(standingSources().map((source) => source.name))).toEqual(new Set(smallest));
+  });
+});
+
+// A module nothing loads before it has nothing to lean on, so it has to load alone or it cannot
+// load at all. The subjects are read off the corpus's own `dependencies:` lines rather than named,
+// and a shipped module that stops depending on anything is covered here the day it does.
+const rootModules = (): string[] =>
+  ids().filter((id) => parseModuleSource(moduleSource(id)).info.dependencies.every((dependency) => dependency.prefix === 'optional' || dependency.prefix === 'recommended' || dependency.prefix === 'incompatible'));
+
+describe('a shipped module that depends on nothing', () => {
+  it('loads clean by itself', () => {
+    expect(rootModules().length).toBeGreaterThan(0);
+    for (const id of rootModules()) {
+      expect(loadUniverseWithDiagnostics([moduleSource(id)]).diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    }
+  });
+
+  // What phase two of the station move rests on: a `# station` is a name, and the thing that opens
+  // one stands somewhere. So a station standing in a module that opens none of them is not a
+  // dangling reference, and a generic recipe may sit beside the name rather than beside the oven.
+  it('holds station names nothing in it opens, and still loads clean', () => {
+    const unopened = rootModules().flatMap((id) => {
+      const { registry } = loadUniverseWithDiagnostics([moduleSource(id)]);
+      const opened = new Set([...registry.entities.values()].flatMap((entity) => entity.capabilities));
+      return [...registry.stations.keys()].filter((station) => !opened.has(station));
+    });
+    expect(unopened.length).toBeGreaterThan(0);
   });
 });

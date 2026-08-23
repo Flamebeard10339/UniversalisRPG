@@ -139,9 +139,9 @@ describe('a line as the engine takes it', () => {
   const RECIPE = (station: string): string => `# recipe tulsa.bread\nstation: ${station}\nout: 1 tulsa.bread`;
 
   it('answers for a name no section carries, where the universe declares that kind of name at all', () => {
-    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }, { kind: 'capability', address: 'oven' }];
+    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }, { kind: 'station', address: 'oven' }];
     expect(amissIn(RECIPE('oven'), stations).flatMap((each) => each.undeclared)).toEqual([]);
-    expect(amissIn(RECIPE('forge'), stations).flatMap((each) => each.undeclared)).toEqual([{ kind: 'capability', id: 'forge' }]);
+    expect(amissIn(RECIPE('forge'), stations).flatMap((each) => each.undeclared)).toEqual([{ kind: 'station', id: 'forge' }]);
   });
 
   it('says nothing of a kind of name the universe declares none of, rather than calling every one of them undeclared', () => {

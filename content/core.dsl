@@ -132,6 +132,16 @@ title: Main Hand
 # slot offhand
 title: Off Hand
 
+// --- stations ---
+
+// The names a recipe may be worked at. They stand nowhere: an # entity that
+// opens one lists it, and that entity belongs to the region it stands in.
+# station anvil
+
+# station oven
+
+# station stove
+
 // --- modals ---
 
 // The mirror raises this one; the engine draws it and writes what it is told

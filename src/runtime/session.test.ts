@@ -623,6 +623,8 @@ kick:
   relocate: vault
   set: kicked
 
+# station bench
+
 # entity bench
 stations: bench
 

@@ -27,11 +27,12 @@ import { save } from './save';
 import { skill } from './skill';
 import { slot } from './slot';
 import { stat } from './stat';
+import { station } from './station';
 import { test } from './test';
 import { variable } from './variable';
 
 // A thunk, not a const: a kind's file may reach this module, and a list built while one member is still loading holds an undefined.
-const declared = () => [stat, skill, item, passive, clusterJewel, faction, event, action, entity, location, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, modal, save, test, info, remove] as const;
+const declared = () => [stat, skill, item, passive, clusterJewel, faction, event, action, entity, location, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, modal, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 

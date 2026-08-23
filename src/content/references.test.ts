@@ -205,9 +205,14 @@ describe('references the walk used to step over', () => {
     expect(loading('  give: 1 straw', '  -> Take it.\n    goto elsewhere')).toThrow(/# dialogue caretaker: node hello choice goto names an unknown node: elsewhere/);
   });
 
-  it('rejects a recipe whose station nothing provides, and accepts one an entity does', () => {
-    expect(() => loadModule(`${VALID}\n# recipe weave\nstation: loom\nout: 1 straw\n`)).toThrow(/# recipe weave station: names an unknown capability: loom/);
-    expect(() => loadModule(`${VALID.replace('stats: max-health 12, dr 2', 'stations: loom\nstats: max-health 12, dr 2')}\n# recipe weave\nstation: loom\nout: 1 straw\n`)).not.toThrow();
+  it('rejects a recipe whose station nothing declares, and accepts one a # station does even though nothing opens it', () => {
+    expect(() => loadModule(`${VALID}\n# recipe weave\nstation: loom\nout: 1 straw\n`)).toThrow(/# recipe weave station: names an unknown station: loom/);
+    expect(() => loadModule(`${VALID}\n# station loom\n\n# recipe weave\nstation: loom\nout: 1 straw\n`)).not.toThrow();
+  });
+
+  it('rejects an entity opening a station nothing declares, which used to be how a station was named', () => {
+    expect(() => loadModule(`${VALID.replace('stats: max-health 12, dr 2', 'stations: loom\nstats: max-health 12, dr 2')}`)).toThrow(/stations: names an unknown station: loom/);
+    expect(() => loadModule(`${VALID.replace('stats: max-health 12, dr 2', 'stations: loom\nstats: max-health 12, dr 2')}\n# station loom\n`)).not.toThrow();
   });
 
   it('rejects every id a # test directive names', () => {

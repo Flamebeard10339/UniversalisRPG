@@ -30,6 +30,29 @@ describe('a module declares into its own namespace', () => {
   });
 });
 
+describe('a station is a name a module declares, not one a side effect mints', () => {
+  const world = module('world', '# station oven');
+
+  it('qualifies it like any other id, and both the entity that opens it and the recipe that needs it land on that one key', () => {
+    const kitchen = module('kitchen', 'dependencies: world', '# entity hearth', 'stations: oven');
+    const cook = module('cook', 'dependencies: world', '# item bread', '# recipe bake', 'station: oven', 'out: bread');
+    const registry = loadUniverse([world, kitchen, cook]);
+    expect([...registry.stations.keys()]).toEqual(['world.oven']);
+    expect(registry.entities.get('kitchen.hearth')!.capabilities).toEqual(['world.oven']);
+    expect(registry.recipes.get('cook.bake')!.requiresCapability).toBe('world.oven');
+  });
+
+  it('is what the recipe resolves against, so a recipe stands without anything that opens one', () => {
+    const cook = module('cook', 'dependencies: world', '# item bread', '# recipe bake', 'station: oven', 'out: bread');
+    expect(loadUniverse([world, cook]).recipes.get('cook.bake')!.requiresCapability).toBe('world.oven');
+  });
+
+  it('is not reachable from a module that does not depend on the one declaring it', () => {
+    const cook = module('cook', '# item bread', '# recipe bake', 'station: oven', 'out: bread');
+    expect(() => loadUniverse([world, cook])).toThrow(/# recipe cook.bake station: names an unknown station: oven/);
+  });
+});
+
 describe('a reference may drop leading segments', () => {
   const referring = (reference: string) => () => loadUniverse([BASE, module('mod', 'dependencies: base', '# entity gull', `peck:`, `  give: ${reference}`)]);
   const given = (reference: string) => loadUniverse([BASE, module('mod', 'dependencies: base', '# entity gull', 'peck:', `  give: ${reference}`)]).entities.get('mod.gull')!.actions[0].results[0];
@@ -144,12 +167,6 @@ describe('names the engine keeps for itself', () => {
 describe('what a namespace does not reach', () => {
   it('leaves a tuning variable global, because the engine reads it by name', () => {
     expect([...loadUniverse([module('base', '# variable min-damage', 'value: 3')]).variables.keys()]).toEqual(['min-damage']);
-  });
-
-  it('leaves a station global, because it is a contract between modules that never met', () => {
-    const kitchen = module('kitchen', '# entity oven', 'stations: oven');
-    const cook = module('cook', 'dependencies: kitchen', '# item bread', '# recipe bake', 'station: oven', 'out: bread');
-    expect(loadUniverse([kitchen, cook]).recipes.get('cook.bake')!.requiresCapability).toBe('oven');
   });
 
   it('leaves a slot global, because it is a contract between modules that never met', () => {

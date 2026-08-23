@@ -436,18 +436,18 @@ describe('loadUniverseWithDiagnostics', () => {
   });
 
   it('attributes post-merge validation errors to the module that owns the section', () => {
-    const base = module('base', '# info base', '# entity oven', 'stations: oven');
-    const bad = module('bad', '# info bad', '# item bread', '# recipe bake', 'station: kiln', 'out: bread');
+    const base = module('base', '# info base', '# entity smith', 'equipment-slots: mainhand');
+    const bad = module('bad', '# info bad', '# item hat', 'slot: helm');
 
     const result = loadUniverseWithDiagnostics([base, bad]);
 
     expect(result.loadedModules).toEqual(['base']);
-    expect(result.registry.recipes.size).toBe(0);
+    expect(result.registry.items.size).toBe(0);
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]).toMatchObject({
       moduleId: 'bad',
       stage: 'validate',
-      message: '# recipe bad.bake station: names an unknown capability: kiln',
+      message: '# item bad.hat slot: names helm, which no # entity declares among its equipment-slots:',
     });
   });
 });

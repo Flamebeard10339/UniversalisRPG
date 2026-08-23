@@ -17,7 +17,7 @@ import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
 import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
 import { isNamespacedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
-import { registryCapabilities, registrySlots, validateItemSlots, validateRecipeReferences, validateSectionReferences, validateTestReferences } from './references';
+import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
 import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
@@ -587,19 +587,6 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     return { module, stage: 'validate', error };
   }
 
-  const capabilities = registryCapabilities(registry);
-  for (const recipe of registry.recipes.values()) {
-    try {
-      validateRecipeReferences(recipe, capabilities);
-    } catch (error) {
-      if (!(error instanceof DslError)) throw error;
-      return {
-        module: sectionOwner(owners, 'recipe', recipe.id)!,
-        stage: 'validate',
-        error,
-      };
-    }
-  }
   for (const test of registry.tests.values()) {
     try {
       validateTestReferences(test, registry);

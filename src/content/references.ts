@@ -1,7 +1,5 @@
 import { DslError } from '../grammar/parser';
 import type { Addressed } from './completion';
-import { CAPABILITY } from './refs';
-import { Recipe } from './sections/recipe';
 import { Registry } from './registry';
 import { Directive, Test } from './sections/test';
 import { } from './namespace';
@@ -28,17 +26,9 @@ function refuseUntimedPayload(itemId: string, where: string, registry: Registry)
   }
 }
 
-// Every name a reference written in a draft may resolve to: the namespace the engine built while loading — sections, the flags they mint, the actions nested in them, the nodes inside a dialogue — and the capabilities, which an entity opens by listing one rather than by being one.
-export const declaredBy = (registry: Registry): Addressed[] => [
-  ...registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address, module: registry.namespace.ownerOf(kind, address) ?? null }))),
-  ...[...registryCapabilities(registry)].map((address) => ({ kind: CAPABILITY, address, module: null })),
-];
-
-export function registryCapabilities(registry: Registry): Set<string> {
-  const capabilities = new Set<string>();
-  for (const entity of registry.entities.values()) for (const capability of entity.capabilities) capabilities.add(capability);
-  return capabilities;
-}
+// Every name a reference written in a draft may resolve to: the namespace the engine built while loading — sections, the flags they mint, the actions nested in them, the nodes inside a dialogue.
+export const declaredBy = (registry: Registry): Addressed[] =>
+  registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address, module: registry.namespace.ownerOf(kind, address) ?? null })));
 
 function declaredSlots(registry: Registry): Set<string> {
   const declared = new Set<string>();
@@ -61,12 +51,6 @@ export function validateItemSlots(registry: Registry): void {
     if (item.slot !== undefined && !declared.has(item.slot)) {
       throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`);
     }
-  }
-}
-
-export function validateRecipeReferences(recipe: Recipe, capabilities: ReadonlySet<string>): void {
-  if (recipe.requiresCapability !== undefined && !capabilities.has(recipe.requiresCapability)) {
-    throw new DslError(`# recipe ${recipe.id} station: names an unknown capability: ${recipe.requiresCapability}`);
   }
 }
 

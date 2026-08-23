@@ -21,7 +21,7 @@ const BY_STAGE = {
   resolve: { body: '# entity gull\npeck:\n  give: missing' },
   merge: { body: '# remove item.base.rope\n\n# remove item.base.rope' },
   build: { body: '# locale en\nbase.hall.title: Hall {who}' },
-  validate: { body: '# item bread\n\n# recipe bake\nstation: kiln\nout: bread' },
+  validate: { body: '# entity smith\nequipment-slots: mainhand\n\n# item hat\nslot: helm' },
 } satisfies Record<ModuleLoadStage, Breakage>;
 
 const BY_REQUIREMENT = {
