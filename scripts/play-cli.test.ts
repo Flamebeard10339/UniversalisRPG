@@ -151,9 +151,43 @@ starting
       'Flags: {"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true}',
       'Inventory: {}',
       'XP: {"core.thieving":0,"core.melee":0,"core.cooking":0}',
+      'Equipped: {"mainhand":null,"offhand":null}',
+      'stats: {"core.attack":10,"core.defense":5,"core.accuracy":100,"core.evasion":0,"core.attack-rate":25,"core.regeneration":0,"core.max-health":30,"core.cooking-rate":55,"core.luck":60}',
       'Health: ██████████ 30/30',
+      'discovered: 3',
+      '  Guide House (core.guide-house) at 0,0,0 -> core.guide-house-upstairs, core.basement',
+      '  Guide House Upstairs (core.guide-house-upstairs) at 0,0,1 -> core.guide-house',
+      '  Basement (core.basement) at 0,0,-1 -> core.guide-house',
+      'locations: 3 of 5 found; not yet found: core.beach, core.market-district',
     ]);
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: core.guide-house');
+  });
+
+  // A road whose condition does not hold is still a road, and a map that drew it the same as an
+  // open one would be telling an author they can walk somewhere they cannot. The corpus has no
+  // shut road between two discovered places, so this branch is only reachable from a fixture.
+  it('marks a road the map draws but the world will not let anyone walk', () => {
+    const ctx = driver(`
+# flag gate-open
+
+# location camp
+x: 0, y: 0
+starting
+adjacent:
+  vault while gate-open
+
+# location vault
+x: 1, y: 0
+
+# save both-found
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"vault.discovered":true}}
+`);
+    runLine(ctx, '/load both-found');
+    const lines = shown(runLine(ctx, '/state'));
+
+    expect(lines).toContain('  Camp (camp) at 0,0,0 -> vault (shut)');
+    expect(lines).toContain('  Vault (vault) at 1,0,0 -> camp (shut)');
+    expect(lines).toContain('locations: 2 of 2 found');
   });
 
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {

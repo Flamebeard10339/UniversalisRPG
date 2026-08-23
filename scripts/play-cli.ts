@@ -37,10 +37,6 @@ export const CLI_NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }
   { field: 'carried', why: 'the same holdings /state already prints as the raw `inventory` id-count map; a friendlier per-slot listing here would say the same holdings twice' },
   { field: 'planes', why: 'the jewel plane of an item, drawn by the GUI as a diagram; this terminal opens the same modal but only ever names its screen and keys, never the plane inside it' },
   { field: 'focus', why: 'which screen is focused, which only matters once more than one screen can be open at a time; this terminal shows the one open modal already, through `formatModals`' },
-  { field: 'discovered', why: "the map of walked-to places and the roads between them; this terminal has no map feature at all, unlike the GUI's own pane for it, so nothing here draws one" },
-  { field: 'locations', why: "every location the registry holds, discovered or not; this terminal has no map feature to draw either half of it on, the same gap that leaves `discovered` unshown" },
-  { field: 'equipment', why: '/state only prints a slot once something is worn in it; an empty-handed session has nothing here to point at, which is a real gap and not a design choice' },
-  { field: 'stats', why: 'the counted stats a character carries; no command in this terminal reads this field at all, a real gap rather than a deliberate exclusion' },
 ];
 
 const repoRoot = path.join(import.meta.dirname, '..');
@@ -183,13 +179,39 @@ type DumpKey = 'engine.repl.state.flags' | 'engine.repl.state.inventory' | 'engi
 const dumped = (localizer: Localizer, key: DumpKey, held: unknown): ToolLine =>
   note(localizer.engine(key, { [key.split('.').pop()!]: localizer.identifier(JSON.stringify(held)) }));
 
+// A /state line for a field the engine locale has no sentence of its own for is labelled with
+// that field's name out of PlayStatus, never with a second English word for it: the label is then
+// the key an author looks the field up under, and renaming the field stops this compiling.
+const field = (name: keyof PlayStatus, held: string, indent = 0): ToolLine => note(`${name}: ${held}`, indent);
+
 function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   const lines = [dumped(localizer, 'engine.repl.state.inventory', status.inventory)];
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
   lines.push(dumped(localizer, 'engine.repl.state.xp', Object.fromEntries(status.xp.map((row) => [row.id, row.value]))));
-  const filled = status.equipment.flatMap((row) => (row.item === null ? [] : [[row.slot, row.item] as const]));
-  if (filled.length > 0) lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(filled)));
+  // Every slot, worn or bare — a slot printed only once something is in it leaves an empty-handed
+  // session with nothing to name when it wants to put something on.
+  lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(status.equipment.map((row) => [row.slot, row.item]))));
+  lines.push(field('stats', JSON.stringify(Object.fromEntries(status.stats.map((row) => [row.id, row.value])))));
   return lines;
+}
+
+// Coordinates put a location on an integer lattice, but what can be walked is `adjacent`, and
+// neither implies the other: two places one step apart on the grid need not be joined, and a road
+// may run the width of the map. So the roads are what is drawn, with each place's coordinates
+// named beside it — a grid would make its own visual neighbours a claim the world never makes.
+function formatMap(status: PlayStatus): ToolLine[] {
+  const found = new Set(status.discovered.map((place) => place.id));
+  const roadsOf = (place: PlayStatus['discovered'][number]): string =>
+    place.adjacent.map((edge) => (edge.open ? String(edge.to) : `${edge.to} (shut)`)).join(', ');
+  const unfound = status.locations.flatMap((each) => (found.has(each.id) ? [] : [String(each.id)]));
+  return [
+    field('discovered', String(status.discovered.length)),
+    ...status.discovered.map((place) => {
+      const roads = roadsOf(place);
+      return note(`${place.title} (${place.id}) at ${place.x},${place.y},${place.z}${roads === '' ? '' : ` -> ${roads}`}`, 2);
+    }),
+    field('locations', `${found.size} of ${status.locations.length} found${unfound.length === 0 ? '' : `; not yet found: ${unfound.join(', ')}`}`),
+  ];
 }
 
 function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
@@ -200,6 +222,7 @@ function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
     ...formatInventory(status, localizer),
     ...formatResources(status.resources, localizer),
     ...formatEncounter(status.encounter, localizer),
+    ...formatMap(status),
   ];
 }
 

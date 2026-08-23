@@ -722,7 +722,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/wait',
     arg: 'directive',
     argHint: '<s>',
-    summary: 'advance simulated time by <s> seconds, or /wait done until what is under way has finished',
+    summary: 'advance simulated time by <s> seconds, letting whatever moves with the clock move: buffs tick down toward expiry, and a pool refills at whatever regeneration is in effect — none, unless something has granted some; or /wait done until what is under way has finished',
     parse: directiveFrom('/wait', (rest) => `wait: ${rest}`),
     run: runDirective,
   }),
@@ -781,7 +781,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/state',
     arg: 'none',
-    summary: 'show location, elapsed sim-time, flags, inventory, xp',
+    summary: "dump this session's state — where and when you are, your pools, stats and skills, what you carry and wear, and the places you have found and the roads between them",
     parse: nothing,
     run: (ctx) => ({ output: [{ kind: 'status', status: sessionStatus(ctx.session) }], quit: false, recorded: [] }),
   }),
