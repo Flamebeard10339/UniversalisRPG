@@ -113,8 +113,6 @@ export const humanizeEn = (id: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
-export const articleEn = (word: string): string => (/^[aeiou]/i.test(word) ? 'an' : 'a');
-
 export interface Quantified {
   item: string;
   amount?: number;

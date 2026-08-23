@@ -49,6 +49,7 @@ export interface ClusterReport {
   readonly hex: Answer;
   readonly jewel: Answer;
   readonly title: Localized;
+  readonly examine: Localized | null;
   readonly shape: Answer;
   readonly entry: { hex: Answer; direction: Direction } | null;
   readonly effects: Array<{ id: Answer; title: Localized; statTitle: Localized; effect: ClusterEffect }>;
@@ -152,6 +153,7 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
     hex: hexKey(hex),
     jewel: jewel.id,
     title: declared ? localizer.title('cluster-jewel', jewel.id) : localizer.engine('engine.plane.base'),
+    examine: (declared ? localizer.words('cluster-jewel', jewel.id, 'examine') : undefined) ?? null,
     shape: jewel.shape,
     entry,
     effects,

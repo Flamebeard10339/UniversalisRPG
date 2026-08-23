@@ -63,28 +63,37 @@ describe('parameters are named and substituted (c4)', () => {
   });
 });
 
-describe('an item with no examine of its own', () => {
-  it('gets the engine sentence, with the English article the title asks for', () => {
-    const registry = loadInEnglish(ISLAND);
-    const localizer = localizerFor(registry, 'en');
+describe('an item’s examine words', () => {
+  const ISLAND_WITH_EXAMINE = `${ISLAND}
+examine: Green, and one side of it blushing.`;
 
-    expect(itemExamine(localizer, registry.items.get('island.apple')!)).toBe('This is an Apple.');
-    expect(itemExamine(localizer, registry.items.get('island.rope')!)).toBe('This is a Rope.');
+  const SPANISH_EXAMINE = {
+    name: 'island-es',
+    text: `# info island-es
+version: 1.0.0
+dependencies:
+  island
+
+# locale es
+island.item.apple.examine: Verde, y sonrojada por un lado.`,
+  };
+
+  it('are the words the author wrote, in the language asking for them', () => {
+    const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND_WITH_EXAMINE }, SPANISH_EXAMINE]);
+
+    expect(itemExamine(localizerFor(registry, 'en'), 'island.apple')).toBe('Green, and one side of it blushing.');
+    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBe('Verde, y sonrojada por un lado.');
   });
 
-  const withExamine = (pattern: string) =>
-    loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, { name: 'island-es', text: ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', `engine.item.examine: ${pattern}`].join('\n') }]);
-
-  it('asks no other language for an English article', () => {
-    const registry = withExamine('Esto es un {item}.');
-
-    expect(itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toBe('Esto es un island.item.apple.title.');
+  it('are nothing at all where the author wrote none, rather than a sentence the engine made up', () => {
+    expect(itemExamine(english(), 'island.rope')).toBeUndefined();
+    expect(itemExamine(spanish(), 'island.rope')).toBeUndefined();
   });
 
-  it('refuses a language that asks for one, rather than handing it English grammar', () => {
-    const registry = withExamine('Esto es {article} {item}.');
+  it('are nothing at all in a language that has not been given them', () => {
+    const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND_WITH_EXAMINE }, SPANISH]);
 
-    expect(() => itemExamine(localizerFor(registry, 'es'), registry.items.get('island.apple')!)).toThrow(/takes a \{article\}/);
+    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBeUndefined();
   });
 });
 

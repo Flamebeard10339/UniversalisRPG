@@ -20,7 +20,7 @@ export const ENGINE_KEYS = [
   'engine.combat.other.hit',
   'engine.combat.other.miss',
   'engine.combat.felled',
-  'engine.item.examine',
+  'engine.examine.beside',
   'engine.item.modified',
   'engine.carried.stack',
   'engine.carried.worn',

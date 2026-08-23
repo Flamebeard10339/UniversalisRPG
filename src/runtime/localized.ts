@@ -4,7 +4,6 @@ import { actionTextKey, actionTextOwner } from '../content/sections/action';
 import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
-import { articleEn } from '../grammar/values';
 import { withoutNote } from '../grammar/note';
 
 declare const LOCALIZED: unique symbol;
@@ -81,10 +80,4 @@ export interface LanguageChoice {
 
 export const localizerOf = (registry: Registry, playing: LanguageChoice): Localizer => localizerFor(registry, playing.language);
 
-export function itemExamine(localizer: Localizer, item: { id: string; title: string; examine?: string }): Localized {
-  if (item.examine !== undefined) return localizer.content('item', item.id, 'examine');
-  const title = localizer.title('item', item.id);
-  const params: Record<string, Localized> = { item: title };
-  if (localizer.language === BASE_LANGUAGE) params.article = articleEn(title) as Localized;
-  return localizer.engine('engine.item.examine', params);
-}
+export const itemExamine = (localizer: Localizer, item: string): Localized | undefined => localizer.words('item', item, 'examine');
