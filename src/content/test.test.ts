@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseModule } from './sections';
 import { DslError } from '../grammar/parser';
 import { parseDirectiveLine, printDirective } from './sections/test';
+import { MODAL_SCREENS } from '../grammar/actionResult';
 
 const ref = (...path: string[]) => ({
   kind: 'reference' as const,
@@ -209,6 +210,17 @@ describe('open-modal: raises a screen by name', () => {
     const bad = (line: string) => () => parseModule(['# test bad', line].join('\n'));
     expect(bad('open-modal: Carried Items')).toThrow(/unexpected line in # test/);
     expect(bad('open-modal:')).toThrow(/unexpected line in # test/);
+  });
+
+  // The set is the language's, so the words the refusal names are read off it rather than written out here.
+  it('refuses a name that is no screen the engine runs, and names the ones it does', () => {
+    for (const screen of MODAL_SCREENS) expect(() => parseModule(['# test opening', `open-modal: ${screen}`].join('\n')), screen).not.toThrow();
+    try {
+      parseModule(['# test bad', 'open-modal: haggling'].join('\n'));
+      expect.unreachable('a screen the engine does not run must not parse');
+    } catch (raw) {
+      for (const screen of MODAL_SCREENS) expect((raw as Error).message, screen).toContain(screen);
+    }
   });
 });
 

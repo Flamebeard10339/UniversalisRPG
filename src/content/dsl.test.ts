@@ -13,7 +13,7 @@ import { memberKey, Namespace } from './namespace';
 import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, localeKey } from './locale';
-import { contentSectionMaps, isDebug, sections, sectionFor, type Section } from './sections';
+import { contentSectionMaps, isDebug, isNamespacedKind, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -219,6 +219,20 @@ describe('a field whose values are names', () => {
         return owner.prune(held as never, cutting(other(each.kind)), `# ${owner.kind} probe`) === held ? [] : [`${where} reacts to a # ${other(each.kind)} being removed`];
       }),
     ).toEqual([]);
+  });
+});
+
+describe('what a reference is checked against', () => {
+  // A reference is checked only where its kind is namespaced: `resolve` rewrites nothing for a global id and `validateSectionReferences` asks nothing about it, so a kind that something names while declaring `ids: 'global'` takes whatever an author writes and fails when a player reaches it. The subjects are every kind a schema field names and every kind the corpus's own references ask about, so neither a field nor a result site added next month can put one back.
+  it('leaves no kind that anything names holding ids nothing resolves', () => {
+    const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+    const referenced = new Set(sections().flatMap((each) => each.names.map((named) => named.kind)));
+    for (const [kind, primary] of contentSectionMaps()) {
+      for (const [id, value] of mapOf(registry, primary)) sectionFor(kind)!.visit(value as never, `# ${kind} ${id}`, (names, named) => (referenced.add(names), named));
+    }
+
+    expect(referenced.size).toBeGreaterThan(0);
+    for (const kind of referenced) expect(isNamespacedKind(kind), kind).toBe(true);
   });
 });
 

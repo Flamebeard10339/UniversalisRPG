@@ -263,14 +263,14 @@ ${line}
     expect(test('unequip: head')).not.toThrow();
   });
 
-  it('resolves nothing for an open-modal:, whatever screen it names', () => {
+  it('resolves nothing for an open-modal:, and refuses a screen the engine does not run', () => {
     const test = (line: string) => () =>
       loadModule(`${VALID}
 # test walk
 ${line}
 `);
     expect(test('open-modal: name-yourself')).not.toThrow();
-    expect(test('open-modal: no-such-screen')).not.toThrow();
+    expect(test('open-modal: no-such-screen')).toThrow(/a modal screen must be one of/);
   });
 
   it('rejects a `use:` naming an unknown kind, object, or action', () => {

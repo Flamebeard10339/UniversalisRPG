@@ -3,36 +3,40 @@ import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
 import { questFrame, sameQuest } from './questScreen';
 import { sameCount, sameShop, shopFrame } from './shopScreen';
+import type { ModalScreen } from '../grammar/actionResult';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
 
 export type ModalName = ModalFrame['name'];
 
-interface FrameKind<F extends ModalFrame> {
-  open(): F | null;
-  same?(a: F, b: F): boolean;
-}
+type Frame<K extends ModalName> = Extract<ModalFrame, { name: K }>;
+
+type Same<K extends ModalName> = (a: Frame<K>, b: Frame<K>) => boolean;
 
 export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
   return { name: 'dialogue', answers: {}, cursor };
 }
 
-const FRAMES: { [K in ModalName]: FrameKind<Extract<ModalFrame, { name: K }>> } = {
-  'name-yourself': { open: () => ({ name: 'name-yourself', answers: {} }) },
-  'choose-race': { open: () => ({ name: 'choose-race', answers: {} }) },
-  'carried-items': { open: () => carriedFrame() },
-  'item-plane': { open: () => null, same: samePlane },
-  'quest-journal': { open: () => questFrame() as Extract<ModalFrame, { name: 'quest-journal' }>, same: sameQuest },
-  shop: { open: () => null, same: sameShop },
-  'shop-count': { open: () => null, same: sameCount },
-  dialogue: {
-    open: () => null,
-    same: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
-  },
+const OPENERS: { [K in ModalScreen]: () => Frame<K> } = {
+  'name-yourself': () => ({ name: 'name-yourself', answers: {} }),
+  'choose-race': () => ({ name: 'choose-race', answers: {} }),
+  'carried-items': () => carriedFrame(),
+  'quest-journal': () => questFrame(),
 };
 
-function kindOf(name: string): FrameKind<ModalFrame> | undefined {
-  return FRAMES[name as ModalName] as FrameKind<ModalFrame> | undefined;
-}
+const SAME: { [K in ModalName]: Same<K> | null } = {
+  'name-yourself': null,
+  'choose-race': null,
+  'carried-items': null,
+  'item-plane': samePlane,
+  'quest-journal': sameQuest,
+  shop: sameShop,
+  'shop-count': sameCount,
+  dialogue: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
+};
+
+const NAMES: readonly string[] = Object.keys(SAME);
+
+const SCREENS: readonly string[] = Object.keys(OPENERS);
 
 function stack(state: GameState): ModalFrame[] {
   return state.modals as ModalFrame[];
@@ -40,7 +44,7 @@ function stack(state: GameState): ModalFrame[] {
 
 function sameScreen(a: ModalFrame, b: ModalFrame): boolean {
   if (a.name !== b.name) return false;
-  return kindOf(a.name)?.same?.(a, b) ?? true;
+  return (SAME[a.name] as ((x: ModalFrame, y: ModalFrame) => boolean) | null)?.(a, b) ?? true;
 }
 
 export function openModal(state: GameState, frame: ModalFrame): void {
@@ -49,11 +53,9 @@ export function openModal(state: GameState, frame: ModalFrame): void {
 }
 
 export function openModalNamed(state: GameState, name: string): void {
-  const kind = kindOf(name);
-  if (!kind) throw new RuntimeError(`unknown modal: ${name}`);
-  const frame = kind.open();
-  if (!frame) throw new RuntimeError(`modal ${name} is not opened by name`);
-  openModal(state, frame);
+  if (!NAMES.includes(name)) throw new RuntimeError(`unknown modal: ${name}`);
+  if (!SCREENS.includes(name)) throw new RuntimeError(`modal ${name} is not opened by name`);
+  openModal(state, (OPENERS as Record<string, () => ModalFrame>)[name]!());
 }
 
 export const openShop = (state: GameState, shop: string): void => openModal(state, shopFrame(shop));

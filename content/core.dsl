@@ -1,7 +1,7 @@
 // The engine's own furniture, which every region depends on: the stat bases, the
-// health pool and its regeneration, the factions, the skills, the equipment slots
-// and the modals, the player, the passives and cluster jewels, the droptables,
-// the generic items, and melee-combat.
+// health pool and its regeneration, the factions, the skills, the equipment
+// slots, the player, the passives and cluster jewels, the droptables, the
+// generic items, and melee-combat.
 //
 // Nothing here stands anywhere. A location, an entity that occupies one, or a
 // line somebody says belongs to the region it happens in, so this module holds
@@ -168,20 +168,6 @@ title: Off Hand
 # station oven
 
 # station stove
-
-// --- modals ---
-
-// Two screens, each writing one field of the player and neither knowing the
-// other. Whatever raises them decides whether it wants one or both.
-# modal name-yourself
-screen: name-yourself
-
-# modal choose-race
-screen: choose-race
-
-// What `/inv` raises, and what a # test answers with submit-modal: item=.
-# modal carried-items
-screen: carried-items
 
 // --- actions ---
 

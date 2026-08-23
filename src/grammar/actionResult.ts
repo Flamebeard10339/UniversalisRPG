@@ -14,6 +14,15 @@ export type Party = 'me' | 'them';
 // that moves its starting mark moves what it means, with no module naming another module's room.
 export const STARTING_LOCATION = 'starting-location';
 
+// The screens the engine runs, and the whole of what `open modal:` may name. It is written beside the syntax because a screen is not something a module declares: a content kind holding the list could only restate this one, and the engine's own openers key off it from above.
+export const MODAL_SCREENS = ['name-yourself', 'choose-race', 'carried-items', 'quest-journal'] as const;
+
+export type ModalScreen = (typeof MODAL_SCREENS)[number];
+
+export const isModalScreen = (raw: string): raw is ModalScreen => (MODAL_SCREENS as readonly string[]).includes(raw);
+
+export const modalScreenRefusal = (raw: string): string => `a modal screen must be one of ${MODAL_SCREENS.join(', ')}, got ${JSON.stringify(raw)}`;
+
 export type ActionResult =
   | { kind: 'say'; text: string; key?: string }
   | { kind: 'set'; variable: string }
@@ -24,7 +33,7 @@ export type ActionResult =
   | { kind: 'xp'; skill: string; amount: Range }
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
-  | { kind: 'open-modal'; modal: string }
+  | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'pool'; resource: string; delta: Range; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party }
   | { kind: 'stop' }
@@ -275,9 +284,16 @@ function parseResult(cursor: Cursor): ActionResult {
   if (cursor.take(/restore:[ \t]*/) !== null) return parsePool(1, cursor);
   if (cursor.take(/relocate:[ \t]*/) !== null) return { kind: 'relocate', location: id.parse(cursor) };
   if (cursor.take(/discover:[ \t]*/) !== null) return { kind: 'discover', location: id.parse(cursor) };
-  if (cursor.take(/open modal:[ \t]*/) !== null) return { kind: 'open-modal', modal: id.parse(cursor) };
+  if (cursor.take(/open modal:[ \t]*/) !== null) return parseOpenModal(cursor);
   if (cursor.take(/stop(?![\w-])/) !== null) return { kind: 'stop' };
   throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+}
+
+function parseOpenModal(cursor: Cursor): ActionResult {
+  const at = cursor.pos;
+  const named = id.parse(cursor);
+  if (!isModalScreen(named)) throw new DslError(modalScreenRefusal(named), { start: cursor.abs(at), end: cursor.abs(cursor.pos) });
+  return { kind: 'open-modal', modal: named };
 }
 
 function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
@@ -443,7 +459,7 @@ const LEAF_EXAMPLES: readonly string[] = [
   `relocate: ${STARTING_LOCATION}`,
   'discover: camp',
   `discover: ${STARTING_LOCATION}`,
-  'open modal: name-yourself',
+  ...MODAL_SCREENS.map((screen) => `open modal: ${screen}`),
   'drain: 5 health',
   'restore: 1-2 health',
   'inflict: dazzled',
@@ -465,7 +481,7 @@ const LEAF_FORMS: readonly string[] = [
   `relocate: ${STARTING_LOCATION}`,
   'discover: <location>',
   `discover: ${STARTING_LOCATION}`,
-  'open modal: <modal>',
+  ...MODAL_SCREENS.map((screen) => `open modal: ${screen}`),
   'drain: <amount> <resource>[ from <me or them>]',
   'restore: <amount> <resource>[ to <me or them>]',
   'inflict: <buff item>[ on <me or them>]',

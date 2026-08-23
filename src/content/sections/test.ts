@@ -1,5 +1,6 @@
 import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
+import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreenRefusal } from '../../grammar/actionResult';
 import { DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { hasBlock } from '../../grammar/structure';
@@ -47,7 +48,7 @@ export type Directive =
   | { kind: 'apply'; target: string; hex: Hex; effect: string }
   | { kind: 'refuse'; inner: GrowthDirective }
   | { kind: 'until'; inner: Directive; until: Terminator }
-  | { kind: 'open-modal'; modal: string }
+  | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'submit-modal'; key: string; value: string };
 
 export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
@@ -300,7 +301,10 @@ export function parseDirectiveLine(text: string): Directive | null {
   }
 
   const opening = OPEN_MODAL.exec(text)?.groups;
-  if (opening) return { kind: 'open-modal', modal: opening.name };
+  if (opening) {
+    if (!isModalScreen(opening.name)) throw new DslError(modalScreenRefusal(opening.name));
+    return { kind: 'open-modal', modal: opening.name };
+  }
 
   if (SUBMIT_MODAL_VERB.test(text)) {
     const submit = SUBMIT_MODAL.exec(text)?.groups;
@@ -446,7 +450,7 @@ export const test = section<Test>()({
     { form: 'allocate: <item> at <q>,<r> slot <direction>', example: 'allocate: cluster-jewel at 0,0 slot ne' },
     { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: feed cluster-jewel with fervour' },
-    { form: 'open-modal: <modal>', example: 'open-modal: name-yourself' },
+    ...MODAL_SCREENS.map((screen) => ({ form: `open-modal: ${screen}`, example: `open-modal: ${screen}` })),
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },
   ],
   parse: (raw) => {

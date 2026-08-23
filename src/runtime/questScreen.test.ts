@@ -31,7 +31,7 @@ const opened = () => {
 const asked = (session: ReturnType<typeof opened>) => view(session).modals[0]!.options[0]!;
 
 describe('the journal as a screen the engine opens', () => {
-  it('opens by name, the way any modal a # modal may declare does', () => {
+  it('opens by name, the way every screen the language names does', () => {
     expect(view(opened()).modals.map((modal) => modal.name)).toEqual(['quest-journal']);
   });
 
