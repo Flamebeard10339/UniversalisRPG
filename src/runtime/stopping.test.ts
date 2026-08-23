@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { restorePools } from './effects';
-import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
+import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_MS, useAction, WaitedOut } from './runtime';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
@@ -371,5 +371,70 @@ describe('a start condition that stops holding', () => {
     resolve(state, registry, secondsToMs(6));
     expect(state.inventory['blessing']).toBe(6);
     expect(state.activeAction).not.toBeNull();
+  });
+});
+
+// One grind, read five ways. A quarter of the tree a swing and two swings allowed is a cycle that
+// runs out, so `on unfinished:` is reached on every reading below and only the terminator changes.
+const GRIND = `
+# stat felling
+base: 0.25
+
+# flag gave-up
+
+# event giving-up
+trigger: unfinished
+
+# location grove
+x: 0, y: 0
+starting
+entities: dead-alder
+
+# entity dead-alder
+grind:
+  continuous
+  time: 1
+  damage: felling
+  attempts: 2
+  on unfinished:
+    set: gave-up
+`;
+
+const CYCLE_SECONDS = 2;
+
+function grinding(rewrite: (source: string) => string = (source) => source): { waited: WaitedOut; state: GameState } {
+  const registry = loadInEnglish(rewrite(GRIND));
+  const state = createGameState('grove');
+  initResources(state, registry);
+  useAction('entity', 'dead-alder', 'grind', registry, state);
+  return { waited: resolveUnderWay(state, registry), state };
+}
+
+const dropping = (line: string) => (source: string) => source.replace(`${line}\n`, '');
+const after = (line: string, added: string) => (source: string) => source.replace(line, `${line}\n${added}`);
+
+describe('attempts: is a budget for one cycle, and a repeating action is handed a fresh one', () => {
+  it('runs out on every reading, and ends only where the action names what ends it', () => {
+    const once = grinding(dropping('  continuous'));
+    expect(once.waited).toEqual({ ended: true });
+    expect(once.state.flags['gave-up']).toBe(true);
+    expect(once.state.time).toBe(secondsToMs(CYCLE_SECONDS));
+
+    const repeated = grinding();
+    expect(repeated.state.flags['gave-up'], 'the handler runs — it is the cycle behind it that never stops coming').toBe(true);
+    expect(repeated.waited.ended).toBe(false);
+    expect(repeated.state.time).toBeGreaterThanOrEqual(UNDER_WAY_LIMIT_MS);
+
+    const unbudgeted = grinding(dropping('  attempts: 2'));
+    expect(unbudgeted.state.flags['gave-up'], 'nothing ran out, so nothing was given up on').toBeUndefined();
+    expect(unbudgeted.waited.ended, 'the same four hours with no attempts: written at all').toBe(false);
+    expect(unbudgeted.state.time).toBeGreaterThanOrEqual(UNDER_WAY_LIMIT_MS);
+
+    for (const naming of [after('    set: gave-up', '    stop'), after('  attempts: 2', '  stops on: giving-up')]) {
+      const ends = grinding(naming);
+      expect(ends.waited).toEqual({ ended: true });
+      expect(ends.state.flags['gave-up']).toBe(true);
+      expect(ends.state.time).toBe(secondsToMs(CYCLE_SECONDS));
+    }
   });
 });

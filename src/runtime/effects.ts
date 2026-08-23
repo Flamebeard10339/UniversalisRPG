@@ -407,11 +407,12 @@ export function requireResource(registry: Registry, resourceId: string): Resourc
 export function emptyPoolNow(segment: Segment, actorId: string, resourceId: string, credit: string): void {
   const store = poolStores(segment.state).find((each) => each.actorId === actorId);
   if (!store) return;
-  store.levels[resourceId] = 0;
+  const resource = requireResource(segment.registry, resourceId);
+  const max = toMilliUnits(statValue(resource.max, segment.state, segment.registry, actorId));
   clearActorDeltas(segment.deltas, actorId);
   const previous = segment.credit;
   segment.credit = credit;
-  fireEvents(segment, actorId, 'on empty', resourceId);
+  setPoolLevel(segment, store, resource, store.levels[resourceId] ?? 0, 0, max);
   segment.credit = previous;
 }
 
