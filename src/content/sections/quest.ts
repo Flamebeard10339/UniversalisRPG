@@ -102,7 +102,7 @@ const stageLines = (stage: QuestStage): string[] => [
   ...stage.speech.flatMap((each) => [`  ${each.owner} says:`, ...indentLines(nodeBody(each.node), 2)]),
 ];
 
-const flagOf = (quest: Quest, stage: string): string => `${quest.id}.${stage}`;
+const flagOf = (quest: { id: string }, stage: string): string => `${quest.id}.${stage}`;
 
 const names = (id: string): Condition => ({ kind: 'reference', reference: { path: id.split('.') } });
 const not = (held: Condition): Condition => ({ kind: 'not', condition: held });
@@ -208,6 +208,12 @@ const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
 // One line, said in both places a hint can be written, because it is the same rule in both.
 const HINT_WHEN_NOTE = 'the last hint whose condition holds is the one shown, so a plain `hint:` written above is the default and each of these is an exception to it';
 
+// A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
+const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored`;
+
+// A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, said out of that grammar's own forms so a form added to it is said here too.
+const DONE_WHEN_NOTE = `the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag: ${condition.forms.join(', ')}`;
+
 function questProblem(quest: Quest): string | undefined {
   if (quest.stages.length === 0) return 'a quest is its stages, and this one has none';
   const seen = new Set<string>();
@@ -235,11 +241,12 @@ export const quest = section<Quest>()({
     {
       form: 'stage <name>:',
       example: 'stage offered:',
+      note: STAGE_NOTE,
       block: (): Written[] => [
         { form: 'log: <text>', example: 'log: Miki offered to show you the ropes.', family: 'what the journal says', note: 'what the journal reads while the quest stands here' },
         { form: 'hint: <text>', example: 'hint: Talk to Miki in the guide house.', family: 'what the journal says' },
         { form: 'hint when <condition>: <text>', example: 'hint when has core.bread: Take the loaf back to Miki.', family: 'what the journal says', holds: () => ({ condition }), note: HINT_WHEN_NOTE },
-        { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: 'the quest leaves this stage on its own once this holds' },
+        { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },
         { form: '<entity> says:', example: 'miki says:', family: 'what is said here', names: { entity: 'entity' }, note: 'lines that entity speaks while the quest stands here, written as a dialogue node is', block: () => nodeGrammar({ hole: 'stage', like: 'sendoff' }) },

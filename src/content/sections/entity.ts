@@ -110,7 +110,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   maps: {
     entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]],
   },
-  nestsActions: true,
+  nestsActions: 'only while the player stands in a location this entity stands in',
   text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,

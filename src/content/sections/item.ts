@@ -68,7 +68,7 @@ export const item = section<Item, never, 'actions'>()({
   kind: 'item',
   ids: 'owned',
   map: 'items',
-  nestsActions: true,
+  nestsActions: 'wherever the player is carrying one, since an item goes where the player goes',
   text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,

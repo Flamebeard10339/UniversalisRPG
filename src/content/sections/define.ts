@@ -1,4 +1,4 @@
-import { actionLines } from '../../grammar/action';
+import { actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
 import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
@@ -51,7 +51,8 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
 interface Common<V extends { id: string }> {
   kind: string;
   ids: Ids;
-  nestsActions?: true;
+  // Where the actions written under this kind reach, said as the rest of "offered …". A kind that nests actions is the only thing that knows this — nothing in the engine can tell an item the player carries from an entity that stays where it stands — so declaring the reach is how a kind declares that it nests them at all.
+  nestsActions?: string;
   // Flags every section of this kind owns without an author writing them.
   flags?: readonly string[];
   // The result lists an author wrote here, whose spoken lines key under this id.
@@ -135,6 +136,13 @@ const namedFields = (schema: AnySchema): readonly Named[] =>
     return kind === undefined ? [] : [{ field, kind, site: `${spec.keyword ?? field}:`, list: isListField(schema, field), standsWithout: spec.standsWithout === true }];
   });
 
+// How an action nested under a kind is addressed and how far it reaches, laid on the lines `actionBody` itself declares. Those forms are what tells an action apart from whatever else a kind nests beside it — an entity's `on <event>:` is not offered anywhere — and the reach is the kind's own word, so this is written once for however many kinds nest actions.
+function nestedActionLines(kind: string, offered: string, lines: readonly Written[]): readonly Written[] {
+  const own = new Set(actionBody.grammar.map((line) => line.form));
+  const note = `addressed as \`${kind}.<${kind}>.<action>\`, which is how a # test names one, and offered ${offered}`;
+  return lines.map((line) => (own.has(line.form) ? { ...line, note } : line));
+}
+
 const ACTION_OWNERS = new Set<string>();
 
 export const isActionOwnerKind = (kind: string): boolean => ACTION_OWNERS.has(kind);
@@ -151,12 +159,13 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions = false, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, map, maps, nestsActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
-    if (nestsActions) ACTION_OWNERS.add(kind);
+    if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
   if (schema === undefined && typeof (spec as Bespoke<V>).parse !== 'function') throw new Error(`# ${kind} declares neither fields nor a parse`);
     const names = schema === undefined ? [] : namedFields(schema);
+    const written = schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar;
     const visited = (value: V, where: string, visit: Visit): void => {
       for (const each of names) {
         const at = `${where} ${each.site}`;
@@ -202,10 +211,10 @@ export const section =
       ids,
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
-      nestsActions,
+      nestsActions: nestsActions !== undefined,
       flags,
       names,
-      grammar: schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar,
+      grammar: nestsActions === undefined ? written : nestedActionLines(kind, nestsActions, written),
       says,
       members,
       text,

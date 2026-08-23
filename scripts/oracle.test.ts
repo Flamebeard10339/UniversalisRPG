@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { actionBody } from '../src/grammar/action';
+import { condition } from '../src/grammar/condition';
 import { offeringAt } from '../src/content/completion';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 import { literalOf } from '../src/content/completion';
@@ -35,6 +37,45 @@ describe('the grammar tree', () => {
 
   it('says so where no such kind is named', () => {
     expect(treeOf('nonsense')).toEqual(['# nonsense — no such kind']);
+  });
+
+  // The block an author writes under one kind is the block they write under every other, and how far the action reaches is the one thing it cannot show them. Every kind that nests actions is asked here, so a fourth of them arrives noted or not at all.
+  describe('an action nested under a kind', () => {
+    const owners = sectionKinds().filter((kind) => sectionFor(kind)!.nestsActions);
+
+    it('is nested by more than one kind, which is why the reach has to be said at all', () => {
+      expect(owners.length).toBeGreaterThan(1);
+    });
+
+    it.each(owners)('%s says how one of its actions is addressed and how far it reaches', (kind) => {
+      const bearing = treeOf(kind).filter((line) => line.includes(`\`${kind}.<${kind}>.<action>\``));
+
+      expect(bearing).toHaveLength(actionBody.grammar.length);
+      for (const line of bearing) {
+        expect(line).toContain(' and offered ');
+        expect(actionBody.grammar.some((written) => line.trim().startsWith(written.form)), `# ${kind}: ${JSON.stringify(line)} is not a line an action is written on`).toBe(true);
+      }
+    });
+
+    it('reaches somewhere different under each kind, which is what an author cannot read off the block', () => {
+      const reach = (kind: string): string => treeOf(kind).find((line) => line.includes(' and offered '))!.split(' and offered ')[1]!;
+
+      expect(new Set(owners.map(reach)).size).toBe(owners.length);
+    });
+  });
+
+  // A quest stage is a name other content reads and a condition of its own, and neither is anything the word `stage` says.
+  describe('a quest stage', () => {
+    const lineOf = (form: string): string => treeOf('quest').find((line) => line.trim().startsWith(form))!;
+
+    it('says the flag its name declares', () => {
+      expect(lineOf('stage <name>:')).toContain('`<quest>.<stage>`');
+    });
+
+    it('says the whole of the condition grammar where it says it is done, off that grammar itself', () => {
+      const said = lineOf('done when:');
+      for (const form of condition.forms) expect(said).toContain(form);
+    });
   });
 
   it('holds the fields of a kind whose grammar it writes itself', () => {

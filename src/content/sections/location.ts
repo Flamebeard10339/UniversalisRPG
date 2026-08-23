@@ -189,7 +189,7 @@ export const location = section<Location, 'starting', 'actions'>()({
   ...SCHEMA,
   ids: 'owned',
   map: 'locations',
-  nestsActions: true,
+  nestsActions: 'only while the player is standing here',
   text: ['title', 'examine'],
   print: printLocation,
   visit: (value, where, visit) => {
