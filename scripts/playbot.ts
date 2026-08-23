@@ -231,8 +231,11 @@ function renderDiscovered(v: PlayView): string[] {
   return v.discovered.map((each) => `${each.title}${each.adjacent.length === 0 ? '' : ` → ${each.adjacent.filter((edge) => edge.open).map((edge) => edge.to).join(' ')}`}`);
 }
 
+// A location holds a count of its kind and not a roster, so the foe standing after a kill wears the
+// id of the one that fell. Saying how many of its kind are left is what tells a player it is a new
+// one at full health rather than the old one healing — two runs reported that as a broken fight.
 function renderEncounter(v: PlayView): string[] {
-  return v.encounter === null ? [] : v.encounter.foes.map((foe) => `${foe.title} ${foe.current}/${foe.max}`);
+  return v.encounter === null ? [] : v.encounter.foes.map((foe) => `${foe.title} ${foe.current}/${foe.max}${foe.remaining === null ? '' : ` (${foe.remaining} of its kind still standing here)`}`);
 }
 
 // The view decides which of an action's figures mean anything: `completion` arrives as null when

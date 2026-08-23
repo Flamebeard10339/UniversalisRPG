@@ -39,7 +39,7 @@ import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
 import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
-import { msUntilEmpty, toMilliUnits, fromMilliUnits } from './units';
+import { msUntilEmpty, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
 
 export { advanceTime, createGameState, PLAYER } from './state';
 export { endAction, endJourney } from './actionEnd';
@@ -494,8 +494,11 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   }
 }
 
-// An author waiting out an action wants it finished, not a number of seconds guessed large enough to cover it. What is under way is stepped one unit of its own at a time — the cycle the progress bar reads — and stops the moment nothing is in flight, so a fight ends when the last swing lands rather than when a clock a test picked runs out. An action that never ends runs into the step cap and says so, rather than running forever.
-const UNDER_WAY_STEPS = 1000;
+// An author waiting out an action wants it finished, not a number of seconds guessed large enough to cover it. What is under way is stepped one unit of its own at a time — the cycle the progress bar reads — and stops the moment nothing is in flight, so a fight ends when the last swing lands rather than when a clock a test picked runs out.
+//
+// Some worlds never go quiet: an `aggressive` location that respawns its dead hands the loop a fresh fight forever, and a player who out-regenerates it never reaches the death that would have stopped them. So the loop carries a backstop of its own for the case where none of the terminators that do the real work — nothing left in flight, a condition met, `attempts:` spent, the player dead — ever fires. It is measured in the world's time rather than in steps of it: an author should not have to remember to write one, and how many cycles a thing took is not a question anyone asked. Four hours is how long a player may be left running unattended, and this loop is the engine running the world on their behalf, so it is the same number; anything shorter is a policy about how much game time one directive should be allowed to spend, which would cut off a legitimate `until xp.mining >= 500`. Nothing in the corpus spends more than half a minute here.
+export const UNDER_WAY_LIMIT_HOURS = 4;
+export const UNDER_WAY_LIMIT_MS = UNDER_WAY_LIMIT_HOURS * 60 * MS_PER_MINUTE;
 
 export interface WaitedOut {
   ended: boolean;
@@ -519,14 +522,15 @@ export type UnderWayTest = (state: GameState, registry: Registry) => boolean;
 // `wait: done` is this stepped with no test of its own: the only thing it is waiting for is the
 // moment nothing is left in flight, which the loop already checks on every step regardless.
 export function resolveUnderWay(state: GameState, registry: Registry, satisfied: UnderWayTest = () => false): WaitedOut {
-  for (let step = 0; step < UNDER_WAY_STEPS; step++) {
+  const startedAt = state.time;
+  for (;;) {
     if (satisfied(state, registry)) return { ended: true };
     if (!state.activeAction && !state.journey) return { ended: true };
+    if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_LIMIT_HOURS} hours of game time, which is as long as the engine will run the world on the player's behalf` };
     const unit = underWayUnit(state, registry);
     if (!(unit > 0)) return { ended: false, reason: 'what is under way advances by nothing, so waiting it out would never end' };
     advanceUnderWayCycle(state, registry);
   }
-  return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_STEPS} of its own cycles` };
 }
 
 function grantFoodBuff(item: Item, state: GameState): void {

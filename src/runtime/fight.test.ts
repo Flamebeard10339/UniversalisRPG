@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve } from './runtime';
+import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS } from './runtime';
 import { hostile, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
@@ -475,5 +475,88 @@ describe('a swing the player lands on themselves', () => {
     logSwing(state, registry, PLAYER, PLAYER, null);
 
     expect(state.log).toEqual(['The Player hits the Player for 3.', 'The Player misses the Player.']);
+  });
+});
+
+// The location never goes quiet on its own: what the player kills is back within a couple of
+// seconds, so something is always standing for `aggressive` to open the next fight on. The player
+// regenerates faster than a limpet can hurt them, so the death that legitimately stops a dangerous
+// action never arrives either, and nothing is left to end the loop but the loop's own bound.
+const TIDEPOOL = `
+# stat attack
+base: 4
+
+# stat dr
+
+# stat attack-rate
+base: 60
+
+# stat regeneration
+base: 600
+
+# stat max-health
+
+# resource health
+rate: regeneration
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# faction world
+
+# faction player
+
+# action swing
+title: swing
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+faction: player
+stats: max-health 100, attack 4, attack-rate 60
+uses: swing
+
+# entity limpet
+faction: world
+stats: max-health 12, attack 4, attack-rate 60
+uses: swing
+aggressive
+respawn after: 2s
+
+# location tidepool
+x: 0, y: 0
+starting
+entities: 3 limpet
+`;
+
+describe('an action under way is bounded in the time of the world it runs in', () => {
+  it('gives up on a room that respawns what it loses, rather than stepping it forever', () => {
+    const registry = loadInEnglish(TIDEPOOL);
+    const state = standing(registry, 'tidepool');
+    resolve(state, registry, secondsToMs(1));
+    expect(state.activeAction, 'nothing opened on the player, so there was never anything to wait out').not.toBeNull();
+
+    const waited = resolveUnderWay(state, registry);
+
+    expect(waited.ended, 'a room that never goes quiet was waited out to the end').toBe(false);
+    expect(waited.reason).toContain(`${UNDER_WAY_LIMIT_HOURS} hours`);
+    expect(state.time).toBeGreaterThanOrEqual(UNDER_WAY_LIMIT_MS);
+    expect(state.activeAction, 'the world is still fighting where the loop left it').not.toBeNull();
+    expect(state.resources['health'], 'the player was never the thing that stopped it').toBeGreaterThan(0);
+  });
+
+  it('leaves a fight that does end exactly where it ended, having spent none of the bound on it', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = standing(registry, 'camp');
+    armFightAction('swing', 'bandit-leader', registry, state);
+
+    const waited = resolveUnderWay(state, registry);
+
+    expect(waited).toEqual({ ended: true });
+    expect(state.activeAction).toBeNull();
+    expect(state.time).toBeLessThan(UNDER_WAY_LIMIT_MS);
   });
 });

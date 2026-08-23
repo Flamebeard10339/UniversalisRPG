@@ -11,6 +11,7 @@ import { fileSlots } from './lib/slotFile';
 import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
 import { type Localized, type Localizer } from '../src/runtime/localized';
 import { openUniverse, type OpenedUniverse } from '../src/runtime/openUniverse';
+import { type EncounterFoe } from '../src/runtime/encounter';
 import { serializeSession, sessionLocalizer, view, type PlayChoice, type PlayStatus, type PlayView } from '../src/runtime/session';
 import {
   askedOption,
@@ -114,9 +115,15 @@ function formatResources(resources: PlayView['resources'], localizer: Localizer)
   return lines;
 }
 
+// A location holds a count of its kind and not a roster, so the foe standing after a kill wears the
+// id of the one that fell. `×3` beside the bar is how a reader tells a fresh foe at full health from
+// the one they were hitting healing itself back up. It rides in as part of the meter because a
+// numeral is the same in every language the pool line is written in.
+const meterFor = (foe: EncounterFoe): string => `${fullBar(foe.current, foe.max)}${foe.remaining === null ? '' : `  ×${foe.remaining}`}`;
+
 function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer): PlayerLine[] {
   if (!encounter) return [];
-  const lines = encounter.foes.map((foe) => say(pool(localizer, foe.title, fullBar(foe.current, foe.max))));
+  const lines = encounter.foes.map((foe) => say(pool(localizer, foe.title, meterFor(foe))));
   const meters = [localizer.engine('engine.repl.swing', { meter: localizer.identifier(minimalGlyph(encounter.cadence, 1)) })];
   for (const foe of encounter.foes) {
     if (foe.cadence !== null) meters.push(pool(localizer, foe.title, minimalGlyph(foe.cadence, 1)));

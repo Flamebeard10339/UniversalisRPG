@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
+import { armAction, armFightAction, createGameState, encounterView, GameState, grantBuff, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
@@ -87,6 +87,10 @@ stats: max-health 3, dr 99
 dent:
   time: 1
   say: Clang.
+
+# location training-hall
+x: 0, y: 0
+entities: 3 training-dummy, anvil
 `;
 
 function loaded(): Registry {
@@ -261,5 +265,38 @@ describe('a two-sided action resolves per attempt, and stays associative doing i
       expect(folded.activeAction).toEqual(oneShot.activeAction);
       expect(folded.resources).toEqual(oneShot.resources);
     }
+  });
+});
+
+// A location declares how many of a kind stand in it, never which ones, so the dummy left standing
+// after a kill is indistinguishable by id from the one that fell. What the view can honestly say is
+// how many of the kind are left, and it says it by asking the population — the same reading
+// `standing` gives everything else, not a tally of its own that would have to be kept in step.
+describe('how many of a foe are left is read off the population, not counted twice', () => {
+  const inTheHall = (registry: Registry): GameState => {
+    const state = createGameState('training-hall');
+    initResources(state, registry);
+    return state;
+  };
+
+  it('falls as the population falls', () => {
+    const registry = loaded();
+    const state = inTheHall(registry);
+    armFightAction('strike', 'training-dummy', registry, state);
+    expect(encounterView(state, registry)!.foes.map((foe) => [foe.id, foe.remaining])).toEqual([['training-dummy', 3]]);
+
+    resolve(state, registry, secondsToMs(2));
+    expect(state.populations['training-hall']['training-dummy'].down).toBe(1);
+
+    armFightAction('strike', 'training-dummy', registry, state);
+    expect(encounterView(state, registry)!.foes[0].remaining).toBe(2);
+  });
+
+  it('says nothing of a foe the location holds no population of', () => {
+    const registry = loaded();
+    const state = inTheHall(registry);
+    armFightAction('strike', 'straw-man', registry, state);
+
+    expect(encounterView(state, registry)!.foes.map((foe) => [foe.id, foe.remaining])).toEqual([['straw-man', null]]);
   });
 });

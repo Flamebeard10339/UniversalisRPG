@@ -7,7 +7,8 @@ import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
 import { declaredId } from '../content/sections/entity';
 import { hostile, Registry } from '../content/registry';
 import { findActiveAction } from './actions';
-import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER } from './state';
+import { standing } from './population';
+import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER, templateOf } from './state';
 import { Answer, Localized, localizerOf, Params } from './localized';
 import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
 
@@ -75,6 +76,12 @@ export interface EncounterFoe {
   current: number;
   max: number;
   cadence: number | null;
+  // How many of this foe's kind still stand where the player is — null for one that is no part of
+  // the location's population, such as an ally called in or a fight-scoped copy of one. A location
+  // holds a count and not a roster, so the rat now standing is the rat that died as far as any id
+  // goes, and without this a player watching a full-health foe replace a felled one reads it as a
+  // healing enemy. Two of them did.
+  remaining: number | null;
 }
 
 export interface EncounterView {
@@ -94,6 +101,13 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
   };
   const resource = requireResource(registry, action.depletes.id);
   const swinging = new Map(participants(state, registry).map((each) => [each.self, each]));
+  const here = registry.locations.get(state.location);
+  const alive = new Map(here ? standing(state, registry, here).map((entry) => [entry.entity, entry.count]) : []);
+  const stillHere = (actorId: string): number | null => {
+    const template = templateOf(actorId);
+    if (!here?.entities.some((entry) => entry.entity === template)) return null;
+    return alive.get(template) ?? 0;
+  };
 
   const foes: EncounterFoe[] = [];
   for (const [actorId, actor] of Object.entries<ActorState>(active.actors ?? {})) {
@@ -105,6 +119,7 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
       current: fromMilliUnits(actor.resources[resource.id] ?? 0),
       max: statValue(resource.max, state, registry, actorId),
       cadence: swing ? fractionOf(swing.cadence, actorId, swing.action) : null,
+      remaining: stillHere(actorId),
     });
   }
   return { cadence: fractionOf(playerCadence(active), PLAYER, action), foes };
