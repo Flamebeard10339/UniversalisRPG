@@ -3,6 +3,10 @@ import type { CommandResult } from '../runtime/command';
 import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import { memoryDriver } from '../runtime/store';
 import { slotStore } from '../runtime/store';
+import { engineLocale } from '../content/engineLocale';
+import { browserSlots } from './browserStore';
+import { pageStorage } from './agent/pageStorage';
+import { createDriver, type Driver } from './driver';
 import { attached, createRecorder, edited, emptyNotes, feedbackOn, turnsPlayed } from './playtest';
 
 const took: CommandResult = { output: [], quit: false, recorded: [] };
@@ -139,5 +143,61 @@ describe('the recorder', () => {
     );
     createRecorder(refusing, (text) => void said.push(text)).start();
     expect(said).toEqual(['the playtest run could not be kept: the quota has been exceeded']);
+  });
+});
+
+// The deliverable, end to end and through the driver rather than the DOM: an author plays, says
+// what they thought, and what comes out is what a playbot run is written in.
+describe('a run an author played in the app', () => {
+  const WORKSHOP = {
+    name: 'workshop',
+    text: [
+      '# info workshop',
+      'version: 1.0.0',
+      '',
+      '# location workshop',
+      'x: 0, y: 0',
+      'starting',
+      'examine: A bench and a lathe.',
+      'entities:',
+      '  lathe',
+      '',
+      '# entity lathe',
+      'title: Lathe',
+      'examine: A lathe, belt slack.',
+      '',
+    ].join('\n'),
+  };
+
+  const playing = (): Driver => createDriver([engineLocale(), WORKSHOP], { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined });
+
+  it('holds nothing until the author starts one, so an ordinary session records nothing', () => {
+    const driver = playing();
+    driver.send('/look');
+    expect(driver.snapshot().playtest).toBeNull();
+    expect(driver.playtest.written()).toBe('');
+  });
+
+  it('reads back as a playbot run does: the line, whether it was taken, and what it answered', () => {
+    const driver = playing();
+    driver.playtest.start();
+    driver.send('use:entity.workshop.lathe.examine');
+    driver.send('travel:nowhere-at-all');
+
+    const written = driver.playtest.written().split('\n');
+    expect(written[0]).toMatch(/^turn 1 \[applied\] use:entity\.workshop\.lathe\.examine — note: \(none\); expected: \(none\); confusion: \(none\); result: /);
+    expect(written[0]).toContain('A lathe, belt slack.');
+    expect(written[written.length - 1]).toMatch(/^turn 2 \[refused\] travel:nowhere-at-all —/);
+  });
+
+  it('carries the author’s own words on the turn they were about', () => {
+    const driver = playing();
+    driver.playtest.start();
+    driver.send('use:entity.workshop.lathe.examine');
+    const about = feedbackOn(driver.snapshot().playtest ?? []);
+    driver.playtest.attach(about!.turn, { ...emptyNotes(), expected: 'to be able to fix the belt', confusion: 'the lathe is described but does nothing' });
+
+    expect(driver.playtest.written()).toContain('expected: to be able to fix the belt');
+    expect(driver.playtest.written()).toContain('confusion: the lathe is described but does nothing');
   });
 });
