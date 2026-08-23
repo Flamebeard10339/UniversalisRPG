@@ -1,5 +1,4 @@
 import type { EngineKey } from '../content/locale';
-import type { GameState } from './state';
 
 export type SettingValue = boolean | number | string;
 
@@ -55,12 +54,10 @@ export function isSettingSheet(value: unknown): boolean {
   return SETTING_NAMES.every((name) => isValue(held[name]));
 }
 
-export const settingStands = (state: GameState, name: SettingName): SettingValue => state.settings[name] ?? settingNamed(name).standing;
+export const settingStands = (sheet: SettingSheet, name: SettingName): SettingValue => sheet[name] ?? settingNamed(name).standing;
 
 export const standingChoice = (name: SettingName, value: SettingValue): SettingChoice | undefined => settingNamed(name).choices.find((choice) => choice.value === value);
 
 export const choiceWritten = (name: SettingName, typed: string): SettingChoice | undefined => settingNamed(name).choices.find((choice) => choice.typed === typed);
 
-export function chooseSetting(state: GameState, name: SettingName, choice: SettingChoice): void {
-  state.settings = { ...state.settings, [name]: choice.value };
-}
+export const chosenSetting = (sheet: SettingSheet, name: SettingName, choice: SettingChoice): SettingSheet => ({ ...sheet, [name]: choice.value });

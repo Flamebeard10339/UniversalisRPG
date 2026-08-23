@@ -38,7 +38,7 @@ import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 import { spanStart, type SpanStart } from './span';
-import { choiceWritten, chooseSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
+import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
@@ -444,7 +444,7 @@ export function settingRows(state: GameState, registry: Registry): SettingRow[] 
       name,
       title: localizer.engine(setting.title),
       note: localizer.engine(setting.note),
-      standing: standingChoice(name, settingStands(state, name))?.typed ?? '',
+      standing: standingChoice(name, settingStands(state.settings, name))?.typed ?? '',
       choices: setting.choices.map((choice) => ({ written: choice.typed, shown: localizer.engine(choice.shown) })),
     };
   });
@@ -745,7 +745,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       if (!isSettingName(directive.setting)) throw new RuntimeError(`unknown setting: ${directive.setting} — this run is played by ${SETTING_NAMES.join(', ')}`);
       const choice = choiceWritten(directive.setting, directive.value);
       if (!choice) throw new RuntimeError(`${directive.setting} is not played ${directive.value}: it is played ${settingNamed(directive.setting).choices.map((each) => each.typed).join(' or ')}`);
-      chooseSetting(state, directive.setting, choice);
+      state.settings = chosenSetting(state.settings, directive.setting, choice);
       return {};
     }
     case 'feed':

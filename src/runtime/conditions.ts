@@ -22,7 +22,7 @@ export interface Answered {
 const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registry: Registry) => Answered>> = {
   time: (_id, state) => ({ value: msToSeconds(state.time) }),
   player: (id, state) => ({ value: state.player[id as PlayerField], names: PLAYER_SHEET[id as PlayerField]?.names ?? undefined }),
-  setting: (id, state) => ({ value: isSettingName(id) ? settingStands(state, id) : undefined }),
+  setting: (id, state) => ({ value: isSettingName(id) ? settingStands(state.settings, id) : undefined }),
   xp: (id, state) => ({ value: state.xp[id] ?? 0 }),
   level: (id, state) => ({ value: skillLevel(state.xp[id] ?? 0) }),
   resource: (id, state) => ({ value: fromMilliUnits(state.resources[id] ?? 0) }),
