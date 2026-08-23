@@ -197,6 +197,74 @@ freshly re-armed each time — which was the bug.
   writing that implies a mechanic is a promise, and a playtester files it as a bug.
 - **No way to rest or heal**, noticed at 14/30 health with nothing to do about it.
 
+## What run 4 turned into, 2026-08-22
+
+### `until` is a terminator an author names, and `done` is one value of it
+
+    use: melee-combat on giant-rat until done
+    use: melee-combat on giant-rat until resource.health < 10
+    craft: cooked-herring until inventory.cooked-herring >= 100
+
+The terminator after `until` is either the word `done` — nothing under way, which
+is a fact about the action system and no engine root names it — or **any condition
+`assert:` takes, parsed by the same parser**. So stress-testing a drop rate or an
+xp curve is a line an author writes rather than a number they guess, and there is
+no second predicate language. `resolveUnderWay` was generalized to take the
+stopping test rather than hard-coding one, so there is still exactly one loop that
+steps an action a cycle at a time.
+
+Written narrow first and widened mid-flight by the repository owner, which was the
+right call: `until done` alone would have had to be written twice the day a
+balance test needed `until xp.melee >= 500`.
+
+It also deleted a guessed number. `miki-route-full` fought three times with
+`wait: 30` under a comment admitting 30s was far longer than the ~6s needed; the
+fixture's `time` fell from 117200 to 36800 and nothing else moved.
+
+**A terminator may only follow a payload that spells itself out.** The split was
+first tried before every other directive shape, which would have read
+`choose: I will wait until morning` — free text, a line a player is shown — as a
+wrapper around `choose: I will wait`, and then refused `morning` as an undeclared
+flag at load. Trying it after free text and before anything that would swallow the
+tail costs one line and no table of eligible kinds.
+
+### `sticky` and `again:` cannot both be set, and the corpus sets both — STILL OPEN
+
+`enterNode` (`src/runtime/dialogue-runtime.ts:65`) reads
+
+    const replay = visit === 1 || node.sticky === true;
+    if (!replay && node.again) …
+
+so `sticky` replays the node whole every visit and **`again:` is unreachable on any
+node that has it**. Every `sticky` + `again:` pairing in
+`content/tutorial-quests.dsl` — six of them — has a dead `again:`, and each of
+those dead lines is a bare `@@@`, which is why they read as unwritten rather than
+as unreachable.
+
+This was found by a coding agent that had been told the opposite in its own brief
+and read the runtime instead of believing it. **It is a contradiction the engine
+should refuse:** declaring what a node says on a later visit, on a node that never
+has a later visit, is not a rough line — it is a line that can never be said. First
+home on `facts-to-home.md`'s list, and it removes six of the corpus's bare marks by
+deleting them rather than by writing them.
+
+### Everyone in Tulsa answers the second time
+
+Thirteen dialogues gained an `again:`. `again:` alone, not `sticky` — for the
+reason above.
+
+The claim that keeps it true derives its subjects from the corpus's own dialogue
+owners: every owner for whom exactly one node is ever offered, so nothing else can
+take the turn, must still say something on a second visit. It names nobody, and it
+listed exactly the thirteen when it was run before the fix.
+
+**It was first written in the content layer, where `layer-check` forbids reaching
+the runtime, so it re-derived `enterNode`'s decision by reading it.** Two readings
+of one rule drift the day the rule moves — and this rule had just been misread by
+two people in one afternoon. It now lives in `src/runtime/dialogue-runtime.test.ts`
+and calls `talk()` twice for real, which is the layer the behaviour belongs to and
+the folder `CLAUDE.md` says a test lives in.
+
 ## Reviewing the writing, 2026-08-22
 
 `npm run review [-- <module>...]` prints every line the game can say, under the
