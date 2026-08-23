@@ -74,6 +74,7 @@ export function validateTestReferences(test: Test, registry: Registry): void {
   const slots = registrySlots(registry);
   const directive = (value: Directive, where: string): void => {
     if (value.kind === 'begin') return directive(value.inner, `${where} begin:`);
+    if (value.kind === 'until') return directive(value.inner, `${where} until:`);
     if (value.kind === 'unequip') {
       if (!slots.has(value.slot)) throw new DslError(`${where} unequip: names an unknown slot: ${value.slot}`);
       return;
