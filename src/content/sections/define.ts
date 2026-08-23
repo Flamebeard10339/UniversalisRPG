@@ -4,7 +4,7 @@ import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
 import { DslError, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
-import { RawSection, sectionParser } from '../../grammar/structure';
+import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, put, strings } from '../refs';
 import { mergeFields } from '../merge';
@@ -16,6 +16,25 @@ export type { PrintContext };
 export type Ids = 'owned' | 'global' | 'none';
 
 export type Maps = Record<string, Map<string, never>>;
+
+// A section written to prove something about the engine, which ships to nobody. Upper case because nothing else in the language is, so it can never be read as an id, a keyword or a value of some kind's own; and written under the heading rather than in it, because a heading is rebuilt from its parts wherever a section is moved or renamed and a body line is carried along whole.
+export const DEBUG_MARK = 'DEBUG';
+
+// The line every kind takes and no kind declares. It is not in any kind's grammar because it belongs to none of them — what holds of every section is written here once, and the page an author reads says so in the same words.
+export const EVERY_SECTION: readonly Written[] = [
+  {
+    form: DEBUG_MARK,
+    example: DEBUG_MARK,
+    note: 'the section is written to prove something about the engine, and ships to nobody: it says nothing in any language, it never reaches `npm run review`, and anything a player can reach is refused for naming it',
+  },
+];
+
+const isMark = (line: RawLine): boolean => line.text === DEBUG_MARK;
+
+export const isDebug = (value: object | undefined): boolean => (value as { debug?: unknown } | undefined)?.debug === true;
+
+// Laid on the value rather than held in a table beside it, so every hand a section passes through — a merge, a build, a prune that spreads it, a printer — carries the mark without knowing it is there.
+const asDebug = <V extends object>(value: V): V => Object.defineProperty(value, 'debug', { enumerable: true, configurable: true, value: true });
 
 // A name the namespace holds under one value of this kind, wherever that value came from. A kind declaring this is answering for every value that lands in its map, including the ones another kind put there.
 export interface MemberName {
@@ -209,6 +228,18 @@ export const section =
       if (problem) throw new DslError(`# ${kind} ${value.id}: ${problem}`);
       return value;
     };
+    const readBody = sectionParser(schema ? (raw: RawSection) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse);
+    const read = (raw: RawSection): object => {
+      const marks = raw.body.filter(isMark);
+      if (marks.length === 0) return readBody(raw) as object;
+      for (const line of marks) requireNoBlock(line);
+      return asDebug(readBody({ ...raw, body: raw.body.filter((line) => !isMark(line)) }) as object);
+    };
+    const mergeBodies = merge ?? ((into: object | undefined, from: object) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from)));
+    const hydrate = schema
+      ? (authored: object, context: HydrateContext): V => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema) ?? undefined)
+      : (authored: object): V => built(authored as V);
+    const printBody = print ?? (schema ? (value: V, context: PrintContext) => printSection(value, schema, context, actionLines) : () => notContent(kind));
     return {
       kind,
       ids,
@@ -223,12 +254,17 @@ export const section =
       members,
       text,
       schema,
-      parse: sectionParser(schema ? (raw) => parseAnySection(raw, schema) : (spec as Bespoke<V>).parse),
-      merge: merge ?? ((into, from) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from))),
-      build: schema
-        ? (authored, context) => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema) ?? undefined)
-        : (authored) => built(authored as V),
-      print: print ?? (schema ? (value, context) => printSection(value, schema, context, actionLines) : () => notContent(kind)),
+      parse: read,
+      // A section already marked cannot be unmarked by a later edit of it: what is written to prove something about the engine stays out of the world however many modules go on to add to it.
+      merge: (into, from) => {
+        const merged = mergeBodies(into, from);
+        return isDebug(into) || isDebug(from) ? asDebug(merged) : merged;
+      },
+      build: (authored, context) => (isDebug(authored) ? asDebug(hydrate(authored, context)) : hydrate(authored, context)),
+      print: (value, context) => {
+        const lines = printBody(value, context);
+        return isDebug(value) ? [lines[0]!, DEBUG_MARK, ...lines.slice(1)] : lines;
+      },
       visit: visited,
       prune: (value, at, where) => {
         const kept = without(value, at, where);

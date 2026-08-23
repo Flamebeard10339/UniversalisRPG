@@ -17,6 +17,37 @@ effective relation lives in `Registry.roads` behind one accessor. Every road in 
 corpus runs both ways — there is deliberately **no `one-way` keyword** until
 something needs one.
 
+**`DEBUG` on a line of its own under any heading marks a section as written to
+prove something about the engine, and it ships to nobody.** It says nothing in any
+language, so `npm run review`, `npm run notes`, the translation sweep and the game
+itself all lose it at once; and anything a player can reach is **refused at load**
+for naming it, so the only way to a `DEBUG` thing is another `DEBUG` thing. Mark
+one section of a cluster and every section that names it has to be marked too —
+which is the point, and is why `content/tutorial-quests.dsl` marks six: two
+hammers, the two saves that arm them, the two tests that swing them. A `DEBUG`
+`# test` still runs; that is what it is for.
+
+**Nothing declares `DEBUG` and no kind's grammar holds it.** `section()` in
+`sections/define.ts` is the one home: it strips the line before the kind's parser
+sees it, writes it back beneath the heading when printing, and makes it **sticky
+through a merge**, so no later module can unmark a section and put it in a player's
+hands. It is exported as `EVERY_SECTION`, which the oracle's tree and the editing
+page both read — so a page that offers the line also shows it, with no second copy
+of its words.
+
+**It is a body line and not part of the heading.** A heading is rebuilt from its
+parts wherever a section is moved, renamed or edited on the GUI's authoring
+surface, and a mark written into one is dropped by every such rebuild; a body line
+rides along whole. It is upper case because nothing else in the language is, so it
+can never be read as an id, a keyword or one of a kind's own values — `# item`
+would otherwise have taken it for a tag.
+
+**A section that is only `DEBUG` is not a valid one of any kind**, which is why the
+line is in nobody's grammar: `dsl.test.ts` holds every grammar line to standing
+alone under its heading, and `# droptable`, `# save` and `# remove` each refuse a
+body with nothing in it. `# remove` cannot be marked at all, and needs no mark — it
+declares nothing for anyone to reach.
+
 **`sticky` replays a node whole; `again:` is what a non-sticky node says on a later
 visit.** The engine refuses both on one node, since `again:` is unreachable on a
 `sticky` one. Without either, a node is said once and then falls silent — and a
@@ -464,9 +495,9 @@ another declined a `testing.dsl`, each on a measurement rather than a taste.
 
 **A test declares what it swings with, so a rebalance cannot quiet it.**
 `# item million-attack-hammer` and `# item eight-a-swing-hammer` live in the module
-of the test that swings them — not in a testing module, because everything in
-`content/` ships bar `local-changes.dsl` and a second exclusion is a rule someone
-has to remember. `-100% attack` scales base *and* bonuses to nothing, so the swing
+of the test that swings them, marked `DEBUG` — not in a testing module, because a
+file the load path has to be told to leave out is a rule someone has to remember,
+while a section that says what it is carries its own answer wherever it is written. `-100% attack` scales base *and* bonuses to nothing, so the swing
 is worth the engine's floor and an `on hit: drain:` is the whole damage: genuinely
 independent of any player-side balance, which `+N attack` could never be.
 `npm run mutate` is what proves a test discriminates — deleting `useFight`'s

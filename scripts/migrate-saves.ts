@@ -5,6 +5,7 @@ import { qualify } from '../src/content/namespace';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { parseSaveSection } from '../src/content/sections/save';
+import { DEBUG_MARK } from '../src/content/sections';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { splitSections } from '../src/grammar/structure';
@@ -129,19 +130,21 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
     const namespace = namespaces.get(sources[index]) ?? null;
     for (const section of splitSections(file.text)) {
       if (section.kind !== 'save') continue;
-      const saved = parseSaveSection(section);
+      // The saved game itself, which is what is rewritten in place; a mark the section wears is none of it and stays where it is written.
+      const written = section.body.filter((line) => line.text !== DEBUG_MARK);
+      const saved = parseSaveSection({ ...section, body: written });
       const fixture: Fixture = { id: qualify(namespace, saved.id), file: file.path, version: saved.version };
       fixtures.push(fixture);
       if (saved.version === SAVE_VERSION) {
         skipped.push(fixture);
         continue;
       }
-      if (section.body.length !== 1) {
-        problems.push(`${fixture.id}: its body is ${section.body.length} lines, and rewriting one in place needs exactly one`);
+      if (written.length !== 1) {
+        problems.push(`${fixture.id}: its body is ${written.length} lines, and rewriting one in place needs exactly one`);
         continue;
       }
       const body = change.moved(saved.diff, fixture);
-      rewrites.push({ fixture, span: section.body[0].span, text: JSON.stringify({ version: SAVE_VERSION, ...body }) });
+      rewrites.push({ fixture, span: written[0].span, text: JSON.stringify({ version: SAVE_VERSION, ...body }) });
     }
   }
 

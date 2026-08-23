@@ -10,7 +10,7 @@ import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
 import { actionSlugProblem, textFieldsOf } from './sections';
 import { closeAdjacency, entitiesStood, recursivelyResolveRelativeCoordinates } from './sections/location';
-import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
+import { type Maps, buildSection, sectionFor, contentSectionMaps, isActionOwnerKind, isDebug, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
@@ -208,6 +208,26 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
   const unsupplied = unsuppliedParameters(locales, key, value);
   if (unsupplied.length === 0) return undefined;
   return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
+}
+
+// Nothing a DEBUG section says is a string this game can say. The tables are swept once they are full rather than gated at each place that fills one, so a kind or a field that starts saying something next month is covered here with no edit — and `npm run review`, `npm run notes`, the translation sweep and the game itself all read these tables, so one sweep answers for all of them.
+//
+// What a section says is filed beneath the section, which is what makes the whole of it one prefix. It is asked under every kind that holds a map and not only under the section's own, because a kind may say something through an entry it gives another kind — a quest hands a dialogue away — and those words are still the giver's.
+function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, ReadonlyMap<string, OwnedSection>>): void {
+  const kinds = contentSectionMaps().map(([kind]) => kind);
+  const prefixes: string[] = [];
+  for (const [kind, byId] of merged) {
+    for (const [id, section] of byId) {
+      if (!isDebug(section.value)) continue;
+      const namespace = isNamespacedKind(kind) ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
+      prefixes.push(...kinds.map((under) => localeKey(namespace, under, id, '')));
+    }
+  }
+  if (prefixes.length === 0) return;
+  const theirs = (key: string): boolean => prefixes.some((prefix) => key.startsWith(prefix));
+  for (const key of [...registry.locales.base.keys()]) if (theirs(key)) registry.locales.base.delete(key);
+  for (const key of [...registry.locales.prose.keys()]) if (theirs(key)) registry.locales.prose.delete(key);
+  for (const key of [...registry.locales.addressable]) if (theirs(key)) registry.locales.addressable.delete(key);
 }
 
 // A line the game says as nothing is a line nobody has written yet, and a player meets it as a broken engine rather than as a blank. A `@@@` note is dropped when the line is said, so a line that is only a note says nothing at all; a note trailing words is playable and stays legal. This asks the same table `npm run notes` and `npm run review` ask, so a kind or a field added next month is covered with no edit.
@@ -748,6 +768,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   }
   for (const [kind, id, lists] of authoredResults(registry)) stampSays(registry, proseOwner(registry, languages, kind, id), lists, sayField);
   for (const dialogue of registry.dialogues.values()) stampDialogue(registry, languages, dialogue);
+  unsayDebug(registry, merged);
   const byNamespace = new Map(modules.map((module) => [module.namespace, module]));
   for (const declared of registry.locales.sections) {
     for (const { key, value } of declared.entries) {

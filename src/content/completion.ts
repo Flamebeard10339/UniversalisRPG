@@ -3,7 +3,7 @@ import type { ListParser } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
-import { parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
+import { EVERY_SECTION, parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
 import { filledBy } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
 
@@ -129,7 +129,8 @@ function enclosing(text: string, lineStart: number, indent: number): Enclosing[]
 }
 
 function linesAt(owner: Section, text: string, lineStart: number, indent: number): { lines: readonly Written[]; where: string[] } {
-  let lines = owner.grammar;
+  // What every section takes stands beside what this kind declares, and only at the top of one: nothing of it opens a block, so a line written inside one is answered by that block's own grammar and nothing else.
+  let lines: readonly Written[] = [...owner.grammar, ...EVERY_SECTION];
   const where = [`# ${owner.kind}`];
   for (const above of enclosing(text, lineStart, indent)) {
     const found = opened(lines, above.text);

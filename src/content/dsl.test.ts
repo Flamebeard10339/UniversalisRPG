@@ -12,7 +12,8 @@ import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
 import { memberKey, Namespace } from './namespace';
 import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
-import { contentSectionMaps, sections, sectionFor, type Section } from './sections';
+import { everySaid, localeKey } from './locale';
+import { contentSectionMaps, isDebug, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -333,6 +334,40 @@ describe('a prose field of any kind', () => {
       expect(() => sectionFor(kind)!.build(set('A {thing} of note.'), DEFAULT_CONTEXT)).toThrow(/names \{thing\}, which nothing supplies/);
     });
   }
+});
+
+// The four answers a DEBUG mark carries, asked of whatever the corpus marks rather than of the sections that first wanted one. A kind marked next month is held to all of this with no edit here.
+describe('a DEBUG section the corpus holds', () => {
+  const { registry, parsed } = loadUniverseWithDiagnostics(CORPUS);
+  const MARKED = parsed.flatMap((module) => module.sections.flatMap((section) => (isDebug(section.value) ? [{ module: module.info.id, kind: section.kind, id: (section.value as { id: string }).id }] : [])));
+
+  it('is written at all, so nothing below is vacuous', () => {
+    expect(MARKED.length).toBeGreaterThan(0);
+  });
+
+  it.each(MARKED.map((each) => `# ${each.kind} ${each.id}`))('%s says nothing the game can say, in any language', (written) => {
+    const each = MARKED.find((one) => `# ${one.kind} ${one.id}` === written)!;
+    const beneath = localeKey(registry.namespace.ownerOf(each.kind, each.id) ?? each.module, each.kind, each.id, '');
+    expect(everySaid(registry.locales).filter((said) => said.key.startsWith(beneath))).toEqual([]);
+  });
+
+  // What stops a player finding one is that nothing they can reach names it, and the load refuses anything else — so the corpus loading clean is the proof, and this is the proof that the proof would fail.
+  it('is refused wherever a section a player can reach names it', () => {
+    const each = MARKED.find((one) => one.kind === 'item')!;
+    const named = `# droptable a-lucky-find
+give: 1 ${each.id}
+`;
+    const module = { name: 'reaching.dsl', text: `# info reaching
+version: 0.0.0
+dependencies:
+  ${each.module}
+
+${named}` };
+    expect(problems(loadUniverseWithDiagnostics([...CORPUS, module])).join(' ')).toMatch(new RegExp(`names ${each.id}, which is DEBUG`));
+    const marked = { ...module, text: module.text.replace('a-lucky-find', `a-lucky-find
+DEBUG`) };
+    expect(problems(loadUniverseWithDiagnostics([...CORPUS, marked]))).toEqual([]);
+  });
 });
 
 describe('the shipped corpus', () => {

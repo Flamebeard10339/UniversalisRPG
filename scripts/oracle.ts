@@ -11,7 +11,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
 import { splitSections, type RawLine, type RawSection } from '../src/grammar/structure';
 import { gathered, shownIn } from '../src/ui/offerGroups';
-import { sectionFor, sectionKinds } from '../src/content/sections';
+import { EVERY_SECTION, sectionFor, sectionKinds } from '../src/content/sections';
 
 const usage = [
   'Usage: npm run oracle -- [<kind>...]',
@@ -196,7 +196,8 @@ export function treeOf(kind: string, seen: Already['seen'] = freshly()): string[
   const already: Already = { kind: `# ${kind}`, seen };
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
   holdNow(already, signOf(owner.grammar), `# ${kind}`);
-  return [`# ${kind} <id>`, ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
+  // The lines any section takes stand under the heading they are written under, before the kind's own: a page that offers a line and does not show it has told an author to guess.
+  return [`# ${kind} <id>`, ...treeLines(EVERY_SECTION, '', sitting, already, `# ${kind}`), ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
 }
 
 const NAMED = 24;

@@ -404,3 +404,32 @@ describe('an engine root reads an id of the kind it names', () => {
     });
   }
 });
+
+// What a player may reach is everything a DEBUG section did not declare, and the only thing that makes that true is a refusal — so the refusal, and the words an author is refused in, are the contract.
+describe('a DEBUG section', () => {
+  const marking = (heading: string): string => VALID.replace(heading, `${heading}\nDEBUG`);
+  const HAMMER = '# item hat';
+  const NAMES_IT = 'give: 1 straw';
+
+  it('is nothing a section a player can reach may name', () => {
+    expect(() => loadModule(marking(HAMMER).replace(NAMES_IT, 'give: 1 hat'))).toThrow(
+      /# dialogue caretaker .*give: names hat, which is DEBUG: nothing a player can reach may name it, so either mark this section DEBUG too or name something a player is meant to find/,
+    );
+  });
+
+  it('may be named by another one, and may name anything itself', () => {
+    expect(() => loadModule(marking(HAMMER).replace(NAMES_IT, 'give: 1 hat').replace('# dialogue caretaker', '# dialogue caretaker\nDEBUG'))).not.toThrow();
+  });
+
+  it('says nothing in any language, so nothing the game says is filed under it', () => {
+    const registry = loadModule(marking(HAMMER));
+    expect(registry.items.get('hat')).toBeDefined();
+    expect([...registry.locales.base.keys()].filter((key) => key.includes('hat'))).toEqual([]);
+    expect([...registry.locales.addressable].filter((key) => key.includes('hat'))).toEqual([]);
+    expect([...loadModule(VALID).locales.addressable].filter((key) => key.includes('hat'))).not.toEqual([]);
+  });
+
+  it('takes no indented block, the way any line that holds nothing does not', () => {
+    expect(() => loadModule(VALID.replace(HAMMER, `${HAMMER}\nDEBUG\n  slot: head`))).toThrow(/"DEBUG" takes no indented block/);
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverse } from './load';
 import { ModuleSource } from './universe';
+import { isDebug } from './sections';
 
 const module = (id: string, ...lines: string[]): ModuleSource => ({
   name: id,
@@ -239,5 +240,24 @@ describe('merging follows load order, not source order', () => {
     const item = loadUniverse([second, BASE, first]).items.get('base.rope')!;
     expect(item.title).toBe('New Rope');
     expect(item.examine).toBe('Coarse and long.');
+  });
+});
+
+// A DEBUG section stays out of the world however many modules go on to add to it: a mod that could unmark one would be a mod that could put it in a player's hands.
+describe('a DEBUG mark survives every edit of the section', () => {
+  const MARKED = module('base', '# stat attack', '# item rope', 'DEBUG', 'title: Hemp Rope');
+  const PLAIN = module('base', '# stat attack', '# item rope', 'title: Hemp Rope');
+
+  it('is not shed by a patch that rewrites the section', () => {
+    const registry = loadUniverse([MARKED, patch('# item base.rope', 'title: Nylon Rope')]);
+    expect(isDebug(registry.items.get('base.rope'))).toBe(true);
+    expect([...registry.locales.addressable].filter((key) => key.includes('rope'))).toEqual([]);
+  });
+
+  it('is taken on by the section a patch marks', () => {
+    const registry = loadUniverse([PLAIN, patch('# item base.rope', 'DEBUG')]);
+    expect(isDebug(registry.items.get('base.rope'))).toBe(true);
+    expect(loadUniverse([PLAIN]).locales.base.get('base.item.rope.title')?.text).toBe('Hemp Rope');
+    expect(registry.locales.base.get('base.item.rope.title')).toBeUndefined();
   });
 });

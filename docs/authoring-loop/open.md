@@ -15,17 +15,7 @@ without evidence is a hunch and does not belong here yet.
 
 Everything under this heading is the owner's, and the order is theirs.
 
-**1. A `DEBUG` key every kind supports.** A test-only section — the two hammers in
-`content/tutorial-quests.dsl` are the first of them — is shipped content today: it
-is localized, it appears on the review sheet, it is upkeep, and nothing stops a
-player finding it. A kind that could declare itself debug would carry all four
-answers at once. *Closes when:* `# <kind> <id>` can say it is debug, the locale and
-`npm run review` skip it, and the engine can state what a player may reach. The
-one-home question to settle first is whether this is a field per kind (which is
-seven copies) or one thing `section()` in `sections/define.ts` fills in, the way it
-already fills in the schema-driven half.
-
-**2. A playtesting mode in the GUI.** A run the author plays in the browser,
+**1. A playtesting mode in the GUI.** A run the author plays in the browser,
 recorded whole, with the author's own notes attached at each step. There should be
 a button visible **only while the mode is active** that opens a modal for feedback
 after a given action, and a way to get the log out — extracted by hand, or written
@@ -37,15 +27,19 @@ beside the playbot's would be the failure this repository keeps having. *Closes
 when:* an author can play a session in the browser and an agent can read what they
 did and what they thought about it, in the same shape a playbot run produces.
 
-**3. The author's own playtest, and the list of problems it produces.** Nothing
+**2. The author's own playtest, and the list of problems it produces.** Nothing
 substitutes for it and nothing is in front of it. `npm run review` is the sheet for
 the writing; this is the sheet for the playing.
 
-**4. Then author each quest in order, with playbot testers in a loop.** Ten quest
+**3. Then author each quest in order, with playbot testers in a loop.** Ten quest
 notes in `.planning/planning_quests/`, deliberately not levelled up before now —
 how much outline detail the loop actually needs is what the runs were meant to
 measure. The runs are cheap and the fixing is not, which is the asymmetry to plan
 around.
+
+## Death resets the player's health to full
+Optional hardcore mode setting which also clears the player's inventory and 
+equipped items on death. Default false. 
 
 ## A quest cannot hold all of its own state
 
@@ -204,7 +198,9 @@ files where it correctly means "loose in the pack".
 
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
-claims about its rat and its `rats-killed`. A clean follow-up.
+claims about its rat and its `rats-killed`. Six `DEBUG` sections move together, or
+the move is refused at load: the two items, the two saves that arm them and the two
+tests that swing them. A clean follow-up.
 
 **`src/ui/render.test.tsx`'s `stringsDrawn` is a hand-written list of view fields.**
 It could derive from the parity walk's `leaves()`.

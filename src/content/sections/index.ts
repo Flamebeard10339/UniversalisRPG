@@ -96,7 +96,7 @@ export const ownedSectionKinds = (): readonly SectionKind[] => kindsWhere((each)
 export const globalSectionKinds = (): readonly SectionKind[] => kindsWhere((each) => each.ids === 'global');
 export const actionOwnerKinds = (): readonly SectionKind[] => kindsWhere((each) => each.nestsActions);
 
-export { isActionOwnerKind } from './define';
+export { isActionOwnerKind, isDebug, DEBUG_MARK, EVERY_SECTION } from './define';
 
 export const registryMapOf = (kind: string): string | null => sectionFor(kind)?.map ?? null;
 

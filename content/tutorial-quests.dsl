@@ -305,25 +305,30 @@ journal: finding-your-feet says Miki gave me water and flour. The two of them ma
 // be worth and the eight it drains is the whole of what it does.
 
 # item million-attack-hammer
+DEBUG
 slot: mainhand
 weapon, +1000000 attack, +1000000 accuracy
 
 # item eight-a-swing-hammer
+DEBUG
 slot: mainhand
 weapon, -100% attack, +1000000 accuracy
 on hit:
   drain: 8 health from them
 
 # save armed-with-a-million-attack-hammer
+DEBUG
 {"version":12,"inventory":{"tutorial-quests.million-attack-hammer":1}}
 
 # save armed-with-an-eight-a-swing-hammer
+DEBUG
 {"version":12,"inventory":{"tutorial-quests.eight-a-swing-hammer":1}}
 
 // Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
 // which is what `rats-killed` counts; one swing does it because the hammer says
 // it does, and nothing about the rat's twenty health is being relied on.
 # test one-swing-of-a-million-attack-hammer-fells-a-rat
+DEBUG
 load: armed-with-a-million-attack-hammer
 equip: million-attack-hammer
 use: entity.stairs.descend
@@ -339,6 +344,7 @@ assert: tulsa.rats-killed = 1
 // that makes a rebalance of the rat fail this loudly, rather than quietly
 // leaving behind a claim about one swing that a re-arming `use:` would pass too.
 # test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
+DEBUG
 load: armed-with-an-eight-a-swing-hammer
 equip: eight-a-swing-hammer
 use: entity.stairs.descend

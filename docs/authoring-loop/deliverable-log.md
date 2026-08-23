@@ -91,11 +91,18 @@ everything else is scheduled around it.** Two lines came back to the sheet marke
 CHANGED this session, which is the mechanism working, and five scenery entities
 became reachable prose for the first time.
 
-**5. Then the author's own playtest, then the quests.** The order is in `open.md`
-under *the next stretch of work*: a debug key so test-only content stops being
-shipped content, a GUI playtesting mode unified with the playbot rather than beside
-it, the author's own playtest and the list it produces, and then the ten quest
-notes authored in order with playbot testers in a loop.
+**5. Test-only content now says so, and the engine holds it to that.** `DEBUG` under
+any heading takes a section out of the world: out of the locale, off the review
+sheet, and out of reach of anything a player can get to, which is a refusal at load
+rather than a convention. The two hammers, their saves and their tests are the
+first six, and what it cost was one home in `sections/define.ts` — no kind declares
+the key and no tool was taught about it, because `npm run review` and the rest all
+read the locale tables the mark empties.
+
+**6. Then the author's own playtest, then the quests.** The order is in `open.md`
+under *the next stretch of work*: a GUI playtesting mode unified with the playbot
+rather than beside it, the author's own playtest and the list it produces, and then
+the ten quest notes authored in order with playbot testers in a loop.
 
 **Map churn is still deliberately deferred.** `combat-expansion.proving-ground`
 sits at `tulsa.market-square`'s own square and hangs off the beach for want of

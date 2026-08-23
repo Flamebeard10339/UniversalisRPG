@@ -4,15 +4,25 @@ import { Registry } from './registry';
 import { Directive, Test } from './sections/test';
 import { } from './namespace';
 import { isNamespacedKind } from './sections';
-import { isActionOwnerKind, sectionOf, type ModuleSection } from './sections';
+import { DEBUG_MARK, isActionOwnerKind, isDebug, registryMapOf, sectionOf, type ModuleSection } from './sections';
 import { INFLICT_SITE, Visit } from './refs';
 import { visitSection } from './sections';
+import { mapOf } from './registry';
+
+// What a player may reach is everything a DEBUG section did not declare, and this is what says so: a section anyone can play their way to may not name one, so the only way to a DEBUG thing is another DEBUG thing. Asked of whichever map the named kind lands in, so a kind added next month is answered for with no edit — and of nothing at all for the members a kind mints, which stand or fall with the section that minted them.
+function refuseDebugReference(kind: string, target: string, where: string, registry: Registry): void {
+  const name = registryMapOf(kind);
+  if (name === null || !isDebug((mapOf(registry, name) as ReadonlyMap<string, object>).get(target))) return;
+  throw new DslError(`${where} names ${target}, which is ${DEBUG_MARK}: nothing a player can reach may name it, so either mark this section ${DEBUG_MARK} too or name something a player is meant to find`);
+}
 
 export function validateSectionReferences(section: ModuleSection, id: string, registry: Registry): void {
+  const debug = isDebug(section.value);
   const visit: Visit = (referenced, target, where) => {
     if (isNamespacedKind(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
+    if (!debug) refuseDebugReference(referenced, target, where, registry);
     if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };

@@ -3,7 +3,7 @@ import { comparison, condition } from '../grammar/condition';
 import type { Parser } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { amissIn, applied, fillingWords, offeringAt, refusalsIn, type Addressed, type Amiss } from './completion';
-import { sectionFor, sections } from './sections';
+import { EVERY_SECTION, sectionFor, sections } from './sections';
 
 const KNOWN: readonly Addressed[] = [
   { kind: 'location', address: 'tulsa.beach' },
@@ -275,7 +275,7 @@ describe('an offering', () => {
     const opening = `# ${kind} probe\n`;
     const offering = offeringAt(opening, opening.length, KNOWN);
     const owner = sectionFor(kind)!;
-    const declared = [...owner.grammar.map((each) => each.form), ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => [...(spec.parser as Parser<unknown>).forms, ...(((spec.parser as { element?: Parser<unknown> }).element?.forms) ?? [])])];
+    const declared = [...owner.grammar.map((each) => each.form), ...EVERY_SECTION.map((each) => each.form), ...Object.values(owner.schema?.fields ?? {}).flatMap((spec) => [...(spec.parser as Parser<unknown>).forms, ...(((spec.parser as { element?: Parser<unknown> }).element?.forms) ?? [])])];
     for (const offer of offering.offers) {
       expect(declared, `# ${kind} offers ${offer.form}`).toContain(offer.form);
       expect(offer.form.startsWith(offer.insert), `# ${kind} writes in ${JSON.stringify(offer.insert)} for ${offer.form}`).toBe(true);
