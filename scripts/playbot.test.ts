@@ -11,10 +11,12 @@ import { excusedFieldsAreReal, unaccountedFields } from './lib/viewCoverage';
 import {
   isolatedCwd,
   journalWindowText,
+  openSession,
   parseReply,
   reloadInto,
   renderView,
   repoRoot,
+  resolveSave,
   runPlaybot,
   runTurn,
   sdkOptionsFor,
@@ -410,6 +412,22 @@ adjacent:
       expect(logSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();
     });
+  });
+
+  // --save: the start-anywhere lever. A run opened on a named fixture begins the turn loop in
+  // exactly the state the save describes, not a fresh session — the same registry.saves lookup
+  // the # test 'load' directive already uses (session.ts), read here instead of re-derived.
+  it('[--save] a run opens in the state a named save describes', () => {
+    const registry = played();
+    const { session, warnings } = openSession(registry, 'tutorial-island.dresser-trinket-end');
+    expect(warnings).toEqual([]);
+    expect(view(session).location.id).toBe('tutorial-island.guide-house-upstairs');
+  });
+
+  it('[--save] an id naming no save is refused with a message listing what exists, not a stack trace', () => {
+    const registry = played();
+    expect(() => resolveSave(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id\. Defined: tutorial-island\.dresser-trinket-end/);
+    expect(() => openSession(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id/);
   });
 
   it('renderView describes the offered choices and the current location', () => {
