@@ -13,7 +13,6 @@ export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answe
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
-import type { EngineKey } from '../content/locale';
 
 export interface Modal {
   name: Answer;
@@ -30,18 +29,17 @@ interface ModalDefinition<F extends ModalFrame> {
   leaves?: Answer;
 }
 
-const RACES: ReadonlyArray<{ value: Answer; shown: EngineKey }> = [
-  { value: 'human', shown: 'engine.race.human' },
-  { value: 'elf', shown: 'engine.race.elf' },
-  { value: 'dwarf', shown: 'engine.race.dwarf' },
-  { value: 'orc', shown: 'engine.race.orc' },
-];
+// Every race the world declares. The order is the order they are written in, which is the same list in every language — sorting by the words would reorder the answers a recording replays.
+function raceChoices(registry: Registry, state: GameState): readonly { value: Answer; shown: Localized }[] {
+  const localizer = localizerOf(registry, state);
+  return [...registry.races.keys()].map((id) => ({ value: id, shown: localizer.title('race', id) }));
+}
 
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
   'character-creation': {
     options: (_frame, state, registry) => [
       { key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null },
-      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: RACES.map((race) => ({ value: race.value, shown: localizerOf(registry, state).engine(race.shown) })) },
+      { key: 'race', label: localizerOf(registry, state).engine('engine.modal.race'), values: raceChoices(registry, state) },
     ],
     submit: (frame, state) => {
       state.player = { name: frame.answers.name, race: frame.answers.race };

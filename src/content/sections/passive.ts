@@ -1,7 +1,6 @@
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
-import { Range } from '../../grammar/range';
-import { TagClause, tagClause } from '../../grammar/tagClause';
+import { TagClause, tagClause, unrolledProblem } from '../../grammar/tagClause';
 import { text } from '../../grammar/values';
 import { hooks, pruneHook, pruneTags, visitTags, type Loose } from '../refs';
 import { section } from './define';
@@ -14,19 +13,7 @@ export interface Passive extends HookCarrier {
   tags: TagClause[];
 }
 
-function formatRangeClause(statId: string, amount: Range): string {
-  const sign = amount.min < 0 ? '-' : '+';
-  return `${sign}${Math.abs(amount.min)}-${Math.abs(amount.max)} ${statId}`;
-}
-
-export function passiveRangeProblem(passive: Passive): string | undefined {
-  for (const tag of passive.tags) {
-    if (tag.kind === 'stat-bonus' && !tag.percent && tag.amount.min !== tag.amount.max) {
-      return `${formatRangeClause(tag.statId, tag.amount)} is a range; a passive has no moment to roll one, so its payload must be one value`;
-    }
-  }
-  return undefined;
-}
+export const passiveRangeProblem = (passive: Passive): string | undefined => unrolledProblem(passive.tags, 'a passive has no moment to roll one');
 
 export const passive = section<Passive>()({
   kind: 'passive',

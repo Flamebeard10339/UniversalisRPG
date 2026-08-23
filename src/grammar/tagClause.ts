@@ -4,7 +4,14 @@ import { duration } from './values';
 
 export type BonusAmount = { percent: false; amount: Range } | { percent: true; amount: number };
 
-export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: string };
+export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: string } | { kind: 'level'; id: string };
+
+// What a counter's id names, and how it is written. A counter kind added here does not compile until it says both, so nothing downstream keeps a second list of the kinds.
+export const COUNTERS: Readonly<Record<Counter['kind'], { names: string; written: (id: string) => string }>> = {
+  resource: { names: 'resource', written: (id) => id },
+  stack: { names: 'item', written: (id) => `stack of ${id}` },
+  level: { names: 'skill', written: (id) => `level of ${id}` },
+};
 
 export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
 
@@ -19,7 +26,7 @@ const CLAUSE_HOLDS: {
 function isCounter(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const { kind, id } = value as { kind?: unknown; id?: unknown };
-  return (kind === 'resource' || kind === 'stack') && typeof id === 'string';
+  return typeof kind === 'string' && kind in COUNTERS && typeof id === 'string';
 }
 
 export function isTagClause(value: unknown): boolean {
@@ -35,7 +42,7 @@ const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)`
 const NAME = String.raw`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*`;
 
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
-const STAT_BONUS = new RegExp(`^${AMOUNT}[ \t]+(?<stat>${NAME})(?:[ \t]+per[ \t]+(?:stack[ \t]+of[ \t]+(?<stack>${NAME})|(?<per>${NAME})))?$`);
+const STAT_BONUS = new RegExp(`^${AMOUNT}[ \t]+(?<stat>${NAME})(?:[ \t]+per[ \t]+(?:stack[ \t]+of[ \t]+(?<stack>${NAME})|level[ \t]+of[ \t]+(?<level>${NAME})|(?<per>${NAME})))?$`);
 const BARE_AMOUNT = new RegExp(`^${AMOUNT}$`);
 const KEYWORD = /^[a-z][a-z0-9-]*$/;
 
@@ -78,6 +85,7 @@ function parseClause(raw: string, span: Span): TagClause {
       ...parseAmount(bonus, raw, span),
     };
     if (bonus.stack !== undefined) return { ...clause, per: { kind: 'stack', id: bonus.stack } };
+    if (bonus.level !== undefined) return { ...clause, per: { kind: 'level', id: bonus.level } };
     return bonus.per === undefined ? clause : { ...clause, per: { kind: 'resource', id: bonus.per } };
   }
 
@@ -94,7 +102,7 @@ function printAmount(value: BonusAmount): string {
   return lo === hi ? `${sign}${lo}` : `${sign}${lo}-${hi}`;
 }
 
-const printCounter = (value: Counter): string => (value.kind === 'stack' ? `stack of ${value.id}` : value.id);
+const printCounter = (value: Counter): string => COUNTERS[value.kind].written(value.id);
 
 export const tagClause: Parser<TagClause> = {
   parse(cursor) {
@@ -119,9 +127,17 @@ export const tagClause: Parser<TagClause> = {
       }
     }
   },
-  forms: ['<keyword>', '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>'],
-  examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour'],
+  forms: ['<keyword>', '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'],
+  examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+1 attack per level of melee'],
 };
+
+// A bonus written as a range has to be rolled, and a carrier that is only ever held has no moment to roll it in. The carrier says why it has none.
+export function unrolledProblem(tags: readonly TagClause[], noMoment: string): string | undefined {
+  for (const tag of tags) {
+    if (tag.kind === 'stat-bonus' && !tag.percent && tag.amount.min !== tag.amount.max) return `${tagClause.print(tag)} is a range; ${noMoment}, so its payload must be one value`;
+  }
+  return undefined;
+}
 
 export const bonusAmount: Parser<BonusAmount> = {
   parse(cursor) {

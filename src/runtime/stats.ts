@@ -14,7 +14,7 @@ import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, PLAYER } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
-import { BonusAmount, TagClause } from '../grammar/tagClause';
+import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
 import { HookCarrier } from '../grammar/hook';
 
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
@@ -33,8 +33,14 @@ function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
 }
 
 export function counterLevels(state: GameState, actorId: string = PLAYER): CounterLevel {
+  const own = ownStores(state, actorId);
   const levels = actorId === PLAYER ? state.resources : state.activeAction?.actors?.[actorId]?.resources;
-  return (counter) => (counter.kind === 'stack' ? stackCount(state, actorId, counter.id) : Math.floor(fromMilliUnits(levels?.[counter.id] ?? 0)));
+  const reads: Readonly<Record<Counter['kind'], (id: string) => number>> = {
+    stack: (id) => stackCount(state, actorId, id),
+    resource: (id) => Math.floor(fromMilliUnits(levels?.[id] ?? 0)),
+    level: (id) => skillLevel(own.xp[id] ?? 0),
+  };
+  return (counter) => reads[counter.kind](counter.id);
 }
 
 function foldStatBonuses(tags: readonly TagClause[], statId: string, fold: StatFold, counter: CounterLevel): void {
@@ -78,6 +84,12 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
     const carrier = passiveCarrier(registry, passiveId, true);
     if (carrier) carriers.push(carrier);
   }
+  for (const skillId of entity?.skills ?? []) {
+    const skill = registry.skills.get(skillId);
+    if (skill) carriers.push({ tags: skill.tags });
+  }
+  const race = actorId === PLAYER ? registry.races.get(state.player.race) : undefined;
+  if (race) carriers.push({ tags: race.tags });
   const own = ownStores(state, actorId);
   for (const buff of own.buffs) carriers.push({ tags: buff.tags });
   for (const wornId of own.equipped) {
@@ -90,14 +102,6 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
     }
   }
   return carriers;
-}
-
-function foldSkillLevels(registry: Registry, actorId: string, statId: string, xp: Record<string, number>, fold: StatFold): void {
-  for (const skillId of actorEntity(registry, actorId)?.skills ?? []) {
-    const skill = registry.skills.get(skillId);
-    if (!skill?.['per-level'] || skill['stat-id'] !== statId) continue;
-    foldBonus(skill['per-level'], fold, skillLevel(xp[skillId] ?? 0));
-  }
 }
 
 function performing(state: GameState, registry: Registry, actorId: string): Action | undefined {
@@ -116,7 +120,6 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
     increased: 0,
   };
   const counter = counterLevels(state, actorId);
-  foldSkillLevels(registry, actorId, statId, ownStores(state, actorId).xp, fold);
   foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold, counter);
   for (const carrier of modifierCarriers(state, registry, actorId)) {
     if (carrier.tags) foldStatBonuses(carrier.tags, statId, fold, counter);

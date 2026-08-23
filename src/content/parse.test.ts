@@ -284,10 +284,10 @@ describe('stat and skill', () => {
     expect(hydrated.base).toEqual(point(0));
   });
 
-  it('leaves a gathering skill stat-id undefined, since it has no default', () => {
+  it('leaves a gathering skill carrying nothing, since tags have no default', () => {
     const mining = parseOne('# skill mining', skill);
-    expect(mining['stat-id']).toBeUndefined();
-    expect(hydrate(skill, mining).title).toBe('Mining');
+    expect(mining.tags).toBeUndefined();
+    expect(hydrate(skill, mining)).toMatchObject({ title: 'Mining', tags: [] });
   });
 });
 
