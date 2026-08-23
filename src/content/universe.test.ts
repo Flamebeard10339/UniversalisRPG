@@ -365,7 +365,7 @@ describe('loadUniverseWithDiagnostics', () => {
         address,
         tests: [],
       });
-      expect(registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.brute.look', 'entity.base.dresser.look']);
+      expect(registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.brute.examine', 'entity.base.dresser.examine']);
     }
   });
 
@@ -385,7 +385,7 @@ describe('loadUniverseWithDiagnostics', () => {
     }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
     expect(survivor.registry.entities.get('base.dresser')!.blocks).toEqual([]);
     expect(survivor.registry.items.get('base.dresser')!.actions).toHaveLength(1);
-    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.dresser.look', 'item.base.dresser.search-drawer']);
+    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.dresser.examine', 'item.base.dresser.search-drawer']);
     expect([...survivor.registry.tests.keys()]).toEqual(['walk.walk']);
 
     const stranded = loadUniverseWithDiagnostics([base, ghost, walker('entity.base.dresser.search-drawer')]);

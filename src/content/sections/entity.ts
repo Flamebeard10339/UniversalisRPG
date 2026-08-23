@@ -62,15 +62,13 @@ export interface Entity extends AuthoredEntity {
 
 const EXAMINE_FIELD = 'examine';
 
-export const EXAMINE_ADDRESS = 'look';
-
 // `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
 // the entity's own action list, saying the words under the key the field already holds them at, so
 // every driver offers it the way it offers any other action and none of them names examine at all.
 export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
-  return [{ id: EXAMINE_ADDRESS, label: humanizeEn(EXAMINE_ADDRESS), generatedLabel: true, kind: 'instant', results: [said] } as Action];
+  return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said] } as Action];
 }
 
 const mintedAddresses = (value: { id: string; examine?: string }): string[] => mintedActions(value, null).map((action) => declaredId(action)!);
@@ -143,7 +141,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   text: ['title', EXAMINE_FIELD],
   fields: {
     title: TITLE_FIELD,
-    examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_ADDRESS}\`, which says these words and nothing else` },
+    examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words and nothing else` },
     hiddenIf: { parser: condition, keyword: 'hidden if' },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {

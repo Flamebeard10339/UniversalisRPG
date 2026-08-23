@@ -5,7 +5,7 @@ import { Visit } from '../refs';
 import { MEMBER_KINDS } from '../namespace';
 import { Maps, PrintContext, Section } from './define';
 
-import { action } from './action';
+import { action, type ActionTextOwner } from './action';
 import { clusterJewel } from './clusterJewel';
 import { dialogue } from './dialogue';
 import { droptable } from './droptable';
@@ -113,11 +113,10 @@ export function parseModule(source: string): ModuleSection[] {
 
 export const isNamespacedKind = (kind: string): boolean => ownedSectionKinds().includes(kind as SectionKind) || MEMBER_KINDS.includes(kind);
 
-export const isProseField = (slug: string): boolean => sections().some((each) => each.text.includes(slug));
-
-export function actionSlugProblem(slug: string, label: string, taken: ReadonlySet<string>): string | undefined {
+export function actionSlugProblem(owner: ActionTextOwner, label: string, taken: ReadonlySet<string>): string | undefined {
+  const slug = owner.field;
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no address: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
-  if (isProseField(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
+  if (textFieldsOf(owner.kind)?.includes(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
   if (taken.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
   return undefined;
 }

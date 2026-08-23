@@ -4,7 +4,7 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
+import { actionTextKey, actionTextOwner } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
@@ -109,11 +109,10 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
   const taken = new Set<string>();
   for (const action of actions) {
-    const slug = actionAddress(action);
-    const problem = actionSlugProblem(slug, action.label, taken);
-    if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
-    taken.add(slug);
     const owner = actionTextOwner(registry.namespace, kind, id, action);
+    const problem = actionSlugProblem(owner, action.label, taken);
+    if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
+    taken.add(owner.field);
     const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
     const key = actionTextKey(owner);
     registry.locales.addressable.add(key);

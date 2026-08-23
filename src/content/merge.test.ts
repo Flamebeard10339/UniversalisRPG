@@ -52,7 +52,7 @@ describe('a section applies its fields over what the id already holds', () => {
       'base.attack': { min: 2, max: 4 },
       'base.defence': { min: 9, max: 9 },
     });
-    expect(entity.actions.map((action) => action.label)).toEqual(['pinch', 'flee', 'Look']);
+    expect(entity.actions.map((action) => action.label)).toEqual(['pinch', 'flee', 'Examine']);
   });
 
   it('creates inside its own module when the heading is bare, whatever a dependency holds', () => {
@@ -86,7 +86,7 @@ describe('actions merge by label', () => {
 
   it('appends an action whose label is new, after the ones already there', () => {
     const entity = loadUniverse([BASE, patch('# entity base.crab', 'wave:', '  say: It waves a claw.')]).entities.get('base.crab')!;
-    expect(entity.actions.map((action) => action.label)).toEqual(['pinch', 'flee', 'wave', 'Look']);
+    expect(entity.actions.map((action) => action.label)).toEqual(['pinch', 'flee', 'wave', 'Examine']);
   });
 });
 
@@ -197,7 +197,7 @@ describe('a list key takes + and -', () => {
 
   it('removes one action by label, and refuses a + that would mean nothing', () => {
     const entity = loadUniverse([BASE, patch('# entity base.crab', '-pinch:')]).entities.get('base.crab')!;
-    expect(entity.actions.map((action) => action.label)).toEqual(['flee', 'Look']);
+    expect(entity.actions.map((action) => action.label)).toEqual(['flee', 'Examine']);
     expect(() => loadUniverse([BASE, patch('# entity base.crab', '+wave:', '  say: Hi.')])).toThrow(/\+ means nothing here/);
   });
 });
