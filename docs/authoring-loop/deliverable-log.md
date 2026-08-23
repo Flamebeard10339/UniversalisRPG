@@ -43,15 +43,19 @@ just the assistance of the oracle and other existing modules.
 
 ## What has actually happened
 
-Two authoring runs and four playbot runs. Tulsa exists — 28 locations, 37 entities,
-13 dialogues, 962 lines, authored from an outline in roughly one pass once the
-oracle was answering the right question. The playbot has reached it, fought in it,
-and stopped itself twice on real blockers.
+Two authoring runs and seven playbot runs. Tulsa exists and now holds the whole
+region — Miki's house, the beach and the town are one module, and `core` is
+furniture that stands nowhere.
 
 **The loop's own product is the finding list, and it has been earning its keep.**
 Run 4 found a whole town's worth of unhearable dialogue that the corpus, the test
-suite and the review sheet all passed clean. That is the case the loop exists for:
-nothing static could have caught it.
+suite and the review sheet all passed clean. Runs 5–7, three runs of 45 turns,
+found that health was unrecoverable, that a fight never announced a kill so three
+rats read as one that healed, and that an earlier quest's opening was unreachable
+because a later module parsed last. None of those was visible to anything static.
+
+**The runs are cheap and the fixing is not.** That asymmetry is the thing to plan
+around: three runs cost minutes and produced a fortnight of work.
 
 ## The phase this is in
 
@@ -61,22 +65,28 @@ route out of Miki's house lands. See `settled.md`.
 **2. Module size is settled** — a removability unit, not a size unit. See
 `settled.md`.
 
-**3. The writing — a human pass over 492 lines, and it is the long pole.**
+**3. The grammar has settled and the region is one module.** The split is done:
+`core` is furniture, `tulsa` is everywhere anybody stands, and both bulk id moves
+were made by tools that refuse on registry drift rather than by hand. A
+conversation offers its open threads, a hint is chosen against live state, an
+action under way is bounded, and a test says the quantity it names.
+
+**4. The writing is now the long pole and nothing is in front of it.**
 `npm run review` is the sheet and `content/reviewed.tsv` makes it resumable. **This
-is Yonatan's and everything else is scheduled around it.** Agents work below `src/`
-while it runs; content-editing passes wait. It has not started: the owner is
-holding until the grammar settles and the bug rate drops, which is the right call
-while findings are still arriving in batches.
+is Yonatan's and everything else is scheduled around it.** It has not started; the
+hold was for the grammar to settle and the bug rate to drop, and both have. The
+list in `open.md` has grown from five items to fourteen because three playtest runs
+kept finding the same shape — a room names a thing and offers no way to touch it.
 
-**4. The hardening pass comes after a playbot run, not before**, because the run's
-`confusion` reports say which lines are actually confusing. Reviewing blind and
-then hardening would do the same reading twice.
+**5. The hardening pass comes after that**, and the runs have already named what
+it is for: `confusion` reports say which lines are actually confusing, so reviewing
+blind and then hardening would do the same reading twice.
 
-**Map churn is deliberately deferred to that pass.** The beach stops making sense
-once Miki's house sits in Tulsa properly; `tutorial-island.market-district` is a
-stub duplicating `tulsa.market-square`; `combat-expansion.proving-ground` and
-`tulsa.market-row` now collide at x:3,y:0. None is worth a hand-fix while the map
-is moving — a playtest names them better than a reading does.
+**Map churn is deliberately deferred to that pass.** `combat-expansion.proving-ground`
+sits at x:3,y:0, which is `tulsa.market-square`'s own square, and it hangs off the
+beach for want of anywhere better. Whether the beach still makes sense as the road
+into town is the same question. Neither is worth a hand-fix while the map is
+moving — a playtest names them better than a reading does.
 
 ## What Yonatan has to deliver
 

@@ -23,6 +23,21 @@ visit.** The engine refuses both on one node, since `again:` is unreachable on a
 conversation whose every node has fallen silent is no longer offered at all, so
 `reachedNow` returns nothing rather than a node that would say nothing.
 
+**Talking to someone offers every thread they hold open, and the player picks.**
+A thread is a node that says which moment is its turn (`when:`) or what it is
+called (`ask:`); a node offering only `always` is not a thread but what they say
+when no thread is open. One thread open is entered outright, so nothing gains a
+click. Threads are ordered by the words the player reads, never by declaration
+order — no module takes a place by loading earlier. Before this, the winner was
+whichever module parsed last, which silently made an earlier quest's opening
+unreachable for fifteen turns of a run.
+
+**`hint when <condition>: <text>`, and the last one whose condition holds wins.**
+So a plain `hint:` written above is the default and each conditional line below is
+an exception to it. It sits in a stage block and at a quest's top level, the same
+line in both. The condition goes before the colon because everything after a colon
+is the value. A stage's `log:` has **no** such form yet.
+
 **A line the game says may carry `@@@` and still be played, and may not be
 silence.** `@@@ <words>` means *unreviewed, or here is what I wanted and could not
 get*; the engine drops the note and says the rest. Because the note is dropped, a
@@ -49,6 +64,21 @@ after free text and before anything that would swallow the tail.
 about a number is `assert:` or a `# save` compared with `expect only:`, which
 matches just the keys the save declares.
 
+**`expect only:` is the default; whole-sheet `expect:` has to earn itself.** Two
+arguments earn it and no third has been found. One: the claim is that a roll
+*happened*, and the cursor moves whether or not it yielded anything, which no
+assertion can name. Two: **the claim is an absence** — `expect only:` compares the
+keys a save names, and a sheet recorded after a buff lifted has stopped naming it,
+so the narrow form would also pass in a world where the buff never expired. A test
+that walks anything must state its claim in words (`assert:` or `refuse:`), and
+`dsl.test.ts` reports one that does not.
+
+**State the quantity the test names in its own title.** A one-line content change
+broke fifteen tests whose claims were all still true; they were exact about
+something else. A buff's *contribution* is not the stat's *total*, and damage is
+not `max - current` once anything regenerates. The fix is a difference, never a
+tolerance band — a band would also pass in a world where the mechanic did nothing.
+
 ## Modules
 
 **One module is one file, and a module is a removability unit, not a size unit.**
@@ -58,12 +88,25 @@ still have a world that loads.* Tulsa standing is one module; each quest is its
 own, and a quest module adds to entities rather than editing the region's file.
 962 lines is not a problem.
 
-**`tutorial-island` keeps its id forever and is not being deleted.** It holds the
-engine furniture every region depends on — stat bases, the health pool, factions,
-`melee-combat` — plus Miki's house. The id is machine-facing, no player meets it,
-and renaming or merging it would churn a hundred references across sixteen files
-and every `# save` body to buy nothing visible. **Renaming the namespace is ruled
-out; do not propose it again.**
+**`core` holds the furniture and stands nowhere.** Stat bases, the health pool,
+the death event, factions, skills, slots, modals, the player, passives, cluster
+jewels, droptables, generic items, recipes with no station, and `melee-combat`.
+It declares no location, no entity that occupies one and no line anybody says —
+those belong to the region they happen in, which is why Miki's house, the beach
+and everything standing in them are `tulsa`'s. The one `# test` core owns is the
+only claim that can be made without walking anywhere.
+
+**A recipe naming a `station:` is refused unless something in the loaded universe
+opens that station**, so a recipe lives with whatever opens it: `bread` went to
+`tulsa` with the oven, `dough` stayed in `core` because it names no station.
+
+**A bulk id move is done by `npm run move-sections`, never by hand.** It lifts
+named sections out of one module into another, writes every machine form of their
+ids across `content/`, `src/` and `scripts/`, and refuses unless the reloaded
+registry differs from the one before by exactly those ids —
+`registryDiff(before, after, rewrite)`, which derives its subjects from the
+section list. `npm run rename-module` is the whole-module case and owns the rule
+for what an id written whole looks like.
 
 **A downstream module reaches an upstream thing by owning the statement and letting
 the engine land the effect** — the way a `# quest` hands a dialogue to the entity it
@@ -83,11 +126,44 @@ its own and always did.
 is a fact about state and lives in `src/runtime/actionLookup.ts`, beneath action
 legality; *may it be performed* reads conditions. Conflating them has now caused
 three separate bugs, and once `stat` is a condition root it is circular besides.
+`stat.test.ts` demonstrates the circularity rather than arguing it: folded through
+offerability, an action granting `+5 attack` whose `requires:` reads
+`stat.attack >= 6` exhausts the stack.
+
+**Everything here is simulated time.** Wall clock belongs to the GUI and the live
+REPL, which tick simulated time at a constant rate. Nothing below them may read it.
+
+**An action under way is bounded at four simulated hours**, exported and named in
+the failure text. It replaced a 1000-*cycle* cap, which was about 1000 seconds for
+a swing and about fifty hours for a craft — not a bound anyone could reason about,
+which is why the respawn treadmill got past it. Hitting it is a directive failure,
+deliberately not `on unfinished:`: that is an authored outcome of `attempts:`
+running out, and a backstop the engine applies is not content. The longest wait-out
+any `# test` reaches is 21.6 simulated seconds.
+
+**`on death: stop` is a designed terminator.** A dangerous action risks dying and
+stopping is the system working. It is not the bound above and must not be routed
+around. Note that a regenerating player may now never die, so death can no longer
+be relied on to end anything.
+
+**A progress figure is published only when it has counted something.**
+`completion` is `number | null` and `stillToCount()` is the one home; a renderer
+shows a figure when there is one and says nothing when there is not. It used to be
+`1.0` at every observable point for every action shape the engine can build.
+
+**Prune records are addressed to whoever loaded the save, not to the player.**
+They travel as `PruneWarning[]` — stderr and the run log for the playbot, a
+warn-toned tool message beside the view for the terminal and the GUI. They are
+written in save-key vocabulary a player never wrote and cannot act on.
 
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
-- `npm run oracle` prints the grammar; `--at <draft>` reads a draft against the world.
+- `npm run oracle` prints the grammar; `--at <draft>` reads a draft against the
+  world, **answering with the refusals and the verdict only** — the per-line
+  reference walk is `--walk`, and it is 3000 lines for a 950-line file. A draft is
+  the module its own `# info` declares, so `--at` answers for a file that already
+  ships by replacing the shipped copy rather than colliding with it.
 - `npm run notes` lists every `@@@` the corpus holds.
 - `npm run review [-- <module>]` is every line the game can say, under the section
   that says it; `--read-through <section>` marks a sitting as read. What has been
@@ -117,12 +193,29 @@ has produced nothing anyone can act on.
 
 ## What the loop keeps teaching
 
-**The symptom is real and the first-named cause is usually wrong.** Four times now
+**The symptom is real and the first-named cause is usually wrong.** Seven times now
 a bot or an agent has reported something true and diagnosed it one layer too low —
 "health tracking is broken" was a restarted cycle, "talk is non-functional" was a
 spent node, "a merged section cannot print back" was a missing landing, "this is a
-balance call" was a semantic circularity. Reproduce before believing the cause.
+balance call" was a semantic circularity, "a fight is broken and the enemy heals"
+was a kill nobody announced, "a quest is softlocked" was declaration order deciding
+who speaks, "the status line lies" was a figure that had never once been meaningful.
+Reproduce before believing the cause.
 
 **A cold agent is cheap at executing a ratified design and honest about hitting a
 wall**, and it will describe the wall in the vocabulary of the layer it was
 standing in. Re-reading the wall one layer up is where the leverage is.
+
+**A bot's reading of the fiction is evidence about the writing, even when it is
+wrong about the mechanics.** Two runs concluded the orbs must heal, because they
+are called Renewal and Vitality; they are item modifiers. Two read the mirror
+re-offering character creation as save corruption; it is permanent by design and
+the player may rename themselves whenever they like. Neither was an engine bug and
+both were real findings — the words were doing something the author did not intend.
+
+**Several agents on one checkout share the git index.** They must never run
+`git add`, `git commit` or `git stash`; the orchestrator commits alone, by
+pathspec. And **a test run read against a tree another agent is mid-write on is
+worthless** — one suite went 14/32 failing then 32/32 minutes later with no edit
+between. Re-run before believing a failure. A bulk id rewrite runs alone on a quiet
+tree, because its blast radius intersects every other lane.
