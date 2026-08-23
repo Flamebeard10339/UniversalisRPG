@@ -10,7 +10,7 @@ import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, humanizeEn, id, text } from '../../grammar/values';
 import { localeKey } from '../locale';
 import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
-import { section } from './define';
+import { MintedAction, section } from './define';
 import { Dialogue, spokenBy } from './dialogue';
 import { TITLE_FIELD } from './info';
 
@@ -71,7 +71,7 @@ export function mintedActions(value: { id: string; examine?: string }, namespace
   return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said] } as Action];
 }
 
-const mintedAddresses = (value: { id: string; examine?: string }): string[] => mintedActions(value, null).map((action) => declaredId(action)!);
+const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ address: declaredId(action)!, from: `${EXAMINE_FIELD}:` }));
 
 // Whether walking up to this entity is worth a player's turn. `actions` is asked after linking, so
 // an entity's own blocks, what it `uses:` and what its `examine:` mints are one question here.
@@ -137,7 +137,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]],
   },
   nestsActions: 'only while the player stands in a location this entity stands in',
-  mintedActions: mintedAddresses,
+  mintedActions: mintedOffers,
   text: ['title', EXAMINE_FIELD],
   fields: {
     title: TITLE_FIELD,

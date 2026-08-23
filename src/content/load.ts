@@ -106,13 +106,14 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
   }
 }
 
-function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[]): void {
-  const taken = new Set<string>();
+function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[], value: { id: string }): void {
+  const minted = new Map((sectionFor(kind)?.mintedActions?.(value) ?? []).map((one) => [one.address, one.from]));
+  const taken = new Map<string, string>();
   for (const action of actions) {
     const owner = actionTextOwner(registry.namespace, kind, id, action);
-    const problem = actionSlugProblem(owner, action.label, taken);
+    const problem = actionSlugProblem(owner, action.label, taken, minted);
     if (problem) throw new DslError(`# ${kind} ${id}: ${problem}`);
-    taken.add(owner.field);
+    taken.set(owner.field, action.label);
     const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
     const key = actionTextKey(owner);
     registry.locales.addressable.add(key);
@@ -751,9 +752,9 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   for (const id of registrySlots(registry)) {
     if (!registry.slots.has(id)) recordBaseText(registry, 'slot', { id }, null, DEFAULT_LANGUAGE);
   }
-  for (const [kind, id, actions] of everyActionTable(registry)) {
+  for (const [kind, id, actions, value] of everyActionTable(registry)) {
     try {
-      recordActionText(registry, languages, kind, id, actions);
+      recordActionText(registry, languages, kind, id, actions, value);
     } catch (error) {
       if (!(error instanceof DslError)) throw error;
       return {

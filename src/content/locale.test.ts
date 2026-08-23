@@ -130,11 +130,17 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
     expect(() => loadModule('# action examine\ninstant\nsay: hm\n')).not.toThrow();
   });
 
+  it('names the line that minted an address, rather than the action nobody wrote, when an author keys as it too', () => {
+    const clashing = ['# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.', '', '# entity mirror', 'examine: A tall mirror.', 'uses: examine'].join('\n');
+
+    expect(() => loadModule(clashing)).toThrow(/examine: already offers an action addressed examine, which "Give It A Long Look" keys as too/);
+  });
+
   it('takes an address opening with a digit, and refuses one that is no key at all', () => {
     const addressed = (field: string): ActionTextOwner => ({ namespace: null, kind: 'entity', id: 'door', field });
 
-    expect(actionSlugProblem(addressed('3-card-monte'), '3 card monte', new Set())).toBeUndefined();
-    expect(actionSlugProblem(addressed(''), '...', new Set())).toMatch(/give it a label with a letter or a digit in it/);
+    expect(actionSlugProblem(addressed('3-card-monte'), '3 card monte', new Map(), new Map())).toBeUndefined();
+    expect(actionSlugProblem(addressed(''), '...', new Map(), new Map())).toMatch(/give it a label with a letter or a digit in it/);
   });
 });
 

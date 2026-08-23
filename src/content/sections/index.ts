@@ -113,10 +113,13 @@ export function parseModule(source: string): ModuleSection[] {
 
 export const isNamespacedKind = (kind: string): boolean => ownedSectionKinds().includes(kind as SectionKind) || MEMBER_KINDS.includes(kind);
 
-export function actionSlugProblem(owner: ActionTextOwner, label: string, taken: ReadonlySet<string>): string | undefined {
+export function actionSlugProblem(owner: ActionTextOwner, label: string, taken: ReadonlyMap<string, string>, minted: ReadonlyMap<string, string>): string | undefined {
   const slug = owner.field;
   if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) return `action ${JSON.stringify(label)} has no address: it keys as ${JSON.stringify(slug)}, so give it a label with a letter or a digit in it`;
   if (textFieldsOf(owner.kind)?.includes(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which is already a field of the object that owns it`;
-  if (taken.has(slug)) return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
-  return undefined;
+  const held = taken.get(slug);
+  if (held === undefined) return undefined;
+  const from = minted.get(slug);
+  if (from !== undefined) return `${from} already offers an action addressed ${slug}, which ${JSON.stringify(held)} keys as too: address one of them elsewhere, or take the ${from} line out`;
+  return `action ${JSON.stringify(label)} keys as ${slug}, which another action here already keys as`;
 }

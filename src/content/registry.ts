@@ -23,11 +23,13 @@ export const mapOf = (registry: Registry, name: string): Map<string, { id?: stri
 
 export const emptyMaps = (): SectionMaps => Object.fromEntries(mapNames().map((name) => [name, new Map()])) as SectionMaps;
 
-const tableOf = (registry: Registry, kind: string): ReadonlyMap<string, { actions?: readonly Action[] }> => registry[registryMapOf(kind) as keyof SectionMaps] as ReadonlyMap<string, { actions?: readonly Action[] }>;
+type ActionOwner = { id: string; actions?: readonly Action[] };
 
-export function everyActionTable(registry: Registry): Array<[string, string, readonly Action[]]> {
-  const owned = actionOwnerKinds().flatMap((kind) => [...tableOf(registry, kind)].map(([id, value]) => [kind, id, value.actions ?? []] as [string, string, readonly Action[]]));
-  return [...owned, ...[...registry.actions].map(([id, action]) => ['action', id, [action]] as [string, string, readonly Action[]])];
+const tableOf = (registry: Registry, kind: string): ReadonlyMap<string, ActionOwner> => registry[registryMapOf(kind) as keyof SectionMaps] as ReadonlyMap<string, ActionOwner>;
+
+export function everyActionTable(registry: Registry): Array<[string, string, readonly Action[], ActionOwner]> {
+  const owned = actionOwnerKinds().flatMap((kind) => [...tableOf(registry, kind)].map(([id, value]) => [kind, id, value.actions ?? [], value] as [string, string, readonly Action[], ActionOwner]));
+  return [...owned, ...[...registry.actions].map(([id, action]) => ['action', id, [action], { id }] as [string, string, readonly Action[], ActionOwner])];
 }
 
 export type ModuleLoadStage = 'parse' | 'order' | 'resolve' | 'merge' | 'build' | 'validate';
