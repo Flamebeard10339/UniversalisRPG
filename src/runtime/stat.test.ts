@@ -4,6 +4,9 @@ import { point, range } from '../grammar/range';
 import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
 import { endAction } from './actionEnd';
+import type { Localized } from './localized';
+
+const TEST_REASON = 'because the test said so' as Localized;
 import { requiresMet } from './actions';
 import { seatedAction } from './actionLookup';
 import { performable } from './roster';
@@ -353,7 +356,7 @@ describe('the stat fold reads the seat, not offerability', () => {
     stockItem(state, 'whetstone', 1);
     expect(statValue('attack', state, registry)).toBe(9);
 
-    endAction(state);
+    endAction(state, TEST_REASON);
     expect(statValue('attack', state, registry)).toBe(4);
   });
 

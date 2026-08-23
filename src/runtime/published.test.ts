@@ -66,6 +66,8 @@ const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/state.ts#GameState', why: '`log` is what a view drains into `said`, held on the state because a line is written before anyone reads it' },
   { type: 'src/runtime/planeScreen.ts#PlaneMove', why: 'the value and the words for it that become one `ModalChoice`' },
   { type: 'src/runtime/dialogue-runtime.ts#MenuEntry', why: 'the words for one entry of a dialogue list, and the name that picks it, on their way to one `ModalChoice`' },
+  { type: 'src/runtime/effects.ts#Segment', why: 'why what is under way is over, carried from the result that said so to the `endAction` that writes it onto the state' },
+  { type: 'src/runtime/runtime.ts#WaitedOut', why: 'why a span the engine ran unattended could not finish, said to the player in the log and answered to whoever issued the directive' },
 ];
 
 const RUNTIME = 'src/runtime';

@@ -36,6 +36,7 @@ import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './locali
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
+import { spanStart, type SpanStart } from './span';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
@@ -619,7 +620,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     }
     case 'goto': {
       if (!registry.locations.has(directive.location)) throw new RuntimeError(`unknown location: ${directive.location}`);
-      endJourney(state);
+      endJourney(state, localizerOf(registry, state).engine('engine.stopped.called-off'));
       relocateTo(state, registry, directive.location);
       return {};
     }
@@ -658,7 +659,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       return { pruned: loadSaved(session, saved) };
     }
     case 'cancel':
-      endJourney(state);
+      endJourney(state, localizerOf(registry, state).engine('engine.stopped.called-off'));
       return {};
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
@@ -666,8 +667,11 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'wait-out':
       return waitedOut(state, registry);
     case 'until': {
+      // One directive, one span: what the inner directive does on the way to being under way is
+      // part of what the player was away for, and it happens before the loop is ever entered.
+      const start = spanStart(state);
       const started = performDirective(session, directive.inner);
-      return started.failure ? started : waitedOut(state, registry, directive.until);
+      return started.failure ? started : waitedOut(state, registry, directive.until, start);
     }
     case 'equip':
       equip(state, registry, directive.item);
@@ -692,8 +696,8 @@ function performDirective(session: PlaySession, directive: Directive): Directive
   }
 }
 
-function waitedOut(state: GameState, registry: Registry, terminator: Terminator = 'done'): { failure?: string } {
-  const waited = resolveUnderWay(state, registry, terminator === 'done' ? undefined : (s, r) => evaluateCondition(terminator, s, r));
+function waitedOut(state: GameState, registry: Registry, terminator: Terminator = 'done', start?: SpanStart): { failure?: string } {
+  const waited = resolveUnderWay(state, registry, terminator, start);
   if (waited.ended) return {};
   const label = terminator === 'done' ? 'wait: done' : `until ${describeCondition(terminator)}`;
   return { failure: `${label} — ${waited.reason}` };

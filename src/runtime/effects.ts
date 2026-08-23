@@ -13,7 +13,7 @@ import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { stockItem } from './itemInstance';
 import { openModalNamed } from './modalStack';
-import { localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
 import { armedAction } from './roster';
 import { experienceFor } from './skillGrants';
@@ -27,10 +27,16 @@ export interface Segment {
   state: GameState;
   registry: Registry;
   deltas: PoolDeltas;
-  stopped: boolean;
+  // Why the action is over, in the player's words, or null while it is not. A `stop` result and an
+  // event an action `stops on:` are the same fact to whoever was away — the moment named it — so
+  // both are written here by the code that fires the event rather than told apart afterwards.
+  stopped: Localized | null;
   observers: readonly ResultObserver[];
   causedBy: Map<string, string>;
   credit?: string;
+  // The event whose handlers are running, so a `stop` inside one says what happened rather than
+  // that something did.
+  firing?: Localized;
   parties?: { readonly [P in Party]: string };
 }
 export type PoolDeltas = Map<string, Map<string, number>>;
@@ -53,7 +59,7 @@ const narrateModal: ResultObserver = ({ state, registry }, { result, lead }) => 
 export const RESULT_OBSERVERS: readonly ResultObserver[] = [narrateModal];
 
 export function newSegment(state: GameState, registry: Registry, observers: readonly ResultObserver[] = RESULT_OBSERVERS): Segment {
-  return { state, registry, deltas: new Map(), stopped: false, observers, causedBy: new Map() };
+  return { state, registry, deltas: new Map(), stopped: null, observers, causedBy: new Map() };
 }
 
 const eventIndexes = new WeakMap<Registry, Map<string, GameEvent[]>>();
@@ -229,7 +235,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return count;
     }
     case 'stop':
-      segment.stopped = true;
+      segment.stopped = segment.firing ?? localizerOf(registry, state).engine('engine.stopped.itself');
       return 0;
     case 'chance':
       if (nextRandom(state) * result.denominator < result.numerator) applyResults(segment, result.results, actor, count);
@@ -264,7 +270,7 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
   const segment = newSegment(state, registry);
   applyResults(segment, results ?? [], PLAYER, count);
   settlePools(state, registry, [], 0, segment.deltas);
-  if (segment.stopped) endAction(state);
+  if (segment.stopped) endAction(state, segment.stopped);
 }
 
 export function initResources(state: GameState, registry: Registry): void {
@@ -325,13 +331,18 @@ export function fireEvents(segment: Segment, actorId: string, trigger: EventTrig
   const events = eventsFor(segment.registry, resourceId, trigger);
   if (events.length === 0) return;
   const ends = endingEvents(segment, actorId);
+  const say = localizerOf(segment.registry, segment.state);
   for (const event of events) {
+    const happened = say.engine('engine.stopped.event', { event: say.title('event', event.id) });
+    const outer = segment.firing;
+    segment.firing = happened;
     for (const results of handlersFor(segment.registry, actorId, event.id)) {
       applyResults(segment, results, actorId, count);
     }
     const earned = experienceFor(segment.registry, actorEntity(segment.registry, actorId), event.id, amount);
     if (earned.length > 0) applyResults(segment, earned, actorId, count);
-    if (ends.includes(event.id)) segment.stopped = true;
+    segment.firing = outer;
+    if (ends.includes(event.id)) segment.stopped = happened;
   }
 }
 
@@ -409,7 +420,7 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
 
 function settleHandlerDeltas(state: GameState, registry: Registry, segment: Segment): void {
   if (segment.deltas.size === 0) {
-    if (segment.stopped) endAction(state);
+    if (segment.stopped) endAction(state, segment.stopped);
     return;
   }
   const stores = poolStores(state);
@@ -421,7 +432,7 @@ function settleHandlerDeltas(state: GameState, registry: Registry, segment: Segm
       store.levels[resource.id] = Math.min(max, Math.max(0, (store.levels[resource.id] ?? 0) + delta));
     }
   }
-  if (segment.stopped) endAction(state);
+  if (segment.stopped) endAction(state, segment.stopped);
 }
 
 export function clampResources(state: GameState, registry: Registry): void {
