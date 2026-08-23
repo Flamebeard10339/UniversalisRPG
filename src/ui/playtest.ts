@@ -1,5 +1,4 @@
-import { describeRun, isPlayed, NOTE_FIELDS, outcomeOf, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
-import type { CommandResult } from '../runtime/command';
+import { describeRun, isPlayed, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type PlayedTurn, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import type { SlotStore } from '../runtime/store';
 
 // The app's own end of the playtest loop, and the counterpart of runPlaybot: it holds the run,
@@ -41,8 +40,9 @@ export interface Recorder {
   run(): readonly RunLogEntry[] | null;
   start(): void;
   stop(): void;
-  // A line the author sent, and where in the transcript its answer begins.
-  opened(line: string, result: CommandResult, from: number): void;
+  // What the player picked, whether the engine took it, and where in the transcript its answer
+  // begins.
+  opened(line: string, outcome: PlayedTurn['outcome'], from: number): void;
   // Everything the transcript has gained since, which is how a live action's ending lines reach
   // the turn that began it rather than the next one.
   settle(said: (from: number) => readonly string[]): boolean;
@@ -80,10 +80,10 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
       log = null;
       keep();
     },
-    opened: (line, result, from) => {
+    opened: (line, outcome, from) => {
       if (log === null) return;
       answering = from;
-      log = [...log, turnRecord(log.length + 1, line, outcomeOf(result), [])];
+      log = [...log, turnRecord(log.length + 1, line, outcome, [])];
     },
     settle: (said) => {
       if (log === null || log.length === 0) return false;

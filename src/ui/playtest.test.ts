@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import type { CommandResult } from '../runtime/command';
 import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import { memoryDriver } from '../runtime/store';
 import { slotStore } from '../runtime/store';
@@ -9,8 +8,8 @@ import { pageStorage } from './agent/pageStorage';
 import { createDriver, type Driver } from './driver';
 import { attached, createRecorder, edited, emptyNotes, feedbackOn, turnsPlayed } from './playtest';
 
-const took: CommandResult = { output: [], quit: false, recorded: [] };
-const turnedAway: CommandResult = { output: [{ kind: 'message', words: 'tool', tone: 'error', text: 'no' }], quit: false, recorded: [] };
+const took = 'applied' as const;
+const turnedAway = 'refused' as const;
 
 const played = (turn: number, line: string, notes: Partial<RunNotes> = {}): RunLogEntry => ({ ...emptyNotes(), ...notes, turn, line, outcome: 'applied', detail: 'something happened' });
 
@@ -188,6 +187,17 @@ describe('a run an author played in the app', () => {
     expect(written[0]).toMatch(/^turn 1 \[applied\] use:entity\.workshop\.lathe\.examine — note: \(none\); expected: \(none\); confusion: \(none\); result: /);
     expect(written[0]).toContain('A lathe, belt slack.');
     expect(written[written.length - 1]).toMatch(/^turn 2 \[refused\] travel:nowhere-at-all —/);
+  });
+
+  it('names the choice the author picked, not the position this driver sends', () => {
+    const driver = playing();
+    driver.playtest.start();
+    driver.choose(1);
+
+    const picked = driver.snapshot().playtest ?? [];
+    expect(picked).toHaveLength(1);
+    expect(driver.playtest.written()).toContain('use:entity.workshop.lathe.examine');
+    expect(driver.playtest.written()).not.toMatch(/^turn 1 \[applied\] 1 —/);
   });
 
   it('carries the author’s own words on the turn they were about', () => {

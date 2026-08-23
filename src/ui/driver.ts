@@ -4,10 +4,10 @@ import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
-import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type CommandResult, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
-import type { RunLogEntry, RunNotes } from '../runtime/runLog';
+import { outcomeOf, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
@@ -97,11 +97,6 @@ function open(opened: OpenedUniverse, authoring: AuthoringContext, save: SaveCon
 }
 
 const because = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-// A line the app itself turned away never reached the engine, so there is no result to read an
-// outcome off. It is a refusal all the same, and a run that dropped it would not say what the
-// author actually typed.
-const REFUSED_OUTRIGHT: CommandResult = { output: [{ kind: 'message', words: 'tool', tone: 'error', text: '' }], quit: false, recorded: [] };
 
 export function createDriver(sources: readonly ModuleSource[], options: DriverOptions = {}): Driver {
   const listeners = new Set<() => void>();
@@ -215,17 +210,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  const send = (line: string): void => {
+  // A run records what the player picked, not how this driver spelled it. Answering a numbered
+  // choice is the one place the two differ: the engine's own protocol for picking one is its
+  // position, and a log of 1, 2, 3 says nothing to whoever reads the run afterwards.
+  const sending = (line: string, chose: string = line): void => {
     const refusal = devRefusal(line, save.dev);
     if (refusal !== null) {
-      record.opened(line, REFUSED_OUTRIGHT, current.transcript.entries.length);
+      record.opened(chose, 'refused', current.transcript.entries.length);
       complain(refusal);
       return;
     }
     if (running) close(true);
     const from = current.transcript.entries.length;
     const result = runLine(context, line);
-    record.opened(line, result, from);
+    record.opened(chose, outcomeOf(result), from);
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
@@ -236,6 +234,10 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     }
     publish();
   };
+
+  const send = (line: string): void => sending(line);
+
+  const chosen = (position: number): string => current.view.choices[position - 1]?.id ?? String(position);
 
   const reopen = (): void => {
     running = null;
@@ -253,7 +255,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     snapshot: () => current,
     transient: options.transient ?? createTransientChannel(),
     send,
-    choose: (position) => send(String(position)),
+    choose: (position) => sending(String(position), chosen(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
     readQuest: (quest) => send(`/quests ${quest}`),
