@@ -102,11 +102,6 @@ hardening pass.
 
 ## Ours, and small
 
-**`LiveProgress.implicit`, `engine.repl.live.counting` and `LiveSheet.tsx`'s
-implicit bar are unreachable.** No action shape the engine can build produces a
-non-null `completion`, so the branch that draws them is dead. *Closes when:* they
-are deleted — which needs `src/ui/`, and a UI change is the author's to test.
-
 **`remaining` does not reach the GUI.** `livePools()`
 (`src/runtime/command.ts:1129`) projects title, current and max, so the count that
 stops three rats reading as one that healed is shown in the terminal and the

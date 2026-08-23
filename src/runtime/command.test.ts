@@ -876,7 +876,7 @@ describe('the live clock', () => {
     expect(started.live!.tick(2000)).toMatchObject({ active: false, label: 'strike' });
   });
 
-  it('publishes progress and the run’s own countdown as numbers, with no target to narrate', () => {
+  it('counts down an untargeted action whose plain damage: reads under 1 — the one shape that publishes a completion', () => {
     const TAPPING_MODULE = `
 # stat tap
 base: 0.2
