@@ -17,6 +17,14 @@ way each time. And **the constraint is the author's endurance**, not the token b
 which is why the run in `../specs/run-an-orchestrator-over-three-parallel-tasks.md`
 measured interruptions rather than wall-clock.
 
+**Read the audit rows with their scope attached.** Every high-value audit round below
+— rows 29-32, the task-system passes, rows 33-38, rows 64-84 — graded *spec clauses*
+in a workflow that was deleted on 2026-08-20. Those audits paid because they checked
+a claim that nothing else checked, and there are no clause claims now: `dsl.test.ts`'s
+derived proofs and `npm run mutate` occupy that slot and run in twenty seconds. This
+file is therefore not an argument for standing audits on this project, and the ruling
+that audits never gate a branch is not in tension with anything measured here.
+
 If a delegation teaches something genuinely new, edit the doctrine. A new row here
 buys nothing.
 
