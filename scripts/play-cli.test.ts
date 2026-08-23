@@ -146,7 +146,7 @@ starting
   it('prints the status readout /state and /quit both produce', () => {
     const ctx = driver(TUTORIAL);
     runLine(ctx, '/wait 7');
-    const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [row.id, row.value])));
+    const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [`${row.title} (${row.id})`, row.value])));
     const state = shown(runLine(ctx, '/state'));
     // Every line the readout is made of, and no other. What the town holds beyond the three rooms
     // walked to here is the world's size rather than this readout's shape, so the two lines that
@@ -158,9 +158,11 @@ starting
       'Flags: {"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}',
       'Inventory: {}',
     ]);
-    expect(state[4]).toMatch(/^XP: \{"core\.thieving":0,"core\.melee":0,"core\.cooking":0[,}]/);
+    // Under the name the world gives a thing as well as the id it is addressed by: an id-only
+    // readout was the whole of what a player at this terminal ever saw of a skill or a stat.
+    expect(state[4]).toMatch(/^XP: \{"Thieving \(core\.thieving\)":0,"Melee \(core\.melee\)":0,"Cooking \(core\.cooking\)":0[,}]/);
     expect(state.slice(5, 12)).toEqual([
-      'Equipped: {"mainhand":null,"offhand":null}',
+      'Equipped: {"Main Hand (mainhand)":null,"Off Hand (offhand)":null}',
       `stats: ${sheet}`,
       'Health: ██████████ 30/30',
       'discovered: 3',
