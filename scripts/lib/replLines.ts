@@ -192,6 +192,15 @@ function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   return lines;
 }
 
+// What the player is in the middle of. The only other place a terminal names an action under way
+// is the live tick sheet, which exists only while a TTY is ticking one, so without this row a
+// session that is not ticking has no way to ask what it is doing.
+function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
+  if (action === null) return [];
+  const counting = action.completion === null ? '' : `, ${tidy(action.completion)} to count`;
+  return [field('action', `${action.label} ${tidy(action.progress)} after ${action.attempts}${counting}`)];
+}
+
 // Coordinates put a location on an integer lattice, but what can be walked is `adjacent`, and
 // neither implies the other: two places one step apart on the grid need not be joined, and a road
 // may run the width of the map. So the roads are what is drawn, with each place's coordinates
@@ -220,6 +229,7 @@ function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
     ...formatInventory(status, localizer),
     ...formatResources(status.resources, localizer),
     ...formatEncounter(status.encounter, localizer),
+    ...formatUnderWay(status.action),
     ...formatMap(status),
   ];
 }

@@ -2,8 +2,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { saidWords } from '../src/content/locale';
 import { newContext, runLine, type CommandContext } from '../src/runtime/command';
-import { sessionLocalizer, startSession, view, type PlayView } from '../src/runtime/session';
+import { sessionLocalizer, startSession, view } from '../src/runtime/session';
 import { pageStorage } from '../src/ui/agent/pageStorage';
 import { App } from '../src/ui/App';
 import { browserSlots } from '../src/ui/browserStore';
@@ -12,7 +13,6 @@ import { LAYERS, OPENING, toLayer, toSubpage } from '../src/ui/nav';
 import { SHIPPED_SOURCES } from '../src/ui/shippedContent';
 import {
   driftingPaths,
-  everythingSaid,
   excusedCommandsAreReal,
   excusedPathsAreReal,
   unansweredCommands,
@@ -20,6 +20,7 @@ import {
   type PathExcuse,
   type SurfaceAnswers,
   type SurfaceRun,
+  type SurfaceStep,
 } from './lib/viewCoverage';
 import { printed } from './lib/replLines';
 import { formatResult } from './play-cli';
@@ -39,6 +40,10 @@ const PARITY_EXCUSED: readonly PathExcuse[] = [
   {
     path: 'modals[].options[].label',
     why: "a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it (ModalSheet's `onlyLeaves`). A terminal has no frame around a screen and names the question to say one is open at all",
+  },
+  {
+    path: 'planes[].clusters[].positions[].title',
+    why: 'the app names the node the player has picked and nothing on the lattice itself, since a tap is how a node is asked about there; a terminal has nothing to tap and so lays every node out as a table with its passive in a column',
   },
 ];
 
@@ -88,42 +93,36 @@ const SCRIPT: readonly string[] = [
   '/goto tulsa.basement',
   '/state',
   'use: core.melee-combat on tulsa.giant-rat',
+  '/state',
 ];
 
 const registry = () => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 
 // The same script, walked once per driver, so a path is asked of each of them in the same state.
-function walkScript(step: (line: string) => PlayView): PlayView[] {
-  return SCRIPT.map(step);
-}
+const walkScript = (step: (line: string) => SurfaceStep): SurfaceStep[] => SCRIPT.map(step);
 
-function cliRun(): { views: PlayView[]; rendered: string } {
+function cliRun(): SurfaceStep[] {
   const session = startSession(registry());
   const ctx = newContext(session, view(session));
-  let rendered = '';
-  const views = walkScript((line) => {
+  return walkScript((line) => {
     const result = runLine(ctx, line);
-    rendered += `${formatResult(result, sessionLocalizer(session)).map(printed).join('\n')}\n`;
+    const rendered = formatResult(result, sessionLocalizer(session)).map(printed).join('\n');
     ctx.view = view(session);
-    return ctx.view;
+    return { view: ctx.view, rendered };
   });
-  return { views, rendered };
 }
 
-function botRun(): { views: PlayView[]; rendered: string } {
+function botRun(): SurfaceStep[] {
   const session = startSession(registry());
   const ctx = newContext(session, view(session));
-  let rendered = '';
-  const views = walkScript((line) => {
+  return walkScript((line) => {
     const result = runLine(ctx, line);
     const localizer = sessionLocalizer(session);
     ctx.view = view(session);
     // Both halves of what a turn puts in front of the model: the view it opens with, and what the
     // line it sent answered with.
-    rendered += `${renderView(ctx.view, localizer)}\n${answerLines(result, localizer).join('\n')}\n`;
-    return ctx.view;
+    return { view: ctx.view, rendered: `${renderView(ctx.view, localizer)}\n${answerLines(result, localizer).join('\n')}` };
   });
-  return { views, rendered };
 }
 
 const EVERY_PAGE = LAYERS.flatMap((layer, at) => layer.subpages.map((subpage) => toSubpage(toLayer(OPENING, at), at, subpage.id)));
@@ -144,30 +143,27 @@ const asWords = (markup: string): string => ESCAPES.reduce((held, [pattern, char
 
 const drawEveryPage = (driver: Driver): string => asWords(EVERY_PAGE.map((where) => renderToStaticMarkup(createElement(App, { driver, opening: where }))).join(''));
 
-function guiRun(): { views: PlayView[]; rendered: string } {
+// The player's pages only. Dev mode opens the authoring map, which draws every location the
+// registry holds whether or not anybody has walked to one — an author's sight, and the thing the
+// other two drivers are deliberately refused.
+function guiRun(): SurfaceStep[] {
   const slots = browserSlots(() => pageStorage());
   const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
-  let rendered = '';
-  const views = walkScript((line) => {
+  return walkScript((line) => {
     driver.send(line);
-    rendered += drawEveryPage(driver);
-    return driver.snapshot().view;
+    return { view: driver.snapshot().view, rendered: drawEveryPage(driver) };
   });
-  // The player's pages only. Dev mode opens the authoring map, which draws every location the
-  // registry holds whether or not anybody has walked to one — an author's sight, and the thing the
-  // other two drivers are deliberately refused.
-  return { views, rendered };
 }
 
 describe('no driver draws less of a live view than the others', () => {
   const runs = (): SurfaceRun[] => [
-    { name: 'the playbot', ...botRun() },
-    { name: 'play-cli', ...cliRun() },
-    { name: 'the GUI', ...guiRun() },
+    { name: 'the playbot', steps: botRun() },
+    { name: 'play-cli', steps: cliRun() },
+    { name: 'the GUI', steps: guiRun() },
   ];
 
   it('every leaf the same short run publishes reaches all three drivers, or none of them', () => {
-    const drifting = driftingPaths(runs(), everythingSaid(registry()), PARITY_EXCUSED);
+    const drifting = driftingPaths(runs(), saidWords(registry().locales), PARITY_EXCUSED);
     expect(drifting, `these paths reach some drivers and not others:\n  ${drifting.join('\n  ')}`).toEqual([]);
   });
 
