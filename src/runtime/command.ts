@@ -1101,6 +1101,7 @@ export interface LivePool {
   title: Localized;
   current: number;
   max: number;
+  remaining: number | null;
 }
 
 export interface LiveProgress {
@@ -1125,8 +1126,8 @@ function finished(label: Localized, current: PlayView): LiveProgress {
 function livePools(status: PlayStatus): LivePool[] {
   if (!status.encounter) return [];
   return [
-    ...status.resources.filter((resource) => resource.display === 'full').map((resource) => ({ title: resource.title, current: resource.current, max: resource.max })),
-    ...status.encounter.foes.map((foe) => ({ title: foe.title, current: foe.current, max: foe.max })),
+    ...status.resources.filter((resource) => resource.display === 'full').map((resource) => ({ title: resource.title, current: resource.current, max: resource.max, remaining: null })),
+    ...status.encounter.foes.map((foe) => ({ title: foe.title, current: foe.current, max: foe.max, remaining: foe.remaining })),
   ];
 }
 

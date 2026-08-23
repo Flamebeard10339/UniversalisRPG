@@ -977,8 +977,8 @@ ring:
     const { started } = liveFixture(FIGHT_MODULE, 'fight:swing:rat');
     const progress = [started.live!.tick(900), started.live!.tick(900)];
     expect(progress[1].pools).toEqual([
-      { title: 'Health', current: 30, max: 30 },
-      { title: 'Rat', current: 6, max: 12 },
+      { title: 'Health', current: 30, max: 30, remaining: null },
+      { title: 'Rat', current: 6, max: 12, remaining: 1 },
     ]);
     for (const each of progress) expect(each.implicit).toBeNull();
   });

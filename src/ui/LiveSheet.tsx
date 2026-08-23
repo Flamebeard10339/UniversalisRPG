@@ -1,5 +1,5 @@
 import type { LiveProgress } from '../runtime/command';
-import { fillPercent } from './format';
+import { fillPercent, remainingBadge } from './format';
 import { Meter } from './Meter';
 import { FILL_TRANSITION } from './transient';
 
@@ -35,7 +35,12 @@ export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCa
       ) : null}
 
       {progress.pools.map((pool) => (
-        <Meter key={pool.title} title={pool.title} current={pool.current} max={pool.max} readout />
+        <div key={pool.title} className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <Meter title={pool.title} current={pool.current} max={pool.max} readout />
+          </div>
+          {remainingBadge(pool.remaining) !== null ? <span className="w-8 shrink-0 text-right text-xs tabular-nums text-text-subtle">{remainingBadge(pool.remaining)}</span> : null}
+        </div>
       ))}
     </div>
   );
