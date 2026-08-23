@@ -125,7 +125,7 @@ describe('combat-expansion, read off the routes it ships', () => {
     const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
     const struck = state.resources['core.health'];
 
-    expect(shipped.entities.get('combat-expansion.spined-urchin')!.actions).toEqual([]);
+    expect(shipped.entities.get('combat-expansion.spined-urchin')!.blocks).toEqual([]);
 
     // The pool fell by what thorns took net of what regeneration gave back, so the same span is run
     // again with nothing to fight, opened where the fight left off: what it gains is what to add back.

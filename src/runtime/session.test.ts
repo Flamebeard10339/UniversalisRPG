@@ -1341,7 +1341,7 @@ describe('the four growth verbs through the directive surface', () => {
 });
 
 describe('a missing translation shows its key, in every direction', () => {
-  const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', '', '# location cove', 'x: 1, y: 0'].join('\n');
+  const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', 'examine: It sidles, and keeps one eye on you.', '', '# location cove', 'x: 1, y: 0'].join('\n');
   const SPANISH = ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', 'island.location.shore.title: Orilla', 'engine.travel.to: Viaja a {destination}'].join('\n');
 
   const played = (language: string, ...extra: ModuleSource[]): PlayView =>
@@ -1363,6 +1363,7 @@ describe('a missing translation shows its key, in every direction', () => {
     expect(v.location.description).toBe('island.location.shore.examine');
     expect(v.entities[0].title).toBe('island.entity.crab.title');
     expect(v.choices.map((choice) => choice.label)).toContain('engine.travel.to');
+    expect(v.choices.map((choice) => choice.label)).toContain('action.look.look');
   });
 
   it('shows what the locale does translate, and the key for what it does not', () => {
@@ -1385,7 +1386,7 @@ describe('a missing translation shows its key, in every direction', () => {
     const v = view(startSession(loadUniverse([{ name: 'island', text: ISLAND }]), 'en'));
 
     expect(v.location.title).toBe('Shore');
-    expect(v.choices.map((choice) => choice.label)).toEqual(['engine.travel.to']);
+    expect(v.choices.map((choice) => choice.label)).toEqual(['Look', 'engine.travel.to']);
   });
 
   it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {

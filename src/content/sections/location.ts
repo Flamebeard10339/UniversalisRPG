@@ -107,6 +107,15 @@ const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
 
 // A road an author writes only from one end is walked from the other end too, carrying the same
 // condition, unless the far end already writes an edge back — an authored edge always beats a derived one.
+// Where a player may walk up to each entity anything stands. Nothing else puts one in a room — a
+// population only counts the deficit against this list — so an entity absent here is one no player
+// meets, which is what the entity a game is played as has in common with a template nobody stands.
+export function entitiesStood(locations: ReadonlyMap<string, Location>): Map<string, string> {
+  const stood = new Map<string, string>();
+  for (const location of locations.values()) for (const entry of location.entities) if (!stood.has(entry.entity)) stood.set(entry.entity, location.id);
+  return stood;
+}
+
 export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<string, Edge[]> {
   const roads = new Map<string, Edge[]>();
   for (const location of locations.values()) roads.set(location.id, [...location.adjacent]);

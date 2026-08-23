@@ -330,8 +330,10 @@ describe('loadUniverseWithDiagnostics', () => {
       '# action swing',
       'give: ghost.gem',
       '# entity brute',
+      'examine: Wider than the door he came through.',
       'uses: swing',
       '# entity dresser',
+      'examine: Three drawers, one of them shut.',
       'search drawer:',
       '  give: ghost.gem',
       '# item lamp',
@@ -363,7 +365,7 @@ describe('loadUniverseWithDiagnostics', () => {
         address,
         tests: [],
       });
-      expect(registry.namespace.declaredKeys('action-slug')).toEqual([]);
+      expect(registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.brute.look', 'entity.base.dresser.look']);
     }
   });
 
@@ -372,7 +374,7 @@ describe('loadUniverseWithDiagnostics', () => {
       ...module('ghost', '# info ghost', '# item gem'),
       enabled: false,
     };
-    const base = module('base', '# info base', 'dependencies: ? ghost', '# entity dresser', 'search drawer:', '  give: ghost.gem', '# item dresser', 'search drawer:', '  say: rattle', '# location shore', 'x: 0, y: 0', 'starting', 'entities: dresser');
+    const base = module('base', '# info base', 'dependencies: ? ghost', '# entity dresser', 'examine: Three drawers, one of them shut.', 'search drawer:', '  give: ghost.gem', '# item dresser', 'search drawer:', '  say: rattle', '# location shore', 'x: 0, y: 0', 'starting', 'entities: dresser');
     const walker = (use: string): ModuleSource => module('walk', '# info walk', 'dependencies: base', '# test walk', `use: ${use}`);
 
     const survivor = loadUniverseWithDiagnostics([base, ghost, walker('item.base.dresser.search-drawer')]);
@@ -383,7 +385,7 @@ describe('loadUniverseWithDiagnostics', () => {
     }).toEqual({ loadedModules: ['base', 'walk'], diagnostics: [] });
     expect(survivor.registry.entities.get('base.dresser')!.blocks).toEqual([]);
     expect(survivor.registry.items.get('base.dresser')!.actions).toHaveLength(1);
-    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['item.base.dresser.search-drawer']);
+    expect(survivor.registry.namespace.declaredKeys('action-slug')).toEqual(['entity.base.dresser.look', 'item.base.dresser.search-drawer']);
     expect([...survivor.registry.tests.keys()]).toEqual(['walk.walk']);
 
     const stranded = loadUniverseWithDiagnostics([base, ghost, walker('entity.base.dresser.search-drawer')]);
