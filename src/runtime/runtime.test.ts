@@ -192,9 +192,9 @@ describe('applyResult', () => {
 
   it('logs and stacks a modal on open-modal', () => {
     const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }]);
-    expect(state.log).toContain('modal:character-creation');
-    expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
+    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'name-yourself' }]);
+    expect(state.log).toContain('modal:name-yourself');
+    expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
   });
 });
 

@@ -17,7 +17,8 @@ export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
 }
 
 const FRAMES: { [K in ModalName]: FrameKind<Extract<ModalFrame, { name: K }>> } = {
-  'character-creation': { open: () => ({ name: 'character-creation', answers: {} }) },
+  'name-yourself': { open: () => ({ name: 'name-yourself', answers: {} }) },
+  'choose-race': { open: () => ({ name: 'choose-race', answers: {} }) },
   'carried-items': { open: () => carriedFrame() },
   'item-plane': { open: () => null, same: samePlane },
   'quest-journal': { open: () => questFrame() as Extract<ModalFrame, { name: 'quest-journal' }>, same: sameQuest },

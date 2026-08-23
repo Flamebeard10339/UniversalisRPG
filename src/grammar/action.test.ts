@@ -90,7 +90,7 @@ describe('side vocabulary is the whole declaration of kind', () => {
   });
 
   it('leaves a one-sided action needing no depletes: and no markers', () => {
-    const mirror = parse('instant\nopen modal: character-creation\nset: mirror-done');
+    const mirror = parse('instant\nopen modal: name-yourself\nset: mirror-done');
     expect(mirror.kind).toBe('instant');
     expect(mirror.depletes).toBeUndefined();
     expect(parse('rate: cooking-rate\ngive: 1 roasted-chestnut').rate).toEqual({

@@ -1,7 +1,7 @@
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { section } from './define';
 
-export const MODAL_SCREENS = ['character-creation', 'carried-items', 'quest-journal'] as const;
+export const MODAL_SCREENS = ['name-yourself', 'choose-race', 'carried-items', 'quest-journal'] as const;
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
 

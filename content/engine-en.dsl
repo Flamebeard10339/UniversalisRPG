@@ -33,6 +33,9 @@ engine.carried.stack: {item} x{count}
 engine.carried.worn: {item} ({slot})
 engine.modal.name: Name
 engine.modal.race: Race
+engine.modal.race.carries: {race} - {carries}
+engine.modal.race.bonus: {amount} {stat}
+engine.modal.race.and: {carries}, {more}
 engine.modal.choice: Choice
 engine.modal.item: Item
 engine.modal.confirm: {verb} {item} for good?

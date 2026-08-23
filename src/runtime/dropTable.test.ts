@@ -169,9 +169,9 @@ describe('a stochastic group is applied count times, not scaled once', () => {
   it('opens a modal once for the batch too, the other line a count ignores', () => {
     const { registry } = fight('give: 1 bones');
     const state = createGameState();
-    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'character-creation' }, { kind: 'give', item: 'coins', amount: { min: 1, max: 4 } }], 5);
-    expect(state.log.filter((line) => line === 'modal:character-creation')).toHaveLength(1);
-    expect(state.modals.map((frame) => frame.name)).toEqual(['character-creation']);
+    applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'name-yourself' }, { kind: 'give', item: 'coins', amount: { min: 1, max: 4 } }], 5);
+    expect(state.log.filter((line) => line === 'modal:name-yourself')).toHaveLength(1);
+    expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
   });
 
   it('lets a say inside a wrapper speak on every repetition that reaches it', () => {

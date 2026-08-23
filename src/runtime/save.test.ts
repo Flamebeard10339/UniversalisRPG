@@ -4,7 +4,6 @@ import { restorePools } from './effects';
 import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { answerModal } from './modals';
 import { openModalNamed } from './modalStack';
 import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
 import { parseSaveSection } from '../content/sections/save';
@@ -166,19 +165,22 @@ describe('loadSave', () => {
   it('carries an open modal stack across a round trip, and refuses a body that is not one', () => {
     const registry = loadInEnglish(MODULE);
     const state = createGameState();
-    openModalNamed(state, 'character-creation');
-    answerModal(state, registry, { name: 'Rowan' });
+    openModalNamed(state, 'choose-race');
+    openModalNamed(state, 'name-yourself');
 
     const { version, ...diff } = JSON.parse(serializeSave(state, registry));
     const restored = createGameState();
     loadSave(restored, { version, diff }, registry);
-    expect(restored.modals).toEqual([{ name: 'character-creation', answers: { name: 'Rowan' } }]);
+    expect(restored.modals).toEqual([
+      { name: 'choose-race', answers: {} },
+      { name: 'name-yourself', answers: {} },
+    ]);
 
     for (const body of [
-      'character-creation',
+      'name-yourself',
       [{ answers: {} }],
-      [{ name: 'character-creation' }],
-      [{ name: 'character-creation', answers: { name: 7 } }],
+      [{ name: 'name-yourself' }],
+      [{ name: 'name-yourself', answers: { name: 7 } }],
       [{ name: 'dialogue', answers: {} }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1.5, replay: true } }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1 } }],
@@ -207,7 +209,8 @@ describe('loadSave', () => {
     for (const [frame, message] of [
       [{ name: 'haggling', answers: {} }, 'Closed modal haggling because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
-      [{ name: 'character-creation', answers: { name: 'Rowan', race: 'elf' } }, 'Closed modal character-creation because it was saved with every option already answered.'],
+      [{ name: 'name-yourself', answers: { name: 'Rowan' } }, 'Closed modal name-yourself because it was saved with every option already answered.'],
+      [{ name: 'choose-race', answers: { race: 'wyvern' } }, 'Closed modal choose-race because it has no race that takes "wyvern".'],
       [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal item-plane because it grows charm, which the player no longer carries.'],
       [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal item-plane because it grows 4, which the player no longer carries.'],
     ] as const) {
