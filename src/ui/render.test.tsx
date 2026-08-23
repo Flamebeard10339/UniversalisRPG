@@ -5,7 +5,7 @@ import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
-import { startSession, view, type PlayView } from '../runtime/session';
+import { applyDirective, startSession, view, type PlayView } from '../runtime/session';
 import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
@@ -32,6 +32,10 @@ const noTicks: Ticker = () => () => undefined;
 
 const ROAST = 'use:entity.core.oven.roast-chestnuts';
 const TALK = 'talk:core.miki';
+
+// The corpus grants no raw chestnut, so the only continuous action it ships is
+// offered to nobody until this save puts the ingredient in hand.
+const STOCKED = { kind: 'load', save: 'core.chestnuts-in-hand' } as const;
 
 const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
 
@@ -106,6 +110,7 @@ const engineRuns = (html: string): string[] => readable(html).filter((run) => !S
 
 function whatStoppingSays(): string[] {
   const session = startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry);
+  applyDirective(session, STOCKED);
   const opening = view(session);
   const armed = runLine(newContext(session, opening, { driving: true }), String(opening.choices.findIndex((choice) => choice.id === ROAST) + 1));
   return armed.live!.end(true).output.flatMap((output) => (output.kind === 'message' ? [output.text] : []));
@@ -168,6 +173,12 @@ function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: bo
       .filter((run) => run !== ''),
     ring: inner.includes('stroke-dashoffset'),
   }));
+}
+
+function stocked(): Driver {
+  const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+  driver.send(`/load ${STOCKED.save}`);
+  return driver;
 }
 
 function position(driver: Driver, choiceId: string): number {
@@ -256,7 +267,7 @@ function everyPageFilled(): Driver {
 
 describe('what the shell puts on the screen', () => {
   it('renders nothing a player can read that the engine did not publish', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = stocked();
     const engine = new Set<string>(whatStoppingSays());
     let seen = 0;
 
@@ -420,7 +431,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws the run above the choices, which it does not withdraw', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = stocked();
     const idle = driver.snapshot().view.choices;
     const running = idle.find((choice) => choice.id === ROAST)!.label;
     const other = idle.find((choice) => choice.id === TALK)!.label;
@@ -515,7 +526,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('names its two glyph controls with the engine value each one acts on', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = stocked();
     const running = driver.snapshot().view.choices.find((choice) => choice.id === ROAST)!.label;
     driver.choose(position(driver, ROAST));
 
@@ -526,7 +537,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('moves a bar over exactly one tick of the cadence both drivers read', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = stocked();
     driver.choose(position(driver, ROAST));
 
     expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`transition-duration:${LIVE_TICK_MS}ms`);

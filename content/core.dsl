@@ -53,7 +53,7 @@ base: 25
 // `max-health` can be fought.
 # stat max-health
 
-// Chestnuts per minute: 15/min is one every 4 seconds.
+// Chestnuts per minute: 55/min is one about every 1.1 seconds.
 # stat cooking-rate
 base: 55
 
@@ -190,6 +190,9 @@ eat:
   instant
   take: 1 bread
   say: You tear into the warm loaf - simple, filling, and worth the trouble.
+
+# item raw-chestnut
+examine: A hard brown nut, its shell scored ready for the embers.
 
 # item roasted-chestnut
 examine: A chestnut roasted soft and sweet in the oven's embers.
@@ -554,7 +557,9 @@ examine: A stone oven, its coals still glowing.
 stations: oven
 roast chestnuts:
   continuous
+  requires: has raw-chestnut
   rate: cooking-rate
+  take: 1 raw-chestnut
   give: 1 roasted-chestnut
   xp: cooking 40-80
   on success:
@@ -677,6 +682,11 @@ node greeting:
 
 # save explored-and-unlocked
 {"version":11,"flags":{"core.front-door.unlocked":true,"core.beach.discovered":true}}
+
+// Standing at the oven with something to roast. Nothing in the world grants a
+// raw chestnut, so this save is the only way the continuous cadence is reached.
+# save chestnuts-in-hand
+{"version":11,"inventory":{"core.raw-chestnut":3}}
 
 // The drawer's contested roll over shipped content. On the default seed this
 // search comes up empty behind the lockpick, so an assertion over inventory
