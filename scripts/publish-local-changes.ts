@@ -9,9 +9,10 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { MOD_PENDING_LABEL } from '../src/content/modportal';
 import { ModuleSource } from '../src/content/universe';
+import { sourceFiles } from './probe';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/core.dsl';
+const defaultContent = 'content';
 const defaultLocal = 'content/local-changes.dsl';
 
 interface Args {
@@ -98,8 +99,11 @@ function sourceName(file: string): string {
 }
 
 function source(file: string): ModuleSource {
-  return { name: sourceName(file), text: readFileSync(repoPath(file), 'utf8') };
+  return { name: sourceName(file), text: readFileSync(file, 'utf8') };
 }
+
+// A source may name a directory, which stands for the .dsl files in it, so `content` names the whole corpus.
+const contentSources = (files: readonly string[]): ModuleSource[] => files.flatMap((file) => sourceFiles(repoPath(file))).map(source);
 
 function fail(lines: string[]): never {
   for (const line of lines) console.error(line);
@@ -126,7 +130,7 @@ export function main(raw: string[] = process.argv.slice(2)): void {
   const args = parseArgs(raw);
   if (!existsSync(repoPath(args.localFile))) fail([`Local changes file not found: ${args.localFile}`]);
 
-  const baseSources = args.contentFiles.map(source);
+  const baseSources = contentSources(args.contentFiles);
   const localSource = source(args.localFile);
   const validation = loadUniverseWithDiagnostics([...baseSources, localSource]);
   if (!localModuleLoaded(localSource.name, validation)) {

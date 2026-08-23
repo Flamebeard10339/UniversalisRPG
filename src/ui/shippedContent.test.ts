@@ -20,6 +20,6 @@ describe('the content the build carries', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view.location.id).toBe('core.guide-house');
+    expect(driver.snapshot().view.location.id).toBe('tulsa.guide-house');
   });
 });

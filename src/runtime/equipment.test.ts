@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { armFightAction, createGameState, equip, GameState, initResources, resolve, statValue, unequip } from './runtime';
 import { Registry } from '../content/registry';
+import { withEngineLocale } from '../content/engineLocale';
 import { loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/load';
 import { parseSaveSection } from '../content/sections/save';
 import { carriedCount, carriesItem, feedItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
@@ -132,14 +134,14 @@ describe('equipment', () => {
   });
 
   it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
-    const tutorial = loadInEnglish(readFileSync('content/core.dsl', 'utf8'));
+    const tutorial = loadUniverse(withEngineLocale([{ name: 'core', text: readFileSync('content/core.dsl', 'utf8') }, { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') }]));
     const sword = 'core.iron-sword';
     const shield = 'core.wooden-shield';
 
     expect(tutorial.items.get(sword)!.slot).toBe('mainhand');
     expect(tutorial.items.get(shield)!.slot).toBe('offhand');
 
-    const state = createGameState('core.beach');
+    const state = createGameState('tulsa.beach');
     initResources(state, tutorial);
     const bareAttack = statValue('core.attack', state, tutorial);
     const bareDefense = statValue('core.defense', state, tutorial);

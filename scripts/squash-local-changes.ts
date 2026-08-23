@@ -3,10 +3,11 @@ import path from 'node:path';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
+import { sourceFiles } from './probe';
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/core.dsl';
+const defaultContent = 'content';
 const defaultLocal = 'content/local-changes.dsl';
 
 interface Args {
@@ -66,8 +67,11 @@ function sourceName(file: string): string {
 }
 
 function source(file: string): ModuleSource {
-  return { name: sourceName(file), text: readFileSync(repoPath(file), 'utf8') };
+  return { name: sourceName(file), text: readFileSync(file, 'utf8') };
 }
+
+// A source may name a directory, which stands for the .dsl files in it, so `content` names the whole corpus.
+const contentSources = (files: readonly string[]): ModuleSource[] => files.flatMap((file) => sourceFiles(repoPath(file))).map(source);
 
 function fail(lines: string[]): never {
   for (const line of lines) console.error(line);
@@ -92,7 +96,7 @@ function writeOutput(file: string, text: string): void {
 const args = parseArgs(process.argv.slice(2));
 if (!existsSync(repoPath(args.localFile))) fail([`Local changes file not found: ${args.localFile}`]);
 
-const baseSources = args.contentFiles.map(source);
+const baseSources = contentSources(args.contentFiles);
 const localSource = source(args.localFile);
 const parsedModules = [...baseSources, localSource].map(parsed);
 const targetId = args.moduleId ?? parsedModules[0]?.info.id ?? usage();

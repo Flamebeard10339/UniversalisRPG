@@ -7,7 +7,7 @@ import { BASE_LANGUAGE, localizerFor } from './localized';
 import { createGameState } from './runtime';
 import { runTest, type TestResult } from './session';
 
-const sources = [engineLocale(), { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }];
+const sources = [engineLocale(), { name: 'core', text: readFileSync('content/core.dsl', 'utf8') }, { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') }];
 const shipped = loadUniverse(sources);
 const registry = loadUniverse([...sources, translationOf(shipped)]);
 

@@ -154,6 +154,10 @@ describe('an action declared once carries one key, however many owners perform i
       name: 'core',
       text: readFileSync('content/core.dsl', 'utf8'),
     },
+    {
+      name: 'tulsa',
+      text: readFileSync('content/tulsa.dsl', 'utf8'),
+    },
   ]);
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
 

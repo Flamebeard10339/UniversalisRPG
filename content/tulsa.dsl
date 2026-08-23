@@ -8,9 +8,12 @@
 // its own that gives these entities more to say — take those modules away and
 // Tulsa still loads, and everyone here still has a word for a traveller.
 //
-// It depends on core for the engine's own furniture: the stat bases, the health
-// pool, the death event, the factions, melee-combat, and the market district that
-// all three routes out of Miki's house converge on.
+// Miki's guide house, the rooms under and over it and the beach east of it are
+// here too, and the game begins in them. They are the region's, not the
+// engine's: what core keeps is the furniture every region would want.
+//
+// It depends on core for that furniture: the stat bases, the health pool, the
+// death event, the factions, the player, and melee-combat.
 
 # info tulsa
 version: 1.0.0
@@ -29,11 +32,17 @@ dependencies:
 // --- flags ---
 //
 // World state no single prop owns. A flag that belongs to one door or one
-// person is declared on that door or that person instead.
+// person is declared on that door or that person instead — the last two below
+// are set by the mirror and by the rats, but the tutorial quest is what reads
+// them, so neither is that object's private business.
 
 # flag heard-of-the-back-way
 
 # flag sewer-toll-paid
+
+# flag mirror-done
+
+# flag rats-killed
 
 // --- items ---
 
@@ -101,6 +110,14 @@ examine: Hairless in patches, and weeping where it is not.
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
 
+# item bread
+examine: A warm, golden loaf.
+food, +5 regeneration, 90s
+eat:
+  instant
+  take: 1 bread
+  say: You tear into the warm loaf - simple, filling, and worth the trouble.
+
 // --- drop tables ---
 
 # droptable feral-rat-remains
@@ -121,16 +138,18 @@ one of:
 //
 // A dense town read as a text adventure. Every road is written from both ends
 // so that a place's own `adjacent:` reads as the whole list of its exits; the
-// engine answers a road from both ends either way, which is what lets the
-// square below name a location in the module underneath this one. Distances are
-// in the units tutorial island already set: five seconds of walking each.
+// engine answers a road from both ends either way. Distances are in the units
+// Miki's house already set: five seconds of walking each.
 
+// However a route leaves the guide house, it lands on the beach and the beach
+// road runs here — so this is the shared ground every route's test converges
+// on, as well as the square every road in town runs through.
 # location market-square
 x: 3, y: 0
 title: Market Square
 examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it.
 adjacent:
-  core.market-district
+  beach
   market-row
   tavern-street
   castle-gate
@@ -403,6 +422,46 @@ adjacent:
   tunnels
 entities:
   2 border-guard
+
+// --- Miki's guide house, and the sand between it and the town ---
+//
+// Where a new game begins. Three rooms and a front door, and east of the door a
+// beach whose road runs into the square: however a player gets out of the house,
+// this is the ground they cross to reach everything above.
+
+# location guide-house
+x: 0, y: 0
+starting
+examine: A cluttered but cozy cottage. Miki's guide house.
+adjacent:
+  guide-house-upstairs
+  basement
+  beach while front-door.unlocked
+entities:
+  miki, front-door, stairs, mirror, oven, smiths-chest
+
+# location guide-house-upstairs
+x: 0, y: 0, z: 1
+examine: A narrow landing with a dresser and a view of the coast.
+adjacent:
+  guide-house
+entities:
+  dresser, stairs-down, window
+
+# location basement
+x: 0, y: 0, z: -1
+examine: A damp cellar, crates stacked against the walls.
+adjacent:
+  guide-house
+entities:
+  3 giant-rat, stairs-up
+
+# location beach
+east of guide-house
+examine: Pale sand and the sound of the tide, and the road into town running the other way.
+adjacent:
+  guide-house
+  market-square
 
 // --- the cast ---
 //
@@ -733,6 +792,127 @@ on death:
     xp: core.melee 25-35
     roll: swamp-pickings
 
+// --- who and what stands in the guide house ---
+
+# entity miki
+faction: player
+examine: A weathered man in patched leather, quick to smile.
+flags: angered
+
+# entity front-door
+examine: A heavy wooden door, bound in iron.
+flags: unlocked
+pick lock:
+  requires: has lockpick
+  hidden if: unlocked
+  time: 4
+  xp: thieving 4
+  on success:
+    set: unlocked
+    say: The lock clicks open.
+
+# entity mirror
+examine: A tall mirror in a gilt frame. Your reflection waits, nameless.
+look in:
+  instant
+  hidden if: mirror-done
+  open modal: character-creation
+  set: mirror-done
+
+# entity oven
+examine: A stone oven, its coals still glowing.
+stations: oven
+roast chestnuts:
+  continuous
+  requires: has raw-chestnut
+  rate: cooking-rate
+  take: 1 raw-chestnut
+  give: 1 roasted-chestnut
+  xp: cooking 40-80
+  on success:
+    say: Another chestnut pops from the embers, roasted through.
+
+# entity stairs
+title: Stairs
+ascend:
+  instant
+  relocate: guide-house-upstairs
+  say: You climb to the second floor.
+descend:
+  instant
+  relocate: basement
+  say: You head down into the basement.
+
+# entity stairs-down
+title: Stairs
+descend:
+  instant
+  relocate: guide-house
+  say: You head back down to the ground floor.
+
+# entity stairs-up
+title: Stairs
+ascend:
+  instant
+  relocate: guide-house
+  say: You climb back up to the ground floor.
+
+# entity smiths-chest
+title: Smith's Chest
+examine: A banded chest shoved under the workbench, its lid unlatched.
+flags: emptied
+open:
+  instant
+  hidden if: emptied
+  roll: smiths-cache
+  set: emptied
+  say: Whetstones, a handful of cut stones, and a blade nobody came back for.
+
+# entity dresser
+examine: A dusty dresser, one drawer left slightly ajar.
+flags: searched
+search drawer:
+  hidden if: searched
+  give: lockpick
+  say: Tucked beneath old linens, a set of worn lockpicks.
+  set: searched
+  luck vs 60:
+    roll: trinket
+
+// The only way out that never runs through Miki. A player who has burned the
+// front door still has this — a straight drop with a cost, not a puzzle.
+# entity window
+examine: A window. @@@
+climb out:
+  instant
+  relocate: beach
+  drain: 5 health
+  say: You climb out. @@@
+fish:
+  instant
+  requires: has fishing-net
+  hidden if: has fish
+  give: 1 fish
+  say: You catch a fish. @@@
+
+// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
+// rat falls in about six seconds and lands a bite or two on the way out. It
+// swings back because it `uses:` an action, not because a tag says so.
+# entity giant-rat
+title: Giant Rat
+examine: A hunched rat claws at an overturned crate, eyes red in the dark.
+stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
+uses: melee-combat
+hidden if: rats-killed >= 3
+on death:
+  add: rats-killed 1
+  say: You put down another rat.
+  credit:
+    xp: melee 4-6
+    roll: rat-remains
+    1 in 3:
+      roll: trinket
+
 // --- recipes ---
 
 # recipe cooked-herring
@@ -742,6 +922,14 @@ out: cooked-herring
 skill: cooking 3
 time: 4
 say: You grill the herring through, which is the only way it is worth eating.
+
+# recipe bread
+station: oven
+in: dough
+out: bread
+skill: cooking 4
+time: 3
+say: The oven bakes your dough into a golden loaf.
 
 // --- dialogue ---
 //
@@ -872,6 +1060,16 @@ node at-the-stakes:
   again: Same as before. We watch. We do not go in.
   Past the stakes is theirs. We watch it. We do not go in.
 
+// Miki has a word for a traveller whatever else is loaded. A quest that wants
+// more of him gives him more to say; this is what is left when none is.
+# dialogue miki
+owner = miki
+
+node greeting:
+  always
+  Well met. Miki, they call me - I keep an eye on this island.
+  There's a mirror upstairs if you've a mind to know your own face, and rats in the basement if you haven't.
+
 // --- saves ---
 
 # save in-town
@@ -893,12 +1091,34 @@ node at-the-stakes:
 # save at-the-sewer-junction
 {"version":11,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
+# save dresser-trinket-end
+{"version":11,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
+
+# save explored-and-unlocked
+{"version":11,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
+
+// Standing at the oven with something to roast. Nothing in the world grants a
+// raw chestnut, so this save is the only way the continuous cadence is reached.
+# save chestnuts-in-hand
+{"version":11,"inventory":{"core.raw-chestnut":3}}
+
+# save growing-a-heartwood-blade-start
+{"version":11,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
+
+# save growing-a-heartwood-blade-end
+{"version":11,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+# save growing-through-the-inventory-screen-end
+{"version":11,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+
 // --- tests ---
 
 // The town is walkable, and every road it holds is walked. The list is long
 // because a road is a fact about two named places and nothing derives it; what
 // it is really proving is that every place has a way in and a way out, and
-// dsl.test.ts makes that claim over the corpus without naming anybody.
+// dsl.test.ts makes that claim over the corpus without naming anybody. It ends
+// on the sand, because the road from the square to the beach is the one every
+// route out of Miki's house arrives by.
 # test walking-the-town
 load: in-town
 travel: market-row
@@ -924,11 +1144,11 @@ travel: hive-mouth
 travel: tunnel-mouth
 travel: market-square
 travel: swamp-edge
-travel: core.market-district
+travel: beach
 assert: market-rooftops.discovered
 assert: castle-solar.discovered
 assert: hive-mouth.discovered
-assert: core.market-district.discovered
+assert: beach.discovered
 
 // The economy, end to end and in the smallest amount that closes: a curio the
 // tutorial's rats drop becomes coin, coin becomes a herring, and the herring
@@ -991,24 +1211,25 @@ wait: 60
 assert: resource.core.health = 30
 
 // Sunny keeps three threads open at once, so talking to her is the list and
-// not a line. The list is ordered by the words a player reads rather than by
-// the order this file writes them, which is why `choose: 0` is the stove and
-// moving these nodes about would not move it. A thread taken stays open
-// because each is sticky, so the third talk finds all three still there.
+// not a line, and a thread taken stays open because each is sticky — the third
+// talk still finds all three there, which is what taking three different ones
+// off three consecutive lists proves. Which index reads which is deliberately
+// not claimed here: the list is ordered by the words a player reads, so the
+// three land in a different order in every language, and this route is replayed
+// in a translated universe. That ordering is `conversation.test.ts`'s to pin.
 # test sunny-has-three-things-to-say
 load: in-town
 travel: tavern-street
 travel: sha-dynastys
 talk: sunny
 choose: 0
-assert: sunny.the-stove.visits = 1
-talk: sunny
-choose: 2
-assert: sunny.the-bottle.visits = 1
 talk: sunny
 choose: 1
-assert: sunny.the-animals.visits = 1
+talk: sunny
+choose: 2
 assert: sunny.the-stove.visits = 1
+assert: sunny.the-bottle.visits = 1
+assert: sunny.the-animals.visits = 1
 
 // Two ways past the barred door, and the door is the same door either way. The
 // key comes off the table with both ratmen still standing on it: taking it is
@@ -1024,3 +1245,155 @@ assert: xp.core.thieving = 15
 travel: sewer-locked-room
 use: entity.key-table.take-the-key
 assert: has sewer-key
+
+// The drawer's contested roll over shipped content. On the default seed this
+// search comes up empty behind the lockpick, so an assertion over inventory
+// alone would also hold in a world where the drawer never rolls at all — which
+// is the shape of test this branch's audit caught. The whole sheet is what tells
+// the two apart: `luck vs 60` and the table behind it move the rng cursor
+// whether or not they yield anything, and `expect:` is what pins that.
+// Regenerate with /create-valid-test when the drawer's odds change on purpose.
+# test dresser-trinket
+travel: guide-house-upstairs
+use: entity.dresser.search-drawer
+assert: has lockpick
+assert: searched
+expect: dresser-trinket-end
+
+# test a-lockpick-opens-the-front-door
+run: dresser-trinket
+travel: guide-house
+use: entity.front-door.pick-lock
+assert: front-door.unlocked
+assert: beach.discovered
+assert: xp.thieving = 4
+assert: time >= 4
+
+# test save-restores-object-owned-flags
+load: explored-and-unlocked
+assert: front-door.unlocked
+assert: beach.discovered
+
+// --- growing an item ---
+//
+// Core's cluster planes, walked from the chest under Miki's workbench, which is
+// the only thing in the world that puts a jewel in anyone's hands.
+//
+// Recorded from a live session with /create-valid-test, so what follows is what
+// a player types and the closing sheet is where that session ended: both grown
+// copies, their planes, every allocation, and the effects each cluster carries.
+// Regenerate with /create-valid-test when this content changes on purpose.
+//
+// What this route claims is written as its refusals — each one names a growth
+// the plane must not take, and there are eight of them. The plane itself is
+// what no condition can name, so the sheet keeps it: `instances` is compared
+// whole even under `expect only:`, so every hex, jewel, point and orb below is
+// still pinned exactly.
+//
+// The Heartwood Blade's origin is a spindle whose root, position 1, is
+// allocated from the start and free. Both of its jewel slots hang off position
+// 3, so either one costs two points to reach before the slot itself.
+# test growing-a-heartwood-blade
+load: growing-a-heartwood-blade-start
+use: entity.smiths-chest.open
+// An orb grants no item experience, and nothing else in the game moves it.
+refuse: feed heartwood-blade with orb-of-vitality
+// Out of adjacency: position 3 touches only position 2 and the two slots,
+// and the point to pay for it is in hand.
+refuse: allocate heartwood-blade at 0,0 position 3
+// The first verb the plane allows is what mints the copy. The two refusals
+// above left the stack whole, so this one still names an item, not an id.
+feed: heartwood-blade with whetstone
+feed: 1 with whetstone
+feed: 1 with whetstone
+feed: 1 with whetstone
+allocate: 1 at 0,0 position 2
+allocate: 1 at 0,0 position 3
+allocate: 1 at 0,0 slot ne
+slot: 1 at 0,0 ne with keen-edge-jewel
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with crossroads-jewel
+// Slotting is permanent: a filled slot refuses a second jewel forever.
+refuse: slot 1 at 0,0 e with causeway-jewel
+feed: 1 with masters-whetstone
+// Allocation is permanent too, and this is asked with six points spare so
+// that having none cannot be the reason.
+refuse: allocate 1 at 0,0 position 2
+allocate: 1 at 1,-1 position 1
+allocate: 1 at 1,-1 position 2
+allocate: 1 at 1,-1 position 3
+allocate: 1 at 1,-1 position 4
+allocate: 1 at 1,-1 position 5
+allocate: 1 at 1,0 position 1
+// The junction's nw edge faces the ring slotted a moment ago, and one hex
+// holds one cluster: that direction is foreclosed for good. Asked with a
+// point in hand and its own position allocated, so blocking is the only
+// answer left — and the ne edge of the same hex, two lines down, takes the
+// point the nw edge would not.
+refuse: allocate 1 at 1,0 slot nw
+refuse: slot 1 at 1,0 nw with causeway-jewel
+allocate: 1 at 1,0 slot ne
+// Level 11 bought eleven points and all eleven are spent.
+refuse: allocate 1 at 1,0 slot se
+apply: 1 at 1,-1 with orb-of-the-edge
+apply: 1 at 1,-1 with lesser-orb-of-the-edge
+// Two effects naming one stat pool to 35% rather than compounding to 37.5%.
+// A second copy of one orb is refused by identity, a third orb by capacity.
+refuse: apply 1 at 1,-1 with orb-of-the-edge
+refuse: apply 1 at 1,-1 with orb-of-the-bulwark
+// The origin's only allocated payload is a percent one, so this is an orb
+// scaling the increased channel rather than the added one.
+apply: 1 at 0,0 with orb-of-vitality
+// The ordinary base, whose hex (0,0) is the bare east slot every base falls
+// back to. Two Master's Whetstones carry it to the level 10 it is capped at,
+// and feeding it again is refused with the whetstone intact.
+feed: iron-sword with masters-whetstone
+feed: 2 with masters-whetstone
+refuse: feed 2 with masters-whetstone
+allocate: 2 at 0,0 slot e
+slot: 2 at 0,0 e with causeway-jewel
+expect only: growing-a-heartwood-blade-end
+
+// --- growing an item through the inventory screen ---
+//
+// The same growth the test above spells as directives, walked the way a player
+// reaches it: every line below is a screen being answered. Recorded from a live
+// session with /create-valid-test and regenerated the same way when this content
+// changes on purpose.
+//
+// It opens the inventory, opens the Iron Sword's plane, slots a jewel into the
+// bare east slot every base has, walks out to the hexagon that jewel put there
+// and to the one slotted beyond that, allocates on both, leaves the plane for
+// the inventory it was opened from, and equips the copy it just grew.
+//
+// That the copy is worn is asserted below. That it is, by c21, no longer in the
+// stack it was grown from is the sheet's: `has` and the `inventory` root both
+// count a worn copy as held, so the stack falling to zero is a fact only
+// `inventory.core.iron-sword` in the save body can state.
+# test growing-through-the-inventory-screen
+load: growing-a-heartwood-blade-start
+use: entity.smiths-chest.open
+open-modal: carried-items
+submit-modal: item=core.iron-sword
+submit-modal: verb=grow
+submit-modal: plane=allocate: slot e
+submit-modal: plane=slot: e with core.crossroads-jewel
+// A base still in its stack is minted by the first growth, so the level the
+// next allocation spends is bought after the copy exists rather than before.
+submit-modal: plane=feed: with core.masters-whetstone
+submit-modal: plane=go: 1,0
+submit-modal: plane=allocate: position 1
+submit-modal: plane=allocate: slot ne
+submit-modal: plane=slot: ne with core.keen-edge-jewel
+submit-modal: plane=go: 2,-1
+submit-modal: plane=allocate: position 1
+submit-modal: plane=back
+submit-modal: verb=equip
+open-modal: carried-items
+submit-modal: item=close
+// A worn item's plane is folded into the wearer's stats, so this one number is
+// both halves of what `verb=equip` did: 14 is the player's own 10, the iron
+// sword's 2, and the 2 that `whetted` carries at position 1 of the ring slotted
+// two hexes out. Nothing else on this route touches attack.
+assert: stat.attack = 14
+expect only: growing-through-the-inventory-screen-end

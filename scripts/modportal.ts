@@ -7,10 +7,11 @@ import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManife
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
+import { sourceFiles } from './probe';
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/core.dsl';
+const defaultContent = 'content';
 
 type Command = 'sync' | 'list' | 'enable' | 'disable' | 'sources' | 'show';
 
@@ -139,8 +140,11 @@ function sourceName(file: string): string {
 }
 
 function contentSource(file: string): ModuleSource {
-  return { name: sourceName(file), text: readFileSync(repoPath(file), 'utf8') };
+  return { name: sourceName(file), text: readFileSync(file, 'utf8') };
 }
+
+// A source may name a directory, which stands for the .dsl files in it, so `content` names the whole corpus.
+const contentSources = (files: readonly string[]): ModuleSource[] => files.flatMap((file) => sourceFiles(repoPath(file))).map(contentSource);
 
 function findEntry(manifest: ModportalManifest, target: string): ModportalEntry | undefined {
   return manifest.entries.find((entry) => entry.moduleId === target || String(entry.issue) === target || `#${entry.issue}` === target);
@@ -153,7 +157,7 @@ function tierLabel(tier: ModTier): string {
 function sync(args: Args): void {
   const materialized: MaterializedMod[] = [];
   const unusable: string[] = [];
-  const base = args.contentFiles.map(contentSource);
+  const base = contentSources(args.contentFiles);
   for (const issue of issueList(args)) {
     try {
       materialized.push(materializeApprovedModIssue(issue, base));
@@ -203,7 +207,7 @@ function list(args: Args): void {
 
 function validateCachedEnabled(args: Args, entries: readonly ModportalEntry[]): string[] {
   const diagnostics: string[] = [];
-  const sources = args.contentFiles.map(contentSource);
+  const sources = contentSources(args.contentFiles);
   for (const entry of entries.filter((entry) => entry.enabled)) {
     const { text, warning } = readEntryText(cachePath(args), entry);
     if (text === undefined) diagnostics.push(warning!);

@@ -87,24 +87,24 @@ describe('the grammar tree', () => {
 describe('a draft read back', () => {
   const KNOWN = [
     { kind: 'flag', address: 'core.quest-given' },
-    { kind: 'location', address: 'core.beach' },
+    { kind: 'location', address: 'tulsa.beach' },
   ];
 
   it('says everything the engine has to say about the draft before saying anything about a line of it', () => {
-    const draft = ['# location core.beach', 'entities: core.giant-rt', 'xppp: 3'].join('\n');
-    const read = amissLines(draft, [{ kind: 'entity', address: 'core.giant-rat' }]).join('\n');
+    const draft = ['# location tulsa.beach', 'entities: tulsa.giant-rt', 'xppp: 3'].join('\n');
+    const read = amissLines(draft, [{ kind: 'entity', address: 'tulsa.giant-rat' }]).join('\n');
 
     expect(read).toContain('2 line(s)');
-    expect(read).toContain('one letter from core.giant-rat');
+    expect(read).toContain('one letter from tulsa.giant-rat');
     expect(read).toContain('will not read this line');
   });
 
   it('says so where there is nothing to say', () => {
-    expect(amissLines('# location core.beach\ntitle: The Beach', KNOWN)[0]).toContain('nothing here is refused');
+    expect(amissLines('# location tulsa.beach\ntitle: The Beach', KNOWN)[0]).toContain('nothing here is refused');
   });
 
   it('writes an answer out where it is first met and points back at it after', () => {
-    const draft = ['# location core.beach', 'adjacent: core.beach while quest-given', 'adjacent: core.beach while quest-given'].join('\n');
+    const draft = ['# location tulsa.beach', 'adjacent: tulsa.beach while quest-given', 'adjacent: tulsa.beach while quest-given'].join('\n');
     const read = offeringLines(draft, KNOWN);
 
     expect(read.filter((line) => line.trim() === '<operators>')).toHaveLength(1);
@@ -212,14 +212,14 @@ describe('a draft is answered against the world it declares, not only the one al
 
 // A comment is whatever the engine drops, and the engine drops it wherever it is written — before the first heading, indented inside a block, at any depth. What it does not drop is a `//` with content in front of it, which is a line like any other and gets the answer any line gets.
 describe('which lines of a draft are answered for', () => {
-  const KNOWN = [{ kind: 'location', address: 'core.beach' }];
+  const KNOWN = [{ kind: 'location', address: 'tulsa.beach' }];
   const DRAFT = [
     '// a note before anything is declared',
-    '# location core.beach',
+    '# location tulsa.beach',
     'title: The Beach // not a comment, and not dropped',
     'adjacent:',
     '  // a note indented inside a block',
-    '  core.beach',
+    '  tulsa.beach',
   ].join('\n');
 
   const readByTheEngine = (text: string): Set<string> => {
@@ -243,7 +243,7 @@ describe('which lines of a draft are answered for', () => {
       if (written === '' || written.startsWith('#')) continue;
       expect(walk.includes(line), `${JSON.stringify(line)} is ${kept.has(written) ? 'read by the engine and not answered for' : 'dropped by the engine and answered for anyway'}`).toBe(kept.has(written));
     }
-    expect(walk).toContain('# location core.beach');
+    expect(walk).toContain('# location tulsa.beach');
   });
 
   it('leaves no breadcrumb or reading behind for a line it passes over', () => {
@@ -255,7 +255,7 @@ describe('which lines of a draft are answered for', () => {
   });
 
   it('answers for every line where the engine will not split the file at all', () => {
-    const broken = ['title: The Beach', '# location core.beach'].join('\n');
+    const broken = ['title: The Beach', '# location tulsa.beach'].join('\n');
 
     expect(() => splitSections(broken)).toThrow();
     expect(offeringLines(broken, KNOWN)).toContain('title: The Beach');

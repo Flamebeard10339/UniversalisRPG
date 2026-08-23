@@ -38,7 +38,7 @@ const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.
 const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.audience === 'cheat');
 
 // Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
-const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.keys()][0];
+const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
 
 const ACTS_ON: Record<string, string> = { '/goto': REAL_LOCATION };
 

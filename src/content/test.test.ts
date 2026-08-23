@@ -120,14 +120,14 @@ describe('test: composable in-game scripts', () => {
     const source = [
       '# test replay',
       'run: core.intro',
-      'talk: core.miki',
-      'use: entity.core.front-door.pick-lock',
-      'travel: core.beach',
-      'craft: core.bread',
+      'talk: tulsa.miki',
+      'use: entity.tulsa.front-door.pick-lock',
+      'travel: tulsa.beach',
+      'craft: tulsa.bread',
       'load: core.start',
       'expect: core.end',
-      'begin: use entity.core.oven.roast-chestnuts',
-      'begin: travel core.basement',
+      'begin: use entity.tulsa.oven.roast-chestnuts',
+      'begin: travel tulsa.basement',
       'begin: craft core.dough',
     ].join('\n');
 
@@ -136,15 +136,15 @@ describe('test: composable in-game scripts', () => {
     }[];
     expect(section.value.directives).toEqual([
       { kind: 'run', test: 'core.intro' },
-      { kind: 'talk', entity: 'core.miki' },
+      { kind: 'talk', entity: 'tulsa.miki' },
       {
         kind: 'use',
         obj: 'entity',
-        objId: 'core.front-door',
+        objId: 'tulsa.front-door',
         actionId: 'pick-lock',
       },
-      { kind: 'travel', location: 'core.beach' },
-      { kind: 'craft', recipe: 'core.bread' },
+      { kind: 'travel', location: 'tulsa.beach' },
+      { kind: 'craft', recipe: 'tulsa.bread' },
       { kind: 'load', save: 'core.start' },
       { kind: 'expect', save: 'core.end' },
       {
@@ -152,13 +152,13 @@ describe('test: composable in-game scripts', () => {
         inner: {
           kind: 'use',
           obj: 'entity',
-          objId: 'core.oven',
+          objId: 'tulsa.oven',
           actionId: 'roast-chestnuts',
         },
       },
       {
         kind: 'begin',
-        inner: { kind: 'travel', location: 'core.basement' },
+        inner: { kind: 'travel', location: 'tulsa.basement' },
       },
       {
         kind: 'begin',

@@ -6,11 +6,11 @@ import { amissIn, applied, fillingWords, offeringAt, refusalsIn, type Addressed,
 import { sectionFor, sections } from './sections';
 
 const KNOWN: readonly Addressed[] = [
-  { kind: 'location', address: 'core.beach' },
-  { kind: 'location', address: 'core.guide-house' },
+  { kind: 'location', address: 'tulsa.beach' },
+  { kind: 'location', address: 'tulsa.guide-house' },
   { kind: 'location', address: 'combat-expansion.proving-ground' },
   { kind: 'item', address: 'core.rusty-sword' },
-  { kind: 'entity', address: 'core.giant-rat' },
+  { kind: 'entity', address: 'tulsa.giant-rat' },
   { kind: 'flag', address: 'core.quest-given' },
   { kind: 'skill', address: 'core.mining' },
 ];
@@ -48,7 +48,7 @@ describe('a heading', () => {
   });
 
   it('names what the kind it declares already addresses', () => {
-    expect(offered('# location |')).toEqual(['combat-expansion.proving-ground', 'core.beach', 'core.guide-house']);
+    expect(offered('# location |')).toEqual(['combat-expansion.proving-ground', 'tulsa.beach', 'tulsa.guide-house']);
   });
 
   it('leaves room for an id when a kind is taken', () => {
@@ -58,56 +58,56 @@ describe('a heading', () => {
 
 describe('a namespace', () => {
   it('opens under a trailing dot', () => {
-    expect(offered('# location core.|')).toEqual(['core.beach', 'core.guide-house']);
+    expect(offered('# location tulsa.|')).toEqual(['tulsa.beach', 'tulsa.guide-house']);
   });
 
   it('is reached by naming what a module calls its own', () => {
-    expect(offered('# location core.beach\nadjacent: guide-|')[0]).toBe('core.guide-house');
+    expect(offered('# location tulsa.beach\nadjacent: guide-|')[0]).toBe('tulsa.guide-house');
   });
 
   it('qualifies what it inserts', () => {
-    expect(inserted('# location core.beach\nadjacent: guide-|', 'core.guide-house')).toBe('# location core.beach\nadjacent: core.guide-house');
+    expect(inserted('# location tulsa.beach\nadjacent: guide-|', 'tulsa.guide-house')).toBe('# location tulsa.beach\nadjacent: tulsa.guide-house');
   });
 });
 
 describe('a field', () => {
   it('shows the shape it takes rather than a value someone once wrote', () => {
-    expect(offered('# location core.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent: <location> while <condition>, …', 'adjacent:']);
+    expect(offered('# location tulsa.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent: <location> while <condition>, …', 'adjacent:']);
   });
 
   it('offers itself bare, for the block it can be written as instead', () => {
-    expect(shapes('# location core.beach\nadjacent:\n  |')).toEqual(['<location>', '<location> while <condition>']);
+    expect(shapes('# location tulsa.beach\nadjacent:\n  |')).toEqual(['<location>', '<location> while <condition>']);
   });
 
   it('hands over what its form spells out, and stops where the author must choose', () => {
-    expect(inserted('# location core.beach\nadj|', 'adjacent: <location>, …')).toBe('# location core.beach\nadjacent: ');
+    expect(inserted('# location tulsa.beach\nadj|', 'adjacent: <location>, …')).toBe('# location tulsa.beach\nadjacent: ');
   });
 
   it('opens onto the ids it references, which the kind alone knows', () => {
-    expect(offered('# location core.beach\nentities: |')).toContain('core.giant-rat');
-    expect(offered('# location core.beach\nentities: |')).not.toContain('core.beach');
+    expect(offered('# location tulsa.beach\nentities: |')).toContain('tulsa.giant-rat');
+    expect(offered('# location tulsa.beach\nentities: |')).not.toContain('tulsa.beach');
   });
 
   it('drops the keyword once it is written, and shows what one value of it may be', () => {
-    expect(shapes('# location core.beach\nadjacent: guide-|')).toEqual(['<location>', '<location> while <condition>']);
+    expect(shapes('# location tulsa.beach\nadjacent: guide-|')).toEqual(['<location>', '<location> while <condition>']);
   });
 
   it('drops its keyword and its list after a comma, where one more value goes', () => {
-    expect(offered('# location core.beach\nadjacent: beach, |')).toContain('<location> while <condition>');
+    expect(offered('# location tulsa.beach\nadjacent: beach, |')).toContain('<location> while <condition>');
   });
 });
 
 describe('an indented line', () => {
   it('is offered the grammar of the block it sits in', () => {
-    expect(offered('# location core.beach\nchop-wood:\n  |')).toContain('on success: <result>, …');
+    expect(offered('# location tulsa.beach\nchop-wood:\n  |')).toContain('on success: <result>, …');
   });
 
   it('reaches the ids a result names', () => {
-    expect(offered('# location core.beach\nchop-wood:\n  requires: |')).toContain('core.quest-given');
+    expect(offered('# location tulsa.beach\nchop-wood:\n  requires: |')).toContain('core.quest-given');
   });
 
   it('is offered nothing of the section body it is nested under', () => {
-    expect(offered('# location core.beach\nchop-wood:\n  |')).not.toContain('adjacent: <location>, …');
+    expect(offered('# location tulsa.beach\nchop-wood:\n  |')).not.toContain('adjacent: <location>, …');
   });
 });
 
@@ -118,34 +118,34 @@ describe('a line as the engine takes it', () => {
   };
 
   it('says a field one letter out in the words the engine refuses it with', () => {
-    expect(taken('# location core.beach\ntittle: The Beach|').refused).toBe('unknown location field: tittle, one letter from title');
+    expect(taken('# location tulsa.beach\ntittle: The Beach|').refused).toBe('unknown location field: tittle, one letter from title');
   });
 
   it('holds its peace over a line the engine takes', () => {
-    expect(taken('# location core.beach\ntitle: The Beach|').refused).toBeNull();
-    expect(taken('# location core.beach\nchop-wood:|').refused).toBeNull();
+    expect(taken('# location tulsa.beach\ntitle: The Beach|').refused).toBeNull();
+    expect(taken('# location tulsa.beach\nchop-wood:|').refused).toBeNull();
   });
 
   it('remarks on an id nothing declares, without calling it a refusal', () => {
-    const held = taken('# location core.beach\nentities: mine.bat|');
+    const held = taken('# location tulsa.beach\nentities: mine.bat|');
     expect(held.undeclared).toEqual([{ kind: 'entity', id: 'mine.bat' }]);
     expect(held.refused).toBeNull();
   });
 
   it('says nothing of an id something does declare', () => {
-    expect(taken('# location core.beach\nadjacent: core.guide-house|').undeclared).toEqual([]);
+    expect(taken('# location tulsa.beach\nadjacent: tulsa.guide-house|').undeclared).toEqual([]);
   });
 
-  const RECIPE = (station: string): string => `# recipe core.bread\nstation: ${station}\nout: 1 core.bread`;
+  const RECIPE = (station: string): string => `# recipe tulsa.bread\nstation: ${station}\nout: 1 tulsa.bread`;
 
   it('answers for a name no section carries, where the universe declares that kind of name at all', () => {
-    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'core.bread' }, { kind: 'capability', address: 'oven' }];
+    const stations: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }, { kind: 'capability', address: 'oven' }];
     expect(amissIn(RECIPE('oven'), stations).flatMap((each) => each.undeclared)).toEqual([]);
     expect(amissIn(RECIPE('forge'), stations).flatMap((each) => each.undeclared)).toEqual([{ kind: 'capability', id: 'forge' }]);
   });
 
   it('says nothing of a kind of name the universe declares none of, rather than calling every one of them undeclared', () => {
-    const known: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'core.bread' }];
+    const known: readonly Addressed[] = [...KNOWN, { kind: 'item', address: 'tulsa.bread' }];
     expect(amissIn(RECIPE('oven'), known).flatMap((each) => each.undeclared)).toEqual([]);
   });
 
@@ -164,7 +164,7 @@ describe('a half-written line', () => {
     const { text, cursor } = at(written);
     return offeringAt(text, cursor, KNOWN);
   };
-  const under = '# entity core.giant-rat\nstats: attack 3\non hit:\n';
+  const under = '# entity tulsa.giant-rat\nstats: attack 3\non hit:\n';
 
   it('is read as the shape it is on its way to being', () => {
     expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', like: 'mining', kind: 'skill' });
@@ -188,7 +188,7 @@ describe('a half-written line', () => {
   it('is not refused while a shape it could still become is unfinished', () => {
     expect(taken(`${under}  xp: |`).refused).toBeNull();
     expect(taken(`${under}  xp: a|`).refused).toBeNull();
-    expect(taken('# location core.beach\nadjacent: |').refused).toBeNull();
+    expect(taken('# location tulsa.beach\nadjacent: |').refused).toBeNull();
   });
 
   it('is refused once it is whole and the engine still will not have it', () => {
@@ -198,7 +198,7 @@ describe('a half-written line', () => {
 
   const refused = (said: readonly Amiss[]): Amiss[] => said.filter((each) => each.refused !== null);
 
-  const OVEN = '# entity core.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate';
+  const OVEN = '# entity tulsa.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate';
 
   it('is not refused for what a line below it supplies', () => {
     expect(taken(OVEN.replace('  continuous', '  continuous|')).refused).toBeNull();
@@ -234,9 +234,9 @@ describe('a half-written line', () => {
   it('says of no line what it would not say of that line alone', () => {
     const drafts = [
       THREE,
-      '# entity core.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate\n  nonsense: 3\n  also-nonsense: 4',
+      '# entity tulsa.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate\n  nonsense: 3\n  also-nonsense: 4',
       '# action core.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion',
-      '# entity core.oven\nstations: oven\nstations:\n  hearth\n  nonsense: 3',
+      '# entity tulsa.oven\nstations: oven\nstations:\n  hearth\n  nonsense: 3',
     ];
     for (const draft of drafts) {
       for (const said of refusalsIn(draft)) {
@@ -299,7 +299,7 @@ describe('a hole with a grammar of its own', () => {
     const { text, cursor } = at(written);
     return offeringAt(text, cursor, KNOWN).filling?.holds;
   };
-  const under = '# entity core.giant-rat\nstats: attack 3\non hit:\n';
+  const under = '# entity tulsa.giant-rat\nstats: attack 3\non hit:\n';
 
   it('breaks it into the words it is written with and the things it may name', () => {
     const held = holds(`${under}  if |`)!;
@@ -311,7 +311,7 @@ describe('a hole with a grammar of its own', () => {
   });
 
   it('says the same of the same hole wherever it is written', () => {
-    expect(holds('# location core.beach\nadjacent: guide-house while |')).toEqual(holds(`${under}  if |`));
+    expect(holds('# location tulsa.beach\nadjacent: guide-house while |')).toEqual(holds(`${under}  if |`));
   });
 
   it('names a kind once, however many placeholders of that grammar name it', () => {

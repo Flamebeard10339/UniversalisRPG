@@ -115,7 +115,7 @@ describe('the two drivers cannot drift', () => {
       '/bogus',
       '/assert time >= 3',
       '/expect empty',
-      '/dsl location core.guide-house x: 9, y: 9',
+      '/dsl location tulsa.guide-house x: 9, y: 9',
       '/local list',
       '/local show',
       '/reload',
@@ -155,7 +155,7 @@ describe('the two drivers cannot drift', () => {
 
   it('answers a modal through the shared table, by the line the table parses', () => {
     const { repl, gui } = bothDrivers();
-    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:core.miki') + 1);
+    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:tulsa.miki') + 1);
     inStep(repl, gui, talk);
 
     const asked = gui.snapshot().view.modals[0].options[0];
@@ -166,7 +166,7 @@ describe('the two drivers cannot drift', () => {
 
   it('walks the crafting route through both drivers, gesture against typed line', () => {
     const { repl, gui } = bothDrivers();
-    inStep(repl, gui, 'use: entity.core.smiths-chest.open');
+    inStep(repl, gui, 'use: entity.tulsa.smiths-chest.open');
     inStep(repl, gui, '/inv core.iron-sword', () => gui.open('core.iron-sword'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 

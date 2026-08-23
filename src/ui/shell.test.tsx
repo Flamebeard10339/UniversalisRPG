@@ -93,7 +93,7 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
 });
 
 // Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
-const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.keys()][0];
+const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
 
 function brokenLocal(): string {
   const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });

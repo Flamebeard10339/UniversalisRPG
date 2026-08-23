@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
 import { feedItem, itemInstance } from './itemInstance';
 import { Registry } from '../content/registry';
-import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
@@ -15,6 +15,10 @@ import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 
 const source = readFileSync('content/core.dsl', 'utf8');
+const town: ModuleSource = { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') };
+
+// The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
+const tutorial = (): Registry => loadUniverse(withEngineLocale([{ name: 'core', text: source }, town]));
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
@@ -76,10 +80,10 @@ stats: attack 0, max-health 10, swings-per-minute 60
   });
 
   it('throws a clear error on an unavailable or unknown choice id', () => {
-    const registry = loadInEnglish(source);
+    const registry = tutorial();
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.core.front-door.pick-lock')).toThrow();
-    expect(() => apply(session, 'travel:core.beach')).toThrow();
+    expect(() => apply(session, 'use:entity.tulsa.front-door.pick-lock')).toThrow();
+    expect(() => apply(session, 'travel:tulsa.beach')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
 
@@ -342,14 +346,14 @@ adjacent:
 
 describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
-    const registry = loadInEnglish(source);
+    const registry = tutorial();
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
-    expect(choiceIds).toContain('use:entity.core.stairs.ascend');
-    expect(choiceIds).toContain('use:entity.core.stairs.descend');
-    expect(choiceIds).not.toContain('travel:core.basement');
-    expect(choiceIds).not.toContain('travel:core.guide-house-upstairs');
+    expect(choiceIds).toContain('use:entity.tulsa.stairs.ascend');
+    expect(choiceIds).toContain('use:entity.tulsa.stairs.descend');
+    expect(choiceIds).not.toContain('travel:tulsa.basement');
+    expect(choiceIds).not.toContain('travel:tulsa.guide-house-upstairs');
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
@@ -387,22 +391,22 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(loadInEnglish(source), { inventory: { 'core.dough': 2 } });
+    const session = primed(tutorial(), { inventory: { 'core.dough': 2 } });
 
-    beginAction(session, 'craft:core.bread');
+    beginAction(session, 'craft:tulsa.bread');
     const baked = wait(session, 4);
-    expect(baked.inventory['core.bread']).toBe(1);
+    expect(baked.inventory['tulsa.bread']).toBe(1);
     expect(baked.action).not.toBeNull();
 
     const v = cancelAction(session);
     expect(v.action).toBeNull();
-    expect(v.inventory['core.bread']).toBe(1);
+    expect(v.inventory['tulsa.bread']).toBe(1);
     expect(v.inventory['core.dough']).toBe(1);
     expect(v.choices.length).toBeGreaterThan(0);
   });
 
   it('is a no-op when nothing is active', () => {
-    const registry = loadInEnglish(source);
+    const registry = tutorial();
     const session = startSession(registry);
     expect(() => cancelAction(session)).not.toThrow();
     expect(sessionStatus(session).action).toBeNull();
@@ -1595,7 +1599,7 @@ describe('a use: choice id and a use: directive are one shape', () => {
   const useChoices = (v: PlayView) => v.choices.filter((choice) => choice.kind === 'action' && choice.id.startsWith('use:'));
 
   it('offers no action choice the directive parser cannot read back', () => {
-    const session = startSession(loadInEnglish(source));
+    const session = startSession(tutorial());
     const offered = useChoices(view(session));
 
     expect(offered.length).toBeGreaterThan(0);
@@ -1607,7 +1611,7 @@ describe('a use: choice id and a use: directive are one shape', () => {
   });
 
   it('prints a line the parser reads back as the directive the choice was', () => {
-    const session = startSession(loadInEnglish(source));
+    const session = startSession(tutorial());
 
     for (const choice of useChoices(view(session))) {
       const directive = choiceToDirective(choice);

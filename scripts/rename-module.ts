@@ -30,9 +30,9 @@ export const occurrencesOf = (id: string): RegExp => new RegExp(`(?<!${EDGE})${i
 
 const stemOf = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
 
-const sourceOf = (file: TextFile): ModuleSource => ({ name: stemOf(file.path), text: file.text });
+export const sourceOf = (file: TextFile): ModuleSource => ({ name: stemOf(file.path), text: file.text });
 
-const corpusOf = (files: readonly TextFile[]): TextFile[] => files.filter((file) => covers(CORPUS, file.path) && file.path.endsWith(MODULE_EXTENSION));
+export const corpusOf = (files: readonly TextFile[]): TextFile[] => files.filter((file) => covers(CORPUS, file.path) && file.path.endsWith(MODULE_EXTENSION));
 
 const refused = (lines: string[]): RenameReport => ({ lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [], moved: null });
 

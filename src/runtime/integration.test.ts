@@ -14,7 +14,8 @@ import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const source = readFileSync('content/core.dsl', 'utf8');
-const island = (text: string) => loadUniverse([engineLocale(), { name: 'core', text }]);
+const town = { name: 'tulsa', text: readFileSync('content/tulsa.dsl', 'utf8') };
+const island = (text: string) => loadUniverse([engineLocale(), { name: 'core', text }, town]);
 const registry = island(source);
 
 const shippedSources = () =>
@@ -246,13 +247,13 @@ describe('core health resource (Pass 2 end-to-end)', () => {
     const state = initialState(registry);
     expect(state.resources['core.health']).toBe(toMilliUnits(30));
 
-    state.location = 'core.basement';
-    useFight('core.melee-combat', 'core.giant-rat', registry, state);
+    state.location = 'tulsa.basement';
+    useFight('core.melee-combat', 'tulsa.giant-rat', registry, state);
     expect(state.time).toBe(secondsToMs(2.4));
 
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health'];
-    expect(state.flags['core.rats-killed']).toBe(1);
+    expect(state.flags['tulsa.rats-killed']).toBe(1);
     expect(afterFighting).toBeLessThan(toMilliUnits(30));
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);

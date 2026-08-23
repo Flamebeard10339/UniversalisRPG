@@ -15,10 +15,10 @@ const MOVED: { [K in keyof Editing]: Editing[K] } = {
   surface: 'global',
   kind: 'entity',
   query: 'tutorial sword',
-  open: 'location core.beach',
+  open: 'location tulsa.beach',
   cursor: 42,
   scroll: 317,
-  draft: '# location core.beach\nx: 4, y: 0',
+  draft: '# location tulsa.beach\nx: 4, y: 0',
   split: 0.3,
   commandLine: true,
   map: { pan: { x: -120.5, y: 88 }, zoom: 2.25, plane: -1 },
@@ -61,7 +61,7 @@ describe('where the author was survives the tab (c10)', () => {
     expect(remembered('not json at all')).toEqual(FORGOTTEN);
     expect(remembered('[1, 2, 3]')).toEqual(FORGOTTEN);
     expect(remembered('{"surface":"nowhere","cursor":"seventeen"}')).toEqual(FORGOTTEN);
-    expect(remembered('{"open":"entity core.miki"}')).toEqual({ ...FORGOTTEN, open: 'entity core.miki' });
+    expect(remembered('{"open":"entity tulsa.miki"}')).toEqual({ ...FORGOTTEN, open: 'entity tulsa.miki' });
     expect(remembered('{"map":{"zoom":3}}')).toEqual({ ...FORGOTTEN, map: { ...FORGOTTEN.map, zoom: 3 } });
     expect(remembered('{"map":{"pan":{"x":5},"plane":null}}')).toEqual({ ...FORGOTTEN, map: { ...FORGOTTEN.map, pan: { x: 5, y: 0 } } });
   });

@@ -7,7 +7,7 @@ import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { ENGINE_KEYS } from '../src/content/locale';
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
-import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
@@ -26,6 +26,8 @@ const live = (progress: Parameters<typeof formatLive>[0]): string => printed(for
 const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
 const source = readFileSync('content/core.dsl', 'utf8');
+const town = readFileSync('content/tulsa.dsl', 'utf8');
+const TUTORIAL: readonly ModuleSource[] = [{ name: 'core', text: source }, { name: 'tulsa', text: town }];
 
 const PLANE_SOURCE = `
 # location camp
@@ -62,8 +64,8 @@ function onPlaneScreen(save: string, item: string): string[] {
   return shown(runLine(ctx, '1'));
 }
 
-function driver(text: string, speed = 1, driving = false): CommandContext {
-  const session = startSession(loadInEnglish(text));
+function driver(text: string | readonly ModuleSource[], speed = 1, driving = false): CommandContext {
+  const session = startSession(typeof text === 'string' ? loadInEnglish(text) : loadUniverse(withEngineLocale(text)));
   const recorder: Recorder = { history: [], startSave: serializeSession(session) };
   return newContext(session, view(session), { recorder, speed, driving });
 }
@@ -78,10 +80,10 @@ function armed(ctx: CommandContext, choiceId: string) {
 
 describe('play-cli renders what a command result says happened', () => {
   it('prints a view as narration, location, occupants, pools, modals, choices and the clock', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     const lines = shown(runLine(ctx, '/look'));
 
-    expect(lines[0]).toBe('Guide House (core.guide-house)');
+    expect(lines[0]).toBe('Guide House (tulsa.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe("Here: Miki, Front Door, Stairs, Mirror, Oven, Smith's Chest");
     expect(lines[3]).toBe('Health: ██████████ 30/30');
@@ -90,7 +92,7 @@ describe('play-cli renders what a command result says happened', () => {
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {
-    const opening = openRepl([{ name: 'core', text: source }]).opening.map(printed);
+    const opening = openRepl([{ name: 'core', text: source }, { name: 'tulsa', text: town }]).opening.map(printed);
 
     expect(ENGINE_KEYS.filter((key) => opening.some((line) => line.includes(key)))).toEqual([]);
     expect(opening.length).toBeGreaterThan(5);
@@ -112,7 +114,7 @@ describe('play-cli renders what a command result says happened', () => {
   });
 
   it('prints a location description on first arrival and again only when /look asks', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     const described = `A cluttered but cozy cottage. Miki's guide house.`;
 
     expect(shown(runLine(ctx, '/look'))).toContain(described);
@@ -143,25 +145,33 @@ starting
   });
 
   it('prints the status readout /state and /quit both produce', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     runLine(ctx, '/wait 7');
     const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [row.id, row.value])));
-    expect(shown(runLine(ctx, '/state'))).toEqual([
-      'Location: core.guide-house',
+    const state = shown(runLine(ctx, '/state'));
+    // Every line the readout is made of, and no other. What the town holds beyond the three rooms
+    // walked to here is the world's size rather than this readout's shape, so the two lines that
+    // count it are read for their form.
+    expect(state).toHaveLength(13);
+    expect(state.slice(0, 4)).toEqual([
+      'Location: tulsa.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {"core.guide-house.discovered":true,"core.guide-house-upstairs.discovered":true,"core.basement.discovered":true}',
+      'Flags: {"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}',
       'Inventory: {}',
-      'XP: {"core.thieving":0,"core.melee":0,"core.cooking":0}',
+    ]);
+    expect(state[4]).toMatch(/^XP: \{"core\.thieving":0,"core\.melee":0,"core\.cooking":0[,}]/);
+    expect(state.slice(5, 12)).toEqual([
       'Equipped: {"mainhand":null,"offhand":null}',
       `stats: ${sheet}`,
       'Health: ██████████ 30/30',
       'discovered: 3',
-      '  Guide House (core.guide-house) at 0,0,0 -> core.guide-house-upstairs, core.basement',
-      '  Guide House Upstairs (core.guide-house-upstairs) at 0,0,1 -> core.guide-house',
-      '  Basement (core.basement) at 0,0,-1 -> core.guide-house',
-      'locations: 3 of 5 found; not yet found: core.beach, core.market-district',
+      '  Guide House (tulsa.guide-house) at 0,0,0 -> tulsa.guide-house-upstairs, tulsa.basement',
+      '  Guide House Upstairs (tulsa.guide-house-upstairs) at 0,0,1 -> tulsa.guide-house',
+      '  Basement (tulsa.basement) at 0,0,-1 -> tulsa.guide-house',
     ]);
-    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: core.guide-house');
+    expect(state[12]).toMatch(/^locations: 3 of \d+ found; not yet found: tulsa\./);
+    expect(state[12]).toContain('tulsa.beach');
+    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tulsa.guide-house');
   });
 
   // A road whose condition does not hold is still a road, and a map that drew it the same as an
@@ -192,7 +202,7 @@ x: 1, y: 0
   });
 
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     const status = runLine(ctx, '/state').output.find((out) => out.kind === 'status')!.status;
 
     expect(drawn({ kind: 'status', status })).not.toContain('Grown: {}');
@@ -202,7 +212,7 @@ x: 1, y: 0
   });
 
   it('draws the inventory screen /inv opens and nothing beside it', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     const lines = shown(runLine(ctx, '/inv'));
 
     expect(lines).toContain('[carried-items] item');
@@ -250,7 +260,7 @@ x: 1, y: 0
   });
 
   it('lays the help out from the table alone, one line per entry, plus this driver’s own startup argv', () => {
-    const ctx = driver(source);
+    const ctx = driver(TUTORIAL);
     const lines = shown(runLine(ctx, '/help'));
 
     expect(lines[0]).toBe('Commands:');

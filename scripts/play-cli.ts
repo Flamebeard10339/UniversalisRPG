@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
+import { sourceFiles } from './probe';
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import { fileSlots } from './lib/slotFile';
@@ -41,7 +42,7 @@ export const CLI_NOT_SHOWN: ReadonlyArray<{ field: keyof PlayView; why: string }
 ];
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = 'content/core.dsl';
+const defaultContent = 'content';
 const defaultLocalChanges = 'content/local-changes.dsl';
 const defaultSaves = '.saves';
 
@@ -473,9 +474,9 @@ function sourceName(file: string): string {
 
 function loadContent(files: string[]): ModuleSource[] {
   return withEngineLocale(
-    files.map((file) => ({
+    files.flatMap((file) => sourceFiles(repoPath(file))).map((file) => ({
       name: sourceName(file),
-      text: readFileSync(repoPath(file), 'utf8'),
+      text: readFileSync(file, 'utf8'),
     })),
   );
 }
