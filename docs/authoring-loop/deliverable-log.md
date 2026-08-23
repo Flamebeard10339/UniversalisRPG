@@ -37,6 +37,10 @@ a bot playing it both need to say "this bit is not right yet" and have it surviv
 into a list someone reads later.** `@@@` and `npm run notes` are already that
 channel. Neither item gets its own.
 
+It is important that authoring agents don't spend 30+ minutes experimenting with 
+the DSL before authoring for real. They should be able to one shot content with 
+just the assistance of the oracle and other existing modules. 
+
 ## What has actually happened
 
 Two authoring runs and four playbot runs. Tulsa exists — 28 locations, 37 entities,
