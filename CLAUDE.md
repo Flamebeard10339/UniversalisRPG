@@ -54,6 +54,21 @@ is the guard.
 met them, and they are the proof the rest of the module still works. Add to a
 module; replace one only having read what you are replacing.
 
+# Work that outlives a session
+
+A feature that runs longer than one sitting hands over through three files in
+`docs/<feature>/`: `deliverable-log.md` says what it is for and what phase it is
+in, `open.md` is what is still wrong, `settled.md` is what someone starting cold
+has to know. **Read all three before touching that work, and keep them current as
+you go.** A finding left only in a session transcript is lost.
+
+Nothing is struck through in any of them — **done means deleted**, and the commit
+that closed a line is where its reasoning lives. A folder where a finished heading
+and an open one look alike has stopped answering the one question it is for.
+
+`npm run handoff` says which of those folders have drifted from the work. The
+`hand-over` skill is the procedure for writing them and for closing a session out.
+
 # Layers
 
 `grammar < content < runtime < ui < scripts`. Imports point downward only, gated
@@ -98,6 +113,7 @@ Tools, none of which are gates:
 - `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
 - `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world, then line by line what may be written where
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
+- `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
 - `npm run review [-- <module>...]` — every line the game can say, under the section that says it, in the order its module writes them; `--read-through <section>` marks a sitting as read. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
