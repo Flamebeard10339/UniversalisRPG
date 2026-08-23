@@ -1,11 +1,11 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { ActionResult, DropRow, nestedResults, Party } from '../grammar/actionResult';
+import { ActionResult, DropRow, nestedResults, Party, STARTING_LOCATION } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/sections/location';
 import { DropTable } from '../content/sections/droptable';
 import { EventTrigger, GameEvent } from '../content/sections/event';
 import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
-import { Registry } from '../content/registry';
+import { Registry, startingLocationId } from '../content/registry';
 import { Resource } from '../content/sections/resource';
 import { evaluateCondition } from './conditions';
 import { effectiveAdjacent } from './journey';
@@ -163,8 +163,17 @@ export function spreadDiscovery(state: GameState, registry: Registry): void {
   }
 }
 
+// A name the engine answers is answered against the registry that is loaded now, so a world whose
+// starting mark moved while it ran moves what the name means with it.
+export function locationNamed(registry: Registry, location: string): string {
+  if (location !== STARTING_LOCATION) return location;
+  const starting = startingLocationId(registry);
+  if (starting === undefined) throw new RuntimeError(`${STARTING_LOCATION} was named, but no # location is marked starting`);
+  return starting;
+}
+
 export function relocateTo(state: GameState, registry: Registry, location: string): void {
-  state.location = location;
+  state.location = locationNamed(registry, location);
   spreadDiscovery(state, registry);
 }
 
@@ -238,7 +247,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       relocateTo(state, registry, result.location);
       return 0;
     case 'discover':
-      state.flags[`${result.location}.${DISCOVERED}`] = true;
+      state.flags[`${locationNamed(registry, result.location)}.${DISCOVERED}`] = true;
       return 0;
     case 'open-modal':
       openModalNamed(state, result.modal);

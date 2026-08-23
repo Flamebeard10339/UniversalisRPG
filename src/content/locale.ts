@@ -250,6 +250,7 @@ export const ENGINE_KEYS = [
   'engine.stopped.still',
   'engine.stopped.unloadable',
   'engine.stopped.pack-full',
+  'engine.stopped.short',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

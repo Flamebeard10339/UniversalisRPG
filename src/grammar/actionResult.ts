@@ -8,6 +8,12 @@ import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantif
 
 export type Party = 'me' | 'them';
 
+// The one location name the engine answers rather than a module declaring it: wherever a result
+// names a location, this stands for whichever `# location` is marked `starting` at the moment the
+// result runs. Nothing resolves it at load, so a module that stands nowhere may write it and a world
+// that moves its starting mark moves what it means, with no module naming another module's room.
+export const STARTING_LOCATION = 'starting-location';
+
 export type ActionResult =
   | { kind: 'say'; text: string; key?: string }
   | { kind: 'set'; variable: string }
@@ -434,7 +440,9 @@ const LEAF_EXAMPLES: readonly string[] = [
   'take: 3 plank',
   'xp: mining 4-7',
   'relocate: camp',
+  `relocate: ${STARTING_LOCATION}`,
   'discover: camp',
+  `discover: ${STARTING_LOCATION}`,
   'open modal: name-yourself',
   'drain: 5 health',
   'restore: 1-2 health',
@@ -454,7 +462,9 @@ const LEAF_FORMS: readonly string[] = [
   'take: <count> <item>',
   'xp: <skill> <amount>',
   'relocate: <location>',
+  `relocate: ${STARTING_LOCATION}`,
   'discover: <location>',
+  `discover: ${STARTING_LOCATION}`,
   'open modal: <modal>',
   'drain: <amount> <resource>[ from <me or them>]',
   'restore: <amount> <resource>[ to <me or them>]',

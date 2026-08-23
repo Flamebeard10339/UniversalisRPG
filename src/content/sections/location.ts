@@ -2,9 +2,10 @@ import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody, actionLines } from '../../grammar/action';
 import { Condition, condition } from '../../grammar/condition';
 import { list } from '../../grammar/list';
+import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { DslError, Parser } from '../../grammar/parser';
 import { AnySchema, PrintContext, SectionSchema, listMembers, printSection } from '../../grammar/section';
-import { id, number, text } from '../../grammar/values';
+import { id, lastSegment, number, text } from '../../grammar/values';
 import { actions, condition as visitCondition, pruneActions, put, type Loose } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
@@ -191,6 +192,7 @@ export const location = section<Location, 'starting', 'actions'>()({
   map: 'locations',
   nestsActions: 'only while the player is standing here',
   text: ['title', 'examine'],
+  validate: (value) => (lastSegment(value.id) === STARTING_LOCATION ? `${STARTING_LOCATION} is the name the engine answers with whichever location is marked starting, so nothing may be called it` : undefined),
   print: printLocation,
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;

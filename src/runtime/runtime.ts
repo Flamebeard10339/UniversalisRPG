@@ -541,7 +541,13 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
     if (terminator !== 'done' && evaluateCondition(terminator, state, registry)) {
       return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(terminator)) }));
     }
-    if (!state.activeAction && !state.journey) return over(true, state.endedBecause ?? say.engine('engine.stopped.finished'));
+    if (!state.activeAction && !state.journey) {
+      const because = state.endedBecause ?? say.engine('engine.stopped.finished');
+      // A terminator that was never reached did not finish, whatever ran out first: the condition is
+      // what was asked for, and running out of things to do without it is the asking having failed.
+      if (terminator === 'done') return over(true, because);
+      return over(false, say.engine('engine.stopped.short', { because, condition: say.identifier(describeCondition(terminator)) }));
+    }
     if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return over(false, say.engine('engine.stopped.bound', { hours: UNDER_WAY_LIMIT_HOURS }));
     const unit = underWayUnit(state, registry);
     if (!(unit > 0)) return over(false, say.engine('engine.stopped.still'));

@@ -1,6 +1,6 @@
 import type { TextSegment } from '../grammar/segment';
 import { Action, Sided } from '../grammar/action';
-import { ActionResult, nestedResults } from '../grammar/actionResult';
+import { ActionResult, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
@@ -130,7 +130,7 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         break;
       case 'relocate':
       case 'discover':
-        put(result, 'location', 'location', `${where} ${result.kind}:`, visit);
+        if (result.location !== STARTING_LOCATION) put(result, 'location', 'location', `${where} ${result.kind}:`, visit);
         break;
       case 'pool':
         put(result, 'resource', 'resource', `${where} ${result.delta.max < 0 ? 'drain' : 'restore'}:`, visit);

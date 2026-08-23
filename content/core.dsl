@@ -618,8 +618,9 @@ skills: melee, cooking, thieving
 equipment-slots: mainhand, offhand
 uses: melee-combat
 on death:
-  say: You slump to the floor, spent. (You should have eaten something.)
+  say: You slump to the floor, spent, and come to a long while later back where you started out. (You should have eaten something.)
   set: fainted
+  relocate: starting-location
   stop
 
 // --- recipes ---

@@ -6,7 +6,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { createGameState, GameState } from './state';
 import type { PruneWarning } from './pruning';
 import { initResources } from './effects';
-import { Registry } from '../content/registry';
+import { Registry, startingLocationId } from '../content/registry';
 import { ParsedSave } from '../content/sections/save';
 import { parseOwnerRef } from './actions';
 import { findActionOwner, travelEndProblem, TRAVEL_PAIR } from './actionLookup';
@@ -123,10 +123,6 @@ function diffRecord(field: SaveField, state: Record<string, unknown>, baseline: 
     if (!deepEqual(value, held(baseline, key, sparsest))) out[key] = value;
   }
   return Object.keys(out).length > 0 ? out : undefined;
-}
-
-export function startingLocationId(registry: Registry): string | undefined {
-  return [...registry.locations.values()].find((location) => location.starting)?.id;
 }
 
 export function initialState(registry: Registry, language: string = DEFAULT_LANGUAGE): GameState {
