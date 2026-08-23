@@ -656,6 +656,21 @@ describe('dialogue', () => {
     expect(() => parseModule(['# quest errand', 'stage offered:', '  complete', '  miki says:', ...node.map((line) => `  ${line}`)].join('\n'))).toThrow(/node said is sticky and also writes again:/);
   });
 
+  it('refuses a take: on the line said when no thread is open, since nothing stands behind that one', () => {
+    const fallback = ['  always', '  take: 5 coin', '  Thanks for the coins.'];
+
+    expect(() => parseModule(['# dialogue miki', 'owner = miki', '', 'node greet:', ...fallback].join('\n'))).toThrow(/node greet is what is said when no thread is open and also takes coin/);
+    expect(() => parseModule(['# quest errand', 'stage offered:', '  complete', '  miki says:', ...fallback.map((line) => `  ${line}`)].join('\n'))).toThrow(/node said is what is said when no thread is open and also takes coin/);
+  });
+
+  it('leaves the same take: alone on a thread and on a choice, which are the two ways to write a cost that hides only itself', () => {
+    const asked = ['  always', '  ask: I owe you five.', '  take: 5 coin', '  Thanks for the coins.'];
+    const chosen = ['  always', '  Owe me anything?', '  -> Here, five coins.', '    take: 5 coin'];
+    const gated = ['  when: has coin', '  take: 5 coin', '  Thanks for the coins.'];
+
+    for (const node of [asked, chosen, gated]) expect(() => parseModule(['# dialogue miki', 'owner = miki', '', 'node greet:', ...node].join('\n'))).not.toThrow();
+  });
+
   it('parses a guarded, consuming choice and a visit-count when: as a comparison', () => {
     const source = ['# dialogue troll', 'owner = bridge-troll', '', 'node toll:', '  when: toll.visits >= 5', '  Pay the toll!', '  -> Here, five shrimp.  (when has-shrimp)', '    take: 5 cooked-shrimp', '    goto paid'].join('\n');
     const [{ value }] = parseModule(source) as {
