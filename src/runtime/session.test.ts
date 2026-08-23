@@ -977,6 +977,7 @@ describe('what the engine withholds', () => {
       activeAction: 'published',
       journey: 'published',
       log: 'withheld',
+      endedBecause: 'withheld',
       rng: 'withheld',
       visits: 'withheld',
       buffs: 'withheld',

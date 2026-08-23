@@ -235,3 +235,22 @@ engine.repl.plane.effect: {effect} {amount}% {stat}
 engine.repl.plane.empty: (empty)
 engine.repl.plane.blocked: blocked by {beyond}
 engine.repl.plane.holds: holds {beyond}
+engine.span.ran: You were at that for {span}s, and stopped because {reason}.
+engine.span.pool: {resource}: {before} to {after}
+engine.span.gained: Gained: {item} x{count}
+engine.span.spent: Spent: {item} x{count}
+engine.span.xp: {skill}: {gained} experience
+engine.span.levelled: {skill}: {gained} experience, and level {level}
+engine.span.moved: You are standing in {location}.
+engine.stopped.itself: what you were doing called a halt
+engine.stopped.condition: {condition} came true
+engine.stopped.event: {event} happened
+engine.stopped.finished: it was finished
+engine.stopped.unfinished: it ran out of attempts
+engine.stopped.unavailable: you could not carry on with it
+engine.stopped.arrived: you got where you were going
+engine.stopped.no-road: the way on was closed
+engine.stopped.called-off: you called it off
+engine.stopped.bound: the world had already run {hours} hours on your behalf, which is as far as it will run unattended
+engine.stopped.still: what was under way advances by nothing, so waiting it out would never end
+engine.stopped.unloadable: what was under way could not be picked up again

@@ -22,9 +22,9 @@ import { PLAYER, templateOf } from './state';
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 12;
 
-export type SaveDiff = Partial<Omit<GameState, 'log' | 'language'>>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause'>;
 
-export type SaveField = Exclude<keyof GameState, 'log' | 'language'>;
+export type SaveDiff = Partial<Pick<GameState, SaveField>>;
 
 interface RecordPrune {
   of: string;
@@ -98,7 +98,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
 };
 
-const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
+export const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
 
 function fieldsOfShape(shape: 'record' | 'scalar'): SaveField[] {
   return SAVE_FIELD_NAMES.filter((field) => SAVE_FIELDS[field].shape === shape);
@@ -226,7 +226,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   if (activeProblem) {
     const active = state.activeAction!;
     const id = `${active.ownerRef}.${active.actionSlug}`;
-    endAction(state);
+    endAction(state, localizer.engine('engine.stopped.unloadable'));
     addWarning(warnings, 'activeAction', id, localizer.engine('engine.prune.action', { action: named(id), reason: activeProblem }));
   }
 
@@ -295,6 +295,7 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
     else delete target[field];
   }
   state.log = base.log;
+  state.endedBecause = base.endedBecause;
   return pruned(state, registry);
 }
 

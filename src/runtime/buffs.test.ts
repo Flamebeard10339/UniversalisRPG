@@ -1,4 +1,7 @@
 import { endAction, endJourney } from './actionEnd';
+import type { Localized } from './localized';
+
+const TEST_REASON = 'because the test said so' as Localized;
 import { clearBuffs } from './buffs';
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
@@ -288,7 +291,7 @@ describe('an inflicted buff is granted by the declaration it names', () => {
   it('expires on the clock its own declaration set, without a second one being named', () => {
     const registry = loaded();
     const state = swinging(registry, 'flashing-blade');
-    endAction(state);
+    endAction(state, TEST_REASON);
 
     resolve(state, registry, secondsToMs(40));
     expect(buffsOf(state, PLAYER).length).toBe(1);
@@ -333,7 +336,7 @@ describe('a buff on a fight-scoped copy dies with the copy', () => {
     grantBuff(state, 'giant-rat', itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
     grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
 
-    endAction(state);
+    endAction(state, TEST_REASON);
 
     expect(Object.keys(state.buffs).sort()).toEqual(['giant-rat', PLAYER]);
   });
@@ -344,7 +347,7 @@ describe('a buff on a fight-scoped copy dies with the copy', () => {
     useFight('strike', 'giant-rat', registry, state);
     grantBuff(state, COPY, itemOf(registry, 'accelerated-vigor'), secondsToMs(1e9));
 
-    endJourney(state);
+    endJourney(state, TEST_REASON);
 
     expect(state.activeAction).toBeNull();
     expect(state.buffs).toEqual({});

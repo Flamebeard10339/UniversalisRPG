@@ -2,6 +2,7 @@ import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { advanceTime, createGameState, evaluateCondition, renderSegments, useAction } from './runtime';
 import { loadModule } from '../content/load';
+import { loadInEnglish } from '../content/engineLocale';
 import { runTest, sessionStatus, startSession, view, wait } from './session';
 import { secondsToMs } from './units';
 
@@ -243,7 +244,7 @@ begin: use entity.kiln.bake-forever
 wait: done
 `;
 
-  const registry = () => loadModule(MODULE);
+  const registry = () => loadInEnglish(MODULE);
 
   it('runs an armed action out to its end without being told how long that is', () => {
     expect(runTest('one-firing', registry(), createGameState())).toEqual({ passed: true });
@@ -261,6 +262,6 @@ wait: done
   it('refuses, rather than running forever, when what is under way never finishes', () => {
     const result = runTest('a-kiln-that-never-stops', registry(), createGameState());
     expect(result.passed).toBe(false);
-    expect(result.failure).toMatch(/wait: done — .*had not finished after/);
+    expect(result.failure).toMatch(/wait: done — .*4 hours on your behalf/);
   });
 });

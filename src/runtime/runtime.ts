@@ -40,6 +40,9 @@ import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs'
 import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { msUntilEmpty, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
+import { describeCondition, evaluateCondition } from './conditions';
+import { spanStart, spanSummary, type SpanStart } from './span';
+import type { Terminator } from '../content/sections/test';
 
 export { advanceTime, createGameState, PLAYER } from './state';
 export { endAction, endJourney } from './actionEnd';
@@ -206,7 +209,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     const remainder = totalAttempts - fights * attemptsToResolve;
     applyOutcome(segment, action, outcome, fights);
     if (segment.stopped) {
-      endAction(state);
+      endAction(state, segment.stopped);
       return;
     }
     player.attemptsMade = remainder;
@@ -295,7 +298,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
   for (;;) {
     if (segment.stopped || !actionStillValid(action, active, state, registry)) {
-      endAction(state);
+      endAction(state, segment.stopped ?? localizerOf(registry, state).engine('engine.stopped.unavailable'));
       return;
     }
 
@@ -315,7 +318,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     }
 
     if (roster.length === 0) {
-      endAction(state);
+      endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
       advanceTime(state, segEnd - state.time);
       return;
     }
@@ -350,7 +353,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     if (fightOutcome) {
       applyOutcome(segment, action, fightOutcome, 1);
       if (segment.stopped) {
-        endAction(state);
+        endAction(state, segment.stopped);
         return;
       }
       if (active.repeating && standsAgain(state, registry, action, armedTarget ?? next.other)) {
@@ -361,7 +364,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         playerCadence(active).attemptsMade = 0;
       } else {
         grantActionFoodBuff(state, registry);
-        endAction(state);
+        endAction(state, outcomeReached(state, registry, fightOutcome));
         return;
       }
     }
@@ -396,7 +399,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     let changed = applyRespawns(state);
     if (stepJourney(state, registry)) changed = true;
     if (fightLeftItsLocation(state, registry)) {
-      endAction(state);
+      endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
       changed = true;
     }
 
@@ -405,7 +408,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     if (state.activeAction) {
       const action = armedAction(state, registry);
       if (!actionStillValid(action, state.activeAction, state, registry)) {
-        endAction(state);
+        endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
         if (!state.activeAction.repeating) {
@@ -415,7 +418,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
             applyOutcome(segment, action, outcome, 1);
             settlePools(state, registry, [], 0, segment.deltas);
             grantActionFoodBuff(state, registry);
-            endAction(state);
+            endAction(state, outcomeReached(state, registry, outcome));
             changed = true;
           }
         }
@@ -429,6 +432,9 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
     }
   }
 }
+
+const outcomeReached = (state: GameState, registry: Registry, outcome: FightOutcome): Localized =>
+  localizerOf(registry, state).engine(outcome === 'completion' ? 'engine.stopped.finished' : 'engine.stopped.unfinished');
 
 function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   const active = state.activeAction;
@@ -502,7 +508,7 @@ export const UNDER_WAY_LIMIT_MS = UNDER_WAY_LIMIT_HOURS * 60 * MS_PER_MINUTE;
 
 export interface WaitedOut {
   ended: boolean;
-  reason?: string;
+  reason?: Localized;
 }
 
 const underWayUnit = (state: GameState, registry: Registry): number => {
@@ -517,18 +523,28 @@ function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
 }
 
-export type UnderWayTest = (state: GameState, registry: Registry) => boolean;
+// Handing the engine a terminator is asking it to run the world in the player's absence, so the
+// terminator is also what decides whether they are told turn by turn or handed a summary: issuing an
+// action without one comes back after a single cycle and never reaches here. `done` is not a
+// condition anything could evaluate, so the loop takes the terminator rather than a test made from
+// it — reading which one it was given is the whole of the split.
+export function resolveUnderWay(state: GameState, registry: Registry, terminator: Terminator = 'done', start: SpanStart = spanStart(state)): WaitedOut {
+  const startedAt = start.at;
+  const say = localizerOf(registry, state);
 
-// `wait: done` is this stepped with no test of its own: the only thing it is waiting for is the
-// moment nothing is left in flight, which the loop already checks on every step regardless.
-export function resolveUnderWay(state: GameState, registry: Registry, satisfied: UnderWayTest = () => false): WaitedOut {
-  const startedAt = state.time;
+  const over = (ended: boolean, because: Localized): WaitedOut => {
+    state.log.push(...spanSummary(start, state, registry, because));
+    return ended ? { ended } : { ended, reason: because };
+  };
+
   for (;;) {
-    if (satisfied(state, registry)) return { ended: true };
-    if (!state.activeAction && !state.journey) return { ended: true };
-    if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return { ended: false, reason: `what is under way had not finished after ${UNDER_WAY_LIMIT_HOURS} hours of game time, which is as long as the engine will run the world on the player's behalf` };
+    if (terminator !== 'done' && evaluateCondition(terminator, state, registry)) {
+      return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(terminator)) }));
+    }
+    if (!state.activeAction && !state.journey) return over(true, state.endedBecause ?? say.engine('engine.stopped.finished'));
+    if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return over(false, say.engine('engine.stopped.bound', { hours: UNDER_WAY_LIMIT_HOURS }));
     const unit = underWayUnit(state, registry);
-    if (!(unit > 0)) return { ended: false, reason: 'what is under way advances by nothing, so waiting it out would never end' };
+    if (!(unit > 0)) return over(false, say.engine('engine.stopped.still'));
     advanceUnderWayCycle(state, registry);
   }
 }
@@ -670,21 +686,27 @@ export function armJourney(dest: string, registry: Registry, state: GameState): 
 function stepJourney(state: GameState, registry: Registry): boolean {
   const journey = state.journey;
   if (!journey || state.activeAction) return false;
+  const say = localizerOf(registry, state);
 
   const crossed = journey.legs[0] === state.location;
   if (crossed) journey.legs.shift();
   if (journey.legs.length === 0) {
     state.journey = null;
+    state.endedBecause = say.engine('engine.stopped.arrived');
     return true;
   }
 
   if (!roadsFrom(state.location, registry, state).includes(journey.legs[0])) {
     state.journey = null;
+    state.endedBecause = say.engine('engine.stopped.no-road');
     return true;
   }
 
   const armed = armTravel(state.location, journey.legs[0], registry, state);
-  if (!armed.armed) state.journey = null;
+  if (!armed.armed) {
+    state.journey = null;
+    state.endedBecause = say.engine('engine.stopped.no-road');
+  }
   return true;
 }
 
