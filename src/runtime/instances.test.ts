@@ -346,6 +346,6 @@ describe('content moving underneath an instance', () => {
 
     expect(warnings.length).toBe(2);
     expect(Object.values(target.instances.byId).flatMap((held) => (held.payload as Token).linked)).toEqual([]);
-    expect(target.log).toEqual(warnings.map((warning) => warning.message));
+    expect(target.log).toEqual([]);
   });
 });

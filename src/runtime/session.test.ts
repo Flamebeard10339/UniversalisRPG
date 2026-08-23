@@ -146,7 +146,7 @@ node greeting:
     expect(v.said).toContain('There you are, Rowan, elf.');
   });
 
-  it('shows content-pruning warnings after loading a save with stale ids', () => {
+  it('reports a prune to whoever asked for the load and says nothing about it to the player', () => {
     const registry = loadInEnglish(`
 # location camp
 x: 0, y: 0
@@ -157,10 +157,11 @@ starting
 `);
     const session = startSession(registry);
 
-    applyDirective(session, { kind: 'load', save: 'stale' });
+    const outcome = applyDirective(session, { kind: 'load', save: 'stale' });
     const v = view(session);
 
-    expect(v.said).toEqual(['Removed inventory mod.gem because its item is not loaded.']);
+    expect((outcome.pruned ?? []).map((warning) => warning.message)).toEqual(['Removed inventory mod.gem because its item is not loaded.']);
+    expect(v.said).toEqual([]);
     expect(v.inventory).toEqual({});
   });
 });
@@ -169,16 +170,17 @@ const ADOPT_BEFORE = ['# location camp', 'x: 0, y: 0', 'starting', '', '# locati
 const ADOPT_AFTER = ['# location camp', 'x: 0, y: 0', 'starting', 'adjacent:', '  tower', '', '# location tower', 'title: Tower', 'x: 0, y: 1'].join('\n');
 
 describe('adoptRegistry: content changed under a live session', () => {
-  it('prunes what the new registry cannot resolve, says every prune, and re-spreads discovery', () => {
+  it('prunes what the new registry cannot resolve, reports every prune, and re-spreads discovery', () => {
     const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
     view(session);
 
-    adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
+    const pruned = adoptRegistry(session, loadInEnglish(ADOPT_AFTER)).map((warning) => warning.message);
     const after = view(session);
 
-    expect(after.said.some((line) => line.includes('outpost'))).toBe(true);
-    expect(after.said.some((line) => line.includes('relic'))).toBe(true);
-    expect(after.said.some((line) => line.includes('charted'))).toBe(true);
+    expect(pruned.some((line) => line.includes('outpost'))).toBe(true);
+    expect(pruned.some((line) => line.includes('relic'))).toBe(true);
+    expect(pruned.some((line) => line.includes('charted'))).toBe(true);
+    expect(after.said).toEqual([]);
     expect(after.location.id).toBe('camp');
     expect(session.registry.locations.has(after.location.id)).toBe(true);
     expect(after.inventory.relic).toBeUndefined();
@@ -189,16 +191,16 @@ describe('adoptRegistry: content changed under a live session', () => {
     expect(flags['outpost.discovered']).toBeUndefined();
   });
 
-  it('publishes its own prunes and not a line the session had said but nobody had read', () => {
+  it('drops a line the session had said but nobody had read, and adds none of its own', () => {
     const session = primed(loadInEnglish(ADOPT_BEFORE), { location: 'outpost', inventory: { relic: 1 }, flags: { charted: true } });
     view(session);
 
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'watcher', actionId: 'poke' });
-    adoptRegistry(session, loadInEnglish(ADOPT_AFTER));
+    const pruned = adoptRegistry(session, loadInEnglish(ADOPT_AFTER)).map((warning) => warning.message);
     const after = view(session);
 
-    expect(after.said.some((line) => line.includes('Nothing here.'))).toBe(false);
-    expect(after.said.some((line) => line.includes('relic'))).toBe(true);
+    expect(after.said).toEqual([]);
+    expect(pruned.some((line) => line.includes('relic'))).toBe(true);
   });
 
   it('says nothing and moves nothing when the registry resolves everything the state names', () => {
@@ -665,7 +667,82 @@ max-level: 10
 item-experience: 1000
 `;
 
+// One of every shape an in-flight action comes in: contested and depleting, plain and timed, and
+// capped by attempts:. The claim below takes its subjects off what this world offers where the
+// player stands, so a shape added here is covered with no edit to the claim.
+const ACTION_SHAPES = `
+# stat attack
+base: 10
+
+# stat dr
+
+# stat attack-rate
+base: 25
+
+# stat max-health
+base: 30
+
+# resource health
+max: max-health
+
+# action strike
+title: strike
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+stats: attack 10, dr 0, max-health 30, attack-rate 25
+uses: strike
+
+# item blessing
+title: Blessing
+
+# location yard
+x: 0, y: 0
+starting
+entities: dummy, shrine, forge
+
+# entity dummy
+title: Dummy
+stats: max-health 1000, dr 0
+
+# entity shrine
+title: Shrine
+chant:
+  continuous
+  time: 4
+  give: 1 blessing
+
+# entity forge
+title: Forge
+stoke:
+  continuous
+  time: 3
+  attempts: 5
+  give: 1 blessing
+`;
+
 describe('what the engine publishes', () => {
+  it('publishes a completion figure only where one has counted something, and none where it has not', () => {
+    const registry = loadInEnglish(ACTION_SHAPES);
+    const shapes = view(startSession(registry)).choices.filter((choice) => choice.kind === 'action');
+    expect(shapes.some((choice) => choice.id.startsWith('fight:'))).toBe(true);
+    expect(shapes.length).toBeGreaterThan(1);
+
+    for (const choice of shapes) {
+      const session = startSession(registry);
+      applyDirective(session, choiceToDirective(choice));
+      for (let step = 0; step < 60; step++) {
+        const action = view(session).action;
+        const completion = action?.completion ?? null;
+        expect(completion === null || completion < 1, `${choice.id} at step ${step} published completion ${completion}`).toBe(true);
+        wait(session, 0.3);
+      }
+    }
+  });
+
   it('names every stat it counts, on the row it counted it on', () => {
     const v = view(startSession(loadInEnglish(PUBLISHED_MODULE)));
 
@@ -1025,7 +1102,7 @@ roast:
     applyDirective(session, { kind: 'load', save: 'midbake' });
 
     const v = view(session);
-    expect(v.action).toEqual({ label: 'roast', progress: 0, attempts: 0, targeted: false, completion: 1 });
+    expect(v.action).toEqual({ label: 'roast', progress: 0, attempts: 0, completion: null });
   });
 });
 

@@ -15,6 +15,7 @@ import {
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { type ParsedSave } from '../content/sections/save';
+import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
@@ -308,6 +309,12 @@ function nothingIsNamed(localizer: Localizer, id: string): Localized {
     : localizer.engine('engine.growth.no-worn', { slot: localizer.identifier(slot) });
 }
 
+// A prune is addressed to whoever asked for the load, in the ids the save is written in, so it
+// goes out as tool words beside the view rather than into what the game is saying to the player.
+function prunedNotes(pruned: readonly PruneWarning[] | undefined): ToolMessage[] {
+  return (pruned ?? []).map((warning) => note('warn', warning.message));
+}
+
 function runDirective(ctx: CommandContext, directive: Directive): CommandResult {
   if (directive.kind === 'run') return runNamedTest(ctx, directive.test);
 
@@ -325,7 +332,7 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
     const outcome = applyDirective(ctx.session, directive);
     if (directive.kind === 'load' && ctx.save) ctx.save.synced = null;
     const next = view(ctx.session);
-    return { ...shown(next), recorded: [recordedOutcome(directive, outcome)] };
+    return { ...shown(next, prunedNotes(outcome.pruned)), recorded: [recordedOutcome(directive, outcome)] };
   } catch (error) {
     return refused(error);
   }
@@ -373,13 +380,13 @@ function adoptLocalChanges(
   }
 
   authoring.localSource.text = text;
-  adoptRegistry(ctx.session, loaded.registry);
+  const reported = [note('plain', staged), ...prunedNotes(adoptRegistry(ctx.session, loaded.registry))];
 
   try {
-    return shown(view(ctx.session), [note('plain', staged)]);
+    return shown(view(ctx.session), reported);
   } catch (error) {
     if (error instanceof RuntimeError) {
-      return { output: [note('plain', staged), note('error', error.message)], quit: false, recorded: [] };
+      return { output: [...reported, note('error', error.message)], quit: false, recorded: [] };
     }
     throw error;
   }
@@ -556,13 +563,14 @@ function withSaves(ctx: CommandContext, run: (save: SaveContext) => CommandResul
 function importPayload(ctx: CommandContext, payload: string, done: string, from: string | null): CommandResult {
   const saved = savedGameFromSerialized(payload);
   if (!saved) return noted('error', `that is not a # save body: ${JSON.stringify(payload.slice(0, 60))}`);
+  let pruned: readonly PruneWarning[];
   try {
-    loadSaved(ctx.session, saved);
+    pruned = loadSaved(ctx.session, saved);
   } catch (error) {
     return refused(error);
   }
   if (ctx.save) ctx.save.synced = from;
-  return shown(view(ctx.session), [note('ok', done)]);
+  return shown(view(ctx.session), [note('ok', done), ...prunedNotes(pruned)]);
 }
 
 const loaded = (result: CommandResult): boolean => !result.output.some((each) => each.kind === 'message' && each.tone === 'error');
@@ -1130,14 +1138,13 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, ar
   const action = next.action;
   if (!action) return finished(label, next);
 
-  const counting = action.attempts > 0 || action.completion < 1;
   return {
     label,
     active: true,
     time: next.time,
     progress: action.progress,
     pools: livePools(next),
-    implicit: !action.targeted && counting ? { attempts: action.attempts, completion: action.completion } : null,
+    implicit: action.completion === null ? null : { attempts: action.attempts, completion: action.completion },
     view: next,
   };
 }

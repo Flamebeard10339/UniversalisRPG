@@ -1221,7 +1221,8 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
 
     const cleared = runLine(ctx, '/local clear');
     expect(messages(cleared)[0].text).toBe('Cleared local-changes.');
-    expect(cleared.view?.said.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(messages(cleared).some((out) => out.tone === 'warn' && out.text.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(cleared.view?.said).toEqual([]);
     expect(cleared.view?.inventory['local-changes.gem']).toBeUndefined();
   });
 
@@ -1328,7 +1329,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     expect(sessionStatus(session).time).toBe(6);
   });
 
-  it('prunes state the edit invalidated, saying each prune, and leaves a state the registry resolves', () => {
+  it('prunes state the edit invalidated, reporting each prune, and leaves a state the registry resolves', () => {
     const { ctx, session, elsewhere } = authoringFixture();
     runLine(ctx, '/dsl item gem title: Gem');
     runLine(ctx, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
@@ -1343,8 +1344,10 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const reloaded = runLine(ctx, '/reload');
 
     expect(errors(reloaded)).toEqual([]);
-    expect(reloaded.view?.said.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
-    expect(reloaded.view?.said.some((line) => line.includes('local-changes.outpost'))).toBe(true);
+    const reported = messages(reloaded).filter((out) => out.tone === 'warn').map((out) => out.text);
+    expect(reported.some((line) => line.includes('Removed inventory local-changes.gem'))).toBe(true);
+    expect(reported.some((line) => line.includes('local-changes.outpost'))).toBe(true);
+    expect(reloaded.view?.said).toEqual([]);
     expect(reloaded.view?.inventory['local-changes.gem']).toBeUndefined();
     expect(session.registry.locations.has(sessionStatus(session).location.id)).toBe(true);
   });

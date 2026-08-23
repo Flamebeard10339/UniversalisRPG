@@ -78,8 +78,8 @@ describe('playbot', () => {
 
     const ctxA = newContext(sessionA, view(sessionA));
     const ctxB = newContext(sessionB, view(sessionB));
-    await runTurn({ ctx: ctxA, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('author'), log: [], turn: 1 });
-    await runTurn({ ctx: ctxB, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('bughunt'), log: [], turn: 1 });
+    await runTurn({ ctx: ctxA, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('author'), log: [], turn: 1, report: () => {} });
+    await runTurn({ ctx: ctxB, read: constantReader(PLAYED_SOURCES), client: recording, system: systemPromptFor('bughunt'), log: [], turn: 1, report: () => {} });
 
     expect(requests).toHaveLength(2);
     expect(requests[0].system).not.toBe(requests[1].system);
@@ -450,7 +450,11 @@ adjacent:
 
   it('[--save] an id naming no save is refused with a message listing what exists, not a stack trace', () => {
     const registry = played();
-    expect(() => resolveSave(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id\. Defined: core\.dresser-trinket-end/);
+    // Every id the registry holds, read off the registry: a fixture added to the corpus next month
+    // is one this refusal has to name, and naming one by hand here is how that stopped being true.
+    const refusal = (): unknown => resolveSave(registry, 'no-such-fixture-at-all');
+    expect(refusal).toThrow(/no # save with that id\. Defined: /);
+    for (const id of registry.saves.keys()) expect(refusal, id).toThrow(id);
     expect(() => openSession(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id/);
   });
 

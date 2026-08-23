@@ -3,7 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
 import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
-import { createGameState, type Journey } from './state';
+import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
@@ -14,7 +14,7 @@ import { relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
 import { journal, type JournalEntry } from './journal';
 export type { JournalEntry, JournalLine, QuestStanding } from './journal';
-import { playerCadence } from './encounter';
+import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
 import { PLAYER } from './state';
@@ -52,8 +52,10 @@ export interface PlayAction {
   label: Localized;
   progress: number;
   attempts: number;
-  targeted: boolean;
-  completion: number;
+  // How much of this cycle is still to be counted, or null when there is no such figure to give.
+  // A renderer draws it when it is there and says nothing when it is not; deciding for itself what
+  // a bare number meant is what had every driver printing a constant as though it were progress.
+  completion: number | null;
 }
 
 export interface CountedRow {
@@ -293,15 +295,15 @@ export function startSession(registry: Registry, language: string = DEFAULT_LANG
   return sessionOver(registry, state);
 }
 
-export function adoptRegistry(session: PlaySession, registry: Registry): void {
+export function adoptRegistry(session: PlaySession, registry: Registry): PruneWarning[] {
   const internals = own(session);
   const { state } = internals;
   internals.registry = registry;
   const warnings = pruneStateForRegistry(state, registry);
-  for (const warning of warnings) state.log.push(warning.message);
-  internals.logCursor = Math.max(0, state.log.length - warnings.length);
+  internals.logCursor = state.log.length;
   initResources(state, registry);
   spreadDiscovery(state, registry);
+  return warnings;
 }
 
 export function serializeSession(session: PlaySession): string {
@@ -316,7 +318,7 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   spreadDiscovery(next, registry);
   standable(registry, next);
   Object.assign(internals.state, next);
-  internals.logCursor = Math.max(0, internals.state.log.length - warnings.length);
+  internals.logCursor = internals.state.log.length;
   return warnings;
 }
 
@@ -433,6 +435,15 @@ function actionUnderWay(localizer: Localizer, obj: string, objId: string, action
   return localizer.actionLabel(obj, objId, action);
 }
 
+// `implicitTarget` counts down from full, and only for an action with nothing of anyone's to
+// deplete: a targeted one drains a pool instead and leaves this standing at full for as long as it
+// runs. Full is also where every cycle starts, so full is the absence of a reading rather than a
+// reading of nothing counted, and telling those two apart is the whole of this.
+function stillToCount(action: Action, active: ActiveAction): number | null {
+  if (action.depletes || active.implicitTarget >= IMPLICIT_TARGET_FULL) return null;
+  return fromMilliUnits(active.implicitTarget);
+}
+
 function publishAction(state: GameState, registry: Registry): PlayAction | null {
   const active = state.activeAction;
   if (!active) return null;
@@ -445,8 +456,7 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
     label: actionUnderWay(localizer, obj, objId, action),
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
-    targeted: Boolean(action.depletes),
-    completion: fromMilliUnits(active.implicitTarget),
+    completion: stillToCount(action, active),
   };
 }
 
@@ -546,13 +556,21 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'trave
   }
 }
 
-export function applyDirective(session: PlaySession, directive: Directive): { failure?: string } {
+export interface DirectiveOutcome {
+  failure?: string;
+  // What loading dropped, addressed to whoever asked for the load — never to the player, who did
+  // not write these ids and cannot act on them. `pruneStateForRegistry` has always returned this;
+  // the only question was which way out it took.
+  pruned?: readonly PruneWarning[];
+}
+
+export function applyDirective(session: PlaySession, directive: Directive): DirectiveOutcome {
   const outcome = performDirective(session, directive);
   pruneModals(stateOf(session), session.registry);
   return outcome;
 }
 
-function performDirective(session: PlaySession, directive: Directive): { failure?: string } {
+function performDirective(session: PlaySession, directive: Directive): DirectiveOutcome {
   const { registry } = session;
   const state = stateOf(session);
 
@@ -611,8 +629,7 @@ function performDirective(session: PlaySession, directive: Directive): { failure
     case 'load': {
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
-      loadSaved(session, saved);
-      return {};
+      return { pruned: loadSaved(session, saved) };
     }
     case 'cancel':
       endJourney(state);

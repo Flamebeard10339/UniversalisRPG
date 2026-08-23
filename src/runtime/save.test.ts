@@ -198,7 +198,7 @@ describe('loadSave', () => {
     expect(restored.modals).toEqual([{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }]);
   });
 
-  it('closes a modal frame the loaded registry cannot answer, and says so, instead of restoring it', () => {
+  it('closes a modal frame the loaded registry cannot answer, and reports it, instead of restoring it', () => {
     const registry = loadInEnglish(MODULE);
     for (const [frame, message] of [
       [{ name: 'shop', answers: {} }, 'Closed modal shop because it is not a modal this engine knows.'],
@@ -212,7 +212,7 @@ describe('loadSave', () => {
 
       expect(state.modals, JSON.stringify(frame)).toEqual([]);
       expect(warnings.map((warning) => warning.message)).toContain(message);
-      expect(state.log).toContain(message);
+      expect(state.log).toEqual([]);
     }
   });
 });
@@ -329,7 +329,7 @@ describe('pruneStateForRegistry', () => {
     expect(target.flags).toEqual({ 'camp.lit': true, 'cave.discovered': true });
   });
 
-  it('loadSave prunes restored stale ids and records quiet warnings in the transient log', () => {
+  it('loadSave prunes restored stale ids, reporting them to its caller and not to the player', () => {
     const registry = loadInEnglish(PRUNE_MODULE);
     const state = createGameState();
     const warnings = loadSave(state, { version: SAVE_VERSION, diff: { inventory: { 'mod.gem': 2 }, flags: { 'mod.flag': true } } }, registry);
@@ -337,7 +337,7 @@ describe('pruneStateForRegistry', () => {
     expect(state.inventory).toEqual({});
     expect(state.flags).toEqual({});
     expect(warnings.map((warning) => warning.path)).toEqual(['inventory.mod.gem', 'flags.mod.flag']);
-    expect(state.log).toEqual(warnings.map((warning) => warning.message));
+    expect(state.log).toEqual([]);
   });
 });
 

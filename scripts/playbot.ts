@@ -235,6 +235,14 @@ function renderEncounter(v: PlayView): string[] {
   return v.encounter === null ? [] : v.encounter.foes.map((foe) => `${foe.title} ${foe.current}/${foe.max}`);
 }
 
+// The view decides which of an action's figures mean anything: `completion` arrives as null when
+// there is no such reading to give, and this says nothing rather than inventing one. Reading it as
+// a done-fraction had every turn of a fight printing "100% done" at a player who had just started.
+function renderAction(action: NonNullable<PlayView['action']>): string[] {
+  const counted = action.completion === null ? [] : [`${Math.round(action.completion * 100)}% of this cycle still to count`];
+  return [[String(action.label), `${action.attempts} attempts this cycle`, `${Math.round(action.progress * 100)}% through the next`, ...counted].join(', ')];
+}
+
 // Every line of a turn is labelled with the name the view itself gives the field, so that the
 // claim in scripts/playbot.test.ts can read what must appear off a live view rather than off a
 // second list of labels that would drift from it.
@@ -257,7 +265,7 @@ export function renderView(v: PlayView): string {
     ...labelled('discovered', renderDiscovered(v)),
     ...labelled('player', [v.player.name, v.player.race].filter((each) => each !== '')),
     ...labelled('journey', v.journey === null ? [] : [`travelling to ${v.journey.to} by ${v.journey.legs.join(' ')}`]),
-    ...labelled('action', v.action === null ? [] : [`${v.action.label} ${Math.round(v.action.completion * 100)}% done, ${v.action.attempts} attempts`]),
+    ...labelled('action', v.action === null ? [] : renderAction(v.action)),
   ];
 
   const asking = askedOption(v.modals);
@@ -333,7 +341,7 @@ function settleTurn(result: CommandResult, before: PlayView): { outcome: 'applie
 
 export type ContentReader = () => readonly ModuleSource[];
 
-export function reloadInto(session: PlaySession, read: ContentReader): { ok: true } | { ok: false; message: string } {
+export function reloadInto(session: PlaySession, read: ContentReader): { ok: true; pruned: readonly PruneWarning[] } | { ok: false; message: string } {
   let sources: readonly ModuleSource[];
   try {
     sources = read();
@@ -344,8 +352,7 @@ export function reloadInto(session: PlaySession, read: ContentReader): { ok: tru
   if (loaded.diagnostics.length > 0) {
     return { ok: false, message: loaded.diagnostics.map((diagnostic) => formatModuleDiagnostic(diagnostic)).join('; ') };
   }
-  adoptRegistry(session, loaded.registry);
-  return { ok: true };
+  return { ok: true, pruned: adoptRegistry(session, loaded.registry) };
 }
 
 export interface RunTurnDeps {
@@ -355,11 +362,15 @@ export interface RunTurnDeps {
   readonly system: string;
   readonly log: readonly RunLogEntry[];
   readonly turn: number;
+  // What an edit mid-run dropped out of this session. It goes to whoever is reading the run, not
+  // into the turn's own entry: the player did not do it and has nothing to answer for it.
+  readonly report: (line: string) => void;
 }
 
 export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   const reloaded = reloadInto(deps.ctx.session, deps.read);
   if (!reloaded.ok) return { turn: deps.turn, outcome: 'reload-failed', detail: reloaded.message };
+  for (const warning of reloaded.pruned) deps.report(`turn ${deps.turn} [pruned] ${warning.message}`);
 
   deps.ctx.view = view(deps.ctx.session);
   const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view) };
@@ -408,7 +419,7 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
   const ctx = newContext(options.session, view(options.session));
   const log: RunLogEntry[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {
-    const entry = await runTurn({ ctx, read: options.read, client: options.client, system, log, turn });
+    const entry = await runTurn({ ctx, read: options.read, client: options.client, system, log, turn, report: options.write });
     log.push(entry);
     const billed = options.client.lastUsage?.() ?? null;
     options.write(billed === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${billed.input} in, ${billed.cacheRead} cached read, ${billed.cacheWrite} cached write]`);

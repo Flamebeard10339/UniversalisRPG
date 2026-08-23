@@ -293,9 +293,7 @@ export function loadSave(state: GameState, saved: ParsedSave, registry: Registry
     else delete target[field];
   }
   state.log = base.log;
-  const warnings = pruned(state, registry);
-  for (const warning of warnings) state.log.push(warning.message);
-  return warnings;
+  return pruned(state, registry);
 }
 
 function describeValue(value: unknown): string {
