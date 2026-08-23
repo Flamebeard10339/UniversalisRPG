@@ -96,6 +96,48 @@ describe('a draft handed to the engine whole', () => {
   });
 });
 
+// An author reaches for --at to edit a module as readily as to write a new one, and a module is which module it is by the id its own # info names, so where the file sits says nothing about which of the three this is.
+describe('which module a draft is', () => {
+  const WORLD = [{ name: 'island.dsl', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n') }];
+  const EDITED = ['# info island', 'version: 1.0.1', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item lantern', 'title: Lantern'].join('\n');
+  const FRESH = ['# info hermitage', 'version: 0.0.1', 'dependencies:', '  island', '', '# item lantern', 'title: Lantern'].join('\n');
+  const UNDECLARED = ['# item lantern', 'title: Lantern'].join('\n');
+  const declares = (read: { known: readonly { address: string }[] }, address: string): boolean => read.known.some((each) => each.address === address);
+
+  // Two copies of one module is exactly what the engine refuses, so a draft standing beside the module it is a version of answers about a world that could never be loaded.
+  it('takes the place of the module whose id it declares, rather than standing beside it', () => {
+    const read = reading('anywhere/at/all.dsl', EDITED, WORLD);
+
+    expect(read.stood).toBe(true);
+    expect(takenLines(read).join('\n')).not.toContain('two modules declare');
+    expect(declares(read, 'island.lantern')).toBe(true);
+    expect(declares(read, 'island.rope')).toBe(false);
+  });
+
+  it('is told by the id the draft declares and not by the path it was read from', () => {
+    for (const file of ['island.dsl', 'content/island.dsl', './content/island.dsl', 'C:\\scratch\\untitled-3.dsl']) {
+      expect(reading(file, EDITED, WORLD).read).toBe('read as the module it declares, in place of the island that already ships');
+    }
+  });
+
+  it('stands beside the world where nothing loaded declares its id', () => {
+    const read = reading('anywhere/at/all.dsl', FRESH, WORLD);
+
+    expect(read.read).toBe('read as the module it declares');
+    expect(read.stood).toBe(true);
+    expect(declares(read, 'island.rope')).toBe(true);
+    expect(declares(read, 'hermitage.lantern')).toBe(true);
+  });
+
+  it('is a module of its own, taking nothing out of the world, where it declares no # info', () => {
+    const read = reading('untitled.dsl', UNDECLARED, WORLD);
+
+    expect(read.read).toBe('read as # info untitled standing on everything already loaded, since the file declares no module of its own');
+    expect(read.stood).toBe(true);
+    expect(declares(read, 'island.rope')).toBe(true);
+  });
+});
+
 describe('a draft is answered against the world it declares, not only the one already loaded', () => {
   const WORLD = [{ name: 'island', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting'].join('\n') }];
   const DRAFT = ['# info hermitage', 'version: 0.0.1', 'dependencies:', '  island', '', '# item lamp', 'title: Lamp', '', '# entity hermit', 'examine: A hermit.', 'hand it over:', '  instant', '  give: 1 lamp'].join('\n');

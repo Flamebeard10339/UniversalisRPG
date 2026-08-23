@@ -8,6 +8,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type ModuleDiagnostic } from '../src/content/registry';
 import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
+import { splitSections } from '../src/grammar/structure';
 import { gathered, shownIn } from '../src/ui/offerGroups';
 import { sectionFor, sectionKinds } from '../src/content/sections';
 
@@ -22,6 +23,8 @@ const usage = [
   '            it stands, then — walking the cursor to each placeholder in turn —',
   '            where each line sits, what it is read as, and what may stand there',
   '',
+  'A draft is whichever module its own `# info` names, so an edited copy of a module',
+  'that already ships is read in place of the shipped one rather than beside it.',
   'Ids come from the corpus, and under --at from the draft as well, so what this',
   'prints is what the page would show with the draft loaded.',
   'An answer given once is pointed back at rather than written out again.',
@@ -32,7 +35,7 @@ const corpus = (): ModuleSource[] =>
     .filter((name) => name.endsWith('.dsl'))
     .map((name) => ({ name, text: readFileSync(path.join('content', name), 'utf8') }));
 
-// One reading of the draft beside the world, which both the per-line pass and the whole-file verdict are about. A draft stands in the world it declares as well as in the one already loaded, so an id it declares on one line is declared for every other line that names it; a draft the engine will not take is not in that world at all, and then nothing it declares is known.
+// One reading of the draft beside the world, which both the per-line pass and the whole-file verdict are about. A draft stands in the world it declares as well as in the one already loaded, so an id it declares on one line is declared for every other line that names it; a draft the engine will not take is not in that world at all, and then nothing it declares is known. A draft that is a version of a module already loaded takes that module's place in the world rather than standing beside it, since both answers an author wants are about the world their edit would make.
 export interface Reading {
   known: Addressed[];
   said: readonly ModuleDiagnostic[];
@@ -41,24 +44,44 @@ export interface Reading {
 }
 
 export function reading(file: string, text: string, world: readonly ModuleSource[]): Reading {
-  const { source, supplied } = draftModule(file, text, world);
-  const loaded = loadUniverseWithDiagnostics([...world, source]);
+  const declared = moduleDeclaredIn(text);
+  const beside = world.filter((each) => declared === null || moduleDeclaredIn(each.text) !== declared);
+  const replaced = declared !== null && beside.length < world.length;
+  const { source, supplied } = draftModule(file, text, beside);
+  const loaded = loadUniverseWithDiagnostics([...beside, source]);
   return {
     known: declaredBy(loaded.registry),
     said: loaded.diagnostics,
-    read: supplied ? `read as # info ${source.name} standing on everything already loaded, since the file declares no module of its own` : 'read as the module it declares',
+    read: supplied
+      ? `read as # info ${source.name} standing on everything already loaded, since the file declares no module of its own`
+      : replaced
+        ? `read as the module it declares, in place of the ${declared} that already ships`
+        : 'read as the module it declares',
     stood: loaded.diagnostics.length === 0,
   };
 }
 
 const DECLARES_A_MODULE = /^#[ \t]+info\b/m;
 
+// A module the engine will not name, which is still a module the draft has declared: nothing that ships is called this, so such a draft stands beside the world rather than in place of anything in it, and the loader says what is wrong with it.
+const UNNAMED = '';
+
+// Which module a text is a version of, or null where it is none. A module is which module it is by the id its own `# info` names and not by where its file sits, so a draft declaring `# info tulsa` is a new tulsa whether it is `content/tulsa.dsl`, a copy under another name, or a scratch file no path comparison would ever match. The heading is read with the grammar's own splitter, so a draft broken further down still says which module it is.
+function moduleDeclaredIn(text: string): string | null {
+  try {
+    const info = splitSections(text).find((section) => section.kind === 'info');
+    return info === undefined ? null : (info.id ?? UNNAMED);
+  } catch {
+    return DECLARES_A_MODULE.test(text) ? UNNAMED : null;
+  }
+}
+
 const slug = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'draft';
 
 // Ids are kept apart by the module that owns them, so the engine will not take a file that declares none. A draft that has not said which module it is is read as one of its own, standing on everything already loaded.
 export function draftModule(file: string, text: string, world: readonly ModuleSource[]): { source: ModuleSource; supplied: boolean } {
   const id = slug(file);
-  if (DECLARES_A_MODULE.test(text)) return { source: { name: id, text }, supplied: false };
+  if (moduleDeclaredIn(text) !== null) return { source: { name: id, text }, supplied: false };
   const loaded = loadUniverseWithDiagnostics(world).loadedModules;
   const head = [`# info ${id}`, 'version: 0.0.1', ...(loaded.length === 0 ? [] : ['dependencies:', ...loaded.map((each) => `  ${each}`)]), ''];
   return { source: { name: id, text: [...head, text].join('\n') }, supplied: true };
