@@ -271,7 +271,10 @@ export function App({
                 if (typeof navigator !== 'undefined') void navigator.clipboard?.writeText(driver.playtest.written());
                 driver.transient.play('note', String(words('playtest-copied')));
               }}
-              onStop={driver.playtest.stop}
+              onStop={() => {
+                const filing = driver.playtest.stop();
+                driver.transient.play('note', String(filing.filed ? words('playtest-filed', { at: localizer.identifier(filing.at) }) : words('playtest-unfiled', { because: localizer.identifier(filing.because) })));
+              }}
             />
           )}
           {snapshot.problems.length > 0 ? (

@@ -33,6 +33,9 @@ export interface Recorder {
   // The run being recorded, or null when none is. Holding one is the whole of being in playtest
   // mode; a second flag beside it would be the thing that could disagree with it.
   run(): RecordedRun | null;
+  // The run together with the saved game it walks forward from, which is what filing one needs and
+  // what drawing one does not.
+  kept(): KeptRun | null;
   // The saved game the run walks forward from, taken when recording starts rather than when the
   // session opened: an author who plays twenty turns before starting a run means them.
   start(from: string): void;
@@ -74,6 +77,7 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
 
   return {
     run: () => held?.run ?? null,
+    kept: () => held,
     start: (from) => {
       held = { run: { id: runId(header().at), log: [] }, from };
       keep();

@@ -65,6 +65,8 @@ export const LABELS = {
   'playtest-discard': 'engine.playtest.discard',
   'playtest-copy': 'engine.playtest.copy',
   'playtest-copied': 'engine.playtest.copied',
+  'playtest-filed': 'engine.playtest.filed',
+  'playtest-unfiled': 'engine.playtest.unfiled',
   'playtest-stop': 'engine.playtest.stop',
   replay: 'engine.replay',
   'replay-of': 'engine.replay.of',

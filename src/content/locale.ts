@@ -198,6 +198,8 @@ export const ENGINE_KEYS = [
   'engine.playtest.discard',
   'engine.playtest.copy',
   'engine.playtest.copied',
+  'engine.playtest.filed',
+  'engine.playtest.unfiled',
   'engine.playtest.stop',
   'engine.playtest.about',
   'engine.playtest.note',

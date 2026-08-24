@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, runId, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, runId, serializeRun, startSaveId, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { SAVE_VERSION } from '../runtime/save';
+import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { qualify } from '../content/namespace';
 import { loadInEnglish } from '../content/engineLocale';
 import { createGameState } from '../runtime/runtime';
 import { runTest } from '../runtime/session';
-import { memoryDriver } from '../runtime/store';
+import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { slotStore } from '../runtime/store';
 import { engineLocale } from '../content/engineLocale';
 import { browserSlots } from './browserStore';
@@ -163,7 +166,15 @@ describe('a run an author played in the app', () => {
     ].join('\n'),
   };
 
-  const playing = (): Driver => createDriver([engineLocale(), WORKSHOP], { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined, now: () => Date.parse(PLAYED.at) });
+  const playingWith = (slots: SlotDriver): Driver => createDriver([engineLocale(), WORKSHOP], { slots, ticker: () => () => undefined, now: () => Date.parse(PLAYED.at) });
+
+  const playing = (): Driver => playingWith(browserSlots(() => pageStorage()));
+
+  const said = (driver: Driver): string =>
+    driver
+      .snapshot()
+      .transcript.entries.map((entry) => String(entry.text))
+      .join('\n');
 
   it('holds nothing until the author starts one, so an ordinary session records nothing', () => {
     const driver = playing();
@@ -225,6 +236,55 @@ describe('a run an author played in the app', () => {
     expect(driver.snapshot().playtest?.log).toHaveLength(1);
     expect(driver.playtest.written()).toContain('use: entity.workshop.lathe.examine');
     expect(driver.playtest.written().split('\n')).not.toContain('1');
+  });
+
+  // The deliverable the owner asked for: stop recording, reload, run through what you just did.
+  it('lands in the game when the author stops it, so a reload finds the run in the registry', () => {
+    const slots = memoryDriver();
+    const driver = playingWith(slots);
+    driver.playtest.start();
+    driver.send('use:entity.workshop.lathe.examine');
+
+    const filing = driver.playtest.stop();
+    if (!filing.filed) throw new Error(filing.because);
+
+    expect(filing.at).toBe(qualify(LOCAL_CHANGES_MODULE_ID, runId(PLAYED.at)));
+    expect(driver.localChanges()).toContain(`# save ${startSaveId(runId(PLAYED.at))}`);
+    expect(driver.localChanges()).toContain(`# test ${runId(PLAYED.at)}`);
+    // Only a filed run clears the slot, and this one filed.
+    expect(driver.snapshot().playtest).toBeNull();
+
+    const holds = (each: Driver): boolean => each.declared().some((declared) => declared.kind === 'test' && declared.address === filing.at);
+    expect(holds(driver)).toBe(true);
+    expect(holds(playingWith(slots))).toBe(true);
+  });
+
+  it('refuses a run the game could not be left holding, says why, and goes on recording it', () => {
+    const driver = playingWith(memoryDriver());
+    driver.playtest.start();
+    // A refused line is written as what was tried, so a run that reached for a location nobody
+    // declared is a run whose `# test` names one — and the module would not load with it in.
+    driver.send('travel:nowhere-at-all');
+
+    const filing = driver.playtest.stop();
+    expect(filing.filed).toBe(false);
+    expect(driver.localChanges() ?? '').not.toContain(runId(PLAYED.at));
+    expect(filing.filed ? '' : filing.because).toContain('nowhere-at-all');
+    expect(said(driver)).toContain('nowhere-at-all');
+
+    driver.send('use:entity.workshop.lathe.examine');
+    expect(turnsPlayed(driver.snapshot().playtest?.log ?? [])).toBe(2);
+  });
+
+  it('refuses a run whose starting save this build cannot read, since nothing here migrates one', () => {
+    const slots = memoryDriver();
+    slotStore(slots, () => 0).write(PLAYTEST_SLOT, serializeRun({ run: { id: runId(PLAYED.at), log: [] }, from: `{"version":${SAVE_VERSION - 1}}` }));
+    const driver = playingWith(slots);
+
+    const filing = driver.playtest.stop();
+    expect(filing.filed ? '' : filing.because).toContain(`expected ${SAVE_VERSION}`);
+    expect(driver.localChanges() ?? '').not.toContain(runId(PLAYED.at));
+    expect(driver.snapshot().playtest).not.toBeNull();
   });
 
   it('carries the author’s own words on the turn they were about', () => {
