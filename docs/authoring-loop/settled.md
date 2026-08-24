@@ -533,25 +533,66 @@ preference, and a 932-token prefix cached nothing at all.
 is no branch on which prompt was chosen, and no branch on whether a save was
 loaded. `scripts/playbot.test.ts` asserts it.
 
-**An author's run in the app and the model's run are one shape, and it has one
-home.** `src/runtime/runLog.ts` declares what a turn records — the line, whether the
-engine took it, what it answered with, and the four things its player says about it
-(`note`, `expected`, `confusion`, `blocked`). That list is one declaration: the
-reply schema the model is held to, the parser that reads a reply, the described
-entry and the questions the app puts to an author all derive from it, so a fifth
-field is one entry there. The playbot's *prompt* deliberately does not derive — it
-is a page of prose tuned for a model, not a form label — and a claim in
-`scripts/playbot.test.ts` fails until the prose for a new field is written.
+**A recorded run is a `# test`, and that is its only written form.** Both harnesses
+— the app's bar and `runPlaybot` — hand back a `KeptRun`, and `runAsSections` in
+`src/runtime/runLog.ts` writes it as the two sections that replay it: the `# save`
+it walks forward from and the `# test` that walks it. There is no prose rendering
+of a run any more. `describeEntry` survives only for the playbot's own journal
+window, which is the model's in-run memory and not a record anybody keeps.
+
+**A `# test` says what its player thought, where they went, and what bounced.**
+`note:`, `expected:`, `confusion:` and `blocked:` are derived from `NOTE_FIELDS`,
+which lives in `src/content/sections/test.ts` — the kind's own file — because
+content cannot import runtime. Add a fifth field there and the grammar, the oracle,
+the app's sheet and the model's reply schema all gain it with nothing else edited.
+The playbot's *prompt* deliberately does not derive — it is a page of prose tuned
+for a model, not a form label — and a claim in `scripts/playbot.test.ts` fails
+until the prose for a new field is written. `page: <layer>/<subpage>` is where in
+the app the player went, which the engine has no pages to honour and passes over.
+
+**`refused` says the line above it bounced, and it is a claim like any other.**
+Most recorded runs are failed runs, and that does not make them a different kind of
+thing: running a `# test` reports where the replay **diverged from the record**,
+and a corpus proof is the case where that report must be empty. A refusal no line
+claims fails exactly as it always did; a line the record marks `refused` which now
+*takes* fails too, and that is how an author sees a fix land. A `refused` standing
+under nothing, under a note or under a page move is refused **at load** — the
+sentence the editing page shows beside the line is literally the string the engine
+refuses one with, which `dsl.test.ts` and `completion.test.ts` require of every
+line a kind writes out.
+
+**There is one walk over a test's steps.** `testSteps` flattens `run:` where it
+stands and refuses a cycle once; `walkTest` walks a range of the result against a
+session. `runTest` is those two and the modal check, and the app's replay is the
+same two — so a replay cannot step a test differently from the way the suite runs
+it. `refused` is read off the whole record rather than off the range, so a range
+ending between a line and its mark still knows the mark is there.
+
+**A replay is a function of one cursor.** The game state follows it, the page of
+the app follows it (`pageAt` in `src/ui/replay.ts`), and what has been said follows
+it. Scrubbing backwards starts the session over and walks forward again rather than
+undoing anything, so the world at a step is the same world however the cursor
+arrived. Forward is walked a step at a time, or every step would say everything the
+run had said so far.
 
 **Recording a playtest in the app is holding a run, and nothing else.** There is no
 second flag saying the mode is on: the run lives in a slot, so a reload lands back
-in the sitting, and stopping drops it. A turn's answer is the transcript the driver
-already writes rather than a second rendering beside it, which is how a live
-action's ending lines reach the turn that began it. The run comes out through the
-clipboard and through the `playtest` test-harness surface, in the same words
-`describeEntry` gives a playbot run. The recorder is the app's counterpart of
-`runPlaybot` and lives at the same level — in `src/ui/playtest.ts`, not in
+in the sitting. The saved game a run walks forward from is taken when recording
+**starts**, not when the session opened — an author who plays twenty turns before
+pressing start meant those twenty turns. The recorder is the app's counterpart of
+`runPlaybot` and lives at the same level, in `src/ui/playtest.ts`, not in
 `CommandContext`, because the playbot does not put its log there either.
+
+**Stopping a run files it into the game.** It goes through the one load-and-adopt
+path `/dsl` uses (`fileRun` in `src/runtime/runFiling.ts`), so the `# test` is in
+the live registry at once and a reload finds it too — no reopen, which would throw
+away the session the author was just playing. Filing lives in the runtime rather
+than the UI because two derived guards say so: no `src/ui` module may name an
+export of `localChanges`, and every `save.store` reach in the driver must be
+exercised for refusal. A run whose starting save this build cannot read is refused
+before anything is written — nothing here migrates one — and a refused run is said
+and **goes on being recorded**, because the author who cannot land one has not
+stopped wanting it.
 
 **A run that stops early with honest notes is a success.** The run's product is the
 player's own `expected` and `confusion`, not the moves — a run recording only moves

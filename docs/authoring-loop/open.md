@@ -15,33 +15,19 @@ without evidence is a hunch and does not belong here yet.
 
 Everything under this heading is the owner's, and the order is theirs.
 
-**1. A recorded run should be a `# test` section.** Ruled by the owner after the
-first run anybody played: *"Playtests have a lot of noise. It would be cool if the
-output was literally a test section. Including GUI navigation and everything. All
-we would need to add to a test is some kind of line which is the note / expected /
-confusion / blocked."* And: *"Can we regenerate the path the player took into a
-test that I can run and watch happen in real time so I don't have to press the same
-mechanical buttons again and again to confirm behavior?"*
+**1. A playtest is not marked reviewed anywhere.** Asked for by the owner beside
+item 2: *"Need to have a way to mark a playtest as reviewed."* A run now files
+itself into `local-changes` as a `# test` when it is stopped, so the runs pile up
+with nothing saying which ones somebody has already read the findings out of.
+`content/reviewed.tsv` does this for the writing and is keyed by locale key, which
+is the wrong key for a run. *Closes when:* an author can see, of the runs standing
+in `local-changes`, which they have been through.
 
-Most of the mechanism is already here and the next session should not rediscover
-it. `CommandContext.recorder` already holds every line a session ran in canonical
-directive form plus the save it started from, and `/create-test` and
-`/create-valid-test` already write a `# test` (and a `# save`, and an `expect:`)
-out of one — the app's driver builds a recorder like every other. So a run today is
-recorded **twice**: once as directives that replay, once as the run log an author
-reads. Those are one fact and should be one record. *Closes when:* the playtest
-bar's copy hands over a `# test` an author can paste into `content/` and run, with
-their own note / expected / confusion / blocked on the turn it was about, and with
-a page move written as a line the replay honours.
-
-Two things that fall out of it and are not decided:
-
-- **A `# test` has no line for what a player thought.** It is the one thing the
-  format is missing, and it is what makes the run a finding list rather than a
-  script. It has to be a body line no kind's grammar holds, the way `DEBUG` is.
-- **Watching a replay happen** wants a driver that feeds a `# test`'s lines at a
-  visible cadence. `npm run play` runs one with `/test` and `npm run probe --
-  --test <id>` runs one in about a second; neither is watchable in the app.
+**Nothing ever removes a filed run.** Each stopped run mints its own id from the
+clock, so `upsertLocalSection` never replaces one and `local-changes` grows by two
+sections per playtest, forever. An author who plays daily carries every run they
+have ever played into every load. *Closes when:* a run can be dropped, or filing
+prunes.
 
 **2. The author's own playtest, and the list of problems it produces.** The first
 one is `.planning/yonatan-playtests/`. Its findings are under *For the human review
@@ -310,8 +296,25 @@ which is where twelve tests used to fail. *Closes when:* that run is taken.
 every route reads its clock and worker count from there. The clock is true now; the
 worker count is still unset and the comment still claims it.
 
-**A GUI wiring line is untested and wants the author's eye** — the two identity rows
-at the top of the Stats page, in `App.tsx`.
+**Two GUI wiring lines are untested and want the author's eye** — the two identity
+rows at the top of the Stats page, and the cadence a running replay steps at.
+Everything the replay decides is proved (`src/ui/replay.test.ts`, and the cursor
+through the driver in `src/ui/playtest.test.ts`); what nobody has watched is the
+tick itself, the bar, and whether 0.3s is the right default once a run with a long
+stretch of `page:` moves is played back.
+
+**`/create-test` still assembles its own `# save` + `# test` pair.** `runAsSections`
+is the one writer everywhere else — the app's filing and the playbot both go
+through it — and `buildCreateTest` cannot, because `runLog.ts` imports
+`type CommandResult` from `command.ts` and the reverse import closes a cycle;
+measured, `npm run layer-check` exits 1 on even the minimal version. What the two
+writers actually disagree about is one fact, the `<id>-start` naming, spelled in
+both. *Closes when:* the cycle is broken — `outcomeOf` and `refusedLine` moving down
+into `command.ts`, where a private `refusedLine` already exists — or that naming
+moves somewhere both can read. Two further things would still need answering:
+`/create-valid-test` appends an `expect: <id>-end` and a second `# save` that
+`runAsSections` has nowhere to put, and a history already opening with `load:`
+deliberately emits no start save.
 
 ## Left by the core/tulsa split
 
