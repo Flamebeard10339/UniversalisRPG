@@ -12,8 +12,8 @@ import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, outcomeOf, turnRecord, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
-import { adoptRegistry, loadSaved, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, outcomeOf, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
+import { adoptRegistry, loadSaved, serializeSession, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
@@ -357,7 +357,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error, notes: NO_NOTES };
 
   const result = runLine(deps.ctx, parsed.reply.line);
-  return turnRecord(deps.turn, parsed.reply.line, outcomeOf(result), answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
+  return turnRecord(deps.turn, parsed.reply.line, outcomeOf(result), result.recorded, answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
 }
 
 export interface PlaybotOptions {
@@ -367,6 +367,9 @@ export interface PlaybotOptions {
   readonly mode: PlaybotMode;
   readonly turns: number;
   readonly write: (line: string) => void;
+  // When the run is played, which names the `# test` it comes back as. Passed in rather than read
+  // off a clock here, so the caller owns the one instant the whole run is filed under.
+  readonly at: string;
 }
 
 // A player that says it is stuck is believed at once. A player that does not say so is still cut
@@ -382,9 +385,13 @@ function stoppedBy(log: readonly RunLogEntry[]): string | null {
   return `${REFUSALS_BEFORE_STOPPING} turns in a row were refused, the last of them: ${tail[tail.length - 1].detail}`;
 }
 
-export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]> {
+// The run and the save it started from, which is what the app's own recorder keeps too: a bot run
+// and an author's run are one kind of thing and come back written the same way.
+export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
   const system = systemPromptFor(options.mode);
   const ctx = newContext(options.session, view(options.session));
+  const from = serializeSession(options.session);
+  const id = runId(options.at);
   const log: RunLogEntry[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {
     const entry = await runTurn({ ctx, read: options.read, client: options.client, system, log, turn, report: options.write });
@@ -394,10 +401,10 @@ export async function runPlaybot(options: PlaybotOptions): Promise<RunLogEntry[]
     const stopping = stoppedBy(log);
     if (stopping !== null) {
       options.write(`run ended after turn ${turn}: ${stopping}`);
-      return log;
+      return { run: { id, log }, from };
     }
   }
-  return log;
+  return { run: { id, log }, from };
 }
 
 const REPLY_KEYS = ['line', ...NOTE_FIELDS.map((field) => field.name)];
@@ -596,8 +603,15 @@ async function main(): Promise<void> {
   for (const warning of opened.warnings) console.error(warning.message);
 
   const client = createSdkModelClient(isolatedCwd());
-  const log = await runPlaybot({ session: opened.session, read, client, mode: args.mode, turns: args.turns, write: (line) => console.log(line) });
-  process.exitCode = log.some((entry) => entry.outcome === 'applied' || entry.outcome === 'refused') ? 0 : 1;
+  const at = new Date().toISOString();
+  const kept = await runPlaybot({ session: opened.session, read, client, mode: args.mode, turns: args.turns, at, write: (line) => console.log(line) });
+
+  // The lines above are the run happening; this is the run. Paste it into a module and it replays,
+  // notes and refusals and all — which is the only reason to write a run down rather than read it.
+  console.log('');
+  for (const block of runAsSections(kept, { at, built: 'this working tree' })) console.log(`${block.join('\n')}\n`);
+
+  process.exitCode = kept.run.log.some((entry) => entry.outcome === 'applied' || entry.outcome === 'refused') ? 0 : 1;
 }
 
 const isEntryPoint = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;

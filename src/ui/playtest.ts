@@ -1,4 +1,4 @@
-import { describeRun, isPlayed, type RunHeader, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, serializeRun, turnRecord, type RunLogEntry, type RunNotes, type TurnOutcome } from '../runtime/runLog';
+import { runAsSections, isPlayed, type KeptRun, type RecordedRun, type RunHeader, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, runId, serializeRun, turnRecord, type RunLogEntry, type RunNotes, type TurnOutcome } from '../runtime/runLog';
 import type { SlotStore } from '../runtime/store';
 
 // The app's own end of the playtest loop, and the counterpart of runPlaybot: it holds the run,
@@ -32,64 +32,69 @@ export const turnsPlayed = (log: readonly RunLogEntry[]): number => log.length;
 export interface Recorder {
   // The run being recorded, or null when none is. Holding one is the whole of being in playtest
   // mode; a second flag beside it would be the thing that could disagree with it.
-  run(): readonly RunLogEntry[] | null;
-  start(): void;
+  run(): RecordedRun | null;
+  // The saved game the run walks forward from, taken when recording starts rather than when the
+  // session opened: an author who plays twenty turns before starting a run means them.
+  start(from: string): void;
   stop(): void;
   // What the player picked, and whether the engine took it. What it answered with is not recorded:
   // the author read it on the screen it was said on.
-  opened(line: string, outcome: TurnOutcome): void;
+  opened(line: string, outcome: TurnOutcome, directives: readonly string[]): void;
   // Where in the app the player went, which the engine never hears about and which they may still
   // have something to say about.
   moved(where: string): void;
   attach(turn: number, notes: RunNotes): void;
+  // The run as the `# test` section that replays it, under the name it was minted with.
   written(): string;
 }
 
 export function createRecorder(store: SlotStore, complain: (text: string) => void, header: () => RunHeader): Recorder {
-  let log: RunLogEntry[] | null = null;
+  let held: KeptRun | null = null;
 
   try {
-    log = parseRun(store.read(PLAYTEST_SLOT)?.payload ?? null);
+    held = parseRun(store.read(PLAYTEST_SLOT)?.payload ?? null);
   } catch {
-    log = null;
+    held = null;
   }
 
   const keep = (): void => {
     try {
-      if (log === null) store.remove(PLAYTEST_SLOT);
-      else store.write(PLAYTEST_SLOT, serializeRun(log));
+      if (held === null) store.remove(PLAYTEST_SLOT);
+      else store.write(PLAYTEST_SLOT, serializeRun(held));
     } catch (error) {
       complain(`the playtest run could not be kept: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
+  const turning = (next: (log: readonly RunLogEntry[]) => readonly RunLogEntry[]): void => {
+    if (held === null) return;
+    held = { ...held, run: { ...held.run, log: next(held.run.log) } };
+    keep();
+  };
+
   return {
-    run: () => log,
-    start: () => {
-      log = [];
+    run: () => held?.run ?? null,
+    start: (from) => {
+      held = { run: { id: runId(header().at), log: [] }, from };
       keep();
     },
     stop: () => {
-      log = null;
+      held = null;
       keep();
     },
-    opened: (line, outcome) => {
-      if (log === null) return;
-      log = [...log, turnRecord(log.length + 1, line, outcome, null)];
-      keep();
-    },
-    moved: (where) => {
-      if (log === null) return;
-      const open = log[log.length - 1];
-      if (open !== undefined && !isPlayed(open) && open.outcome === 'moved' && open.detail === where) return;
-      log = [...log, { turn: log.length + 1, outcome: 'moved', detail: where, notes: emptyNotes() }];
-      keep();
-    },
-    attach: (turn, notes) => {
-      if (log === null) return;
-      log = attached(log, turn, notes);
-      keep();
-    },
-    written: () => (log === null ? '' : describeRun(log, header())),
+    opened: (line, outcome, directives) => turning((log) => [...log, turnRecord(log.length + 1, line, outcome, directives, null)]),
+    moved: (where) =>
+      turning((log) => {
+        const open = log[log.length - 1];
+        if (open !== undefined && !isPlayed(open) && open.outcome === 'moved' && open.detail === where) return log;
+        return [...log, { turn: log.length + 1, outcome: 'moved', detail: where, notes: emptyNotes() }];
+      }),
+    attach: (turn, notes) => turning((log) => attached(log, turn, notes)),
+    written: () =>
+      held === null
+        ? ''
+        : runAsSections(held, header())
+            .map((block) => block.join('\n'))
+            .join('\n\n'),
   };
 }

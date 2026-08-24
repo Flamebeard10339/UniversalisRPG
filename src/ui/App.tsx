@@ -190,7 +190,7 @@ export function App({
   };
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
-  useTestSurface('playtest', { log: snapshot.playtest, controls: driver.playtest });
+  useTestSurface('playtest', { run: snapshot.playtest, controls: driver.playtest });
   const wide = useWide();
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
@@ -263,7 +263,7 @@ export function App({
           <DevBanner dev={dev} words={words} />
           {snapshot.playtest === null ? null : (
             <PlaytestBar
-              log={snapshot.playtest}
+              run={snapshot.playtest}
               words={words}
               localizer={localizer}
               onAttach={driver.playtest.attach}

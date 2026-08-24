@@ -6,8 +6,9 @@ import type { Registry } from '../src/content/registry';
 import { moduleSource, shippedFiles } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/command';
-import { journalWindowText, NOTE_FIELDS, type RunLogEntry } from '../src/runtime/runLog';
-import { sessionLocalizer, sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
+import { journalWindowText, NOTE_FIELDS, runAsSections, runId, type RunLogEntry } from '../src/runtime/runLog';
+import { runTest, sessionLocalizer, sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
+import { createGameState } from '../src/runtime/runtime';
 import {
   DEFAULT_SOURCES,
   fileContentReader,
@@ -58,6 +59,8 @@ function wellBehavedClient(session: PlaySession): ModelClient {
   return { send: async () => wellBehavedReply(session) };
 }
 
+const PLAYED_AT = '2026-08-23T00:00:00.000Z';
+
 describe('playbot', () => {
   // c1: one loop, two prompts — below the point a prompt is selected, nothing branches on which
   // one was chosen. The two request bodies from one turn under each prompt differ only in system.
@@ -92,9 +95,24 @@ describe('playbot', () => {
   // this file never imports or calls the SDK's `query`.
   it('[c2] runPlaybot completes a run against a fake client with no network call', async () => {
     const session = startSession(played());
-    const log = await runPlaybot({ session, read: tutorialReader, client: wellBehavedClient(session), mode: 'author', turns: 5, write: () => {} });
-    expect(log).toHaveLength(5);
-    expect(log.every((entry) => entry.outcome === 'applied' || entry.outcome === 'refused')).toBe(true);
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client: wellBehavedClient(session), mode: 'author', turns: 5, at: PLAYED_AT, write: () => {} });
+    expect(recorded.log).toHaveLength(5);
+    expect(recorded.log.every((entry) => entry.outcome === 'applied' || entry.outcome === 'refused')).toBe(true);
+  });
+
+  // A bot run and an author's run are one kind of thing. What the model played comes back as the
+  // two sections that replay it against the same corpus, which is what makes a found bug watchable
+  // rather than a paragraph somebody has to re-enact by hand.
+  it('comes back as the # test that replays it, against the corpus it was played on', async () => {
+    const session = startSession(played());
+    const kept = await runPlaybot({ session, read: tutorialReader, client: wellBehavedClient(session), mode: 'author', turns: 6, at: PLAYED_AT, write: () => {} });
+
+    const filed = runAsSections(kept, { at: PLAYED_AT, built: 'a test' })
+      .map((block) => block.join('\n'))
+      .join('\n\n');
+    const registry = loadUniverse([...PLAYED_SOURCES, { name: 'the-run', text: ['# info the-run', 'version: 1.0.0', 'dependencies:', ...PLAYED_MODULES.map((each) => `  ${each}`), '', filed].join('\n') }]);
+
+    expect(runTest(`the-run.${runId(PLAYED_AT)}`, registry, createGameState())).toEqual({ passed: true });
   });
 
   // c3: billed input does not grow with turn count. The journal window is bounded, so the
@@ -108,6 +126,7 @@ describe('playbot', () => {
         turn: index + 1,
         outcome: 'applied' as const,
         line: 'travel:x',
+        directives: ['travel: x'],
         notes: { note: 'moving along the fixed loop', expected: '', confusion: '', blocked: '' },
         detail: 'arrived somewhere',
       }));
@@ -145,7 +164,7 @@ describe('playbot', () => {
         return wellBehavedReply(session);
       },
     };
-    await runPlaybot({ session, read: tutorialReader, client: recording, mode: 'bughunt', turns: 6, write: () => {} });
+    await runPlaybot({ session, read: tutorialReader, client: recording, mode: 'bughunt', turns: 6, at: PLAYED_AT, write: () => {} });
 
     expect(requests).toHaveLength(6);
     const distinctSystems = new Set(requests.map((request) => request.system));
@@ -207,10 +226,10 @@ describe('playbot', () => {
         return { line: '/look', note: 'looking', expected: '', confusion: '', blocked: asked === 2 ? 'every way on is refused' : '' };
       },
     };
-    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 20, write: (line) => lines.push(line) });
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 20, at: PLAYED_AT, write: (line) => lines.push(line) });
 
     expect(asked).toBe(2);
-    expect(log).toHaveLength(2);
+    expect(recorded.log).toHaveLength(2);
     expect(lines[lines.length - 1]).toContain('every way on is refused');
   });
 
@@ -224,10 +243,10 @@ describe('playbot', () => {
         return { line: 'no-such-choice-at-all', note: 'trying', expected: '', confusion: 'it keeps refusing', blocked: '' };
       },
     };
-    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 30, write: (line) => lines.push(line) });
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 30, at: PLAYED_AT, write: (line) => lines.push(line) });
 
     expect(asked).toBe(REFUSALS_BEFORE_STOPPING);
-    expect(log.every((entry) => entry.outcome === 'refused' || entry.outcome === 'invalid-reply')).toBe(true);
+    expect(recorded.log.every((entry) => entry.outcome === 'refused' || entry.outcome === 'invalid-reply')).toBe(true);
     expect(lines[lines.length - 1]).toContain('in a row were refused');
   });
 
@@ -273,9 +292,9 @@ describe('playbot', () => {
   it("[c9] a line naming a command outside this player's audience is refused before runLine runs it", async () => {
     const session = startSession(played());
     const client: ModelClient = { send: async () => ({ line: '/dsl location tulsa.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
-    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
-    expect(log[0].outcome).toBe('invalid-reply');
-    expect(log[0].detail).toMatch(/\/dsl is not a command this player may run/);
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, at: PLAYED_AT, write: () => {} });
+    expect(recorded.log[0].outcome).toBe('invalid-reply');
+    expect(recorded.log[0].detail).toMatch(/\/dsl is not a command this player may run/);
   });
 
   // c8, and the refusal half of c6: a reply naming a token the view did not offer ends the turn
@@ -284,9 +303,9 @@ describe('playbot', () => {
     const session = startSession(played());
     const client: ModelClient = { send: async () => ({ line: 'travel:somewhere-that-does-not-exist', note: 'n', expected: '', confusion: '' }) };
     const locationBefore = sessionStatus(session).location.id;
-    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
-    expect(log[0].outcome).toBe('refused');
-    expect(log[0].detail).toMatch(/unknown location/);
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, at: PLAYED_AT, write: () => {} });
+    expect(recorded.log[0].outcome).toBe('refused');
+    expect(recorded.log[0].detail).toMatch(/unknown location/);
     expect(sessionStatus(session).location.id).toBe(locationBefore);
   });
 
@@ -295,9 +314,9 @@ describe('playbot', () => {
   it('[c8] a structurally malformed reply is refused loudly', async () => {
     const session = startSession(played());
     const client: ModelClient = { send: async () => ({ line: 'whatever' }) };
-    const log = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, write: () => {} });
-    expect(log[0].outcome).toBe('invalid-reply');
-    expect(log[0].detail).toMatch(/line, note, expected, confusion/);
+    const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, at: PLAYED_AT, write: () => {} });
+    expect(recorded.log[0].outcome).toBe('invalid-reply');
+    expect(recorded.log[0].detail).toMatch(/line, note, expected, confusion/);
   });
 
   // c7: content edits land between turns without a restart, and a load that fails leaves the
@@ -361,13 +380,13 @@ adjacent:
       },
     };
 
-    const log = await runPlaybot({ session, read, client, mode: 'author', turns: 4, write: () => {} });
+    const { run: recorded } = await runPlaybot({ session, read, client, mode: 'author', turns: 4, at: PLAYED_AT, write: () => {} });
 
-    expect(log[0].outcome).toBe('applied');
-    expect(log[1].outcome).toBe('reload-failed');
-    expect(log[1].detail.length).toBeGreaterThan(0);
-    expect(log[2].outcome).toBe('applied');
-    expect(log[3].outcome).toBe('applied');
+    expect(recorded.log[0].outcome).toBe('applied');
+    expect(recorded.log[1].outcome).toBe('reload-failed');
+    expect(recorded.log[1].detail.length).toBeGreaterThan(0);
+    expect(recorded.log[2].outcome).toBe('applied');
+    expect(recorded.log[3].outcome).toBe('applied');
 
     // The model was never asked on the failed-load turn, so only three calls happened for four turns.
     expect(seenChoices).toHaveLength(3);
@@ -402,9 +421,9 @@ adjacent:
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const session = startSession(played());
       const written: string[] = [];
-      const log = await runPlaybot({ session, read: tutorialReader, client: wellBehavedClient(session), mode: 'author', turns: 8, write: (line) => written.push(line) });
+      const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client: wellBehavedClient(session), mode: 'author', turns: 8, at: PLAYED_AT, write: (line) => written.push(line) });
 
-      expect(written).toHaveLength(log.length);
+      expect(written).toHaveLength(recorded.log.length);
       expect(written.length).toBeGreaterThan(0);
       expect(logSpy).not.toHaveBeenCalled();
       expect(errorSpy).not.toHaveBeenCalled();

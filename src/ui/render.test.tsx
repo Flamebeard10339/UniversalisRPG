@@ -308,7 +308,7 @@ describe('what the shell puts on the screen', () => {
 
     expect(onScreen(recording, shellWord('playtest-attach')), 'the bar is drawn').toBe(true);
     expect(onScreen(recording, shellWord('playtest-turn', { turn: 1 })), 'it says which turn').toBe(true);
-    expect(driver.playtest.written()).toContain('turn 1 [applied] /look');
+    expect(driver.playtest.written().split('\n')[0]).toMatch(/^# save run-[a-z0-9-]+-start$/);
   });
 
   it('draws every choice the engine is offering', () => {

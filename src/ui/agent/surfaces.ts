@@ -12,7 +12,7 @@ import type { JournalRow } from '../journalPanel';
 import type { JournalEntry } from '../../runtime/session';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
-import { NOTE_FIELDS, type RunLogEntry, type RunNotes } from '../../runtime/runLog';
+import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../../runtime/runLog';
 import { emptyNotes, feedbackOn } from '../playtest';
 import type { PlaytestControls } from '../driver';
 
@@ -58,9 +58,10 @@ function notesFrom(value: unknown): RunNotes {
 }
 
 export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
-  const { log, controls } = held;
+  const { run, controls } = held;
+  const log = run?.log ?? null;
   return {
-    state: () => ({ recording: log !== null, turns: log?.length ?? 0, about: log === null ? null : feedbackOn(log), written: controls.written() }),
+    state: () => ({ recording: run !== null, id: run?.id ?? null, turns: log?.length ?? 0, about: log === null ? null : feedbackOn(log), written: controls.written() }),
     actions: {
       recording: (value) => (value === true ? controls.start() : controls.stop()),
       attach: (value) => {
@@ -341,7 +342,7 @@ export interface AgentSurfaces {
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
   quest: { entry: JournalEntry };
-  playtest: { log: readonly RunLogEntry[] | null; controls: PlaytestControls };
+  playtest: { run: RecordedRun | null; controls: PlaytestControls };
   edit: EditHeld;
 }
 

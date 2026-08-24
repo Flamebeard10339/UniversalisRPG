@@ -573,6 +573,9 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'open-modal':
     case 'submit-modal':
     case 'shop':
+    case 'note':
+    case 'refused':
+    case 'page':
       return null;
     default: {
       const unreached: never = directive;
@@ -653,6 +656,13 @@ function performDirective(session: PlaySession, directive: Directive): Directive
   switch (directive.kind) {
     case 'run':
       throw new RuntimeError('run: is handled by runTest, not applyDirective');
+    case 'refused':
+      throw new RuntimeError('refused is about the line before it, so runTest settles it and not applyDirective');
+    // What a player thought, and where in the app they went. The engine has no opinion about either
+    // and no pages to move between, so a run recorded through the app replays through a terminal.
+    case 'note':
+    case 'page':
+      return {};
     case 'talk': {
       const cursor = talk(directive.entity, registry, state);
       if (cursor) openModal(state, dialogueFrame(cursor));
@@ -785,6 +795,24 @@ export interface TestResult {
   failure?: string;
 }
 
+// A refusal is what a player is told they cannot do, whichever way the engine says it — an outcome
+// that failed or a RuntimeError thrown out of the middle of one. runLine already makes no
+// distinction, so a recording taken through the app and a test replaying it agree about which
+// lines bounced. Null is a line that took.
+function refusalFrom(session: PlaySession, directive: Directive): string | null {
+  try {
+    return applyDirective(session, directive).failure ?? null;
+  } catch (error) {
+    if (error instanceof RuntimeError) return error.message;
+    throw error;
+  }
+}
+
+const describeLast = (directives: readonly Directive[], at: number): string => {
+  const before = directives[at - 1];
+  return before === undefined ? 'nothing' : printDirective(before);
+};
+
 export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
   if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
   const test = registry.tests.get(testId);
@@ -792,15 +820,26 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
 
   const session = sessionOver(registry, state);
 
-  for (const directive of test.directives) {
+  // A refusal the record has not yet claimed. A test that says nothing about it is a test that
+  // expected the line to take, so it fails exactly as it always has; `refused` on the next line
+  // says the record expected it, and the run carries on.
+  let unclaimed: string | null = null;
+
+  for (const [at, directive] of test.directives.entries()) {
+    if (directive.kind === 'refused') {
+      if (unclaimed === null) return { passed: false, failure: `refused: ${describeLast(test.directives, at)} was not refused` };
+      unclaimed = null;
+      continue;
+    }
+    if (unclaimed !== null) return { passed: false, failure: unclaimed };
     if (directive.kind === 'run') {
       const result = runTest(directive.test, registry, state, [...stack, testId]);
       if (!result.passed) return result;
       continue;
     }
-    const result = applyDirective(session, directive);
-    if (result.failure) return { passed: false, failure: result.failure };
+    unclaimed = refusalFrom(session, directive);
   }
+  if (unclaimed !== null) return { passed: false, failure: unclaimed };
 
   const open = topModal(state);
   if (open) return { passed: false, failure: `modal left open: ${open.name}` };

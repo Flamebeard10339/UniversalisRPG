@@ -5,12 +5,36 @@ import { DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { hasBlock } from '../../grammar/structure';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
+import type { EngineKey } from '../locale';
 
 import { section } from './define';
 import { condition as visitCondition, put, putCarried, putLocation, type Visit } from '../refs';
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
 import { lastSegment } from '../../grammar/values';
+
+// What a player is asked about the turn they have just taken, in both harnesses that ask: the app's
+// own sheet and the playbot's prompt. Each one is a body line a run writes under the turn it was
+// about, so this list is the whole of what a recorded run can say beyond what it did.
+export interface NoteField {
+  // As the body line spells it, as an entry carries it, and as the playbot's JSON schema names it.
+  readonly name: 'note' | 'expected' | 'confusion' | 'blocked';
+  // What an author playing in the app is asked for it. The model is asked in the playbot's own
+  // prompt, at the length a prompt wants; the two agree about the field and not about the wording.
+  readonly asks: EngineKey;
+  // Whether a reply that does not carry it as a string is refused, and whether a turn that left it
+  // empty still says so where a run is read as prose.
+  readonly required: boolean;
+}
+
+export const NOTE_FIELDS: readonly NoteField[] = [
+  { name: 'note', asks: 'engine.playtest.note', required: true },
+  { name: 'expected', asks: 'engine.playtest.expected', required: true },
+  { name: 'confusion', asks: 'engine.playtest.confusion', required: true },
+  { name: 'blocked', asks: 'engine.playtest.blocked', required: false },
+];
+
+export type NoteName = NoteField['name'];
 
 export type Directive =
   | { kind: 'run'; test: string }
@@ -50,7 +74,10 @@ export type Directive =
   | { kind: 'until'; inner: Directive; until: Terminator }
   | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'setting'; setting: string; value: string }
-  | { kind: 'submit-modal'; key: string; value: string };
+  | { kind: 'submit-modal'; key: string; value: string }
+  | { kind: 'note'; field: NoteName; text: string }
+  | { kind: 'refused' }
+  | { kind: 'page'; layer: string; subpage: string };
 
 export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
 
@@ -91,6 +118,9 @@ const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const SETTING = /^setting:[ 	]*(?<setting>[a-z][a-z0-9-]*)[ 	]+(?<value>[a-z0-9][a-z0-9-]*)$/;
 const CANCEL = /^cancel$/;
+const NOTE = new RegExp(`^(?<field>${NOTE_FIELDS.map((field) => field.name).join('|')}):[ \\t]*(?<text>.*)$`);
+const REFUSED = /^refused$/;
+const PAGE = new RegExp(`^page:[ \\t]*(?<layer>${SLUG})/(?<subpage>${SLUG})$`);
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 const WAIT_OUT = /^wait:[ \t]*done$/;
 const UNTIL = /^(?<rest>.+)[ \t]+until[ \t]+(?<terminator>.+)$/;
@@ -222,6 +252,14 @@ export function parseDirectiveLine(text: string): Directive | null {
 
   const choose = CHOOSE.exec(text)?.groups;
   if (choose) return { kind: 'choose', text: choose.text };
+
+  const note = NOTE.exec(text)?.groups;
+  if (note) return { kind: 'note', field: note.field as NoteName, text: note.text };
+
+  if (REFUSED.test(text)) return { kind: 'refused' };
+
+  const page = PAGE.exec(text)?.groups;
+  if (page) return { kind: 'page', layer: page.layer, subpage: page.subpage };
 
   const until = UNTIL.exec(text)?.groups;
   if (until) {
@@ -384,6 +422,12 @@ export function printDirective(value: Directive): string {
       return `open-modal: ${value.modal}`;
     case 'submit-modal':
       return `submit-modal: ${value.key}=${value.value}`;
+    case 'note':
+      return `${value.field}: ${value.text}`;
+    case 'refused':
+      return 'refused';
+    case 'page':
+      return `page: ${value.layer}/${value.subpage}`;
     default: {
       const unreached: never = value;
       return unreached;
@@ -460,6 +504,21 @@ export const test = section<Test>()({
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: feed cluster-jewel with fervour' },
     ...MODAL_SCREENS.map((screen) => ({ form: `open-modal: ${screen}`, example: `open-modal: ${screen}` })),
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },
+    ...NOTE_FIELDS.map((field) => ({
+      form: `${field.name}: <what the player said about the turn above>`,
+      example: `${field.name}: the mirror answered, but nothing said what it cost`,
+      note: 'a recorded run says what its player thought at the turn they thought it; the engine does nothing with it',
+    })),
+    {
+      form: 'refused',
+      example: 'refused',
+      note: 'the line above was refused, and must be refused again — a recorded run keeps what did not work, and a replay where it now takes is how a fix is seen to have landed',
+    },
+    {
+      form: 'page: <layer>/<page>',
+      example: 'page: character/inventory',
+      note: 'where in the app the player went, which the engine has no pages to honour and passes over',
+    },
   ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# test requires an id', raw.span);
@@ -550,6 +609,9 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       visitDirective(value.inner, `${where} until:`, visit);
       if (value.until !== 'done') visitCondition(value.until, `${where} until:`, visit);
       return;
+    case 'note':
+    case 'refused':
+    case 'page':
     case 'unequip':
     case 'setting':
     case 'open-modal':

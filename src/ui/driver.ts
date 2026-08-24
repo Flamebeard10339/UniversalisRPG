@@ -7,7 +7,7 @@ import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
-import { outcomeOf, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { outcomeOf, type RecordedRun, type RunNotes } from '../runtime/runLog';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
@@ -38,7 +38,7 @@ export interface DriverSnapshot {
   speed: number;
   // The run being recorded, or null when none is. Holding one is the whole of being in playtest
   // mode; there is no second flag to disagree with it.
-  playtest: readonly RunLogEntry[] | null;
+  playtest: RecordedRun | null;
 }
 
 export interface PlaytestControls {
@@ -48,7 +48,7 @@ export interface PlaytestControls {
   // Where in the app the player went. The engine never hears about a page, and a player who has
   // just navigated somewhere is a player with something to say about having navigated there.
   moved(where: string): void;
-  // The run in the same words a playbot run is written in, for whoever reads it next.
+  // The run as the `# test` section that replays it, under the name it was minted with.
   written(): string;
 }
 
@@ -221,13 +221,13 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const chose = picked(line);
     const refusal = devRefusal(line, save.dev);
     if (refusal !== null) {
-      record.opened(chose, 'refused');
+      record.opened(chose, 'refused', []);
       complain(refusal);
       return;
     }
     if (running) close(true);
     const result = runLine(context, line);
-    record.opened(chose, outcomeOf(result));
+    record.opened(chose, outcomeOf(result), result.recorded);
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     if (result.live) {
       running = result.live;
@@ -275,7 +275,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     declared: () => declaredBy(context.session.registry),
     note: complain,
     playtest: {
-      start: () => changing(() => record.start()),
+      start: () => changing(() => record.start(serializeSession(context.session))),
       stop: () => changing(() => record.stop()),
       attach: (turn, notes) => changing(() => record.attach(turn, notes)),
       moved: (where) => changing(() => record.moved(where)),
