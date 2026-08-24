@@ -57,7 +57,10 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     send: (line) => void calls.push(`send:${line}`),
     playtest: {
       start: () => void calls.push('playtest:start'),
-      stop: () => void calls.push('playtest:stop'),
+      stop: () => {
+        calls.push('playtest:stop');
+        return { filed: true, at: 'local-changes.run', text: '' };
+      },
       attach: (turn) => void calls.push(`playtest:attach:${turn}`),
       moved: (where) => void calls.push(`playtest:moved:${where}`),
       written: () => '',

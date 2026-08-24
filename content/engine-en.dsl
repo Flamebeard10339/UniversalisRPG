@@ -205,6 +205,8 @@ engine.playtest.keep: Attach
 engine.playtest.discard: Never mind
 engine.playtest.copy: Copy the run
 engine.playtest.copied: The run is on the clipboard.
+engine.playtest.filed: The run is in the game as {at}. Reload to run through it again.
+engine.playtest.unfiled: The run could not be filed, and is still being recorded: {because}
 engine.playtest.stop: Stop recording
 engine.playtest.about: About {line}
 engine.playtest.note: What you were doing, and why

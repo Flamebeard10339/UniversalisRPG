@@ -79,7 +79,7 @@ function pagesDrawn(view: PlayView): Record<string, number> {
 
 const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
-const NODE = { position: 1, direction: asLocalized('ne'), turn: 1, line: asLocalized('travel:beach') };
+const NODE = { position: 1, direction: asLocalized('ne'), turn: 1, line: asLocalized('travel:beach'), at: asLocalized('local-changes.run-1'), because: asLocalized('nothing loaded') };
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 

@@ -63,7 +63,10 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
   return {
     state: () => ({ recording: run !== null, id: run?.id ?? null, turns: log?.length ?? 0, about: log === null ? null : feedbackOn(log), written: controls.written() }),
     actions: {
-      recording: (value) => (value === true ? controls.start() : controls.stop()),
+      recording: (value) => {
+        if (value === true) controls.start();
+        else controls.stop();
+      },
       attach: (value) => {
         if (log === null) throw new Error('no run is being recorded');
         const about = feedbackOn(log);

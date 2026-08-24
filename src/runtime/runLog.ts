@@ -119,15 +119,17 @@ function turnLines(entry: RunLogEntry): string[] {
 // own report.
 export function runAsTest(kept: KeptRun, header?: RunHeader): string[] {
   const { run } = kept;
-  return [`# test ${run.id}`, `load: ${startSaveId(run)}`, ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]), ...run.log.flatMap(turnLines)];
+  return [`# test ${run.id}`, `load: ${startSaveId(run.id)}`, ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]), ...run.log.flatMap(turnLines)];
 }
 
-const startSaveId = (run: RecordedRun): Answer => `${run.id}-start`;
+// The saved game a run walks forward from, under the run's own name. Every harness that writes a
+// run reads the name off this rather than spelling the suffix a second time.
+export const startSaveId = (run: string): Answer => `${run}-start`;
 
 // The two sections a recorded run is: where it started, and what was done from there. Every harness
 // that files a run — the app, the playbot, /create-test — writes these and not its own pair.
 export function runAsSections(kept: KeptRun, header?: RunHeader): string[][] {
-  return [[`# save ${startSaveId(kept.run)}`, kept.from], runAsTest(kept, header)];
+  return [[`# save ${startSaveId(kept.run.id)}`, kept.from], runAsTest(kept, header)];
 }
 
 export const outcomeOf = (result: CommandResult): TurnOutcome => (refusedLine(result) ? 'refused' : 'applied');

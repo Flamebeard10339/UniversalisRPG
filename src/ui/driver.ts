@@ -1,4 +1,5 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { qualify } from '../content/namespace';
 import type { Addressed } from '../content/completion';
 import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
@@ -7,7 +8,8 @@ import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
-import { outcomeOf, type RecordedRun, type RunNotes } from '../runtime/runLog';
+import { fileRun } from '../runtime/runFiling';
+import { outcomeOf, refusedLine, type RecordedRun, type RunHeader, type RunNotes } from '../runtime/runLog';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
@@ -17,6 +19,11 @@ import { createRecorder } from './playtest';
 import { createTransientChannel, type TransientChannel } from './transient';
 
 export const REMEDIES = ['clear-local', 'reopen'] as const;
+
+// Where a stopped run was filed, or why it could not be. Only a run that files clears the slot: the
+// author who cannot land one has not stopped wanting it, and dropping it here is the one loss
+// nothing else in the app could make good.
+export type Filing = { readonly filed: true; readonly at: string } | { readonly filed: false; readonly because: string };
 
 export type Remedy = (typeof REMEDIES)[number];
 
@@ -43,7 +50,10 @@ export interface DriverSnapshot {
 
 export interface PlaytestControls {
   start(): void;
-  stop(): void;
+  // Stopping files the run into the local changes, adopting them as `/dsl` does, so the `# test` is
+  // in the registry at once and a reload runs through what was just played. A run the game could
+  // not be left holding is refused, said, and still recorded afterwards.
+  stop(): Filing;
   attach(turn: number, notes: RunNotes): void;
   // Where in the app the player went. The engine never hears about a page, and a player who has
   // just navigated somewhere is a player with something to say about having navigated there.
@@ -111,9 +121,11 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const shipped = [...sources];
 
+  const header = (): RunHeader => ({ at: new Date(save.now()).toISOString(), built: typeof __BUILT_FROM__ === 'string' ? __BUILT_FROM__ : 'unknown' });
+
   // A run is read back out of its slot before anything else, so a reload lands mid-playtest with
   // what was already played rather than starting a second run beside it.
-  const record = createRecorder(save.store, (text) => complain(text), () => ({ at: new Date(save.now()).toISOString(), built: typeof __BUILT_FROM__ === 'string' ? __BUILT_FROM__ : 'unknown' }));
+  const record = createRecorder(save.store, (text) => complain(text), header);
 
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
@@ -249,6 +261,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
+  const fileAndStop = (): Filing => {
+    const kept = record.kept();
+    if (kept === null) return { filed: false, because: 'nothing is being recorded' };
+
+    const result = fileRun(context, kept, header());
+    current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
+    if (refusedLine(result)) {
+      publish();
+      return { filed: false, because: result.output.flatMap((output) => (output.kind === 'message' && output.words === 'tool' && output.tone === 'error' ? [output.text, ...(output.detail ?? [])] : [])).join(' ') };
+    }
+    changing(() => record.stop());
+    return { filed: true, at: qualify(LOCAL_CHANGES_MODULE_ID, kept.run.id) };
+  };
+
   const driver: Driver = {
     subscribe(listener) {
       listeners.add(listener);
@@ -276,7 +302,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     note: complain,
     playtest: {
       start: () => changing(() => record.start(serializeSession(context.session))),
-      stop: () => changing(() => record.stop()),
+      stop: fileAndStop,
       attach: (turn, notes) => changing(() => record.attach(turn, notes)),
       moved: (where) => changing(() => record.moved(where)),
       written: () => record.written(),

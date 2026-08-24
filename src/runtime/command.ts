@@ -225,7 +225,7 @@ function said(tone: MessageTone, text: Localized): CommandResult {
   return { output: [message(tone, text)], quit: false, recorded: [] };
 }
 
-function noted(tone: MessageTone, text: string, detail?: string[]): CommandResult {
+export function noted(tone: MessageTone, text: string, detail?: string[]): CommandResult {
   return { output: [note(tone, text, detail)], quit: false, recorded: [] };
 }
 
@@ -442,20 +442,30 @@ function localSourceNow(authoring: AuthoringContext): { read: true; text: string
   return { read: true, text };
 }
 
-function runSectionEdit(ctx: CommandContext, section: SectionArg): CommandResult {
+// Sections written straight into the local changes, upserted together and adopted once. Every
+// author-facing edit lands here — a section typed at `/dsl`, a run the app files when its author
+// stops recording — so nothing has a load-and-adopt path of its own.
+export function stageLocalSections(ctx: CommandContext, sections: readonly string[]): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
   try {
     const source = localSourceNow(authoring);
     if (!source.read) return source.refusal;
-    const edit = upsertLocalSection(source.text, authoring.dependencies, localSectionSource(section));
-    const verb = edit.replaced ? 'Replaced' : 'Staged';
-    return commitLocalChanges(ctx, authoring, edit.text, `${verb} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
+    let text = source.text;
+    const staged: string[] = [];
+    for (const section of sections) {
+      const edit = upsertLocalSection(text, authoring.dependencies, section);
+      text = edit.text;
+      staged.push(`${edit.replaced ? 'Replaced' : 'Staged'} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
+    }
+    return commitLocalChanges(ctx, authoring, text, staged.join(' '));
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
     return refused(error);
   }
 }
+
+const runSectionEdit = (ctx: CommandContext, section: SectionArg): CommandResult => stageLocalSections(ctx, [localSectionSource(section)]);
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
@@ -493,7 +503,7 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   }
 }
 
-function savedGameFromSerialized(serialized: string): ParsedSave | null {
+export function savedGameFromSerialized(serialized: string): ParsedSave | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(serialized);
