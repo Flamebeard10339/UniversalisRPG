@@ -108,3 +108,36 @@ describe('walking a test one step at a time', () => {
     }
   });
 });
+
+// A driver watching a run steps a little at a time, so that what each step said reaches the screen
+// on the step that said it. Walking a range has to land where walking the whole thing lands.
+describe('walking a range of a test', () => {
+  const world = (...lines: string[]) => loadInEnglish([WORLD, '', '# test recorded', ...lines].join('\n'));
+
+  it('lands where one walk of the whole record lands, walked a step at a time', () => {
+    const registry = world('goto: cove', 'goto: shore', 'goto: cove');
+    const steps = testSteps('recorded', registry);
+
+    const wholly = startSession(registry);
+    walkTest(wholly, steps);
+
+    const bitByBit = startSession(registry);
+    for (let at = 0; at < steps.length; at += 1) walkTest(bitByBit, steps, at + 1, at);
+
+    expect(view(bitByBit).location.id).toBe(view(wholly).location.id);
+  });
+
+  it('hands back only the steps of the range it was asked for', () => {
+    const registry = world('goto: cove', 'goto: shore', 'goto: cove');
+    const steps = testSteps('recorded', registry);
+    expect(walkTest(startSession(registry), steps, 3, 1).walked.map(printDirective)).toEqual(['goto: shore', 'goto: cove']);
+  });
+
+  // The mark is read off the whole record, not off the range, so a range ending between a line and
+  // its mark does not report the line as an unclaimed refusal.
+  it('knows a refusal is claimed even where the mark falls outside the range', () => {
+    const registry = world('choose: 0', 'refused', 'goto: cove');
+    const steps = testSteps('recorded', registry);
+    expect(walkTest(startSession(registry), steps, 1).failure).toBeNull();
+  });
+});

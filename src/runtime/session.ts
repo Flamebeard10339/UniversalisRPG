@@ -827,14 +827,17 @@ export interface Replayed {
   readonly failure: string | null;
 }
 
-// Walk a test's steps against a session as it stands, stopping after `upTo` of them or at the first
-// place the world stopped answering the way the record says it did. Going to step N means walking
-// from the start again, which is what makes a replay scrubbable in both directions without the
-// engine having to undo anything.
-export function walkTest(session: PlaySession, steps: readonly Directive[], upTo: number = steps.length): Replayed {
+// Walk `steps[from..upTo)` against a session as it stands, stopping at the first place the world
+// stopped answering the way the record says it does. A driver watching a run steps a little at a
+// time and hands back the range it has not walked yet; a driver scrubbing backwards starts a
+// session over and walks from nothing, which is why the engine never has to undo anything.
+// `refused` is read off the whole record rather than off the range, so a range ending between a
+// line and its mark still knows the mark is there.
+export function walkTest(session: PlaySession, steps: readonly Directive[], upTo: number = steps.length, from = 0): Replayed {
   const walked: Directive[] = [];
 
   for (const [at, directive] of steps.entries()) {
+    if (at < from) continue;
     if (at >= upTo) break;
     // Settled by the step it is about, one line above.
     if (directive.kind === 'refused') {
