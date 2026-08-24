@@ -24,9 +24,12 @@ import { SkillsPane } from './SkillsPane';
 import { XpOverlay } from './XpOverlay';
 import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
 import { ModalSheet } from './ModalSheet';
+import type { LabelId } from './labels';
 import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaytestBar } from './PlaytestBar';
+import { ReplayBar } from './ReplayBar';
+import { pageAt } from './replay';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
 import { carried, counted, identity, worn } from './sheet';
@@ -151,8 +154,21 @@ export function App({
 
   const page = shellState(where, dev, editing.commandLine);
   useEffect(() => {
-    if (snapshot.playtest !== null) driver.playtest.moved(`${page.layer}/${page.subpage}`);
-  }, [page.layer, page.subpage, snapshot.playtest === null]);
+    // A page the replay walked to is the record's own, not a move the author made, so it is not
+    // recorded back — a run watched while another is recording would otherwise write itself down.
+    if (snapshot.playtest !== null && snapshot.replay === null) driver.playtest.moved(`${page.layer}/${page.subpage}`);
+  }, [page.layer, page.subpage, snapshot.playtest === null, snapshot.replay === null]);
+
+  // Where the run was standing at this step. The page follows the cursor exactly as the game state
+  // does, so scrubbing back walks the app back with it.
+  const watched = snapshot.replay;
+  const standingOn = watched === null ? null : pageAt(watched.steps, watched.at);
+  useEffect(() => {
+    if (standingOn === null) return;
+    const layer = LAYERS.findIndex((each) => each.id === standingOn.layer);
+    if (layer < 0) return;
+    setWhere((held) => toSubpage(toLayer(held, layer), layer, standingOn.subpage as LabelId));
+  }, [standingOn?.layer, standingOn?.subpage]);
 
   const leaving = dismissal(view.modals);
   const leave = leaving ? () => driver.answer(leaving.key, leaving.value) : undefined;
@@ -191,6 +207,7 @@ export function App({
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
   useTestSurface('playtest', { run: snapshot.playtest, controls: driver.playtest });
+  useTestSurface('replay', { replay: snapshot.replay, controls: driver.replay });
   const wide = useWide();
 
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
@@ -275,6 +292,22 @@ export function App({
                 const filing = driver.playtest.stop();
                 driver.transient.play('note', String(filing.filed ? words('playtest-filed', { at: localizer.identifier(filing.at) }) : words('playtest-unfiled', { because: localizer.identifier(filing.because) })));
               }}
+            />
+          )}
+          {snapshot.replay === null ? null : (
+            <ReplayBar
+              test={snapshot.replay.test}
+              steps={snapshot.replay.steps}
+              at={snapshot.replay.at}
+              playing={snapshot.replay.playing}
+              delay={snapshot.replay.delay}
+              failure={snapshot.replay.failure}
+              words={words}
+              localizer={localizer}
+              onGoTo={driver.replay.at}
+              onPlaying={driver.replay.playing}
+              onDelay={driver.replay.every}
+              onClose={() => driver.replay.watching(null)}
             />
           )}
           {snapshot.problems.length > 0 ? (

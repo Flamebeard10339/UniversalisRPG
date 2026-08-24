@@ -14,7 +14,8 @@ import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../../runtime/runLog';
 import { emptyNotes, feedbackOn } from '../playtest';
-import type { PlaytestControls } from '../driver';
+import type { PlaytestControls, ReplayControls, ReplaySnapshot } from '../driver';
+import { replayLines } from '../replay';
 
 export function layerNamed(value: unknown): number {
   const at = LAYERS.findIndex((layer) => layer.id === value);
@@ -72,6 +73,27 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
         const about = feedbackOn(log);
         if (about === null) throw new Error('nothing has been played to attach a note to');
         controls.attach(about.turn, notesFrom(value));
+      },
+    },
+  };
+}
+
+// A run being watched, and the four ways of moving through it. What an agent reads back is what the
+// bar draws: the same lines, the same cursor, the same word on whether the record still holds.
+export function replaySurface(held: AgentSurfaces['replay']): TestSurface {
+  const { replay, controls } = held;
+  return {
+    state: () => (replay === null ? { watching: null } : { watching: replay.test, at: replay.at, playing: replay.playing, delay: replay.delay, failure: replay.failure, lines: replayLines(replay.steps) }),
+    actions: {
+      watching: (value) => controls.watching(value === null || value === false ? null : String(value)),
+      at: (value) => {
+        if (typeof value !== 'number') throw new Error('a step is a number');
+        controls.at(value);
+      },
+      playing: (value) => controls.playing(value === true),
+      every: (value) => {
+        if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) throw new Error('a delay is a number of seconds above nothing');
+        controls.every(value);
       },
     },
   };
@@ -346,6 +368,7 @@ export interface AgentSurfaces {
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
   quest: { entry: JournalEntry };
   playtest: { run: RecordedRun | null; controls: PlaytestControls };
+  replay: { replay: ReplaySnapshot | null; controls: ReplayControls };
   edit: EditHeld;
 }
 
@@ -357,5 +380,6 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   journal: (held) => journalSurface(held),
   quest: (held) => questSurface(held),
   playtest: (held) => playtestSurface(held),
+  replay: (held) => replaySurface(held),
   edit: (held) => editSurface(held),
 };

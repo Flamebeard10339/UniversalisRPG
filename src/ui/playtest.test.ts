@@ -12,6 +12,7 @@ import { engineLocale } from '../content/engineLocale';
 import { browserSlots } from './browserStore';
 import { pageStorage } from './agent/pageStorage';
 import { createDriver, type Driver } from './driver';
+import { printDirective } from '../content/sections/test';
 import { attached, createRecorder, edited, emptyNotes, feedbackOn, turnsPlayed } from './playtest';
 
 const took = 'applied' as const;
@@ -296,5 +297,86 @@ describe('a run an author played in the app', () => {
 
     expect(driver.playtest.written()).toContain('expected: to be able to fix the belt');
     expect(driver.playtest.written()).toContain('confusion: the lathe is described but does nothing');
+  });
+});
+
+// The loop closing: an author plays, stops, and watches back what they just did. The tick that
+// paces a running replay is the author's to look at; what is proved here is that the cursor puts
+// the world where the record says it was.
+describe('watching a filed run back', () => {
+  const WORKSHOP = {
+    name: 'workshop',
+    text: ['# info workshop', 'version: 1.0.0', '', '# location workshop', 'x: 0, y: 0', 'starting', 'entities:', '  lathe', '', '# location yard', 'x: 1, y: 0', 'adjacent:', '  workshop', '', '# entity lathe', 'title: Lathe', 'examine: A lathe, belt slack.'].join('\n'),
+  };
+
+  const played = (): Driver => {
+    const driver = createDriver([engineLocale(), WORKSHOP], { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined, now: () => Date.parse(PLAYED.at) });
+    driver.playtest.start();
+    driver.send('use:entity.workshop.lathe.examine');
+    driver.playtest.moved('character/inventory');
+    driver.send('goto: workshop.yard');
+    expect(driver.playtest.stop().filed).toBe(true);
+    return driver;
+  };
+
+  const filed = qualify(LOCAL_CHANGES_MODULE_ID, runId(PLAYED.at));
+
+  it('opens on the run standing at nothing, with every step it is made of', () => {
+    const driver = played();
+    driver.replay.watching(filed);
+
+    const watching = driver.snapshot().replay!;
+    expect(watching.test).toBe(filed);
+    expect(watching.at).toBe(0);
+    expect(watching.failure).toBeNull();
+    expect(watching.steps.map(printDirective)).toContain('goto: workshop.yard');
+  });
+
+  it('puts the world where the record says it was, one step at a time', () => {
+    const driver = played();
+    driver.replay.watching(filed);
+    const steps = driver.snapshot().replay!.steps;
+
+    driver.replay.at(steps.length);
+    expect(driver.snapshot().replay!.failure).toBeNull();
+    expect(driver.snapshot().view.location.id).toBe('workshop.yard');
+  });
+
+  // Scrubbing back walks forward from nothing rather than undoing anything, so the world at a step
+  // is the same world however the cursor arrived there.
+  it('lands in the same world scrubbing back to a step as walking to it', () => {
+    const driver = played();
+    driver.replay.watching(filed);
+    const steps = driver.snapshot().replay!.steps;
+
+    driver.replay.at(1);
+    const walkedTo = driver.snapshot().view.location.id;
+
+    driver.replay.at(steps.length);
+    driver.replay.at(1);
+    expect(driver.snapshot().view.location.id).toBe(walkedTo);
+    expect(driver.snapshot().replay!.at).toBe(1);
+  });
+
+  it('stops watching without stopping the world it left standing', () => {
+    const driver = played();
+    driver.replay.watching(filed);
+    driver.replay.at(driver.snapshot().replay!.steps.length);
+    driver.replay.watching(null);
+
+    expect(driver.snapshot().replay).toBeNull();
+    expect(driver.snapshot().view.location.id).toBe('workshop.yard');
+  });
+
+  it('says so rather than throwing when asked to watch a run nothing declares', () => {
+    const driver = played();
+    driver.replay.watching('workshop.no-such-run');
+    expect(driver.snapshot().replay).toBeNull();
+    expect(
+      driver
+        .snapshot()
+        .transcript.entries.map((entry) => String(entry.text))
+        .join(' '),
+    ).toContain('unknown test');
   });
 });

@@ -9,9 +9,12 @@ import { type AuthoringContext, createTicker, newContext, type CommandContext, t
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
 import { fileRun } from '../runtime/runFiling';
+import type { Answer } from '../runtime/localized';
+import type { Directive } from '../content/sections/test';
+import { advances, clamped, REPLAY_SPEED } from './replay';
 import { outcomeOf, refusedLine, type RecordedRun, type RunHeader, type RunNotes } from '../runtime/runLog';
 import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
-import { sessionLocalizer, serializeSession, view, type PlayView } from '../runtime/session';
+import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
@@ -35,6 +38,27 @@ function remediesFor(problems: readonly UniverseProblem[], ifCleared: () => read
   return cleared !== null && asRead(cleared) !== asRead(problems) ? ['clear-local', 'reopen'] : ['reopen'];
 }
 
+// A `# test` being watched happen: which one, what it is made of, how far the cursor has walked,
+// and where the record and the world parted. A replay is a function of that cursor — the state, the
+// page and what has been said all follow from it — which is why there is nothing else here.
+export interface ReplaySnapshot {
+  readonly test: Answer;
+  readonly steps: readonly Directive[];
+  readonly at: number;
+  readonly playing: boolean;
+  readonly delay: number;
+  readonly failure: string | null;
+}
+
+export interface ReplayControls {
+  // The test to watch, or null to stop watching. The world is left standing where the replay left
+  // it, since that is usually the thing the author opened one to look at.
+  watching(test: string | null): void;
+  at(step: number): void;
+  playing(on: boolean): void;
+  every(seconds: number): void;
+}
+
 export interface DriverSnapshot {
   view: PlayView;
   transcript: Transcript;
@@ -46,6 +70,8 @@ export interface DriverSnapshot {
   // The run being recorded, or null when none is. Holding one is the whole of being in playtest
   // mode; there is no second flag to disagree with it.
   playtest: RecordedRun | null;
+  // The run being watched, or null when none is.
+  replay: ReplaySnapshot | null;
 }
 
 export interface PlaytestControls {
@@ -82,6 +108,7 @@ export interface Driver {
   reopen(): void;
   clearLocalChanges(): void;
   playtest: PlaytestControls;
+  replay: ReplayControls;
 }
 
 export interface DriverOptions {
@@ -129,7 +156,10 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
-  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run() });
+  let replay: ReplaySnapshot | null = null;
+  let authoring!: AuthoringContext;
+
+  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest' | 'replay'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run(), replay });
 
   const readLocal = (): { text: string; complaints: CommandOutput[] } => {
     try {
@@ -151,7 +181,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const sources = local.text.trim() === '' ? shipped : [...shipped, localSource];
     const opened = openUniverse(sources, { save });
 
-    const authoring: AuthoringContext = {
+    authoring = {
       baseSources: shipped,
       dependencies: opened.modules.filter((id) => id !== LOCAL_CHANGES_MODULE_ID),
       localSource,
@@ -261,6 +291,63 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
+  // A session over the same world standing at the beginning. A replay scrubbing backwards walks
+  // forward from nothing rather than undoing anything, so this is what nothing is.
+  const restart = (): void => {
+    const session = startSession(context.session.registry);
+    context = newContext(session, view(session), { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } });
+  };
+
+  const goTo = (step: number): void => {
+    if (replay === null) return;
+    const target = clamped(step, replay.steps);
+
+    // Walking a step at a time is what lets each step say its own words. Going anywhere behind the
+    // cursor — or anywhere at all once the record and the world have parted — starts over.
+    const backwards = target < replay.at || replay.failure !== null;
+    if (backwards) restart();
+    const from = backwards ? 0 : replay.at;
+    const walked = walkTest(context.session, replay.steps, target, from);
+
+    context.view = view(context.session);
+    replay = { ...replay, at: from + walked.walked.length, failure: walked.failure };
+    if (!advances(replay)) replay = { ...replay, playing: false };
+    current = settled({
+      ...current,
+      view: context.view,
+      live: null,
+      transcript: appendOutputs(backwards ? emptyTranscript() : current.transcript, [{ kind: 'view', view: context.view, reread: false }]),
+    });
+    publish();
+  };
+
+  let sinceStep = 0;
+  let stopReplayTicking: (() => void) | null = null;
+
+  const stopReplayTicks = (): void => {
+    stopReplayTicking?.();
+    stopReplayTicking = null;
+    sinceStep = 0;
+  };
+
+  // A replay is watched, so it advances on the clock rather than as fast as the engine can settle
+  // the steps. It runs off the same ticker every other timed thing here does.
+  const replayTick = (elapsedMs: number): void => {
+    if (replay === null || !replay.playing) return;
+    sinceStep += elapsedMs;
+    if (sinceStep < replay.delay * 1000) return;
+    sinceStep = 0;
+    goTo(replay.at + 1);
+    if (replay === null || !replay.playing) stopReplayTicks();
+  };
+
+  const replaying = (next: (held: ReplaySnapshot) => ReplaySnapshot): void => {
+    if (replay === null) return;
+    replay = next(replay);
+    current = { ...current, replay };
+    publish();
+  };
+
   const fileAndStop = (): Filing => {
     const kept = record.kept();
     if (kept === null) return { filed: false, because: 'nothing is being recorded' };
@@ -300,6 +387,33 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     baseSources: () => shipped,
     declared: () => declaredBy(context.session.registry),
     note: complain,
+    replay: {
+      watching: (test) => {
+        stopReplayTicks();
+        if (test === null) {
+          replay = null;
+          current = { ...current, replay };
+          publish();
+          return;
+        }
+        try {
+          const steps = testSteps(test, context.session.registry);
+          restart();
+          replay = { test, steps, at: 0, playing: false, delay: REPLAY_SPEED, failure: null };
+          current = settled({ ...current, view: context.view, live: null, transcript: emptyTranscript() });
+          publish();
+        } catch (error) {
+          complain(because(error));
+        }
+      },
+      at: goTo,
+      playing: (on) => {
+        stopReplayTicks();
+        replaying((held) => ({ ...held, playing: on && advances(held) }));
+        if (replay?.playing === true) stopReplayTicking = ticker(replayTick);
+      },
+      every: (seconds) => replaying((held) => ({ ...held, delay: seconds })),
+    },
     playtest: {
       start: () => changing(() => record.start(serializeSession(context.session))),
       stop: fileAndStop,
