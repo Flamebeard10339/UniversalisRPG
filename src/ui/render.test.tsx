@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { localizerFor } from '../runtime/localized';
+import { localizerFor, type Params } from '../runtime/localized';
+import { parametersOf } from '../content/locale';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { leaves } from '../runtime/viewLeaves';
@@ -79,7 +80,13 @@ function pagesDrawn(view: PlayView): Record<string, number> {
 
 const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
-const NODE = { position: 1, direction: asLocalized('ne'), turn: 1, line: asLocalized('travel:beach') };
+// Every parameter any label takes, read off the labels themselves. A label added next month with a
+// parameter nobody here has heard of is still rendered, rather than throwing over a list that was
+// not grown to meet it.
+const SAID = loadInEnglish('');
+const NODE: Params = Object.fromEntries(
+  Object.values(LABELS).flatMap((key) => parametersOf(SAID.locales.english.get(key) ?? SAID.locales.base.get(key)?.text ?? '').map((name) => [name, asLocalized(name)])),
+);
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));
 

@@ -211,6 +211,17 @@ engine.playtest.note: What you were doing, and why
 engine.playtest.expected: Something you reached for and could not do
 engine.playtest.confusion: Anything unclear, contradictory or unfinished
 engine.playtest.blocked: Say why the run cannot go on, if it cannot
+engine.replay: Watch a run
+engine.replay.of: Replaying {test}
+engine.replay.step: Step {at} of {count}
+engine.replay.play: Play
+engine.replay.pause: Pause
+engine.replay.back: Back a step
+engine.replay.on: On a step
+engine.replay.every: Every {seconds}s
+engine.replay.parted: The run and the game have parted here: {because}
+engine.replay.done: The run has played out.
+engine.replay.close: Close
 engine.repl.place: {location} ({id})
 engine.repl.here: Here: {entities}
 engine.repl.clock: [time: {time}s]

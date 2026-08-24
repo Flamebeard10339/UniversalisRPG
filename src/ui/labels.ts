@@ -66,6 +66,17 @@ export const LABELS = {
   'playtest-copy': 'engine.playtest.copy',
   'playtest-copied': 'engine.playtest.copied',
   'playtest-stop': 'engine.playtest.stop',
+  replay: 'engine.replay',
+  'replay-of': 'engine.replay.of',
+  'replay-step': 'engine.replay.step',
+  'replay-play': 'engine.replay.play',
+  'replay-pause': 'engine.replay.pause',
+  'replay-back': 'engine.replay.back',
+  'replay-on': 'engine.replay.on',
+  'replay-every': 'engine.replay.every',
+  'replay-parted': 'engine.replay.parted',
+  'replay-done': 'engine.replay.done',
+  'replay-close': 'engine.replay.close',
 } as const satisfies Record<string, EngineKey>;
 
 export type LabelId = keyof typeof LABELS;
