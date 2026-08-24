@@ -808,38 +808,55 @@ function refusalFrom(session: PlaySession, directive: Directive): string | null 
   }
 }
 
-const describeLast = (directives: readonly Directive[], at: number): string => {
-  const before = directives[at - 1];
-  return before === undefined ? 'nothing' : printDirective(before);
-};
-
-export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
+// The directives a test runs, with `run:` expanded where it stands. Anything that drives a `# test`
+// steps this one list — the suite, the REPL, and the app's replay — so none of them can come to
+// differ about what a test is made of, and a cycle is refused once rather than in each of them.
+export function testSteps(testId: string, registry: Registry, stack: readonly string[] = []): Directive[] {
   if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
   const test = registry.tests.get(testId);
   if (!test) throw new RuntimeError(`unknown test: ${testId}`);
+  return test.directives.flatMap((directive) => (directive.kind === 'run' ? testSteps(directive.test, registry, [...stack, testId]) : [directive]));
+}
 
-  const session = sessionOver(registry, state);
+export interface Replayed {
+  // What actually ran, which is every step up to and including the one that parted from the record.
+  readonly walked: readonly Directive[];
+  // Where the replay and the record first disagreed, or null where they never did. A line the
+  // record marks `refused` and which refuses again agrees; one that now takes does not, and that is
+  // how an author sees a fix land.
+  readonly failure: string | null;
+}
 
-  // A refusal the record has not yet claimed. A test that says nothing about it is a test that
-  // expected the line to take, so it fails exactly as it always has; `refused` on the next line
-  // says the record expected it, and the run carries on.
-  let unclaimed: string | null = null;
+// Walk a test's steps against a session as it stands, stopping after `upTo` of them or at the first
+// place the world stopped answering the way the record says it did. Going to step N means walking
+// from the start again, which is what makes a replay scrubbable in both directions without the
+// engine having to undo anything.
+export function walkTest(session: PlaySession, steps: readonly Directive[], upTo: number = steps.length): Replayed {
+  const walked: Directive[] = [];
 
-  for (const [at, directive] of test.directives.entries()) {
+  for (const [at, directive] of steps.entries()) {
+    if (at >= upTo) break;
+    // Settled by the step it is about, one line above.
     if (directive.kind === 'refused') {
-      if (unclaimed === null) return { passed: false, failure: `refused: ${describeLast(test.directives, at)} was not refused` };
-      unclaimed = null;
+      walked.push(directive);
       continue;
     }
-    if (unclaimed !== null) return { passed: false, failure: unclaimed };
-    if (directive.kind === 'run') {
-      const result = runTest(directive.test, registry, state, [...stack, testId]);
-      if (!result.passed) return result;
-      continue;
-    }
-    unclaimed = refusalFrom(session, directive);
+
+    const refusal = refusalFrom(session, directive);
+    const claimed = steps[at + 1]?.kind === 'refused';
+    walked.push(directive);
+
+    if (refusal !== null && !claimed) return { walked, failure: refusal };
+    if (refusal === null && claimed) return { walked, failure: `refused: ${printDirective(directive)} was not refused` };
   }
-  if (unclaimed !== null) return { passed: false, failure: unclaimed };
+
+  return { walked, failure: null };
+}
+
+export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
+  const session = sessionOver(registry, state);
+  const replayed = walkTest(session, testSteps(testId, registry, stack));
+  if (replayed.failure !== null) return { passed: false, failure: replayed.failure };
 
   const open = topModal(state);
   if (open) return { passed: false, failure: `modal left open: ${open.name}` };

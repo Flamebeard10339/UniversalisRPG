@@ -4,6 +4,7 @@ import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreenRefusal } from '.
 import { DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { hasBlock } from '../../grammar/structure';
+import type { Span } from '../../grammar/parser';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
 import type { EngineKey } from '../locale';
 
@@ -438,6 +439,19 @@ export function printDirective(value: Directive): string {
 // The id under `use:` is of whatever kind the line itself opened with, and the action after it is keyed under that id rather than declared anywhere a name could be offered from.
 const USED = { names: { id: '<kind>', action: null } };
 
+// What the editing page says beside `refused` and what the engine refuses one for are the same
+// sentence, written once. Under a note, a page move or another `refused` the mark would be about
+// nothing at all, and a mark about nothing reads exactly like a mark about something.
+const REFUSED_STANDS_UNDER =
+  'refused is about the line above it, which has to be a line the engine was asked to take — a recorded run keeps what did not work, and a replay where it now takes is how a fix is seen to have landed';
+
+function refusalStands(above: Directive | undefined, span: Span): void {
+  if (above === undefined) throw new DslError(`${REFUSED_STANDS_UNDER}; nothing stands there`, span);
+  if (above.kind === 'note' || above.kind === 'page' || above.kind === 'refused') {
+    throw new DslError(`${REFUSED_STANDS_UNDER}; ${JSON.stringify(printDirective(above))} is not one`, span);
+  }
+}
+
 export const test = section<Test>()({
   kind: 'test',
   ids: 'owned',
@@ -509,11 +523,7 @@ export const test = section<Test>()({
       example: `${field.name}: the mirror answered, but nothing said what it cost`,
       note: 'a recorded run says what its player thought at the turn they thought it; the engine does nothing with it',
     })),
-    {
-      form: 'refused',
-      example: 'refused',
-      note: 'the line above was refused, and must be refused again — a recorded run keeps what did not work, and a replay where it now takes is how a fix is seen to have landed',
-    },
+    { form: 'refused', example: 'refused', note: REFUSED_STANDS_UNDER },
     {
       form: 'page: <layer>/<page>',
       example: 'page: character/inventory',
@@ -529,6 +539,7 @@ export const test = section<Test>()({
 
       const directive = parseDirectiveLine(line.text);
       if (!directive) throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
+      if (directive.kind === 'refused') refusalStands(directives[directives.length - 1], line.span);
       directives.push(directive);
     }
 
