@@ -7,9 +7,12 @@ import { DslError, Parser } from '../../grammar/parser';
 import { AnySchema, PrintContext, SectionSchema, listMembers, printSection } from '../../grammar/section';
 import { id, lastSegment, number, text } from '../../grammar/values';
 import { actions, condition as visitCondition, pruneActions, put, type Loose } from '../refs';
-import { section } from './define';
+import { section, TOUCHED } from './define';
 import { TITLE_FIELD } from './info';
 
+// Whether this place is on the player's map — which a road reaching it from somewhere they stood is
+// enough for. It is a weaker thing than `TOUCHED`, and the two are separate flags because a place
+// heard of and a place stood in are what a `when:` most often needs to tell apart.
 export const DISCOVERED = 'discovered';
 
 export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
@@ -194,7 +197,7 @@ const printLocation = (value: Location, context: PrintContext): readonly string[
 };
 
 export const location = section<Location, 'starting', 'actions'>()({
-  flags: [DISCOVERED],
+  flags: [TOUCHED, DISCOVERED],
   says: (value) => value.actions.flatMap(actionResultLists),
   ...SCHEMA,
   ids: 'owned',

@@ -32,6 +32,13 @@ export const EVERY_SECTION: readonly Written[] = [
   },
 ];
 
+// The one name for *the player has interacted with this thing themselves*, put in a kind's `flags`
+// by every kind whose things a player interacts with. It is named on the contract rather than in one
+// kind's file because two kinds mean the same thing by it — an entity that has been read and a
+// location that has been stood in are the same fact about the player — and a third kind that becomes
+// interactable joins them by declaring this, not by minting a word of its own.
+export const TOUCHED = 'touched';
+
 const isMark = (line: RawLine): boolean => line.text === DEBUG_MARK;
 
 export const isDebug = (value: object | undefined): boolean => (value as { debug?: unknown } | undefined)?.debug === true;

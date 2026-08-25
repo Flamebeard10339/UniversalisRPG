@@ -2,6 +2,7 @@ import { endJourney } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
+import { TOUCHED } from '../content/sections/define';
 import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems, packRows } from './itemInstance';
@@ -11,7 +12,7 @@ import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
 import { ownerRef, parseOwnerRef } from './actions';
 import { TRAVEL_PAIR } from './actionLookup';
-import { locationNamed, relocateTo, spreadDiscovery } from './effects';
+import { locationNamed, relocateTo, standWhereTheyAre } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
 import { journal, standingLine, type JournalEntry } from './journal';
 export { standingLine } from './journal';
@@ -20,7 +21,7 @@ import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
-import { declaredId, Entity, EXAMINED, isMintedAction } from '../content/sections/entity';
+import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
@@ -228,7 +229,7 @@ function maskedHere(registry: Registry, state: GameState, location: Location): R
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const masked = new Set<string>();
   for (const entityId of standingHere(registry, state, location)) {
-    if (truthy(state.flags[`${entityId}.${EXAMINED}`]) || fighting.has(entityId)) continue;
+    if (truthy(state.flags[`${entityId}.${TOUCHED}`]) || fighting.has(entityId)) continue;
     if (registry.entities.get(entityId)?.actions.some(isMintedAction)) masked.add(entityId);
   }
   return masked;
@@ -417,7 +418,7 @@ export function choiceToDirective(choice: PlayChoice): Directive {
 export function startSession(registry: Registry, language: string = DEFAULT_LANGUAGE): PlaySession {
   const state = initialState(registry, language);
   if (!state.location) throw new RuntimeError('no # location is marked starting, so a new game has nowhere to begin');
-  spreadDiscovery(state, registry);
+  standWhereTheyAre(state, registry);
   return sessionOver(registry, state);
 }
 
@@ -428,7 +429,7 @@ export function adoptRegistry(session: PlaySession, registry: Registry): PruneWa
   const warnings = pruneStateForRegistry(state, registry);
   internals.logCursor = state.log.length;
   initResources(state, registry);
-  spreadDiscovery(state, registry);
+  standWhereTheyAre(state, registry);
   return warnings;
 }
 
@@ -441,7 +442,7 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   const { registry } = internals;
   const next = createGameState('', internals.state.language);
   const warnings = loadSave(next, saved, registry);
-  spreadDiscovery(next, registry);
+  standWhereTheyAre(next, registry);
   standable(registry, next);
   Object.assign(internals.state, next);
   internals.logCursor = internals.state.log.length;

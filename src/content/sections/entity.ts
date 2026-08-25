@@ -10,7 +10,7 @@ import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
 import { localeKey } from '../locale';
 import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
-import { MintedAction, section } from './define';
+import { MintedAction, section, TOUCHED } from './define';
 import { Dialogue, spokenBy } from './dialogue';
 import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
@@ -67,11 +67,6 @@ export interface Entity extends AuthoredEntity {
 // address rather than writing the word down a second time.
 export const EXAMINE_FIELD = 'examine';
 
-// The flag every entity owns saying its `examine:` has been run, which is why it is declared by the
-// kind rather than by an author: having read a thing is the game's own state, a save carries it
-// under this name, and a condition may read it wherever a flag is read.
-export const EXAMINED = 'examined';
-
 // `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
 // the entity's own action list, saying the words under the key the field already holds them at, so
 // every driver offers it the way it offers any other action — and it marks itself run, so nothing
@@ -79,7 +74,7 @@ export const EXAMINED = 'examined';
 export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
-  const marked: ActionResult = { kind: 'set', variable: `${value.id}.${EXAMINED}` };
+  const marked: ActionResult = { kind: 'set', variable: `${value.id}.${TOUCHED}` };
   return [{ id: EXAMINE_FIELD, label: EXAMINE_FIELD, generatedLabel: true, kind: 'instant', results: [said, marked] } as Action];
 }
 
@@ -146,7 +141,7 @@ const entityBlock: EntryBody = {
 };
 
 export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
-  flags: [EXAMINED],
+  flags: [TOUCHED],
   says: (value) => [...value.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block))), value.onHit, value.whenHit],
   kind: 'entity',
   ids: 'owned',

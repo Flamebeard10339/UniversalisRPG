@@ -1080,7 +1080,7 @@ node greeting:
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
 # save dresser-trinket-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.dresser.searched":true},"location":"tulsa.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
 {"version":13,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
