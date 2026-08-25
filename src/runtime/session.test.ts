@@ -1158,6 +1158,43 @@ roast:
     expect(() => wait(session, 3)).not.toThrow();
   });
 
+  // The other half — an action aimed at nothing saying nothing — is the `midbake` claim below,
+  // whose `toEqual` holds the whole shape and so fails on a field appearing where none belongs.
+  it('says who the action under way is aimed at, addressed and named the way a choice says what offers it', () => {
+    const session = startSession(loadInEnglish(FIGHT_MODULE));
+    view(session);
+
+    const v = apply(session, 'fight:hit:dummy');
+
+    expect(v.action!.of).toBe('entity.dummy');
+    expect(v.action!.detail).toBe('Dummy');
+  });
+
+  // A seat carries an address, and not every address is an entity: walking a road seats the road.
+  it('is aimed at nobody when what the seat holds is not an entity', () => {
+    const road = `
+# location camp
+title: Camp
+x: 0, y: 0
+starting
+adjacent: hut
+
+# location hut
+title: Hut
+x: 1, y: 0
+
+# entity player
+`;
+    const session = startSession(loadInEnglish(road));
+    view(session);
+
+    const v = beginAction(session, 'travel:hut');
+
+    expect(v.action!.label).toContain('Hut');
+    expect(v.action!.of).toBeUndefined();
+    expect(v.action!.detail).toBeUndefined();
+  });
+
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);

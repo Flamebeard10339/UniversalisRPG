@@ -1,6 +1,7 @@
 import type { Place } from '../content/sections/slot';
+import type { Range } from '../grammar/range';
 import type { Answer, Localized, Localizer } from '../runtime/localized';
-import type { CountedRow, GroupRow, PlayStatus } from '../runtime/session';
+import type { GroupRow, PlayStatus, StatRow, StatShare } from '../runtime/session';
 import { signed, tidy } from './format';
 
 export interface Entry {
@@ -28,17 +29,36 @@ export function identity(rows: PlayStatus['player']): Entry[] {
   return Object.values(rows).flatMap((row) => (row === null ? [] : [{ id: row.id, name: row.label, value: row.title }]));
 }
 
-export function counted(rows: readonly CountedRow[], localizer: Localizer): Entry[] {
-  return rows.map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)) })).sort(byName);
+// How much a bonus is worth, in the two channels a bonus lands on and in the words every sheet
+// reads them in. A channel that moves nothing says nothing, so a bonus on one channel reads as one
+// figure rather than as a figure and a zero.
+function amounts(added: Range, increased: number): string[] {
+  const said: string[] = [];
+  if (added.min !== 0 || added.max !== 0) said.push(added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`);
+  if (increased !== 0) said.push(`${signed(increased)}%`);
+  return said;
+}
+
+// What a stat is made of, as the row under it: every share the engine folded, named and signed, in
+// the order the engine folded them. A share that moves nothing still stands — the base of a stat
+// nothing touches is the whole answer to where its number came from.
+export function madeOf(shares: readonly StatShare[]): string {
+  return shares
+    .map((share) => {
+      const said = amounts(share.added, share.increased);
+      return [share.title, ...(said.length > 0 ? said : [signed(0)])].join(' ');
+    })
+    .join(' · ');
+}
+
+export function counted(rows: readonly StatRow[], localizer: Localizer, opened: string | null = null): Entry[] {
+  return rows
+    .map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)), ...(row.id === opened ? { detail: localizer.identifier(madeOf(row.from)) } : {}) }))
+    .sort(byName);
 }
 
 export function contributionText(contributions: readonly Contribution[], localizer: Localizer): Localized {
-  const parts: string[] = [];
-  for (const { statTitle, added, increased } of contributions) {
-    if (added.min !== 0 || added.max !== 0) parts.push(`${added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`} ${statTitle}`);
-    if (increased !== 0) parts.push(`${signed(increased)}% ${statTitle}`);
-  }
-  return localizer.identifier(parts.join(', '));
+  return localizer.identifier(contributions.flatMap(({ statTitle, added, increased }) => amounts(added, increased).map((each) => `${each} ${statTitle}`)).join(', '));
 }
 
 function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localizer): Partial<Entry> {

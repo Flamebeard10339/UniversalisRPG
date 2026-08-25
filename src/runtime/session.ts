@@ -9,7 +9,7 @@ import { swappedOrder } from './packOrder';
 import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
-import { ownerRef, parseOwnerRef } from './actions';
+import { ownerRef, parseOwnerRef } from './state';
 import { TRAVEL_PAIR } from './actionLookup';
 import { locationNamed, relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
@@ -18,7 +18,8 @@ export { standingLine } from './journal';
 export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
-import { hasPool } from './stats';
+import { foldStat, hasPool, statBreakdown } from './stats';
+import { midpoint, type Range } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
 import { declaredId, Entity, EXAMINED, isMintedAction } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
@@ -62,6 +63,11 @@ export interface PlayChoice {
 
 export interface PlayAction {
   label: Localized;
+  // Who the action under way is aimed at, said the way a choice says what offers it. The seat is
+  // where the target is read from and the registry is asked whether it names an entity, because a
+  // seat also carries addresses that are not one — a travel seats the road it is walking.
+  of?: Answer;
+  detail?: Localized;
   progress: number;
   attempts: number;
   // How much of this cycle is still to be counted, or null when there is no such figure to give.
@@ -74,6 +80,22 @@ export interface CountedRow {
   id: Answer;
   title: Localized;
   value: number;
+}
+
+// One named share of a stat, in the two channels a bonus lands on. `increased` is a percentage, and
+// a share is drawn as it stands rather than resolved into the total, because *what is adding to
+// this* is the question and a resolved figure has stopped answering it.
+export interface StatShare {
+  title: Localized;
+  added: Range;
+  increased: number;
+}
+
+// A stat, and everything the engine folded to reach it — where it starts and what every carrier put
+// in. The shares are the same ones the number is folded from, so a row that says nothing about a
+// bonus is a row the bonus did not reach.
+export interface StatRow extends CountedRow {
+  from: StatShare[];
 }
 
 export interface SkillRow extends CountedRow {
@@ -127,7 +149,7 @@ export interface PlayStatus {
   focus: Focus | null;
   equipment: WornRow[];
   xp: SkillRow[];
-  stats: CountedRow[];
+  stats: StatRow[];
   flags: AnswerTable<boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
   locations: Array<{ id: Answer; title: Localized }>;
@@ -506,7 +528,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     focus: modalFocus(state),
     equipment: wornRows(state, registry),
     xp: listedToPlayer(registry.skills.values()).map(({ id }) => skillRow(id, state.xp[id] ?? 0, localizer)),
-    stats: listedToPlayer(registry.stats.values()).map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
+    stats: listedToPlayer(registry.stats.values()).map((stat) => statRow(stat.id, state, registry, localizer)),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
     locations: listedToPlayer(registry.locations.values()).map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
@@ -582,6 +604,19 @@ function publishResources(state: GameState, registry: Registry): PlayStatus['res
     }));
 }
 
+function statRow(statId: string, state: GameState, registry: Registry, localizer: Localizer): StatRow {
+  const breakdown = statBreakdown(statId, state, registry);
+  return {
+    id: statId,
+    title: localizer.title('stat', statId),
+    value: midpoint(foldStat(breakdown)),
+    from: [
+      { title: localizer.engine('engine.stat.base'), added: breakdown.base, increased: 0 },
+      ...breakdown.parts.map((part) => ({ title: localizer.content(part.source.kind, part.source.id, part.source.field), added: part.added, increased: part.increased })),
+    ],
+  };
+}
+
 function actionUnderWay(localizer: Localizer, obj: string, objId: string, action: Action): Localized {
   if (obj === 'travel') return travelLabel(localizer, objId.slice(objId.indexOf(TRAVEL_PAIR) + 1));
   if (obj === 'recipe') return craftLabel(localizer, objId);
@@ -605,8 +640,11 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   const clock = playerCadence(active);
   const localizer = localizerOf(registry, state);
   const action = armedAction(state, registry);
+  const target = active.roster?.[PLAYER]?.target;
+  const aimed = target !== undefined && registry.entities.has(target) ? offeredBy(registry, localizer, 'entity', target) : undefined;
   return {
     label: actionUnderWay(localizer, obj, objId, action),
+    ...(aimed === undefined ? {} : { of: aimed.of, detail: aimed.detail }),
     progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
     attempts: clock.attemptsMade,
     completion: stillToCount(action, active),

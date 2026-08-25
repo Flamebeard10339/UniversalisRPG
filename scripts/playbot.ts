@@ -199,7 +199,8 @@ function renderEncounter(v: PlayView): string[] {
 // a done-fraction had every turn of a fight printing "100% done" at a player who had just started.
 function renderAction(action: NonNullable<PlayView['action']>): string[] {
   const counted = action.completion === null ? [] : [`${Math.round(action.completion * 100)}% of this cycle still to count`];
-  return [[String(action.label), `${action.attempts} attempts this cycle`, `${Math.round(action.progress * 100)}% through the next`, ...counted].join(', ')];
+  const named = action.detail === undefined ? String(action.label) : `${action.label} · ${action.detail}`;
+  return [[named, `${action.attempts} attempts this cycle`, `${Math.round(action.progress * 100)}% through the next`, ...counted].join(', ')];
 }
 
 // Every line of a turn is labelled with the name the view itself gives the field, so that the

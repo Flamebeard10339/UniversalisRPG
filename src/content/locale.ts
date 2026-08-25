@@ -25,6 +25,7 @@ export const ENGINE_KEYS = [
   'engine.combat.felled',
   'engine.examine.beside',
   'engine.entity.unexamined',
+  'engine.stat.base',
   'engine.item.modified',
   'engine.carried.stack',
   'engine.carried.worn',

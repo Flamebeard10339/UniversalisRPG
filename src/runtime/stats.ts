@@ -1,5 +1,6 @@
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
+import { actionAddress, actionTextSection } from '../content/sections/action';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
 import { actorEntity, seatedAction } from './actionLookup';
@@ -12,7 +13,7 @@ import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { skillTags } from '../content/sections/skill';
 import { buffsOf, stackCount } from './buffs';
-import { type BuffInstance, GameState, PLAYER } from './state';
+import { type BuffInstance, GameState, parseOwnerRef, PLAYER } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
@@ -22,6 +23,9 @@ export function hitChance(accuracy: number, evasion: number, registry: Registry)
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
 }
 
+// What one carrier does to one stat: a flat amount and a percentage, the two channels every bonus
+// in the language lands on. `increased` is the percentage itself, as an item's own contribution
+// already reports it, so a row a player reads and a row the engine folds are the same row.
 interface StatFold {
   added: Range;
   increased: number;
@@ -29,7 +33,7 @@ interface StatFold {
 
 function foldBonus(bonus: BonusAmount, fold: StatFold, times: number): void {
   const scaled = scaledAmount(bonus, times);
-  if (scaled.percent) fold.increased += scaled.amount / 100;
+  if (scaled.percent) fold.increased += scaled.amount;
   else fold.added = addRanges(fold.added, scaled.amount);
 }
 
@@ -55,7 +59,7 @@ function foldContribution(contributions: readonly StatContribution[], statId: st
   for (const contribution of contributions) {
     if (contribution.statId !== statId) continue;
     fold.added = addRanges(fold.added, contribution.added);
-    fold.increased += contribution.increased / 100;
+    fold.increased += contribution.increased;
   }
 }
 
@@ -64,7 +68,19 @@ function ownStores(state: GameState, actorId: string): { buffs: readonly BuffIns
   return { buffs: buffsOf(state, actorId), equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
 }
 
+// Where a carrier's own name is written: the section that holds it and the field the words sit in.
+// Every kind writes its name under `title:`; an action writes its under the address it is addressed
+// by, which is why the field is asked for rather than assumed.
+export interface StatSource {
+  readonly kind: string;
+  readonly id: string;
+  readonly field: string;
+}
+
+const titled = (kind: string, id: string): StatSource => ({ kind, id, field: 'title' });
+
 export interface ModifierCarrier {
+  source: StatSource;
   hooks?: HookCarrier;
   tags?: readonly TagClause[];
   item?: Item;
@@ -74,29 +90,31 @@ export interface ModifierCarrier {
 function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean): ModifierCarrier | undefined {
   const passive = registry.passives.get(passiveId);
   if (!passive) return undefined;
-  return paysOut ? { hooks: passive, tags: passive.tags } : { hooks: passive };
+  const source = titled('passive', passiveId);
+  return paysOut ? { source, hooks: passive, tags: passive.tags } : { source, hooks: passive };
 }
 
 export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
   const carriers: ModifierCarrier[] = [];
   const entity = actorEntity(registry, actorId);
-  if (entity) carriers.push({ hooks: entity });
+  if (entity) carriers.push({ source: titled('entity', entity.id), hooks: entity });
   for (const passiveId of entity?.passives ?? []) {
     const carrier = passiveCarrier(registry, passiveId, true);
     if (carrier) carriers.push(carrier);
   }
   for (const skillId of entity?.skills ?? []) {
     const skill = registry.skills.get(skillId);
-    if (skill) carriers.push({ tags: skillTags(skill) });
+    if (skill) carriers.push({ source: titled('skill', skillId), tags: skillTags(skill) });
   }
   const race = actorId === PLAYER ? registry.races.get(state.player.race) : undefined;
-  if (race) carriers.push({ tags: race.tags });
+  if (race) carriers.push({ source: titled('race', race.id), tags: race.tags });
   const own = ownStores(state, actorId);
-  for (const buff of own.buffs) carriers.push({ tags: buff.tags });
+  for (const buff of own.buffs) carriers.push({ source: titled('item', buff.source), tags: buff.tags });
   for (const wornId of own.equipped) {
-    const item = registry.items.get(itemTemplate(state, wornId));
+    const templateId = itemTemplate(state, wornId);
+    const item = registry.items.get(templateId);
     if (!item) continue;
-    carriers.push({ hooks: item, item, wornId });
+    carriers.push({ source: titled('item', templateId), hooks: item, item, wornId });
     for (const passiveId of carriedPassives(registry, itemInstance(state, wornId))) {
       const carrier = passiveCarrier(registry, passiveId, false);
       if (carrier) carriers.push(carrier);
@@ -105,9 +123,12 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
   return carriers;
 }
 
-function performing(state: GameState, registry: Registry, actorId: string): Action | undefined {
+function performing(state: GameState, registry: Registry, actorId: string): ModifierCarrier | undefined {
   const seat = state.activeAction?.roster?.[actorId];
-  return seat && seatedAction(seat, registry, actorId);
+  const action = seat && seatedAction(seat, registry, actorId);
+  if (!seat || !action) return undefined;
+  const { obj, objId } = parseOwnerRef(seat.ownerRef);
+  return { source: { ...actionTextSection(obj, objId, action), field: actionAddress(action) }, tags: action.tags };
 }
 
 export function hasPool(state: GameState, registry: Registry, actorId: string, resourceId: string): boolean {
@@ -115,18 +136,58 @@ export function hasPool(state: GameState, registry: Registry, actorId: string, r
   return resource !== undefined && statValue(resource.max, state, registry, actorId) > 0;
 }
 
-export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
-  const fold: StatFold = {
-    added: actorEntity(registry, actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0),
-    increased: 0,
-  };
+// One line of the answer to *where did this number come from*: what a single carrier put in, named
+// by where its words are written.
+export interface StatPart extends StatFold {
+  readonly source: StatSource;
+}
+
+// The whole of a stat, kept apart: what it starts at, and what every carrier adds to it. `statRange`
+// is this folded up, so a breakdown that omitted a carrier would change the number it explains
+// rather than quietly disagreeing with it.
+export interface StatBreakdown {
+  readonly base: Range;
+  readonly parts: readonly StatPart[];
+}
+
+const contributes = (fold: StatFold): boolean => fold.increased !== 0 || fold.added.min !== 0 || fold.added.max !== 0;
+
+// One line per *source*, not per carrier: eight stacks of one buff are one thing eight times over,
+// and a reader asking where a number came from is told the thing rather than the bookkeeping.
+const addressOf = (source: StatSource): string => [source.kind, source.id, source.field].join(' ');
+
+export function statBreakdown(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
   const counter = counterLevels(state, actorId);
-  foldStatBonuses(performing(state, registry, actorId)?.tags ?? [], statId, fold, counter);
-  for (const carrier of modifierCarriers(state, registry, actorId)) {
+  const carriers = modifierCarriers(state, registry, actorId);
+  const seated = performing(state, registry, actorId);
+  if (seated) carriers.unshift(seated);
+  const parts = new Map<string, StatPart>();
+
+  for (const carrier of carriers) {
+    const fold: StatFold = { added: point(0), increased: 0 };
     if (carrier.tags) foldStatBonuses(carrier.tags, statId, fold, counter);
     if (carrier.item) foldContribution(itemContribution(registry, carrier.item, itemInstance(state, carrier.wornId!), counter), statId, fold);
+    if (!contributes(fold)) continue;
+    const address = addressOf(carrier.source);
+    const held = parts.get(address);
+    parts.set(address, held === undefined ? { source: carrier.source, ...fold } : { source: held.source, added: addRanges(held.added, fold.added), increased: held.increased + fold.increased });
   }
-  return scaleRange(fold.added, 1 + fold.increased);
+
+  return { base: actorEntity(registry, actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
+}
+
+export function foldStat({ base, parts }: StatBreakdown): Range {
+  let added = base;
+  let increased = 0;
+  for (const part of parts) {
+    added = addRanges(added, part.added);
+    increased += part.increased;
+  }
+  return scaleRange(added, 1 + increased / 100);
+}
+
+export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
+  return foldStat(statBreakdown(statId, state, registry, actorId));
 }
 
 export function statValue(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {

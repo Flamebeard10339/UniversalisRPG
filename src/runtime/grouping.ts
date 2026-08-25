@@ -1,7 +1,7 @@
 import { mapOf, type Registry } from '../content/registry';
 import { registryMapOf } from '../content/sections';
 import { groupOf, type Group } from '../content/sections/group';
-import { ownerRef } from './actions';
+import { ownerRef } from './state';
 import type { Answer, Localized, Localizer } from './localized';
 
 // What kind of thing something is, published beside it: the word a player reads and the colour every

@@ -90,6 +90,7 @@ engine.cluster.not-an-effect: {item} carries no cluster effect
 engine.cluster.effect-repeated: the cluster at {hex} already carries {effect}
 engine.cluster.slots-full: the cluster at {hex} fills all {count} of its mod slots
 engine.said.elided: … {dropped} more lines
+engine.stat.base: Base
 engine.shop.label: Trade with {entity}
 engine.shop.counter: The counter — you are carrying {held} {coin}
 engine.shop.buy: Buy {item} — {price} each, {count} in stock

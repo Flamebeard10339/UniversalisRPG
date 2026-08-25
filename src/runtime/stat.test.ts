@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from '../grammar/parser';
-import { point, range } from '../grammar/range';
+import { addRanges, midpoint, point, range, scaleRange } from '../grammar/range';
 import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
 import { endAction } from './actionEnd';
@@ -15,6 +15,8 @@ import { handOver, HandOver, receiveItem } from './itemInstance';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { Registry } from '../content/registry';
 import { loadModule, loadUniverse } from '../content/load';
+import { loadSave } from './save';
+import { statBreakdown, type StatBreakdown } from './stats';
 import { shippedSources } from '../content/shipped';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
@@ -421,5 +423,63 @@ describe('a skill weighed against one that names no stat', () => {
   it('raises nothing at any level where it names no stat', () => {
     expect(movedByLevels(REGISTRY, 'whistling', 4)).toEqual({});
     expect(movedByLevels(REGISTRY, 'whistling', 40)).toEqual({});
+  });
+});
+
+// Where a stat's number came from, held to the number itself. The subjects derive twice over —
+// every `# save` the shipped corpus holds, against every stat the world declares — so a stat added
+// next month, or a save that puts a new kind of carrier on the player, is asked with nothing edited
+// here. The fold is written out again rather than borrowed, because borrowing `foldStat` would
+// prove only that it equals itself; what is worth proving is that the shares a player is shown are
+// the whole of what the engine added up.
+describe('the shares a stat publishes', () => {
+  const SHIPPED = loadUniverse(shippedSources());
+
+  const standing = (): Array<{ save: string; state: GameState }> =>
+    [...SHIPPED.saves.entries()].map(([id, saved]) => {
+      const state = createGameState('');
+      loadSave(state, saved, SHIPPED);
+      return { save: id, state };
+    });
+
+  const byHand = (breakdown: StatBreakdown): number => {
+    let added = breakdown.base;
+    let increased = 0;
+    for (const part of breakdown.parts) {
+      added = addRanges(added, part.added);
+      increased += part.increased;
+    }
+    return midpoint(scaleRange(added, 1 + increased / 100));
+  };
+
+  const everyBreakdown = (): Array<{ save: string; stat: string; breakdown: StatBreakdown; state: GameState }> =>
+    standing().flatMap(({ save, state }) => [...SHIPPED.stats.keys()].map((stat) => ({ save, stat, state, breakdown: statBreakdown(stat, state, SHIPPED) })));
+
+  it('is asked of a corpus that carries carriers, so nothing below is vacuous', () => {
+    const carried = everyBreakdown().filter((each) => each.breakdown.parts.length > 0);
+    expect(SHIPPED.saves.size).toBeGreaterThan(5);
+    expect(carried.length).toBeGreaterThan(5);
+    expect(new Set(carried.flatMap((each) => each.breakdown.parts.map((part) => part.source.kind))).size).toBeGreaterThan(1);
+  });
+
+  it('folds back to the number it explains, save for save and stat for stat', () => {
+    for (const { save, stat, state, breakdown } of everyBreakdown()) {
+      expect(byHand(breakdown), `${save} / ${stat}`).toBe(statValue(stat, state, SHIPPED));
+    }
+  });
+
+  it('holds no share that leaves the number where it found it', () => {
+    for (const { save, stat, breakdown } of everyBreakdown()) {
+      for (const part of breakdown.parts) {
+        expect(byHand({ ...breakdown, parts: breakdown.parts.filter((each) => each !== part) }), `${save} / ${stat} / ${part.source.id}`).not.toBe(byHand(breakdown));
+      }
+    }
+  });
+
+  it('names one thing once, however many times the player is carrying it', () => {
+    for (const { save, stat, breakdown } of everyBreakdown()) {
+      const named = breakdown.parts.map((part) => [part.source.kind, part.source.id, part.source.field].join(' '));
+      expect(named, `${save} / ${stat}`).toEqual([...new Set(named)]);
+    }
   });
 });

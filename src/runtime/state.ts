@@ -17,6 +17,13 @@ export const templateOf = (actorId: string): string => actorId.split(FIGHT_SCOPE
 
 export const isFightScoped = (actorId: string): boolean => actorId !== templateOf(actorId);
 
+export const ownerRef = (obj: string, objId: string): string => `${obj}.${objId}`;
+
+export function parseOwnerRef(ownerRef: string): { obj: string; objId: string } {
+  const dot = ownerRef.indexOf('.');
+  return { obj: ownerRef.slice(0, dot), objId: ownerRef.slice(dot + 1) };
+}
+
 export interface Seat {
   ownerRef: string;
   actionSlug: string;

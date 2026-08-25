@@ -5,7 +5,7 @@ import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
-import { LiveSheet } from './LiveSheet';
+import { restingAt, startedAt } from './logRest';
 import { GRID } from './sheetLayout';
 import { Splitter } from './Splitter';
 import type { LogEntry } from './transcript';
@@ -14,11 +14,11 @@ import type { Words } from './words';
 
 const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
 
-function Line({ entry }: { entry: LogEntry }): JSX.Element {
+function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElement | null) => void }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
   return (
-    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
+    <p ref={measure} className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
       {entry.repeats > 1 ? <span className="tabular-nums text-text-subtle">{`(${entry.repeats}) `}</span> : null}
       {entry.text}
     </p>
@@ -60,35 +60,36 @@ function Sheet({ choices, words, onChoose }: { choices: PlayView['choices']; wor
   );
 }
 
-const NEAR_BOTTOM_PX = 32;
-
 export function Home({
   snapshot,
   words,
   commandLine,
   onChoose,
-  onCancel,
   onSend,
 }: {
   snapshot: DriverSnapshot;
   words: Words;
   commandLine: boolean;
   onChoose: (position: number) => void;
-  onCancel: () => void;
   onSend: (line: string) => void;
 }): JSX.Element {
   const view = snapshot.view;
-  const live = snapshot.live;
   const surface = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
-  const following = useRef(true);
   const [split, setSplit] = useState(SPLIT_DEFAULT);
   const held = useRef(SPLIT_DEFAULT);
   const entries = snapshot.transcript.entries;
+  const drawn = useRef(new Map<number, HTMLElement>());
+  const read = useRef(snapshot.transcript);
 
   useEffect(() => {
     const scroller = column.current;
-    if (scroller && following.current) scroller.scrollTop = scroller.scrollHeight;
+    const anchor = startedAt(read.current, snapshot.transcript);
+    read.current = snapshot.transcript;
+    if (!scroller || anchor === null) return;
+    const line = drawn.current.get(anchor);
+    const top = line === undefined ? scroller.scrollHeight : line.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = restingAt(top, scroller.scrollHeight, scroller.clientHeight);
   });
 
   return (
@@ -98,39 +99,32 @@ export function Home({
           ref={column}
           className="unbarred min-h-0 overflow-y-auto px-4 py-3"
           style={{ flexGrow: split, flexBasis: 0 }}
-          onScroll={(event) => {
-            const scroller = event.currentTarget;
-            following.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= NEAR_BOTTOM_PX;
-          }}
         >
           <div className="mx-auto flex max-w-2xl flex-col gap-1">
             {entries.map((entry) => (
-              <Line key={entry.id} entry={entry} />
+              <Line
+                key={entry.id}
+                entry={entry}
+                measure={(element) => void (element === null ? drawn.current.delete(entry.id) : drawn.current.set(entry.id, element))}
+              />
             ))}
           </div>
         </div>
 
-        {live || !drawsNothing(view.choices) ? (
+        {drawsNothing(view.choices) ? (
+          <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
+            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
+          </div>
+        ) : (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
               onDrag={(dy) => setSplit(splitFrom(held.current, dy, surface.current?.clientHeight ?? 0))}
             />
-            <div className="flex min-h-0 flex-col border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              {live ? (
-                <div className="shrink-0 border-b border-border">
-                  <LiveSheet progress={live} onCancel={onCancel} />
-                </div>
-              ) : null}
-              <div className="unbarred min-h-0 flex-1 overflow-y-auto">
-                <Sheet choices={view.choices} words={words} onChoose={onChoose} />
-              </div>
+            <div className="unbarred min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
+              <Sheet choices={view.choices} words={words} onChoose={onChoose} />
             </div>
           </>
-        ) : (
-          <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
-            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
-          </div>
         )}
       </div>
 

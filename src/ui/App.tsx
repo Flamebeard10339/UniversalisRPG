@@ -14,6 +14,7 @@ import { recorded, remembered, type Editing, type MapWhere } from './editorMemor
 import { Home } from './Home';
 import { JournalPane } from './JournalPane';
 import { Ledger } from './Ledger';
+import { LiveSheet } from './LiveSheet';
 import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
@@ -112,6 +113,7 @@ const standingIn = (view: PlayView): Standing => ({ location: view.location.id, 
 export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
+  const [openStat, setOpenStat] = useState<string | null>(null);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
   const dev = snapshot.dev;
@@ -188,7 +190,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home')
-        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onCancel={driver.cancel} onSend={driver.send} />;
+        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onSend={driver.send} />;
       if (subpage.id === 'edit') return <EditPane held={held} words={words} />;
       return subpage.id === 'settings' ? (
         <SettingsPane
@@ -223,7 +225,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         />
       );
     }
-    if (subpage.id === 'stats') return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer)]} />;
+    if (subpage.id === 'stats')
+      return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer, openStat)]} onOpen={(id) => setOpenStat((held) => (held === id ? null : id))} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
@@ -302,6 +305,11 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           />
           <Notices channel={driver.transient} />
         </main>
+        {snapshot.live === null ? null : (
+          <div className="shrink-0 border-t border-border bg-surface-raised">
+            <LiveSheet progress={snapshot.live} onCancel={driver.cancel} />
+          </div>
+        )}
         <TabBar
           words={words}
           tabs={here.shown}
