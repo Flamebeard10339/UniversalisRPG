@@ -35,50 +35,12 @@ line back with what it measured.
 
 ### Grids, not lists
 
-**The pack is a flat list of full-width rows.** *"inventory is a grid instead of list
-just like the skills tab."* The pack, the stats page and the equipment page are three
-callers of one `Ledger`, a `<dl>` of truncated single-line rows. Ruled: **`Ledger` stays
-the one component that renders a sheet and takes a layout** — `list`, `grid`, `doll` —
-where `grid` is the shape `SkillsPane` already draws,
-`grid-cols-[repeat(auto-fill,minmax(6rem,1fr))]` (`src/ui/SkillsPane.tsx:50`). The pack
-asks for `grid`, the stats page keeps `list`. Text expands down far better than it
-expands sideways and Android's app drawer is the reference, so **a small font is
-acceptable and a small touch target is not**: the density cannot come out of the 44px
-floor `src/index.css:59` sets for every control. **A layout branches on the prop and on
-what an `Entry` carries, never on which page is calling** — a branch on the caller is
-the per-page table this repo counts commits against. *Closes when:* the pack is a grid
-and `Ledger` is still the only component that draws a sheet.
-
-**The equipment page wants a paper doll.** Same `Ledger`, fed by `worn(...)`
-(`src/ui/sheet.ts`). Where a slot sits on a body is a fact nothing declares — a `# slot`
-supplies display words and nothing else (`src/content/sections/slot.ts`). Ruled: **the
-position is declared on `# slot`**, joining the display words it already owns, and
-`Ledger`'s `doll` layout draws it. The slot vocabulary is the union of every
-`equipment-slots:`, so a slot can exist with no `# slot` at all; that slot, and a
-`# slot` that declares no position, both draw in a row beneath the doll. Nothing is a
-table kept in sync and no slot is unreachable. Two slots ship today, `mainhand` and
-`offhand` (`content/core.dsl:156`). *Closes when:* worn gear draws in declared slot
-positions and a slot with no declared position still draws.
-
 **The pack has no order the player owns.** The want is drag-and-drop to swap two items.
 `state.inventory` is a `Record<template, count>` and `packRows` reads its order off that
 (`src/runtime/itemInstance.ts:134`), so there is nothing to reorder and nothing a save
 would carry. `DragSheet` is the drag surface the map and the plane already share, and
 with the grid ruling the thing dragged is the cell. *Closes when:* the pack has a
 player-owned order that survives a save.
-
-**The action list is a wrapping row of pills.** `Home.tsx`'s `Sheet` draws
-`flex flex-wrap` with `grow basis-40`, grouped under each source's name, so no two rows
-are the same width and nothing lines up down the page. It takes `Ledger`'s `grid`
-layout, the same one the pack and the skills page draw. *Closes when:* the action list
-is that grid.
-
-**An entity's name is inert.** *"Clicking name/background of an action does the examine
-action."* Today the group heading `groupOffers` produces is plain text, and *Examine*
-stands as one more pill in the group beside it. Once there are cells: **the cell's name
-and background examine, and the control on it acts** — which takes a pill out of every
-group. *Closes when:* examine is reached from the cell rather than from a pill of its
-own.
 
 ### Chat readability, and the information dump
 
@@ -222,6 +184,14 @@ waiting 60 seconds, reloading, and coming back at 0. `/autosave` writes the live
 slot and `/restore` reads it back, so the pieces exist and nothing joins them. It
 costs an author a playtest and a player their game. *Closes when:* the app opens on
 what it last wrote, or refuses to lose it silently.
+
+**`readable()` in `src/ui/render.test.tsx` cannot see an `aria-label`.** It injects the
+attribute's value inside the tag, and the following `/<[^>]*>/g` swallows it again — so
+any assertion that a label reaches a screen through `aria-label` passes without reading
+anything. Found by the lane that made a cell's background examine, whose examine label
+is exactly such a case; it derived its one exception rather than weakening the claim, so
+nothing is currently hidden by this. It silently disarms the next one. *Closes when:* an
+`aria-label`'s words are readable to that test.
 
 **A `DEBUG` section's `title:` cannot survive a round trip.** `unsayDebug`
 (`src/content/load.ts`) empties a `DEBUG` section's locale rows, and the printer's

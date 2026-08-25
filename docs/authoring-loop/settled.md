@@ -481,6 +481,27 @@ the refusal naming the shape. The overflow rule came with the writer: a handler 
 restores a pool past full now fires `on full` and wraps, which is what every other
 route already did and which nothing in the corpus exercises yet.
 
+**`Ledger` is the one component that draws a sheet, and it takes a layout.** `list`,
+`grid` and `doll` branch on the prop and on what an `Entry` carries — never on which
+page is calling, because a branch on the caller is a per-page table. The grid's column
+shape lives once in `src/ui/sheetLayout.ts` and `sheetLayout.test.ts` holds it derivedly:
+exactly one file under `src/ui` writes `auto-fill`, and more than one takes `GRID`. A
+cell's density comes out of the font and never out of the 44px touch floor.
+
+**`SkillsPane` takes the grid's shape and keeps its own cell body, and that is the seam
+in the right place.** It is deliberately not a fourth `Ledger` caller: its body is a
+`Ring` — an SVG sweep, a level, and an arrival flash keyed on a generation — and pushing
+a progress fraction and a flash key through `Entry` would make `Ledger` draw a Ring for
+nobody else. `Home`'s `Sheet` is the same arrangement.
+
+**A `# slot` says where on a body it sits, and the body is derived from the slots.**
+`at: <column> <row>` is an ordinary field of the kind with its own parser and printer, so
+the oracle prints it and the round-trip claim covers it. `doll()` makes the body as wide
+and tall as the placed slots reach rather than declaring a canvas, and a slot with no
+`at:` — including one no `# slot` describes at all, since the vocabulary is the union of
+every `equipment-slots:` — falls to a row beneath. So no slot is unreachable and no table
+of positions exists.
+
 **`leaves()` is a fact about `PlayView`, and lives with it.** `src/runtime/viewLeaves.ts`
 holds the walk; `scripts/lib/viewCoverage.ts` keeps what is about *comparing*
 surfaces. So `src/ui/render.test.tsx` derives what a player may read from the same
