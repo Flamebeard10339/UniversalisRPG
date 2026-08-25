@@ -11,7 +11,6 @@ import { DevBanner } from './DevBanner';
 import { FaultBanner } from './FaultBanner';
 import { SettingsPane } from './SettingsPane';
 import { recorded, remembered, type Editing, type MapWhere } from './editorMemory';
-import { FloatingText } from './FloatingText';
 import { Home } from './Home';
 import { JournalPane } from './JournalPane';
 import { Ledger } from './Ledger';
@@ -21,8 +20,8 @@ import { newlyFound, type Place } from './discovery';
 import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } from './levelling';
 import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
-import { XpOverlay } from './XpOverlay';
-import { arrivalsBetween, emptyQueue, gainsBetween, heard, poured, type Note } from './xpNotes';
+import { Notices } from './Notices';
+import { noticesBetween } from './notice';
 import { ModalSheet } from './ModalSheet';
 import type { LabelId } from './labels';
 import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
@@ -38,8 +37,8 @@ import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
 import { useWide } from './wide';
 import { columnsIn } from './gesture';
-import { wordsOf } from './words';
-import { TransientProvider } from './transient';
+import { wordsOf, type Words } from './words';
+import { TransientProvider, type TransientChannel } from './transient';
 import { VStack } from './VStack';
 
 function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[]; generation: number } {
@@ -55,29 +54,14 @@ function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[
   return found;
 }
 
-const NOTE_TICK_MS = 100;
-
-function useXpNotes(view: PlayView, clock: () => number): readonly Note[] {
-  const rows = view.xp;
-  const carried = view.carried;
-  const seen = useRef({ rows, carried });
-  const [queue, setQueue] = useState(emptyQueue);
+function useNotices(view: PlayView, words: Words, channel: TransientChannel): void {
+  const seen = useRef(view);
 
   useEffect(() => {
-    const gains = gainsBetween(seen.current.rows, rows);
-    const arrivals = arrivalsBetween(seen.current.carried, carried);
-    seen.current = { rows, carried };
-    if (gains.length + arrivals.length > 0) setQueue((held) => poured(heard(held, gains, arrivals, clock()), clock()));
-  }, [rows, carried]);
-
-  const settled = queue.waiting.length === 0 && queue.shown.length === 0;
-  useEffect(() => {
-    if (settled) return;
-    const timer = setInterval(() => setQueue((held) => poured(held, clock())), NOTE_TICK_MS);
-    return () => clearInterval(timer);
-  }, [settled]);
-
-  return queue.shown;
+    const said = noticesBetween(seen.current, view, words);
+    seen.current = view;
+    for (const one of said) channel.note(one);
+  }, [view]);
 }
 
 function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
@@ -124,17 +108,7 @@ function tryAgain(driver: Driver): void {
 
 const standingIn = (view: PlayView): Standing => ({ location: view.location.id, entities: view.entities.map((entity) => entity.id) });
 
-export function App({
-  driver,
-  opening = OPENING,
-  clock = () => Date.now(),
-  remembering = REMEMBER_AFTER_MS,
-}: {
-  driver: Driver;
-  opening?: Where;
-  clock?: () => number;
-  remembering?: number;
-}): JSX.Element {
+export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
   const [editing, setEditing] = useEditing(driver, remembering);
@@ -148,7 +122,7 @@ export function App({
   const questRead = reading?.kind === 'quest' ? (view.journal.find((entry) => entry.quest === reading.quest) ?? null) : null;
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
-  const notes = useXpNotes(view, clock);
+  useNotices(view, words, driver.transient);
   const opened = useRef<XpMark | null>(null);
   if (opened.current === null) opened.current = markOf(view);
 
@@ -286,11 +260,11 @@ export function App({
               onAttach={driver.playtest.attach}
               onCopy={() => {
                 if (typeof navigator !== 'undefined') void navigator.clipboard?.writeText(driver.playtest.written());
-                driver.transient.play('note', String(words('playtest-copied')));
+                driver.transient.note({ key: 'playtest-copied', count: 0, words: words('playtest-copied') });
               }}
               onStop={() => {
                 const filing = driver.playtest.stop();
-                driver.transient.play('note', String(filing.filed ? words('playtest-filed', { at: localizer.identifier(filing.at) }) : words('playtest-unfiled', { because: localizer.identifier(filing.because) })));
+                driver.transient.note({ key: 'playtest-stopped', count: 0, words: filing.filed ? words('playtest-filed', { at: localizer.identifier(filing.at) }) : words('playtest-unfiled', { because: localizer.identifier(filing.because) }) });
               }}
             />
           )}
@@ -322,8 +296,7 @@ export function App({
             ]}
             bodies={bodies}
           />
-          <FloatingText channel={driver.transient} />
-          <XpOverlay notes={notes} />
+          <Notices channel={driver.transient} />
         </main>
         <TabBar
           words={words}

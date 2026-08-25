@@ -167,6 +167,7 @@ engine.shell.close: Close
 engine.shell.command: Command
 engine.shell.run: Run
 engine.shell.level: Level
+engine.shell.levelled: {skill} reached level {level}
 engine.shell.points: Points
 engine.shell.spent: Spent
 engine.shell.ready: Ready

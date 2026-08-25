@@ -26,6 +26,7 @@ export const LABELS = {
   'until-next': 'engine.shell.until-next',
   run: 'engine.shell.run',
   level: 'engine.shell.level',
+  levelled: 'engine.shell.levelled',
   points: 'engine.shell.points',
   spent: 'engine.shell.spent',
   ready: 'engine.shell.ready',

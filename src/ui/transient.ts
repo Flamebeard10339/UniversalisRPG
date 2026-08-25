@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect } from 'react';
 import { LIVE_TICK_MS } from '../runtime/command';
+import { merged, NOTICE_LIFETIME_MS, sayingOf, type Notice, type Shown } from './notice';
 
 export const SETTLE_MS = 220;
 
-export type MomentKind = 'note' | 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny';
+export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny';
 
 const DRAWN_AS: Record<MomentKind, string> = {
-  note: '',
   arrival: 'arrived',
   rise: 'risen',
   darken: 'darkened',
@@ -22,14 +22,9 @@ export const playedAfter = (ms: number): { animationDelay: string; animationFill
 
 export const STIRRING = 'stirring';
 
-export interface TransientNote {
-  id: number;
-  text: string;
-}
-
 export interface Moment {
   id: number;
-  kind: MomentKind;
+  kind: MomentKind | 'note';
   subject: string;
 }
 
@@ -40,7 +35,8 @@ export interface Played {
 
 export interface TransientChannel {
   play(kind: MomentKind, subject?: string): string;
-  notes(): readonly TransientNote[];
+  note(said: Notice): void;
+  notices(): readonly Shown[];
   playedSince(cursor: number): Played;
   subscribe(listener: () => void): () => void;
 }
@@ -51,16 +47,14 @@ export interface TransientOptions {
   limit?: number;
 }
 
-export const TRANSIENT_LIFETIME_MS = 1400;
-
 export const MOMENT_LOG_LIMIT = 200;
 
 export function createTransientChannel(options: TransientOptions = {}): TransientChannel {
-  const lifetimeMs = options.lifetimeMs ?? TRANSIENT_LIFETIME_MS;
+  const lifetimeMs = options.lifetimeMs ?? NOTICE_LIFETIME_MS;
   const schedule = options.schedule ?? ((expire, ms) => setTimeout(expire, ms));
   const limit = options.limit ?? MOMENT_LOG_LIMIT;
   const listeners = new Set<() => void>();
-  let notes: readonly TransientNote[] = [];
+  let shown: readonly Shown[] = [];
   let log: readonly Moment[] = [];
   let nextId = 1;
 
@@ -68,24 +62,30 @@ export function createTransientChannel(options: TransientOptions = {}): Transien
     for (const listener of listeners) listener();
   };
 
+  const wrote = (kind: Moment['kind'], subject: string): number => {
+    const moment: Moment = { id: nextId++, kind, subject };
+    log = [...log, moment].slice(-limit);
+    return moment.id;
+  };
+
   return {
     play(kind, subject = '') {
-      const moment: Moment = { id: nextId++, kind, subject };
-      log = [...log, moment].slice(-limit);
-
-      if (kind === 'note') {
-        const note = { id: moment.id, text: subject };
-        notes = [...notes, note];
-        schedule(() => {
-          notes = notes.filter((each) => each !== note);
-          tell();
-        }, lifetimeMs);
-      }
-
+      wrote(kind, subject);
       tell();
       return DRAWN_AS[kind];
     },
-    notes: () => notes,
+    note(said) {
+      const grew = merged(shown, said, wrote('note', sayingOf(said)));
+      shown = grew.shown;
+      // By identity, so a notice told something more is a new object the earlier waking passes over
+      // and the later one takes: being fed keeps a notice alive without anything reading a clock.
+      schedule(() => {
+        shown = shown.filter((each) => each !== grew.one);
+        tell();
+      }, lifetimeMs);
+      tell();
+    },
+    notices: () => shown,
     playedSince: (cursor) => ({ moments: log.filter((moment) => moment.id > cursor), cursor: nextId - 1 }),
     subscribe(listener) {
       listeners.add(listener);

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { asLocalized } from '../runtime/localizedFixture';
+import { sayingOf, type Notice } from './notice';
 import { createTransientChannel } from './transient';
 
-function fakeClock(): { schedule: (expire: () => void, ms: number) => void; run: () => void } {
+const notice = (text: string, count = 0, key = text): Notice => ({ key, count, words: asLocalized(text) });
+
+function fakeClock(): { schedule: (expire: () => void, ms: number) => void; run: () => void; next: () => void } {
   const due: Array<() => void> = [];
   return {
     schedule: (expire) => void due.push(expire),
@@ -9,30 +13,43 @@ function fakeClock(): { schedule: (expire: () => void, ms: number) => void; run:
       const pending = due.splice(0);
       for (const expire of pending) expire();
     },
+    next: () => due.shift()?.(),
   };
 }
 
 describe('the channel every moment is played through', () => {
-  it('carries any text at all, and nothing about where it came from', () => {
+  it('carries any words at all, and nothing about where they came from', () => {
     const clock = fakeClock();
     const channel = createTransientChannel({ schedule: clock.schedule });
 
-    channel.play('note', '+12 Woodcutting');
-    channel.play('note', 'anything');
+    channel.note(notice('Woodcutting', 12, 'xp:woodcutting'));
+    channel.note(notice('anything'));
 
-    expect(channel.notes().map((note) => note.text)).toEqual(['+12 Woodcutting', 'anything']);
-    expect(Object.keys(channel.notes()[0])).toEqual(['id', 'text']);
+    expect(channel.notices().map(sayingOf)).toEqual(['anything', '+12 Woodcutting']);
   });
 
-  it('drops a note when its lifetime is up, leaving the ones still running', () => {
+  it('drops a notification when its lifetime is up, leaving the ones still running', () => {
     const clock = fakeClock();
     const channel = createTransientChannel({ schedule: clock.schedule });
 
-    channel.play('note', 'first');
+    channel.note(notice('first'));
     clock.run();
-    channel.play('note', 'second');
+    channel.note(notice('second'));
 
-    expect(channel.notes().map((note) => note.text)).toEqual(['second']);
+    expect(channel.notices().map(sayingOf)).toEqual(['second']);
+  });
+
+  it('keeps one alive while it is still being fed, without reading a clock to do it', () => {
+    const clock = fakeClock();
+    const channel = createTransientChannel({ schedule: clock.schedule });
+
+    channel.note(notice('Rope', 1, 'item:rope'));
+    channel.note(notice('Rope', 2, 'item:rope'));
+    clock.next();
+
+    expect(channel.notices().map(sayingOf)).toEqual(['+3 Rope']);
+    clock.next();
+    expect(channel.notices()).toEqual([]);
   });
 
   it('tells a subscriber both times, and stops when it unsubscribes', () => {
@@ -41,10 +58,10 @@ describe('the channel every moment is played through', () => {
     let told = 0;
     const stop = channel.subscribe(() => void told++);
 
-    channel.play('note', 'one');
+    channel.note(notice('one'));
     clock.run();
     stop();
-    channel.play('note', 'two');
+    channel.note(notice('two'));
 
     expect(told).toBe(2);
   });
@@ -52,10 +69,10 @@ describe('the channel every moment is played through', () => {
   it('hands back the same array until something changes', () => {
     const channel = createTransientChannel({ schedule: fakeClock().schedule });
 
-    const before = channel.notes();
-    expect(channel.notes()).toBe(before);
-    channel.play('note', 'now');
-    expect(channel.notes()).not.toBe(before);
+    const before = channel.notices();
+    expect(channel.notices()).toBe(before);
+    channel.note(notice('now'));
+    expect(channel.notices()).not.toBe(before);
   });
 
   it('hands a caller what its node needs, which is what makes asking the writing-down', () => {
@@ -65,7 +82,6 @@ describe('the channel every moment is played through', () => {
     expect(channel.play('rise')).toBe('risen');
     expect(channel.play('darken')).toBe('darkened');
     expect(channel.play('settle')).toMatch(/^transform \d+ms /);
-    expect(channel.play('note', 'text')).toBe('');
   });
 
   it('reports what played since a cursor, not what is playing at it', () => {
@@ -74,7 +90,7 @@ describe('the channel every moment is played through', () => {
     channel.play('arrival', 'guide-house');
     const first = channel.playedSince(0);
     channel.play('rise');
-    channel.play('note', '+3 Cooking');
+    channel.note(notice('Cooking', 3, 'xp:cooking'));
     const next = channel.playedSince(first.cursor);
 
     expect(first.moments.map((moment) => moment.kind)).toEqual(['arrival']);
@@ -97,10 +113,10 @@ describe('the channel every moment is played through', () => {
     const clock = fakeClock();
     const channel = createTransientChannel({ schedule: clock.schedule });
 
-    channel.play('note', 'gone by now');
+    channel.note(notice('gone by now'));
     clock.run();
 
-    expect(channel.notes()).toEqual([]);
+    expect(channel.notices()).toEqual([]);
     expect(channel.playedSince(0).moments.map((moment) => moment.subject)).toEqual(['gone by now']);
   });
 
