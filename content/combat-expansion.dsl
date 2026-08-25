@@ -467,6 +467,22 @@ wait: 10
 assert: resource.core.health < 10
 expect only: striking-a-thorned-enemy-costs-the-striker-end
 
+// The take-back rule walked from shipped content rather than only from a unit
+// test: a leaf comes back for its point, a node something still stands on is
+// refused, and a socket is refused whatever else is true of it.
+# test a-plane-unwinds-from-its-leaves-and-never-out-from-under-a-jewel
+DEBUG
+load: at-the-proving-ground
+use: entity.armourers-chest.open
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with wrath-jewel
+refuse: unallocate 1 at 0,0 slot e
+allocate: 1 at 1,0 position 1
+allocate: 1 at 1,0 position 2
+refuse: unallocate 1 at 1,0 position 1
+unallocate: 1 at 1,0 position 2
+unallocate: 1 at 1,0 position 1
+
 // --- the sheets those routes ended on ---
 
 # save rage-rises-as-swings-land-end
