@@ -846,9 +846,7 @@ ascend:
 
 // Not in anyone's guide house any more. It stays because the two recorded
 // growth tests below are the only route to a cluster plane, and a DEBUG
-// section is how the engine keeps one out of a player's hands. It carries no
-// title:, no examine: and no say:, because a DEBUG section says nothing in any
-// language and prose written on one is a locale row nothing can ever read.
+// section is how the engine keeps one out of a player's hands.
 # entity smiths-chest
 DEBUG
 flags: emptied
