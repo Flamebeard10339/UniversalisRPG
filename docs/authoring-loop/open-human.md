@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Nineteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Twenty lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -414,3 +414,21 @@ runtime does not change, and wrote the reason at the call site rather than quiet
 *Moves when: he says whether the terminal owes a stat's breakdown. If yes it is a small
 agent line — two functions down a layer and `replLines` reading them; if no, this is deleted
 and one sentence goes to `settled.md` saying the app is where a number is explained.*
+
+## Whether the reveal is off/on or a choice of paces, and whether it types
+
+Dialogue now arrives a line at a time and it is a player preference — *Paced dialogue*,
+default **on**, *"What is said to you arrives a line at a time, at reading speed, rather than
+all at once."* Two calls the lane made rather than guessed at, both cheap to reverse:
+
+- **Off/on, not slow/quick.** *"A global variable that can optionally be edited/skipped"* was
+  read as one number, and the three tunables in `src/ui/reveal.ts` (`A_CHARACTER = 24`,
+  `LEAST_A_LINE_HOLDS = 260`, `MOST_A_LINE_HOLDS = 2400`) beat a keyed pace table the app
+  would have to keep in step with the declaration. If you want the player choosing a pace, it
+  is two lines plus two engine keys, and the derived test already guards it.
+- **A fade, not a typewriter.** Lines arrive whole, one after another — the same technique
+  the plane's nodes sprout with. Chopping a `Localized` mid-character felt wrong, and nothing
+  in the engine stops it, which is worse.
+
+*Moves when: he watches it and says. Both are small and neither blocks anything; the numbers
+are his to tune whatever he decides about the shape.*
