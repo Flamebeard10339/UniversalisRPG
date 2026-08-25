@@ -109,20 +109,6 @@ location rather than to the door. The line above puts the road back on the list;
 one is that the door should be what opens it. *Closes when:* an entity a player walks up
 to and reads as a way out is one.
 
-**An action whose `requires:` fails is absent rather than refused.** *"The oven should
-say that you have nothing to cook if you interact with it before or after crafting the
-bread."* Measured: standing in the Guide House with an empty pack, `tulsa.oven` offers
-`Examine` and nothing else — `roast chestnuts` carries `requires: has raw-chestnut`
-(`content/tulsa.dsl:812`) and is simply not there. `hidden if:` is the field that means
-*do not show this*, and today an unmet `requires:` means the same thing, so an author
-has no way to say *offer it and refuse it with a reason*. *Closes when:* an unmet
-`requires:` is offered and refused in the player's own words, and `hidden if:` is the
-only thing that removes an action.
-
-**This changes what every gated action in the corpus looks like**, so measure the
-reading before shipping it: count what becomes visible across `content/`, and if a room
-fills up with refusals, come back and say so rather than landing it.
-
 **The action progress bar is invisible on the map.** *"It should exist on lower banner
 regardless of whether I'm on home, or on the map."* This is also what the
 travel-progress question in `open-human.md` was waiting on, and it crosses here with

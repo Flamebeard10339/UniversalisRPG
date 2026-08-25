@@ -849,6 +849,27 @@ lines in the whole history, whenever they were said — which is why a quest she
 last few chat messages. That guess is deleted rather than sharpened; a modal takes
 `view.said`.
 
+**`hidden if:` is the only thing that removes an action, and one function says why an
+offered one turns you away.** An unmet `requires:` is now offered and refused rather than
+absent; `refuseAction` in `src/runtime/runtime.ts` is that one home, having been
+`refuseUnpayableInputs` widened, and an author's `on failure:` still stands in place of
+all of it. `armAction` no longer throws `action requires unmet`, so **a `# test`'s
+`refused` mark no longer covers an unmet `requires:`** — it refuses silently, the way an
+unpayable input already did. The words are `engine.requires.item` (*You need {item} for
+that.*) and `engine.requires.unmet` (*You cannot do that yet.*); the generic one is bland
+on purpose, because it has to be true of any condition, and an author who wants better
+writes `on failure:`. `describeCondition` is never called on this path, so no machine
+condition reaches a player. The proof derives its subjects from the grammar's own field
+table — every gate declared `offered when` — so a third gate has to answer it.
+
+**The corpus's whole appetite for `requires:` is six actions in four rooms.** Measured
+before that change landed, because it changes what every gated action looks like: 91
+actions, 12 carrying `hidden if:`, 6 carrying `requires:`, 4 carrying both. The worst room
+gains two offers and 29 of 33 rooms gain nothing, so the feared wall of refusals is not
+reachable from this corpus — the ceiling *is* six. A gated door that refuses does not
+suppress the room's own road out; nothing in `content/` reaches that today and it would
+have been a stranding bug.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
