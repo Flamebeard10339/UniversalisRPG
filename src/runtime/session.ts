@@ -40,6 +40,7 @@ import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { offeredBy, type GroupRow } from './grouping';
+export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 

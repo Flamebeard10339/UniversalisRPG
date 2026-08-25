@@ -1,6 +1,6 @@
 import type { Place } from '../content/sections/slot';
 import type { Answer, Localized, Localizer } from '../runtime/localized';
-import type { CountedRow, PlayStatus } from '../runtime/session';
+import type { CountedRow, GroupRow, PlayStatus } from '../runtime/session';
 import { signed, tidy } from './format';
 
 export interface Entry {
@@ -9,6 +9,8 @@ export interface Entry {
   id?: Answer;
   detail?: Localized;
   at?: Place;
+  // What kind of thing this row is, which is the one thing a cell is filled with.
+  group?: GroupRow;
 }
 
 type CarriedRow = PlayStatus['carried'][number];
@@ -48,7 +50,7 @@ function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localize
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
     .filter((row) => row.worn === undefined)
-    .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...detailOf(row, planes, localizer) }))
+    .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...(row.group === undefined ? {} : { group: row.group }), ...detailOf(row, planes, localizer) }))
     .sort(byName);
 }
 
@@ -58,7 +60,7 @@ export function worn(slots: readonly WornSlot[], rows: readonly CarriedRow[], pl
       const where = slot.at === undefined ? {} : { at: slot.at };
       const filled = rows.find((row) => row.worn?.slot === slot.slot);
       if (!filled) return { name: slot.title, value: empty, ...where };
-      return { id: filled.id, name: slot.title, value: filled.name, ...detailOf(filled, planes, localizer), ...where };
+      return { id: filled.id, name: slot.title, value: filled.name, ...(filled.group === undefined ? {} : { group: filled.group }), ...detailOf(filled, planes, localizer), ...where };
     })
     .sort(byName);
 }
