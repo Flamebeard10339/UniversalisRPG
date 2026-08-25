@@ -69,6 +69,7 @@ export type Directive =
       jewel: string;
     }
   | { kind: 'allocate'; target: string; node: PlaneNode }
+  | { kind: 'unallocate'; target: string; node: PlaneNode }
   | { kind: 'apply'; target: string; hex: Hex; effect: string }
   | { kind: 'refuse'; inner: GrowthDirective }
   | { kind: 'until'; inner: Directive; until: Terminator }
@@ -79,7 +80,7 @@ export type Directive =
   | { kind: 'refused' }
   | { kind: 'page'; layer: string; subpage: string };
 
-export type GrowthDirective = Extract<Directive, { kind: 'slot' | 'allocate' | 'apply' }>;
+export type GrowthDirective = Extract<Directive, { kind: 'slot' | 'allocate' | 'unallocate' | 'apply' }>;
 
 // `done` is a fact about the action system — nothing is under way — not a fact about game state, so no engine root could ever spell it and it stays a word rather than a condition.
 export type Terminator = 'done' | Condition;
@@ -140,14 +141,18 @@ const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
 const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${CARRIED})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
 
+const NODE_PAYLOAD = `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?:position[ \\t]+(?<position>[0-9]+)|slot[ \\t]+(?<direction>${DIRECTION}))`;
+const NODE_FORM = '<target> at <q>,<r> position <n>, or <target> at <q>,<r> slot <direction>';
+
 const GROWTH_PAYLOAD = {
   slot: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?<direction>${DIRECTION})[ \\t]+with[ \\t]+(?<jewel>${PATH})`,
-  allocate: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?:position[ \\t]+(?<position>[0-9]+)|slot[ \\t]+(?<direction>${DIRECTION}))`,
+  allocate: NODE_PAYLOAD,
+  unallocate: NODE_PAYLOAD,
   apply: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+with[ \\t]+(?<effect>${PATH})`,
 } as const;
 
 type GrowthVerb = GrowthDirective['kind'];
-const GROWTH_VERBS = Object.keys(GROWTH_PAYLOAD) as GrowthVerb[];
+export const GROWTH_VERBS = Object.keys(GROWTH_PAYLOAD) as GrowthVerb[];
 
 const GROWTH_LINE = new Map(GROWTH_VERBS.map((verb) => [verb, new RegExp(`^${verb}:[ \\t]*${GROWTH_PAYLOAD[verb]}$`)]));
 const GROWTH_INLINE = new Map(GROWTH_VERBS.map((verb) => [verb, new RegExp(`^${GROWTH_PAYLOAD[verb]}$`)]));
@@ -157,7 +162,8 @@ const REFUSE = new RegExp(`^refuse:[ \\t]*(?<verb>${GROWTH_VERBS.join('|')})[ \\
 
 const GROWTH_FORM: Readonly<Record<GrowthVerb, string>> = {
   slot: '<target> at <q>,<r> <direction> with <jewel item>',
-  allocate: '<target> at <q>,<r> position <n>, or <target> at <q>,<r> slot <direction>',
+  allocate: NODE_FORM,
+  unallocate: NODE_FORM,
   apply: '<target> at <q>,<r> with <effect item>',
 };
 
@@ -204,7 +210,7 @@ function growth(verb: GrowthVerb, text: string, groups: Groups): GrowthDirective
     };
   if (verb === 'apply') return { kind: 'apply', target, hex, effect: groups.effect as string };
   const node: PlaneNode = groups.position === undefined ? { hex, kind: 'slot', direction } : { hex, kind: 'position', position: Number(groups.position) };
-  return { kind: 'allocate', target, node };
+  return { kind: verb, target, node };
 }
 
 function parseGrowth(verb: GrowthVerb, pattern: Map<GrowthVerb, RegExp>, payload: string, text: string): GrowthDirective {
@@ -410,7 +416,8 @@ export function printDirective(value: Directive): string {
     case 'slot':
       return `slot: ${value.target} at ${hexKey(value.hex)} ${value.direction} with ${value.jewel}`;
     case 'allocate':
-      return `allocate: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
+    case 'unallocate':
+      return `${value.kind}: ${value.target} at ${hexKey(value.node.hex)} ${value.node.kind === 'position' ? `position ${value.node.position}` : `slot ${value.node.direction}`}`;
     case 'apply':
       return `apply: ${value.target} at ${hexKey(value.hex)} with ${value.effect}`;
     case 'open-modal':
@@ -508,6 +515,16 @@ export const test = section<Test>()({
     { form: 'slot: <item> at <q>,<r> <direction> with <jewel item>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
     { form: 'allocate: <item> at <q>,<r> position <n>', example: 'allocate: cluster-jewel at 0,0 position 1' },
     { form: 'allocate: <item> at <q>,<r> slot <direction>', example: 'allocate: cluster-jewel at 0,0 slot ne' },
+    {
+      form: 'unallocate: <item> at <q>,<r> position <n>',
+      example: 'unallocate: cluster-jewel at 0,0 position 1',
+      note: 'gives the point back, and is refused where taking it back would leave anything still allocated touching nothing — so a plane is unwound from its leaves inward',
+    },
+    {
+      form: 'unallocate: <item> at <q>,<r> slot <direction>',
+      example: 'unallocate: cluster-jewel at 0,0 slot ne',
+      note: 'always refused: a jewel socket is spent for good, so what this writes down is that a plane cannot be shrunk out from under a jewel',
+    },
     { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: slot cluster-jewel at 0,0 ne with small-jewel' },
     ...MODAL_SCREENS.map((screen) => ({ form: `open-modal: ${screen}`, example: `open-modal: ${screen}` })),
@@ -601,7 +618,8 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       put(value, 'effect', 'item', `${where} apply: with`, visit);
       return;
     case 'allocate':
-      putCarried(value, 'target', `${where} allocate:`, visit);
+    case 'unallocate':
+      putCarried(value, 'target', `${where} ${value.kind}:`, visit);
       return;
     case 'refuse':
       visitDirective(value.inner, `${where} refuse:`, visit);

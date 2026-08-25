@@ -2,7 +2,7 @@ import { Direction, Hex, PlaneNode } from '../content/hex';
 import { isBase, Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { sampleCount } from '../grammar/range';
-import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
+import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane, unallocateNode } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
 import { localizerOf } from './localized';
 import { isRoll, nextRandom } from './rng';
@@ -362,6 +362,13 @@ export function allocate(state: GameState, registry: Registry, target: string, n
   return growItem(state, registry, {
     target,
     change: (payload, item) => allocateNode(registry, payload.plane, node, pointsRemaining(payload, item)),
+  });
+}
+
+export function unallocate(state: GameState, registry: Registry, target: string, node: PlaneNode): Growth {
+  return growItem(state, registry, {
+    target,
+    change: (payload) => unallocateNode(registry, payload.plane, node),
   });
 }
 

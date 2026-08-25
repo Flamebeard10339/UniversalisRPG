@@ -642,6 +642,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'setting':
     case 'slot':
     case 'allocate':
+    case 'unallocate':
     case 'apply':
     case 'refuse':
     case 'until':
@@ -836,6 +837,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     }
     case 'slot':
     case 'allocate':
+    case 'unallocate':
     case 'apply':
       return grew(session, state, grow(state, registry, directive));
     case 'refuse': {
