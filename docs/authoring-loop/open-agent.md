@@ -176,8 +176,6 @@ plane and the equip are surfaces the modal has elsewhere and not here, and the w
 is the one of the three with a derived proof available — a label long enough to wrap is
 a fixture, not a screenshot.
 
-### The quest journal
-
 ### Modals
 
 **Every modal is its own thing.** The owner's, written into `open-human.md` on
@@ -286,8 +284,9 @@ declared in `sections/test.ts` and then re-listed by two `case 'feed':` arms in
 ## Crossed from `open-human.md`, second pass, 2026-08-25
 
 Seventeen parked lines went to the owner after the playtest was read out and came back
-ruled. Each carries his answer; none is to be re-decided. What was left behind stands in
-`open-human.md`, and it is three lines.
+ruled. Each carries his answer; none is to be re-decided. What was left behind stood in
+`open-human.md` and was three lines; seven more have crossed back since, each carrying
+what the lane that hit it had already measured.
 
 ### The town
 
