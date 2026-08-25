@@ -389,15 +389,3 @@ to position Y, swapping if necessary. Each of the play states can either call or
 Either way, the function is exposed and only exists in one place."* So the terminal's
 missing control was never the question — the question was where the move lives, and the
 answer is runtime, once. `swap:` stays the directive that records and replays it.
-
-**Find what the suite's twenty-three seconds are actually made of, and report.** From
-*"development when npm test takes >30s is very annoying."* This is a measurement lane and
-it ends in a report, not a refactor — **nothing here authorises deleting a test.** What is
-already known: two-thirds of the CPU is import and transform rather than test bodies, it
-is a function of how many test **files** there are, `pool: 'threads'` makes it worse, and
-~450 full loads of the shipped corpus cost about a quarter of all test time. What is not
-known and is cheap to measure: **nothing memoizes a corpus load anywhere** — there is no
-cache in `src/content/` at all — so measure what a per-process memoized shipped-corpus
-load does to those 450, and measure whether the dev loop's real answer is that `npm test`
-is the gate while a watch-mode or changed-files run is the loop. Report both numbers; the
-decision after them is the owner's.

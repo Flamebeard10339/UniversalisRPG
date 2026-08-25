@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Nine lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Ten lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -217,3 +217,29 @@ beside it are *Not started* / *Under way* / *Done*, and the colours are `#e5e7eb
 *Moves when: he looks at it and says fill or lettering. If lettering, it is a different
 ruling about what the text channel carries and `settled.md` moves with it; the colours and
 the words themselves are one-line edits in `content/core.dsl` either way.*
+
+## Whether to take the corpus cache, now that it is known what it buys
+
+*"Development when npm test takes >30s is very annoying."* The measurement ran and the
+numbers are in `settled.md`; what is left is your call, because the answer is not the one
+the question expected.
+
+**The suite is not slow because of the corpus.** 692 universe loads cost 20.4s of CPU, and
+a per-process content-keyed cache takes that to near zero — but **wall clock does not
+move**, because the twenty-three seconds are import and transform, which is a function of
+how many test *files* there are. Summed test-body time falls 95.7s → 70.9s and the clock
+on the wall stays where it was.
+
+So there are two separable answers:
+
+- **The dev loop.** Running the one file you are editing costs about **1 second**. That is
+  the loop and `npm test` is the gate. Nothing needs building for it — it is a habit, and
+  it is over twenty times faster than the thing the complaint was about.
+- **The cache itself.** Worth taking only if CPU rather than wall clock is what is short —
+  CI parallelism, or a box already running several agent lanes. It is not free: the five
+  corpus-rewriting tools in `scripts/` fail with it in and each needs a way round it, and
+  a cached registry is handed to many callers at once.
+
+*Moves when: he says whether to build the cache. If yes it is an agent line with a known
+shape and a known cost — five tools to teach; if no, this is deleted and the dev-loop
+sentence goes to `settled.md`. Nothing else is waiting on it either way.*

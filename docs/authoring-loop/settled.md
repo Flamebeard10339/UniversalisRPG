@@ -875,6 +875,25 @@ last few chat messages. That guess is deleted rather than sharpened; a modal tak
 builds off each kind's declared prose fields. Nothing is marked by hand to appear
 on the sheet, and `@@@` keeps meaning what it means.
 
+**The suite's twenty-three seconds are import and transform, and a corpus cache does not
+touch them.** Measured 2026-08-25 by instrumenting the load path and reverting it: **692
+universe loads across 14 worker processes, costing 20.4s of CPU** — about a fifth of the
+summed test time, and **307 of them are one worker**, costing 13.4s. A warm shipped-corpus
+load is 20.2ms median (15.9–31.9); the first in a process is 69.6ms, which is JIT. A
+per-process cache keyed on the sources' own content then **removes a quarter of the
+test-body CPU and none of the wall clock** — summed test time fell 95.7s → 70.9s while
+wall stayed inside the 22.6–26.5s the suite already varies over. That is the answer to
+*why is it twenty-three seconds*: it is not the test bodies, and it is not the corpus.
+
+**A per-process corpus cache is safe everywhere except the five tools that rewrite the
+corpus.** With the cache in, the only failures are `scripts/rename-module`,
+`migrate-saves`, `move-sections`, `publish-local-changes` and `probe` — the tools that
+write files and reload — and **not one engine, content or UI test.** Two things a lane
+building it must know: the key has to include `ModuleSource.enabled`, because a source
+switched off carries the same name and text as one switched on and collides otherwise
+(24 failures on the first attempt, all from that); and `loadUniverseWithDiagnostics` hands
+back a diagnostics array a caller may treat as its own.
+
 **Test telemetry is deferred, and no lane deletes a test to make the suite faster.**
 The sketch in `.planning/.scratch.md` — tracking runs, failures, mutation effectiveness
 and churn per test to find deletion candidates — was weighed against the measurement and
