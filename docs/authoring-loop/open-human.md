@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Ten lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Eleven lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -243,3 +243,25 @@ So there are two separable answers:
 *Moves when: he says whether to build the cache. If yes it is an agent line with a known
 shape and a known cost — five tools to teach; if no, this is deleted and the dev-loop
 sentence goes to `settled.md`. Nothing else is waiting on it either way.*
+
+## Whether a screen may be readable through, and what that would cost
+
+The modal API landed with three strategies, and one of them — `behind: 'clear'`, a screen
+that does not darken what is under it — is implemented and proved and **has no user**.
+Every shipped screen still dims, exactly as before. The complaint it was built for —
+*"The dialogue modal darkens the screen and I can't see the words that were just
+spoken"* — was already answered from the other side, by the sheet drawing the beat it is
+answering; `showsTheBeat` now makes that coupling explicit, so a screen draws the words
+*because* it took them away.
+
+If you still want the transcript itself visible behind dialogue, there is a cost and it is
+not a word. A per-screen departure has to key on some **surface-neutral** fact the view
+publishes, because a published modal deliberately says nothing about how to draw it —
+`place: 'bottom'` means nothing to a terminal. Today that fact is `focus`, and the dialogue
+screen publishes none. So the choice is: give that screen a neutral fact to key on, or
+relax the rule and let the view carry an app-only vocabulary.
+
+*Moves when: he says whether dialogue should be readable through. If no, this is deleted
+and nothing else changes. If yes, the second half is his call too, because relaxing
+"nothing about how to draw them" is a rule the suite currently enforces and a lane will not
+take it down on its own.*

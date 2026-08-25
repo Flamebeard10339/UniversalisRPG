@@ -877,6 +877,37 @@ reachable from this corpus — the ceiling *is* six. A gated door that refuses d
 suppress the room's own road out; nothing in `content/` reaches that today and it would
 have been a stranding bug.
 
+**Every screen in the app is drawn on one layer, and a strategy is a word.** `Modal` and
+`ModalCard` in `src/ui/Modal.tsx` are the only overlay there is; what a screen does with
+the surface under it is a `Declared` manner resolved in `src/ui/modalManner.ts`, over three
+axes and no more — **`place`** (bottom / centre / fill), **`over`** (app / pane), **`behind`**
+(dim / clear). Those three are what actually varied across the six overlays that shipped
+before it; the fade-in that looked like a fourth was an inconsistency and now follows the
+dimming. Two sweeps in `src/ui/surface.test.ts` hold it: only `Modal.tsx` may write
+`role="dialog"`, and only `modalManner.ts` may write the scrim or the layer.
+
+**Clicking off a screen is derived from whether it published a way out, and is not a
+strategy.** `clickingOffLeaves` is the one place asked. That is why the Playtest Note is
+fixed by the derivation rather than by a flag — it had a *Discard* all along and did not
+honour it — and why a `fill` screen keeps an explicit button, having no backdrop to tap.
+
+**No kind declares a modal and the manner does not reach the published view.** Two proofs
+already in the suite decide this and the lane that built the API tried the other way first
+and let them refuse it: a UI file may not name a modal, so the app cannot key a table by
+screen; and a published `Modal` says what is still to be answered *and nothing about how
+to draw it*, because `place: 'bottom'` is meaningless to `play-cli` and to the playbot. A
+screen that must depart from the ordinary is keyed on the `focus` the view already
+publishes, through a `Record` over `PlayView['focus']['kind']` that will not compile until
+a new focus kind answers it.
+
+**A modal's name is minted from its own id, and nothing can declare one.** `mintedName` in
+`src/grammar/values.ts` is the one function — `humanizeEn` under the base language, the
+plain last segment otherwise — reached through `Localizer.minted`, and `# info`'s
+`defaultTitle` was a second copy of those two lines and now points at it. Because nothing
+*can* author a modal's words, there is no second authority to drift. Two proofs derive
+their subjects from `MODAL_SCREENS` and `MODAL_NAMES`: every screen's opening line carries
+the minted words and never the address.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

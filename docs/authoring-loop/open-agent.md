@@ -45,10 +45,13 @@ that turn produced. Which entry a turn starts at is a pure decision and belongs 
 the component.
 
 **A node that says words and offers no choice reaches the player as nothing.** *"The
-second dialogue with miki doesn't pop up a modal (because there is no choice) the
-choice should be `continue`."* *Closes when:* such a node draws the same modal every
-other node draws, carrying one choice, *Continue*. This is the modal API line below in
-miniature and should probably land with it.
+second dialogue with miki doesn't pop up a modal (because there is no choice) the choice
+should be `continue`."* *Closes when:* such a node draws the same modal every other node
+draws, carrying one choice, *Continue*. **The modal API has since landed and this is now
+runtime only, with no UI edit at all** — the lane that built it says so: the `dialogue`
+entry in `DEFINITIONS` gives the option its one value, `declaredFor(null)` hands back the
+default manner, and a value that is not a `leaving` draws as an ordinary bottom sheet with
+the beat above it.
 
 **Talking is a location action rather than something Miki offers.** *"The talk to miki
 dialogue should be attached to miki, not be a location action."* Measured on the
@@ -178,9 +181,6 @@ a fixture, not a screenshot.
 
 ### Modals
 
-**Every modal is its own thing.** The owner's, written into `open-human.md` on
-2026-08-25 and crossed here because it is a ruling rather than a question:
-
 > Modals need to be generalized into a single API so that every single modal isn't
 > this unique thing. Some modals overlap the bottom. Some can't be cancelled by
 > clicking off of them.
@@ -206,10 +206,6 @@ the failure mode `one-home` exists to catch.
 
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
-
-**Two shipped choices are labelled with a machine address.** `modal:choose-race` and
-`modal:name-yourself` reach the player as `choices[].label`. *"This needs to be done."*
-Under the policy above the words are the lane's to write.
 
 **Miki never says to find the mirror**, from the first run: *"He asks if you want him to
 show you the ropes."* The quest's opening reads as though he did. The mirror's location
