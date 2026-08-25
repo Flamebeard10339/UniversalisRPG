@@ -3,7 +3,7 @@ import type { Addressed } from './completion';
 import { Registry } from './registry';
 import { Directive, Test } from './sections/test';
 import { } from './namespace';
-import { isNamespacedKind } from './sections';
+import { isCheckedKind } from './sections';
 import { DEBUG_MARK, isActionOwnerKind, isDebug, registryMapOf, sectionOf, type ModuleSection } from './sections';
 import { INFLICT_SITE, Visit } from './refs';
 import { visitSection } from './sections';
@@ -19,7 +19,7 @@ function refuseDebugReference(kind: string, target: string, where: string, regis
 export function validateSectionReferences(section: ModuleSection, id: string, registry: Registry): void {
   const debug = isDebug(section.value);
   const visit: Visit = (referenced, target, where) => {
-    if (isNamespacedKind(referenced) && !registry.namespace.has(referenced, target)) {
+    if (isCheckedKind(referenced) && !registry.namespace.has(referenced, target)) {
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
     if (!debug) refuseDebugReference(referenced, target, where, registry);

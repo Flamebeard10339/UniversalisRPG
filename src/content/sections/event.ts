@@ -61,6 +61,7 @@ function answeredByAHook(event: GameEvent): string | undefined {
 export const event = section<GameEvent>()({
   kind: 'event',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'events',
   text: ['title'],
   fields: {

@@ -15,6 +15,7 @@ export interface ModuleInfo {
 export const info = section<ModuleInfo>()({
   kind: 'info',
   ids: 'none',
+  vocabulary: 'declared',
   fields: {
     version: { parser: version, default: () => [0, 0, 0] },
     dependencies: { parser: list(dependency), default: () => [] },

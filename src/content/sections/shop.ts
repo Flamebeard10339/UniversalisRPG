@@ -84,6 +84,7 @@ export function replenished(shop: Shop, counts: Readonly<Record<string, number>>
 export const shop = section<Shop>()({
   kind: 'shop',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'shops',
   fields: {
     coin: { parser: id, names: { id: 'item' }, note: 'the item this shop counts in, which is therefore the one thing it will neither buy nor sell' },

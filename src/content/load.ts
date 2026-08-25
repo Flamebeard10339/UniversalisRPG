@@ -4,7 +4,7 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionTextKey, actionTextOwner } from './sections/action';
+import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
@@ -15,7 +15,7 @@ import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseMod
 import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
 import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
-import { isNamespacedKind } from './sections';
+import { isOwnedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
 import { Pruning, ReferenceKind, Visit } from './refs';
@@ -107,7 +107,7 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
 }
 
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[], value: { id: string }): void {
-  const minted = new Map((sectionFor(kind)?.mintedActions?.(value) ?? []).map((one) => [one.address, one.from]));
+  const minted = new Map((sectionFor(kind)?.mintedActions?.(value) ?? []).map((one) => [actionAddress(one.action), one.from]));
   const taken = new Map<string, string>();
   for (const action of actions) {
     const owner = actionTextOwner(registry.namespace, kind, id, action);
@@ -219,7 +219,7 @@ function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, Readonl
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
       if (!isDebug(section.value)) continue;
-      const namespace = isNamespacedKind(kind) ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
+      const namespace = isOwnedKind(kind) ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
       prefixes.push(...kinds.map((under) => localeKey(namespace, under, id, '')));
     }
   }
@@ -738,7 +738,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   registry.roads = closeAdjacency(registry.locations);
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
-      const owned = isNamespacedKind(kind);
+      const owned = isOwnedKind(kind);
       if (owned && !registry.namespace.has(kind, id)) continue;
       const namespace = owned ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
       try {

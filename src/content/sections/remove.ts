@@ -10,6 +10,7 @@ export interface Removal {
 export const remove = section<Removal>()({
   kind: 'remove',
   ids: 'none',
+  vocabulary: 'declared',
   grammar: [],
   parse: (raw) => {
     const [kind, ...path] = raw.id?.split('.') ?? [];

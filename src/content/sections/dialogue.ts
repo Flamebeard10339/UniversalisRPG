@@ -202,6 +202,7 @@ function unknownNode(value: Dialogue): string | undefined {
 export const dialogue = section<Dialogue>()({
   kind: 'dialogue',
   ids: 'owned',
+  vocabulary: 'declared',
   validate: unknownNode,
   map: 'dialogues',
   says: (value) => value.nodes.map((node) => (node.ask === undefined ? [] : [node.ask])),

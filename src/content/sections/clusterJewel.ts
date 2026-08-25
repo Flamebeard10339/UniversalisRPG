@@ -63,6 +63,7 @@ export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): s
 export const clusterJewel = section<ClusterJewel>()({
   kind: 'cluster-jewel',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'clusterJewels',
   text: ['title', 'examine'],
   fields: {

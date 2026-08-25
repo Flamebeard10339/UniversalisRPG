@@ -1,4 +1,5 @@
 import { Action } from '../grammar/action';
+import { actionAddress, actionTextSection } from './sections/action';
 import { actionSlug } from './locale';
 import { DslError } from '../grammar/parser';
 import { EntityBlock, isHandlerBlock } from './sections/entity';
@@ -6,7 +7,7 @@ import { lastSegment } from '../grammar/values';
 import { VISITS } from '../grammar/condition';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { ACTION_MEMBER, Namespace, qualify } from './namespace';
-import { isNamespacedKind } from './sections';
+import { idScopeOf, isOwnedKind } from './sections';
 import { contentSectionMaps, isActionOwnerKind, sectionFor } from './sections';
 import { MemberName } from './sections/define';
 import { ParsedModule } from './universe';
@@ -21,8 +22,6 @@ function visibleTo(module: ParsedModule, loaded: ReadonlySet<string>): Set<strin
   }
   return visible;
 }
-
-const isNamespaced = isNamespacedKind;
 
 function missingOptionalDependencies(module: ParsedModule, loaded: ReadonlySet<string>): Set<string> {
   const missing = new Set<string>();
@@ -43,7 +42,7 @@ function unorderedDependencies(module: ParsedModule): ReadonlySet<string> {
 }
 
 export function declaredKey(namespace: string | null, kind: string, id: string): string | null {
-  if (!isNamespaced(kind)) return id;
+  if (!isOwnedKind(kind)) return id;
   return id.includes('.') ? null : qualify(namespace, id);
 }
 
@@ -83,7 +82,7 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
   const used = addedMembers<string>(value.uses).map(lastSegment);
   const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
   const minted = sectionFor(kind)?.mintedActions?.(value) ?? [];
-  return [...used, ...minted.map((one) => one.address), ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
+  return [...used, ...minted.map((one) => actionAddress(one.action)), ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
 }
 
 type Members = (value: { id: string }) => readonly MemberName[];
@@ -146,13 +145,20 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
   module.sections = module.sections.filter((section) => {
     if (section.kind === 'remove') return !namesMissingOptional((section.value as Removal).kind, (section.value as Removal).target, missingOptional);
     const { id } = section.value as { id?: string };
-    return id === undefined || !isNamespaced(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
+    return id === undefined || !isOwnedKind(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
   });
 
   for (const { kind, value } of createdSections(module)) {
-    if (!isNamespaced(kind) || value.id === undefined || value.id.includes('.')) continue;
+    // An action minted under a section of its own takes that section's id, so it is declared where an authored one's would be and an author who writes the same heading is told rather than silently overwritten.
+    for (const minted of sectionFor(kind)?.mintedActions?.(value) ?? []) {
+      const under = actionTextSection(kind, value.id, minted.action);
+      if (under.kind !== kind || under.id !== value.id) namespace.mint(under.kind, under.id, minted.from);
+    }
+    const scope = idScopeOf(kind);
+    if (scope === 'none' || value.id === undefined || value.id.includes('.')) continue;
     if (kind === 'flag' && value.id === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
-    namespace.declare(kind, module.namespace, value.id);
+    // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
+    namespace.declare(kind, scope === 'owned' ? module.namespace : null, value.id);
   }
 }
 
@@ -172,7 +178,7 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
   for (const section of module.sections) {
     if (section.kind === 'remove') {
       const removal = section.value as Removal;
-      if (!isNamespaced(removal.kind)) throw new DslError(`# remove ${removal.id}: ${removal.kind} is not a kind a module owns`);
+      if (!isOwnedKind(removal.kind)) throw new DslError(`# remove ${removal.id}: ${removal.kind} is not a kind a module owns`);
       removal.target = namespace.resolve(removal.kind, removal.target, self, visible, `# remove ${removal.id}`);
       const owner = namespace.ownerOf(removal.kind, removal.target);
       if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
@@ -181,7 +187,7 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
       continue;
     }
     const { id } = section.value as { id: string };
-    const visit = (kind: ReferenceKind, raw: string, where: string): string => (isNamespaced(kind) && !namesMissingOptional(kind, raw, missingOptional) ? namespace.resolve(kind, raw, self, visible, where, id) : raw);
+    const visit = (kind: ReferenceKind, raw: string, where: string): string => (isOwnedKind(kind) && !namesMissingOptional(kind, raw, missingOptional) ? namespace.resolve(kind, raw, self, visible, where, id) : raw);
     visitSection(section, `# ${section.kind} ${id}`, visit);
   }
 }

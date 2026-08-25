@@ -34,6 +34,7 @@ const displayValue: Parser<ResourceDisplay> = {
 export const resource = section<Resource>()({
   kind: 'resource',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'resources',
   text: ['title'],
   fields: {

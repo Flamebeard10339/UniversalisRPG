@@ -212,6 +212,7 @@ function questProblem(quest: Quest): string | undefined {
 export const quest = section<Quest>()({
   kind: 'quest',
   ids: 'owned',
+  vocabulary: 'declared',
   text: ['title'],
   maps: {
     quests: (value) => [[value.id, value]],

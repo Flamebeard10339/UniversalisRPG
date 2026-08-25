@@ -18,6 +18,7 @@ export const passiveRangeProblem = (passive: Passive): string | undefined => unr
 export const passive = section<Passive>()({
   kind: 'passive',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'passives',
   text: ['title', 'examine'],
   fields: {

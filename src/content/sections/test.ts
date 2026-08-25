@@ -455,6 +455,7 @@ function refusalStands(above: Directive | undefined, span: Span): void {
 export const test = section<Test>()({
   kind: 'test',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'tests',
   grammar: [
     { form: 'run: <test>', example: 'run: opening' },
