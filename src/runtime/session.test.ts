@@ -6,10 +6,12 @@ import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
-import { standingSources } from '../content/shipped';
+import { shippedSources, standingSources } from '../content/shipped';
+import { isMintedAction } from '../content/sections/entity';
+import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
 import { inEnglish } from './sayFixture';
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
@@ -1662,5 +1664,66 @@ describe('a use: choice id and a use: directive are one shape', () => {
       const directive = choiceToDirective(choice);
       expect(parseDirectiveLine(printDirective(directive))).toEqual(directive);
     }
+  });
+});
+
+describe('an entity puts the offer it mints second', () => {
+  interface Group {
+    at: string;
+    entity: string;
+    offers: PlayChoice[];
+    minted: string | undefined;
+  }
+
+  const world = (): Registry => loadUniverse(withEngineLocale(shippedSources()));
+
+  // Every entity the shipped world stands anywhere, with the offers it makes where it stands and
+  // the id of the one it minted. The subjects come off the corpus and off `isMintedAction`, so an
+  // entity, an action or a second minted offer written next month is held to this with no edit
+  // here. One entity's offers are the choices carrying it as `detail` — the key the app groups a
+  // sheet by, and the run the terminals print it in.
+  function groups(registry: Registry): Group[] {
+    const found: Group[] = [];
+    for (const location of registry.locations.values()) {
+      const session = startSession(registry);
+      applyDirective(session, { kind: 'goto', location: location.id });
+      const status = sessionStatus(session);
+      if (status.location.id !== location.id) continue;
+      for (const standing of status.entities) {
+        const minted = registry.entities.get(standing.id)?.actions.find(isMintedAction);
+        found.push({
+          at: location.id,
+          entity: standing.id,
+          offers: status.choices.filter((choice) => choice.detail === standing.title),
+          minted: minted && useChoiceId({ kind: 'use', obj: 'entity', objId: standing.id, actionId: actionAddress(minted) }),
+        });
+      }
+    }
+    return found;
+  }
+
+  const speaking = (registry: Registry): Group[] => groups(registry).filter((group) => group.minted !== undefined && group.offers.length > 1);
+
+  it('offers examine second wherever the entity offers anything else', () => {
+    const subjects = speaking(world());
+    expect(subjects.length).toBeGreaterThan(0);
+
+    for (const group of subjects) {
+      const at = `${group.at} / ${group.entity}: ${group.offers.map((offer) => String(offer.label)).join(' | ')}`;
+      expect(group.offers.map((offer) => offer.id).indexOf(group.minted!), at).toBe(1);
+    }
+  });
+
+  // Something fought reaches the offer list by a different road — the player's own two-sided
+  // actions, aimed at whatever is standing here — so a rule that only held for what an entity
+  // writes itself would pass the claim above and still put examine first on every rat.
+  it('holds over something fought as well as something only acted on', () => {
+    const registry = world();
+    const subjects = speaking(registry);
+    const fought = subjects.filter((group) => Object.keys(registry.entities.get(group.entity)!.stats).length > 0);
+
+    expect(fought.length).toBeGreaterThan(0);
+    expect(subjects.length).toBeGreaterThan(fought.length);
+    for (const group of fought) expect(group.offers.map((offer) => offer.id).indexOf(group.minted!), `${group.at} / ${group.entity}`).toBe(1);
   });
 });
