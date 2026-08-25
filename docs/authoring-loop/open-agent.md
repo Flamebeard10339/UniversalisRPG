@@ -270,22 +270,6 @@ section had lived in `core` or `tulsa`; moving the hammers into `tulsa` broke it
 It derives properly now. Whether its neighbours carry the same assumption has not
 been asked.
 
-**A kind cannot ask for one name across modules and have its references checked.**
-`ids: 'global'` reads like an id-scoping choice and is silently also an opt-out of
-reference checking — `isNamespacedKind` gates both reference visits, two files away
-from the comment that says what `global` means. `# modal` picked the obvious word
-and got the bug; `dsl.test.ts` now refuses any global kind that anything names, so
-the next one fails rather than ships, but a kind that legitimately wants both still
-has no way to say so. *Closes when:* the two are separate declarations.
-
-**A minted action squats the `# action` key space without declaring it.** The
-action `examine:` mints keys its label at `action.examine.examine` through a plain
-`set`, on a bare unnamespaced global id it never declares — so a module writing
-`# action examine` lands on the same key and one of the two silently wins. Nothing
-can refuse the squat, because the namespace was never told the minted id exists.
-Pre-existing, and the same shape when the address was `look`. *Closes when:* a
-minted action's id is declared where an authored one's would be.
-
 **A locale-key move silently orphans a row in `content/reviewed.tsv`.** The ledger
 is keyed by locale key, so a key that moves takes its "a person has read this"
 answer with it — the row does not come back marked CHANGED, it just stops being

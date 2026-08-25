@@ -198,11 +198,28 @@ only claim that can be made without walking anywhere.
 engine opens `quest-journal` by name from `command.ts` while `core.dsl` never
 declared it. `sections/test.ts` refuses `open-modal:` through the same words,
 `modalStack.ts` keys its openers by `ModalScreen` so the compiler refuses both
-directions, and the oracle's forms map off the same list. **A kind that anything
-names may not declare `ids: 'global'`** — that flag silently opts a kind out of both
-reference visits, and `dsl.test.ts` derives its subjects twice over (every kind a
-schema field names, plus every kind the corpus's own references ask about) so the
-next one fails rather than ships.
+directions, and the oracle's forms map off the same list.
+
+**A kind declares its id scope and its name checking separately: `ids` and
+`vocabulary`.** They used to be one answer — `ids: 'global'` silently opted a kind out
+of both reference visits, because `isNamespacedKind` gated both — so a kind that wanted
+one name across every module *and* its references checked could not say so, and
+`# modal` picked the obvious word and got the bug. `isNamespacedKind` is gone.
+`vocabulary: 'declared'` means a name nothing declares is refused; `vocabulary: 'open'`
+means the vocabulary is the union of what the corpus writes, which is what `# slot`
+wants and what its own file already said in a comment. `dsl.test.ts` derives both
+halves: every kind anything names must be `declared`, and `ids: 'owned'` implies
+`declared`, because `resolve` rewrites a module-scoped name into a key that has to
+exist. A global name is already its own key, which is the one that may be left open.
+
+**A name the engine mints and a name an author writes are different acts, and
+`Namespace` keeps them apart.** `mint` holds a minted id at the root, is idempotent
+across every section that mints it, and refuses an authored id standing on one;
+`declare` refuses the reverse. Before that, the minted `examine:` stood on a bare
+undeclared id, so a module writing `# action examine` landed on `action.examine.examine`
+and one of the two silently won — confirmed against a two-section draft, where the
+statue's minted offer wore the authored action's title. The minted id derives from the
+same branch the locale key already used, so the id and the words cannot drift.
 
 **A station is `# station <id>`, and a station's name is core's furniture.** The
 name is declared where the world's vocabulary is declared, the entity that opens
