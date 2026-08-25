@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Seventeen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Nineteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -388,3 +388,29 @@ The lane's case against making it automatic, which is why it did not guess:
 *Moves when: he says permission or obligation. If obligation, the third point has to be
 answered first — either those runs never enter `content/`, or the claim-in-words rule gains
 an exception, and that exception is his to grant.*
+
+## The stat groups are a draft, and which stat sits where is yours
+
+A stat's tab is now its own `# group` and nothing else, so revising this is one `group:`
+line per stat in `content/core.dsl` and `content/combat-expansion.dsl`. The only structural
+constraint is that exactly one `# group` stands `standard for: stat`. The draft:
+
+- **Fighting** (the main tab) — Attack, Defense, Accuracy, Evasion, Attack Rate, Max Health
+- **Upkeep** — Regeneration, Max Rage, Rage Drain
+- **Knack** — Cooking Rate, Felling, Luck
+
+*Moves when: he renames a tab or moves a stat. Nothing is waiting on it — the shape is
+settled and only the membership is a draft, which is exactly what the ruling said it would
+be.*
+
+## Whether a terminal should print a stat's shares too
+
+`/stat <id>` opens the screen on every surface, but the *words* for what makes a number —
+`amounts` and `madeOf` — live in `src/ui`, so `replLines` draws nothing beside it and only
+the app shows the shares. Moving those two down into runtime would give both surfaces one
+function. The lane left them where they were because the costing it inherited said the
+runtime does not change, and wrote the reason at the call site rather than quietly moving it.
+
+*Moves when: he says whether the terminal owes a stat's breakdown. If yes it is a small
+agent line — two functions down a layer and `replLines` reading them; if no, this is deleted
+and one sentence goes to `settled.md` saying the app is where a number is explained.*

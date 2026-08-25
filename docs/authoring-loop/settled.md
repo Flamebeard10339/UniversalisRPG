@@ -1067,6 +1067,26 @@ automatic end sheet would mint corpus-illegal tests by construction. Where one *
 it lands as whole-sheet `expect:`, which is the one form that can say a key the state has
 stopped holding.
 
+**A stat's tab is its `# group`, and no list of tabs exists.** `# stat` carries the same
+`GROUP_FIELD` `# item` and `# entity` already write, `statRow` publishes it through the
+generic `grouping()`, and `statTabs` derives the strip from the groups the rows carry in the
+order the view publishes them — so the first tab is the group of the first `# stat`, and
+moving a stat between groups moves it between tabs. `# group measure` stands
+`standard for: stat`, which makes *every stat is on a tab* true by construction and is
+already covered by the claim `dsl.test.ts` derives for every kind that names a group.
+
+**A declared name is drawn whole, and `NAME` in `src/ui/sheetLayout.ts` is where that is
+decided.** Every `truncate` on a name is gone from `Ledger`, `SkillsPane` and `PlaneModal`;
+`LAYOUTS` is the same object as the `Layout` type, so a fixture long enough to wrap is drawn
+in all three layouts and a fourth has to answer it. The sweep derives its subjects: a file
+that takes `NAME` may not write `truncate`.
+
+**A stat's shares are reached by `/stat <id>`, the way a quest is reached by `/quests
+<quest>`.** `stat-breakdown` is an ordinary `MODAL_SCREENS` entry with a `stat` `Focus`, so
+the app, the terminal and a recorded run reach it by one line, and `/stat` with no id lists
+every stat with its group's word — which is what put `stats[].group` in front of all three
+drivers instead of into the parity excuse list.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

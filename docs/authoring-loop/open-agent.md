@@ -128,34 +128,6 @@ dialogue change moves the same figures and the two collide.
 
 ### The character sheet
 
-**Every stat is on one page and most of them are secondary.** *"there are a whole bunch
-of stats that are secondary. Like rage drain. We need to be able to group stats into
-tabs and then have the important ones on the main tab, and the less important ones
-elsewhere."* A `# group` already says what something is; whether a stat's group is that
-same fact or a different one is the lane's first question, and `one-home` is the
-procedure for answering it. Which stat lands where is authoring the lane drafts and the
-owner revises.
-
-**A stat's breakdown is drawn on a sheet row rather than on the modal that now exists.**
-Pressing a stat says what is adding to it, by name, through the simplest surface that was
-already there — `Ledger`'s `onOpen` and `Entry.detail`. The modal API landed the same day
-and this should move onto it, and the lane that built the breakdown costed the move: **the
-runtime does not change at all.** The shares are already on the view as `StatRow.from` and
-the words are already one function, `madeOf` in `src/ui/sheet.ts`. What moves is the
-`openStat` `useState` in `App.tsx` and the third parameter of `counted`, both deleted;
-`onOpen` points at whatever opens the modal — its sibling today is `driver.open`, which
-sends `/inv <id>` and sets `view.focus`, so a stat wants the equivalent `/stat <id>` and a
-`Focus` case — and the body renders from `row.from`, one row per share, which a modal can
-afford and a sheet row cannot. *Closes when:* the breakdown is a modal like every other.
-
-**Three things wrong with the item modal, in one turn.** *"Clicking on an item in the
-inventory flashes the ?chat? on the screen for a single frame. I can't seem to interact
-with the skill tree of the iron sword. Or equip them. Also the item names should wrap
-(we should support languages with arbitrary length strings)."* The flash is a bug, the
-plane and the equip are surfaces the modal has elsewhere and not here, and the wrapping
-is the one of the three with a derived proof available — a label long enough to wrap is
-a fixture, not a screenshot.
-
 ### Modals
 
 > Modals need to be generalized into a single API so that every single modal isn't
