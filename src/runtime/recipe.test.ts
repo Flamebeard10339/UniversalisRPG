@@ -4,6 +4,7 @@ import { craft, createGameState, recipeCraftable, resolve } from './runtime';
 import { Registry } from '../content/registry';
 import { CRAFT_ADDRESS } from '../content/sections/recipe';
 import { loadModule } from '../content/load';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { applyDirective, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
@@ -153,7 +154,9 @@ describe('session craft choices', () => {
   });
 });
 
-const STATION_MODULE = `
+const STATION_MODULE =
+  FIXTURE_WORLD +
+  `
 # item water
 examine: A splash of water.
 
@@ -167,7 +170,6 @@ examine: A small camp stove.
 stations: stove
 
 # location camp
-x: 2, y: 0
 entities:
   stovetop
 
