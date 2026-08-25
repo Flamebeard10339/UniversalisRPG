@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Twenty-three lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Twenty-four lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -465,3 +465,14 @@ twenty — but the number no longer reads as the ceiling.
 *Moves when: he says whether that assert should read the ceiling exactly. `wait: 29` does
 it; it is a content choice about what the route is demonstrating, which is why the lane did
 not take it.*
+
+## Whether the on-ramp should mention the Skill Tree
+
+Miki now hands over the sword and the shield, tells the player to open what they are carrying
+and put them on, and the screen opens behind him. The iron sword declares `item-level: 3-8`,
+so a **Skill Tree** verb is sitting on it the moment they get there — with nothing in the
+world having explained what a plane is. The lane left it unmentioned deliberately: the ruling's
+own closing condition is the gear and the wearing of it, and a plane is a whole system.
+
+*Moves when: he says whether the on-ramp gets a fourth line for it or whether that belongs to
+a later beat. It is one line of Miki's under the standing draft-it-directly policy either way.*

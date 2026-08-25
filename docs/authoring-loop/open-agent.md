@@ -63,13 +63,3 @@ cutting them landed the route on its recorded sheet **completely unchanged**, wh
 proved they were no-ops. Pre-existing and unclaimed. *Closes when:* arming a fight on
 something that is not there is refused in the player's own words, the way an unmet
 `requires:` now is.
-
-**Miki teaches the plane when he hands over the gear.** Ruled, closing the on-ramp
-question: *"Miki needs an extra line of dialogue when he gives the player the sword and
-the shield encouraging the player to check the items in their inventory and opening up
-the modals."* So the on-ramp is words plus an affordance — the line should be able to put
-the player in front of the modal rather than only mentioning it. **The modal API has since
-landed and that affordance now exists**: a screen is opened by a line the way `/stat <id>`
-and `/quests <quest>` open theirs, so this is words plus one `open modal:`, with no
-component edit. *Closes when:* the line that hands over the gear can also put the player in
-front of what it is talking about.

@@ -1169,6 +1169,22 @@ a fishing net per talk because of it. The pair the engine already has is the ans
 says its piece once and every visit after gets the `again:` line, so the offer still stands
 as long as the stage does without the gift repeating.
 
+**A dialogue node's `open modal:` lands under the conversation, not over it.** `session.ts`
+steps the whole node — effects included — and *then* pushes `dialogueFrame(cursor)`, so a
+screen a line opens is what the player finds when they have read the speaker out and pressed
+Continue. Nothing is thrown at anyone mid-sentence, and that is the engine's ordering rather
+than something a caller arranges. Write `open modal:` **last in the node body** so the
+engine's *A screen opens: …* notice lands after the last thing said instead of between two
+of them. Miki's gear hand-over is the first use of it in dialogue; it had only ever been on
+an action before, and no component needed editing because `modals.ts` publishes `topModal`
+alone.
+
+**`carried-items` is the only screen `open modal:` can name that holds an item**, and
+everything an on-ramp wants is reached from inside it: the chosen item's `examine:` words
+are the heading, **Equip** is a verb on it, and an item's plane is the **Skill Tree** verb one
+step further in. An item's own screen is a second option row on that one, and `item-plane` is
+a frame `openModalNamed` explicitly refuses to open by name.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
