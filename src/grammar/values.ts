@@ -18,6 +18,8 @@ export const text: Parser<string> = {
   examples: ['Rusty Sword', 'a line that runs to the end'],
 };
 
+const THRESHOLD = 'this number is a threshold, not a quantity, so it takes one value rather than a range';
+
 export const number: Parser<number> = {
   parse: (cursor) => {
     const raw = cursor.take(/-?\d+/);
@@ -26,7 +28,7 @@ export const number: Parser<number> = {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
-    refuseRange(cursor, 'this number is a threshold, not a quantity, so it takes one value rather than a range');
+    refuseRange(cursor, THRESHOLD);
     return Number(raw);
   },
   print: (value) => String(value),
@@ -44,6 +46,7 @@ export const decimal: Parser<number> = {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
+    refuseRange(cursor, THRESHOLD);
     return Number(raw);
   },
   print: (value) => String(value),

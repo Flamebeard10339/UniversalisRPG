@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser } from './parser';
-import { id, number, REFERENCE } from './values';
+import { decimal, id, number, REFERENCE } from './values';
 
 export interface Reference {
   path: string[];
@@ -29,7 +29,7 @@ export const ENGINE_ROOTS = {
   level: { kind: 'skill', stands: 'mining', against: 2 },
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
-  stat: { kind: 'stat', stands: 'attack', against: 10 },
+  stat: { kind: 'stat', stands: 'attack', against: 1.5 },
 } as const satisfies Readonly<Record<string, Rooted | Named | null>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
@@ -106,7 +106,7 @@ function parsePrimary(cursor: Cursor): Condition {
       kind: 'comparison',
       left: reference,
       operator: comparison.trim() as ComparisonOperator,
-      right: number.parse(cursor),
+      right: decimal.parse(cursor),
     };
   }
   return { kind: 'reference', reference };
@@ -136,7 +136,7 @@ function printCondition(value: Condition): string {
     case 'reference':
       return printReference(value.reference);
     case 'comparison':
-      return `${printReference(value.left)} ${value.operator} ${number.print(value.right)}`;
+      return `${printReference(value.left)} ${value.operator} ${decimal.print(value.right)}`;
     case 'has':
       return value.count === 1 ? `has ${value.item}` : `has ${number.print(value.count)} ${value.item}`;
     case 'not':
