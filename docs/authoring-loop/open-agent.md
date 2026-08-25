@@ -214,25 +214,6 @@ would then need somewhere else to travel from, and a `/map` command is the propo
 lands, *Travelling shows no progress on the map* in `open-human.md` may close with
 it: a three-second walk does not read as a freeze.
 
-## A condition cannot name a number that is not whole
-
-**`assert:` reads integers only** (`/-?\d+/` in `src/grammar/values.ts`), so a claim
-landing on a folded percentage stat cannot be exact and is forced into a band — and a
-band also passes in a world where the mechanic did nothing. That is the structural
-reason the vigor claim existed at all, found by the lane that closed it: it worked
-around the wall by counting the stacks off a `DEBUG` tally instead of reading the
-stat, which is a good answer for one test and not a general one. Every later claim on
-a real-valued stat meets the same wall. *Closes when:* a condition can name a number
-the engine can actually hold.
-
-**`expect only:` is carrying a claim nobody wrote.** The vigor sheet caught both a
-rebalance and a dead `quickening`, but only through incidental couplings — buff expiry
-clocks shifting because the cadence shifted. The file's own instruction is to
-regenerate a sheet whenever content changes on purpose, so a recording doing work no
-`assert:` states is one regeneration away from doing none. *Closes when:* what the
-sheet stands in for is written as a claim, or the load is measured and found to be
-nothing.
-
 ## Ours, and small
 
 **A reload starts a fresh game.** `openUniverse` calls `startSession`
@@ -267,13 +248,6 @@ while its claim was about locale keys, and only ever passed because no `DEBUG`
 section had lived in `core` or `tulsa`; moving the hammers into `tulsa` broke it.
 It derives properly now. Whether its neighbours carry the same assumption has not
 been asked.
-
-**A locale-key move silently orphans a row in `content/reviewed.tsv`.** The ledger
-is keyed by locale key, so a key that moves takes its "a person has read this"
-answer with it — the row does not come back marked CHANGED, it just stops being
-about anything. No file exists yet on this branch, so nothing has broken; the first
-review pass is when it starts to matter. *Closes when:* an orphaned row is reported
-rather than ignored.
 
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`

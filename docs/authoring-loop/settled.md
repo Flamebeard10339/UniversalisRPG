@@ -520,6 +520,30 @@ are priced in band with the hand-axe at 12 while every jewel, whetstone and orb
 still declares no value at all. A price that read the ceiling would turn the
 one-shot caches those come out of into purses.
 
+**A condition's threshold reads a decimal; a count reads a whole number.** The engine's
+numbers were measured rather than assumed: `statValue` is a midpoint of a scaled range,
+an arbitrary double with folded percentages in it, while `xp`, `level` and an inventory
+count are genuinely whole. So the comparison's right side takes `decimal` and
+`has <count>` does not. Nothing else widened — the other readers of both parsers were
+checked one at a time, and no input that was accepted before is refused.
+
+**An `expect only:` sheet is not a claim, and what one carries alone can be measured.**
+The vigor sheet's load was found by deleting its `expect only:` line and running seven
+deliberate breaks against both shapes: five were already caught by `assert:`, and two
+rested on the recording alone — whether `quickening` paid out at all, and whether the
+payload's clock was the sixty seconds its declaration claims. Both are written as
+claims now, one of which needed the decimal threshold to exist. `npm run mutate` is the
+tool that settles this question and it reports `2 killed, 0 survived` on those two.
+
+**An orphaned `content/reviewed.tsv` row is reported and never deleted.** The row
+carries a person's "I read this" answer, so a key that moved wants its row moved and a
+line that is gone wants its row gone — and which of the two it is, is the reader's call.
+The keys it is measured against derive off the same walk that writes the ledger, and
+every module's sheet is built even when a run asks for one, because deriving from only
+the asked-for modules would report the rest of the ledger as orphaned. A key a
+`# locale` declares is not in `registry.locales.base`, which is why a registry-only
+derivation would have been wrong.
+
 **How long the runner waits for a test lives once, in `vite.config.ts`.** It is a
 hang detector at 120 seconds, not a budget, and no test states its own — the two
 hand-kept per-test budgets are deleted. Every red `npm test` has produced on this
