@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { declaredId } from './sections/entity';
+import { declaredId, type Action } from './sections/entity';
 import { actionAddress, type ActionTextOwner } from './sections/action';
 import { actionSlug, localeKey, missingTranslations, unmatchedLocaleKeys } from './locale';
-import { actionSlugProblem, contentSectionMaps } from './sections';
+import { actionSlugProblem, contentSectionMaps, isDebug } from './sections';
 import { everyActionTable, mapOf, type Registry } from './registry';
 import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { sameValue } from './registryDiff';
@@ -156,22 +156,29 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
 describe('an action declared once carries one key, however many owners perform it (c7)', () => {
   const island = loadUniverse(standingSources());
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
+  const declarationKey = (action: Action): string => localeKey(island.namespace.ownerOf('action', declaredId(action)!) ?? null, 'action', declaredId(action)!, actionAddress(action));
+
+  // A DEBUG declaration says nothing in any language, so the words it does not have are not a
+  // missing key: the two halves are asked their own question rather than one half being dropped.
+  const spoken = performed.filter(({ action }) => !isDebug(island.actions.get(declaredId(action)!)));
+  const silent = performed.filter(({ action }) => isDebug(island.actions.get(declaredId(action)!)));
 
   it('has shipped content that hands one declaration to several owners', () => {
     const perDeclaration = new Map<string, number>();
-    for (const { action } of performed) perDeclaration.set(declaredId(action)!, (perDeclaration.get(declaredId(action)!) ?? 0) + 1);
+    for (const { action } of spoken) perDeclaration.set(declaredId(action)!, (perDeclaration.get(declaredId(action)!) ?? 0) + 1);
 
     expect([...perDeclaration.values()].some((count) => count > 1)).toBe(true);
   });
 
   it('writes the words under the declaration, in the language the declaration was written in', () => {
-    for (const { action } of performed) {
-      const id = declaredId(action)!;
-      const key = localeKey(island.namespace.ownerOf('action', id) ?? null, 'action', id, actionAddress(action));
-
-      expect(island.locales.base.get(key)?.text).toBe(action.label);
-      expect(island.locales.base.get(key)?.language).toBe('en');
+    for (const { action } of spoken) {
+      expect(island.locales.base.get(declarationKey(action))?.text).toBe(action.label);
+      expect(island.locales.base.get(declarationKey(action))?.language).toBe('en');
     }
+  });
+
+  it('writes none for a declaration that ships to nobody, wherever one is performed', () => {
+    for (const { action } of silent) expect(island.locales.base.has(declarationKey(action))).toBe(false);
   });
 
   it('writes none under the performer, so no translator fills one word once per performer', () => {
