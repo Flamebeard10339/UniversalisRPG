@@ -61,6 +61,7 @@ export type Directive =
   | { kind: 'wait-out' }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
+  | { kind: 'swap'; one: string; other: string }
   | { kind: 'feed'; target: string; food: string }
   | {
       kind: 'slot';
@@ -140,6 +141,7 @@ const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
 
 const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${CARRIED})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
+const SWAP = new RegExp(`^swap:[ \\t]*(?<one>${CARRIED})[ \\t]+with[ \\t]+(?<other>${CARRIED})$`);
 
 const GROWTH_PAYLOAD = {
   feed: `(?<target>${CARRIED})[ \\t]+with[ \\t]+(?<food>${PATH})`,
@@ -332,6 +334,9 @@ export function parseDirectiveLine(text: string): Directive | null {
   const unequip = UNEQUIP.exec(text)?.groups;
   if (unequip) return { kind: 'unequip', slot: unequip.slot };
 
+  const swap = SWAP.exec(text)?.groups;
+  if (swap) return { kind: 'swap', one: swap.one, other: swap.other };
+
   const growing = GROWTH_VERB.exec(text)?.groups;
   if (growing) return parseGrowth(growing.verb as GrowthVerb, GROWTH_LINE, text, text);
 
@@ -411,6 +416,8 @@ export function printDirective(value: Directive): string {
       return `equip: ${value.item}`;
     case 'unequip':
       return `unequip: ${value.slot}`;
+    case 'swap':
+      return `swap: ${value.one} with ${value.other}`;
     case 'feed':
       return `feed: ${value.target} with ${value.food}`;
     case 'slot':
@@ -511,6 +518,7 @@ export const test = section<Test>()({
     },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
+    { form: 'swap: <item> with <item>', example: 'swap: rusty-sword with bread', note: 'exchanges where two things sit in the pack, which is the order the pack is drawn in and the order a save carries' },
     { form: 'feed: <item> with <item>', example: 'feed: cluster-jewel with fervour' },
     { form: 'slot: <item> at <q>,<r> <direction> with <jewel item>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
     { form: 'allocate: <item> at <q>,<r> position <n>', example: 'allocate: cluster-jewel at 0,0 position 1' },
@@ -598,6 +606,10 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'equip':
       putCarried(value, 'item', `${where} equip:`, visit);
+      return;
+    case 'swap':
+      putCarried(value, 'one', `${where} swap:`, visit);
+      putCarried(value, 'other', `${where} swap: with`, visit);
       return;
     case 'feed':
       putCarried(value, 'target', `${where} feed:`, visit);

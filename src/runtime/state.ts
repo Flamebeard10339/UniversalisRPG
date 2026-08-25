@@ -105,6 +105,7 @@ export interface GameState extends RngCursor {
   language: string;
   flags: Record<string, boolean | number>;
   inventory: Record<string, number>;
+  packOrder: string[];
   location: string;
   visits: Record<string, number>;
   xp: Record<string, number>;
@@ -153,7 +154,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

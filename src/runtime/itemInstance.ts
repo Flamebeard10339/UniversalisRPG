@@ -4,6 +4,7 @@ import { Registry } from '../content/registry';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
 import { localizerOf } from './localized';
+import { inPlayerOrder, type PackRow } from './packOrder';
 import { anId, aCopy, aCount, says, type Said } from './said';
 import { inventorySlots } from './tuning';
 import { skillLevel } from './skills';
@@ -125,12 +126,9 @@ export function heldCount(state: GameState, itemId: string): number {
   return stack + grown + worn;
 }
 
-export type PackRow = { readonly kind: 'stack'; readonly template: string; readonly count: number } | { readonly kind: 'grown'; readonly id: string; readonly template: string };
-
-// One row is one slot. A stack is a row however deep it gets, a grown copy is a thing in its own
-// right and so is a row of its own, and what the player is wearing is on them rather than in the
-// pack — which is why the sheet draws worn gear under a heading of its own and nothing here counts
-// it. Everything that asks how full the pack is, and everything that draws it, reads this list.
+// What the player is wearing is on them rather than in the pack, which is why the sheet draws worn
+// gear under a heading of its own and nothing here counts it. The rows come back in the order the
+// player has put their pack in.
 export function packRows(state: GameState): PackRow[] {
   const rows: PackRow[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
@@ -139,7 +137,7 @@ export function packRows(state: GameState): PackRow[] {
   for (const [id, template] of Object.entries(grownItems(state))) {
     if (wornIn(state, id) === undefined) rows.push({ kind: 'grown', id, template });
   }
-  return rows;
+  return inPlayerOrder(rows, state.packOrder);
 }
 
 // How many of one item are in the pack, read off the rows rather than counted again beside them, so

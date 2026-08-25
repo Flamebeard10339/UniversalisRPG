@@ -993,6 +993,7 @@ describe('what the engine withholds', () => {
       time: 'published',
       flags: 'published',
       inventory: 'published',
+      packOrder: 'published',
       equipped: 'published',
       xp: 'published',
       resources: 'published',
@@ -1017,7 +1018,7 @@ describe('what the engine withholds', () => {
 
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
     const carried = new Set(Object.keys(view(startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n')))));
-    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown', packOrder: 'carried' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
   });
 });
