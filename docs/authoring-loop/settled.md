@@ -963,6 +963,17 @@ through. **A masked thing offers nothing but the look that reads it**, so the pl
 stands until the player has met the door and nobody is stranded by a door they have not
 looked at.
 
+**Gains that land together and are the same size read as one line, and the count is not
+summed.** `saidLines` in `src/ui/notice.ts` folds a run of them — `+5 Attack` and
+`+5 Defence` become `+5 Attack, Defence`, because a player who gained five of each gained
+five and `+10` would say they gained ten of something there is no ten of. **One count is not
+enough to fold on**: an action that hands over a thing and the xp for taking it raises both
+at once, so roasting one chestnut is `+1` of the chestnut and `+1` of cooking, and counting
+alone says `+1 Roast Chestnut, Cooking`. The fold is held to one namespace as well, read
+back through `noticeKey` — the same function every watcher mints a key with, so what is
+written into a key and what is read out of one is one rule. A notice counting nothing is a
+whole sentence and never folds.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

@@ -323,14 +323,6 @@ that still cannot say *stood in* as distinct from *heard of* has not merged anyt
 
 ### Numbers and rules the owner ruled
 
-**Two xp gains fold back into one line.** Ruled: *"+5 attack and +5 defense, should read
-+10 attack, defense."* The grouping belongs in `sayingOf` over notices that share a count,
-not in the notice type — the lane costed that and it is small. **One thing to settle
-before writing it:** the previous fold read `+5 Attack, Defence`, and summing two
-different stats into `+10` says the player gained ten of something they did not. Take
-`+5 Attack, Defence` unless he says otherwise — the ruling is that they fold, and the
-arithmetic inside it reads like a slip rather than a decision.
-
 ### The tools
 
 **A recorded run carries a start save and an ending save, always.** Ruled, both halves:

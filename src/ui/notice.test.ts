@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { skillLevel, xpForLevel } from '../runtime/skills';
-import { merged, NOTICE_LIFETIME_MS, noticesBetween, sayingOf, type Notice, type Shown } from './notice';
+import { merged, NOTICE_LIFETIME_MS, noticesBetween, saidLines, sayingOf, type Notice, type Shown } from './notice';
 import type { Words } from './words';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -149,5 +149,32 @@ describe('how long a notification stays', () => {
 
     expect(fade, 'the stylesheet draws no .lingered fade').not.toBeNull();
     expect(Number(fade?.[1])).toBe(NOTICE_LIFETIME_MS);
+  });
+});
+
+describe('two gains the same size, landing together', () => {
+  const shownOf = (...notices: Notice[]): Shown[] => notices.map((notice, at) => ({ ...notice, id: at + 1, told: 1 }));
+  const said = (...notices: Notice[]): string[] => saidLines(shownOf(...notices)).map((line) => line.text);
+
+  it('reads as one line naming both, and does not sum what they are worth', () => {
+    expect(said(notice('xp:attack', 5, 'Attack'), notice('xp:defence', 5, 'Defence'))).toEqual(['+5 Attack, Defence']);
+  });
+
+  it('leaves two gains of different sizes as the two lines they are', () => {
+    expect(said(notice('xp:attack', 5, 'Attack'), notice('xp:defence', 3, 'Defence'))).toEqual(['+5 Attack', '+3 Defence']);
+  });
+
+  // Roasting one chestnut raises +1 of the chestnut and +1 of cooking in the same breath, and
+  // `+1 Roast Chestnut, Cooking` is a sentence about nothing.
+  it('leaves an item and a skill apart however alike their counts are', () => {
+    expect(said(notice('item:roast-chestnut', 1, 'Roast Chestnut'), notice('xp:cooking', 1, 'Cooking'))).toEqual(['+1 Roast Chestnut', '+1 Cooking']);
+  });
+
+  it('never folds a notice that counts nothing, since each is a whole sentence', () => {
+    expect(said(notice('quest:one', 0, 'A quest begins'), notice('quest:two', 0, 'Another begins'))).toEqual(['A quest begins', 'Another begins']);
+  });
+
+  it('folds a run of three, and keeps what follows it on its own line', () => {
+    expect(said(notice('xp:attack', 5, 'Attack'), notice('xp:defence', 5, 'Defence'), notice('xp:melee', 5, 'Melee'), notice('xp:cooking', 2, 'Cooking'))).toEqual(['+5 Attack, Defence, Melee', '+2 Cooking']);
   });
 });
