@@ -12,6 +12,7 @@ import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { PER_UNIT } from './discovery';
+import { offerCells } from './choices';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
 import { LocationBanner } from './LocationBanner';
@@ -318,12 +319,20 @@ describe('what the shell puts on the screen', () => {
     expect(driver.playtest.written().split('\n')[0]).toMatch(/^# save run-[a-z0-9-]+-start$/);
   });
 
-  it('draws every choice the engine is offering', () => {
+  it('draws every choice the engine is offering, or else the cell that is the way to it', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
+    const choices = driver.snapshot().view.choices;
+    // What a cell itself does is reached by pressing the cell, so its own words go undrawn. The name
+    // over that cell is what is on the screen instead, and that is what has to be there.
+    const lifted = new Map(offerCells(choices).flatMap((cell) => (cell.examine === null ? [] : [[cell.examine.id, cell.name!] as const])));
 
-    for (const choice of driver.snapshot().view.choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
+    expect(lifted.size, 'nothing is reached from the cell it sits on, so this excuses nothing').toBeGreaterThan(0);
+    for (const choice of choices) {
+      const through = lifted.get(choice.id) ?? choice.label;
+      expect(onScreen(runs, through), through).toBe(true);
+    }
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {

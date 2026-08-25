@@ -1,4 +1,5 @@
 import { Registry } from '../content/registry';
+import type { Place } from '../content/sections/slot';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { isGrownCopy, itemTemplate, packRows, wornCopy } from './itemInstance';
@@ -18,6 +19,7 @@ export interface WornRow {
   readonly title: Localized;
   readonly item: Answer | null;
   readonly name: Localized | null;
+  readonly at?: Place;
 }
 
 export type CarriedFrame = Extract<ModalFrame, { name: 'carried-items' }>;
@@ -64,11 +66,13 @@ export function wornRows(state: GameState, registry: Registry): WornRow[] {
   const slots = [...declared, ...Object.keys(state.equipped).filter((slot) => !declared.includes(slot))];
   return slots.map((slot) => {
     const id: string | undefined = state.equipped[slot];
+    const at = registry.slots.get(slot)?.at;
     return {
       slot,
       title: localizer.title('slot', slot),
       item: id ?? null,
       name: id === undefined ? null : nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null),
+      ...(at === undefined ? {} : { at }),
     };
   });
 }
