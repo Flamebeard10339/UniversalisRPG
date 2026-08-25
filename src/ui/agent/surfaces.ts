@@ -9,7 +9,8 @@ import type { LabelId } from '../labels';
 import { LAYERS, shellState, shownIn, toLayer, toSubpage, type ShellState, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
 import type { JournalRow } from '../journalPanel';
-import type { JournalEntry } from '../../runtime/session';
+import type { JournalEntry, StatRow } from '../../runtime/session';
+import type { StatTab } from '../statTabs';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
 import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../../runtime/runLog';
@@ -357,6 +358,31 @@ export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   };
 }
 
+// The character sheet's tabs, which are the groups the world's own stats belong to, and the one way
+// in: pressing one, which changes nothing the engine hears about.
+export function statsSurface(held: AgentSurfaces['stats']): TestSurface {
+  return {
+    state: () => ({ chosen: held.chosen, tabs: held.tabs.map((tab) => ({ id: tab.group?.id ?? null, title: tab.group?.title ?? null, stats: tab.rows.map((row) => row.id) })) }),
+    actions: {
+      tab: (value) => held.controls.tab(tabNamed(held.tabs, value)),
+    },
+  };
+}
+
+export function tabNamed(tabs: readonly StatTab[], value: unknown): Answer | null {
+  const tab = tabs.find((each) => (each.group?.id ?? null) === (value ?? null));
+  if (!tab) throw new Error(`the character sheet has no tab called ${String(value)}`);
+  return tab.group?.id ?? null;
+}
+
+// What the breakdown screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
+export function statSurface(held: AgentSurfaces['stat']): TestSurface {
+  return {
+    state: () => ({ stat: held.row.id, value: held.row.value, from: held.row.from.map((share) => share.title) }),
+    actions: {},
+  };
+}
+
 // What the journal screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
 export function questSurface(held: AgentSurfaces['quest']): TestSurface {
   return {
@@ -378,6 +404,8 @@ export interface AgentSurfaces {
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
   quest: { entry: JournalEntry };
+  stats: { tabs: readonly StatTab[]; chosen: Answer | null; controls: { tab(id: Answer | null): void } };
+  stat: { row: StatRow };
   playtest: { run: RecordedRun | null; controls: PlaytestControls };
   replay: { replay: ReplaySnapshot | null; controls: ReplayControls };
   edit: EditHeld;
@@ -390,6 +418,8 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   skills: (held) => skillsSurface(held),
   journal: (held) => journalSurface(held),
   quest: (held) => questSurface(held),
+  stats: (held) => statsSurface(held),
+  stat: (held) => statSurface(held),
   playtest: (held) => playtestSurface(held),
   replay: (held) => replaySurface(held),
   edit: (held) => editSurface(held),

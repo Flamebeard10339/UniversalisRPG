@@ -5,6 +5,7 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { slotStore, type SlotDriver } from '../runtime/store';
+import { dismissal } from './asking';
 import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
 import { listLocalSections, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { clearingReaches, OPENING_CELLS, type OpeningCell } from '../runtime/openUniverseFixture';
@@ -142,6 +143,35 @@ describe('the GUI driver', () => {
 
     expect(shown(driver).modals.map((modal) => modal.name)).toEqual(['quest-journal']);
     expect(shown(driver).said).toEqual([]);
+  });
+
+  // The same claim of every screen the player opens for themselves, its subjects derived from what
+  // the shipped world puts in their hands and on their sheet rather than named here. What the app
+  // draws above a screen can no longer be anything but this: `Modal`'s `spoken` takes the view's own
+  // `Localized` lines, which the transcript's entries are not, so the guess that drew the tail of the
+  // chat over the item screen is refused by the compiler and not only by a test.
+  it('hands every screen a player opens no words, whichever door they opened it by', () => {
+    const driver = createDriver(SHIPPED_SOURCES);
+    // A pack with something in it, which is the one of the three doors a fresh session cannot open.
+    driver.send('/dev on');
+    driver.send('/load core.four-rows-and-a-blade-worn');
+    const opening: Array<[string, () => void]> = [
+      ['quest-journal', () => driver.readQuest(shown(driver).journal[0]!.quest)],
+      ['stat-breakdown', () => driver.readStat(shown(driver).stats[0]!.id)],
+      ['carried-items', () => driver.open(shown(driver).carried[0]!.id)],
+    ];
+
+    for (const [screen, open] of opening) {
+      const examine = shown(driver).choices.find((choice) => choice.id.endsWith('.examine'))!;
+      driver.choose(position(driver, examine.id));
+      expect(shown(driver).said.length, screen).toBeGreaterThan(0);
+
+      open();
+
+      expect(shown(driver).modals.map((modal) => modal.name), screen).toEqual([screen]);
+      expect(shown(driver).said, screen).toEqual([]);
+      driver.answer(dismissal(shown(driver).modals)!.key, dismissal(shown(driver).modals)!.value);
+    }
   });
 
   it('answers a modal by its published option key, and what was beneath comes back', () => {

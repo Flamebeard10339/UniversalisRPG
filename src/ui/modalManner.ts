@@ -60,6 +60,7 @@ type About = NonNullable<PlayView['focus']>['kind'];
 const AROUND: Record<About, Declared> = {
   plane: { place: 'fill' },
   quest: {},
+  stat: {},
 };
 
 export const declaredFor = (focus: PlayView['focus']): Declared => (focus === null ? {} : AROUND[focus.kind]);

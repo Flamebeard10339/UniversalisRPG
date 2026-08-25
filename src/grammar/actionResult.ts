@@ -15,7 +15,7 @@ export type Party = 'me' | 'them';
 export const STARTING_LOCATION = 'starting-location';
 
 // The screens the engine runs, and the whole of what `open modal:` may name. It is written beside the syntax because a screen is not something a module declares: a content kind holding the list could only restate this one, and the engine's own openers key off it from above.
-export const MODAL_SCREENS = ['name-yourself', 'choose-race', 'carried-items', 'quest-journal'] as const;
+export const MODAL_SCREENS = ['name-yourself', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown'] as const;
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
 

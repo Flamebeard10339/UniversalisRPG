@@ -3,7 +3,7 @@ import { gripFor, type Carried, type Grip } from './DragSheet';
 import { fillOf } from './lineStyle';
 import { droppedOn, type CellBox } from './packDrag';
 import type { Entry } from './sheet';
-import { doll, GRID, type Layout } from './sheetLayout';
+import { doll, GRID, NAME, type Layout } from './sheetLayout';
 import type { Point } from './viewport';
 import { TOUCH_FLOOR } from './viewport';
 
@@ -22,7 +22,7 @@ function Row({ entry, onOpen }: { entry: Entry; onOpen?: (id: string) => void })
     <div className="relative border-b border-border py-2 last:border-b-0 active:scale-[0.99] active:text-accent">
       <Opener entry={entry} onOpen={onOpen} drag={null} />
       <div className="flex items-baseline justify-between gap-3">
-        <dt className="min-w-0 flex-1 truncate text-sm">{entry.name}</dt>
+        <dt className={`min-w-0 flex-1 text-sm ${NAME}`}>{entry.name}</dt>
         <dd className="shrink-0 text-sm tabular-nums text-text-subtle">{entry.value}</dd>
       </div>
       {entry.detail ? <dd className="mt-0.5 text-xs tabular-nums text-text-muted">{entry.detail}</dd> : null}
@@ -51,9 +51,9 @@ function Cell({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => 
       }`}
     >
       <Opener entry={entry} onOpen={onOpen} drag={drag} />
-      <dt className="w-full truncate text-center text-xs font-semibold">{entry.name}</dt>
-      <dd className="w-full truncate text-center text-xs tabular-nums text-text-subtle">{entry.value}</dd>
-      {entry.detail ? <dd className="w-full truncate text-center text-xs tabular-nums text-text-muted">{entry.detail}</dd> : null}
+      <dt className={`w-full text-center text-xs font-semibold ${NAME}`}>{entry.name}</dt>
+      <dd className={`w-full text-center text-xs tabular-nums text-text-subtle ${NAME}`}>{entry.value}</dd>
+      {entry.detail ? <dd className={`w-full text-center text-xs tabular-nums text-text-muted ${NAME}`}>{entry.detail}</dd> : null}
     </div>
   );
 }

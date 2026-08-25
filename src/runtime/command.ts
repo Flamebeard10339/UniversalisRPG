@@ -309,6 +309,19 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
 }
 
+// The breakdown opened on one stat, the same two lines the journal opens a quest with. A stat is
+// found by the id the view publishes or by the name its own module gave it, which is how every id a
+// player types is read.
+function openStat(ctx: CommandContext, stat: string): CommandResult {
+  const found = ctx.view.stats.find((row) => row.id === stat || row.id.endsWith(`.${stat}`));
+  if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.stat.unknown', { stat: sessionLocalizer(ctx.session).identifier(stat) }));
+
+  const opened = runDirective(ctx, { kind: 'open-modal', modal: 'stat-breakdown' });
+  if (opened.recorded.length === 0) return opened;
+  const reading = runDirective(ctx, { kind: 'submit-modal', key: 'stat', value: found.id });
+  return { ...reading, recorded: [...opened.recorded, ...reading.recorded] };
+}
+
 // The journal opened on one quest, which is the screen opened and then answered — the same two lines a recording would replay.
 function openJournal(ctx: CommandContext, entries: readonly JournalEntry[], quest: string): CommandResult {
   const found = entries.find((entry) => entry.quest === quest || entry.quest.endsWith(`.${quest}`));
@@ -867,6 +880,27 @@ export const COMMANDS: readonly CommandSpec[] = [
           tone: 'plain' as const,
           text: grouped(localizer, entry.group, entry.title),
           detail: entry.lines.map((line) => (line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said)),
+        })),
+        quit: false,
+        recorded: [],
+      };
+    },
+  }),
+  define({
+    name: '/stat',
+    arg: 'id',
+    argHint: '[<stat>]',
+    summary: 'list every stat and what it stands at, or open one on what is adding to it',
+    parse: (rest) => rest,
+    run: (ctx, stat) => {
+      const localizer = sessionLocalizer(ctx.session);
+      if (stat !== '') return openStat(ctx, stat);
+      return {
+        output: ctx.view.stats.map((row) => ({
+          kind: 'message' as const,
+          words: 'player' as const,
+          tone: 'plain' as const,
+          text: grouped(localizer, row.group, localizer.engine('engine.repl.stat', { stat: row.title, value: Number(row.value.toFixed(2)) })),
         })),
         quit: false,
         recorded: [],

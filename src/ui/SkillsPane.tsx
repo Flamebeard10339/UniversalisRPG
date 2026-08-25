@@ -4,7 +4,7 @@ import type { PlayView } from '../runtime/session';
 import { formatClock, tidy } from './format';
 import { Modal, ModalCard } from './Modal';
 import type { Declared } from './modalManner';
-import { GRID } from './sheetLayout';
+import { GRID, NAME } from './sheetLayout';
 import { filled, perHour, skillPanels, untilNext, type SkillPanel, type XpMark } from './skillPanels';
 import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
@@ -64,7 +64,7 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
               onClick={() => setOpened(panel.id)}
               className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised px-3 py-3 transition-transform duration-75 active:scale-[0.98] active:border-accent"
             >
-              <span className="w-full truncate text-center text-sm font-semibold">{panel.title}</span>
+              <span className={`w-full text-center text-sm font-semibold ${NAME}`}>{panel.title}</span>
               <Ring key={`${panel.id}-${crossed.greeted.has(panel.id) ? crossed.generation : 0}`} panel={panel} greeted={crossed.greeted.has(panel.id)} />
             </button>
           ))}

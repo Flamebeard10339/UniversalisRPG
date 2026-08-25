@@ -1,10 +1,20 @@
 import type { Entry } from './sheet';
 
-export type Layout = 'list' | 'grid' | 'doll';
+// Every shape a sheet is drawn in. The list and the type are one object, so a fourth cannot be drawn
+// without the claims that sweep every layout picking it up.
+export const LAYOUTS = ['list', 'grid', 'doll'] as const;
+
+export type Layout = (typeof LAYOUTS)[number];
 
 // The one grid every dense page is laid out on: as many columns of at least 6rem as the width
 // affords. A page that wants this shape takes it from here rather than writing the columns again.
 export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3';
+
+// How a name the world declares is drawn wherever a sheet draws one. It wraps and it breaks inside a
+// word, because a name is as long as its language makes it: cutting one off at the cell's edge reads
+// as a shorter name rather than as a name gone missing, and the languages that write longer ones than
+// English would lose the end of every row at once.
+export const NAME = 'whitespace-normal break-words';
 
 export interface Doll {
   body: readonly Entry[];
