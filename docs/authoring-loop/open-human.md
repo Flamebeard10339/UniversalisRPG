@@ -19,9 +19,10 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Three lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Six lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
-this file held turned out to be one-line answers nobody had asked him for.
+this file held turned out to be one-line answers nobody had asked him for. Three of
+the six arrived back the same day, each measured by the lane that hit it.
 
 ---
 
@@ -100,12 +101,14 @@ redundant paths to one field. Collapsing them is not available, and that was che
 — a per-line unit gives the same answer, because those two share a chunk for exactly
 the reason they share a word.
 
-**The recommendation on file: neither, yet.** What is actually at risk is one mutant
-in a test harness, and the specific hole — `choice.detail` going missing unnoticed —
-is closed for about five lines by a direct test, which is queued in `open-agent.md`.
-Shape A buys the general case at the price of the one thing this repo spends 11.5% of
-its commits undoing. Shape B is what the repo's own doctrine selects and should be
-taken the next time a driver is open for another reason, not on its own account.
+**The recommendation on file: neither, yet.** What was actually at risk is one mutant
+in a test harness, and that specific hole — `choice.detail` going missing unnoticed —
+is now shut: `scripts/lib/replLines.test.ts` holds every choice the shipped opening
+view gives an owner to saying it, and the mutation it was written against was made and
+watched to fail. So only the general question stands here. Shape A buys it at the price
+of the one thing this repo spends 11.5% of its commits undoing. Shape B is what the
+repo's own doctrine selects and should be taken the next time a driver is open for
+another reason, not on its own account.
 
 *Moves when: the owner picks a shape, or accepts the recommendation and this line is
 deleted with one sentence going to `settled.md` naming the blind spot and naming B as
@@ -121,3 +124,50 @@ of `page:` moves is played back. There are two recorded runs standing in
 
 *Moves when: he watches one and names the cadence. Nothing else answers it — and he
 has said explicitly that he will do it later.*
+
+## Which stat each skill raises, where a skill raises one at all
+
+Ruled and landed: every `# skill` naming a stat grants +1 to it per level, derived from
+that one word rather than written beside each skill, and a skill naming no stat grants
+nothing. `melee` and `thieving` took back the `stat: attack` the ruling names. What the
+lane could not answer is the rest of the list, and it measured the candidates rather
+than guessing:
+
+- **`cooking` → `cooking-rate`** (base 55). Natural fit by name, and +1 a level is a
+  modest nudge against that base.
+- **`woodcutting` → `felling`** (base **0.25**). Natural fit by name, but +1 a level is
+  a scale change rather than a balance nit: at level 2 a trunk falls in one swing where
+  it now takes four.
+- **`fishing` → nothing exists.** A stat would have to be invented before the question
+  can be answered at all.
+- **`thieving` → `attack`** is what is in the corpus now, restored because the ruling's
+  own wording names it — but it reads like a placeholder somebody pasted, a non-combat
+  skill quietly adding to the player's damage.
+
+*Moves when: he names a stat, or `none`, for each of the four. Each answer is a one-word
+content edit and the derived proof follows it with nothing else edited — so this is four
+words, not four tasks.*
+
+## Whether a sale may pay for itself when the pack is full
+
+`sellProblem` checks there is room for the coin before anything leaves the pack, so a
+player whose pack is full and who holds no coin cannot sell — including selling the very
+thing that would free the row. Pre-existing, and pinned by `pack.test.ts:182`, so the
+behaviour is deliberate as far as the suite is concerned. It bites harder now that grown
+gear takes a row: a pack full of blades and no coin is a reachable state and it is a
+dead end.
+
+*Moves when: he says whether the coin check belongs after the item leaves rather than
+before. Either answer is a small edit and the pinned test moves with it; guessing is what
+would be wrong, because the current order may be guarding something the lane did not see.*
+
+## Whether the counter should ask "how many" for a thing there is one of
+
+A grown copy has a stack size of 1 by construction, and the counter still says
+`Sell Modified Iron Sword — 19 each, you carry 1` and then asks *How many Modified Iron
+Sword will you sell?* Correct, and clunky. Both rulings that opened the counter to grown
+gear are silent on it.
+
+*Moves when: he says whether a row there is exactly one of skips the count. That is a
+second engine line and a branch in `shopScreen`, which no ruling on file authorises, so
+it needs his word before it is worth writing.*

@@ -380,26 +380,16 @@ that still cannot say *stood in* as distinct from *heard of* has not merged anyt
 
 ### Numbers and rules the owner ruled
 
-**Every skill grants +1 to its own stat per level.** Ruled: *"Yes, all skills should grant
-+1 to their respective stat per level."* `# skill melee` and `thieving` carried an inert
-`stat-id: attack` with no `per-level:` anywhere; the dead declarations were deleted and
-this makes them live. The rule says **every**, so its proof derives its subjects from the
-skill list rather than naming melee and thieving — and a skill that names no stat is the
-case to settle first, because the rule has to mean something for it.
-
-**A grown copy inherits its base's price and can be sold.** Ruled: *"A grown copy inherits
-the price and can be sold. Since stack size is 1, there is no ambiguity if the player
-chooses to sell their weapon."* That answer deliberately kills the hard half — the price
-does **not** answer to the instance's modifiers or plane, it is the base's `value:` — so
-what is left is `Trade` carrying copy identity. `trade.test.ts` currently asserts the
-refusal, so the behaviour is pinned and that assertion is part of what changes.
-
-**Grown gear takes a pack slot; worn gear does not.** Ruled: *"The player effectively has
-their inventory + all of their equipment slots. So yes, the player can store an extra item
-per equipment slot. However, grown gear should also take a slot."* `state.inventory`
-excludes worn **and** grown today; only the second exclusion goes. Equipping therefore
-still frees capacity, and growing an item when the pack is full becomes refusable, which
-is the new refusal to write and prove.
+**A shipped `# save` holds a base item the engine cannot put there.** Found while the
+counter was being taught to sell a grown copy. `# save
+in-town-with-mikis-sword-and-shield` (`content/tulsa.dsl:1064`) puts `core.iron-sword`
+into plain `inventory:`, and that item declares `item-level: 3-8`, so every one the
+world actually mints is an instance — every other save in the file carries it in the
+`instances` table. `receiveItem` can never produce the state this save describes. So
+`# test a-sword-and-a-shield-are-goods-at-a-counter` proves the *stack* path at the
+counter and the path real play produces is uncovered. *Closes when:* the save holds
+what play would hold, and the test that stands on it still proves what it was written
+to prove. Read the save and the test before touching either.
 
 **Two xp gains fold back into one line.** Ruled: *"+5 attack and +5 defense, should read
 +10 attack, defense."* The grouping belongs in `sayingOf` over notices that share a count,
