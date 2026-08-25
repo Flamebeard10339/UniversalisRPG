@@ -54,14 +54,36 @@ visit.** The engine refuses both on one node, since `again:` is unreachable on a
 conversation whose every node has fallen silent is no longer offered at all, so
 `reachedNow` returns nothing rather than a node that would say nothing.
 
-**Talking to someone offers every thread they hold open, and the player picks.**
-A thread is a node that says which moment is its turn (`when:`) or what it is
-called (`ask:`); a node offering only `always` is not a thread but what they say
-when no thread is open. One thread open is entered outright, so nothing gains a
-click. Threads are ordered by the words the player reads, never by declaration
-order — no module takes a place by loading earlier. Before this, the winner was
+**Talking to someone offers every thread they hold open, quest lines first, and the
+player picks.** A thread is a node that says which moment is its turn (`when:`) or
+what it is called (`ask:`); a node offering only `always` is what they say when no
+thread is open — **except under a `# quest`, where a line is never the fallback**.
+`Dialogue.fromQuest` is minted in `saidAt`, the one place a quest dialogue is made,
+`givenByQuest` reads it, and `openersNow` ranks quest → thread → otherwise. That
+ranking does not depend on how many stages a quest happens to have, and it moves no
+node into or out of the offered set: every quest node already carried a `when:` the
+engine wrote. **`isThread` must not be made to read that compiled `when:`** — it was
+tried, measured, and it strands the whole `apologised` route, because `snubbed.miki.0`
+becomes an `otherwise` node and `adrift.miki.0` is sticky on a flag that never goes
+false. One thread open is entered outright, so nothing gains a click. Within one
+standing, threads are ordered by the words the player reads, never by declaration
+order — no module takes a place by loading earlier. Before that, the winner was
 whichever module parsed last, which silently made an earlier quest's opening
 unreachable for fifteen turns of a run.
+
+**Naming a line says what to call it, not which moment is its turn.** `otherwise()` in
+`quest.ts` no longer treats `ask:` as an exemption, so a stage's fallback line can be
+named without coming open beside the line meant to replace it.
+
+**A beat that says its piece and asks nothing stands at Continue, and is not a modal
+left open.** `standingAfter` is the one place either way of stepping a conversation
+turns into what it leaves in front of the player, and `AT_WHAT_WAS_SAID` is an
+ordinary cursor like the thread list — so the frame, the staleness check, the stack's
+sameness test and all three drivers needed no edit. A screen declares `asksNothing` in
+`DEFINITIONS` rather than having it inferred from its options, because a list of one is
+still a decision; `runTest` asks the screen rather than treating any open modal as a
+failure. A visit that genuinely said nothing leaves nothing standing, so no screen
+appears to be dismissed over nothing.
 
 **`choose:` names what it takes, and only falls back to counting.** A line in one
 node's menu is named by the words the `.dsl` writes it with; a thread is named by

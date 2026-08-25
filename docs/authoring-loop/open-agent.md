@@ -38,38 +38,6 @@ evidence a line exists, and the measurement is the evidence about its cause.
 
 ### What the chat says, and when
 
-**A node that says words and offers no choice reaches the player as nothing.** *"The
-second dialogue with miki doesn't pop up a modal (because there is no choice) the choice
-should be `continue`."* *Closes when:* such a node draws the same modal every other node
-draws, carrying one choice, *Continue*. **The modal API has since landed and this is now
-runtime only, with no UI edit at all** — the lane that built it says so: the `dialogue`
-entry in `DEFINITIONS` gives the option its one value, `declaredFor(null)` hands back the
-default manner, and a value that is not a `leaving` draws as an ordinary bottom sheet with
-the beat above it.
-
-**Talking is a location action rather than something Miki offers.** *"The talk to miki
-dialogue should be attached to miki, not be a location action."* Measured on the
-shipped corpus after examining Miki: `talk:tulsa.miki` is a `kind: 'talk'` choice in
-the same flat `choices` list as every `use:entity.…`, and it is the **only** choice
-carrying no `detail` — so it is the only one that does not name who is offering it,
-while the six beside it read `Examine · Miki`, `Examine · ?`, `ascend · Stairs`.
-Examine has already moved onto the entity's own cell; talk has not. *Closes when:*
-talk is reached from Miki, the way examine is.
-
-**Miki does not acknowledge what the player has already done.** *"Talking to miki
-after interacting with the mirror doesn't acknowledge that the player already did the
-thing."* `tulsa.mirror` sets `mirror-done` and the run's own `# save` carries it, so
-the flag is there and the greeting is what gets said anyway. Reproduce from that save
-before believing a cause; this closes with the thread ruling below, and probably by the
-same edit.
-
-**Miki's threads, and the ruling that unblocks them.** Crossed from `open-human.md`
-with the owner's answer: *"The dialogue should be drafted, and when I review it later,
-it might change, but it should be functional now for playtesters. The answer is just
-give the player a choice on which dialogue path they want to go down. Quests should
-have priority over regular dialogue, but a playtester shouldn't read the situation as a
-bug if they encounter it."*
-
 So: talking with more than one thread open **offers the paths as a choice**, quest
 threads ahead of the rest, each labelled in words rather than with its first spoken
 line. The reproduction is a fresh game on this branch — talk, take *"I'd rather find my
@@ -84,6 +52,14 @@ on its own:** it was measured, it makes Miki speak, and it strands the whole
 apologises before ever leaving the house, so the suite would not catch it — a proof
 that walks out of the house and back is part of closing this.
 
+**The apology hands out a fishing net every time it is talked through.**
+`finding-your-feet.apologised`'s first line is `sticky` and carries
+`give: core.fishing-net`, and sticky replays a node whole — so four talks measured
+`[1, 2, 3, 4]` nets. Found by the lane that rewrote Miki's threads and left alone as
+outside its four lines. *Closes when:* the route hands over one net however many times
+it is walked. **It moves `apology-route-full-end`'s sheet**, so do not take it beside
+anything else regenerating a route.
+
 **`leave-tutorial-island.adrift` opens on a premise that is false**, which is what
 makes the collision above reachable so early. Its gate is
 `tulsa.market-square.discovered` and the module's own comment justifies it as *"a place
@@ -91,7 +67,10 @@ that is only discovered by having stood in it"* — but discovery spreads to adj
 locations, so landing on the beach one step out of the house sets it, measured `true`
 immediately after `climb out`. Miki says *"So you found the market"* to a player who has
 never left the sand. *Closes when:* the corpus can state *has stood in*, and the stage
-is gated on that. Standing in a place is not a fact anything can state today, so this is
+is gated on that. **Since threads became a named list this is no longer silence but
+noise**: `adrift.miki.0` is sticky on a flag that never goes false, so *About this island
+of yours.* stands on every talk from the moment the market is found, for a player who has
+never left the sand. Standing in a place is not a fact anything can state today, so this is
 a small piece of engine work before it is a content edit — and rewriting the line to be
 true of the beach is the cheaper answer if the lane measures the new condition as worth
 more than it costs.
@@ -221,11 +200,6 @@ the failure mode `one-home` exists to catch.
 
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
-
-**Miki never says to find the mirror**, from the first run: *"He asks if you want him to
-show you the ropes."* The quest's opening reads as though he did. The mirror's location
-line has already been fixed by the owner in the working tree; this is the quest opening,
-and under the dialogue policy it is a lane's to write.
 
 **Dialogue does not animate.** Ruled: *"This should be a global variable that can
 optionally be edited/skipped by modals."* So a reveal rate is a setting with a default

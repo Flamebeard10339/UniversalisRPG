@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Fourteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Fifteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -307,3 +307,32 @@ that slot already set on this machine.
 *Moves when: he says whether an existing `"0"` should be read as `never` for the sake of
 whoever set it meaning never. It is a few lines in `cadenceOrUnreadable` and a claim beside
 it; doing it wrong silently changes what a slot means, which is why it was not guessed.*
+
+## Whether a talk and a trade should name who they are with
+
+Talking is now one of Miki's own offers rather than a location action, so a terminal reads
+`Miki: Talk to Miki` and the app draws it in a cell already headed *Miki*. The name is said
+twice. That is exactly the shape `engine.shop.label` has had all along — `Sunny: Trade with
+Sunny` — so **one ruling covers both** and the lane deliberately left them alike rather than
+fixing one and leaving the other odd.
+
+The cost of making it read just *Talk*: the English value drops `{entity}`, and
+`unsuppliedParameters` derives the parameters a translation may use **from the English** — so
+no other language could name the entity any more. `locale.test.ts:83` uses that very key as
+its worked example.
+
+*Moves when: he says whether an offer that already sits under its owner's name should repeat
+it. If yes, nothing changes; if no, it is two locale values and a decision about what a
+translation may still say, which is why it was not guessed.*
+
+## Whether the oracle should print the flags a kind mints
+
+`npm run oracle` prints the `flags:` line an author may *write*, and not the flags a kind
+mints for itself — so the grammar page never mentioned `discovered`, and now never mentions
+`touched`, even though the editing page's completion offers both and `declaredBy` holds all
+33. The gap predates today's work; the lane that found it left it alone.
+
+*Moves when: he says whether the printed grammar owes an author the minted flags too, or
+whether completion is the authority for those. If the oracle owes them, it is an agent line
+with an obvious shape; if not, this is deleted and one sentence goes to `settled.md` saying
+which surface answers for minted names.*
