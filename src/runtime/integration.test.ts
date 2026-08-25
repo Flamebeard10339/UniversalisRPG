@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, sampleStat, statValue, useFight } from './runtime';
 import { restorePools } from './effects';
 import { isPoint } from '../grammar/range';
+import { populationCount } from '../content/sections/location';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
@@ -262,9 +263,12 @@ describe('no shipped identifier is named after this content', () => {
 });
 
 describe('core health resource (Pass 2 end-to-end)', () => {
+  const cellarRats = registry.locations.get('tulsa.basement')!.entities.find((each) => each.entity === 'tulsa.giant-rat')!;
+
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
-    expect(state.resources['core.health']).toBe(toMilliUnits(30));
+    const full = state.resources['core.health'];
+    expect(full).toBe(toMilliUnits(30));
 
     state.location = 'tulsa.basement';
     useFight('core.melee-combat', 'tulsa.giant-rat', registry, state);
@@ -272,13 +276,18 @@ describe('core health resource (Pass 2 end-to-end)', () => {
 
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health'];
-    expect(state.flags['tulsa.rats-killed']).toBe(1);
-    expect(afterFighting).toBeLessThan(toMilliUnits(30));
+    // One Fight clears the cellar, so the tally is the population the room declares.
+    expect(state.flags['tulsa.rats-killed']).toBe(populationCount(cellarRats));
+    expect(afterFighting).toBeLessThan(full);
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
+    const unfed = statValue('core.regeneration', state, registry);
     grantBuff(state, PLAYER, registry.items.get('core.cooked-shrimp')!, state.time + secondsToMs(60));
+    const fed = statValue('core.regeneration', state, registry);
+    expect(fed).toBeGreaterThan(unfed);
+
     resolve(state, registry, state.time + secondsToMs(60));
-    expect(state.resources['core.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
+    expect(state.resources['core.health']).toBe(Math.min(full, afterFighting + toMilliUnits(fed)));
   });
 });

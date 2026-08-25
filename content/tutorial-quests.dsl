@@ -207,10 +207,10 @@ talk: tulsa.miki
 choose: continue
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
-// rather than through the floor.
+// rather than through the floor. One Fight clears the cellar: melee is
+// continuous, so it re-arms on the next rat still standing, and the tally
+// below is what says it did.
 use: entity.stairs.descend
-use: melee-combat on giant-rat until done
-use: melee-combat on giant-rat until done
 use: melee-combat on giant-rat until done
 assert: tulsa.rats-killed >= 3
 use: entity.stairs-up.ascend
