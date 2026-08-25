@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Sixteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Seventeen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -366,3 +366,25 @@ in the module of the test that swings it.
 *Moves when: he says whether that trade is worth 264 lines and a mechanism. If yes it is a
 substantial agent line with a known shape; if no, this is deleted and one sentence goes to
 `settled.md` saying the DEBUG mechanism stays and why the fixture world did not replace it.*
+
+## Whether every recorded run should pin the sheet it ended on
+
+*"Of course it can have an ending save"* was read as **permission**, so `KeptRun.ends` exists
+and any harness could supply one — and none does. If you meant obligation, say so: it is a
+small follow-up, because both harnesses have the session in hand at stop time.
+
+The lane's case against making it automatic, which is why it did not guess:
+
+- A run's product is the player's notes, not a state pin, and a recorded run is disposable
+  by design. `settled.md`: *"`expect only:` is the default; whole-sheet `expect:` has to earn
+  itself."*
+- An always-on end sheet is exactly the recorded-figure churn already on file — one content
+  change cost fifteen regenerated claims today, and those were tests somebody wrote on
+  purpose.
+- **The decisive one:** `dsl.test.ts` refuses a test that states its claim only in a save
+  body. An automatic end sheet would mint corpus-illegal tests by construction, the moment
+  anybody promoted a run into `content/`.
+
+*Moves when: he says permission or obligation. If obligation, the third point has to be
+answered first — either those runs never enter `content/`, or the claim-in-words rule gains
+an exception, and that exception is his to grant.*

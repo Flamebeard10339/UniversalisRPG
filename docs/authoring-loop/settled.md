@@ -533,7 +533,7 @@ recorded run whose starting save will not read, deliberately, rather than a seco
 answer to one question. `resumptionNotes` in `command.ts` is the one home for the words
 and both the driver and `play-cli` call it.
 
-**`runLog.ts` is the only file that mints a `-start` id, and a sweep says so.** The
+**`runLog.ts` is the only file that mints a `-start` or `-end` id, and a sweep says so.** The
 cycle that used to stop `/create-test` reading it is gone: `outcomeOf` and `refusedLine`
 moved down into `command.ts`, and the private `refusedLine` already living there is
 `refusal` now, because it mints a refusal rather than recognising one — two meanings
@@ -993,7 +993,11 @@ the moment it does. The per-action path reports only a write it tried and could 
 Making the cadence slot answer that question instead would put a second meaning on one
 piece of state and would still repeat the line every turn.
 
-**A filed run is the pair `runSections` names, and dropping one takes both in one edit.**
+**A filed run brings a subset of the three addresses `runSections` names, and dropping one
+takes exactly what it brought.** A run whose start is a `# save` the world already holds
+*names* it and brings one section; a run carrying its own bytes brings two; one with an end
+sheet brings three. `filedRuns` intersects with what is staged, so a named start save is
+never taken — it was not the run's to take.
 `runSections` in `src/runtime/runLog.ts` is the single answer to which two sections a run
 is, so filing writes exactly what dropping takes; `dropLocalSections` is the counterpart of
 `stageLocalSections`, adopting once so the registry never holds a `# test` whose `load:`
@@ -1042,6 +1046,26 @@ was for: the original measurement found seventeen test modules each declaring th
 copy of the item being deleted. The wider finding is that the duplication was never only
 those seventeen — **24 modules still declare at least one of the six**, mostly outside the
 ruled scope, so the fixture has room to absorb more.
+
+**A run always carries a start save, and `KeptRun.from` says whether it holds one or names
+one.** `RunStart` is `{ bytes }` or `{ save }`, `startsAtSave` is the one predicate, and
+`runLines` always writes `load: <that save>` first — so nothing downstream asks again
+whether a run declares its start. The branch that used to decide it lives once, as
+`runStart(history, taken)` in `runLog.ts`: *a history opening by loading a save has already
+said where the run begins, so that line is the run's start rather than its first move.* The
+old `usesStartSave` in `command.ts` gated four separate things off one guess and is gone.
+**Both `/create-test` and `/create-valid-test` go through `runAsSections`**, and
+`buildCreateTest` adopts into the live registry by walking the same pairs, so a section
+cannot land under a name the written form does not use. A run kept from before this reads a
+plain-text `from` as bytes, so the playtest slot still opens.
+
+**An ending save is permission, not obligation.** `KeptRun.ends` exists so any harness could
+supply one, and none does: a run's product is the player's notes rather than a state pin, an
+always-on end sheet would be exactly the recorded-figure churn the queue already warns
+about, and — decisively — `dsl.test.ts` refuses `expect only:` as a claim in words, so an
+automatic end sheet would mint corpus-illegal tests by construction. Where one *is* written
+it lands as whole-sheet `expect:`, which is the one form that can say a key the state has
+stopped holding.
 
 ## The tools
 

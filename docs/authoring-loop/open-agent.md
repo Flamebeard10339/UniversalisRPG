@@ -60,8 +60,6 @@ outside its four lines. *Closes when:* the route hands over one net however many
 it is walked. **It moves `apology-route-full-end`'s sheet**, so do not take it beside
 anything else regenerating a route.
 
-### The action list
-
 ### The fight
 
 **The player's damage never varies.** *"The player always does the same exact amount of
@@ -249,32 +247,3 @@ one of them, and the *has stood in* condition the town work needs is a third thi
 same kind. **Fold all three questions before writing the merge**, because a merged list
 that still cannot say *stood in* as distinct from *heard of* has not merged anything.
 `one-home` is the procedure and this is exactly the case it is for.
-
-### Numbers and rules the owner ruled
-
-### The tools
-
-**A recorded run carries a start save and an ending save, always.** Ruled, both halves:
-*"of course it can have an ending save"* and *"yes and yes"* — so `KeptRun.from` may name
-a `# save` the corpus already holds instead of carrying bytes. This is what lets
-`/create-test` finally go through `runAsSections` as the one writer.
-
-**Two things measured 2026-08-25 that the line was written before.** First, **the layering
-cycle that stopped `/create-test` going through the shared writer is gone.** A lane once
-reported it could not collapse them because `runLog.ts` imported a type from `command.ts`,
-so the reverse import closed a cycle and `layer-check` exited 1. `runLog.ts` now imports
-only `../content/sections/test` and `./localized`, while `command.ts` imports *from*
-`runLog.ts` — one direction, no cycle — so `runAsSections` is reachable from
-`buildCreateTest` today. Second, **the branch to delete is `usesStartSave` in
-`buildCreateTest` (`src/runtime/command.ts:563`)**, computed as *the history does not open
-with `load:`*, and it gates four separate things: whether a start save is read, whether the
-id is treated as taken, whether `load:` is unshifted onto the lines, and whether a `# save`
-block is emitted. That is the one rule the ruling replaces.
-
-**And the exception goes with it**, which is his own question turned into the answer:
-*"Why do we need an exception here in the first place? Why do we sometimes need to declare
-a savegame was loaded and sometimes not?"* Today a history already opening with `load:`
-declines to write a start save, because the author's `load:` already places the replay —
-which is two rules where one would do. With `from` able to name a `# save`, the run always
-carries a start save, a `load:` in the history is the same fact stated twice, and the
-branch that decides between them is deleted rather than moved.
