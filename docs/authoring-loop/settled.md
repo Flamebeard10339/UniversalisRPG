@@ -672,6 +672,19 @@ are priced in band with the hand-axe at 12 while every jewel, whetstone and orb
 still declares no value at all. A price that read the ceiling would turn the
 one-shot caches those come out of into purses.
 
+**A comparison's literal declares the precision it is weighed at.** The right side is a
+`Threshold` carrying how many decimals the author actually wrote, peeked off the literal
+before it is parsed, and the engine's answer is read to that many places before the
+operator is applied. `= 50.84` therefore holds for 50.839999999999996, which is what 41
+raised by 24% is in a double and what an author's own arithmetic gives — without this the
+decimal threshold could not express the figure it was added for. The rounding happens
+once, before any operator rather than per operator, so `<`, `=` and `>` still partition
+the line at every precision; a whole-number literal declares no decimals and means what it
+always meant. A literal prints back with the decimals it was written to, so `50.80` stays
+`50.80`. The derived claim builds a record saying each operator in terms of `<`, `=` and
+`>` and asserts its keys equal the grammar's own operator forms, so an operator added with
+no word there fails rather than going unweighed.
+
 **A condition's threshold reads a decimal; a count reads a whole number.** The engine's
 numbers were measured rather than assumed: `statValue` is a midpoint of a scaled range,
 an arbitrary double with folded percentages in it, while `xp`, `level` and an inventory

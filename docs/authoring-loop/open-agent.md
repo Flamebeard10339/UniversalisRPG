@@ -41,23 +41,6 @@ plane — there is no unallocate of any kind, free or costly, to build that rule
 
 ## Ours, and small
 
-**A claim cannot name the number an author's own arithmetic gives.** The decimal
-threshold landed this session and immediately met its own wall: the vigor sheet's
-attack-rate is 41 raised by 24%, which is 50.84 on paper and 50.839999999999996 in a
-double, so `assert: stat.attack-rate = 50.84` — the only literal an author would write —
-is refused. Measured by bisecting the engine's own answer: it sits in [50.83, 50.84).
-The claim ships as a hundredth-wide band with a comment saying why, which is the
-workaround the decimal was supposed to remove. The cheap answer is that an author's
-literal declares the precision it is compared at, so `= 50.84` holds for anything
-rounding to 50.84 at two places; whether that is the rule is the only open part.
-*Closes when:* an author can write the figure their arithmetic gives and have it hold.
-
-**Two tests still live in the wrong module.** The hammers and their claims are in
-`content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
-claims about its rat and its `rats-killed`. Six `DEBUG` sections move together, or
-the move is refused at load: the two items, the two saves that arm them and the two
-tests that swing them. A clean follow-up.
-
 **A green suite under heavy load is still owed.** The lane that fixed the clock
 measured green at 13 processes and, separately, green at 32 with the new clock on
 the pre-split tree. Nobody has run the whole suite at 70 with the split in place,
