@@ -4,7 +4,8 @@ import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
 import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
-import { itemCopies, Growth, grownItems } from './itemInstance';
+import { itemCopies, Growth, grownItems, packRows } from './itemInstance';
+import { swappedOrder } from './packOrder';
 import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
@@ -639,6 +640,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'wait-out':
     case 'equip':
     case 'unequip':
+    case 'swap':
     case 'setting':
     case 'slot':
     case 'allocate':
@@ -826,6 +828,9 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       return {};
     case 'unequip':
       unequip(state, registry, directive.slot);
+      return {};
+    case 'swap':
+      state.packOrder = swappedOrder(packRows(state), state.packOrder, directive.one, directive.other);
       return {};
     case 'setting': {
       if (!isSettingName(directive.setting)) throw new RuntimeError(`unknown setting: ${directive.setting} — this run is played by ${SETTING_NAMES.join(', ')}`);

@@ -21,6 +21,7 @@ import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
+import { waysOut } from './waysOut';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
@@ -826,6 +827,18 @@ export const COMMANDS: readonly CommandSpec[] = [
         quit: false,
         recorded: [],
       };
+    },
+  }),
+  define({
+    name: '/map',
+    arg: 'none',
+    summary: 'list the places a road reaches from here, each under the number that walks to it',
+    parse: nothing,
+    run: (ctx) => {
+      const localizer = sessionLocalizer(ctx.session);
+      const ways = waysOut(ctx.view.choices);
+      if (ways.length === 0) return said('plain', localizer.engine('engine.travel.nowhere'));
+      return { output: ways.map((way) => message('plain', localizer.engine('engine.repl.choice', { index: way.at, choice: way.label }))), quit: false, recorded: [] };
     },
   }),
   define({

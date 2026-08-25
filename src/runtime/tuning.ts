@@ -1,10 +1,13 @@
 import type { Registry } from '../content/registry';
-import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, INVENTORY_SLOTS, MIN_DAMAGE, TRAVEL_SECONDS_PER_UNIT } from '../content/tuningVariables';
+import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, INVENTORY_SLOTS, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
 
-const DEFAULT_TRAVEL_SECONDS_PER_UNIT = 5;
+const DEFAULT_TRAVEL_SECONDS = 3;
 
-export function travelSecondsPerUnit(registry: Registry): number {
-  return registry.variables.get(TRAVEL_SECONDS_PER_UNIT)?.value ?? DEFAULT_TRAVEL_SECONDS_PER_UNIT;
+// What walking one road costs, wherever it runs to. Nothing here reads a map: two places a world
+// draws far apart are as far apart as the author wanted them to look, and charging the player for
+// the drawing made the world worse to walk the more of it there was.
+export function travelSeconds(registry: Registry): number {
+  return Math.max(0, registry.variables.get(TRAVEL_SECONDS)?.value ?? DEFAULT_TRAVEL_SECONDS);
 }
 
 const DEFAULT_MIN_DAMAGE = 1;

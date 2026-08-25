@@ -223,7 +223,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
-    return <Ledger entries={carried(view.carried, view.planes, localizer)} layout="grid" onOpen={driver.open} />;
+    return <Ledger entries={carried(view.carried, view.planes, localizer)} layout="grid" onOpen={driver.open} onSwap={driver.swap} />;
   };
 
   const paging = (at: number): { shown: readonly Subpage[]; columns: number; page: number } => {

@@ -39,14 +39,20 @@ describe('the offers on the sheet', () => {
     expect(groupOffers([])).toEqual([]);
   });
 
-  it('leaves out the places that are a walk away, and keeps the one next door', () => {
+  it('leaves out the places, near and far alike, since a way out is reached from the map', () => {
     const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: asLocalized('Travel to Yard'), leadsTo: 'yard', legs: 1 };
     const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: asLocalized('Travel to Ford'), leadsTo: 'ford', legs: 3 };
 
-    const groups = groupOffers([choice('a', 'Talk to Miki'), near, far]);
+    const groups = groupOffers([choice('a', 'Talk to Miki'), near, far, choice('b', 'Look around')]);
 
-    expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'travel:yard']);
-    expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 2]);
+    expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'b']);
+    expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 4]);
+  });
+
+  it("keeps a staircase, which is an entity's own action and only happens to move the player", () => {
+    const stairs: PlayView['choices'][number] = { id: 'use:entity.stairs.ascend', kind: 'action', label: asLocalized('ascend'), detail: asLocalized('Stairs'), leadsTo: 'landing' };
+
+    expect(groupOffers([stairs]).flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['use:entity.stairs.ascend']);
   });
 
   it('draws what one object offers as one cell under its name, and everything else a cell each', () => {

@@ -2,12 +2,11 @@ import { RuntimeError } from './error';
 import { Action } from '../grammar/action';
 import { actionAddress, ActionDeclaration } from '../content/sections/action';
 import { declaredId, Entity } from '../content/sections/entity';
-import { Location } from '../content/sections/location';
 import { humanizeEn } from '../grammar/values';
 import { mapOf, Registry } from '../content/registry';
 import { isActionOwnerKind, registryMapOf } from '../content/sections';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
-import { travelSecondsPerUnit } from './tuning';
+import { travelSeconds } from './tuning';
 import { PLAYER, type Seat, templateOf } from './state';
 
 export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
@@ -36,10 +35,6 @@ export function findActionOwner(obj: string, objId: string, registry: Registry):
   }
 }
 
-function locationDistance(a: Location, b: Location): number {
-  return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-}
-
 export const TRAVEL_PAIR = '>';
 
 export const travelPair = (origin: string, dest: string): string => `${origin}${TRAVEL_PAIR}${dest}`;
@@ -60,7 +55,7 @@ export function travelAction(originId: string, destId: string, registry: Registr
     label: humanizeEn(TRAVEL_ADDRESS),
     generatedLabel: true,
     results: [{ kind: 'relocate', location: destId }],
-    time: locationDistance(registry.locations.get(originId)!, registry.locations.get(destId)!) * travelSecondsPerUnit(registry),
+    time: travelSeconds(registry),
   };
 }
 

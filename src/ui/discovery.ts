@@ -1,4 +1,5 @@
 import type { PlayView } from '../runtime/session';
+import { waysOut } from '../runtime/waysOut';
 import { bounds, type Box, type Point } from './viewport';
 
 export type Place = PlayView['discovered'][number];
@@ -54,15 +55,6 @@ export function sheetAt(discovered: readonly Place[], here: string, plane: numbe
   return { nodes, roads, planes: [...new Set(discovered.map((place) => place.z))].sort((low, high) => low - high) };
 }
 
-export function waysOut(choices: readonly PlayView['choices'][number][]): Map<string, number> {
-  const ways = new Map<string, number>();
-  choices.forEach((choice, index) => {
-    if (choice.leadsTo === undefined || ways.has(choice.leadsTo)) return;
-    ways.set(choice.leadsTo, index + 1);
-  });
-  return ways;
-}
-
 export interface Drawn {
   plane: number;
   here: string;
@@ -74,7 +66,7 @@ export function drawnFor(view: PlayView, asked: number | null): Drawn {
   const discovered = view.discovered;
   const here = view.location.id;
   const plane = asked ?? discovered.find((place) => place.id === here)?.z ?? 0;
-  const travels = waysOut(view.choices);
+  const travels = new Map(waysOut(view.choices).map((way) => [way.to, way.at]));
 
   return { plane, here, sheet: sheetAt(discovered, here, plane, travels), travels };
 }

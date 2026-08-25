@@ -2,6 +2,7 @@ import { EXAMINE_FIELD } from '../content/sections/entity';
 import { parseUseChoiceId } from '../content/sections/test';
 import type { Answer, Localized } from '../runtime/localized';
 import type { GroupRow, PlayView } from '../runtime/session';
+import { onActionList } from '../runtime/waysOut';
 
 export interface Offer {
   id: Answer;
@@ -30,14 +31,12 @@ export interface OfferCell {
 
 const reads = (offer: Offer): boolean => parseUseChoiceId(String(offer.id))?.actionId === EXAMINE_FIELD;
 
-const aWalkAway = (choice: PlayView['choices'][number]): boolean => choice.legs !== undefined && choice.legs > 1;
-
 // Keyed by the address the view states rather than by the name it draws, because everything the
 // player has not read is drawn under the same placeholder and two unread things are still two.
 export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
   const groups: OfferGroup[] = [];
   choices.forEach((choice, at) => {
-    if (aWalkAway(choice)) return;
+    if (!onActionList(choice)) return;
     const of = choice.of ?? null;
     const offer = { id: choice.id, label: choice.label, position: at + 1 };
     const held = groups.find((each) => each.of === of);

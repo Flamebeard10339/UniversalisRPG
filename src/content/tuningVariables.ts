@@ -1,7 +1,7 @@
 import { DslError } from '../grammar/parser';
 import { Variable } from './sections/variable';
 
-export const TRAVEL_SECONDS_PER_UNIT = 'travel-seconds-per-unit';
+export const TRAVEL_SECONDS = 'travel-seconds';
 export const MIN_DAMAGE = 'min-damage';
 export const CONTEST_SPREAD = 'contest-spread';
 export const DEFAULT_ACTION_DURATION = 'default-action-duration';
@@ -15,6 +15,10 @@ const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = 
   [DEFAULT_ACTION_DURATION]: {
     least: 0,
     why: 'an action cannot take less than no time',
+  },
+  [TRAVEL_SECONDS]: {
+    least: 0,
+    why: 'walking a road cannot take less than no time',
   },
   [INVENTORY_SLOTS]: {
     least: 0,

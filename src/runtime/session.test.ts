@@ -1,6 +1,6 @@
 import type { ModalChoice } from './modalOption';
 import { describe, expect, it } from 'vitest';
-import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
+import { createGameState, GameState, travelSeconds } from './runtime';
 import { itemInstance, receiveItem } from './itemInstance';
 import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
@@ -309,9 +309,9 @@ out: 1 mix
   });
 });
 
-describe('travel is a distance-timed journey', () => {
+describe('travel is a flat-timed journey', () => {
   const module = `
-# variable travel-seconds-per-unit
+# variable travel-seconds
 value: 7
 
 # location camp
@@ -329,7 +329,7 @@ adjacent:
   it('apply relocates instantly in real time while accruing the journey sim-time', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
-    const journey = 1 * travelSecondsPerUnit(registry);
+    const journey = travelSeconds(registry);
 
     const v = apply(session, 'travel:beach');
     expect(v.location.id).toBe('beach');
@@ -340,7 +340,7 @@ adjacent:
   it('beginAction arms the journey spannably — location and time unchanged until driven', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
-    const journey = 1 * travelSecondsPerUnit(registry);
+    const journey = travelSeconds(registry);
 
     const v = beginAction(session, 'travel:beach');
     expect(v.action).not.toBeNull();
@@ -995,6 +995,7 @@ describe('what the engine withholds', () => {
       time: 'published',
       flags: 'published',
       inventory: 'published',
+      packOrder: 'published',
       equipped: 'published',
       xp: 'published',
       resources: 'published',
@@ -1019,7 +1020,7 @@ describe('what the engine withholds', () => {
 
     const published = Object.keys(classified).filter((field) => classified[field as keyof GameState] === 'published');
     const carried = new Set(Object.keys(view(startSession(loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n')))));
-    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown' };
+    const renamed: Record<string, string> = { equipped: 'equipment', activeAction: 'action', instances: 'grown', packOrder: 'carried' };
     for (const field of published) expect(carried.has(renamed[field] ?? field), field).toBe(true);
   });
 });

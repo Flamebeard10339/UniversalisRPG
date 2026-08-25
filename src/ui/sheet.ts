@@ -47,11 +47,13 @@ function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localize
   return detail === '' ? {} : { detail };
 }
 
+// The pack, cell for cell, in the order the view hands it over — which is the order the player has
+// put it in. Nothing is sorted here: a sheet that arranged the pack for itself would be a second
+// answer to where a thing sits, and the player's own would never survive being drawn.
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
     .filter((row) => row.worn === undefined)
-    .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...(row.group === undefined ? {} : { group: row.group }), ...detailOf(row, planes, localizer) }))
-    .sort(byName);
+    .map((row) => ({ id: row.id, name: row.name, value: localizer.identifier(tidy(row.count)), ...(row.group === undefined ? {} : { group: row.group }), ...detailOf(row, planes, localizer) }));
 }
 
 export function worn(slots: readonly WornSlot[], rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer, empty: Localized): Entry[] {

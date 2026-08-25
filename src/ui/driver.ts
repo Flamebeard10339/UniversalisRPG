@@ -96,6 +96,7 @@ export interface Driver {
   choose(position: number): void;
   answer(key: string, value: string): void;
   open(item: string): void;
+  swap(one: string, other: string): void;
   readQuest(quest: string): void;
   cancel(): void;
   localizer(): Localizer;
@@ -374,6 +375,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     choose: (position) => sending(String(position)),
     answer: (key, value) => send(`submit-modal: ${key}=${value}`),
     open: (item) => send(`/inv ${item}`),
+    swap: (one, other) => send(`swap: ${one} with ${other}`),
     readQuest: (quest) => send(`/quests ${quest}`),
     localizer: () => sessionLocalizer(context.session),
     cancel: () => close(true),

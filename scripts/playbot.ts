@@ -14,6 +14,7 @@ import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
 import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { onActionList } from '../src/runtime/waysOut';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
@@ -237,12 +238,12 @@ export function renderView(v: PlayView, localizer: Localizer): string {
     parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — ${String(asking.label)}, answered as ${asking.key}:`);
     if (asking.values) for (const choice of asking.values) parts.push(`  value=${choice.value} :: ${String(choice.shown)}`);
     else parts.push('  value=<free text>');
-  } else if (v.choices.length > 0) {
+  } else if (v.choices.some(onActionList)) {
     parts.push('choices:');
     // What the choice is offered by, which the terminal draws beside the label through
     // `engine.repl.choice.owned`. Without it three things standing here that can each be looked at
     // read as `Look`, `Look`, `Look`, told apart only by an id the model has to parse.
-    for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
+    for (const choice of v.choices.filter(onActionList)) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
   } else {
     parts.push('choices: (nothing offers itself here)');
   }

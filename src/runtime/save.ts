@@ -81,6 +81,7 @@ const isPlayer = (value: unknown): boolean => PLAYER_FIELDS.every((field) => at(
 export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
   inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } },
+  packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' },
   flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
   visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
   xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
@@ -182,6 +183,11 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
 
   warnings.push(...pruneInstances(state, registry));
   warnings.push(...prunePopulations(state, registry));
+
+  // Where the player put a thing they no longer have is not a holding and is not worth a word: the
+  // order is settled against the pack every time one is rearranged anyway, and a name left in it
+  // draws nothing.
+  state.packOrder = state.packOrder.filter((key) => registry.items.has(key) || key in state.instances.byId);
 
   if (state.location && !registry.locations.has(state.location)) {
     const old = state.location;

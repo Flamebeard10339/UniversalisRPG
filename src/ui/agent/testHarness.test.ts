@@ -76,6 +76,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     choose: (position) => void calls.push(`choose:${position}`),
     answer: (key, value) => void calls.push(`answer:${key}=${value}`),
     open: (item) => void calls.push(`open:${item}`),
+    swap: (one, other) => void calls.push(`swap:${one}:${other}`),
     readQuest: (quest) => void calls.push(`quest:${quest}`),
     localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),

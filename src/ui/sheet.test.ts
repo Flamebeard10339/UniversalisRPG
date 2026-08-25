@@ -79,13 +79,14 @@ describe('what the player carries, as rows', () => {
     expect(rows[0].name).toBe('Modified Blade');
   });
 
-  it('sorts by name and keeps two copies of one name apart by the id they are of', () => {
+  it('keeps the order the engine published, which is the order the player has put the pack in', () => {
     const two = [
       row({ id: '3', name: asLocalized('Modified Blade'), grown: true }),
       row({ id: '1', name: asLocalized('Modified Blade'), grown: true }),
       row({ id: 'awl', name: asLocalized('Awl') }),
     ];
-    expect(carried(two, [], localizer).map((entry) => entry.id)).toEqual(['awl', '1', '3']);
+    expect(carried(two, [], localizer).map((entry) => entry.id)).toEqual(['3', '1', 'awl']);
+    expect(carried([...two].reverse(), [], localizer).map((entry) => entry.id)).toEqual(['awl', '1', '3']);
   });
 
   it('states the stat summary beneath a grown copy, read from the plane the engine published', () => {
