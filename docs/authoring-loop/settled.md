@@ -1087,6 +1087,25 @@ the app, the terminal and a recorded run reach it by one line, and `/stat` with 
 every stat with its group's word — which is what put `stats[].group` in front of all three
 drivers instead of into the parity excuse list.
 
+**Tulsa holds the whole region and `combat-expansion` is a list of jewels and items.** Its
+`# info` names `core` alone, and it loads *before* `tulsa` rather than after it — which is
+the test of whether that separation is real, because a module about archetypes used to pull
+the whole town in behind it. The 254 lines that left it were its locations, its entities and
+the seven routes that walked them; those routes are `tulsa.*` tests now, because they stand
+in tulsa's own proving ground.
+
+**The proving ground is a walled yard north of the forge, and the beach is gone.** The yard
+is the town's fixture, there whatever else is loaded, rather than a square borrowed from the
+market. The beach has zero references left in `content/`: the guide house opens straight
+onto the market square, still gated on `front-door.unlocked`, and **the window still lands
+somewhere that is not through Miki** — the market square now, with its words rewritten
+rather than left describing sand that is not there. The world declares 32 locations.
+
+**A derived claim count shrinks when the world does, and that is not lost coverage.** Cutting
+one location took four claims with it, because several proofs take their subjects from every
+location the corpus declares. A test count that falls with a content cut is the proofs doing
+what they were built to do.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

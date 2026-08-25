@@ -57,8 +57,8 @@ that walks out of the house and back is part of closing this.
 `give: core.fishing-net`, and sticky replays a node whole — so four talks measured
 `[1, 2, 3, 4]` nets. Found by the lane that rewrote Miki's threads and left alone as
 outside its four lines. *Closes when:* the route hands over one net however many times
-it is walked. **It moves `apology-route-full-end`'s sheet**, so do not take it beside
-anything else regenerating a route.
+it is walked. **It moves `apology-route-full-end`'s sheet**, which nothing else is moving now that the
+town migration has landed.
 
 ### The fight
 
@@ -92,9 +92,10 @@ player swinging flat. **Nothing on file chooses between them**, which is what *t
 to draft* means here — but say which one you took and why, because it is the difference
 between *a body swings unevenly* and *a blade does*.
 
-**And do not take this in the same session as anything else that moves a recorded route.**
-Whichever reading is taken, every combat figure in `content/` moves — that is what the
-rat's own range cost, and two lanes regenerating the same end-save collide.
+**The routes have settled**, so this is takeable: the town migration landed and nothing
+else is moving a recorded end-save. It will still move every combat figure in `content/`,
+which is what the rat's own range cost — so it and the chaining line below want one lane
+between them, or one after the other.
 
 The spread the derivation produces is the lane's to draft and is explicitly **not**
 balanced yet: *"Balance will happen after."* What has to be true when this lands is that
@@ -123,8 +124,8 @@ What it costs is **15 failing claims, every one a recorded figure**: `repeating:
 one serialized `activeAction`, seven `combat-expansion` route end-saves, `miki-route-end`
 (health 24529 → 24609, clock 28400 → 33200, because the route now kills more inside one
 action), and one runtime health claim. None is a break; each is a route to regenerate.
-**Do not take this in the same session as anything else that moves `miki-route-end`** — a
-dialogue change moves the same figures and the two collide.
+**The routes have settled**, so this is takeable — but it and the player's-damage line
+above move the same sheets, so they want one lane between them rather than two at once.
 
 ### The character sheet
 
@@ -174,51 +175,3 @@ string is the wrong measure** — a module that prepends the fixture still write
 optionally be edited/skipped by modals."* So a reveal rate is a setting with a default
 the lane picks and the owner tunes, and a modal may say it wants the words at once.
 Explicitly low priority; it is here because it is no longer blocked.
-
-**Tulsa's map is wrong and the fix is one shape, not four edits.** Ruled:
-*"combat-expansion should not need locations or entities. It is a list of jewels and
-items. The proving ground should be permanently moved as a static fixture in tulsa.
-Likewise, the beach should be removed outright, it no longer makes sense. Miki's house is
-adjacent to the market square."*
-
-Measured before filing, because the beach is load-bearing: **30 references across three
-modules.** Four shipped `# save` bodies stand on `tulsa.beach` and more carry
-`tulsa.beach.discovered`; seven `# test` scripts travel there; and
-`tulsa.window.climb-out` is `relocate: beach` — *"the only way out that never runs
-through Miki,"* by the module's own comment, so the drop needs somewhere to land. This is
-a content migration with a fixture sweep in it, not a map edit.
-
-Two consequences worth knowing before starting:
-
-- **`leave-tutorial-island.adrift` gets worse, not better.** Its gate is
-  `tulsa.market-square.discovered`, discovery spreads to adjacent locations, and the
-  ruling makes the market **adjacent to Miki's house** — so a stage that already opened a
-  step too early now opens on turn one. The *has stood in* work named above stops being
-  optional the moment this lands, and the two should land together.
-- **`combat-expansion` losing its locations is what removes the dependency edge** that
-  made a module about archetypes load the whole town. Check `layer-check` and the module
-  dependency list afterwards: if `combat-expansion` still names `tulsa`, the edit did not
-  finish.
-
-**Miki teaches the plane when he hands over the gear.** Ruled, closing the on-ramp
-question: *"Miki needs an extra line of dialogue when he gives the player the sword and
-the shield encouraging the player to check the items in their inventory and opening up
-the modals."* So the on-ramp is words plus an affordance — the line should be able to put
-the player in front of the modal rather than only mentioning it, which is the same
-mechanism the modal API line wants.
-
-### What a player has already touched
-
-Beside it, the standing rule that constrains how it is built: *"Dialogue should always be
-able to be said. We shouldn't need a dozen conditions or complicated logic to guarantee
-that an NPC can be talked to. We shouldn't even need complicated tests."* That is the
-same ruling as the thread line above arriving from the other direction — an NPC being
-sayable is not something a lane should be able to break with a gate.
-
-Today these are two mechanisms: `<entity>.examined` flags carry *have I read this* and
-drive the `?` mask, and `<location>.discovered` flags carry *have I been here* and drive
-the map, the journal and several quest gates. `leave-tutorial-island.adrift` is gated on
-one of them, and the *has stood in* condition the town work needs is a third thing of the
-same kind. **Fold all three questions before writing the merge**, because a merged list
-that still cannot say *stood in* as distinct from *heard of* has not merged anything.
-`one-home` is the procedure and this is exactly the case it is for.
