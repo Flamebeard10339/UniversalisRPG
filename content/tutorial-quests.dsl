@@ -132,10 +132,14 @@ stage snubbed:
 
 stage apologised:
   log: I went back and apologised. Miki took it, and put a price on it: one fish, out of his own net.
+  // Not sticky: the node hands over a net, and sticky replays a node whole, so
+  // a player who talked this through four times walked away with four nets.
+  // `again:` is the other half of that pair — the offer is made once, and what
+  // every talk after it gets is Miki pointing at the net already in the pack.
   tulsa.miki says:
     always
-    sticky
     ask: About squaring it with you.
+    again: The net's yours already. One fish out of it and we're square.
     give: core.fishing-net
     Take the net. Bring me one fish out of it and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   tulsa.miki says:
@@ -287,6 +291,14 @@ choose: Actually - sorry. Show me the ropes after all.
 talk: tulsa.miki
 choose: continue
 assert: has core.fishing-net
+// Talked through twice more before going fishing. The offer stands as long as
+// the fish is owed, so the line keeps being reachable; what it must not do is
+// keep paying out, which is what the count below is here for.
+talk: tulsa.miki
+choose: continue
+talk: tulsa.miki
+choose: continue
+assert: inventory.core.fishing-net = 1
 use: entity.stairs.ascend
 use: entity.window.fish
 assert: has core.fish
@@ -391,4 +403,4 @@ assert: finding-your-feet.sendoff and tulsa.front-door.unlocked
 
 // The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
-{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-quests.finding-your-feet.apologised":true,"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house.touched":true,"tulsa.basement.discovered":true,"tulsa.front-door.unlocked":true,"tulsa.market-square.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}
+{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-quests.finding-your-feet.apologised":true,"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house.touched":true,"tulsa.basement.discovered":true,"tulsa.front-door.unlocked":true,"tulsa.market-square.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.0.said":3,"tutorial-quests.finding-your-feet.apologised.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}
