@@ -8,7 +8,14 @@ export const DEV_SNAPSHOT_SLOT = 'dev-snapshot';
 
 export const AUTOSAVE_SLOT = 'autosave';
 
-export const DEFAULT_AUTOSAVE_SECONDS = 0;
+// A cadence is the least time to leave between autosaves, in seconds. Zero is not *never*: it is no
+// minimum at all, which is what writing after every action is. Never is a word of its own, because
+// a quantity of nothing and the absence of one are different answers.
+export const NEVER = 'never';
+
+export type Cadence = number | typeof NEVER;
+
+export const DEFAULT_CADENCE: Cadence = 0;
 
 export interface SaveContext {
   readonly store: SlotStore;
@@ -53,34 +60,34 @@ export function liveHolding(save: SaveContext): SlotState {
   return stateOf(save.store, liveSlot(save));
 }
 
-export function cadenceOrNone(save: SaveContext): number | null {
+// The cadence the store stands at, or null when the slot holds something this cannot read. A slot
+// nobody has written stands at the default, which is the whole of how a player who never asked for
+// a cadence gets one.
+export function cadenceOrUnreadable(save: SaveContext): Cadence | null {
   const state = stateOf(save.store, AUTOSAVE_SLOT);
-  if (state.kind === 'empty') return DEFAULT_AUTOSAVE_SECONDS;
+  if (state.kind === 'empty') return DEFAULT_CADENCE;
   if (state.kind === 'unreadable') return null;
+  if (state.slot.payload === NEVER) return NEVER;
   const seconds = Number(state.slot.payload);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
-export function autosaveSeconds(save: SaveContext): number {
-  const seconds = cadenceOrNone(save);
-  if (seconds === null) throw new RuntimeError(`slot ${AUTOSAVE_SLOT} does not hold a cadence in seconds`);
-  return seconds;
-}
-
-export function setAutosaveSeconds(save: SaveContext, seconds: number): void {
-  if (!Number.isFinite(seconds) || seconds < 0) throw new RuntimeError(`an autosave cadence is seconds, zero for never, not ${JSON.stringify(seconds)}`);
-  save.store.write(AUTOSAVE_SLOT, String(seconds));
+export function setAutosaveCadence(save: SaveContext, cadence: Cadence): void {
+  if (cadence !== NEVER && (!Number.isFinite(cadence) || cadence < 0)) throw new RuntimeError(`an autosave cadence is seconds, or ${NEVER}, not ${JSON.stringify(cadence)}`);
+  save.store.write(AUTOSAVE_SLOT, String(cadence));
 }
 
 function liveWrittenAt(save: SaveContext): number | null {
   return datable(save.store, liveSlot(save))?.writtenAt ?? null;
 }
 
+// A cadence nothing can read stops the autosaving rather than raising: this is asked under every
+// action, and a slot that has stopped parsing would otherwise raise under every one of them.
 export function autosaveDue(save: SaveContext): boolean {
-  const seconds = autosaveSeconds(save);
-  if (seconds === 0) return false;
+  const cadence = cadenceOrUnreadable(save);
+  if (cadence === null || cadence === NEVER) return false;
   const writtenAt = liveWrittenAt(save);
-  return writtenAt === null || save.now() - writtenAt >= seconds * 1000;
+  return writtenAt === null || save.now() - writtenAt >= cadence * 1000;
 }
 
 export type Autosaved = { kind: 'waited' } | { kind: 'wrote'; slot: string } | { kind: 'held'; slot: string } | { kind: 'unreadable'; slot: string };
@@ -156,7 +163,7 @@ export interface SaveReport {
   dev: boolean;
   slot: string;
   writes: SlotWrites;
-  autosaveSeconds: number | null;
+  autosave: Cadence | null;
   slots: SlotStanding[];
 }
 
@@ -171,7 +178,7 @@ export function saveReport(save: SaveContext): SaveReport {
     dev: save.dev,
     slot: liveSlot(save),
     writes: writesLive(save),
-    autosaveSeconds: cadenceOrNone(save),
+    autosave: cadenceOrUnreadable(save),
     slots: save.store.list().map((name) => ({ name, writtenAt: standing(save.store, name) })),
   };
 }

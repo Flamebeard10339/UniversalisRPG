@@ -8,15 +8,16 @@ import {
   PLAYER_SLOT,
   autosave,
   autosaveDue,
-  autosaveSeconds,
+  cadenceOrUnreadable,
   createSaveContext,
   devSnapshot,
   enterDev,
   leaveDev,
   liveSlot,
+  NEVER,
   saveNow,
   saveReport,
-  setAutosaveSeconds,
+  setAutosaveCadence,
   type SaveContext,
 } from './saveSlots';
 
@@ -42,19 +43,33 @@ function unreadable(save: SaveContext, name: string): void {
 }
 
 describe('the cadence is a slot like any other (c4)', () => {
-  it('starts at never, so a session that was never asked to save writes nothing', () => {
+  it('starts at no interval at all, so a session nobody asked about is written after every act', () => {
     const { save, pass } = turning();
 
-    expect(autosaveSeconds(save)).toBe(0);
+    expect(cadenceOrUnreadable(save)).toBe(0);
+    expect(autosaveDue(save)).toBe(true);
+    expect(autosave(save, () => 'first')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(autosave(save, () => 'second')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(save.store.read(PLAYER_SLOT)?.payload).toBe('second');
+    pass(1);
+    expect(autosave(save, () => 'third')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
+    expect(save.store.read(PLAYER_SLOT)?.payload).toBe('third');
+  });
+
+  it('has a word for never, which is the absence of a cadence and not a quantity of one', () => {
+    const { save, pass } = turning();
+    setAutosaveCadence(save, NEVER);
+
+    expect(cadenceOrUnreadable(save)).toBe(NEVER);
     pass(10 * 60 * 1000);
     expect(autosaveDue(save)).toBe(false);
     expect(autosave(save, () => 'payload')).toEqual({ kind: 'waited' });
-    expect(save.store.list()).toEqual([]);
+    expect(save.store.list()).toEqual([AUTOSAVE_SLOT]);
   });
 
   it('measures real seconds since the live slot was last written', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
 
     expect(autosave(save, () => 'first')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
 
@@ -71,26 +86,28 @@ describe('the cadence is a slot like any other (c4)', () => {
 
   it('holds the cadence in a slot of its own, which is the store being asked for something that is not a save', () => {
     const { save } = turning();
-    setAutosaveSeconds(save, 45);
+    setAutosaveCadence(save, 45);
 
     expect(save.store.list()).toEqual([AUTOSAVE_SLOT]);
     expect(save.store.read(AUTOSAVE_SLOT)?.payload).toBe('45');
-    expect(autosaveSeconds(save)).toBe(45);
+    expect(cadenceOrUnreadable(save)).toBe(45);
   });
 
-  it('refuses a cadence that is not seconds, and says so when the slot holds one', () => {
+  it('refuses a cadence that is neither seconds nor the word, and stops autosaving when the slot holds one', () => {
     const { save } = turning();
 
-    expect(() => setAutosaveSeconds(save, -1)).toThrow(RuntimeError);
-    expect(() => setAutosaveSeconds(save, Number.NaN)).toThrow(RuntimeError);
+    expect(() => setAutosaveCadence(save, -1)).toThrow(RuntimeError);
+    expect(() => setAutosaveCadence(save, Number.NaN)).toThrow(RuntimeError);
 
     save.store.write(AUTOSAVE_SLOT, 'often');
-    expect(() => autosaveSeconds(save)).toThrow(/slot autosave does not hold a cadence/);
+    expect(cadenceOrUnreadable(save)).toBeNull();
+    expect(autosaveDue(save)).toBe(false);
+    expect(autosave(save, () => 'payload')).toEqual({ kind: 'waited' });
   });
 
   it('is due when the live slot cannot be dated, because the next write replaces it anyway', () => {
     const { save } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'good');
     expect(autosaveDue(save)).toBe(false);
 
@@ -109,7 +126,7 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
 
   it('is no slot"s when it is built over one that already holds a game, which is a reopened one', () => {
     const { save, pass, restarted } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
 
     const next = restarted();
@@ -134,7 +151,7 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
 
   it('writes once it has been loaded out of the slot', () => {
     const { save, pass, restarted } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
     const next = restarted();
     pass(3_600_000);
@@ -146,7 +163,7 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
 
   it('takes the slot outright when it is said out loud', () => {
     const { save, pass, restarted } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
     const next = restarted();
 
@@ -158,7 +175,7 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
 
   it('leaves bytes nobody can read alone, and still answers every question about them', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'good');
     unreadable(save, PLAYER_SLOT);
     save.synced = null;
@@ -174,7 +191,7 @@ describe('a session writes the one slot whose game it is (c4, c9)', () => {
 
   it('will not autosave over a dev slot a crashed session left behind', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(DEV_SLOT, 'what the last dev session was doing');
 
     enterDev(save, 'the session being played');
@@ -287,7 +304,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('comes back out to the standing it went in with, so a session that was nobody"s stays nobody"s', () => {
     const { save, pass, restarted } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     save.store.write(PLAYER_SLOT, 'an hour of play');
 
     const next = restarted();
@@ -305,11 +322,11 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('will not autosave into an empty player slot after dev mode, where a fresh game would', () => {
     const fresh = turning();
-    setAutosaveSeconds(fresh.save, 30);
+    setAutosaveCadence(fresh.save, 30);
     expect(autosave(fresh.save, () => 'a new game')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
 
     const authoring = turning();
-    setAutosaveSeconds(authoring.save, 30);
+    setAutosaveCadence(authoring.save, 30);
     enterDev(authoring.save, 'the session being played');
     authoring.pass(30_000);
     autosave(authoring.save, () => 'authoring');
@@ -368,7 +385,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('creates no dev slot at all while the mode is off', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     saveNow(save, 'the player');
     pass(5_000);
     autosave(save, () => 'later');
@@ -378,14 +395,14 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('answers which slot is live, whether the mode is on, and what is kept', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     saveNow(save, 'the player');
 
     expect(saveReport(save)).toEqual({
       dev: false,
       slot: PLAYER_SLOT,
       writes: 'yes',
-      autosaveSeconds: 30,
+      autosave: 30,
       slots: [
         { name: AUTOSAVE_SLOT, writtenAt: 1_000 },
         { name: PLAYER_SLOT, writtenAt: 1_000 },
@@ -402,21 +419,21 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('reports a cadence it cannot read as no cadence, rather than refusing the whole answer', () => {
     const { save } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     saveNow(save, 'the player');
     save.store.write(AUTOSAVE_SLOT, 'whenever');
 
     const report = saveReport(save);
-    expect(report.autosaveSeconds).toBeNull();
+    expect(report.autosave).toBeNull();
     expect(report.slot).toBe(PLAYER_SLOT);
     expect(report.writes).toBe('yes');
     expect(report.slots.map((slot) => slot.name)).toEqual([AUTOSAVE_SLOT, PLAYER_SLOT]);
-    expect(() => autosaveSeconds(save)).toThrow(/does not hold a cadence/);
+    expect(autosaveDue(save)).toBe(false);
   });
 
   it('takes an empty dev slot on every visit, not only the first', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     saveNow(save, 'the player');
 
     expect(enterDev(save, 'the session being played')).toBeNull();
@@ -432,7 +449,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('says a cadence it cannot read is unknown, rather than quietly meaning never', () => {
     const { save } = turning();
-    setAutosaveSeconds(save, 30);
+    setAutosaveCadence(save, 30);
     saveNow(save, 'the player');
     const readable = save.store.read.bind(save.store);
     (save.store as { read: (name: string) => unknown }).read = (name) => {
@@ -440,14 +457,14 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
       throw new RuntimeError('slot autosave does not parse');
     };
 
-    expect(saveReport(save).autosaveSeconds).toBeNull();
-    expect(() => autosaveSeconds(save)).toThrow(/does not hold a cadence/);
+    expect(saveReport(save).autosave).toBeNull();
+    expect(autosaveDue(save)).toBe(false);
     expect(saveReport(save).writes).toBe('yes');
   });
 
   it('picks the dev slot up on the way in, so a second visit is not a session refused', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     saveNow(save, 'the player');
 
     expect(enterDev(save, 'the session being played')).toBeNull();
@@ -463,7 +480,7 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
 
   it('leaves a dev slot nobody has loaded as no session"s until the caller says it picked it up', () => {
     const { save, pass } = turning();
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     save.store.write(DEV_SLOT, 'what the last dev session was doing');
 
     expect(enterDev(save, 'the session being played')).toBe('what the last dev session was doing');
