@@ -526,6 +526,52 @@ subjects from a registry map while claiming about words. Both read the mark off
 words, so a node whose words genuinely are missing still fails rather than quietly
 leaving the sweep. The other five were clean.
 
+**Gear drops carrying its points, and `item-level:` is what gives an item a plane.**
+`isBase` reads `itemLevel`, not `slot`. `receiveItem` was already the one arrival, so
+that is where a base is rolled and minted — which is what makes every base an instance
+stacking to 1, because the roll is what makes two copies different. `feedItem`, the
+`feed:` directive and the whetstone are gone. An `item-level:` on an item with no
+`slot:` is refused, so a potion cannot silently become unstackable with an invisible
+skill tree.
+
+**A thing entering the world draws one fraction and keeps it, and every `Range` it
+declares is read at that fraction.** `ItemInstance.roll` and `Cluster.roll` are the same
+field — a jewel's passives and an item's level are one mechanism, not two that look
+alike. Storing the roll rather than the number is what lets a recorded run replay and
+lets a rebalanced range reach gear already standing in the world. One roll per *cluster*
+rather than per payload, so a jewel comes out good or bad rather than good in places, and
+two of one jewel in one plane are two different jewels.
+
+**An unexamined thing is masked in the view, so all three surfaces mask alike.** Having
+been looked at is per-entity state on the road `# location` already takes for
+`discovered`: `# entity` declares `flags: [EXAMINED]` and `mintedActions` puts the set
+beside its `say:`, so the write lives where the mint lives and no runtime file spells the
+word. The mask is written once, in `sessionStatus` and `locationChoices`, and no renderer
+was taught anything — which is why the parity harness keeps its whole claim with no new
+excuse. Two rules came with it, both measured: an entity with no `examine:` is never
+masked, because it mints no offer that could lift the mask and masking it would void the
+rule that a thing must offer something; and a foe in the fight under way is never masked,
+because arming an examine would overwrite `state.activeAction` and disarm the player's
+own fight. The mask hides offers and does not refuse a directive, so every recorded
+`# test` still replays. The playbot reads a room free on arrival, before the model is
+asked anything, so its turn budget means what it meant before.
+
+**A DEBUG section carries no words, and is on no sheet that lists what the world
+declares.** Two rules, and the first is why the second could be simple. Prose on a DEBUG
+section is refused where it is written, because a section that says nothing in any
+language has no business carrying words — which resolves what looked like two opposite
+demands, since emptying the locale rows had been answering *these words are not sayable*
+and *these words were never written* with one absence. What the emptying still holds is
+only what the engine generated, and an action's label stays deliberately, because it is
+the address a recorded `# test` drives the section through. Separately, the old rule
+*nothing a player can reach may name a DEBUG thing* never fired on a sheet, because a
+sheet walking a registry map names nothing — it lists everything. `listedToPlayer` sits
+beside `isDebug` and is asked at every such enumeration; a sheet reporting what the
+player holds or where they stand is reading state and does not ask it. The proof takes
+its subjects from `contentSectionMaps()` and walks `sessionStatus` whole, with an
+`it.each` coverage guard that fails the file for a kind nobody has probed — which is how
+`# group` was caught the same day it arrived.
+
 **A `# group` says what something is, and its colour is read off the same declaration.**
 `# item` and `# entity` each name one through a shared `GROUP_FIELD`, and the standard
 group for each kind is declared in `core.dsl` rather than defaulted in TypeScript, so

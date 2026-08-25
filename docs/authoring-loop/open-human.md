@@ -343,6 +343,68 @@ should be a function of.
 *Moves when: that decision is taken. The item's own closing clause is the missing
 information and more measurement does not supply it.*
 
+**Removing a feature costs what its declaration was copied into, and the copies are in
+the fixtures.** This answers what the owner wrote under the whetstone line — *"it would
+be nice if these kinds of balance refactors cost less… some effort to reduce the work of
+removing features would be nice."* The lane that removed it kept count. **57 files: 25
+non-test, 32 test.** Nine non-test files genuinely encoded a whetstone fact — the items
+and the cache, the three modules that used them, the engine's words, the field, the
+directive, `feedItem`, the plane move and the panel.
+
+Five were touched only because the same fact was spelled a second time, and they are
+worth naming because they are a chain: the verb set is declared in
+`sections/test.ts` and then re-listed by two `case 'feed':` arms in `session.ts` and a
+third dispatch in `growth.ts`; and one engine word travels engine key → `locale.ts` row
+→ `labels.ts` id → `planePanel.ts` channel → JSX, so four files move for one word.
+
+**But the multiplier is the fixtures, and it dwarfs the rest. Seventeen test modules
+each declared their own `# item whetstone` with its own `item-experience: 1000`** —
+`itemInstance`, `modals` ×3, `session` ×2, `item`, `carriedItem`, `carriedScreen`,
+`clusterEffect`, `command`, `equipment`, `growth`, `itemContribution`, `pack`,
+`planeReport`, `planeScreen`, `stat`, `trade`. Deleting one feature meant deleting
+seventeen copies of its declaration and rewriting whatever each fixture proved with it.
+A shared, derived fixture world would have made those seventeen into one.
+
+*Moves when: the owner says a shared fixture world is worth building. It is the one lever
+measured to matter, it is a large piece of work, and it would change how nearly every
+test in the repo is written — which is exactly why nobody should start it on their own
+judgement. The engine-word chain is the smaller second answer and could be taken
+separately.*
+
+**Three balance numbers and one policy came out of the item-level lane and none is the
+owner's.** The rolls are `iron-sword 3-8`, `heartwood-blade 12-18`, `proving-blade
+6-10`; the rolling passives are Keen Eye `+4-8 accuracy`, Quickstep `+6-10 evasion`,
+Fortune `+3-8 luck`. They were chosen so the corpus's routes have points enough and so
+at least one rolled payload is actually walked, and each is a one-line edit.
+
+Beside them, a consequence measured rather than assumed: **gear is now unsellable and
+`value:` on a base is inert.** A shop takes from the stack and a base never joins one,
+so `iron-sword` still carries `value: 24` and no counter will ever price it.
+`trade.test.ts` asserts the refusal, so the behaviour is pinned rather than accidental.
+This is the same question as *What a shop pays for a grown copy* further down, which is
+now the only shape a gear sale could take.
+
+*Moves when: the owner rules the six numbers, and says whether a counter should learn to
+take a copy. The numbers are one line each; the counter is engine work that `Trade`
+carrying copy identity would open.*
+
+**A re-read and a node that has fallen silent still cannot be told apart, and the cause
+is not what it looked like.** Crossed from `open-agent.md` on 2026-08-25 as the half of
+the examine-mask line the mask does not close. The mask closes *have I read this* — a
+thing wearing its own name is read, a `?` is not. The other half was reproduced rather
+than guessed: repeating `talk:` says a sticky line every time and a spent node simply
+stops being offered, and repeating an examine always says the same words. **The silence
+is the transcript.** `appendOutputs` merges an identical consecutive line into the entry
+already held and bumps `repeats`, which `Line` draws as a `(2)` on the line above.
+Measured on the shipped mirror: examine twice gives `entries=4, repeats=1`; a third time
+gives `entries=4, repeats=2` — nothing moves at the bottom of the log, which is exactly
+*a third time says nothing at all*.
+
+*Moves when: the owner rules which of two. Either a re-read that collapses says something
+of its own — an engine line to the effect that this has been read already — or the
+collapsed line moves to the bottom of the log so the count is where the player is
+looking. Both are small; neither is derivable.*
+
 **Autosave ships as *never*, so the app opens on what it last wrote and a player who
 never types `/save` still has nothing to open on.** The reload half is done — a session
 now resumes the live slot, and a save this build cannot read is kept rather than

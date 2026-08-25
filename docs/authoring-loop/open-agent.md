@@ -42,51 +42,13 @@ would carry. `DragSheet` is the drag surface the map and the plane already share
 with the grid ruling the thing dragged is the cell. *Closes when:* the pack has a
 player-owned order that survives a save.
 
-### Chat readability, and the information dump
-
-**A new location dumps everything at once, and none of it has been examined.** Two
-rounds of play on the same subject. From 2026-08-23: *"There should be some sort of
-visual cue that I already examined this object."* From 2026-08-24, the larger form:
-something never examined shows as a question mark that hides its name and its actions
-and keeps only its background colour, so a room the player has not read is a short list
-of unknowns rather than a wall of text. Examining twice says the same words and a third
-time says nothing at all, because the node has fallen silent — and the player cannot
-tell those two apart either. Both rulings it waited on are taken. **The terminals mask
-too**: an unexamined entity reaches the REPL and the playbot as an unnamed placeholder
-whose only offer is *Examine*, so all three surfaces say the same words and the parity
-harness keeps its whole claim with nothing excused. **The playbot reveals a room free on
-arrival**, examining everything unexamined at no turn cost, so its runs stay about the
-quest and its turn budget keeps the meaning it had before the mask. *Closes when:* what
-has been examined is visible on the thing, an unexamined room costs less to read than it
-does now, and the mask reads the same in all three surfaces.
-
 ### Balance, and four rulings from playing it
-
-**The whetstone is a step that buys nothing.** *"just have gear drop with a certain
-amount of points. Drop the whetstone idea. It is just an extra step."* Today an
-instance's level is `skillLevel(payload.experience)` capped at `max-level:`
-(`src/runtime/itemInstance.ts:293`) and `feed:` is how the experience arrives. Wanted
-instead: gear drops carrying its points, rolled from a range the item declares
-(`item-level: 3-8`) — which also makes every piece of gear an instance stacking to 1,
-because the roll is what makes two copies different. **And it is the same declaration
-that says a piece of gear has a skill tree at all**: an item with an item level has a
-plane, an item without one does not. *Closes when:* an item declares its level range
-and a drop rolls it. The cost is known and it is not small — 39 whetstone lines across
-`core`, `tulsa` and `combat-expansion`, and 22 files under `src/` and `scripts/` that
-name one.
-RESPONSE: It would be nice if these kinds of balance refactors cost less. There are going 
-to be many features that are built then cut. It probably isn't possible, but some effort 
-to reduce the work of removing features would be nice. 
 
 **Nothing can be unallocated.** The ruling: passive points refund for free and jewel
 sockets do not, so a socketed jewel is semi-permanent, and a node whose removal would
 strand a socket cannot be taken back. `src/runtime/clusterPlane.ts` only ever grows a
 plane — there is no unallocate of any kind, free or costly, to build that rule on.
 *Closes when:* a plane can shrink, and refuses to shrink out from under a jewel.
-
-**A jewel's passives should roll.** Ranges on a jewel's passives, locked in the moment
-it is allocated and socketed. That is the same roll-and-fix shape as the item level
-above and wants deciding with it rather than after it.
 
 **Travel should be 2–5 seconds everywhere.** *"Travel feels bad."* Today it is
 straight-line distance × `travel-seconds-per-unit` (`src/runtime/actionLookup.ts:63`,
@@ -103,54 +65,16 @@ it: a three-second walk does not read as a freeze.
 
 ## Ours, and small
 
-**`readable()` in `src/ui/render.test.tsx` cannot see an `aria-label`.** It injects the
-attribute's value inside the tag, and the following `/<[^>]*>/g` swallows it again — so
-any assertion that a label reaches a screen through `aria-label` passes without reading
-anything. Found by the lane that made a cell's background examine, whose examine label
-is exactly such a case; it derived its one exception rather than weakening the claim, so
-nothing is currently hidden by this. It silently disarms the next one. *Closes when:* an
-`aria-label`'s words are readable to that test.
-
-**A `DEBUG` section reaches a player without anything naming it.** Two roads, found by
-the audit that swept every `standingSources()` caller with a planted `DEBUG` section of
-each kind. A `DEBUG` `# resource` draws in the player's status bar on every turn as its
-raw key — `core.resource.probe-resource.title: ██████████ 10/10` — which
-`scripts/printedWords.test.ts` catches loudly. A `DEBUG` `# stat` reaches `/state`'s
-stats blob as `"core.stat.probe-max.title (core.probe-max)":10` and **nothing in the
-suite catches it**, because `printedWords` sweeps player-worded lines only and
-`play-cli.test.ts` compares the stats line against `sessionStatus` itself, so it agrees
-with the leak. A `DEBUG` `# location` appears the same way in `/state`'s *not yet found*
-list and is caught only by that test's `tulsa.` anchor. Nothing shipped triggers any of
-the three today.
-
-Decision taken, and it is the one the engine already implies: **the row leaves the
-sheet, the section is not refused at load.** `load.ts` empties a `DEBUG` section's words
-rather than refusing the section, precisely so a `DEBUG` thing stays usable for testing —
-refusing a `DEBUG` `# resource` outright would contradict that. So the rule extends from
-*nothing a player can reach may name a DEBUG thing* to *nothing a player-facing sheet
-lists may be one*, and the sweep that empties the words is the same place that should
-drop the row. *Closes when:* a `DEBUG` resource, stat and location are absent from every
-player-facing sheet, and a derived proof covers all three rather than the two that
-happen to be caught today.
-
-**A `DEBUG` section's `title:` cannot survive a round trip.** `unsayDebug`
-(`src/content/load.ts`) empties a `DEBUG` section's locale rows, and the printer's
-`authored(field)` predicate (`src/content/serialize.ts`) reads that same table to decide
-whether a title was written — so it prints nothing and the reload derives a title from
-the id. Found by marking the smith's chest: `npm run probe -- content --round-trip`
-reported `entities: changed tulsa.smiths-chest` and named no cause. The corpus does not
-hold one today only because the chest's `title:` was deleted with it. *Closes when:* a
-`DEBUG` section prints back what it parsed, or the round-trip report names why it
-cannot.
-
-**A `DEBUG` section's `say:` reaches the terminal as its bare locale key.** Same
-emptied table, read at a different moment: the words are gone by the time the terminal
-asks for them, so the key is what a player sees. Caught by
-`scripts/printedWords.test.ts`, whose script opens the smith's chest to reach a cluster
-plane. Whether prose on a `DEBUG` section should be refused at load rather than said as
-a key is the shape of the answer — a section that says nothing in any language has no
-business carrying words. *Closes when:* a `DEBUG` section cannot reach a player with a
-locale key.
+**A claim cannot name the number an author's own arithmetic gives.** The decimal
+threshold landed this session and immediately met its own wall: the vigor sheet's
+attack-rate is 41 raised by 24%, which is 50.84 on paper and 50.839999999999996 in a
+double, so `assert: stat.attack-rate = 50.84` — the only literal an author would write —
+is refused. Measured by bisecting the engine's own answer: it sits in [50.83, 50.84).
+The claim ships as a hundredth-wide band with a comment saying why, which is the
+workaround the decimal was supposed to remove. The cheap answer is that an author's
+literal declares the precision it is compared at, so `= 50.84` holds for anything
+rounding to 50.84 at two places; whether that is the rule is the only open part.
+*Closes when:* an author can write the figure their arithmetic gives and have it hold.
 
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
