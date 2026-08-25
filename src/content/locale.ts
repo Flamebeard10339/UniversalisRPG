@@ -219,6 +219,7 @@ export const ENGINE_KEYS = [
   'engine.replay.close',
   'engine.repl.place',
   'engine.repl.here',
+  'engine.repl.grouped',
   'engine.repl.clock',
   'engine.repl.pool',
   'engine.repl.swing',

@@ -39,7 +39,7 @@ import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
-import { grouping, offeredBy, type GroupRow } from './grouping';
+import { offeredBy, type GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
@@ -106,7 +106,7 @@ export interface SettingRow {
 
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
-  entities: Array<{ id: Answer; title: Localized; group?: GroupRow }>;
+  entities: Array<{ id: Answer; title: Localized }>;
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: Answer; title: Localized; current: number; max: number; display: ResourceDisplay }>;
@@ -431,7 +431,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   const entities: PlayStatus['entities'] = [];
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id), ...grouping(registry, localizer, 'entity', entity.id) });
+    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id) });
   }
 
   return {
