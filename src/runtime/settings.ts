@@ -28,6 +28,7 @@ const OFF_ON: readonly SettingChoice[] = [
 // rather than written out, the way the player's own sheet names the question that filled it.
 export const SETTINGS = {
   hardcore: { title: 'engine.setting.hardcore', note: 'engine.setting.hardcore.note', choices: OFF_ON, standing: false },
+  reveal: { title: 'engine.setting.reveal', note: 'engine.setting.reveal.note', choices: OFF_ON, standing: true },
 } as const satisfies Readonly<Record<string, Setting>>;
 
 export type SettingName = keyof typeof SETTINGS;

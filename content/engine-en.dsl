@@ -310,3 +310,5 @@ engine.setting.on: On
 engine.setting.off: Off
 engine.setting.hardcore: Hardcore
 engine.setting.hardcore.note: Fainting costs you everything you were carrying and wearing.
+engine.setting.reveal: Paced dialogue
+engine.setting.reveal.note: What is said to you arrives a line at a time, at reading speed, rather than all at once.

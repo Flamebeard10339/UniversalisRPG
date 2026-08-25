@@ -31,6 +31,7 @@ import { Pager } from './Pager';
 import { PlaytestBar } from './PlaytestBar';
 import { ReplayBar } from './ReplayBar';
 import { pageAt } from './replay';
+import { revealing } from './reveal';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
 import { StatBody } from './StatBody';
@@ -320,7 +321,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         />
         {asking && plane ? <PlaneModal plane={plane} option={asking} manner={declaredFor(view.focus)} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? (
-          <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said}>
+          <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
             {questRead ? <QuestBody entry={questRead} words={words} /> : null}
             {statRead ? <StatBody row={statRead} /> : null}
           </ModalSheet>

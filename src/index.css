@@ -114,6 +114,15 @@ textarea {
   }
 }
 
+@keyframes spoken {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes denied {
   0%,
   100% {
@@ -164,6 +173,13 @@ textarea {
   animation: darkened 180ms ease-out;
 }
 
+/* A line of a beat coming in. Short, because what is being waited for is the
+   line before it and not this: the pace is in the delay the beat hands each
+   line, and this only keeps a line from being read before its turn. */
+.spoken {
+  animation: spoken 200ms ease-out;
+}
+
 /* Twice over, so a second refusal on a count that has not moved still reads as
    an answer rather than as nothing happening. */
 .denied {
@@ -212,6 +228,7 @@ textarea {
   .risen,
   .darkened,
   .sprouted,
+  .spoken,
   .lingered,
   .denied,
   .stirring,
