@@ -4,7 +4,7 @@ import { merged, NOTICE_LIFETIME_MS, sayingOf, type Notice, type Shown } from '.
 
 export const SETTLE_MS = 220;
 
-export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway';
+export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway' | 'speak';
 
 const DRAWN_AS: Record<MomentKind, string> = {
   arrival: 'arrived',
@@ -12,6 +12,7 @@ const DRAWN_AS: Record<MomentKind, string> = {
   darken: 'darkened',
   settle: `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
   sprout: 'sprouted',
+  speak: 'spoken',
   linger: 'lingered',
   deny: 'denied',
   underway: 'underway',

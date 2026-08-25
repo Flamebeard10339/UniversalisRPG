@@ -14,6 +14,7 @@ export function ModalSheet({
   onDismiss,
   leaving,
   spoken = [],
+  paced = false,
   children,
 }: {
   option: Option;
@@ -22,13 +23,14 @@ export function ModalSheet({
   onDismiss?: () => void;
   leaving?: string;
   spoken?: readonly Localized[];
+  paced?: boolean;
   children?: ReactNode;
 }): JSX.Element {
   const [typed, setTyped] = useState('');
   const asksNothing = onlyLeaves(option, leaving);
 
   return (
-    <Modal manner={manner} asksNothing={asksNothing} subject={option.key} onDismiss={onDismiss} spoken={spoken} about={children}>
+    <Modal manner={manner} asksNothing={asksNothing} subject={option.key} onDismiss={onDismiss} spoken={spoken} paced={paced} about={children}>
       {asksNothing ? null : (
         <ModalCard key={option.key} subject={option.key} title={option.label}>
           {option.values ? (

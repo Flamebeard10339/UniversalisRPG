@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { VOICE_CLASS } from './lineStyle';
 import { clickingOffLeaves, layerOf, mannerOf, showsTheBeat, type Declared } from './modalManner';
 import type { Localized } from '../runtime/localized';
-import { useMoment } from './transient';
+import { revealDelays } from './reveal';
+import { playedAfter, useMoment } from './transient';
 
 const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
 
@@ -20,18 +21,32 @@ export function ModalCard({ subject, title, children }: { subject?: string; titl
   );
 }
 
+// One line of the beat, waiting out the lines before it. Keyed on its own words, because the same
+// slot holding something else is a new line and a line that never remounts never arrives again.
+function Said({ line, waits, paced }: { line: Localized; waits: number; paced: boolean }): JSX.Element {
+  const spoken = useMoment('speak', paced, line);
+
+  return (
+    <p style={paced ? playedAfter(waits) : undefined} className={`${spoken} whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`}>
+      {line}
+    </p>
+  );
+}
+
 // The words the screen is answering, which the scrim behind it has taken away. Drawn in the voice
-// they were said in, so a line reads the same whether it is in the history or in front of it.
-function Beat({ lines }: { lines: readonly Localized[] }): JSX.Element | null {
+// they were said in, so a line reads the same whether it is in the history or in front of it. This
+// is the one place the words are paced: the history behind the scrim is a record and comes to rest
+// at the line the turn began on, which is a line nobody has read yet if it is still arriving.
+function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean }): JSX.Element | null {
   if (lines.length === 0) return null;
+
+  const waits = revealDelays(lines, paced);
 
   return (
     <ModalCard>
       <div className="unbarred flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
         {lines.map((line, at) => (
-          <p key={at} className={`whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`}>
-            {line}
-          </p>
+          <Said key={`${at}:${line}`} line={line} waits={waits[at]} paced={paced} />
         ))}
       </div>
     </ModalCard>
@@ -47,6 +62,7 @@ export function Modal({
   subject,
   onDismiss,
   spoken = [],
+  paced = false,
   about,
   children,
 }: {
@@ -55,6 +71,7 @@ export function Modal({
   subject?: string;
   onDismiss?: () => void;
   spoken?: readonly Localized[];
+  paced?: boolean;
   about?: ReactNode;
   children?: ReactNode;
 }): JSX.Element {
@@ -71,7 +88,7 @@ export function Modal({
       className={`${darkened} ${layerOf(held)}`}
     >
       {about}
-      {showsTheBeat(held) ? <Beat lines={spoken} /> : null}
+      {showsTheBeat(held) ? <Beat lines={spoken} paced={paced} /> : null}
       {children}
     </div>
   );
