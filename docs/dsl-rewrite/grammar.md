@@ -361,8 +361,9 @@ hydration and grants nothing — unlike `title`, this field has no default.
 A named numeric constant, for pacing/tuning values the engine would otherwise
 bake in. The engine reads specific well-known ids:
 
-- `travel-seconds-per-unit` — seconds of travel per unit of straight-line
-  distance between locations. Falls back to 5.
+- `travel-seconds` — how long walking a road takes, the same for every road.
+  Falls back to 3. It used to be a rate per unit of straight-line distance, which
+  made the time a function of map coordinates and got worse as the world grew.
 - `default-action-duration` — seconds a `duration` action takes when it names no
   cadence of its own. Falls back to 0, which is why an untagged action is over
   the instant it is used today; raising it spans every action that has not
@@ -376,13 +377,12 @@ variable:
 ```
 
 ```
-# variable travel-seconds-per-unit
-value: 5
+# variable travel-seconds
+value: 3
 ```
 
 An omitted or empty `value:` is the same as leaving the whole section out: the
-consuming system supplies its own fallback (`travel-seconds-per-unit` falls back
-to 5).
+consuming system supplies its own fallback (`travel-seconds` falls back to 3).
 
 ### recipe
 

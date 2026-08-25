@@ -33,35 +33,11 @@ on was taken. **The ruling is stated in the line and is authoritative** — a la
 it as given rather than reopening it, and a lane that finds it cannot be held sends the
 line back with what it measured.
 
-### Grids, not lists
-
-**The pack has no order the player owns.** The want is drag-and-drop to swap two items.
-`state.inventory` is a `Record<template, count>` and `packRows` reads its order off that
-(`src/runtime/itemInstance.ts:134`), so there is nothing to reorder and nothing a save
-would carry. `DragSheet` is the drag surface the map and the plane already share, and
-with the grid ruling the thing dragged is the cell. *Closes when:* the pack has a
-player-owned order that survives a save.
-
-### Balance, and four rulings from playing it
-
 **Nothing can be unallocated.** The ruling: passive points refund for free and jewel
 sockets do not, so a socketed jewel is semi-permanent, and a node whose removal would
 strand a socket cannot be taken back. `src/runtime/clusterPlane.ts` only ever grows a
 plane — there is no unallocate of any kind, free or costly, to build that rule on.
 *Closes when:* a plane can shrink, and refuses to shrink out from under a jewel.
-
-**Travel should be 2–5 seconds everywhere.** *"Travel feels bad."* Today it is
-straight-line distance × `travel-seconds-per-unit` (`src/runtime/actionLookup.ts:63`,
-default 5, set at `content/core.dsl:20`), so the time is a function of map coordinates
-and gets worse as the world grows: a flat band is a different mechanism, not a
-different number. Beside it, **travel actions should leave the action list** unless
-they are an entity's action, because they are visual clutter — the GUI already drops
-the multi-leg ones (`aWalkAway` hides any choice with `legs > 1`, `src/ui/choices.ts`),
-so this extends a rule that exists rather than inventing one. The REPL and the playbot
-would then need somewhere else to travel from, and a `/map` command is the proposal.
-*Closes when:* travel costs a flat few seconds and is reached from the map. If it
-lands, *Travelling shows no progress on the map* in `open-human.md` may close with
-it: a three-second walk does not read as a freeze.
 
 ## Ours, and small
 

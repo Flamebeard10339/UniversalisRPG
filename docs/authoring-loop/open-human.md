@@ -318,10 +318,12 @@ three drivers rather than to the harness, and is the expensive path.*
 
 **Travelling shows no progress on the map.** From the first run: *"The map doesn't
 show a progress of how far along the travel is, so it reads as a bug like the game
-is frozen."*
+is frozen."* Flat-band travel has now landed at three seconds, which was the condition
+this was waiting on, so the question is only whether a three-second walk still reads as
+a freeze.
 
-*Moves when: flat-band travel lands — the item carrying that says this may close with
-it — or the owner says a three-second walk still wants a figure.*
+*Moves when: the owner walks one and says. Nothing else can answer it, and the item that
+was going to answer it has landed.*
 
 **`accepts: any` is the default and no shop in the corpus says otherwise.** So
 every counter will buy anything carrying a `value:`, and pricing four items changed
@@ -451,6 +453,19 @@ what is there now.
 *Moves when: the owner rules whether a recorded run may carry an ending save, and
 whether `KeptRun.from` may name a `# save` instead of holding bytes. Both are one-line
 answers and the engine work after either is ordinary.*
+
+**A pack reorder has no terminal control, and the save version was not bumped for it.**
+Two loose ends from the pack-order lane, neither of which blocks anything. The `swap:`
+directive is how a rearrangement records and replays, and a REPL player can type one, but
+nothing lists their pack keys except `/state` — so the order is a thing the app can drive
+and a terminal can only replay. Separately, `packOrder` was added to the save without
+bumping the version: it is additive with a sparsest of `[]`, so all 32 corpus fixtures
+read back identically, and bumping would have meant a `migrate-saves` run across every
+`# save` body for no behavioural gain. Both are stated in the lane's commit messages.
+
+*Moves when: the owner says whether a terminal needs to reorder a pack at all — it may
+simply not be a terminal thing — and whether he wants the version bumped for tidiness.
+The bump is one line plus a migrate run.*
 
 **Two xp gains at once now read as two pills, not one line.** A turn granting `+5
 Attack` and `+5 Defence` used to fold into one pill, `+5 Attack, Defence`, because the

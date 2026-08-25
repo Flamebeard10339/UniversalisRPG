@@ -526,6 +526,21 @@ subjects from a registry map while claiming about words. Both read the mark off
 words, so a node whose words genuinely are missing still fails rather than quietly
 leaving the sweep. The other five were clean.
 
+**A road costs a flat three seconds and a way out is not on the action list.**
+`travel-seconds` is the tunable and `travel-seconds-per-unit` is gone, along with
+`locationDistance` — nothing derives a travel time from map coordinates any more, which
+was a mechanism that got worse as the world grew rather than a number that was too big.
+`onActionList` in `src/runtime/waysOut.ts` is the one rule, read by the app, the REPL and
+the playbot; `aWalkAway` is deleted, having been the same judgement applied to only the
+multi-leg half. `waysOut` lives in runtime so `/map` and the app's map read one list.
+
+**The pack has an order its owner chose, and `swap:` is how it is written.** It reaches
+state by the road state already takes, so `SaveField`, `SAVE_FIELDS` and `SPAN_VOICE` all
+had to answer for it through `keyof GameState` rather than a list being edited. A row the
+order has never seen falls in behind the ones it has; a name the pack no longer holds
+draws nothing. `carried()` no longer sorts by name, which was a second answer to where a
+thing sits.
+
 **Gear drops carrying its points, and `item-level:` is what gives an item a plane.**
 `isBase` reads `itemLevel`, not `slot`. `receiveItem` was already the one arrival, so
 that is where a base is rolled and minted — which is what makes every base an instance
