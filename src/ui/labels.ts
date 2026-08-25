@@ -17,6 +17,7 @@ export const LABELS = {
   recentre: 'engine.shell.recentre',
   socket: 'engine.shell.socket',
   allocate: 'engine.shell.allocate',
+  unallocate: 'engine.shell.unallocate',
   insert: 'engine.shell.insert',
   empty: 'engine.shell.empty',
   experience: 'engine.shell.experience',

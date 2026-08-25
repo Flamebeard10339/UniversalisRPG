@@ -162,6 +162,26 @@ describe('the modal prefills and never narrows', () => {
 
     expect(JSON.stringify(answered)).toBe(JSON.stringify(typed));
   });
+
+  it('takes a point back the same way, and never offers a jewel socket back at all', () => {
+    const answered = carrying({ blade: 1, 'spark-jewel': 1 });
+    const typed = carrying({ blade: 1, 'spark-jewel': 1 });
+
+    const walked = plane(answered, ['allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0', 'allocate: position 1', 'unallocate: position 1']);
+    for (const line of [
+      'allocate: 1 at 0,0 slot e',
+      'slot: 1 at 0,0 e with spark-jewel',
+      'allocate: 1 at 1,0 position 1',
+      'unallocate: 1 at 1,0 position 1',
+    ]) {
+      const growth = growLine(typed, registry, line);
+      if (!growth.ok) throw new Error(inEnglish(registry, growth.refused));
+    }
+
+    expect(JSON.stringify(answered)).toBe(JSON.stringify(typed));
+    expect(values(walked, answered)).toEqual(['go: 0,0', 'allocate: position 1', BACK]);
+    expect(values({ ...walked, hex: '0,0' }, answered).filter((value) => value.startsWith('unallocate:'))).toEqual([]);
+  });
 });
 
 describe('what the screen does with an answer', () => {

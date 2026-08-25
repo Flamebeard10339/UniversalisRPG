@@ -6,7 +6,7 @@ import { BonusAmount, Counter } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
-import { isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, pointsSpent, positionOnEdge, slotDirections, slotState } from './clusterPlane';
+import { isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, pointsSpent, positionOnEdge, slotDirections, slotState, unallocateRefusal } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
@@ -33,6 +33,7 @@ export interface PositionReport {
   readonly title: Localized | null;
   readonly standing: Standing;
   readonly free: boolean;
+  readonly givesBack: boolean;
   readonly faces: Answer[];
   readonly payloads: PayloadReport[];
 }
@@ -41,6 +42,7 @@ export interface SlotReport {
   readonly direction: Direction;
   readonly node: Answer;
   readonly standing: Standing;
+  readonly givesBack: boolean;
   readonly toward: Answer;
   readonly beyond: Answer | null;
 }
@@ -113,14 +115,16 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
   const positions: PositionReport[] = [];
   for (let position = 1; position <= shape.positionCount; position++) {
     const passive: string | undefined = jewel.positions[position];
-    const standing = standingOf(registry, plane, { hex, kind: 'position', position });
+    const node: PlaneNode = { hex, kind: 'position', position };
+    const standing = standingOf(registry, plane, node);
     positions.push({
       position,
-      node: nodeKey({ hex, kind: 'position', position }),
+      node: nodeKey(node),
       passive: passive ?? null,
       title: passive === undefined ? null : localizer.title('passive', passive),
       standing,
       free: standing === 'allocated' && !cluster.allocatedPositions.includes(position),
+      givesBack: unallocateRefusal(registry, plane, node) === undefined,
       faces: DIRECTIONS.filter((direction) => positionOnEdge(placement, direction) === position).map((direction) => step(hex, direction)),
       payloads: payloadsOf(registry, localizer, plane, hex, position),
     });
@@ -131,10 +135,12 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
   for (const direction of DIRECTIONS) {
     if (!open.includes(direction)) continue;
     const occupied = plane[step(hex, direction)] !== undefined;
+    const node: PlaneNode = { hex, kind: 'slot', direction };
     slots.push({
       direction,
-      node: nodeKey({ hex, kind: 'slot', direction }),
-      standing: standingOf(registry, plane, { hex, kind: 'slot', direction }),
+      node: nodeKey(node),
+      standing: standingOf(registry, plane, node),
+      givesBack: unallocateRefusal(registry, plane, node) === undefined,
       toward: step(hex, direction),
       beyond: occupied ? step(hex, direction) : null,
     });

@@ -73,6 +73,14 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
     if (position.standing !== 'available') continue;
     moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position }), position.node));
   }
+  for (const slot of here.slots) {
+    if (!slot.givesBack) continue;
+    moves.push(onHexagon(frame, 'unallocate', `slot ${slot.direction}`, localizer.engine('engine.plane.unallocate.slot', { direction: localizer.identifier(slot.direction) }), slot.node));
+  }
+  for (const position of here.positions) {
+    if (!position.givesBack) continue;
+    moves.push(onHexagon(frame, 'unallocate', `position ${position.position}`, localizer.engine('engine.plane.unallocate.position', { position: position.position }), position.node));
+  }
   return moves;
 }
 

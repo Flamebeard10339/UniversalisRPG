@@ -29,6 +29,7 @@ export interface GraphNode {
   standing: Standing;
   socket: boolean;
   free: boolean;
+  givesBack: boolean;
   holds: Cluster['title'] | null;
   title: Position['title'];
   payloads: Position['payloads'];
@@ -109,6 +110,7 @@ export function planeGraph(plane: Plane): PlaneGraph {
         standing: position.standing,
         socket: false,
         free: position.free,
+        givesBack: position.givesBack,
         holds: null,
         title: position.title,
         payloads: position.payloads,
@@ -127,6 +129,7 @@ export function planeGraph(plane: Plane): PlaneGraph {
         standing: slot.standing,
         socket: true,
         free: false,
+        givesBack: slot.givesBack,
         holds: slot.beyond === null ? null : (plane.clusters.find((each) => each.hex === slot.beyond)?.title ?? null),
         title: null,
         payloads: [],

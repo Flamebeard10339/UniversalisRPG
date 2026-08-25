@@ -244,7 +244,7 @@ export function PlaneModal({
                   onClick={() => grow(acting.value)}
                   className="mt-3 self-start rounded-xl border border-accent bg-panel px-4 text-sm font-semibold text-accent transition-transform duration-75 active:scale-[0.98] active:bg-accent-strong active:text-accent-text"
                 >
-                  {words('allocate')}
+                  {words(panel.actsAs!)}
                 </button>
               )}
               {jewels.length === 0 ? null : (
