@@ -11,6 +11,7 @@ import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
 import { memberKey, Namespace } from './namespace';
+import { TOUCHED } from './sections/define';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, GENERATED_FIELD, localeKey } from './locale';
@@ -657,6 +658,34 @@ describe('an entity the corpus writes examine: on', () => {
   it('offers those words as an action, so no scenery is reviewed that nobody can read', () => {
     const unreachable = written.filter((entity) => !entity.actions.some((action) => action.results.some((result) => result.kind === 'say' && result.text === entity.examine)));
     expect(unreachable.map((entity) => entity.id)).toEqual([]);
+  });
+
+  it('marks itself touched under the name a location is marked with too, so reading a thing and standing somewhere are one list', () => {
+    const unmarked = written.filter((entity) => !entity.actions.some((action) => action.results.some((result) => result.kind === 'set' && result.variable === `${entity.id}.${TOUCHED}`)));
+    expect(unmarked.map((entity) => entity.id)).toEqual([]);
+    expect(sectionFor('location')!.flags).toContain(TOUCHED);
+  });
+});
+
+// A flag a kind mints for its own sections is state the engine owns and an author never writes, but
+// a `when:` may still read it and the editing page still offers it — which only holds because the
+// same declaration sweep that files an authored `flags:` entry files these. The subjects are every
+// flag every kind declares, crossed with every section of that kind the corpus holds, so a kind that
+// mints a flag next month is held to this with no edit here.
+describe('a flag a kind mints of its own', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const minted = sections().flatMap((section) => section.flags.map((flag) => ({ kind: section.kind, flag })));
+
+  it('is minted by enough kinds, under few enough names, for what is below to mean something', () => {
+    expect(new Set(minted.map((each) => each.kind)).size).toBeGreaterThan(1);
+    expect(minted.length).toBeGreaterThan(new Set(minted.map((each) => each.flag)).size);
+  });
+
+  it.each(minted)('stands on every # $kind the corpus holds as <id>.$flag, so a when: may name one', ({ kind, flag }) => {
+    const known = new Set(declaredBy(registry).flatMap((each) => (each.kind === 'flag' ? [each.address] : [])));
+    const ids = [...mapOf(registry, registryMapOf(kind)!).keys()];
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.filter((id) => !known.has(`${id}.${flag}`))).toEqual([]);
   });
 });
 

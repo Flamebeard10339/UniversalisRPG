@@ -2,6 +2,7 @@ import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { ActionResult, DropRow, nestedResults, Party, STARTING_LOCATION } from '../grammar/actionResult';
 import { DISCOVERED } from '../content/sections/location';
+import { TOUCHED } from '../content/sections/define';
 import { DropTable } from '../content/sections/droptable';
 import { EventTrigger, GameEvent } from '../content/sections/event';
 import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
@@ -151,9 +152,13 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
   }
 }
 
-export function spreadDiscovery(state: GameState, registry: Registry): void {
+// Standing somewhere is the only thing that touches a place, and the one road from touched to
+// discovered: a neighbour is put on the map without being touched, which is the whole difference
+// between a place heard of and a place been to.
+export function standWhereTheyAre(state: GameState, registry: Registry): void {
   const here = registry.locations.get(state.location);
   if (!here) return;
+  state.flags[`${here.id}.${TOUCHED}`] = true;
   state.flags[`${here.id}.${DISCOVERED}`] = true;
   for (const edge of effectiveAdjacent(registry, here.id)) {
     const key = `${edge.target}.${DISCOVERED}`;
@@ -174,7 +179,7 @@ export function locationNamed(registry: Registry, location: string): string {
 
 export function relocateTo(state: GameState, registry: Registry, location: string): void {
   state.location = locationNamed(registry, location);
-  spreadDiscovery(state, registry);
+  standWhereTheyAre(state, registry);
 }
 
 function subjectOf(segment: Segment, party: Party | undefined, actor: string): string {
@@ -191,18 +196,18 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return 0;
     case 'set':
       state.flags[result.variable] = true;
-      spreadDiscovery(state, registry);
+      standWhereTheyAre(state, registry);
       return 0;
     case 'unset':
       delete state.flags[result.variable];
-      spreadDiscovery(state, registry);
+      standWhereTheyAre(state, registry);
       return 0;
     case 'add': {
       const current = state.flags[result.variable];
       const base = typeof current === 'number' ? current : 0;
       const amount = result.amount * count;
       state.flags[result.variable] = base + amount;
-      spreadDiscovery(state, registry);
+      standWhereTheyAre(state, registry);
       return amount;
     }
     case 'give': {
