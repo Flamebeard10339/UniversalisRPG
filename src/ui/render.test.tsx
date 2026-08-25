@@ -7,7 +7,7 @@ import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { leaves } from '../runtime/viewLeaves';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
-import { applyDirective, startSession, view, type PlayView } from '../runtime/session';
+import { applyDirective, readRoom, startSession, unreadHere, view, type PlayView } from '../runtime/session';
 import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
@@ -102,6 +102,7 @@ const engineRuns = (html: string): string[] => readable(html).filter((run) => !S
 function whatStoppingSays(): string[] {
   const session = startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry);
   applyDirective(session, STOCKED);
+  readRoom(session);
   const opening = view(session);
   const armed = runLine(newContext(session, opening, { driving: true }), String(opening.choices.findIndex((choice) => choice.id === ROAST) + 1));
   return armed.live!.end(true).output.flatMap((output) => (output.kind === 'message' ? [output.text] : []));
@@ -169,6 +170,13 @@ function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: bo
 function stocked(): Driver {
   const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
   driver.send(`/load ${STOCKED.save}`);
+  return read(driver);
+}
+
+// A room nobody has read offers only the looks that read it, so a sheet is asked about after
+// taking them, which is what a player does before anything else here is on it.
+function read(driver: Driver): Driver {
+  for (const choice of unreadHere(driver.snapshot().view)) driver.send(String(choice.id));
   return driver;
 }
 
@@ -258,7 +266,8 @@ function everyPageFilled(): Driver {
 
 describe('what the shell puts on the screen', () => {
   it('renders nothing a player can read that the engine did not publish', () => {
-    const driver = stocked();
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send(`/load ${STOCKED.save}`);
     const addresses = addressesOf(driver);
     const engine = new Set<string>(whatStoppingSays());
     let seen = 0;
@@ -276,6 +285,11 @@ describe('what the shell puts on the screen', () => {
     };
 
     step();
+    // The room arrives masked, and every look that lifts one is a screen of its own to account for.
+    for (const choice of unreadHere(driver.snapshot().view)) {
+      driver.send(String(choice.id));
+      step();
+    }
     driver.choose(position(driver, TALK));
     step();
     const menu = driver.snapshot().view.modals[0].options[0];
@@ -501,7 +515,7 @@ describe('what the shell puts on the screen', () => {
     const leaves = createDriver([engineLocale(), SURVEYED]);
     leaves.choose(position(leaves, LOOK_OUT));
     leaves.open('surveyed.awl');
-    const stays = createDriver(SHIPPED_SOURCES);
+    const stays = read(createDriver(SHIPPED_SOURCES));
     stays.choose(position(stays, TALK));
 
     expect(dismissal(leaves.snapshot().view.modals)).not.toBeNull();
@@ -559,7 +573,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
+    const driver = read(createDriver(SHIPPED_SOURCES));
     driver.choose(position(driver, 'talk:tulsa.miki'));
     const menu = driver.snapshot().view.modals[0].options[0];
 

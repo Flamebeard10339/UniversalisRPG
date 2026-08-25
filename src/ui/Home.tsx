@@ -30,7 +30,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
         {offerCells(choices).map((cell) => (
-          <div key={String(cell.name ?? cell.offers[0]?.id)} style={fillOf(cell.group)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
+          <div key={String(cell.of ?? cell.offers[0]?.id)} style={fillOf(cell.group)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
             {cell.examine ? (
               <button
                 data-drive="choose"
