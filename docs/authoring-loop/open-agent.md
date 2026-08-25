@@ -207,12 +207,6 @@ the failure mode `one-home` exists to catch.
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
 
-**Dialogue is drafted directly, and the review pass waits for the world.** *"The human
-review pass is deferred until the world has settled. Until then, we will directly fix
-all dialogue rather than leave it unclear or broken."* A line that reads wrong is a
-lane's to rewrite, not a question to park. This is the standing policy and it is in
-`settled.md`.
-
 **Two shipped choices are labelled with a machine address.** `modal:choose-race` and
 `modal:name-yourself` reach the player as `choices[].label`. *"This needs to be done."*
 Under the policy above the words are the lane's to write.
@@ -245,12 +239,6 @@ from the clock, so `upsertLocalSection` never replaces one and `local-changes` g
 two sections per playtest forever. *Closes when:* the playtest list can drop a run, both
 its sections at once, through that same function. Nothing prunes on a timer — that was
 refused, because it destroys runs the author has not exported yet.
-
-**A playtest is marked reviewed by its filename.** Ruled: a run whose findings have been
-read out is renamed with a `-reviewed` suffix in `.planning/yonatan-playtests/`. Nothing
-in the app tracks it, `content/reviewed.tsv` stays the writing's ledger, and both runs
-have been renamed. No work follows; the line is here so a lane knows the convention
-exists.
 
 **A shared fixture world, kept as small as it can be.** Ruled: build it. The measurement
 that asked for it: removing the whetstone touched 57 files, and **seventeen of them were
