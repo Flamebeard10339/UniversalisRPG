@@ -160,7 +160,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   fields: {
     title: TITLE_FIELD,
     group: GROUP_FIELD,
-    examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words and nothing else` },
+    examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words. Until it is taken, this thing stands under a placeholder with nothing else on offer` },
     hiddenIf:{ parser: condition, keyword: 'hidden if' },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
