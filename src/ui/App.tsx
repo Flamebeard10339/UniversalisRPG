@@ -22,6 +22,7 @@ import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { Notices } from './Notices';
 import { noticesBetween } from './notice';
+import { declaredFor } from './modalManner';
 import { ModalSheet } from './ModalSheet';
 import type { LabelId } from './labels';
 import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
@@ -305,9 +306,9 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           columns={here.columns}
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
-        {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
+        {asking && plane ? <PlaneModal plane={plane} option={asking} manner={declaredFor(view.focus)} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? (
-          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={answering(snapshot.transcript.entries)}>
+          <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={answering(snapshot.transcript.entries)}>
             {questRead ? <QuestBody entry={questRead} words={words} /> : null}
           </ModalSheet>
         ) : null}

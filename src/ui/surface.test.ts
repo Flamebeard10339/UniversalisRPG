@@ -123,6 +123,16 @@ const OFFERED = offered();
 
 const MOVES_THE_WORLD = /\b(wait|apply|applyDirective|beginAction|cancelAction|submitModal)\s*\(/;
 
+const MODAL_LAYER = 'Modal.tsx';
+
+const MANNER_TABLE = 'modalManner.ts';
+
+// A screen announcing itself to a reader and to everything that reads a screen.
+const A_SCREEN = /role="dialog"|aria-modal/;
+
+// What a screen costs in pixels: the ground it covers and what it does to what is under it.
+const A_LAYER = /bg-scrim|inset-0 z-50/;
+
 
 describe('the rules the driver is held to', () => {
   it('reads the tree it is a rule about', () => {
@@ -162,6 +172,31 @@ describe('the rules the driver is held to', () => {
 
   it('names no game state, so it can hold none', () => {
     for (const source of SOURCES) expect(source.text, source.file).not.toContain('GameState');
+  });
+
+  // Subjects derived by sweeping the tree, so a screen written next month is held to both rules
+  // without anybody adding it to a list. The two are apart because they have different owners: one
+  // component draws a screen, one module decides what a manner costs in pixels.
+  it('draws every screen on the one layer, so none of them decides for itself what a tap beside it does', () => {
+    const layer = SOURCES.filter((source) => source.file.endsWith(`/${MODAL_LAYER}`));
+    expect(layer, `nothing under src/ui is ${MODAL_LAYER}`).toHaveLength(1);
+    expect(layer[0].text, `${MODAL_LAYER} draws no screen, so every check below holds vacuously`).toMatch(A_SCREEN);
+
+    for (const source of SOURCES) {
+      if (source === layer[0]) continue;
+      expect(source.text, `${source.file} opens a screen of its own instead of drawing it through ${MODAL_LAYER}`).not.toMatch(A_SCREEN);
+    }
+  });
+
+  it('spells a screen out in one module, so no component picks its own inset, scrim or stacking', () => {
+    const table = SOURCES.filter((source) => source.file.endsWith(`/${MANNER_TABLE}`));
+    expect(table, `nothing under src/ui is ${MANNER_TABLE}`).toHaveLength(1);
+    expect(table[0].text, `${MANNER_TABLE} spells no screen out, so every check below holds vacuously`).toMatch(A_LAYER);
+
+    for (const source of SOURCES) {
+      if (source === table[0]) continue;
+      expect(source.text, `${source.file} spells a screen's layer out rather than reading it off ${MANNER_TABLE}`).not.toMatch(A_LAYER);
+    }
   });
 
   it('names no modal, so it cannot be rendering one it knows', () => {
