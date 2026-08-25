@@ -394,14 +394,6 @@ same kind. **Fold all three questions before writing the merge**, because a merg
 that still cannot say *stood in* as distinct from *heard of* has not merged anything.
 `one-home` is the procedure and this is exactly the case it is for.
 
-**Pin `choice.detail` with a direct test.** From the alias discussion: the specific hole
-is that mutating `formatChoices` in `scripts/lib/replLines.ts` to drop `choice.detail`
-**passes the suite**, because the parity harness counts words and `choices[].detail` and
-`entities[].title` hold identical word sets at `/look`. A focused test asserting a choice
-line carries what offers it closes that hole in about five lines and touches no harness.
-The general question — whether the view may declare aliases — stays in `open-human.md`
-and this does not pre-empt it.
-
 ### Numbers and rules the owner ruled
 
 **Every skill grants +1 to its own stat per level.** Ruled: *"Yes, all skills should grant
@@ -424,12 +416,6 @@ per equipment slot. However, grown gear should also take a slot."* `state.invent
 excludes worn **and** grown today; only the second exclusion goes. Equipping therefore
 still frees capacity, and growing an item when the pack is full becomes refusable, which
 is the new refusal to write and prove.
-
-**A `# shop` accepts one of exactly two things.** Ruled: *"There are 2 states for a shop.
-Accepts any, or accepts stock. The second option is for shops that only accept items they
-already keep stocked."* So `accepts:` is a closed two-value field, `stock` means what the
-shop already lists, and the effective policy becomes readable off the shop instead of
-falling out of which items happen to carry a `value:`.
 
 **Two xp gains fold back into one line.** Ruled: *"+5 attack and +5 defense, should read
 +10 attack, defense."* The grouping belongs in `sayingOf` over notices that share a count,
