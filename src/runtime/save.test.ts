@@ -4,6 +4,7 @@ import { restorePools } from './effects';
 import { armAction, armCraft, armFightAction, armTravel, buffsOf, createGameState, grantBuff, PLAYER, statValue } from './runtime';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { openModalNamed } from './modalStack';
 import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
 import { parseSaveSection } from '../content/sections/save';
@@ -17,11 +18,9 @@ import { GameState, type ModalFrame } from './state';
 import { toMilliUnits } from './units';
 import { receiveItem } from './itemInstance';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # item gold
 title: Gold
 
@@ -37,9 +36,6 @@ slot: hand
 item-level: 2
 
 # flag done
-
-# stat max-health
-base: 10
 
 # resource health
 max: max-health
@@ -231,10 +227,10 @@ describe('loadSave', () => {
   });
 });
 
-const PRUNE_MODULE = `
+const PRUNE_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 flags: lit
 
 # location cave
@@ -248,9 +244,6 @@ slot: head
 # flag known
 
 # skill cooking
-
-# stat max-health
-base: 10
 
 # stat strength
 base: 1
@@ -439,11 +432,9 @@ describe('compareSaveOnly', () => {
   });
 });
 
-const SAVE_TEST_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const SAVE_TEST_MODULE =
+  FIXTURE_WORLD +
+  `
 # item gold
 title: Gold
 

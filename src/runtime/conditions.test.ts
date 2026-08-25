@@ -5,14 +5,13 @@ import { loadInEnglish } from '../content/engineLocale';
 import { parseWhole } from '../grammar/parser';
 import { createGameState, GameState } from './runtime';
 import { Registry } from '../content/registry';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { xpForLevel } from './skills';
 
-const MODULE = `
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # skill mining
-
-# location camp
-x: 0, y: 0
-starting
 `;
 
 const registry: Registry = loadInEnglish(MODULE);

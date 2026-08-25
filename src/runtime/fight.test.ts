@@ -4,6 +4,7 @@ import { condition } from '../grammar/condition';
 import { parseWhole } from '../grammar/parser';
 import { hostile, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { logSwing } from './encounter';
 import { declaredId } from '../content/sections/entity';
@@ -11,16 +12,13 @@ import { localizerOf } from './localized';
 import { isPopulations } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
-const MODULE = `
-# stat attack
-base: 4
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # stat dr
 
 # stat attack-rate
 base: 60
-
-# stat max-health
 
 # resource health
 max: max-health
@@ -131,8 +129,6 @@ guarded:
   requires: has token
 
 # location camp
-x: 0, y: 0
-starting
 entities: 2 bandit-leader, boulder, ogre
 
 # location shore
@@ -484,10 +480,9 @@ describe('a swing the player lands on themselves', () => {
 // seconds, so something is always standing for `aggressive` to open the next fight on. The player
 // regenerates faster than a limpet can hurt them, so the death that legitimately stops a dangerous
 // action never arrives either, and nothing is left to end the loop but the loop's own bound.
-const TIDEPOOL = `
-# stat attack
-base: 4
-
+const TIDEPOOL =
+  FIXTURE_WORLD +
+  `
 # stat dr
 
 # stat attack-rate
@@ -495,8 +490,6 @@ base: 60
 
 # stat regeneration
 base: 600
-
-# stat max-health
 
 # resource health
 rate: regeneration
@@ -528,16 +521,14 @@ uses: swing
 aggressive
 respawn after: 2s
 
-# location tidepool
-x: 0, y: 0
-starting
+# location camp
 entities: 3 limpet
 `;
 
 describe('an action under way is bounded in the time of the world it runs in', () => {
   it('gives up on a room that respawns what it loses, rather than stepping it forever', () => {
     const registry = loadInEnglish(TIDEPOOL);
-    const state = standing(registry, 'tidepool');
+    const state = standing(registry, 'camp');
     resolve(state, registry, secondsToMs(1));
     expect(state.activeAction, 'nothing opened on the player, so there was never anything to wait out').not.toBeNull();
 
