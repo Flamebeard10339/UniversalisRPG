@@ -10,6 +10,7 @@ import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack
 import { MODAL_SCREENS } from '../grammar/actionResult';
 import { shippedSources } from '../content/shipped';
 import { SAVE_VERSION } from './save';
+import { receiveItem } from './itemInstance';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { askedOption } from './command';
@@ -530,9 +531,9 @@ describe('the carried-items screen, as a frame like any other', () => {
     const session = startSession(loadInEnglish(GROWING_MODULE));
     applyDirective(session, { kind: 'load', save: 'stocked' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: 'blade' });
+    submitModal(session, { item: '1' });
     submitModal(session, { verb: 'grow' });
-    submitModal(session, { plane: 'feed: with whetstone' });
+    submitModal(session, { plane: 'allocate: slot e' });
     submitModal(session, { plane: 'back' });
 
     expect(submitModal(session, { verb: 'destroy' }).modals[0].options.map((option) => option.key)).toEqual(['confirm']);
@@ -555,18 +556,14 @@ open-connections: e
 # item blade
 title: Blade
 slot: mainhand
-max-level: 10
+item-level: 4
 origin-cluster: core
 
 # item rope
 title: Rope
 
-# item whetstone
-title: Whetstone
-item-experience: 1000
-
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"rope":1,"whetstone":1}}
+{"version":${SAVE_VERSION},"inventory":{"rope":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
 const PLANE_MODULE = `
@@ -574,29 +571,25 @@ const PLANE_MODULE = `
 x: 0, y: 0
 starting
 
-# cluster-jewel core
-shape: point
+# cluster-jewel ring
+shape: ring
 open-connections: e
 
 # item blade
 title: Blade
 slot: mainhand
-max-level: 1
-origin-cluster: core
-
-# item whetstone
-title: Whetstone
-item-experience: 1000
+item-level: 1
+origin-cluster: ring
 
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1}}
+{"version":${SAVE_VERSION},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"ring","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
 function openOnBlade(): PlaySession {
   const session = startSession(loadInEnglish(PLANE_MODULE));
   applyDirective(session, { kind: 'load', save: 'stocked' });
   applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'blade' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: '1' });
   return session;
 }
 
@@ -616,13 +609,13 @@ describe('the plane screen, as a frame like any other', () => {
   it('states a refused growth on the screen it was refused on, and puts nothing under it', () => {
     const session = openOnBlade();
     submitModal(session, { verb: 'grow' });
-    expect(takes(view(session).modals[0].options[0])).toContain('feed: with whetstone');
+    expect(takes(view(session).modals[0].options[0])).toContain('allocate: position 2');
 
-    const refused = submitModal(session, { plane: 'feed: with whetstone' });
+    submitModal(session, { plane: 'allocate: position 2' });
+    const refused = submitModal(session, { plane: 'allocate: position 3' });
     expect(modalNames(refused)).toEqual(['item-plane']);
-    expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — Blade is already at level 1, which is its maximum');
+    expect(refused.modals[0].options[0].label).toBe('Modified Blade at 0,0 — position 3 of 0,0 costs a point and none remain');
     expect(refused.said).toEqual([]);
-    expect(refused.inventory).toEqual({ blade: 1, whetstone: 1 });
   });
 
   it('is not a screen a name alone can raise, because a name cannot say which copy', () => {
@@ -648,7 +641,7 @@ describe('the plane screen, as a frame like any other', () => {
   it('closes a saved frame whose copy or hexagon the world no longer has', () => {
     const registry = loadInEnglish(PLANE_MODULE);
     for (const [frame, reason] of [
-      [{ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' }, 'it grows blade, which the player no longer carries'],
+      [{ name: 'item-plane', answers: {}, target: '1', hex: '0,0' }, 'it grows 1, which the player no longer carries'],
       [{ name: 'item-plane', answers: {}, target: 'rope', hex: '0,0' }, 'it grows rope, which the player no longer carries'],
     ] as const) {
       const state = createGameState('camp');
@@ -662,8 +655,8 @@ describe('the plane screen, as a frame like any other', () => {
   it('keeps a saved frame whose copy is still carried', () => {
     const registry = loadInEnglish(PLANE_MODULE);
     const state = createGameState('camp');
-    state.inventory.blade = 1;
-    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'blade', hex: '0,0' });
+    receiveItem(state, registry, 'blade', 1);
+    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: '1', hex: '0,0' });
 
     expect(pruneModals(state, registry)).toEqual([]);
     expect(names(state)).toEqual(['item-plane']);
@@ -674,8 +667,8 @@ describe('the plane screen, as a frame like any other', () => {
     submitModal(session, { verb: 'grow' });
 
     const shown = view(session);
-    expect(shown.focus).toEqual({ kind: 'plane', instance: 'blade', hex: '0,0' });
-    expect(shown.planes.map((plane) => plane.instance)).toContain('blade');
+    expect(shown.focus).toEqual({ kind: 'plane', instance: '1', hex: '0,0' });
+    expect(shown.planes.map((plane) => plane.instance)).toContain('1');
   });
 
   it('publishes no focus for a screen that has no plane in hand, nor for none at all', () => {
@@ -777,12 +770,8 @@ describe('nothing a player answers with carries words', () => {
     '# item blade',
     'title: Blade',
     'slot: mainhand',
-    'max-level: 4',
+    'item-level: 4',
     'origin-cluster: core',
-    '',
-    '# item whetstone',
-    'title: Whetstone',
-    'item-experience: 1000',
     '',
     '# item coin',
     'title: Coin',
@@ -820,11 +809,11 @@ describe('nothing a player answers with carries words', () => {
     'log: Someone at the forge wants something fetched.',
     '',
     'stage asking:',
-    '  log: The sage asked for a whetstone.',
+    '  log: The sage asked for a bough.',
     '  complete',
     '',
     '# save stocked',
-    `{"version":${SAVE_VERSION},"inventory":{"forge.blade":2,"forge.whetstone":2,"forge.bough-jewel":1,"forge.coin":50,"forge.nail":1}}`,
+    `{"version":${SAVE_VERSION},"inventory":{"forge.bough-jewel":1,"forge.coin":50,"forge.nail":1},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"forge.blade","payload":{"roll":0.25,"plane":{"0,0":{"jewel":"forge.core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"forge.blade","payload":{"roll":0.75,"plane":{"0,0":{"jewel":"forge.core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}`,
   ].join('\n');
 
   const SPANISH = [
@@ -835,7 +824,6 @@ describe('nothing a player answers with carries words', () => {
     '',
     '# locale es',
     'forge.item.blade.title: Espada',
-    'forge.item.whetstone.title: Piedra',
     'forge.item.bough-jewel.title: Rama',
     'forge.entity.sage.title: Sabio',
     'engine.carried.verb.grow: Cultiva',
@@ -869,7 +857,7 @@ describe('nothing a player answers with carries words', () => {
   const everyValue = (language: string): string[] => {
     const session = startSession(registry, language);
     applyDirective(session, { kind: 'load', save: 'forge.stocked' });
-    applyDirective(session, { kind: 'equip', item: 'forge.blade' });
+    applyDirective(session, { kind: 'equip', item: '2' });
     const values: string[] = [];
     const published = (): void => {
       for (const modal of view(session).modals) {
@@ -890,7 +878,6 @@ describe('nothing a player answers with carries words', () => {
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'race', value: 'forge.elf' });
 
-    applyDirective(session, { kind: 'feed', target: 'forge.blade', food: 'forge.whetstone' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: '1' });
@@ -936,7 +923,7 @@ describe('nothing a player answers with carries words', () => {
     for (const language of ['en', 'es']) {
       const values = everyValue(language);
       expect(values.length, language).toBeGreaterThan(10);
-      for (const verb of ['slot: ', 'feed: ']) expect(values.filter((value) => value.startsWith(verb)), `${language} published no ${verb.trim()} value`).not.toEqual([]);
+      for (const verb of ['slot: ', 'allocate: ']) expect(values.filter((value) => value.startsWith(verb)), `${language} published no ${verb.trim()} value`).not.toEqual([]);
       for (const verb of ['equip', 'unequip', 'destroy']) expect(values, language).toContain(verb);
       expect(values.flatMap((value) => wordsInside(value, words).map((word) => `${value} holds ${word}`)), language).toEqual([]);
     }

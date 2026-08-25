@@ -4,7 +4,7 @@ import { applyClusterEffect, instancePayloads } from './clusterEffect';
 import { Hex } from '../content/hex';
 import { clusterAt, ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
-import { allocate, feedItem, Growth, itemInstance, slotJewel } from './itemInstance';
+import { allocate, Growth, itemInstance, receiveItem, slotJewel } from './itemInstance';
 import { initialState } from './save';
 import { hitDamage, statValue } from './stats';
 import { GameState } from './state';
@@ -60,27 +60,33 @@ mod-slots: 1
 
 # item blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 
 # item plated-blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 +10 max-health
 
 # item chain-blade
 slot: mainhand
+item-level: 20
 origin-cluster: node
 
 # item spark-blade
 slot: mainhand
+item-level: 20
 origin-cluster: spark
 
 # item wide-blade
 slot: mainhand
+item-level: 20
 origin-cluster: quad
 
 # item tight-blade
 slot: mainhand
+item-level: 20
 origin-cluster: tight
 
 # item node-jewel
@@ -97,9 +103,6 @@ cluster-effect: +25% max-health
 
 # item goad
 cluster-effect: +50% attack
-
-# item whetstone
-item-experience: 1000
 `;
 
 const registry = loadInEnglish(MODULE);
@@ -111,17 +114,15 @@ function ok(outcome: Growth): string {
   return outcome.instance;
 }
 
-function carrying(inventory: Record<string, number>): GameState {
+function carrying(holdings: Record<string, number>): GameState {
   const state = initialState(registry);
-  Object.assign(state.inventory, inventory);
+  for (const [id, count] of Object.entries(holdings)) receiveItem(state, registry, id, count);
   return state;
 }
 
 function grown(itemId: string, positions: number[], extra: Record<string, number> = {}): GameState {
-  const state = carrying({ [itemId]: 1, whetstone: positions.length + 1, ...extra });
-  let target = ok(feedItem(state, registry, itemId, 'whetstone'));
-  for (let fed = 0; fed < positions.length; fed++) target = ok(feedItem(state, registry, target, 'whetstone'));
-  for (const position of positions) ok(allocate(state, registry, target, { hex: ORIGIN, kind: 'position', position }));
+  const state = carrying({ [itemId]: 1, ...extra });
+  for (const position of positions) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
   return state;
 }
 
@@ -195,10 +196,12 @@ describe('applying a cluster effect', () => {
     expect(state.inventory['lesser-orb']).toBe(1);
   });
 
-  it('grows a stack copy into an instance the way every other verb does', () => {
+  it('spends the orb on the copy it names and leaves the other copy of the same base alone', () => {
     const state = carrying({ blade: 2, 'lesser-orb': 1 });
-    expect(applyClusterEffect(state, registry, 'blade', 'lesser-orb', ORIGIN)).toEqual({ ok: true, instance: '1' });
-    expect(state.inventory).toEqual({ blade: 1, 'lesser-orb': 0 });
+    expect(applyClusterEffect(state, registry, '2', 'lesser-orb', ORIGIN)).toEqual({ ok: true, instance: '2' });
+    expect(state.inventory).toEqual({ 'lesser-orb': 0 });
+    expect(clusterAt(itemInstance(state, '2')!.plane, ORIGIN)!.effects).toEqual(['lesser-orb']);
+    expect(clusterAt(itemInstance(state, '1')!.plane, ORIGIN)!.effects).toEqual([]);
   });
 
   it('refuses a jewel in inventory as its target, leaving both items stacked and uninstanced', () => {
@@ -255,9 +258,8 @@ describe('an effect scales a payload without moving it between channels', () => 
 
 describe('an effect stops at its cluster and a percent payload does not', () => {
   const twoClusters = (): GameState => {
-    const state = carrying({ 'chain-blade': 1, 'node-jewel': 1, 'lesser-orb': 1, whetstone: 3 });
-    let target = ok(feedItem(state, registry, 'chain-blade', 'whetstone'));
-    for (let fed = 1; fed < 3; fed++) target = ok(feedItem(state, registry, target, 'whetstone'));
+    const state = carrying({ 'chain-blade': 1, 'node-jewel': 1, 'lesser-orb': 1 });
+    const target = '1';
     ok(allocate(state, registry, target, { hex: ORIGIN, kind: 'slot', direction: 'e' }));
     ok(slotJewel(state, registry, target, 'node-jewel', ORIGIN, 'e'));
     ok(allocate(state, registry, target, { hex: AT_E, kind: 'position', position: 1 }));
@@ -310,13 +312,13 @@ describe('what the runtime reports', () => {
   });
 });
 
-describe('a worn stack contributes its cluster jewel\'s free root passive', () => {
-  it('grants the same passive before and after a feed that spends no point', () => {
-    const state = carrying({ 'chain-blade': 1, whetstone: 1 });
-    equip(state, registry, 'chain-blade');
+describe("a worn copy contributes its cluster jewel's free root passive", () => {
+  it('grants it from the moment the copy dropped, before any point has been spent', () => {
+    const state = carrying({ 'chain-blade': 1 });
+    equip(state, registry, '1');
     expect(health(state)).toBeCloseTo(40, 10);
 
-    ok(feedItem(state, registry, 'chain-blade', 'whetstone'));
+    ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'slot', direction: 'e' }));
     expect(health(state)).toBeCloseTo(40, 10);
   });
 });

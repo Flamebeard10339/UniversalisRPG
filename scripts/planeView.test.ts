@@ -45,7 +45,6 @@ const plane = (over: Partial<PlaneReport> = {}): PlaneReport => ({
   title: asLocalized('Blade'),
   name: asLocalized('Blade'),
   level: 3,
-  maxLevel: 20,
   spent: 1,
   links: [],
   remaining: 2,
@@ -58,11 +57,11 @@ const shown = (report: PlaneReport, worn = false): string => formatPlane(report,
 
 describe('formatPlane', () => {
   it('heads a plane with its name, the level and the points left', () => {
-    expect(formatPlane(plane(), false, null, localizer)[0]).toBe('Blade — level 3/20, 1 spent, 2 points left');
+    expect(formatPlane(plane(), false, null, localizer)[0]).toBe('Blade — level 3, 1 spent, 2 points left');
   });
 
   it('says a single point in the singular, and marks a plane the player is wearing', () => {
-    expect(formatPlane(plane({ remaining: 1 }), true, null, localizer)[0]).toBe('Blade — worn — level 3/20, 1 spent, 1 point left');
+    expect(formatPlane(plane({ remaining: 1 }), true, null, localizer)[0]).toBe('Blade — worn — level 3, 1 spent, 1 point left');
   });
 
   it('addresses the origin as an origin and a slotted cluster by the slot it came through', () => {

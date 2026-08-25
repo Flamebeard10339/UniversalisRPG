@@ -36,11 +36,11 @@ open-connections: e
 # item blade
 title: Blade
 slot: mainhand
-max-level: 2
+item-level: 2
 origin-cluster: core
 
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1}}
+{"version":${SAVE_VERSION},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
 function stocked(): PlaySession {
@@ -52,7 +52,7 @@ function stocked(): PlaySession {
 function onBlade(): PlaySession {
   const session = stocked();
   applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-  applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'blade' });
+  applyDirective(session, { kind: 'submit-modal', key: 'item', value: '1' });
   return session;
 }
 

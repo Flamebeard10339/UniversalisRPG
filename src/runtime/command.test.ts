@@ -370,7 +370,7 @@ describe('the commands a player plays with', () => {
     const opened = runLine(ctx, '/inv gauntlet');
     expect(kinds(opened)).toEqual(['view']);
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['equip', 'destroy', 'close'] }]);
   });
 
   it('/inventory <slot> opens the copy that is worn while its stack still stands', () => {
@@ -379,7 +379,7 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv worn:hand');
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=worn:hand']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'unequip', 'destroy', 'close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['unequip', 'destroy', 'close'] }]);
   });
 
   it('/inventory <item> still opens the stack the worn copy left, and offers it Equip', () => {
@@ -388,7 +388,7 @@ describe('the commands a player plays with', () => {
 
     const opened = runLine(ctx, '/inv gauntlet');
     expect(opened.recorded).toEqual(['open-modal: carried-items', 'submit-modal: item=gauntlet']);
-    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['grow', 'equip', 'destroy', 'close'] }]);
+    expect(answered(opened.view?.modals[0].options)).toEqual([{ key: 'verb', label: 'Gauntlet', values: ['equip', 'destroy', 'close'] }]);
   });
 
   it('refuses an item the player is not carrying, and opens no screen to say so', () => {
@@ -412,7 +412,7 @@ describe('the commands a player plays with', () => {
     runLine(ctx, '/load stocked');
     runLine(ctx, '/inv gauntlet');
 
-    const equipped = runLine(ctx, '2');
+    const equipped = runLine(ctx, '1');
     expect(equipped.recorded).toEqual(['submit-modal: verb=equip']);
     expect(sessionStatus(session).equipment).toEqual([{ slot: 'hand', title: 'Hand', item: 'gauntlet', name: 'Gauntlet' }]);
     expect(equipped.view?.modals).toEqual([]);
@@ -1617,24 +1617,21 @@ passives: 1 hale
 title: Blade
 slot: hand
 origin-cluster: node
-max-level: 2
-
-# item whetstone
-item-experience: 1000
+item-level: 1
 
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":2}}
+{"version":${SAVE_VERSION},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"node","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
   it('records the verb when it was done and the refusal when it was not', () => {
     const { ctx, recorder } = fixture(GROWTH_MODULE);
     runLine(ctx, '/load stocked');
 
-    runLine(ctx, 'feed: blade with whetstone');
-    const said = runLine(ctx, 'feed: 1 with whetstone');
+    runLine(ctx, 'allocate: 1 at 0,0 slot e');
+    const said = runLine(ctx, 'allocate: 1 at 0,0 slot e');
 
-    expect(recorder.history).toEqual(['load: stocked', 'feed: blade with whetstone', 'refuse: feed 1 with whetstone']);
-    expect(said.view?.said).toContain('Blade is already at level 2, which is its maximum');
+    expect(recorder.history).toEqual(['load: stocked', 'allocate: 1 at 0,0 slot e', 'refuse: allocate 1 at 0,0 slot e']);
+    expect(said.view?.said).toContain('the e slot of 0,0 is already allocated');
   });
 });
 

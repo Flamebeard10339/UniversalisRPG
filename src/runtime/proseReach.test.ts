@@ -12,6 +12,7 @@ import { MODAL_NAMES, publishModal } from './modals';
 import { planeReport } from './planeReport';
 import { planeFrame } from './planeScreen';
 import { questFrame } from './questScreen';
+import { grownItems, receiveItem } from './itemInstance';
 import { initialState, SAVE_VERSION } from './save';
 import { apply, applyDirective, startSession, view } from './session';
 import type { ModalFrame } from './state';
@@ -79,7 +80,11 @@ function probedUniverse(shipped: Registry): { registry: Registry; jewelBases: re
     'version: 1.0.0',
     'dependencies:',
     ...owners.map((owner) => `  ${owner}`),
-    ...jewels.flatMap((id) => ['', `# item base-${flat(id)}`, 'slot: mainhand', `origin-cluster: ${id}`]),
+    '',
+    // The pack this author's sight fills is every item at once, which is more than any world would let a player carry.
+    '# variable inventory-slots',
+    'value: 0',
+    ...jewels.flatMap((id) => ['', `# item base-${flat(id)}`, 'slot: mainhand', 'item-level: 4', `origin-cluster: ${id}`]),
     ...locations.flatMap((id) => ['', `# save at-${flat(id)}`, JSON.stringify({ version: SAVE_VERSION, location: id, inventory })]),
   ].join('\n');
   return {
@@ -159,12 +164,14 @@ function published(shipped: Registry): Surface[] {
   const { registry, jewelBases, standings } = probedUniverse(shipped);
   const state = initialState(registry);
   const held = [...registry.items.keys()];
-  for (const item of [...held, ...jewelBases]) state.inventory[item] = 1;
+  for (const item of [...held, ...jewelBases]) receiveItem(state, registry, item, 1);
+  // A base arrives as a copy of its own, and a copy is what its plane is opened under.
+  const copies = Object.keys(grownItems(state));
   return [
     { name: 'standing somewhere', said: standing(registry, standings) },
     { name: 'the screens', said: screens(registry, state) },
-    { name: 'the carried screen', said: carried(registry, state, held) },
-    { name: 'a plane', said: planes(registry, state, [...held, ...jewelBases]) },
+    { name: 'the carried screen', said: carried(registry, state, [...held, ...copies]) },
+    { name: 'a plane', said: planes(registry, state, [...held, ...copies]) },
     { name: 'the journal', said: journals(registry, state) },
   ];
 }

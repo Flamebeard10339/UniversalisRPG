@@ -40,20 +40,20 @@ open-connections: e
 # item blade
 title: Blade
 slot: mainhand
-max-level: 2
+item-level: 1
 origin-cluster: core
 
 # item shield
 title: Shield
 slot: offhand
-max-level: 2
+item-level: 1
 origin-cluster: core
 
 # save stocked
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1}}
+{"version":${SAVE_VERSION},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"shield","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save worn
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"shield":1},"equipped":{"offhand":"shield"}}
+{"version":${SAVE_VERSION},"equipped":{"offhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"shield","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
 function onPlaneScreen(save: string, item: string): string[] {
@@ -223,30 +223,30 @@ x: 1, y: 0
   });
 
   it('draws the plane a screen has in hand above the question it is asking', () => {
-    const lines = onPlaneScreen('stocked', 'blade');
+    const lines = onPlaneScreen('stocked', '1');
 
     expect(lines).toContain('[item-plane] plane');
-    expect(lines).toContain('Blade — level 1/2, 0 spent, 1 point left');
+    expect(lines).toContain('Modified Blade — level 1, 0 spent, 1 point left');
     expect(lines.indexOf('> 0,0  Core · point · origin · mods 0/2')).toBeGreaterThan(lines.indexOf('[item-plane] plane'));
-    expect(lines.indexOf('Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  Core · point · origin · mods 0/2'));
+    expect(lines.indexOf('Modified Blade at 0,0:')).toBeGreaterThan(lines.indexOf('> 0,0  Core · point · origin · mods 0/2'));
   });
 
   it('draws the plane the focus names rather than the first one published', () => {
-    const lines = onPlaneScreen('stocked', 'shield');
+    const lines = onPlaneScreen('stocked', '2');
 
-    expect(lines).toContain('Shield — level 1/2, 0 spent, 1 point left');
-    expect(lines.some((line) => line.startsWith('Blade —'))).toBe(false);
+    expect(lines).toContain('Modified Shield — level 1, 0 spent, 1 point left');
+    expect(lines.some((line) => line.startsWith('Modified Blade —'))).toBe(false);
   });
 
   it('says the plane in hand is one the player is wearing', () => {
-    expect(onPlaneScreen('worn', 'shield')).toContain('Shield — worn — level 1/2, 0 spent, 1 point left');
+    expect(onPlaneScreen('worn', '2')).toContain('Modified Shield — worn — level 1, 0 spent, 1 point left');
   });
 
   it('draws no plane for a screen with none in hand', () => {
     const ctx = driver(PLANE_SOURCE);
     runLine(ctx, '/load stocked');
 
-    expect(shown(runLine(ctx, '/inv'))).not.toContain('Blade — level 1/2, 0 spent, 1 point left');
+    expect(shown(runLine(ctx, '/inv'))).not.toContain('Modified Blade — level 1, 0 spent, 1 point left');
   });
 
   it('separates each authored block with a blank line, so the emission pastes into a module', () => {

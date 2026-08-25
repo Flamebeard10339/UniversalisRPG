@@ -58,7 +58,6 @@ function planeOf(shape: Shape, hex = '0,0'): Plane {
     title: asLocalized('Blade'),
     name: asLocalized('Blade'),
     level: 1,
-    maxLevel: 20,
     spent: 0,
     remaining: 3,
     clusters: [clusterOf(shape, hex)],

@@ -4,7 +4,7 @@ import { DslError } from '../grammar/parser';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import { grow, growLine } from './growth';
-import { itemInstance, type Growth } from './itemInstance';
+import { itemInstance, itemLevel, receiveItem, type Growth } from './itemInstance';
 import { planeReport } from './planeReport';
 import { initialState } from './save';
 import { GameState } from './state';
@@ -35,7 +35,7 @@ open-connections: e
 # item blade
 title: Blade
 slot: mainhand
-max-level: 20
+item-level: 6
 origin-cluster: core
 
 # item spark-jewel
@@ -44,17 +44,16 @@ cluster-jewel: spark
 # item goad
 cluster-effect: +50% attack
 
-# item whetstone
-item-experience: 1000
+# item rope
+
 `;
 
 const registry = loadInEnglish(MODULE);
 
 function fed(extra: Record<string, number> = {}): GameState {
   const state = initialState(registry);
-  Object.assign(state.inventory, { blade: 1, whetstone: 1, ...extra });
-  const growth = growLine(state, registry, 'feed: blade with whetstone');
-  if (!growth.ok) throw new Error(inEnglish(registry, growth.refused));
+  receiveItem(state, registry, 'blade', 1);
+  Object.assign(state.inventory, extra);
   return state;
 }
 
@@ -63,9 +62,10 @@ const clusters = (state: GameState): Array<[string, string]> =>
 
 const refusalOf = (outcome: Growth): string => (outcome.ok ? 'not refused' : inEnglish(registry, outcome.refused));
 
-describe('the four verbs a growth names', () => {
-  it('feeds a copy the experience its food carries', () => {
-    expect(itemInstance(fed(), '1')?.experience).toBe(1000);
+describe('the three verbs a growth names', () => {
+  it('drops a copy carrying the level its item declares', () => {
+    const state = fed();
+    expect(itemLevel(itemInstance(state, '1')!, registry.items.get('blade')!)).toBe(6);
   });
 
   it('allocates a node, and slots a jewel into one that is allocated', () => {
@@ -122,26 +122,25 @@ describe('a refusal is a key, not a sentence', () => {
     '',
     '# locale es',
     'engine.plane.no-cluster: ningun cumulo esta en {hex}',
-    'engine.growth.no-experience: {item} no da experiencia',
   ].join('\n');
   const bilingual = loadUniverse([engineLocale(), { name: 'camp', text: MODULE }, { name: 'camp-es', text: SPANISH }]);
 
   const refusalIn = (language: string, line: string): string => {
     const state = initialState(bilingual, language);
-    Object.assign(state.inventory, { blade: 1, whetstone: 1, goad: 1 });
+    receiveItem(state, bilingual, 'blade', 1);
+    Object.assign(state.inventory, { goad: 1, rope: 1 });
     const growth = growLine(state, bilingual, line);
     if (growth.ok) throw new Error(`${line} was not refused`);
     return say(localizerFor(bilingual, language), growth.refused);
   };
 
   it('reads in the language being played', () => {
-    expect(refusalIn('en', 'allocate: blade at 9,9 position 1')).toBe('no cluster stands in 9,9');
-    expect(refusalIn('es', 'allocate: blade at 9,9 position 1')).toBe('ningun cumulo esta en 9,9');
-    expect(refusalIn('es', 'feed: blade with goad')).toBe('goad no da experiencia');
+    expect(refusalIn('en', 'allocate: 1 at 9,9 position 1')).toBe('no cluster stands in 9,9');
+    expect(refusalIn('es', 'allocate: 1 at 9,9 position 1')).toBe('ningun cumulo esta en 9,9');
   });
 
   it('shows its key where the language being played has no entry for it', () => {
-    expect(refusalIn('en', 'slot: blade at 0,0 e with whetstone')).toBe('whetstone is not a cluster jewel');
-    expect(refusalIn('es', 'slot: blade at 0,0 e with whetstone')).toBe('engine.growth.not-a-jewel');
+    expect(refusalIn('en', 'slot: 1 at 0,0 e with rope')).toBe('rope is not a cluster jewel');
+    expect(refusalIn('es', 'slot: 1 at 0,0 e with rope')).toBe('engine.growth.not-a-jewel');
   });
 });

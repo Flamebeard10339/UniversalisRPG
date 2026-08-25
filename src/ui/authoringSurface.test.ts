@@ -300,7 +300,7 @@ describe('narrowing the list to the sections being looked for', () => {
   });
 
   it('reads a term as a pattern rather than as the letters it is spelt with', () => {
-    expect(kept('sword|whetstone').length).toBeGreaterThan(kept('sword').length);
+    expect(kept('sword|shield').length).toBeGreaterThan(kept('sword').length);
     expect(kept('sw.rd').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
     expect(kept('SWORD').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
   });

@@ -126,12 +126,11 @@ const SCRIPT: readonly string[] = [
     return [bare, `${bare} 1`];
   }),
   'use: entity.tulsa.smiths-chest.open',
-  '/inv core.iron-sword',
+  '/inv 2',
   ...[
     ['verb', 'grow'],
     ['plane', 'allocate: slot e'],
     ['plane', 'slot: e with core.crossroads-jewel'],
-    ['plane', 'feed: with core.masters-whetstone'],
     ['plane', 'go: 1,0'],
     ['plane', 'allocate: position 1'],
     ['plane', 'allocate: slot ne'],

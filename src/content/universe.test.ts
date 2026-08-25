@@ -271,6 +271,7 @@ describe('loadUniverseWithDiagnostics', () => {
       'cluster-jewel: band',
       '# item heartwood-blade',
       'slot: mainhand',
+      'item-level: 3-8',
       'origin-cluster: addon.gilded',
       '# item orb-of-vitality',
       'cluster-effect: +25% addon.vigour',
