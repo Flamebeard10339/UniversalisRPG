@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/block-main-git-writes.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/one-long-job-at-a-time.sh"
           }
         ]
       }

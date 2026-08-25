@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { availableParallelism } from 'node:os';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
@@ -48,6 +49,11 @@ export default defineConfig({
     // costs is read off the run's own Duration.
     testTimeout: 120_000,
     hookTimeout: 120_000,
+    // Half the machine. Uncapped, vitest takes every core it can see, and the
+    // machine running this suite is also running the agents that asked for it,
+    // a dev server, and often a second suite — so an uncapped run does not go
+    // faster, it starves its own neighbours and then times out above.
+    maxWorkers: Math.max(1, Math.floor(availableParallelism() / 2)),
     projects: [
       {
         extends: true,
