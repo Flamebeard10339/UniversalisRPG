@@ -14,6 +14,13 @@ const SHORTEST_SIGNATURE = 2;
 export interface PathExcuse {
   readonly path: string;
   readonly why: string;
+  // The moments the excuse covers, asked of the view the driver was holding. A reason that holds
+  // only in some states — a screen whose one answer is the one that leaves — is keyed to the state
+  // and not to the path, because keying it to the path would excuse the states it says nothing
+  // about too, and a driver that dropped the path everywhere would pass on a reason for a corner
+  // of it. An excuse that really is about the path whatever the view says answers true to all of
+  // them, and says so in one place a reader can see.
+  covers(view: PlayView): boolean;
 }
 
 // One moment of a run: the view the driver was left holding, beside what it drew for that view
@@ -36,8 +43,10 @@ const under = (path: string, excused: string): boolean => path === excused || pa
 // keep it honest — a live view still carries something at the path it names, and the reason is
 // more than a placeholder.
 export function excusedPathsAreReal(runs: readonly SurfaceRun[], excused: readonly PathExcuse[]): string[] {
-  const live = runs.flatMap((run) => run.steps).flatMap((step) => leaves(step.view)).map((leaf) => leaf.path);
-  return excused.filter((each) => each.why.length <= 20 || !live.some((path) => under(path, each.path))).map((each) => each.path);
+  const steps = runs.flatMap((run) => run.steps);
+  const live = steps.flatMap((step) => leaves(step.view)).map((leaf) => leaf.path);
+  const bites = (each: PathExcuse): boolean => steps.some((step) => each.covers(step.view) && leaves(step.view).some((leaf) => under(leaf.path, each.path)));
+  return excused.filter((each) => each.why.length <= 20 || !live.some((path) => under(path, each.path)) || !bites(each)).map((each) => each.path);
 }
 
 // A path only some of whose strings are prose is one the world says through and addresses through
@@ -85,19 +94,23 @@ export function driftingPaths(runs: readonly SurfaceRun[], said: ReadonlySet<str
   // held and its own never did would report a difference nobody made. A driver draws a path by
   // drawing it at any one moment its view carried it: a terminal answers a command rather than
   // redrawing everything each turn, and being shown once is what being shown means.
+  // An excuse is spent moment by moment, beside the words it is excusing. A path let off at the one
+  // moment its reason speaks of is still asked at every other, which is what keeps an excuse
+  // written for a corner of a path from covering the whole of it.
+  const excusedHere = (path: string, view: PlayView): boolean => excused.some((each) => under(path, each.path) && each.covers(view));
+
   const verdicts = runs.map((run) => {
     const carried = new Set<string>();
     const drew = new Set<string>();
     for (const step of run.steps) {
-      for (const path of wordsHere(step.view, said).keys()) carried.add(path);
-      for (const path of drawnHere(step, said)) drew.add(path);
+      for (const path of wordsHere(step.view, said).keys()) if (!excusedHere(path, step.view)) carried.add(path);
+      for (const path of drawnHere(step, said)) if (!excusedHere(path, step.view)) drew.add(path);
     }
     return { run, carried, drew };
   });
   const everyPath = [...new Set(verdicts.flatMap(({ carried }) => [...carried]))];
 
   return everyPath.flatMap((path) => {
-    if (excused.some((each) => under(path, each.path))) return [];
     const asked = verdicts.filter(({ carried }) => carried.has(path));
     const drew = asked.filter((each) => each.drew.has(path));
     if (drew.length === 0 || drew.length === asked.length) return [];

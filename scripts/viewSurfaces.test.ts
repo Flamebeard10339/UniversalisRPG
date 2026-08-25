@@ -7,6 +7,7 @@ import { LIVE_TICK_MS, newContext, runLine, type CommandContext, type LiveRun } 
 import type { Localizer } from '../src/runtime/localized';
 import { sessionLocalizer, startSession, view } from '../src/runtime/session';
 import { pageStorage } from '../src/ui/agent/pageStorage';
+import { asksNothing } from '../src/ui/asking';
 import { App } from '../src/ui/App';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
@@ -40,11 +41,16 @@ import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 const PARITY_EXCUSED: readonly PathExcuse[] = [
   {
     path: 'modals[].options[].label',
-    why: "a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it (ModalSheet's `onlyLeaves`). A terminal has no frame around a screen and names the question to say one is open at all",
+    why: 'a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it. A terminal has no frame around a screen and names the question to say one is open at all',
+    // The app's own judgement, asked rather than restated, so this covers the moments it covers and
+    // not the path. Every other screen's question is load-bearing — an item's own words, a jewel's —
+    // and a driver that dropped one fails here.
+    covers: (view) => asksNothing(view.modals),
   },
   {
     path: 'planes[].clusters[].positions[].title',
     why: 'the app names the node the player has picked and nothing on the lattice itself, since a tap is how a node is asked about there; a terminal has nothing to tap and so lays every node out as a table with its passive in a column',
+    covers: () => true,
   },
 ];
 
