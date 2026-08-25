@@ -157,6 +157,25 @@ cancel it."* Three consecutive `begin: use core.melee-combat on tulsa.giant-rat`
 in the run are the evidence. *Closes when:* a finished fight with a foe still standing
 opens the next one, cancellably.
 
+**Measured 2026-08-25, so take this with the answer rather than looking for it.** The
+chaining machinery is already built and `melee-combat` simply does not ask for it: a
+`continuous` action re-arms on the next foe still standing in the room (`standsAgain` →
+`enterEncounter`, `src/runtime/runtime.ts`), and `# action melee-combat` in
+`content/core.dsl` carries no tag, so `actionKind` reads `duration` and `repeating` is
+false. Adding the word `continuous` to it was run against the whole suite and **the only
+behavioural difference is the chaining** — the rage route's swing figures come back
+identical at `progress: 1200, attemptsMade: 13`, so the timing does not move, and
+`standsAgain` keys on the same entity, so it chains onto another rat rather than onto
+whatever else is in the room. It is cancellable already, being a live action like any
+other.
+
+What it costs is **15 failing claims, every one a recorded figure**: `repeating: true` in
+one serialized `activeAction`, seven `combat-expansion` route end-saves, `miki-route-end`
+(health 24529 → 24609, clock 28400 → 33200, because the route now kills more inside one
+action), and one runtime health claim. None is a break; each is a route to regenerate.
+**Do not take this in the same session as anything else that moves `miki-route-end`** — a
+dialogue change moves the same figures and the two collide.
+
 ### The character sheet
 
 **Every stat is on one page and most of them are secondary.** *"there are a whole bunch
