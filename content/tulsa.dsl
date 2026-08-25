@@ -1061,7 +1061,7 @@ node greeting:
 // What the tutorial puts in a player's hands and nothing takes back off them,
 // standing in the row that would buy either.
 # save in-town-with-mikis-sword-and-shield
-{"version":13,"location":"tulsa.market-row","inventory":{"core.iron-sword":1,"core.wooden-shield":1}}
+{"version":13,"location":"tulsa.market-row","inventory":{"core.wooden-shield":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
@@ -1234,7 +1234,7 @@ assert: xp.core.cooking = 3
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-mikis-sword-and-shield
 shop: general-store
-submit-modal: item=sell:core.iron-sword
+submit-modal: item=sell:1
 submit-modal: count=1
 submit-modal: item=sell:core.wooden-shield
 submit-modal: count=1

@@ -372,17 +372,6 @@ that still cannot say *stood in* as distinct from *heard of* has not merged anyt
 
 ### Numbers and rules the owner ruled
 
-**A shipped `# save` holds a base item the engine cannot put there.** Found while the
-counter was being taught to sell a grown copy. `# save
-in-town-with-mikis-sword-and-shield` (`content/tulsa.dsl:1064`) puts `core.iron-sword`
-into plain `inventory:`, and that item declares `item-level: 3-8`, so every one the
-world actually mints is an instance — every other save in the file carries it in the
-`instances` table. `receiveItem` can never produce the state this save describes. So
-`# test a-sword-and-a-shield-are-goods-at-a-counter` proves the *stack* path at the
-counter and the path real play produces is uncovered. *Closes when:* the save holds
-what play would hold, and the test that stands on it still proves what it was written
-to prove. Read the save and the test before touching either.
-
 **Two xp gains fold back into one line.** Ruled: *"+5 attack and +5 defense, should read
 +10 attack, defense."* The grouping belongs in `sayingOf` over notices that share a count,
 not in the notice type — the lane costed that and it is small. **One thing to settle
