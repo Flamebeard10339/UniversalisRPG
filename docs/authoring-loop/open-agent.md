@@ -120,6 +120,20 @@ range. **Watch `hitDamage`'s floor** — `max(1, min(minDamage, attack))` in mil
 because an attack at or below the target's defence collapses to a constant 1, which is
 the trap that makes a naive `attack 1-3` mean nothing.
 
+**Where the spread comes from is the open half, and the two readings are not the same
+edit.** The player declares its own `stats: ... attack 10 ...` on `# entity player`, which
+overrides `# stat attack base: 10`, and the melee grant adds a point to it — so today the
+player's attack is a point and every swing is identical by construction. Making the
+declared attack a range (`attack 8-12`) satisfies *base plus level* literally: `addRanges`
+shifts both ends by the grant. Putting the spread on the weapon instead leaves an unarmed
+player swinging flat. **Nothing on file chooses between them**, which is what *the lane's
+to draft* means here — but say which one you took and why, because it is the difference
+between *a body swings unevenly* and *a blade does*.
+
+**And do not take this in the same session as anything else that moves a recorded route.**
+Whichever reading is taken, every combat figure in `content/` moves — that is what the
+rat's own range cost, and two lanes regenerating the same end-save collide.
+
 The spread the derivation produces is the lane's to draft and is explicitly **not**
 balanced yet: *"Balance will happen after."* What has to be true when this lands is that
 two swings differ and that the player's differ because of what the player is. Only
