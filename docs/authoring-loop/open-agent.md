@@ -14,6 +14,12 @@ Everything here is proved headlessly — `npm test`, `npm run probe`,
 take one to the end without asking. What waits on the owner's play, his reading of
 the writing, or a ruling nobody has taken is in `open-human.md`.
 
+**A GUI line is proved the way `CLAUDE.md` says and no further.** The decision goes
+in a `.ts` beside the component and is tested there; the wiring is built, `tsc` and
+the suite are run, and it is handed to the author in one line. A lane that cannot
+find a pure decision under a GUI line says so rather than reaching for a screenshot
+loop. Half of what is below is GUI, because it came out of a playtest.
+
 **A line here that turns out to need his judgement does not stay here flagged — it
 moves, carrying what you measured.** Guessing the ruling and abandoning the lane
 are the two bad answers, and the second is worse, because the measurement dies with
@@ -21,3 +27,290 @@ the session. `deliverable-log.md` states how a line crosses, in both directions,
 and is the one place that rule is written.
 
 ---
+
+## From the owner's second playtest, 2026-08-25
+
+`.planning/yonatan-playtests/run-2026-08-25t14-51-24-926z-reviewed.md`, sixty turns
+through Miki's route recorded through the playtest tool against `56a2dca7`. Every
+line quotes what he wrote at the turn it happened. Four were measured against the
+live loader while the run was read, and those carry the measurement — the run is the
+evidence a line exists, and the measurement is the evidence about its cause.
+
+### What the chat says, and when
+
+**The chat does not scroll to what the turn just said.** *"Talking to miki, I have to
+scroll down to see the dialogue. I should see just what Miki said, not everything
+before as well."* *Closes when:* a turn leaves the log positioned on the first line
+that turn produced. Which entry a turn starts at is a pure decision and belongs beside
+the component.
+
+**A node that says words and offers no choice reaches the player as nothing.** *"The
+second dialogue with miki doesn't pop up a modal (because there is no choice) the
+choice should be `continue`."* *Closes when:* such a node draws the same modal every
+other node draws, carrying one choice, *Continue*. This is the modal API line below in
+miniature and should probably land with it.
+
+**Talking is a location action rather than something Miki offers.** *"The talk to miki
+dialogue should be attached to miki, not be a location action."* Measured on the
+shipped corpus after examining Miki: `talk:tulsa.miki` is a `kind: 'talk'` choice in
+the same flat `choices` list as every `use:entity.…`, and it is the **only** choice
+carrying no `detail` — so it is the only one that does not name who is offering it,
+while the six beside it read `Examine · Miki`, `Examine · ?`, `ascend · Stairs`.
+Examine has already moved onto the entity's own cell; talk has not. *Closes when:*
+talk is reached from Miki, the way examine is.
+
+**Miki does not acknowledge what the player has already done.** *"Talking to miki
+after interacting with the mirror doesn't acknowledge that the player already did the
+thing."* `tulsa.mirror` sets `mirror-done` and the run's own `# save` carries it, so
+the flag is there and the greeting is what gets said anyway. Reproduce from that save
+before believing a cause; this closes with the thread ruling below, and probably by the
+same edit.
+
+**Miki's threads, and the ruling that unblocks them.** Crossed from `open-human.md`
+with the owner's answer: *"The dialogue should be drafted, and when I review it later,
+it might change, but it should be functional now for playtesters. The answer is just
+give the player a choice on which dialogue path they want to go down. Quests should
+have priority over regular dialogue, but a playtester shouldn't read the situation as a
+bug if they encounter it."*
+
+So: talking with more than one thread open **offers the paths as a choice**, quest
+threads ahead of the rest, each labelled in words rather than with its first spoken
+line. The reproduction is a fresh game on this branch — talk, take *"I'd rather find my
+own way"*, refuse again, leave by the window, come back — and today it says nothing and
+draws a bare list labelled with each thread's opening line. `isThread`
+(`src/content/sections/dialogue.ts`) is `when !== undefined || ask !== undefined`, so
+every quest-given node is a thread including one the author wrote `always` on, and
+fifteen of Miki's sixteen nodes are threads. **Do not take the one-line `isThread` fix
+on its own:** it was measured, it makes Miki speak, and it strands the whole
+`apologised` route, because `snubbed.miki.0` becomes an `otherwise` node and
+`adrift.miki.0` is `sticky` on a flag that never goes false. `apology-route-full`
+apologises before ever leaving the house, so the suite would not catch it — a proof
+that walks out of the house and back is part of closing this.
+
+**`leave-tutorial-island.adrift` opens on a premise that is false**, which is what
+makes the collision above reachable so early. Its gate is
+`tulsa.market-square.discovered` and the module's own comment justifies it as *"a place
+that is only discovered by having stood in it"* — but discovery spreads to adjacent
+locations, so landing on the beach one step out of the house sets it, measured `true`
+immediately after `climb out`. Miki says *"So you found the market"* to a player who has
+never left the sand. *Closes when:* the corpus can state *has stood in*, and the stage
+is gated on that. Standing in a place is not a fact anything can state today, so this is
+a small piece of engine work before it is a content edit — and rewriting the line to be
+true of the beach is the cheaper answer if the lane measures the new condition as worth
+more than it costs.
+
+### The action list
+
+**A way out is not on the action list, and the owner has reversed that ruling.** *"We
+have to revert the concept of location actions not being visible. I was wrong. It isn't
+very intuitive to have to open the map to change locations."* Measured at the start of
+the shipped corpus: the Guide House offers six choices and **none of them leaves the
+building** — `waysOut` finds only the two the stairs offer, and the stairs are an
+entity's own action rather than a road. `onActionList` in `src/runtime/waysOut.ts` is
+the one rule and it is one line. *Closes when:* a road is on the list again, and
+`settled.md`'s paragraph is corrected with it — the flat three seconds stands, the
+second half of that sentence does not.
+
+**The front door does not open onto anything.** *"Clicking on the front door doesn't
+allow me to walk through it."* `# entity front-door` (`content/tulsa.dsl:776`) carries
+`examine:` and a `pick lock:` that is `hidden if: unlocked`, so on a shipped save the
+door offers exactly one action, *Examine*, and the road out of the house belongs to the
+location rather than to the door. The line above puts the road back on the list; this
+one is that the door should be what opens it. *Closes when:* an entity a player walks up
+to and reads as a way out is one.
+
+**An action whose `requires:` fails is absent rather than refused.** *"The oven should
+say that you have nothing to cook if you interact with it before or after crafting the
+bread."* Measured: standing in the Guide House with an empty pack, `tulsa.oven` offers
+`Examine` and nothing else — `roast chestnuts` carries `requires: has raw-chestnut`
+(`content/tulsa.dsl:812`) and is simply not there. `hidden if:` is the field that means
+*do not show this*, and today an unmet `requires:` means the same thing, so an author
+has no way to say *offer it and refuse it with a reason*. *Closes when:* an unmet
+`requires:` is offered and refused in the player's own words, and `hidden if:` is the
+only thing that removes an action.
+
+**This changes what every gated action in the corpus looks like**, so measure the
+reading before shipping it: count what becomes visible across `content/`, and if a room
+fills up with refusals, come back and say so rather than landing it.
+
+**An empty location says nothing.** *"No actions on the beach reads like a bug. There
+should be a small centered text that says `nothing to do here`."* *Closes when:* a
+location whose action list is empty says so.
+
+**The action progress bar is invisible on the map.** *"It should exist on lower banner
+regardless of whether I'm on home, or on the map."* This is also what the
+travel-progress question in `open-human.md` was waiting on, and it crosses here with
+it: the first run's *"the map doesn't show a progress of how far along the travel is, so
+it reads as a bug like the game is frozen"* is the same bar in the same place. Flat-band
+travel landed at three seconds, so the bar is the whole of what is left. *Closes when:*
+the bar is on the lower banner and a travel shows in it, whatever page the player is on.
+
+**A running action does not animate, and nothing says who is being fought.** *"The
+currently running action should animate when running. The game should acknowledge that
+I am fighting the rat."*
+
+### The fight
+
+**Damage never varies.** *"The player always does the same exact amount of damage. So
+does the rat."* Ruled by the owner on 2026-08-25: **an attack declares its range and a
+swing rolls inside it — `1-3` for the rat and `3-8` for the player.** Those two numbers
+are his and are not to be re-derived. Every other attack in the corpus needs a range,
+and those the lane drafts and he revises; a range is a form the DSL already spells
+elsewhere (`xp: cooking 40-80`), so this should not want a new one.
+
+**A fight does not chain.** *"Fighting the rat should auto start the next fight unless I
+cancel it."* Three consecutive `begin: use core.melee-combat on tulsa.giant-rat` turns
+in the run are the evidence. *Closes when:* a finished fight with a foe still standing
+opens the next one, cancellably.
+
+**A foe dies at zero rather than below one.** *"Entities should die if they have <1
+health, not <0. An enemy with 0.1 health reads like a bug."* Ruled: below one is dead.
+
+### The character sheet
+
+**Every stat is on one page and most of them are secondary.** *"there are a whole bunch
+of stats that are secondary. Like rage drain. We need to be able to group stats into
+tabs and then have the important ones on the main tab, and the less important ones
+elsewhere."* A `# group` already says what something is; whether a stat's group is that
+same fact or a different one is the lane's first question, and `one-home` is the
+procedure for answering it. Which stat lands where is authoring the lane drafts and the
+owner revises.
+
+**A stat does not say where its number came from.** *"I tried to click on regeneration
+stat to see what was causing the number 6. A modal didn't open describing the bread
+eating bonus."* *Closes when:* pressing a stat says what is adding to it, by name.
+
+**Three things wrong with the item modal, in one turn.** *"Clicking on an item in the
+inventory flashes the ?chat? on the screen for a single frame. I can't seem to interact
+with the skill tree of the iron sword. Or equip them. Also the item names should wrap
+(we should support languages with arbitrary length strings)."* The flash is a bug, the
+plane and the equip are surfaces the modal has elsewhere and not here, and the wrapping
+is the one of the three with a derived proof available — a label long enough to wrap is
+a fixture, not a screenshot.
+
+**The font is a little large.** *"Less reduce the font by a little."*
+
+### The quest journal
+
+**Neither quest is coloured by its state.** *"Neither quest is yellow (yellow=started,
+white=unstarted, green=finished)."* Ruled by the note: those three states, those three
+colours, and the colour comes off the group channel rather than out of a component.
+
+**The journal draws the last few chat messages.** *"The finding your feet quest shows
+the last few chat messages."*
+
+**`finding-your-feet` does not complete.** *"Finding your feet quest isn't done?"* The
+run walked the mirror, the bread and three rats and the quest still read unfinished.
+Reproduce from the run's own `# save` before believing any cause — `settled.md` holds
+seven occasions where the first-named cause was one layer too low.
+
+### Modals
+
+**Every modal is its own thing.** The owner's, written into `open-human.md` on
+2026-08-25 and crossed here because it is a ruling rather than a question:
+
+> Modals need to be generalized into a single API so that every single modal isn't
+> this unique thing. Some modals overlap the bottom. Some can't be cancelled by
+> clicking off of them.
+>
+> There should be an opaque api and we should teach all agents how to interact with
+> making new modals. Modals should also have general strategies (centered, bottom,
+> darken background, etc) that the `# modal` section can interact with that default to
+> reasonable values.
+>
+> The DSL should expose strategies not the minutiae.
+
+This run's instance: *"Clicking off of the `Playtest Note` modal doesn't cancel it. This
+is a generalize modal problem."* And from the first run, the same class: *"The dialogue
+modal darkens the screen and I can't see the words that were just spoken."* *Closes
+when:* a strategy is a word a `# modal` says, the defaults are reasonable, and no
+component decides for itself whether clicking off cancels. The list of strategies is the
+lane's to derive from what the shipped modals actually do — a hand-kept table of them is
+the failure mode `one-home` exists to catch.
+
+---
+
+## Crossed from `open-human.md`, 2026-08-25
+
+The owner ruled these while reviewing the run. Each carries his answer; none is to be
+re-decided.
+
+**Dialogue is drafted directly, and the review pass waits for the world.** *"The human
+review pass is deferred until the world has settled. Until then, we will directly fix
+all dialogue rather than leave it unclear or broken."* A line that reads wrong is a
+lane's to rewrite, not a question to park. This is the standing policy and it is in
+`settled.md`.
+
+**Two shipped choices are labelled with a machine address.** `modal:choose-race` and
+`modal:name-yourself` reach the player as `choices[].label`. *"This needs to be done."*
+Under the policy above the words are the lane's to write.
+
+**Action labels are cased two ways**, so `ascend`, `descend`, `look in` and `open`
+stand in one list beside *Talk to Miki* and *Examine* — measured again in this run's
+Guide House. Ruled: *"Title Case everywhere. There should only be a single humanizeEn
+function. Any other inconsistencies are just raw dsl `title:` fields that should be
+brought in line."* Two halves: one `humanizeEn` with every caller reading it, and a
+sweep of the corpus's own `title:` fields. The second is a corpus edit; the first wants
+a derived guard, so that *no second casing function* is proved rather than remembered.
+
+**Miki never says to find the mirror**, from the first run: *"He asks if you want him to
+show you the ropes."* The quest's opening reads as though he did. The mirror's location
+line has already been fixed by the owner in the working tree; this is the quest opening,
+and under the dialogue policy it is a lane's to write.
+
+**Dialogue does not animate.** Ruled: *"This should be a global variable that can
+optionally be edited/skipped by modals."* So a reveal rate is a setting with a default
+the lane picks and the owner tunes, and a modal may say it wants the words at once.
+Explicitly low priority; it is here because it is no longer blocked.
+
+**Autosave writes after every action.** Ruled by the owner, and measured while ruling
+it: a session serializes in **0.013 ms** to **165 bytes** on the shipped corpus, so the
+cadence question was never about cost. `DEFAULT_AUTOSAVE_SECONDS` is `0` and four proofs
+encode *never*; setting a cadence surfaced an author's warning — *"autosave held: slot
+player — this session did not come out of that slot"* — to a player on turn one, and
+**separating those two readings of `held` is part of this line**, not a follow-on. A
+warning meant for an author who typed `/autosave` is noise to a player who asked for no
+cadence at all.
+
+**A filed run is dropped by hand, and nothing prunes.** Ruled: *"Can I just delete them
+manually for now?"* — and today he can, from a terminal: `/local delete test <run-id>`
+and `/local delete save <run-id>-start`, two commands per run, through
+`deleteLocalSection` (`src/content/localChanges.ts:135`). What is missing is the surface
+in the app, which is where the runs actually pile up: each stopped run mints its own id
+from the clock, so `upsertLocalSection` never replaces one and `local-changes` grows by
+two sections per playtest forever. *Closes when:* the playtest list can drop a run, both
+its sections at once, through that same function. Nothing prunes on a timer — that was
+refused, because it destroys runs the author has not exported yet.
+
+**A playtest is marked reviewed by its filename.** Ruled: a run whose findings have been
+read out is renamed with a `-reviewed` suffix in `.planning/yonatan-playtests/`. Nothing
+in the app tracks it, `content/reviewed.tsv` stays the writing's ledger, and both runs
+have been renamed. No work follows; the line is here so a lane knows the convention
+exists.
+
+**A shared fixture world, kept as small as it can be.** Ruled: build it. The measurement
+that asked for it: removing the whetstone touched 57 files, and **seventeen of them were
+test modules each declaring their own `# item whetstone` with its own
+`item-experience: 1000`** — `itemInstance`, `modals` ×3, `session` ×2, `item`,
+`carriedItem`, `carriedScreen`, `clusterEffect`, `command`, `equipment`, `growth`,
+`itemContribution`, `pack`, `planeReport`, `planeScreen`, `stat`, `trade`. His
+constraint: *"Keep it as small as possible. Nothing needs a verbose examine, etc."*
+
+Two things a lane settles before writing much of it, either of which can send it back:
+
+- **`settled.md` says the opposite about `DEBUG`, deliberately.** `# item
+  million-attack-hammer` lives in the module of the test that swings it *"not in a
+  testing module, because a file the load path has to be told to leave out is a rule
+  someone has to remember."* A shared fixture world is exactly that file. It is only
+  safe if its unreachability is **derived** — a guard proving no shipped load path can
+  reach it — rather than remembered. Build the guard first; if it cannot be derived, the
+  settled ruling wins and this line comes back.
+- **Then the `DEBUG` sections in the shipped corpus are worth re-asking about**, which
+  is the owner's own follow-up. They stop being necessary the moment that guard exists,
+  and not one moment before it.
+
+The smaller second answer from the same measurement can be taken separately and needs
+none of this: **one engine word travels engine key → `locale.ts` row → `labels.ts` id →
+`planePanel.ts` channel → JSX**, so four files move for one word; and the verb set is
+declared in `sections/test.ts` and then re-listed by two `case 'feed':` arms in
+`session.ts` and a third dispatch in `growth.ts`.

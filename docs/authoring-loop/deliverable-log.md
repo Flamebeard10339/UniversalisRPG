@@ -13,8 +13,10 @@ name here with no file behind it is reported:**
   proof is headless: `npm test`, `npm run probe`, `npm run oracle`, `tsc`
 - **`open-human.md`** — everything still wrong that waits on Yonatan: his play,
   his reading of the writing, and the rulings nobody else can take. Every line
-  there carries one italic clause naming what would move it to `open-agent.md`,
-  or saying plainly that nothing would
+  there carries one italic clause naming what would move it to `open-agent.md`.
+  **A line whose clause would have to read *nothing moves it, and no work hangs
+  off it* is not an open line**: it is a ruling, which belongs in `settled.md`, or
+  an observation, which belongs in git. It is deleted
 - **`settled.md`** — what is already true, for an agent starting cold
 
 A line is deleted the day it closes, and one that changes hands crosses between
@@ -54,9 +56,9 @@ just the assistance of the oracle and other existing modules.
 
 ## What has actually happened
 
-Two authoring runs and seven playbot runs. Tulsa exists and now holds the whole
-region — Miki's house, the beach and the town are one module, and `core` is
-furniture that stands nowhere.
+Two authoring runs, seven playbot runs, and two playtests the owner played himself.
+Tulsa exists and now holds the whole region — Miki's house, the beach and the town
+are one module, and `core` is furniture that stands nowhere.
 
 **The loop's own product is the finding list, and it has been earning its keep.**
 Run 4 found a whole town's worth of unhearable dialogue that the corpus, the test
@@ -129,27 +131,36 @@ on arrival; a `# group` says what something is and colour carries voice and fill
 channels that never share; there is one notification surface and a notification is words
 and a merge key with no kind; gear drops carrying rolled points and the whetstone is
 gone; a plane can shrink and refuses to shrink out from under a jewel; a road costs a
-flat three seconds and a way out has left the action list.
+flat three seconds and a way out left the action list — which he has since played and
+reversed, and the flat three seconds is the half that survived.
 
-**9. What is left in `open-human.md` is his, and it grew rather than shrank.** That is
-the loop working. Nine questions crossed there this session carrying measurements a lane
-took and could not decide: what talking does when an `always` line and a `when:` thread
-are both open on one entity (reproduced, and the obvious fix strands the apology route);
-whether the view may declare two paths aliases of one fact (the cheap rule works and
-raises exactly three false alarms, which are exactly the alias groups); the shipped
-autosave cadence (setting it surfaces an author's warning to a player on turn one);
-whether a recorded run may carry an ending save; the six balance numbers the item-level
-lane chose; whether a counter should learn to take a copy, now that gear is unsellable;
-whether two xp gains should still fold into one line; whether a re-read should say
-something of its own; and what should gate `leave-tutorial-island.adrift`, whose stated
-premise turns out to be false about the world.
+**9. The second playtest emptied more of `open-human.md` than it filled**, which is the
+other half of the loop working. Sixty turns through Miki's route on 2026-08-25, recorded
+through the playtest tool and marked reviewed by its filename. Twenty-one findings, and
+**every one of them turned out to be takeable** — the run states its own ruling nearly
+every time it complains, which is what a note written at the turn it happened buys you.
+Reading it out took the owner's rulings on eight more lines that had been parked, so
+`open-human.md` lost its whole review-pass heading, both never-moving balance
+observations and four settled questions, and `open-agent.md` went from an empty queue to
+a full one.
 
-**10. The removal-cost question has an answer, and it is the fixtures.** The owner asked
-whether cutting a feature could cost less. Measured on the whetstone: 57 files, of which
-nine genuinely encoded a whetstone fact, five moved because one engine word is spelled in
-four places, and **seventeen were test modules each declaring their own copy of the item
-being deleted**. A shared, derived fixture world is the one lever that matters, and it is
-in `open-human.md` because it would change how nearly every test here is written.
+The rulings worth knowing without opening the file: **dialogue is drafted directly and
+the review pass waits for the world**; a way out is back on the action list, reversing
+`settled.md`; talking is offered as a choice of path with quests first; an attack
+declares a damage range and rolls in it; autosave writes every action; a run is marked
+reviewed by its filename and nothing prunes on a timer.
+
+**10. The removal-cost question has an answer, it is the fixtures, and it is now ruled.**
+The owner asked whether cutting a feature could cost less. Measured on the whetstone: 57
+files, of which nine genuinely encoded a whetstone fact, five moved because one engine
+word is spelled in four places, and **seventeen were test modules each declaring their
+own copy of the item being deleted**. A shared, derived fixture world is the one lever
+that matters and it is queued — *"build it, keep it as small as possible"* — with one
+condition that can send it back: `settled.md` refuses a testing module the load path has
+to be told to leave out, so the fixture world's unreachability has to be **derived** by a
+guard before any of it is written. His own follow-up rides on the same guard — whether
+the shipped corpus still needs its `DEBUG` sections — and it is not answerable until the
+guard exists.
 
 Map churn is still deliberately deferred. `combat-expansion.proving-ground` sits at
 `tulsa.market-square`'s own square and hangs off the beach for want of anywhere
@@ -157,13 +168,18 @@ better. A playtest names it better than a reading does.
 
 ## What Yonatan has to deliver
 
-1. **The review pass over the writing.** `npm run review`, resumable through
-   `content/reviewed.tsv`.
-2. **A playtest of his own, and the list of problems it produces.** Nothing
-   substitutes for it. It is what the GUI playtesting mode in `open-human.md`
-   exists to record.
-3. Nothing else. The reload question is closed and the quest notes stay as they are
-   until the town has been played.
+1. **The rulings still standing in `open-human.md`.** Most are one line, and every one
+   of them has an italic clause naming exactly the decision that is missing. This is
+   now the shortest path to work: eight of them were answered in an hour on 2026-08-25
+   and the queue filled up behind them.
+2. **More play, and the list of problems it produces.** Nothing substitutes for it, and
+   the second run's yield says so — twenty-one findings, all of them actionable, from
+   sixty turns. Runs go to `.planning/yonatan-playtests/` and get a `-reviewed` suffix
+   once their findings are out.
+3. **The review pass over the writing, when the world has settled.** Deferred by his own
+   ruling of 2026-08-25. Until then a lane fixes dialogue directly rather than parking
+   it, and `content/reviewed.tsv` brings a rewritten line back marked CHANGED, which is
+   what makes drafting safe.
 
 ## The ordering, which the corpus decided
 

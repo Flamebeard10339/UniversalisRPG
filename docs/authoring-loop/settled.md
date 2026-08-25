@@ -526,13 +526,17 @@ subjects from a registry map while claiming about words. Both read the mark off
 words, so a node whose words genuinely are missing still fails rather than quietly
 leaving the sweep. The other five were clean.
 
-**A road costs a flat three seconds and a way out is not on the action list.**
-`travel-seconds` is the tunable and `travel-seconds-per-unit` is gone, along with
-`locationDistance` — nothing derives a travel time from map coordinates any more, which
-was a mechanism that got worse as the world grew rather than a number that was too big.
-`onActionList` in `src/runtime/waysOut.ts` is the one rule, read by the app, the REPL and
-the playbot; `aWalkAway` is deleted, having been the same judgement applied to only the
-multi-leg half. `waysOut` lives in runtime so `/map` and the app's map read one list.
+**A road costs a flat three seconds, and whether a way out is on the action list is one
+rule in one place.** `travel-seconds` is the tunable and `travel-seconds-per-unit` is
+gone, along with `locationDistance` — nothing derives a travel time from map coordinates
+any more, which was a mechanism that got worse as the world grew rather than a number
+that was too big. `onActionList` in `src/runtime/waysOut.ts` is that one rule, read by
+the app, the REPL and the playbot; `aWalkAway` is deleted, having been the same
+judgement applied to only the multi-leg half. `waysOut` lives in runtime so `/map` and
+the app's map read one list. **What that rule currently answers is not settled** — it
+says a way out is not on the list, the owner reversed that on 2026-08-25 having played
+it, and the reversal is in `open-agent.md`. The one-place-ness is what is settled here,
+and it is why the reversal is one line.
 
 **The pack has an order its owner chose, and `swap:` is how it is written.** It reaches
 state by the road state already takes, so `SaveField`, `SAVE_FIELDS` and `SPAN_VOICE` all
@@ -624,6 +628,12 @@ both terminals. The two app-side paths carry one shared excuse that writes the r
 down. `group` is deliberately not on the entity roster: prefixing it printed the same
 word five times in one line, and an entity reaches every driver through the offers it
 makes.
+
+**A plain colour wheel ships, and guidance with it was ruled not now.** The want was a
+constrained palette or one control moving saturation uniformly, because the owner does
+not want to learn colour theory to change the game's colours. Deliberately deferred:
+whether a free choice actually goes wrong is a thing the corpus answers by having
+colours in it, and it has almost none yet.
 
 **A control answers a hole, and which control it is derives from the parser.**
 `COLOUR_HOLE` comes from the colour parser's own form, so any field written with that
@@ -757,6 +767,13 @@ of everything the registry declares. The question is asked of the **field**, not
 line — a value behind a flag nobody sets is undecidable for the same reason `requires:`
 is — and that reduction is what turns 360 undecidable questions into 19 decidable ones.
 
+**`event.title` is excused rather than dead, and the excuse expires by itself.** Its one
+reader is `engine.stopped.event`, reached only off an action's `stops on:`, and the
+corpus writes no `stops on:` at all — `on death: stop` is a result and not a stopper. So
+it sits in the guarded `NOT_SAID` list, and the day an author writes a `stops on:` the
+words reach a screen and the entry has to go. Nobody has to remember that: the guard is
+what fails.
+
 **A recorded run is one line a turn and does not echo the engine back.** The author read
 the answer on the screen it was said on; the model's journal is the only sight it has of
 its own last turn, so `turnRecord` is handed null by one harness and a list by the
@@ -790,6 +807,14 @@ played against.
 **The set of things to review derives itself** from the locale tables the engine
 builds off each kind's declared prose fields. Nothing is marked by hand to appear
 on the sheet, and `@@@` keeps meaning what it means.
+
+**The human review pass is deferred until the world settles, and until then a lane fixes
+dialogue directly.** The owner's ruling, 2026-08-25: *"we will directly fix all dialogue
+rather than leave it unclear or broken."* So a line that reads wrong is rewritten by
+whoever finds it, and drafted words are what a playtester should meet — not a `@@@` and
+not a parked question. The sheet is still where he reads it all back afterwards, and a
+line rewritten after he signed it off returns marked CHANGED, which is the mechanism
+that makes drafting safe.
 
 ## The playbot
 
@@ -890,6 +915,15 @@ case `/state`, about 620 tokens for ten turns.
 choice hangs off, and every driver draws it; without it three things standing here
 that can each be looked at read as `Look`, `Look`, `Look`.
 
+**A run is marked reviewed by its filename, and nothing in the app tracks it.** Ruled
+2026-08-25: a run whose findings have been read out into `docs/authoring-loop/` is
+exported to `.planning/yonatan-playtests/` and renamed with a `-reviewed` suffix.
+`content/reviewed.tsv` stays the ledger for the *writing* and was the wrong key for a
+run — it is keyed by locale key, and a run is not a line. A filed run in `local-changes`
+is disposable once it has been exported: `/local delete test <run-id>` and `/local
+delete save <run-id>-start` drop one, and **nothing prunes on a timer**, because a timer
+destroys runs the author has not exported yet.
+
 ## The world acting on its own
 
 **Aggression already is the target selector, and no selector is being built.**
@@ -904,6 +938,18 @@ naming no target at all, because the world is what opens the fight.
 what is *under way*, so with nothing under way it stops on the first iteration —
 the form could only ever succeed where the condition already held. The `1` in
 `wait: 1 until …` is not a wart concealing a useful form.
+
+**A foe has no identity, and a count is enough.** `EncounterFoe.remaining` is it. Only
+play reopens this — wanting to name one individual of a kind has never actually come up.
+
+**Two forms the language declines, and what reopens each.** *Do this N times* is unsaid:
+`until <condition>` finishes one action and fails loudly when it cannot reach the
+condition, so `tutorial-quests.dsl:189-191` writes the same rat line three times.
+Re-engagement was offered and the owner chose the failure instead; the fourth such line
+in the corpus is what reopens it. And a range is equality written twice —
+`xp.thieving >= 100 and xp.thieving <= 200` is a bound stated twice rather than a bound
+— which wants its own form only once somebody has written a hundred of them. Both are
+facts the corpus produces; neither is information anyone can supply now.
 
 ## What the loop keeps teaching
 
