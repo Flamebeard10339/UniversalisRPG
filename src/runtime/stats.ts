@@ -77,7 +77,7 @@ export interface StatSource {
   readonly field: string;
 }
 
-const TITLED = (kind: string, id: string): StatSource => ({ kind, id, field: 'title' });
+const titled = (kind: string, id: string): StatSource => ({ kind, id, field: 'title' });
 
 export interface ModifierCarrier {
   source: StatSource;
@@ -90,31 +90,31 @@ export interface ModifierCarrier {
 function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean): ModifierCarrier | undefined {
   const passive = registry.passives.get(passiveId);
   if (!passive) return undefined;
-  const source = TITLED('passive', passiveId);
+  const source = titled('passive', passiveId);
   return paysOut ? { source, hooks: passive, tags: passive.tags } : { source, hooks: passive };
 }
 
 export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
   const carriers: ModifierCarrier[] = [];
   const entity = actorEntity(registry, actorId);
-  if (entity) carriers.push({ source: TITLED('entity', entity.id), hooks: entity });
+  if (entity) carriers.push({ source: titled('entity', entity.id), hooks: entity });
   for (const passiveId of entity?.passives ?? []) {
     const carrier = passiveCarrier(registry, passiveId, true);
     if (carrier) carriers.push(carrier);
   }
   for (const skillId of entity?.skills ?? []) {
     const skill = registry.skills.get(skillId);
-    if (skill) carriers.push({ source: TITLED('skill', skillId), tags: skillTags(skill) });
+    if (skill) carriers.push({ source: titled('skill', skillId), tags: skillTags(skill) });
   }
   const race = actorId === PLAYER ? registry.races.get(state.player.race) : undefined;
-  if (race) carriers.push({ source: TITLED('race', race.id), tags: race.tags });
+  if (race) carriers.push({ source: titled('race', race.id), tags: race.tags });
   const own = ownStores(state, actorId);
-  for (const buff of own.buffs) carriers.push({ source: TITLED('item', buff.source), tags: buff.tags });
+  for (const buff of own.buffs) carriers.push({ source: titled('item', buff.source), tags: buff.tags });
   for (const wornId of own.equipped) {
     const templateId = itemTemplate(state, wornId);
     const item = registry.items.get(templateId);
     if (!item) continue;
-    carriers.push({ source: TITLED('item', templateId), hooks: item, item, wornId });
+    carriers.push({ source: titled('item', templateId), hooks: item, item, wornId });
     for (const passiveId of carriedPassives(registry, itemInstance(state, wornId))) {
       const carrier = passiveCarrier(registry, passiveId, false);
       if (carrier) carriers.push(carrier);
@@ -158,10 +158,12 @@ const addressOf = (source: StatSource): string => [source.kind, source.id, sourc
 
 export function statBreakdown(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
   const counter = counterLevels(state, actorId);
+  const carriers = modifierCarriers(state, registry, actorId);
   const seated = performing(state, registry, actorId);
+  if (seated) carriers.unshift(seated);
   const parts = new Map<string, StatPart>();
 
-  for (const carrier of seated === undefined ? modifierCarriers(state, registry, actorId) : [seated, ...modifierCarriers(state, registry, actorId)]) {
+  for (const carrier of carriers) {
     const fold: StatFold = { added: point(0), increased: 0 };
     if (carrier.tags) foldStatBonuses(carrier.tags, statId, fold, counter);
     if (carrier.item) foldContribution(itemContribution(registry, carrier.item, itemInstance(state, carrier.wornId!), counter), statId, fold);
