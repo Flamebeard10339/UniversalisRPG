@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildContributionIssueBody, contributionBase, extractContributionDsl, localModuleLoaded } from './contribution';
 import { loadUniverseWithDiagnostics } from './load';
+import { FIXTURE_WORLD } from './worldFixture';
 
-const BASE = `
+const BASE =
+  `
 # info base
 version: 1.0.0
-
-# location camp
-x: 0, y: 0
-starting
-`;
+` + FIXTURE_WORLD;
 
 const LOCAL = `
 # info local-changes

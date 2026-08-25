@@ -9,7 +9,9 @@ import { applyDirective, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-const MODULE = `
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # item jug-of-water
 examine: A clay jug of clean water.
 
@@ -30,9 +32,7 @@ examine: A warm loaf.
 examine: A stone oven.
 stations: oven
 
-# location guide-house
-x: 0, y: 0
-starting
+# location camp
 entities:
   oven
 
@@ -84,7 +84,7 @@ describe('recipe parsing', () => {
 describe('craft', () => {
   it('consumes inputs, gives outputs, grants xp, and logs say when held and at station', () => {
     const registry = loaded();
-    const state = createGameState('guide-house');
+    const state = createGameState('camp');
     state.inventory.dough = 1;
     craft('bread', registry, state);
     expect(state.inventory.dough).toBe(0);
@@ -97,7 +97,7 @@ describe('craft', () => {
 
   it('throws when an input is missing', () => {
     const registry = loaded();
-    const state = createGameState('guide-house');
+    const state = createGameState('camp');
     expect(() => craft('dough', registry, state)).toThrow(RuntimeError);
   });
 
@@ -110,7 +110,7 @@ describe('craft', () => {
 
   it('succeeds for a stationed recipe once the station entity is present', () => {
     const registry = loaded();
-    const state = createGameState('guide-house');
+    const state = createGameState('camp');
     state.inventory.dough = 1;
     expect(() => craft('bread', registry, state)).not.toThrow();
     expect(state.inventory.bread).toBe(1);
@@ -130,7 +130,7 @@ describe('recipeCraftable', () => {
   it('reflects inventory and station presence', () => {
     const registry = loaded();
     const bread = registry.recipes.get('bread')!;
-    const state = createGameState('guide-house');
+    const state = createGameState('camp');
     expect(recipeCraftable(bread, registry, state)).toBe(false);
     state.inventory.dough = 1;
     expect(recipeCraftable(bread, registry, state)).toBe(true);
@@ -205,16 +205,14 @@ describe('recipe station capability', () => {
   });
 });
 
-const SPANNABLE_MODULE = `
+const SPANNABLE_MODULE =
+  FIXTURE_WORLD +
+  `
 # item raw-clay
 examine: A lump of raw clay.
 
 # item clay-brick
 examine: A fired clay brick.
-
-# location kiln-yard
-x: 0, y: 0
-starting
 
 # recipe brick
 time: 2
@@ -225,7 +223,7 @@ out: clay-brick
 describe('spannable repeating craft', () => {
   it('craft() on a time>0 recipe fires one completion then leaves an activeAction a later resolve() continues', () => {
     const registry = loadModule(SPANNABLE_MODULE);
-    const state = createGameState('kiln-yard');
+    const state = createGameState('camp');
     state.inventory['raw-clay'] = 3;
 
     craft('brick', registry, state);
@@ -241,7 +239,9 @@ describe('spannable repeating craft', () => {
   });
 });
 
-const BURN_MODULE = `
+const BURN_MODULE =
+  FIXTURE_WORLD +
+  `
 # stat firing
 base: 80
 
@@ -257,10 +257,6 @@ examine: A fired clay tile.
 # item slag
 examine: A ruined, half-melted lump of clay.
 
-# location kiln-yard
-x: 0, y: 0
-starting
-
 # recipe tile
 time: 1
 accuracy: firing
@@ -274,7 +270,7 @@ describe('burn: accuracy < 1 with a burnt output', () => {
   it('produces both fired and burnt outcomes over many crafts, each consuming exactly one input, fired + burnt totaling the craft count', () => {
     const registry = loadModule(BURN_MODULE);
     const attempts = 500;
-    const state = createGameState('kiln-yard');
+    const state = createGameState('camp');
     state.inventory['raw-clay'] = attempts;
 
     craft('tile', registry, state);

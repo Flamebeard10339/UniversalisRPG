@@ -3,19 +3,17 @@ import { buildContributionIssueBody } from './contribution';
 import { loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { emptyModportalManifest, issueTier, materializeApprovedModIssue, planModportalSync } from './modportal';
 import { registryDiff } from './registryDiff';
+import { FIXTURE_WORLD } from './worldFixture';
 import type { MaterializedMod, ModportalManifest, ModTier } from './modportal';
 
-const BASE = `
+const BASE =
+  `
 # info base
 version: 1.0.0
 
 # item rock
 title: Rock
-
-# location camp
-x: 0, y: 0
-starting
-`;
+` + FIXTURE_WORLD;
 
 const LOCAL = `
 # info local-changes
