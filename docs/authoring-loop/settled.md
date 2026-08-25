@@ -1138,6 +1138,37 @@ screen is up the transcript is scrimmed anyway, so nothing double-plays. `.spoke
 the `prefers-reduced-motion` block, so reduced motion lands a beat whole with nothing in
 TypeScript knowing about it.
 
+**The player's swing varies because the arm does, not because the blade does.**
+`# entity player` declares `attack 8-12` where it declared `attack 10` — the midpoint is
+unmoved, so nothing the engine *plans* with moves (`statValue` reads midpoints) and only the
+swing varies. Three reasons the spread is on the body, kept because the other reading will
+be proposed again: the engine has **one** mechanism for a spread, a `Range` on a stat, and
+`giant-rat` writes its own `attack 6-8` in exactly that place, so a weapon spread would make
+the player the one actor whose swing does not read off its own sheet; **it has to survive
+being unarmed**, and the only fight the tutorial ships is the cellar, fought bare-handed;
+and `addRanges` shifts both ends, so a melee level and a weapon's `+n attack` compose onto
+it and *base plus level* reads straight off the line. The corpus claim picked the player up
+with **no edit**, because it already filtered shipped entities whose declared attack is not
+a point.
+
+**A ranged stat draws one `nextRandom` per swing where a point draws none, so giving
+anything a range shifts the seeded stream and moves every recorded figure downstream of
+it.** That is a standing cost, not a one-off: every foe given a range in the balance pass
+will move the routes again. It is also why a regenerated route is re-derived from what it
+now measures rather than patched — the rage pool reads its ceiling less what bled instead of
+the ceiling flat, and a `1 in 4` gate rolls differently off the shifted stream.
+
+**`melee-combat` is `continuous`, which is the whole of what makes a fight chain.**
+`standsAgain` → `enterEncounter` re-arms a repeating action on the next foe standing in the
+room, and melee simply did not ask for it. Nothing about a swing moved when it did: all four
+combat sheets came back with exactly one key changed, `activeAction.repeating`.
+
+**A node that must hand something over once says it with `again:`, never with `sticky`.**
+`sticky` replays a node whole, *results and all* — `finding-your-feet.apologised` handed out
+a fishing net per talk because of it. The pair the engine already has is the answer: the node
+says its piece once and every visit after gets the `again:` line, so the offer still stands
+as long as the stage does without the gift repeating.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

@@ -52,110 +52,17 @@ on its own:** it was measured, it makes Miki speak, and it strands the whole
 apologises before ever leaving the house, so the suite would not catch it — a proof
 that walks out of the house and back is part of closing this.
 
-**The apology hands out a fishing net every time it is talked through.**
-`finding-your-feet.apologised`'s first line is `sticky` and carries
-`give: core.fishing-net`, and sticky replays a node whole — so four talks measured
-`[1, 2, 3, 4]` nets. Found by the lane that rewrote Miki's threads and left alone as
-outside its four lines. *Closes when:* the route hands over one net however many times
-it is walked. **It moves `apology-route-full-end`'s sheet**, which nothing else is moving now that the
-town migration has landed.
-
 ### The fight
 
-**The player's damage never varies.** *"The player always does the same exact amount of
-damage."* The foe's half of this is done — `giant-rat` declares `attack 6-8` and the
-range grammar it uses was already there. The player's half is a different mechanism and
-is what is left: *"The player's 3-8 should be part of their skill level + base."* So
-`3-8` is a reading of what a starting player happens to come out at, not a number to
-write down anywhere — it falls out of the base plus the melee level, which under the
-skill rule that has since landed is `+1 attack per level`. **A lane that writes `3-8` on
-the player has got this backwards.**
-
-The seam already exists and the combat lane mapped it rather than building a second one:
-`statRange` (`src/runtime/stats.ts`) is the single place a stat becomes a `Range` — the
-actor's own `stats:` entry folded with every `stat-bonus` tag clause through
-`addRanges`, so a ranged bonus composes with a ranged base. `+N attack per level of
-melee` is already a writable tag clause on any carrier, so *base plus melee level* is
-content rather than engine. Planning reads the midpoint through `statValue` while the
-swing reads `sampleStat`, and the `flail`/`straw-man` fixture shows both working over a
-range. **Watch `hitDamage`'s floor** — `max(1, min(minDamage, attack))` in milli-units —
-because an attack at or below the target's defence collapses to a constant 1, which is
-the trap that makes a naive `attack 1-3` mean nothing.
-
-**Where the spread comes from is the open half, and the two readings are not the same
-edit.** The player declares its own `stats: ... attack 10 ...` on `# entity player`, which
-overrides `# stat attack base: 10`, and the melee grant adds a point to it — so today the
-player's attack is a point and every swing is identical by construction. Making the
-declared attack a range (`attack 8-12`) satisfies *base plus level* literally: `addRanges`
-shifts both ends by the grant. Putting the spread on the weapon instead leaves an unarmed
-player swinging flat. **Nothing on file chooses between them**, which is what *the lane's
-to draft* means here — but say which one you took and why, because it is the difference
-between *a body swings unevenly* and *a blade does*.
-
-**The routes have settled**, so this is takeable: the town migration landed and nothing
-else is moving a recorded end-save. It will still move every combat figure in `content/`,
-which is what the rat's own range cost — so it and the chaining line below want one lane
-between them, or one after the other.
-
-The spread the derivation produces is the lane's to draft and is explicitly **not**
-balanced yet: *"Balance will happen after."* What has to be true when this lands is that
-two swings differ and that the player's differ because of what the player is. Only
-`giant-rat` carries a range today; the other five foes still declare point attacks, and
-that is the balance pass rather than this line.
-
-**A fight does not chain.** *"Fighting the rat should auto start the next fight unless I
-cancel it."* Three consecutive `begin: use core.melee-combat on tulsa.giant-rat` turns
-in the run are the evidence. *Closes when:* a finished fight with a foe still standing
-opens the next one, cancellably.
-
-**Measured 2026-08-25, so take this with the answer rather than looking for it.** The
-chaining machinery is already built and `melee-combat` simply does not ask for it: a
-`continuous` action re-arms on the next foe still standing in the room (`standsAgain` →
-`enterEncounter`, `src/runtime/runtime.ts`), and `# action melee-combat` in
-`content/core.dsl` carries no tag, so `actionKind` reads `duration` and `repeating` is
-false. Adding the word `continuous` to it was run against the whole suite and **the only
-behavioural difference is the chaining** — the rage route's swing figures come back
-identical at `progress: 1200, attemptsMade: 13`, so the timing does not move, and
-`standsAgain` keys on the same entity, so it chains onto another rat rather than onto
-whatever else is in the room. It is cancellable already, being a live action like any
-other.
-
-What it costs is **15 failing claims, every one a recorded figure**: `repeating: true` in
-one serialized `activeAction`, seven `combat-expansion` route end-saves, `miki-route-end`
-(health 24529 → 24609, clock 28400 → 33200, because the route now kills more inside one
-action), and one runtime health claim. None is a break; each is a route to regenerate.
-**The routes have settled**, so this is takeable — but it and the player's-damage line
-above move the same sheets, so they want one lane between them rather than two at once.
-
-### The character sheet
-
-### Modals
-
-> Modals need to be generalized into a single API so that every single modal isn't
-> this unique thing. Some modals overlap the bottom. Some can't be cancelled by
-> clicking off of them.
->
-> There should be an opaque api and we should teach all agents how to interact with
-> making new modals. Modals should also have general strategies (centered, bottom,
-> darken background, etc) that the `# modal` section can interact with that default to
-> reasonable values.
->
-> The DSL should expose strategies not the minutiae.
-
-This run's instance: *"Clicking off of the `Playtest Note` modal doesn't cancel it. This
-is a generalize modal problem."* And from the first run, the same class: *"The dialogue
-modal darkens the screen and I can't see the words that were just spoken."* *Closes
-when:* a strategy is a word a `# modal` says, the defaults are reasonable, and no
-component decides for itself whether clicking off cancels. The list of strategies is the
-lane's to derive from what the shipped modals actually do — a hand-kept table of them is
-the failure mode `one-home` exists to catch.
-
----
-
-## Crossed from `open-human.md`, 2026-08-25
-
-The owner ruled these while reviewing the run. Each carries his answer; none is to be
-re-decided.
+**A fight can be armed on a foe that is not standing there.** `armFightAction`
+(`src/runtime/runtime.ts`) never checks its target still stands in the room, so a line can
+arm against an empty one: it burns an attempt-unit of time and fells nothing. Found by the
+lane that made fights chain — Miki's route had two trailing `Fight` lines doing exactly
+that, each spending 2400ms and 40 milli-health of regeneration against a cleared cellar, and
+cutting them landed the route on its recorded sheet **completely unchanged**, which is what
+proved they were no-ops. Pre-existing and unclaimed. *Closes when:* arming a fight on
+something that is not there is refused in the player's own words, the way an unmet
+`requires:` now is.
 
 **Miki teaches the plane when he hands over the gear.** Ruled, closing the on-ramp
 question: *"Miki needs an extra line of dialogue when he gives the player the sword and

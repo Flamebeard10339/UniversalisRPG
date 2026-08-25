@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Twenty-one lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Twenty-three lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -444,3 +444,24 @@ says the world is deliberately generic. Folding it in works mechanically but sav
 *Moves when: he says whether one triple is worth churning a file's addresses. Either answer
 is fine and nothing waits on it — it is here rather than guessed at because the trade is
 genuinely close.*
+
+## How wide the player's swing should be
+
+`8-12` is the lane's choice, not a ruling. It keeps the midpoint at 10 so nothing the engine
+plans with moved, and ±2 on 10 sits beside the rat's ±1 on 7. The other foes still declare
+point attacks, which is the balance pass rather than this line.
+
+*Moves when: he names a width, or says the balance pass will. It is one line in
+`content/core.dsl` and the derived claim follows it — but **every recorded combat figure
+moves again** whenever it changes, so it is worth deciding once rather than twice.*
+
+## Whether the rage route should still land flat on its ceiling
+
+Giving the player a ranged swing shifted the seeded stream, so the rage route now closes at
+19.8 of a 20 pool rather than exactly on the cap. It still demonstrates the cap biting —
+twelve hits granting three each, less fifteen bled, is twenty-one into a pool that holds
+twenty — but the number no longer reads as the ceiling.
+
+*Moves when: he says whether that assert should read the ceiling exactly. `wait: 29` does
+it; it is a content choice about what the route is demonstrating, which is why the lane did
+not take it.*
