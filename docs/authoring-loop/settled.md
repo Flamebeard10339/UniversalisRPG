@@ -526,6 +526,42 @@ subjects from a registry map while claiming about words. Both read the mark off
 words, so a node whose words genuinely are missing still fails rather than quietly
 leaving the sweep. The other five were clean.
 
+**A `# group` says what something is, and its colour is read off the same declaration.**
+`# item` and `# entity` each name one through a shared `GROUP_FIELD`, and the standard
+group for each kind is declared in `core.dsl` rather than defaulted in TypeScript, so
+nothing is ever ungrouped and the fallback is content like everything else. The claims in
+`dsl.test.ts` derive their subjects from whichever kinds name a group at all — including
+the one `group.ts` cannot make about itself without closing the section-list cycle. A
+standard group's word has to be true of everything that falls to it: the first attempt
+was `creature`, and the terminal printed `[Creature] Front Door` before the lane had
+finished, which is why it is `presence`.
+
+**Colour carries two meanings on two channels and they never share one.** Text is voice,
+fill is group, and `src/ui/lineStyle.ts` holds both with the separation proved off the
+records themselves — no voice may name a background, no tone may name a colour, every
+voice is distinct so `message` no longer borrows its tone's, and a place change has no
+colour. The error tone is a rule down the margin rather than a fill, because fill means
+group and nothing else.
+
+**A group reaches the app as a fill and a terminal as a word, and the parity harness
+holds both halves.** `engine.repl.grouped` is the one place the bracket form lives and
+the prefix is the group's own `title:`, so a choice line and a carried row carry it in
+both terminals. The two app-side paths carry one shared excuse that writes the ruling
+down. `group` is deliberately not on the entity roster: prefixing it printed the same
+word five times in one line, and an entity reaches every driver through the offers it
+makes.
+
+**A control answers a hole, and which control it is derives from the parser.**
+`COLOUR_HOLE` comes from the colour parser's own form, so any field written with that
+parser gets the picker without naming itself anywhere. `Filling` gained `at` — where a
+hole's value begins inside what the offering replaces — which is the fact that lets any
+control fill a hole rather than replace the whole line.
+
+**A modal shows the beat it is answering, and that is not dialogue-specific.**
+`answering(entries)` in `asking.ts` is the whole decision: the trailing run of `said`
+lines, stopping at the first line that is not somebody speaking. Any screen that darkens
+what is behind it draws them above its choices, in the voice they were said in.
+
 **A notification is a key, a count and its words, and `src/ui/notice.ts` is its one
 home.** There is no discriminant: merging counts up under the key alone, so it never
 asks what raised anything, and a raiser chooses how coarse its counting is by choosing
