@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillOf, TONE_CLASS, VOICE_CLASS } from './lineStyle';
+import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
 
 // The subjects are whatever the two records hold, so a line kind or a tone added next month is held
 // to the same separation with nothing edited here.
@@ -35,6 +35,11 @@ describe('the two channels a transcript line carries colour on', () => {
   it('leaves a place change to the break above it rather than to a colour', () => {
     expect(colours(VOICE_CLASS.place)).toEqual([]);
     expect(fills(VOICE_CLASS.place)).toEqual([]);
+    expect(SHAPE_CLASS.place).not.toBe('');
+  });
+
+  it('never lets what sets a line apart fill it either, since a fill is the group', () => {
+    expect(Object.entries(SHAPE_CLASS).flatMap(([kind, written]) => fills(written).map((word) => `${kind} fills with ${word}`))).toEqual([]);
   });
 });
 

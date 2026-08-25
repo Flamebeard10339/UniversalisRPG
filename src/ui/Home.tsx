@@ -4,23 +4,13 @@ import { offerCells } from './choices';
 import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
-import { fillOf, TONE_CLASS, VOICE_CLASS } from './lineStyle';
+import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
 import { LiveSheet } from './LiveSheet';
 import { GRID } from './sheetLayout';
 import { Splitter } from './Splitter';
-import type { LogEntry, LogKind } from './transcript';
+import type { LogEntry } from './transcript';
 import { useMoment } from './transient';
 import type { Words } from './words';
-
-// How much room a line takes, which says nothing about whose words they are: the voice is a colour
-// and this is a size, and neither is read for the other.
-const SHAPE_CLASS: Record<LogKind, string> = {
-  said: '',
-  place: 'pt-2',
-  describe: '',
-  message: '',
-  detail: 'pl-3 text-xs',
-};
 
 const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
 
@@ -28,7 +18,7 @@ function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
   return (
-    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
+    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
       {entry.repeats > 1 ? <span className="tabular-nums text-text-subtle">{`(${entry.repeats}) `}</span> : null}
       {entry.text}
     </p>
@@ -112,7 +102,7 @@ export function Home({
             following.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= NEAR_BOTTOM_PX;
           }}
         >
-          <div className="mx-auto flex max-w-2xl flex-col gap-2">
+          <div className="mx-auto flex max-w-2xl flex-col gap-1">
             {entries.map((entry) => (
               <Line key={entry.id} entry={entry} />
             ))}
