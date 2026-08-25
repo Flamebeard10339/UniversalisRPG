@@ -192,10 +192,6 @@ const NOT_SAID: ReadonlyArray<{ field: string; why: string }> = [
     field: 'event.title',
     why: 'named to the player by `engine.stopped.event` alone, which needs an action to write `stops on:`, and the corpus writes none. The words are the engine\'s to say in a world that writes one',
   },
-  {
-    field: 'faction.title',
-    why: 'a faction is a bitmask — `factionBits` in src/content/load.ts is the whole of what one does — and no call site anywhere names one to a player. The two the corpus declares write no `title:`, so what stands on the review sheet is `humanizeEn` of the id. Either give a faction a surface or take `title` out of `# faction`, and this entry goes with it',
-  },
 ];
 
 describe('every prose field a kind declares reaches a player', () => {
