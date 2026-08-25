@@ -774,8 +774,13 @@ examine: A weathered man in patched leather, quick to smile.
 flags: angered
 
 # entity front-door
-examine: A heavy wooden door, bound in iron.
+examine: A heavy wooden door, bound in iron. The latch lifts from this side once whatever is holding it has stopped.
 flags: unlocked
+step outside:
+  instant
+  hidden if: not unlocked
+  relocate: beach
+  say: You lift the latch and step out into the light coming off the water.
 pick lock:
   requires: has lockpick
   hidden if: unlocked

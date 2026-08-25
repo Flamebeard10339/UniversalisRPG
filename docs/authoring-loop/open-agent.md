@@ -104,14 +104,6 @@ more than it costs.
 
 ### The action list
 
-**The front door does not open onto anything.** *"Clicking on the front door doesn't
-allow me to walk through it."* `# entity front-door` (`content/tulsa.dsl:776`) carries
-`examine:` and a `pick lock:` that is `hidden if: unlocked`, so on a shipped save the
-door offers exactly one action, *Examine*, and the road out of the house belongs to the
-location rather than to the door. The line above puts the road back on the list; this
-one is that the door should be what opens it. *Closes when:* an entity a player walks up
-to and reads as a way out is one.
-
 **The action progress bar is invisible on the map.** *"It should exist on lower banner
 regardless of whether I'm on home, or on the map."* This is also what the
 travel-progress question in `open-human.md` was waiting on, and it crosses here with
