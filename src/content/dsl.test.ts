@@ -13,7 +13,7 @@ import { memberKey, Namespace } from './namespace';
 import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, localeKey } from './locale';
-import { contentSectionMaps, isCheckedKind, isDebug, sections, sectionFor, type Section } from './sections';
+import { contentSectionMaps, isCheckedKind, isDebug, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -368,6 +368,26 @@ describe('a DEBUG section the corpus holds', () => {
     const each = MARKED.find((one) => `# ${one.kind} ${one.id}` === written)!;
     const beneath = localeKey(registry.namespace.ownerOf(each.kind, each.id) ?? each.module, each.kind, each.id, '');
     expect(everySaid(registry.locales).filter((said) => said.key.startsWith(beneath))).toEqual([]);
+  });
+
+  // Words it does not have are what makes the claim above true rather than merely tidy: a row swept off the tables is a row the printer cannot tell from one nobody wrote and a key the terminal says in place of a line, so the words are refused where they are written instead. Asked of every field the marked section's own kind calls prose, so a prose field declared next month is held to this with no edit.
+  const PROSE = MARKED.flatMap((each) => (textFieldsOf(each.kind) ?? []).map((field) => ({ ...each, field })));
+
+  it('is written under a kind that has prose to refuse, so nothing below is vacuous', () => {
+    expect(PROSE.length).toBeGreaterThan(0);
+  });
+
+  it.each(PROSE.map((each) => `# ${each.kind} ${each.id} ${each.field}:`))('refuses %s, because a section saying nothing in any language has no business carrying words', (written) => {
+    const each = PROSE.find((one) => `# ${one.kind} ${one.id} ${one.field}:` === written)!;
+    const module = { name: 'saying.dsl', text: `# info saying
+version: 0.0.0
+dependencies:
+  ${each.module}
+
+# ${each.kind} ${each.id}
+${each.field}: Words a player would read.
+` };
+    expect(problems(loadUniverseWithDiagnostics([...CORPUS, module])).join(' ')).toMatch(new RegExp(`# ${each.kind} ${each.id}: ${each.field}: "Words a player would read." is words a player reads`));
   });
 
   // What stops a player finding one is that nothing they can reach names it, and the load refuses anything else — so the corpus loading clean is the proof, and this is the proof that the proof would fail.
