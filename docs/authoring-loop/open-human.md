@@ -343,6 +343,18 @@ should be a function of.
 *Moves when: that decision is taken. The item's own closing clause is the missing
 information and more measurement does not supply it.*
 
+**Two xp gains at once now read as two pills, not one line.** A turn granting `+5
+Attack` and `+5 Defence` used to fold into one pill, `+5 Attack, Defence`, because the
+old notes grouped by amount. A notice is now words and a merge key with no discriminant,
+and merging under the key alone is what makes adding a notification a line rather than a
+shape — so the grouping went, deliberately, as the mechanism the ruling asked to delete.
+Six rat kills still land as one line, because they share a key.
+
+*Moves when: the owner says whether he wants the grouped reading back. If he does, it
+belongs in `sayingOf` over notices that share a count, not in the notice type — the
+lane costed that and it is small; what nobody can decide for him is whether two pills
+read worse than one line.*
+
 **Two GUI wiring lines are untested and want the author's eye** — the two identity
 rows at the top of the Stats page, and the cadence a running replay steps at.
 Everything the replay decides is proved (`src/ui/replay.test.ts`, and the cursor

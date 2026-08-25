@@ -502,6 +502,16 @@ and tall as the placed slots reach rather than declaring a canvas, and a slot wi
 every `equipment-slots:` — falls to a row beneath. So no slot is unreachable and no table
 of positions exists.
 
+**A notification is a key, a count and its words, and `src/ui/notice.ts` is its one
+home.** There is no discriminant: merging counts up under the key alone, so it never
+asks what raised anything, and a raiser chooses how coarse its counting is by choosing
+the key. Adding one is a line in `RAISED_BY`, and the imperative path reaches the same
+type, which is why the playtest messages and an xp gain share a surface. Three derived
+claims hold the list honest — nothing moved raises nothing, every raiser keys apart on
+an everything-moved turn, and every line has words — so a raiser added next month is
+covered with no edit. `Notices.tsx` is the only surface, and its lifetime is proved by
+parsing `.lingered`'s duration out of `index.css` rather than restated beside it.
+
 **`leaves()` is a fact about `PlayView`, and lives with it.** `src/runtime/viewLeaves.ts`
 holds the walk; `scripts/lib/viewCoverage.ts` keeps what is about *comparing*
 surfaces. So `src/ui/render.test.tsx` derives what a player may read from the same

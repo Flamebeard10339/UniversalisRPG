@@ -119,22 +119,6 @@ guidance the owner asked for is deliberately not built and is in `open-human.md`
 *Open questions, not yet work*, because it may turn out not to be needed. *Closes when:*
 a colour is writable from content and reachable from a picker.
 
-### Notifications
-
-**There are two notification surfaces and neither behaves the way wanted.** `XpOverlay`
-draws xp gains and item arrivals top-right in fixed slots (`src/ui/XpOverlay.tsx`,
-`src/ui/xpNotes.ts`); `FloatingText` draws centred pills a quarter of the way down
-(`src/ui/FloatingText.tsx`), and the only two things that reach it are *playtest
-copied* and *playtest filed*. The verdict from play is that they are too complicated
-and look wrong. One behaviour is wanted: **spawn at the top, flow down, fade.**
-*Closes when:* there is one notification surface.
-
-**A notification cannot be added without inventing a kind.** `xpNotes.ts` knows exactly
-two — `xp` and `item` — and both are derived by diffing `PlayView` between turns, so
-quest progress and levelling up, which are the two named, cannot raise one at all and a
-third would be a third diff. *Closes when:* a notification is what an arbitrary event
-raises, so adding or removing one is a line rather than a shape.
-
 ### Balance, and four rulings from playing it
 
 **The whetstone is a step that buys nothing.** *"just have gear drop with a certain
