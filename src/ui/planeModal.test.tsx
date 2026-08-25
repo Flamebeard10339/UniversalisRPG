@@ -5,6 +5,7 @@ import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { App } from './App';
 import { createDriver, type Driver } from './driver';
+import { htmlRuns } from './htmlRuns';
 import { planeGraph } from './planeGraph';
 import { panelFor, type Choice } from './planePanel';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -36,16 +37,7 @@ const planeOf = (view: PlayView): PlayView['planes'][number] => view.planes.find
 
 const choicesOf = (view: PlayView): readonly Choice[] => askedOption(view.modals)!.values ?? [];
 
-const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
-
-function readable(html: string): string[] {
-  return html
-    .replace(/aria-label="([^"]*)"/g, '\n$1\n')
-    .replace(/<[^>]*>/g, '\n')
-    .split('\n')
-    .map((run) => run.replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (entity) => ENTITIES[entity]).trim())
-    .filter((run) => run !== '');
-}
+const readable = htmlRuns;
 
 const A_HEXAGON = /-?\d+\s*,\s*-?\d+/;
 
