@@ -118,17 +118,39 @@ function turnLines(entry: RunLogEntry): string[] {
 // own report.
 export function runAsTest(kept: KeptRun, header?: RunHeader): string[] {
   const { run } = kept;
-  return [`# test ${run.id}`, `load: ${startSaveId(run.id)}`, ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]), ...run.log.flatMap(turnLines)];
+  return [heading(runSections(run.id)[1]), `load: ${startSaveId(run.id)}`, ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]), ...run.log.flatMap(turnLines)];
 }
 
 // The saved game a run walks forward from, under the run's own name. Every harness that writes a
 // run reads the name off this rather than spelling the suffix a second time.
 export const startSaveId = (run: string): Answer => `${run}-start`;
 
-// The two sections a recorded run is: where it started, and what was done from there. Every harness
-// that files a run — the app, the playbot, /create-test — writes these and not its own pair.
+export interface SectionAddress {
+  readonly kind: Answer;
+  readonly id: Answer;
+}
+
+// The kind a run is written as, which is also the kind whatever lists filed runs picks them out by.
+export const RUN_SECTION = 'test';
+
+const START_SECTION = 'save';
+
+const heading = (at: SectionAddress): string => `# ${at.kind} ${at.id}`;
+
+// Which two sections a recorded run is, by name and in the order they are filed: where it started,
+// and what was done from there. Writing one and dropping one read this same pair, so neither act
+// can be about a different set of sections than the other.
+export function runSections(run: string): readonly [SectionAddress, SectionAddress] {
+  return [
+    { kind: START_SECTION, id: startSaveId(run) },
+    { kind: RUN_SECTION, id: run },
+  ];
+}
+
+// Every harness that files a run — the app, the playbot, /create-test — writes these and not its
+// own pair.
 export function runAsSections(kept: KeptRun, header?: RunHeader): string[][] {
-  return [[`# save ${startSaveId(kept.run.id)}`, kept.from], runAsTest(kept, header)];
+  return [[heading(runSections(kept.run.id)[0]), kept.from], runAsTest(kept, header)];
 }
 
 // A run outlives the tab it was played in. Holding one is what recording *is* — there is no

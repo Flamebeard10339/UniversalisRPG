@@ -196,10 +196,13 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           settings={view.settings}
           commandLine={editing.commandLine}
           words={words}
+          localizer={localizer}
           onSend={driver.send}
           onCommandLine={(shown) => setEditing({ ...editing, commandLine: shown })}
           playtest={snapshot.playtest !== null}
           onPlaytest={(on) => (on ? driver.playtest.start() : driver.playtest.stop())}
+          runs={driver.playtest.filed()}
+          onDropRun={driver.playtest.drop}
         />
       ) : null;
     }
