@@ -1,3 +1,4 @@
+import type { Place } from '../content/sections/slot';
 import type { Answer, Localized, Localizer } from '../runtime/localized';
 import type { CountedRow, PlayStatus } from '../runtime/session';
 import { signed, tidy } from './format';
@@ -7,6 +8,7 @@ export interface Entry {
   value: Localized;
   id?: Answer;
   detail?: Localized;
+  at?: Place;
 }
 
 type CarriedRow = PlayStatus['carried'][number];
@@ -53,9 +55,10 @@ export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], l
 export function worn(slots: readonly WornSlot[], rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer, empty: Localized): Entry[] {
   return slots
     .map((slot) => {
+      const where = slot.at === undefined ? {} : { at: slot.at };
       const filled = rows.find((row) => row.worn?.slot === slot.slot);
-      if (!filled) return { name: slot.title, value: empty };
-      return { id: filled.id, name: slot.title, value: filled.name, ...detailOf(filled, planes, localizer) };
+      if (!filled) return { name: slot.title, value: empty, ...where };
+      return { id: filled.id, name: slot.title, value: filled.name, ...detailOf(filled, planes, localizer), ...where };
     })
     .sort(byName);
 }

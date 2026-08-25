@@ -152,12 +152,16 @@ trigger: inventory-changed
 // --- equipment slots ---
 
 // The vocabulary is still `equipment-slots:` on # entity player; these are the
-// words the equipment page draws, and the keys a translation answers.
+// words the equipment page draws, where on the body it draws them, and the keys
+// a translation answers. The body is three columns wide because the hands stand
+// either side of a torso; a slot added down the middle needs no other change.
 # slot mainhand
 title: Main Hand
+at: 1 1
 
 # slot offhand
 title: Off Hand
+at: 3 1
 
 // --- stations ---
 

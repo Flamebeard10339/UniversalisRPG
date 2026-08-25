@@ -49,6 +49,26 @@ describe('a slot is a word with a key (c10)', () => {
     expect(missingTranslations(registry.locales, 'es')).toContain('slot.offhand.title');
   });
 
+  it('keeps where a slot sits on the body, and prints it back where it was written', () => {
+    const source: ModuleSource = { name: 'island', text: lines(ISLAND, '', '# slot mainhand', 'title: Main Hand', 'at: 1 2') };
+    const parsed = parseModuleSource(source);
+    const trip = roundTripModule(loadUniverse([source]), { info: parsed.info, globals: declaredGlobalIds(parsed) }, (printed) => loadUniverseWithDiagnostics([{ ...source, text: printed }]));
+
+    expect(loadModule(source.text).slots.get('mainhand')?.at).toEqual({ column: 1, row: 2 });
+    expect(trip.differences).toEqual([]);
+    expect(trip.printed).toContain(lines('# slot mainhand', 'title: Main Hand', 'at: 1 2'));
+  });
+
+  it('leaves a slot that says nothing about where it sits without a position, rather than guessing one', () => {
+    expect(loadModule(lines(ISLAND, '', '# slot mainhand', 'title: Main Hand')).slots.get('mainhand')?.at).toBeUndefined();
+  });
+
+  it('refuses a position that is not a column and a row, both counted from 1', () => {
+    expect(() => loadModule(lines(ISLAND, '', '# slot mainhand', 'at: 1'))).toThrow(/expected a row after the column/);
+    expect(() => loadModule(lines(ISLAND, '', '# slot mainhand', 'at: 0 1'))).toThrow(/a column is counted from 1/);
+    expect(() => loadModule(lines(ISLAND, '', '# slot mainhand', 'at: 1 0'))).toThrow(/a row is counted from 1/);
+  });
+
   it('prints a declared slot back out and drops a generated title, the way a stat does', () => {
     const source: ModuleSource = {
       name: 'island',

@@ -153,6 +153,16 @@ describe('what the player is wearing, as rows', () => {
     ]);
   });
 
+  it('carries where the slot sits onto the row, and leaves a slot that declares none without one', () => {
+    const rows = [row({ id: '1', name: asLocalized('Blade'), worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
+    const placed = { ...slot('mainhand', 'Main Hand'), at: { column: 1, row: 2 } };
+
+    expect(worn([placed, slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
+      { name: 'Back', value: 'Empty' },
+      { id: '1', name: 'Main Hand', value: 'Blade', at: { column: 1, row: 2 } },
+    ]);
+  });
+
   it('leaves the worn rows to this page and off the one that lists what is carried', () => {
     const rows = [
       row({ id: 'blade', name: asLocalized('Blade'), count: 2 }),

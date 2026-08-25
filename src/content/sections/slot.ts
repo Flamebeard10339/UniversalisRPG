@@ -1,10 +1,39 @@
+import { Cursor, DslError, Parser } from '../../grammar/parser';
+import { number } from '../../grammar/values';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// A `# slot` is optional — the vocabulary is the union of every `equipment-slots:`, and this only supplies display words.
+// Where on the body a slot is drawn, counted from the top left of whatever grid the slots that
+// declare an `at:` describe between them. Nothing declares the size of that grid: it is as wide and
+// as tall as the furthest slot reaches, so adding a slot to the far side widens the body by itself.
+export interface Place {
+  column: number;
+  row: number;
+}
+
+function counted(cursor: Cursor, what: string): number {
+  const start = cursor.pos;
+  const value = number.parse(cursor);
+  if (value < 1) throw new DslError(`a ${what} is counted from 1`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+  return value;
+}
+
+export const place: Parser<Place> = {
+  parse(cursor) {
+    const column = counted(cursor, 'column');
+    if (cursor.take(/[ \t]+/) === null) throw new DslError('expected a row after the column', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    return { column, row: counted(cursor, 'row') };
+  },
+  print: (value) => `${value.column} ${value.row}`,
+  forms: ['<column> <row>'],
+  examples: ['1 1', '3 2'],
+};
+
+// A `# slot` is optional — the vocabulary is the union of every `equipment-slots:`, and this only supplies display words and where they are drawn.
 export interface Slot {
   id: string;
   title: string;
+  at?: Place;
 }
 
 export const slot = section<Slot>()({
@@ -15,5 +44,6 @@ export const slot = section<Slot>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
+    at: { parser: place, note: 'where the equipment page draws this slot on the body; a slot that leaves it out draws in a row beneath, as does a slot no # slot describes at all' },
   },
 });
