@@ -343,6 +343,53 @@ should be a function of.
 *Moves when: that decision is taken. The item's own closing clause is the missing
 information and more measurement does not supply it.*
 
+**Autosave ships as *never*, so the app opens on what it last wrote and a player who
+never types `/save` still has nothing to open on.** The reload half is done — a session
+now resumes the live slot, and a save this build cannot read is kept rather than
+overwritten. What is left is the shipped cadence: `DEFAULT_AUTOSAVE_SECONDS` is `0`, and
+measured through `createDriver` over the standing corpus, three turns spanning three
+minutes write nothing at all. The GUI offers no control that sets one either.
+
+Setting it to a real number was tried and reverted, because it is not the one-constant
+change it looks like. At 60 seconds, four proofs fail, and one of them says something
+worth knowing: a session that did not come out of the live slot immediately draws
+*"autosave held: slot player — this session did not come out of that slot, so autosave
+will not write it"* on the player's first turn. That warning is right when an author
+typed `/autosave` and is noise when nobody asked for a cadence at all — so turning
+autosave on by default surfaces an author's warning to a player, and the two readings
+of `held` would have to be separated first.
+
+*Moves when: the owner names the shipped cadence, and says whether a held autosave
+nobody asked for should be silent. Both halves are then headless — the number is one
+constant and the silence is one branch, and the four proofs that encode `never` are
+named above.*
+
+**`/create-test` still cannot go through the one writer, and what stops it is a contract
+nobody has written.** Crossed from `open-agent.md` on 2026-08-25. The cycle that was
+blamed is gone — `outcomeOf` and `refusedLine` moved down into `command.ts`,
+`layer-check` exits 0, and `buildCreateTest` reads `startSaveId` so the one fact the two
+writers disagreed about has one home, with a sweep requiring `runLog.ts` to be the only
+file minting a `-start` id. But `runAsSections` still is not the writer for the sections
+themselves, on the two counts the original line named, and neither is a decision a lane
+can take:
+
+- `/create-valid-test` appends `expect: <id>-end` and a second `# save` that a `KeptRun`
+  has nowhere to put. Appending to the test block is easy; **whether a recorded run may
+  have an ending save at all** is the question.
+- A history already opening with `load:` deliberately emits no start save. `KeptRun`
+  cannot say that — `from` is the bytes, and in that case the session *did* take a start
+  save; the command simply declines to write it, because the author's own `load:`
+  already places the replay. Saying it needs `from` to become *bytes, or a `# save` the
+  corpus already holds*, which changes a type the app's playtest slot serializes.
+
+The lane's judgement, worth keeping: routing only the common case through
+`runAsSections` and slicing its output by index for the other two would be worse than
+what is there now.
+
+*Moves when: the owner rules whether a recorded run may carry an ending save, and
+whether `KeptRun.from` may name a `# save` instead of holding bytes. Both are one-line
+answers and the engine work after either is ordinary.*
+
 **Two xp gains at once now read as two pills, not one line.** A turn granting `+5
 Attack` and `+5 Defence` used to fold into one pill, `+5 Attack, Defence`, because the
 old notes grouped by amount. A notice is now words and a merge key with no discriminant,

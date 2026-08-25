@@ -502,6 +502,30 @@ and tall as the placed slots reach rather than declaring a canvas, and a slot wi
 every `equipment-slots:` — falls to a row beneath. So no slot is unreachable and no table
 of positions exists.
 
+**A session opens on what the live slot last held, and a save it cannot read is kept.**
+`openUniverse` returns a `Resumption` — `new` when the slot is empty, `resumed` when it
+holds a game this build can read, `kept` when it holds one it cannot. In the `kept` case
+the game is new and `synced` stays null, so nothing autosaves over the bytes that are
+there, and it is said in error words. That is the same shape `fileRun` uses for a
+recorded run whose starting save will not read, deliberately, rather than a second
+answer to one question. `resumptionNotes` in `command.ts` is the one home for the words
+and both the driver and `play-cli` call it.
+
+**`runLog.ts` is the only file that mints a `-start` id, and a sweep says so.** The
+cycle that used to stop `/create-test` reading it is gone: `outcomeOf` and `refusedLine`
+moved down into `command.ts`, and the private `refusedLine` already living there is
+`refusal` now, because it mints a refusal rather than recognising one — two meanings
+under one name is what made the collision look like an obstacle in the first place.
+
+**The `DEBUG` assumption was swept out of every `standingSources()` caller, empirically.**
+A `DEBUG` section of each kind that can stand alone was appended to `core.dsl` in turn
+and all seven callers run against each. Two carried it — the action-key claim in
+`locale.test.ts` and the thread-list claim in `translationSurvival.test.ts`, both taking
+subjects from a registry map while claiming about words. Both read the mark off
+`isDebug`, the section's own answer, rather than off whether the locale carries the
+words, so a node whose words genuinely are missing still fails rather than quietly
+leaving the sweep. The other five were clean.
+
 **A notification is a key, a count and its words, and `src/ui/notice.ts` is its one
 home.** There is no discriminant: merging counts up under the key alone, so it never
 asks what raised anything, and a raiser chooses how coarse its counting is by choosing

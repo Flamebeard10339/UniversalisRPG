@@ -162,13 +162,6 @@ it: a three-second walk does not read as a freeze.
 
 ## Ours, and small
 
-**A reload starts a fresh game.** `openUniverse` calls `startSession`
-unconditionally, so closing the tab or refreshing loses the session: measured by
-waiting 60 seconds, reloading, and coming back at 0. `/autosave` writes the live
-slot and `/restore` reads it back, so the pieces exist and nothing joins them. It
-costs an author a playtest and a player their game. *Closes when:* the app opens on
-what it last wrote, or refuses to lose it silently.
-
 **`readable()` in `src/ui/render.test.tsx` cannot see an `aria-label`.** It injects the
 attribute's value inside the tag, and the following `/<[^>]*>/g` swallows it again — so
 any assertion that a label reaches a screen through `aria-label` passes without reading
@@ -176,6 +169,28 @@ anything. Found by the lane that made a cell's background examine, whose examine
 is exactly such a case; it derived its one exception rather than weakening the claim, so
 nothing is currently hidden by this. It silently disarms the next one. *Closes when:* an
 `aria-label`'s words are readable to that test.
+
+**A `DEBUG` section reaches a player without anything naming it.** Two roads, found by
+the audit that swept every `standingSources()` caller with a planted `DEBUG` section of
+each kind. A `DEBUG` `# resource` draws in the player's status bar on every turn as its
+raw key — `core.resource.probe-resource.title: ██████████ 10/10` — which
+`scripts/printedWords.test.ts` catches loudly. A `DEBUG` `# stat` reaches `/state`'s
+stats blob as `"core.stat.probe-max.title (core.probe-max)":10` and **nothing in the
+suite catches it**, because `printedWords` sweeps player-worded lines only and
+`play-cli.test.ts` compares the stats line against `sessionStatus` itself, so it agrees
+with the leak. A `DEBUG` `# location` appears the same way in `/state`'s *not yet found*
+list and is caught only by that test's `tulsa.` anchor. Nothing shipped triggers any of
+the three today.
+
+Decision taken, and it is the one the engine already implies: **the row leaves the
+sheet, the section is not refused at load.** `load.ts` empties a `DEBUG` section's words
+rather than refusing the section, precisely so a `DEBUG` thing stays usable for testing —
+refusing a `DEBUG` `# resource` outright would contradict that. So the rule extends from
+*nothing a player can reach may name a DEBUG thing* to *nothing a player-facing sheet
+lists may be one*, and the sweep that empties the words is the same place that should
+drop the row. *Closes when:* a `DEBUG` resource, stat and location are absent from every
+player-facing sheet, and a derived proof covers all three rather than the two that
+happen to be caught today.
 
 **A `DEBUG` section's `title:` cannot survive a round trip.** `unsayDebug`
 (`src/content/load.ts`) empties a `DEBUG` section's locale rows, and the printer's
@@ -196,13 +211,6 @@ a key is the shape of the answer — a section that says nothing in any language
 business carrying words. *Closes when:* a `DEBUG` section cannot reach a player with a
 locale key.
 
-**A proof that loads `standingSources()` may assume no `DEBUG` section stands
-there.** `translationSurvival` took its subjects from `[...shipped.items.keys()]`
-while its claim was about locale keys, and only ever passed because no `DEBUG`
-section had lived in `core` or `tulsa`; moving the hammers into `tulsa` broke it.
-It derives properly now. Whether its neighbours carry the same assumption has not
-been asked.
-
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
 claims about its rat and its `rats-killed`. Six `DEBUG` sections move together, or
@@ -214,15 +222,4 @@ measured green at 13 processes and, separately, green at 32 with the new clock o
 the pre-split tree. Nobody has run the whole suite at 70 with the split in place,
 which is where twelve tests used to fail. *Closes when:* that run is taken.
 
-**`/create-test` still assembles its own `# save` + `# test` pair.** `runAsSections`
-is the one writer everywhere else — the app's filing and the playbot both go
-through it — and `buildCreateTest` cannot, because `runLog.ts` imports
-`type CommandResult` from `command.ts` and the reverse import closes a cycle;
-measured, `npm run layer-check` exits 1 on even the minimal version. What the two
-writers actually disagree about is one fact, the `<id>-start` naming, spelled in
-both. *Closes when:* the cycle is broken — `outcomeOf` and `refusedLine` moving down
-into `command.ts`, where a private `refusedLine` already exists — or that naming
-moves somewhere both can read. Two further things would still need answering:
-`/create-valid-test` appends an `expect: <id>-end` and a second `# save` that
-`runAsSections` has nowhere to put, and a history already opening with `load:`
-deliberately emits no start save.
+
