@@ -44,6 +44,11 @@ export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
   return groups;
 }
 
+// A panel with no cells in it reads as the game having broken rather than as a quiet room, so the
+// sheet says so in words. Asked of what would be drawn rather than of the view's own list, because
+// what reaches a cell is `offerCells`'s judgement and not the caller's.
+export const drawsNothing = (choices: PlayView['choices']): boolean => offerCells(choices).length === 0;
+
 export function offerCells(choices: PlayView['choices']): OfferCell[] {
   return groupOffers(choices).flatMap((group): OfferCell[] => {
     const fill = group.group === undefined ? {} : { group: group.group };

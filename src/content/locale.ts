@@ -160,6 +160,7 @@ export const ENGINE_KEYS = [
   'engine.journal.close',
   'engine.shell.journal',
   'engine.shell.journal.empty',
+  'engine.shell.sheet.empty',
   'engine.shell.journal.untouched',
   'engine.shell.close',
   'engine.shell.command',

@@ -167,6 +167,7 @@ engine.journal.reading: Quest
 engine.journal.close: Close
 engine.shell.journal: Journal
 engine.shell.journal.empty: You have taken nothing on yet.
+engine.shell.sheet.empty: Nothing to do here.
 engine.shell.journal.untouched: You have not begun this quest.
 engine.shell.close: Close
 engine.shell.command: Command

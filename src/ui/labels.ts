@@ -11,6 +11,7 @@ export const LABELS = {
   inventory: 'engine.shell.inventory',
   journal: 'engine.shell.journal',
   'journal-empty': 'engine.shell.journal.empty',
+  'sheet-empty': 'engine.shell.sheet.empty',
   'journal-untouched': 'engine.shell.journal.untouched',
   close: 'engine.shell.close',
   command: 'engine.shell.command',

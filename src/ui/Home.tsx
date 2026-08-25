@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { offerCells } from './choices';
+import { drawsNothing, offerCells } from './choices';
 import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
@@ -25,7 +25,8 @@ function Line({ entry }: { entry: LogEntry }): JSX.Element {
   );
 }
 
-function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: (position: number) => void }): JSX.Element {
+function Sheet({ choices, words, onChoose }: { choices: PlayView['choices']; words: Words; onChoose: (position: number) => void }): JSX.Element {
+  if (drawsNothing(choices)) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;
   return (
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
@@ -109,7 +110,7 @@ export function Home({
           </div>
         </div>
 
-        {live || view.choices.length > 0 ? (
+        {live || !drawsNothing(view.choices) ? (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
@@ -122,11 +123,15 @@ export function Home({
                 </div>
               ) : null}
               <div className="unbarred min-h-0 flex-1 overflow-y-auto">
-                {view.choices.length > 0 ? <Sheet choices={view.choices} onChoose={onChoose} /> : null}
+                <Sheet choices={view.choices} words={words} onChoose={onChoose} />
               </div>
             </div>
           </>
-        ) : null}
+        ) : (
+          <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
+            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
+          </div>
+        )}
       </div>
 
       {commandLine ? <Console onSend={onSend} words={words} /> : null}

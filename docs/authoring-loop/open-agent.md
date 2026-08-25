@@ -123,10 +123,6 @@ only thing that removes an action.
 reading before shipping it: count what becomes visible across `content/`, and if a room
 fills up with refusals, come back and say so rather than landing it.
 
-**An empty location says nothing.** *"No actions on the beach reads like a bug. There
-should be a small centered text that says `nothing to do here`."* *Closes when:* a
-location whose action list is empty says so.
-
 **The action progress bar is invisible on the map.** *"It should exist on lower banner
 regardless of whether I'm on home, or on the map."* This is also what the
 travel-progress question in `open-human.md` was waiting on, and it crosses here with

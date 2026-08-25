@@ -4,7 +4,7 @@ import { mintedActions } from '../content/sections/entity';
 import { useChoiceId } from '../content/sections/test';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
-import { groupOffers, offerCells } from './choices';
+import { drawsNothing, groupOffers, offerCells } from './choices';
 import { drawnFor, type Place } from './discovery';
 
 // Whatever offers a choice is named as the engine names it and drawn as the engine draws it, which
@@ -128,5 +128,21 @@ describe('the offers on the sheet', () => {
     expect(drawn.plane).toBe(1);
     expect(drawn.sheet.nodes.map((node) => node.place.id)).toContain('cellar');
     expect(drawn.travels.get('cellar')).toBe(2);
+  });
+});
+
+describe('a sheet with no cells on it', () => {
+  it('has nothing to draw when the engine offers nothing at all', () => {
+    expect(drawsNothing([])).toBe(true);
+  });
+
+  it('has something to draw when a way out is all this place offers, since a way out is a cell like any other', () => {
+    const walk: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: asLocalized('Travel to Yard'), leadsTo: 'yard', legs: 1 };
+
+    expect(drawsNothing([walk])).toBe(false);
+  });
+
+  it('has something to draw when anything reaches a cell', () => {
+    expect(drawsNothing([choice('a', 'Talk to Miki')])).toBe(false);
   });
 });
