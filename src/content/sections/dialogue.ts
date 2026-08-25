@@ -84,7 +84,7 @@ function parseChoice(source: RawLine): Choice {
 
 // The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
 export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] => [
-  { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open — talking to somebody puts up every thread they have open at that moment, and a node offering nothing but `always` is not one of them' },
+  { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open — talking to somebody puts up every thread they have open at that moment, and a node offering nothing but `always` is not one of them, unless a quest gave it: a quest is what the player is in the middle of, so its line always stands in that list and stands first in it' },
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread, and writing it makes the node one — a thread with no `ask:` is named in the list by the first line it says, and is entered without a list at all when it is the only one open' },
   { form: 'once', example: 'once', family: 'reached when' },
