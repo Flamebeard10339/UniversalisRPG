@@ -1106,6 +1106,25 @@ one location took four claims with it, because several proofs take their subject
 location the corpus declares. A test count that falls with a content cut is the proofs doing
 what they were built to do.
 
+**What is said arrives a line at a time, and that is a player preference rather than a
+manner.** `SETTINGS.reveal` is one declaration in `src/runtime/settings.ts` and the engine
+branches on none of it; `src/ui/reveal.ts` holds the three numbers to tune and the two words
+of the declaration the app knows. **It is deliberately not a fourth `Declared` axis**, and
+the argument is worth keeping because it will be proposed again: all three existing axes are
+spent in `layerOf` and a pace costs no pixels, so crossing it in would double `EVERY_MANNER`
+to eighteen members producing nine distinct layers; there is no shipped subject, because
+every screen a player opens carries `said: []` and only a screen the world raised in the
+step that said the words draws a beat at all; and the case it would have served is already
+answered by `showsTheBeat`, which withholds a beat from a `clear` or a `fill` screen. A pace
+is a property of the words, not of the screen.
+
+**The transcript does not wait.** The reveal is the beat's alone. `Home.tsx` rests the log on
+`startedAt`, the line the turn began on — which would be a line nobody has read yet if it
+were still arriving — and a record does not wait for the thing it is a record of. When a
+screen is up the transcript is scrimmed anyway, so nothing double-plays. `.spoken` sits in
+the `prefers-reduced-motion` block, so reduced motion lands a beat whole with nothing in
+TypeScript knowing about it.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
