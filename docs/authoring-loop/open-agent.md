@@ -156,16 +156,19 @@ the failure mode `one-home` exists to catch.
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
 
-**The shared fixture world has room, and the duplication was never only the seventeen.**
-Measured while it was built: **24 test modules still declare at least one of the six things
-`FIXTURE_WORLD` now holds** — a starting `# location camp`, `max-health` and `attack` bases,
-the `hale` and `keen` passives, and a plain item — mostly outside the seventeen the original
-whetstone measurement named: `fight`, `save`, `time`, `moments`, `conditions`, `buffs`,
-`span`, `play-cli` and others. The lane that built it did not force them, and it was right
-not to: several of those worlds *are* the arithmetic under test rather than furniture, which
-is the distinction that decides each one. *Closes when:* every module whose world is
-genuinely furniture stands on the shared one, and the report says which were left and why —
-because a module left behind with a reason is the answer, not a miss.
+**The fixture world's second pass moved ten more modules and owes the other half of its
+answer.** `clusterPlane`, `conditions`, `fight`, `instances`, `moments`, `recipe`, `save`,
+`skillGrants`, `stopsOn` and `time` now stand on `FIXTURE_WORLD` — 23 modules import it,
+up from 13, and 121 lines of duplicated furniture are gone with **no change to the claim
+count**, which is the signal that no test's meaning moved. The lane doing it was killed
+mid-gates by a spend limit and never wrote its report, so **what is missing is the list of
+modules it left and why**. That list is the deliverable as much as the migration: a module
+whose world *is* the arithmetic under test is a correct thing to leave, and saying so is
+what stops the next pass re-opening it. *Closes when:* every remaining test module that
+declares a starting `# location camp`, a `max-health` or `attack` base, `hale`, `keen` or a
+plain item has been read and either moved or written down with its reason. **Counting the
+string is the wrong measure** — a module that prepends the fixture still writes
+`# location camp` again to add its own `entities:`, because sections merge.
 
 **Dialogue does not animate.** Ruled: *"This should be a global variable that can
 optionally be edited/skipped by modals."* So a reveal rate is a setting with a default
