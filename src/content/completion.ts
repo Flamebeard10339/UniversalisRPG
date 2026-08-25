@@ -27,6 +27,10 @@ export interface Offer {
 export interface Filling {
   form: string;
   hole: string;
+  // Where this hole's own value begins inside what the offering replaces, counted from `from`. What
+  // stands before it is the keyword the line is written under, which a control filling the hole
+  // leaves where it is.
+  at: number;
   like?: string;
   kind?: string;
   // What a value of this hole is written with, where the hole holds a grammar of its own that nothing else on the page is showing.
@@ -483,7 +487,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
       to: at + LEADING_ID.exec(text.slice(at, lineEnd))![0].length,
       where: ['# <kind>'],
       reads: kind === '' ? null : '# <kind>',
-      filling: { form: '# <kind> <id>', hole: 'kind', like: 'item' },
+      filling: { form: '# <kind> <id>', hole: 'kind', at: 0, like: 'item' },
       refused: null,
       undeclared: [],
         offers: sectionKinds()
@@ -497,7 +501,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
     to: lineEnd,
     where: [`# ${kind}`],
     reads: typed === '' ? null : `# ${kind} <id>`,
-    filling: { form: `# ${kind} <id>`, hole: 'id', like: `${kind}-of-your-own` },
+    filling: { form: `# ${kind} <id>`, hole: 'id', at: 0, like: `${kind}-of-your-own` },
     refused: null,
     undeclared: [],
     offers: addressOffers(known, new Set(kind === '' ? [] : [kind]), '', typed),
@@ -573,7 +577,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     to,
     where: here.where,
     reads,
-    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, ...(filled.like === undefined ? {} : { like: filled.like }), ...(naming === undefined ? {} : { kind: naming }), ...(holdings === undefined ? {} : { holds: holdings }) },
+    filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, at: reached, ...(filled.like === undefined ? {} : { like: filled.like }), ...(naming === undefined ? {} : { kind: naming }), ...(holdings === undefined ? {} : { holds: holdings }) },
     refused,
     undeclared: undeclaredAt(text, lineStart, known),
     // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.

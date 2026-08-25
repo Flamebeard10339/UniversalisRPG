@@ -25,3 +25,12 @@ export const colour: Parser<string> = {
 export const COLOUR_HOLE = holeNames(colour.forms[0]!)[0]!;
 
 export const isColourHole = (hole: string | undefined): boolean => hole === COLOUR_HOLE;
+
+// What a picker opens on: the colour already written where it is standing, or one to start from
+// where nothing readable is written there, since a picker has no way to show no colour at all.
+const OPENS_ON = '#808080';
+
+export const colourStanding = (written: string): string => {
+  const held = written.trim();
+  return new RegExp(`^${WRITTEN.source}$`).test(held) ? held : OPENS_ON;
+};

@@ -1,7 +1,7 @@
 import type { Answer } from '../../runtime/localized';
 import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
 import type { Sheet } from '../discovery';
-import { draftIn, kindsIn, offeringIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
+import { colourIn, draftIn, kindsIn, offeringIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
 import { modeNamed, type MapMode } from '../mapEdit';
 import { clampZoom, type Point } from '../viewport';
 import { clampIndex } from '../gesture';
@@ -209,6 +209,7 @@ export interface EditState {
   draft: string;
   cursor: number;
   offers: readonly string[];
+  colour: string | null;
   scroll: number;
   split: number;
   standing: Standing;
@@ -227,6 +228,7 @@ export function editState(held: EditHeld): EditState {
     draft: draftIn(held.sections, held.editing),
     cursor: held.editing.cursor,
     offers: offeringIn(held).offers.map((offer) => offer.form),
+    colour: colourIn(held),
     scroll: held.editing.scroll,
     split: held.editing.split,
     standing: held.standing,
@@ -270,6 +272,7 @@ export function editSurface(held: EditHeld): TestSurface {
       text: (value) => held.controls.text(String(value), String(value).length),
       cursor: (value) => held.controls.cursor(Number(value)),
       take: (value) => held.controls.take(offerNamed(held, value)),
+      fill: (value) => held.controls.fill(String(value)),
       'step-in': () => held.controls.stepIn(),
       'step-out': () => held.controls.stepOut(),
       scroll: (value) => held.controls.scroll(Number(value)),

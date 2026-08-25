@@ -169,7 +169,7 @@ describe('a half-written line', () => {
   const under = '# entity tulsa.giant-rat\nstats: attack 3\non hit:\n';
 
   it('is read as the shape it is on its way to being', () => {
-    expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', like: 'mining', kind: 'skill' });
+    expect(taken(`${under}  xp: |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'skill', at: 4, like: 'mining', kind: 'skill' });
   });
 
   it('says what a hole holds and what it may name, and says only the one that is not the other', () => {
@@ -184,7 +184,7 @@ describe('a half-written line', () => {
   });
 
   it('moves to the next hole once the one before it is written', () => {
-    expect(taken(`${under}  xp: mining |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'amount', like: '4-7' });
+    expect(taken(`${under}  xp: mining |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'amount', at: 11, like: '4-7' });
   });
 
   it('is not refused while a shape it could still become is unfinished', () => {

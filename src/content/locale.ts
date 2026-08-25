@@ -173,6 +173,7 @@ export const ENGINE_KEYS = [
   'engine.shell.every-kind',
   'engine.shell.section',
   'engine.shell.grammar',
+  'engine.shell.colour',
   'engine.shell.starting',
   'engine.shell.undeclared',
   'engine.shell.step-in',
