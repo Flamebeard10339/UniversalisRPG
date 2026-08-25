@@ -19,10 +19,10 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Six lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Eight lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
-this file held turned out to be one-line answers nobody had asked him for. Three of
-the six arrived back the same day, each measured by the lane that hit it.
+this file held turned out to be one-line answers nobody had asked him for. Five of the
+eight arrived back the same day, each measured by the lane that hit it.
 
 ---
 
@@ -171,3 +171,35 @@ gear are silent on it.
 *Moves when: he says whether a row there is exactly one of skips the count. That is a
 second engine line and a branch in `shopScreen`, which no ruling on file authorises, so
 it needs his word before it is worth writing.*
+
+## Whether `1-3` was the number in the file or the number on screen
+
+The ruling reads *"the rat swings 1-3"*. The lane wrote `attack 6-8` on `giant-rat`,
+because that is the declaration that makes the **swing** literally 1–3 against the
+shipped player's defence of 5 — and it measured the other reading rather than assuming
+it: `damage: my attack vs their defense` subtracts, and `hitDamage`'s floor is
+`max(1, min(minDamage, attack))`, so an authored `attack 1-3` against a defence of 5
+collapses to a **constant 1**. That reading fails the *"two swings differ"* requirement
+outright, so it cannot be what was meant unless something bigger changes.
+
+*Moves when: he says which number he was naming. If it is the number in the file, the
+swing has to stop being `attack − defense` and that is engine work well past this line;
+if it is the number on screen, this is already done and the line is deleted.*
+
+## Whether `humanizeEn` should know English's minor words
+
+Now that a generated action label passes through `humanizeEn` on its way to a player,
+it capitalises every word: *Take The Leaf*, *Chop A Log*, *Reach Through The Bars*,
+*Unlock With The Key*. The corpus's own authored titles use real English title case and
+lower the minor words — *Orb of the Edge*, *Charlie the Tramp*, and the engine's own
+*Talk to Miki* — so the generated names and the written ones now read to two different
+standards.
+
+- **Leave it.** One function, one rule, no exceptions list. An author who wants *Take
+  the Leaf* gives that action a `title:`.
+- **Teach it a minor-word set** (`a an the of to in on at for with`, never first). Still
+  one function and one home, but it becomes a small table somebody maintains — and it
+  would then also be the standard the new derived guard holds every authored title to.
+
+*Moves when: he picks one. Either is a one-line change in `src/grammar/values.ts` and
+nothing downstream depends on the answer, which is why the lane did not guess.*

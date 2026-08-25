@@ -137,29 +137,36 @@ I am fighting the rat."*
 
 ### The fight
 
-**Damage never varies.** *"The player always does the same exact amount of damage. So
-does the rat."* Ruled by the owner on 2026-08-25, and **the two halves are not the same
-mechanism**:
+**The player's damage never varies.** *"The player always does the same exact amount of
+damage."* The foe's half of this is done — `giant-rat` declares `attack 6-8` and the
+range grammar it uses was already there. The player's half is a different mechanism and
+is what is left: *"The player's 3-8 should be part of their skill level + base."* So
+`3-8` is a reading of what a starting player happens to come out at, not a number to
+write down anywhere — it falls out of the base plus the melee level, which under the
+skill rule that has since landed is `+1 attack per level`. **A lane that writes `3-8` on
+the player has got this backwards.**
 
-- **A foe's range is declared and literal.** The rat swings `1-3`. A range is a form the
-  DSL already spells elsewhere (`xp: cooking 40-80`), so this wants no new one.
-- **The player's range is derived, not declared.** *"The player's 3-8 should be part of
-  their skill level + base."* So `3-8` is a reading of what a starting player happens to
-  come out at, not a number to write down anywhere — it falls out of the base plus the
-  melee level, which under the skill ruling below is `+1 attack per level`. A lane that
-  writes `3-8` on the player has got this backwards.
+The seam already exists and the combat lane mapped it rather than building a second one:
+`statRange` (`src/runtime/stats.ts`) is the single place a stat becomes a `Range` — the
+actor's own `stats:` entry folded with every `stat-bonus` tag clause through
+`addRanges`, so a ranged bonus composes with a ranged base. `+N attack per level of
+melee` is already a writable tag clause on any carrier, so *base plus melee level* is
+content rather than engine. Planning reads the midpoint through `statValue` while the
+swing reads `sampleStat`, and the `flail`/`straw-man` fixture shows both working over a
+range. **Watch `hitDamage`'s floor** — `max(1, min(minDamage, attack))` in milli-units —
+because an attack at or below the target's defence collapses to a constant 1, which is
+the trap that makes a naive `attack 1-3` mean nothing.
 
 The spread the derivation produces is the lane's to draft and is explicitly **not**
 balanced yet: *"Balance will happen after."* What has to be true when this lands is that
-two swings differ and that the player's differ because of what the player is.
+two swings differ and that the player's differ because of what the player is. Only
+`giant-rat` carries a range today; the other five foes still declare point attacks, and
+that is the balance pass rather than this line.
 
 **A fight does not chain.** *"Fighting the rat should auto start the next fight unless I
 cancel it."* Three consecutive `begin: use core.melee-combat on tulsa.giant-rat` turns
 in the run are the evidence. *Closes when:* a finished fight with a foe still standing
 opens the next one, cancellably.
-
-**A foe dies at zero rather than below one.** *"Entities should die if they have <1
-health, not <0. An enemy with 0.1 health reads like a bug."* Ruled: below one is dead.
 
 ### The character sheet
 
@@ -237,14 +244,6 @@ lane's to rewrite, not a question to park. This is the standing policy and it is
 **Two shipped choices are labelled with a machine address.** `modal:choose-race` and
 `modal:name-yourself` reach the player as `choices[].label`. *"This needs to be done."*
 Under the policy above the words are the lane's to write.
-
-**Action labels are cased two ways**, so `ascend`, `descend`, `look in` and `open`
-stand in one list beside *Talk to Miki* and *Examine* — measured again in this run's
-Guide House. Ruled: *"Title Case everywhere. There should only be a single humanizeEn
-function. Any other inconsistencies are just raw dsl `title:` fields that should be
-brought in line."* Two halves: one `humanizeEn` with every caller reading it, and a
-sweep of the corpus's own `title:` fields. The second is a corpus edit; the first wants
-a derived guard, so that *no second casing function* is proved rather than remembered.
 
 **Miki never says to find the mirror**, from the first run: *"He asks if you want him to
 show you the ropes."* The quest's opening reads as though he did. The mirror's location
@@ -349,13 +348,6 @@ the shield encouraging the player to check the items in their inventory and open
 the modals."* So the on-ramp is words plus an affordance — the line should be able to put
 the player in front of the modal rather than only mentioning it, which is the same
 mechanism the modal API line wants.
-
-**`# faction` drops its authored `title:`.** Ruled: *"Factions should have humanizeEn
-names, but they will not be shown to the player in the current version of the game."* So
-nothing authors a faction's words, anything needing a display name derives it through the
-one `humanizeEn`, and the field leaves `NOT_SAID` with two lines leaving the review
-sheet. Already costed: dropping it leaves `tsc` clean, loses exactly one derived test and
-adds no failure.
 
 ### What a player has already touched
 

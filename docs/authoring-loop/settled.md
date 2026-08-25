@@ -794,6 +794,41 @@ passives. None of these is an open question; a lane that trips over one leaves i
 a sparsest of `[]`, so all 32 corpus fixtures read back identically, and bumping would
 have meant a `migrate-saves` run across every `# save` body for no behavioural gain.
 
+**A `# skill` names one `stat:` and the engine grants +1 of it per level.** `PER_LEVEL`
+lives once in `src/content/sections/skill.ts` and `skillTags` derives the grant from
+that one word, appending it to whatever tags the author wrote — so the grant rides the
+same carrier list a race, a buff and a worn item already go through, and `stats.ts`
+needed one expression. A skill naming no stat grants nothing, which is stated in the
+field's own note and is therefore what `npm run oracle -- skill` prints. The proof
+derives its subjects from the skills the shipped player holds crossed with every stat
+the registry declares, so a skill or a stat added next month is covered with no edit.
+
+**Being spent is below one, it lives beside `setPoolLevel`, and the level stays where it
+fell.** `SPENT_BELOW` / `spendable` / `isSpent` in `src/runtime/effects.ts` are the one
+answer, asked by `emptied`, `drainedAPool`, `completionsBeforeDrain` and the rated-pool
+boundary — four places that each used to spell `<= 0` for themselves. **The zeroing
+variant was built and measured and is wrong:** it destroys a pool nobody binds an event
+to, and it makes a span non-associative across a split, which `resolve.test.ts`'s
+sign-change claim catches. Being spent and holding nothing are different facts; a felled
+foe is zeroed separately by `emptyPoolNow`.
+
+**One function makes the words a player reads off an action, and an inline label cannot
+be written in Title Case.** `actionWords` in `src/content/sections/action.ts` is that
+home — an author's `title:` if there is one, otherwise `humanizeEn` of the address — and
+`recordActionText` is its only caller, because every driver already reads display labels
+off `locales.base`. The corpus sweep this looks like it wants **does not exist**: the
+entry-label pattern in `src/grammar/section.ts` refuses a capital, so `ascend`,
+`look in` and `open` are the address an action is reached by and never writing. They
+were the one generated name in the engine not passing through `humanizeEn`, and that was
+the whole defect. `scripts/printedWords.test.ts` proves no second casing function exists
+by sweeping the tracked sources rather than by naming today's callers.
+
+**The counter counts `packRows`, so a grown copy is on it and worn gear is not.** One
+substitution in `src/runtime/trade.ts` carries both halves of that rule without either
+being written a second time: a copy is offered under its instance id, and a price
+resolves through the template, so the plane and the points on a copy move it not at all.
+`engine.pack.full` is the refusal a player reads when a row is what is missing.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
