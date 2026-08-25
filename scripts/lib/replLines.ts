@@ -3,6 +3,7 @@ import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { type GroupRow } from '../../src/runtime/grouping';
+import { onActionList } from '../../src/runtime/waysOut';
 import { formatPlane } from '../planeView';
 
 // What a command answered with, written out as lines a player reads. Both drivers that put words
@@ -44,12 +45,16 @@ const shownLocations = new Set<string>();
 export const grouped = (localizer: Localizer, group: GroupRow | undefined, said: Localized): Localized =>
   group === undefined ? said : localizer.engine('engine.repl.grouped', { group: group.title, said });
 
+// A choice is answered by where it sits in the view's own list, so what is skipped here still
+// counts: the numbers a reader sees are the numbers the engine takes, with the ways out missing
+// from among them rather than renumbered away.
 function formatChoices(choices: PlayChoice[], localizer: Localizer): PlayerLine[] {
-  return choices.map((choice, index) => {
+  return choices.flatMap((choice, index) => {
+    if (!onActionList(choice)) return [];
     const numbered = choice.detail
       ? localizer.engine('engine.repl.choice.owned', { index: index + 1, owner: grouped(localizer, choice.group, choice.detail), choice: choice.label })
       : localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.label });
-    return say(numbered, 2);
+    return [say(numbered, 2)];
   });
 }
 

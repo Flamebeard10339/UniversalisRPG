@@ -2,6 +2,7 @@ import { EXAMINE_FIELD } from '../content/sections/entity';
 import { parseUseChoiceId } from '../content/sections/test';
 import type { Answer, Localized } from '../runtime/localized';
 import type { GroupRow, PlayView } from '../runtime/session';
+import { onActionList } from '../runtime/waysOut';
 
 export interface Offer {
   id: Answer;
@@ -28,12 +29,10 @@ export interface OfferCell {
 
 const reads = (offer: Offer): boolean => parseUseChoiceId(String(offer.id))?.actionId === EXAMINE_FIELD;
 
-const aWalkAway = (choice: PlayView['choices'][number]): boolean => choice.legs !== undefined && choice.legs > 1;
-
 export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
   const groups: OfferGroup[] = [];
   choices.forEach((choice, at) => {
-    if (aWalkAway(choice)) return;
+    if (!onActionList(choice)) return;
     const source = choice.detail ?? null;
     const offer = { id: choice.id, label: choice.label, position: at + 1 };
     const held = groups.find((each) => each.source === source);
