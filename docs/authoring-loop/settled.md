@@ -1185,6 +1185,24 @@ are the heading, **Equip** is a verb on it, and an item's plane is the **Skill T
 step further in. An item's own screen is a second option row on that one, and `item-plane` is
 a frame `openModalNamed` explicitly refuses to open by name.
 
+**A fight named on a foe that is not standing here is refused in the player's words.**
+`whyRefused` takes the target as an input and asks `isStanding` — the same function
+`standing()` backs, which is what `locationChoices` builds every room offer from, so this is
+one reading with three callers framing their own questions, not three readings.
+**`standsAgain` is deliberately not reused**: its `!action.depletes` guard is about whether a
+re-arm has a foe left to count down, and carrying it into arming would exempt exactly the
+case that wants refusing. The words are `engine.target.absent` — *"There is no {target}
+here."* — bland because it has to be true both of a foe felled out of the room and of one
+that was never in it.
+
+**Only a directive could reach that case, and that is why the offer path needed nothing.**
+`locationChoices` iterates `standingHere`, so a felled foe offers *nothing at all* — no
+fight, no talk, no shop — and that is neither `hidden if:` nor a refusal: the entity is
+simply absent, and `hidden if:` removes an action rather than an entity. `apply` and
+`beginAction` throw `unavailable choice` for an id the view did not publish, so no button can
+reach the refusal. A directive names an id outright and reaches past the offer list, which is
+the whole of the difference.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

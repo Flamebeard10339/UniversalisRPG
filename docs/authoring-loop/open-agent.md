@@ -54,12 +54,14 @@ that walks out of the house and back is part of closing this.
 
 ### The fight
 
-**A fight can be armed on a foe that is not standing there.** `armFightAction`
-(`src/runtime/runtime.ts`) never checks its target still stands in the room, so a line can
-arm against an empty one: it burns an attempt-unit of time and fells nothing. Found by the
-lane that made fights chain — Miki's route had two trailing `Fight` lines doing exactly
-that, each spending 2400ms and 40 milli-health of regeneration against a cleared cellar, and
-cutting them landed the route on its recorded sheet **completely unchanged**, which is what
-proved they were no-ops. Pre-existing and unclaimed. *Closes when:* arming a fight on
-something that is not there is refused in the player's own words, the way an unmet
-`requires:` now is.
+**An entity's own action can still be armed from off-location, and the fix is not a
+two-line widening.** The fight half of this is closed — a directive naming a foe that is not
+standing here is refused in the player's words — but `armAction` does not ask the same
+question of an **entity** whose action a directive names, so `use: entity.<felled-foe>.<action>`
+still arms. The lane that closed the fight half **probed the obvious widening**
+(`refuseAction(..., obj === 'entity' ? objId : undefined)`) and it fails **26 tests across 10
+files**: the corpus and the fixtures lean on arming an entity's action from off-location.
+That is a real piece of work with its own scope rather than a tail of the fight one, and the
+26 are the measurement to start from — read them before deciding whether they are wrong or
+the rule is. *Closes when:* naming an entity that is not here is answered the same way naming
+a foe that is not here now is, or it is written down why the two differ.
