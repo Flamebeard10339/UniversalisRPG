@@ -61,6 +61,7 @@ const DISPATCHES = [
   'runLine',
   'serializeSession',
   'sessionLocalizer',
+  'standingLine',
   'view',
   'createSaveContext',
   'memoryDriver',
