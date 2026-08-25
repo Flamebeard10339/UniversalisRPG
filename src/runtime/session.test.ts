@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSeconds } from './runtime';
 import { itemInstance, receiveItem } from './itemInstance';
 import { Registry } from '../content/registry';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
@@ -88,11 +89,9 @@ stats: attack 0, max-health 10, swings-per-minute 60
   });
 
   it('dispatches an item action through the choice-list API', () => {
-    const module = `
-# location camp
-x: 0, y: 0
-starting
-
+    const module =
+      FIXTURE_WORLD +
+      `
 # item bread
 eat: take: 1 bread, say: You eat the bread.
 `;
@@ -108,10 +107,10 @@ eat: take: 1 bread, say: You eat the bread.
   });
 
   it('publishes a modal from open modal:, and closes it on the answer that completes it', () => {
-    const module = `
+    const module =
+      FIXTURE_WORLD +
+      `
 # location camp
-x: 0, y: 0
-starting
 entities:
   mirror
 
@@ -162,11 +161,9 @@ node greeting:
   });
 
   it('reports a prune to whoever asked for the load and says nothing about it to the player', () => {
-    const registry = loadInEnglish(`
-# location camp
-x: 0, y: 0
-starting
-
+    const registry = loadInEnglish(
+      FIXTURE_WORLD +
+        `
 # save stale
 {"version":${SAVE_VERSION},"inventory":{"mod.gem":1}}
 `);
@@ -231,10 +228,10 @@ describe('adoptRegistry: content changed under a live session', () => {
 });
 
 describe('beginAction: arms a spannable action/craft instead of resolving it, but still completes an instant one', () => {
-  const module = `
+  const module =
+    FIXTURE_WORLD +
+    `
 # location camp
-x: 0, y: 0
-starting
 entities:
   oven
 
@@ -389,10 +386,10 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
-    const module = `
+    const module =
+      FIXTURE_WORLD +
+      `
 # location camp
-x: 0, y: 0
-starting
 adjacent:
   cave
   summit
@@ -506,10 +503,10 @@ cancel
 });
 
 describe('runTest: a route that ends holding a modal has not been walked to its end', () => {
-  const module = `
+  const module =
+    FIXTURE_WORLD +
+    `
 # location camp
-x: 0, y: 0
-starting
 entities:
   mirror
   sage
@@ -696,11 +693,10 @@ forget:
 travel: forge
 `;
 
-const GROWN_MODULE = `
-# location camp
-x: 0, y: 0
-starting
+const GROWN_MODULE =
 
+  FIXTURE_WORLD +
+  `
 # stat might
 base: 4
 
@@ -1083,10 +1079,10 @@ stats: attack 1, max-health 12, swings-per-minute 60
 `;
 
 describe('a save is data the engine takes a copy of, not a handle onto it', () => {
-  const module = `
+  const module =
+    FIXTURE_WORLD +
+    `
 # location camp
-x: 0, y: 0
-starting
 entities:
   oven
   mirror
@@ -1313,17 +1309,10 @@ stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 
   });
 });
 
-const GROWTH_MODULE = `
-# location camp
-x: 0, y: 0
-starting
+const GROWTH_MODULE =
 
-# stat max-health
-base: 30
-
-# passive hale
-+10 max-health
-
+  FIXTURE_WORLD +
+  `
 # cluster-jewel node
 shape: point
 open-connections: e

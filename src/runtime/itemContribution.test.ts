@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { characterHooks } from './hooks';
 import { loadModule } from '../content/load';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { midpoint } from '../grammar/range';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
@@ -13,25 +14,11 @@ import { counterLevels, statValue } from './stats';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat max-health
-base: 30
-
-# stat attack
-base: 4
-
-# passive hale
-+10 max-health
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # passive vigorous
 +10% max-health
-
-# passive keen
-+4 attack
 
 // The two shapes a payload takes that a flat one does not: a magnitude paid per
 // point of a live counter, and a block answering a moment.

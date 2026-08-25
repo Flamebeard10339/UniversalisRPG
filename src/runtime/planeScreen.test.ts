@@ -5,6 +5,7 @@ import { shippedSources } from '../content/shipped';
 import { withoutNote } from '../grammar/note';
 import { publishModal } from './modals';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { carriedFrame } from './carried';
 import { equip } from './equipment';
 import { growLine } from './growth';
@@ -16,17 +17,9 @@ import { GameState, type ModalFrame } from './state';
 import { inEnglish } from './sayFixture';
 import { aCount, anId, says } from './said';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat attack
-base: 4
-
-# passive keen
-+4 attack
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # cluster-jewel core
 shape: point
 open-connections: e, ne
@@ -50,9 +43,6 @@ cluster-jewel: spark
 # item ember-jewel
 title: Ember Jewel
 cluster-jewel: spark
-
-# item rope
-title: Rope
 `;
 
 const registry = loadInEnglish(MODULE);

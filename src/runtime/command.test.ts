@@ -11,6 +11,7 @@ import { initialLocalChangesModule, renderLocalChangesModule } from '../content/
 import type { ModuleSource } from '../content/universe';
 import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
   COMMANDS,
@@ -51,10 +52,10 @@ slot: hand
 {"version":${SAVE_VERSION},"inventory":{"gauntlet":1},"equipped":{"hand":"gauntlet"}}
 `;
 
-const SAVE_MODULE = `
+const SAVE_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   chest
 
@@ -75,10 +76,10 @@ assert: time >= 0
 assert: time < 0
 `;
 
-const TRAVEL_MODULE = `
+const TRAVEL_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 adjacent:
   ruins
 
@@ -86,10 +87,10 @@ adjacent:
 x: 1, y: 0
 `;
 
-const CUT_OFF_MODULE = `
+const CUT_OFF_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 
 # location island
 x: 40, y: 0
@@ -100,10 +101,10 @@ adjacent:
 x: 41, y: 0
 `;
 
-const TALK_MODULE = `
+const TALK_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   guide
 
@@ -604,10 +605,10 @@ describe('/test, /load, /expect, /assert, /cancel', () => {
   });
 });
 
-const MODAL_MODULE = `
+const MODAL_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   mirror
   sage
@@ -650,7 +651,9 @@ submit-modal: name=Rowan
 submit-modal: race=elf
 `;
 
-const STACKED_MODAL_MODULE = `
+const STACKED_MODAL_MODULE =
+  FIXTURE_WORLD +
+  `
 # race human
 
 # race elf
@@ -659,8 +662,6 @@ const STACKED_MODAL_MODULE = `
 
 # race orc
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
 
@@ -761,10 +762,10 @@ describe('a modal is driven by its published name and options', () => {
   });
 });
 
-const LIVE_MODULE = `
+const LIVE_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   oven
   anvil
@@ -1598,17 +1599,9 @@ describe('the ticker a live run is advanced by', () => {
 });
 
 describe('recording a growth the plane refused', () => {
-  const GROWTH_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat max-health
-base: 30
-
-# passive hale
-+10 max-health
-
+  const GROWTH_MODULE =
+    FIXTURE_WORLD +
+    `
 # cluster-jewel node
 shape: point
 open-connections: e

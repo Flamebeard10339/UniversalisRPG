@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { loadUniverse } from '../content/load';
 import { shippedSources } from '../content/shipped';
 import { withoutNote } from '../grammar/note';
@@ -14,11 +15,9 @@ import { initialState } from './save';
 import { GameState } from './state';
 
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # item iron-sword
 title: Iron Sword
 slot: mainhand
@@ -27,9 +26,6 @@ slot: mainhand
 title: Heartwood Blade
 slot: mainhand
 item-level: 4
-
-# item rope
-title: Rope
 `;
 
 const registry = loadInEnglish(MODULE);

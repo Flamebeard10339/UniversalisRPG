@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { everyActionTable, Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { loadUniverse } from '../content/load';
 import { shippedSources } from '../content/shipped';
 import { Action } from '../grammar/action';
@@ -19,11 +20,11 @@ import { buy, buyProblem, sell, sellProblem, shopOf } from './trade';
 import { inventorySlots } from './tuning';
 import { createGameState, GameState } from './state';
 
-const world = (slots: string): string => `
+const world = (slots: string): string =>
+  FIXTURE_WORLD +
+  `
 # variable inventory-slots
 ${slots}
-
-# stat max-health
 
 # resource health
 max: max-health
@@ -73,8 +74,6 @@ title: mason
 keeps shop: quarry
 
 # location camp
-x: 0, y: 0
-starting
 entities: mason
 `;
 
