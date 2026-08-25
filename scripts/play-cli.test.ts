@@ -192,7 +192,7 @@ starting
       '  Basement (tulsa.basement) at 0,0,-1 -> tulsa.guide-house',
     ]);
     expect(state[12]).toMatch(/^locations: 3 of \d+ found; not yet found: tulsa\./);
-    expect(state[12]).toContain('tulsa.beach');
+    expect(state[12]).toContain('tulsa.market-square');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tulsa.guide-house');
   });
 

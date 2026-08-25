@@ -31,7 +31,8 @@ import {
 } from './playbot';
 
 // The island and quest actually played: standing Tulsa, plus the tutorial quest module —
-// deliberately not the whole shipped corpus, so a run here never meets combat-expansion.
+// deliberately not the whole shipped corpus, so the archetype pack Tulsa names optionally is
+// absent and a run here never meets a jewel.
 const PLAYED_MODULES = ['core', 'tulsa', 'tutorial-quests'];
 
 // The island and quest actually played, same corpus session.test.ts drives.
