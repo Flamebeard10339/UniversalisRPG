@@ -283,27 +283,6 @@ claims about its rat and its `rats-killed`. Six `DEBUG` sections move together, 
 the move is refused at load: the two items, the two saves that arm them and the two
 tests that swing them. A clean follow-up.
 
-**The parity excuse on `modals[].options[].label` is keyed to a whole path.** Its
-stated reason covers one narrow case — `ModalSheet`'s `onlyLeaves`, a screen whose
-only answer is *close* — but because the excuse names the path, a driver that
-dropped **every** modal label would pass. That path now carries an item's own words
-and a jewel's, so it is load-bearing.
-
-**Two paths holding the same words at the same moment cannot be told apart.** The
-parity proof now counts per moment and credits a path only beyond what
-already-proved paths account for, which caught `action.label` and the plane node
-titles. It still cannot see `choice.detail` going missing, because
-`entities[].title` holds exactly the same words at that moment and one occurrence
-credits both. Separating them needs locality, and the three surfaces share no unit
-of it: a line is a unit the terminals have and the app does not, an element is a
-unit the app has and the terminals do not. *Closes when:* the harness gives each
-surface a comparable unit — the thing to change is the harness, not the rule.
-
-**The parity harness runs `play-cli` in a shape `play-cli` is never in.** `cliRun`
-builds a non-driving context, so `result.live` never comes back and
-`formatTick`/`formatLive` — the one place the real terminal names an action under
-way — never runs. That is how `action.label` stayed invisible until this session.
-
 **A green suite under heavy load is still owed.** The lane that fixed the clock
 measured green at 13 processes and, separately, green at 32 with the new clock on
 the pre-split tree. Nobody has run the whole suite at 70 with the split in place,

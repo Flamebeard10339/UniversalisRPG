@@ -485,6 +485,24 @@ The filter therefore lives in `driftingPaths` and not in the walk. Moving it bac
 into `leaves()` silently stops a two-letter word counting as published, which is
 how a settings choice shown as `On` read as a word no engine value produced.
 
+**The parity walk takes both shapes of `play-cli`'s driving flag, and neither alone
+would do.** `cliRun` opens through `openRepl` the way the script's own `main` does and
+hands the run to the script's own `driveRun`, so `formatTick`/`formatLive` are actually
+exercised. But `play-cli` drives only under `--live` on a TTY, and without it `/state`'s
+`action:` row is the only place a terminal names an action under way — measured by
+deleting `formatUnderWay`, which the old non-driving harness caught and a driving-only
+one did not. So the walk runs both and unions the credit. A claim guards the trap
+itself: the walk reports which script lines came back with a run to advance, and an
+empty list fails.
+
+**A parity excuse says which moments it covers, not which path it names.** An excuse
+keyed to a path strikes it out before the walk, so a driver dropping *every* occurrence
+of that path passes — which is what `modals[].options[].label` was doing while its
+stated reason covered one screen. `PathExcuse` carries `covers(view)` now and is spent
+moment by moment, the modal excuse calls the app's own `onlyLeaves` (moved into
+`asking.ts` beside `dismissal`, so the sheet and the excuse read one answer), and an
+excuse that never bites is reported.
+
 **A counter pays for the thing on the table.** The steel and the days in it, never
 the plane an item carries or how far it grows — which is why the four weapon bases
 are priced in band with the hand-axe at 12 while every jewel, whetstone and orb

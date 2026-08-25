@@ -234,6 +234,35 @@ which is a whole run's worth of consequence nobody has felt yet. Default off.
 
 ## Ours, and small
 
+**Two paths holding the same words at the same moment cannot be told apart.** Crossed
+from `open-agent.md` on 2026-08-25 by the lane that fixed the other two parity lines.
+The proof counts per moment and credits a path only beyond what already-proved paths
+account for, and it still cannot see `choice.detail` going missing: mutating
+`formatChoices` in `scripts/lib/replLines.ts` to drop it passes the suite. Measured at
+`/look` in the Guide House, `choices[].detail` and `entities[].title` hold *identical*
+word sets — Miki, Front Door, Stairs, Mirror, Oven, Smith's Chest — so neither is ever
+proved, which needs a word with exactly one bearer, and the one occurrence in the
+`Here:` line credits both.
+
+The cheap rule that closes it — a shared word must be drawn once per bearing path —
+does fail the mutant, and raises three false alarms on a clean tree: `location.title`,
+`planes[].name`, `action.label`. None is a bug. `location.title` / `discovered[].title`
+/ `locations[].title` are three names for one place, and `carried[].name` /
+`planes[].title` / `planes[].name` are three names for one item, where drawing it once
+is right. So two paths bearing one word are sometimes two showings that must both
+appear and sometimes one fact reachable by several names, **and nothing in the view
+distinguishes them** — no counting rule over the rendered text can, because the same
+evidence supports both readings. The line's own suggested close does not work either,
+and that was checked: a per-line unit gives the same answer, because `location.title`
+and `discovered[].title` share a chunk for exactly the reason they share a word.
+*Closes when:* an alias and a distinct showing can be told apart.
+
+*Moves when: the owner rules whether the view may declare which paths are aliases of
+one fact. If it may, the demand rule above is correct and cheap, and the three false
+alarms are exactly the alias groups — they look declarable. If it may not, every driver
+has to report its text keyed by the subject it hangs off, which is a change to all
+three drivers rather than to the harness, and is the expensive path.*
+
 **Travelling shows no progress on the map.** From the first run: *"The map doesn't
 show a progress of how far along the travel is, so it reads as a bug like the game
 is frozen."*
