@@ -58,6 +58,8 @@ engine.plane.go: Go to {hex}
 engine.plane.slot: slot: {direction} with {jewel}
 engine.plane.allocate.slot: allocate: slot {direction}
 engine.plane.allocate.position: allocate: position {position}
+engine.plane.unallocate.slot: unallocate: slot {direction}
+engine.plane.unallocate.position: unallocate: position {position}
 engine.plane.back: Back to inventory
 engine.plane.heading: {plane} at {hex}
 engine.plane.heading.said: {heading} — {said}
@@ -72,6 +74,10 @@ engine.plane.no-position: {shape} has no position {position} (1-{count})
 engine.plane.already-allocated: {node} is already allocated
 engine.plane.no-points: {node} costs a point and none remain
 engine.plane.unreachable: {node} touches nothing allocated
+engine.plane.not-allocated: {node} is not allocated, so there is nothing there to take back
+engine.plane.socket-spent: {node} is a jewel socket, and a socket is spent for good — a jewel put in one stays in it
+engine.plane.plane-root: {node} is where the plane starts, and cost no point to take
+engine.plane.strands: {node} cannot be taken back while {stranded} stands on it
 engine.plane.repair.origin: the origin cluster {jewel} is not loaded, so the base's own cluster stands in its place
 engine.plane.repair.cluster: dropped the {jewel} cluster at {hex}, whose declaration is gone, and everything allocated in it
 engine.plane.repair.stranded: dropped the {jewel} cluster at {hex}, which entered through a {direction} slot of {parent} that is gone
@@ -142,6 +148,7 @@ engine.skill.levelled: Congratulations! You have levelled up {skill} to level {l
 engine.shell.recentre: Recentre
 engine.shell.socket: Jewel socket
 engine.shell.allocate: Allocate
+engine.shell.unallocate: Take back
 engine.shell.insert: Socket a jewel
 engine.shell.empty: Empty
 engine.shell.experience: Experience

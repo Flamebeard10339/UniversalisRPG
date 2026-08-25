@@ -19,11 +19,12 @@ const position = (over: Partial<PositionReport> = {}): PositionReport => ({
   title: asLocalized('Hale'),
   standing: 'unreached',
   free: false,
+  givesBack: false,
   payloads: [],
   ...over,
 });
 
-const slot = (over: Partial<SlotReport> = {}): SlotReport => ({ direction: 'e', node: '0,0/e', standing: 'unreached', toward: '1,0', beyond: null, ...over });
+const slot = (over: Partial<SlotReport> = {}): SlotReport => ({ direction: 'e', node: '0,0/e', standing: 'unreached', givesBack: false, toward: '1,0', beyond: null, ...over });
 
 const cluster = (over: Partial<ClusterReport> = {}): ClusterReport => ({
   hex: '0,0',

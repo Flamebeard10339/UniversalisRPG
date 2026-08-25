@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseModule } from './sections';
 import { DslError } from '../grammar/parser';
 import type { Threshold } from '../grammar/condition';
-import { parseDirectiveLine, printDirective } from './sections/test';
+import { GROWTH_VERBS, parseDirectiveLine, printDirective } from './sections/test';
 import { MODAL_SCREENS } from '../grammar/actionResult';
 
 const ref = (...path: string[]) => ({
@@ -355,9 +355,17 @@ describe('refuse: the outcome under test', () => {
     });
   });
 
-  it('rejects a verb whose refusal is not a value the plane returns', () => {
-    expect(() => parseDirectiveLine('refuse: travel beach')).toThrow(/unknown refuse: verb \(expected one of slot, allocate, apply\)/);
-    expect(() => parseDirectiveLine('refuse: apply 1')).toThrow(/malformed apply: payload/);
+  it('rejects a verb whose refusal is not a value the plane returns, naming every one that is', () => {
+    let named = '';
+    try {
+      parseDirectiveLine('refuse: travel beach');
+    } catch (error) {
+      named = String((error as Error).message);
+    }
+
+    expect(named).toMatch(/^unknown refuse: verb \(expected one of /);
+    for (const verb of GROWTH_VERBS) expect(named, verb).toContain(verb);
+    for (const verb of GROWTH_VERBS) expect(() => parseDirectiveLine(`refuse: ${verb} 1`), verb).toThrow(new RegExp(`malformed ${verb}: payload`));
   });
 });
 

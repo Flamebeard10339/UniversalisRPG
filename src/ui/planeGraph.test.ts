@@ -31,6 +31,7 @@ function clusterOf(shape: Shape, hex: string, over: Partial<Cluster> = {}): Clus
         title: null,
         standing: 'unreached' as const,
         free: false,
+        givesBack: false,
         faces: DIRECTIONS.filter((direction) => shape.edges[direction] === position).map((direction) => step(hex, direction)),
         payloads: [],
       };
@@ -39,6 +40,7 @@ function clusterOf(shape: Shape, hex: string, over: Partial<Cluster> = {}): Clus
       direction,
       node: `${hex}/${direction}`,
       standing: 'unreached' as const,
+      givesBack: false,
       toward: step(hex, direction),
       beyond: null,
     })),
