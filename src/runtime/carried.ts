@@ -1,5 +1,6 @@
 import { Registry } from '../content/registry';
 import type { Place } from '../content/sections/slot';
+import { listedToPlayer } from '../content/sections';
 import { carriedName } from './carriedName';
 import { grouping, type GroupRow } from './grouping';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
@@ -66,7 +67,7 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
 
 export function wornRows(state: GameState, registry: Registry): WornRow[] {
   const localizer = localizerOf(registry, state);
-  const declared = [...registry.slots.keys()];
+  const declared = listedToPlayer(registry.slots.values()).map((slot) => slot.id);
   const slots = [...declared, ...Object.keys(state.equipped).filter((slot) => !declared.includes(slot))];
   return slots.map((slot) => {
     const id: string | undefined = state.equipped[slot];

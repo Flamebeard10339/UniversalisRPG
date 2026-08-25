@@ -36,6 +36,9 @@ const isMark = (line: RawLine): boolean => line.text === DEBUG_MARK;
 
 export const isDebug = (value: object | undefined): boolean => (value as { debug?: unknown } | undefined)?.debug === true;
 
+// What a sheet that lists what the world declares may put on it. What keeps a DEBUG section out of a player's hands everywhere else is that anything they can reach is refused for naming it — and a sheet that walks a registry map names nothing, it lists everything, so the refusal never fires there and the sheet asks here instead. A sheet that reports what a player holds or where they stand is reading their state and is not one of these.
+export const listedToPlayer = <V extends object>(declared: Iterable<V>): V[] => [...declared].filter((value) => !isDebug(value));
+
 // Laid on the value rather than held in a table beside it, so every hand a section passes through — a merge, a build, a prune that spreads it, a printer — carries the mark without knowing it is there.
 const asDebug = <V extends object>(value: V): V => Object.defineProperty(value, 'debug', { enumerable: true, configurable: true, value: true });
 

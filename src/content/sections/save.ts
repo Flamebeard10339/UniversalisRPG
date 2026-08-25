@@ -35,7 +35,8 @@ export const save = section<SaveSection>()({
   ids: 'owned',
   vocabulary: 'declared',
   maps: {
-    saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, { version: value.version, diff: value.diff }]],
+    // The section itself, rather than the two fields read off it: a mark laid on a section travels with the section, and one copied field at a time is one mark left behind.
+    saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, value]],
   },
   grammar: [{ form: '{"version": <number>[, <the rest of a saved game>]}', example: '{"version": 1}' }],
   parse: parseSaveSection,

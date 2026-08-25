@@ -27,6 +27,7 @@ import { answerModal, Modal, modalFocus, pruneModals, publishModal, type Focus }
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
+import { listedToPlayer } from '../content/sections';
 import { type ParsedSave } from '../content/sections/save';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
@@ -324,7 +325,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
-  for (const recipe of registry.recipes.values()) {
+  for (const recipe of listedToPlayer(registry.recipes.values())) {
     if (!recipeCraftable(recipe, registry, state)) continue;
     const station = recipe.requiresCapability
       ? standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!))
@@ -498,11 +499,11 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     planes: planeReports(registry, state),
     focus: modalFocus(state),
     equipment: wornRows(state, registry),
-    xp: [...registry.skills.keys()].map((id) => skillRow(id, state.xp[id] ?? 0, localizer)),
-    stats: [...registry.stats.values()].map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
+    xp: listedToPlayer(registry.skills.values()).map(({ id }) => skillRow(id, state.xp[id] ?? 0, localizer)),
+    stats: listedToPlayer(registry.stats.values()).map((stat) => ({ id: stat.id, title: localizer.title('stat', stat.id), value: statValue(stat.id, state, registry) })),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
-    locations: [...registry.locations.values()].map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
+    locations: listedToPlayer(registry.locations.values()).map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),
     player: playerRows(state, registry),
@@ -548,7 +549,7 @@ export function carriedListing(session: PlaySession): CarriedEntry[] {
 
 function publishDiscovered(state: GameState, registry: Registry): PlayStatus['discovered'] {
   const localizer = localizerOf(registry, state);
-  const found = [...registry.locations.values()].filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
+  const found = listedToPlayer(registry.locations.values()).filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
   const known = new Set(found.map((each) => each.id));
   return found.map((each) => ({
     id: each.id,
@@ -564,7 +565,7 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
 
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {
   const localizer = localizerOf(registry, state);
-  return [...registry.resources.values()]
+  return listedToPlayer(registry.resources.values())
     .filter((resource) => hasPool(state, registry, PLAYER, resource.id))
     .map((resource) => ({
       id: resource.id,

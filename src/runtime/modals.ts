@@ -14,6 +14,7 @@ export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answe
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
+import { listedToPlayer } from '../content/sections';
 
 export interface Modal {
   name: Answer;
@@ -38,7 +39,8 @@ function carriedWords(localizer: Localizer, tag: TagClause): Localized {
 // Every race the world declares. The order is the order they are written in, which is the same list in every language — sorting by the words would reorder the answers a recording replays.
 function raceChoices(registry: Registry, state: GameState): readonly { value: Answer; shown: Localized }[] {
   const localizer = localizerOf(registry, state);
-  return [...registry.races.entries()].map(([id, race]) => {
+  return listedToPlayer(registry.races.values()).map((race) => {
+    const id = race.id;
     const title = localizer.title('race', id);
     if (race.tags.length === 0) return { value: id, shown: title };
     const [first, ...rest] = race.tags.map((tag) => carriedWords(localizer, tag));

@@ -96,7 +96,7 @@ export const ownedSectionKinds = (): readonly SectionKind[] => kindsWhere((each)
 export const globalSectionKinds = (): readonly SectionKind[] => kindsWhere((each) => each.ids === 'global');
 export const actionOwnerKinds = (): readonly SectionKind[] => kindsWhere((each) => each.nestsActions);
 
-export { isActionOwnerKind, isDebug, DEBUG_MARK, EVERY_SECTION } from './define';
+export { isActionOwnerKind, isDebug, listedToPlayer, DEBUG_MARK, EVERY_SECTION } from './define';
 
 // Where a name of this kind is kept apart from the same word written in another module. A member kind's key hangs beneath the section that declared it, so it is scoped however that section's id is.
 export const idScopeOf = (kind: string): Ids => sectionFor(kind)?.ids ?? (MEMBER_KINDS.includes(kind) ? 'owned' : 'none');

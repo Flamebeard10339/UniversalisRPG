@@ -20,6 +20,7 @@ import { StatusBanner } from './StatusBanner';
 import { dismissal } from './asking';
 import { sectionKey } from './editControls';
 import { formatClock } from './format';
+import { htmlRuns } from './htmlRuns';
 import { devLine, RATES, speedLine } from './devMode';
 import { FORGOTTEN, recorded } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
@@ -40,16 +41,7 @@ const TALK = 'talk:tulsa.miki';
 // offered to nobody until this save puts the ingredient in hand.
 const STOCKED = { kind: 'load', save: 'tulsa.chestnuts-in-hand' } as const;
 
-const ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'", '&#39;': "'" };
-
-function readable(html: string): string[] {
-  return html
-    .replace(/aria-label="([^"]*)"/g, '\n$1\n')
-    .replace(/<[^>]*>/g, '\n')
-    .split('\n')
-    .map((run) => run.replace(/&(?:amp|lt|gt|quot|#x27|#39);/g, (entity) => ENTITIES[entity]).trim())
-    .filter((run) => /[A-Za-z]/.test(run));
-}
+const readable = (html: string): string[] => htmlRuns(html).filter((run) => /[A-Za-z]/.test(run));
 
 function accountedFor(run: string, permitted: readonly string[]): boolean {
   const longest = [...permitted].filter((word) => /[A-Za-z]/.test(word)).sort((left, right) => right.length - left.length);
@@ -338,15 +330,9 @@ describe('what the shell puts on the screen', () => {
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
     const choices = driver.snapshot().view.choices;
-    // What a cell itself does is reached by pressing the cell, so its own words go undrawn. The name
-    // over that cell is what is on the screen instead, and that is what has to be there.
-    const lifted = new Map(offerCells(choices).flatMap((cell) => (cell.examine === null ? [] : [[cell.examine.id, cell.name!] as const])));
 
-    expect(lifted.size, 'nothing is reached from the cell it sits on, so this excuses nothing').toBeGreaterThan(0);
-    for (const choice of choices) {
-      const through = lifted.get(choice.id) ?? choice.label;
-      expect(onScreen(runs, through), through).toBe(true);
-    }
+    expect(offerCells(choices).some((cell) => cell.examine !== null), 'something is reached from the cell it sits on, so a label read off a cell is not a label nothing has').toBe(true);
+    for (const choice of choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {
@@ -598,7 +584,7 @@ describe('what the shell puts on the screen', () => {
   it('renders a free-text option as a field with no listed answer', () => {
     const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: asLocalized('Name'), values: null }} onAnswer={() => undefined} />);
 
-    expect(readable(html)).toEqual(['Name']);
+    expect(readable(html), 'the field is named over it, and named again on the button that submits it').toEqual(['Name', 'Name']);
     expect(html).toContain('<input');
   });
 
