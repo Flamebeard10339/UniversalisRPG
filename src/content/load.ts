@@ -226,24 +226,23 @@ function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, Readonl
     }
   }
   if (marked.length === 0) return null;
+  const beneath = (key: string): (typeof marked)[number] | undefined => marked.find(({ prefix }) => key.startsWith(prefix));
 
-  for (const { owner, kind, id, under, prefix } of marked) {
-    for (const [key, entry] of registry.locales.base) {
-      if (!key.startsWith(prefix)) continue;
-      const field = key.slice(prefix.length);
-      if (!registry.locales.prose.has(key) && (entry.generated === true || !(textFieldsOf(under) ?? []).includes(field))) continue;
-      return {
-        module: owner.module,
-        stage: 'build',
-        error: new DslError(`# ${kind} ${id}: ${field}: ${JSON.stringify(entry.text)} is words a player reads, and a ${DEBUG_MARK} section says nothing in any language: take the line out, or take the ${DEBUG_MARK} mark off`),
-      };
-    }
+  for (const [key, entry] of registry.locales.base) {
+    const at = beneath(key);
+    if (at === undefined) continue;
+    const field = key.slice(at.prefix.length);
+    if (!registry.locales.prose.has(key) && (entry.generated === true || !(textFieldsOf(at.under) ?? []).includes(field))) continue;
+    return {
+      module: at.owner.module,
+      stage: 'build',
+      error: new DslError(`# ${at.kind} ${at.id}: ${field}: ${JSON.stringify(entry.text)} is words a player reads, and a ${DEBUG_MARK} section says nothing in any language: take the line out, or take the ${DEBUG_MARK} mark off`),
+    };
   }
 
-  const theirs = (key: string): boolean => marked.some(({ prefix }) => key.startsWith(prefix));
-  for (const key of [...registry.locales.base.keys()]) if (theirs(key)) registry.locales.base.delete(key);
-  for (const key of [...registry.locales.prose.keys()]) if (theirs(key)) registry.locales.prose.delete(key);
-  for (const key of [...registry.locales.addressable]) if (theirs(key)) registry.locales.addressable.delete(key);
+  for (const key of [...registry.locales.base.keys()]) if (beneath(key)) registry.locales.base.delete(key);
+  for (const key of [...registry.locales.prose.keys()]) if (beneath(key)) registry.locales.prose.delete(key);
+  for (const key of [...registry.locales.addressable]) if (beneath(key)) registry.locales.addressable.delete(key);
   return null;
 }
 
