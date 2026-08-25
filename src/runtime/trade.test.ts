@@ -6,8 +6,9 @@ import { buyPrice, sellPrice } from '../content/sections/shop';
 import { initialState } from './save';
 import { GameState } from './state';
 import { applyDirective, startSession, view } from './session';
-import { copiesOf, heldCount, receiveItem } from './itemInstance';
+import { copiesOf, heldCount, itemInstance, itemLevel, itemTemplate, packRows, receiveItem } from './itemInstance';
 import { equip } from './equipment';
+import { rowAnswer, shopFrame, shopOptions } from './shopScreen';
 import { buy, coinHeld, countProblem, forSale, sell, stockNow, wanted } from './trade';
 
 const MINUTE = 60_000;
@@ -158,7 +159,7 @@ describe('a shop holds what its author said until someone trades', () => {
   });
 });
 
-describe('a grown copy is never spent, at a counter as much as anywhere else', () => {
+describe('a grown copy sells for what its base is worth', () => {
   // A base drops as a copy of its own, so a Honed Blade is held and never stacked however many arrive.
   const withGrownBlades = (grown: number): GameState => {
     const state = carrying({});
@@ -166,13 +167,67 @@ describe('a grown copy is never spent, at a counter as much as anywhere else', (
     return state;
   };
 
-  it('leaves a base off the counter, and refuses it there: 0 of the 8 coin it would fetch', () => {
+  const grownCopies = (state: GameState): string[] => packRows(state).flatMap((row) => (row.kind === 'grown' ? [row.id] : []));
+
+  it('is on the counter as itself and fetches the 8 its base is worth, leaving the pack when it does', () => {
     const state = withGrownBlades(1);
+    const [copy] = grownCopies(state);
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
-    expect(wanted(shopOf('stall'), state, registry).map((trade) => trade.item)).not.toContain('honed-blade');
-    expect(sell(shopOf('stall'), state, registry, 'honed-blade', 1)).toBe('not-carried');
+    expect(wanted(shopOf('stall'), state, registry)).toEqual([{ item: copy, count: 1, coin: 8 }]);
+
+    expect(sell(shopOf('stall'), state, registry, copy, 1)).toBeUndefined();
+    expect(state.inventory.coin).toBe(8);
+    expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 0, worn: 0 });
+    // The shop counts what it took in items, not in the name the player's copy went by.
+    expect(stockNow(shopOf('stall'), state)).toEqual({ nail: 4, pin: 2, 'honed-blade': 1 });
+  });
+
+  // The half of the ruling that was deliberately not built: a copy is priced at its base's value:,
+  // so the points on it and the plane it carries move nothing. Derived over every row the pack holds
+  // rather than over the two the fixture happens to mint, and the levels are asserted to be read off
+  // the copies so the claim is about copies that genuinely differ.
+  it('prices every copy at its base, whatever level the copy rolled', () => {
+    const state = withGrownBlades(4);
+    const copies = grownCopies(state);
+    const levels = copies.map((copy) => itemLevel(itemInstance(state, copy)!, registry.items.get('honed-blade')!));
+    expect(levels.length).toBe(4);
+    expect(levels.every((level) => level >= 0 && level <= 4)).toBe(true);
+
+    const trades = wanted(shopOf('stall'), state, registry);
+    expect([...trades.map((trade) => trade.item)].sort()).toEqual([...copies].sort());
+    for (const trade of trades) {
+      expect(trade.coin, trade.item).toBe(sellPrice(shopOf('stall'), registry.items.get(itemTemplate(state, trade.item)))!);
+    }
+  });
+
+  // Stack size is 1, which is what the ruling leaned on: there is exactly one of it, so the only
+  // number it answers to is one and asking for two takes nothing.
+  it('refuses to sell two of the one there is, and the one is still held', () => {
+    const state = withGrownBlades(1);
+    const [copy] = grownCopies(state);
+    expect(sell(shopOf('stall'), state, registry, copy, 2)).toBe('not-carried');
     expect(state.inventory.coin ?? 0).toBe(0);
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
+  });
+
+  // What survives of the old refusal, and the reason the counter reads the pack's own rows: what is
+  // worn is on the player rather than in the pack, so it is not on offer and does not answer if named.
+  it('leaves the copy on the arm off the counter and refuses it there, worn and whole after', () => {
+    const state = withGrownBlades(1);
+    const [copy] = grownCopies(state);
+    expect(equip(state, registry, copy)).toBe(true);
+    expect(wanted(shopOf('stall'), state, registry)).toEqual([]);
+    expect(sell(shopOf('stall'), state, registry, copy, 1)).toBe('not-carried');
+    expect(state.inventory.coin ?? 0).toBe(0);
+    expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 0, worn: 1 });
+  });
+
+  it("draws the copy on the counter under the copy's own name, not its base's", () => {
+    const state = withGrownBlades(1);
+    const [copy] = grownCopies(state);
+    const values = shopOptions(shopFrame('stall'), state, registry)[0]!.values!;
+    expect(values.map((choice) => choice.shown)).toContain('Sell Modified Honed Blade — 8 each, you carry 1');
+    expect(values.find((choice) => String(choice.shown).includes('Modified'))!.value).toBe(rowAnswer('sell', copy));
   });
 
   it('offers the plain blades beside a base and pays 16 for two of them, the base untouched', () => {

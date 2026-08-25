@@ -198,6 +198,26 @@ describe('something arriving at a pack with no room', () => {
     expect(receiveItem(state, registry, 'blade', 3)).toBe(2);
     expect(packRows(state).length).toBe(2);
   });
+
+  // Grown gear takes a row like anything else, so a pack with none is a thing a player can walk into
+  // holding nothing but blades. What they are told has to be the same sentence anything else turned
+  // away gets, and putting one on has to be the way out of it — a row on the arm is not a row in the
+  // pack, so wearing one is what makes room for the next.
+  it("says so in the player's own words when a blade cannot come, and takes it once one is worn and its row is free", () => {
+    const registry = twoSlots();
+    const state = standing(registry);
+
+    expect(receiveItem(state, registry, 'blade', 3)).toBe(2);
+    expect(state.log.map(String)).toContain('Your pack is full, so the blade stays where it is.');
+
+    const [first] = packRows(state).flatMap((row) => (row.kind === 'grown' ? [row.id] : []));
+    expect(equip(state, registry, first!)).toBe(true);
+    expect(packRows(state).length).toBe(1);
+
+    expect(receiveItem(state, registry, 'blade', 1)).toBe(1);
+    expect(packRows(state).length).toBe(2);
+    expect(state.equipped).toEqual({ mainhand: first });
+  });
 });
 
 describe('a save holding more than the pack has room for', () => {
