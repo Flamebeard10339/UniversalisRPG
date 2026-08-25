@@ -19,7 +19,7 @@ import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, type PlayerField } from './state';
-import { declaredId } from '../content/sections/entity';
+import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
@@ -210,23 +210,54 @@ export function shopkeeperHere(registry: Registry, state: GameState, shopId: str
   return standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.shop === shopId);
 }
 
-function fightChoices(registry: Registry, state: GameState, location: Location): PlayChoice[] {
-  const choices: PlayChoice[] = [];
+function fightChoices(entityId: string, registry: Registry, state: GameState, localizer: Localizer): PlayChoice[] {
   const player = registry.player;
-  if (!player) return choices;
-  const localizer = localizerOf(registry, state);
-  for (const entityId of standingHere(registry, state, location)) {
-    const entity = registry.entities.get(entityId);
-    if (!entity) continue;
-    for (const action of player.actions) {
-      const id = declaredId(action);
-      if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
-      if (!requiresMet(action, state, registry) || !actionVisible(action, state, registry)) continue;
-      if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-      choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), detail: localizer.title('entity', entityId) });
-    }
+  if (!player) return [];
+  const choices: PlayChoice[] = [];
+  for (const action of player.actions) {
+    const id = declaredId(action);
+    if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
+    if (!requiresMet(action, state, registry) || !actionVisible(action, state, registry)) continue;
+    if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
+    choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), detail: localizer.title('entity', entityId) });
   }
   return choices;
+}
+
+interface Offered {
+  choice: PlayChoice;
+  minted: boolean;
+}
+
+// Everything one entity offers, gathered into the run a player reads as that entity's: its shop,
+// what it can be asked to do, and what the player can open on it. Every one of them carries the
+// entity as `choice.detail`, which is the key the app already groups by.
+function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer): Offered[] {
+  const detail = localizer.title('entity', entityId);
+  const offers: Offered[] = [];
+  if (entity.shop !== undefined && registry.shops.has(entity.shop)) {
+    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: detail }), detail }, minted: false });
+  }
+  for (const action of availableActions(entity, state, registry)) {
+    const slug = actionAddress(action);
+    offers.push({
+      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), detail, leadsTo: movesTo(action) },
+      minted: isMintedAction(action),
+    });
+  }
+  for (const choice of fightChoices(entityId, registry, state, localizer)) offers.push({ choice, minted: false });
+  return offers;
+}
+
+// What an entity mints stands second among the offers it makes, so examine sits in one place
+// whether the thing is fought, traded with, or only has words about itself. This list is what
+// every surface draws, so none of them sorts and none of them can drift from the others.
+function mintedSecond(offers: readonly Offered[]): PlayChoice[] {
+  const at = offers.findIndex((offer) => offer.minted);
+  const rest = offers.map((offer) => offer.choice);
+  if (at < 0 || at === 1 || rest.length < 2) return rest;
+  const [minted] = rest.splice(at, 1);
+  return [rest[0]!, minted!, ...rest.slice(1)];
 }
 
 const canTalk = (entityId: string, registry: Registry, state: GameState): boolean => reachedNow(registry, state, entityId) !== null;
@@ -242,19 +273,11 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
-    if (entity.shop !== undefined && registry.shops.has(entity.shop)) {
-      choices.push({ id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: localizer.title('entity', entityId) }), detail: localizer.title('entity', entityId) });
-    }
     if (canTalk(entityId, registry, state)) {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
-    for (const action of availableActions(entity, state, registry)) {
-      const slug = actionAddress(action);
-      choices.push({ id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), detail: localizer.title('entity', entityId), leadsTo: movesTo(action) });
-    }
+    choices.push(...mintedSecond(entityOffers(entity, entityId, registry, state, localizer)));
   }
-
-  choices.push(...fightChoices(registry, state, location));
 
   for (const action of availableActions(location, state, registry)) {
     const slug = actionAddress(action);

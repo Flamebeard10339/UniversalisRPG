@@ -401,7 +401,7 @@ adjacent:
   basement
   beach while front-door.unlocked
 entities:
-  miki, front-door, stairs, mirror, oven, smiths-chest
+  miki, front-door, stairs, mirror, oven
 
 # location guide-house-upstairs
 x: 0, y: 0, z: 1
@@ -804,7 +804,7 @@ look in again:
   on success:
     say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
   on failure:
-    say: The glass shows you exactly what you are carrying, and it is not enough to be looked at twice.
+    say: You need 1000 coin to perform this action.
 
 # entity oven
 examine: A stone oven, its coals still glowing.
@@ -844,16 +844,19 @@ ascend:
   relocate: guide-house
   say: You climb back up to the ground floor.
 
+// Not in anyone's guide house any more. It stays because the two recorded
+// growth tests below are the only route to a cluster plane, and a DEBUG
+// section is how the engine keeps one out of a player's hands. It carries no
+// title:, no examine: and no say:, because a DEBUG section says nothing in any
+// language and prose written on one is a locale row nothing can ever read.
 # entity smiths-chest
-title: Smith's Chest
-examine: A banded chest shoved under the workbench, its lid unlatched.
+DEBUG
 flags: emptied
 open:
   instant
   hidden if: emptied
   roll: smiths-cache
   set: emptied
-  say: Whetstones, a handful of cut stones, and a blade nobody came back for.
 
 # entity dresser
 examine: A dusty dresser, one drawer left slightly ajar.
@@ -1385,8 +1388,8 @@ assert: beach.discovered
 
 // --- growing an item ---
 //
-// Core's cluster planes, walked from the chest under Miki's workbench, which is
-// the only thing in the world that puts a jewel in anyone's hands.
+// Core's cluster planes, walked from the DEBUG smith's chest, which is the only
+// thing left that puts a jewel in anyone's hands and stands in no location.
 //
 // Recorded from a live session with /create-valid-test, so what follows is what
 // a player types and the closing sheet is where that session ended: both grown
@@ -1403,6 +1406,7 @@ assert: beach.discovered
 // allocated from the start and free. Both of its jewel slots hang off position
 // 3, so either one costs two points to reach before the slot itself.
 # test growing-a-heartwood-blade
+DEBUG
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 // An orb grants no item experience, and nothing else in the game moves it.
@@ -1480,6 +1484,7 @@ expect only: growing-a-heartwood-blade-end
 // count a worn copy as held, so the stack falling to zero is a fact only
 // `inventory.core.iron-sword` in the save body can state.
 # test growing-through-the-inventory-screen
+DEBUG
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 open-modal: carried-items

@@ -73,6 +73,10 @@ export function mintedActions(value: { id: string; examine?: string }, namespace
 
 const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ action, from: `${EXAMINE_FIELD}:` }));
 
+// Which of an entity's assembled actions it minted rather than its author writing. Asked of the
+// linked list, where an action no longer remembers where it came from.
+export const isMintedAction = (action: Action): boolean => declaredId(action) === EXAMINE_FIELD;
+
 // Whether walking up to this entity is worth a player's turn. `actions` is asked after linking, so
 // an entity's own blocks, what it `uses:` and what its `examine:` mints are one question here.
 // `requires:` and `hidden if:` are deliberately unread: something offered only once a flag is set
