@@ -1168,11 +1168,10 @@ roast:
 
   // A seat carries an address, and not every address is an entity: walking a road seats the road.
   it('is aimed at nobody when what the seat holds is not an entity', () => {
-    const road = `
+    const road =
+      FIXTURE_WORLD +
+      `
 # location camp
-title: Camp
-x: 0, y: 0
-starting
 adjacent: hut
 
 # location hut
