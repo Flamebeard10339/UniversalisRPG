@@ -346,10 +346,6 @@ measured green at 13 processes and, separately, green at 32 with the new clock o
 the pre-split tree. Nobody has run the whole suite at 70 with the split in place,
 which is where twelve tests used to fail. *Closes when:* that run is taken.
 
-**`vite.config.ts` claims to hold the worker count and does not.** Its comment says
-every route reads its clock and worker count from there. The clock is true now; the
-worker count is still unset and the comment still claims it.
-
 **`/create-test` still assembles its own `# save` + `# test` pair.** `runAsSections`
 is the one writer everywhere else — the app's filing and the playbot both go
 through it — and `buildCreateTest` cannot, because `runLog.ts` imports
