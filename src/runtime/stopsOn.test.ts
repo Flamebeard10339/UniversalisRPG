@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { armAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { secondsToMs } from './units';
 
-const MODULE = `
-# stat max-health
-base: 10
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # resource health
 max: max-health
 
@@ -31,10 +31,6 @@ xp: lore 1000
 
 # entity player
 skills: lore
-
-# location camp
-x: 0, y: 0
-starting
 `;
 
 const registry = loadInEnglish(MODULE);

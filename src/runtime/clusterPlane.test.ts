@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DIRECTIONS, Direction, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode, rotate } from '../content/hex';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { loadUniverse } from '../content/load';
 import { Registry } from '../content/registry';
 import { shippedSources } from '../content/shipped';
@@ -31,13 +32,9 @@ import {
 import { localizerFor } from './localized';
 import { say, type Said } from './said';
 
-const COMMON = `
-# stat max-health
-base: 30
-
-# passive hale
-+10 max-health
-
+const COMMON =
+  FIXTURE_WORLD +
+  `
 # passive stout
 +5 max-health
 
@@ -55,16 +52,13 @@ passives: 1 hale
 `;
 
 const ROLLED = `
-# stat attack
-base: 4
-
-# passive keen
+# passive wide
 +1-1000 attack
 
-# cluster-jewel keenring
+# cluster-jewel widering
 shape: ring
 open-connections: e
-passives: 1 keen
+passives: 1 wide
 `;
 
 const registry = loadInEnglish(COMMON + CROSSROADS + ROLLED);
@@ -320,25 +314,25 @@ describe('unallocation', () => {
 describe('a jewel already socketed', () => {
   const CHILD = at(1, 0);
 
-  function socketedKeenring(): { plane: Plane; root: number; drawn: RngCursor } {
+  function socketedWidering(): { plane: Plane; root: number; drawn: RngCursor } {
     const plane = reachedEastSlot();
     const drawn = cursor();
-    fillSlot(registry, plane, ORIGIN, 'e', 'keenring', drawn);
+    fillSlot(registry, plane, ORIGIN, 'e', 'widering', drawn);
     const root = rootPosition(placed(plane, CHILD).jewel);
     allocateAll(plane, [position(CHILD, root)]);
     return { plane, root, drawn };
   }
 
   it('reads its payloads at a roll a different roll would move', () => {
-    const { plane, root } = socketedKeenring();
-    const shifted = socketedKeenring();
+    const { plane, root } = socketedWidering();
+    const shifted = socketedWidering();
     shifted.plane[hexKey(CHILD)]!.roll = clusterAt(plane, CHILD)!.roll < 0.5 ? 0.99 : 0.01;
 
     expect(positionPayloads(registry, shifted.plane, CHILD, root)).not.toEqual(positionPayloads(registry, plane, CHILD, root));
   });
 
   it('keeps that roll through a position given back and taken again, and draws nothing new', () => {
-    const { plane, root, drawn } = socketedKeenring();
+    const { plane, root, drawn } = socketedWidering();
     const before = positionPayloads(registry, plane, CHILD, root);
     const roll = clusterAt(plane, CHILD)!.roll;
     const cursorAfterFilling = drawn.rng;

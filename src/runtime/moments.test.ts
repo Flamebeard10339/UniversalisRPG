@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { armAction, armFightAction, createGameState, GameState, initResources, resolve } from './runtime';
 import { HOOK_LABELS } from '../grammar/hook';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { Registry } from '../content/registry';
 import { TRIGGER_NAMES } from '../content/sections/event';
 import { secondsToMs } from './units';
@@ -16,10 +17,9 @@ interface Moment {
   times: number;
 }
 
-const page = (moment: Moment): string => `
-# stat attack
-base: 4
-
+const page = (moment: Moment): string =>
+  FIXTURE_WORLD +
+  `
 # stat dr
 
 # stat attack-rate
@@ -33,8 +33,6 @@ base: 400
 
 # stat trickle
 base: 60
-
-# stat max-health
 
 # stat max-fury
 
@@ -119,8 +117,6 @@ stats: max-health 8, attack 4, attack-rate 60
 skills: tally
 
 # location camp
-x: 0, y: 0
-starting
 entities: rat, mouse
 `;
 

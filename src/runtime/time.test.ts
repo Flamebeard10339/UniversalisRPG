@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { advanceTime, createGameState, evaluateCondition, renderSegments, useAction } from './runtime';
 import { loadModule } from '../content/load';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { runTest, sessionStatus, startSession, view, wait } from './session';
 import { secondsToMs } from './units';
 
@@ -108,11 +109,7 @@ glance:
 });
 
 describe('session wait()', () => {
-  const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-`;
+  const MODULE = FIXTURE_WORLD;
 
   it('advances the session’s simulated time and reflects it in the returned PlayView', () => {
     const registry = loadModule(MODULE);
@@ -126,11 +123,9 @@ starting
 });
 
 describe('wait: test directive', () => {
-  const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+  const MODULE =
+    FIXTURE_WORLD +
+    `
 # test wait-enough
 wait: 61
 assert: time > 60

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import {
   collapseInstance,
   createInstance,
@@ -15,11 +16,9 @@ import { createGameState } from './state';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { parseSaveSection } from '../content/sections/save';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # item charm
 title: Charm
 
