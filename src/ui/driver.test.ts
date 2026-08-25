@@ -172,7 +172,7 @@ describe('the GUI driver', () => {
 
     driver.choose(position(driver, SPINDLE));
 
-    expect(driver.snapshot().live).toMatchObject({ label: 'turn a spindle', active: true, progress: 0 });
+    expect(driver.snapshot().live).toMatchObject({ label: 'Turn A Spindle', active: true, progress: 0 });
     expect(shown(driver).time).toBe(0);
   });
 

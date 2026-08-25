@@ -356,20 +356,20 @@ describe('play-cli renders the live clock', () => {
 
   it('draws the bar and the clock from the numbers the tick publishes', () => {
     expect(liveLines('use:entity.anvil.strike', 5, 700)).toEqual([
-      'strike... [#####---------------]  [time: 0.7s]',
-      'strike... [#########-----------]  [time: 1.4s]',
-      'strike... [##############------]  [time: 2.1s]',
-      'strike... [###################-]  [time: 2.8s]',
-      'strike: done.  [time: 3.5s]',
+      'Strike... [#####---------------]  [time: 0.7s]',
+      'Strike... [#########-----------]  [time: 1.4s]',
+      'Strike... [##############------]  [time: 2.1s]',
+      'Strike... [###################-]  [time: 2.8s]',
+      'Strike: done.  [time: 3.5s]',
     ]);
   });
 
   it('counts an untargeted action’s swings down to its completion instead of a foe’s pool', () => {
     expect(liveLines('use:entity.bell.ring', 4, 1000)).toEqual([
-      'ring... [--------------------] hits:1 completion:0.8  [time: 1.0s]',
-      'ring... [--------------------] hits:2 completion:0.6  [time: 2.0s]',
-      'ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
-      'ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
+      'Ring... [--------------------] hits:1 completion:0.8  [time: 1.0s]',
+      'Ring... [--------------------] hits:2 completion:0.6  [time: 2.0s]',
+      'Ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
+      'Ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
     ]);
   });
 
@@ -379,8 +379,8 @@ describe('play-cli renders the live clock', () => {
     const before = ticked(started.live!.tick(1000));
     const landing = ticked(started.live!.tick(1000));
 
-    expect(before).toEqual(['fire... [##########----------]  [time: 1.0s]']);
-    expect(landing).toEqual(['The kiln settles with a crack.', 'fire: done.  [time: 2.0s]']);
+    expect(before).toEqual(['Fire... [##########----------]  [time: 1.0s]']);
+    expect(landing).toEqual(['The kiln settles with a crack.', 'Fire: done.  [time: 2.0s]']);
   });
 
   it('leaves nothing for the closing result to print, which is why the tick must', () => {
@@ -401,8 +401,8 @@ describe('play-cli renders the live clock', () => {
 
   it('scales elapsed real time by the speed dial before it draws anything', () => {
     expect(liveLines('use:entity.oven.roast', 2, 1000, 4)).toEqual([
-      'roast... [--------------------]  [time: 4.0s]',
-      'roast... [--------------------]  [time: 8.0s]',
+      'Roast... [--------------------]  [time: 4.0s]',
+      'Roast... [--------------------]  [time: 8.0s]',
     ]);
   });
 
@@ -469,7 +469,7 @@ uses: swing
 
   it('prefers the pools to the countdown when a run has both, so a fight is never narrated as a tally', () => {
     const both = {
-      label: asLocalized('ring'),
+      label: asLocalized('Ring'),
       active: true,
       time: 2,
       progress: 0.5,
@@ -477,8 +477,8 @@ uses: swing
       implicit: { attempts: 3, completion: 0.4 },
       view: undefined as never,
     };
-    expect(live(both)).toBe('ring... [##########----------] Health 21/30  [time: 2.0s]');
-    expect(live({ ...both, pools: [] })).toBe('ring... [##########----------] hits:3 completion:0.4  [time: 2.0s]');
+    expect(live(both)).toBe('Ring... [##########----------] Health 21/30  [time: 2.0s]');
+    expect(live({ ...both, pools: [] })).toBe('Ring... [##########----------] hits:3 completion:0.4  [time: 2.0s]');
   });
 
   it('prints the stop and the world it left when a run is cancelled', () => {
@@ -656,7 +656,7 @@ describe('play-cli drives a live run', () => {
     run.ticker.advance(1000);
 
     expect(run.ctx.view.time).toBe(1);
-    expect(run.written).toEqual([`\r\x1b[Kfire... [##########----------]  [time: 1.0s]`]);
+    expect(run.written).toEqual([`\r\x1b[KFire... [##########----------]  [time: 1.0s]`]);
     expect(run.closed).toEqual([]);
   });
 

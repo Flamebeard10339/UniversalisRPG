@@ -2,7 +2,6 @@ import { RuntimeError } from './error';
 import { Action } from '../grammar/action';
 import { actionAddress, ActionDeclaration } from '../content/sections/action';
 import { declaredId, Entity } from '../content/sections/entity';
-import { humanizeEn } from '../grammar/values';
 import { mapOf, Registry } from '../content/registry';
 import { isActionOwnerKind, registryMapOf } from '../content/sections';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
@@ -52,7 +51,7 @@ export function travelAction(originId: string, destId: string, registry: Registr
   if (problem) throw new RuntimeError(problem);
   return {
     id: TRAVEL_ADDRESS,
-    label: humanizeEn(TRAVEL_ADDRESS),
+    label: TRAVEL_ADDRESS,
     generatedLabel: true,
     results: [{ kind: 'relocate', location: destId }],
     time: travelSeconds(registry),
