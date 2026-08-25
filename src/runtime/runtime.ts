@@ -49,7 +49,7 @@ export { endAction, endJourney } from './actionEnd';
 export { RuntimeError } from './error';
 export type { ActiveAction, ActorState, BuffInstance, BuffTable, Cadence, DialogueCursor, GameState, ModalFrame } from './state';
 export { buffsOf, grantBuff, stackCount } from './buffs';
-export { contestSpread, minDamage, travelSecondsPerUnit } from './tuning';
+export { contestSpread, minDamage, travelSeconds } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
 export { actionVisible, requiresMet } from './actions';
 export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';

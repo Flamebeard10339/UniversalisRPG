@@ -14,11 +14,11 @@ version: 1.0.0
 
 // --- variables ---
 
-// Seconds of real-time travel per unit of straight-line distance between
-// locations. A region writes its map in whole units, so this is what one step
-// of that map costs.
-# variable travel-seconds-per-unit
-value: 5
+// What walking one road costs, whichever road it is. A map is drawn to be read
+// rather than to be measured, so how far apart two places look on it is the
+// author's business and not the player's; every road is the same few seconds.
+# variable travel-seconds
+value: 3
 
 // What a duration action takes when it names no cadence of its own. At 0 an
 // untagged action is over the instant it is used; raising it makes every action

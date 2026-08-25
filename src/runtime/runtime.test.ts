@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { Condition, ENGINE_ROOT_NAMES } from '../grammar/condition';
 import {
-  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSecondsPerUnit, useAction } from './runtime';
+  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSeconds, useAction } from './runtime';
+import { travelAction } from './actionLookup';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { restorePools } from './effects';
 import type { Registry } from '../content/registry';
@@ -78,20 +79,28 @@ describe('runTest', () => {
   });
 });
 
-describe('travelSecondsPerUnit', () => {
-  it('reads the authored travel-seconds-per-unit variable', () => {
-    const registry = loadInEnglish('# variable travel-seconds-per-unit\nvalue: 7');
-    expect(travelSecondsPerUnit(registry)).toBe(7);
+describe('travelSeconds', () => {
+  it('reads the authored travel-seconds variable', () => {
+    const registry = loadInEnglish('# variable travel-seconds\nvalue: 7');
+    expect(travelSeconds(registry)).toBe(7);
   });
 
   it('falls back to the engine default when content omits the variable', () => {
     const registry = loadInEnglish('# location camp\nx: 0, y: 0\nstarting');
-    expect(travelSecondsPerUnit(registry)).toBe(5);
+    expect(travelSeconds(registry)).toBe(3);
   });
 
   it('falls back to the default when the variable is declared with an empty value', () => {
-    const registry = loadInEnglish('# variable travel-seconds-per-unit');
-    expect(travelSecondsPerUnit(registry)).toBe(5);
+    const registry = loadInEnglish('# variable travel-seconds');
+    expect(travelSeconds(registry)).toBe(3);
+  });
+
+  it('costs the same wherever the road runs, however far apart the map draws its ends', () => {
+    const registry = loadInEnglish(
+      '# variable travel-seconds\nvalue: 4\n\n# location camp\nx: 0, y: 0\nstarting\nadjacent:\n  near\n  far\n\n# location near\nx: 1, y: 0\n\n# location far\nx: 40, y: 30\n',
+    );
+    expect(travelAction('camp', 'near', registry).time).toBe(4);
+    expect(travelAction('camp', 'far', registry).time).toBe(4);
   });
 });
 

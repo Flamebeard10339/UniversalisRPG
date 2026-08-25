@@ -205,9 +205,9 @@ describe('a summary says what stopped the span, in the words of whoever stopped 
     expect(said(until(act('drown')), fatal)).toContain(ran(1, say(fatal).engine('engine.stopped.event', { event: say(fatal).title('event', 'death') }), fatal));
   });
 
-  it('says the journey arrived, five seconds down the one road there is', () => {
+  it('says the journey arrived, the flat few seconds down the one road there is', () => {
     const walk = until({ kind: 'begin', inner: { kind: 'travel', location: 'dunes' } });
-    stoppedBy(walk, 5, say().engine('engine.stopped.arrived'));
+    stoppedBy(walk, 3, say().engine('engine.stopped.arrived'));
     expect(said(walk)).toContain(say().engine('engine.span.moved', { location: say().title('location', 'dunes') }));
   });
 
