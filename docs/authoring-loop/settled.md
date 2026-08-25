@@ -441,6 +441,18 @@ could see it. One behaviour moved with the collapse: a pool that is *already* at
 nothing is no longer fired on, only one that falls to nothing, which is the rule
 the rest of the engine always kept.
 
+**An event handler's pool writes go through that writer too, and the settle repeats
+until the deltas run out.** `settleHandlerDeltas` was the third writer and looked like
+a guard against a death handler recursing; measured, it was guarding nothing, because
+`setPoolLevel` only fires on a crossing and a pool already at zero cannot cross again.
+A handler draining a *second* pool to nothing had been silent, which was the actual
+cost. Settling once only moves that silence one level deeper, so it settles until the
+deltas run out — which makes livelock reachable where it was not (`on charged: restore:
+charge` re-fires forever), and the passes are bounded at `HANDLER_SETTLE_PASSES` with
+the refusal naming the shape. The overflow rule came with the writer: a handler that
+restores a pool past full now fires `on full` and wraps, which is what every other
+route already did and which nothing in the corpus exercises yet.
+
 **`leaves()` is a fact about `PlayView`, and lives with it.** `src/runtime/viewLeaves.ts`
 holds the walk; `scripts/lib/viewCoverage.ts` keeps what is about *comparing*
 surfaces. So `src/ui/render.test.tsx` derives what a player may read from the same

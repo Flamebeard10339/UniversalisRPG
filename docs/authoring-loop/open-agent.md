@@ -233,23 +233,6 @@ regenerate a sheet whenever content changes on purpose, so a recording doing wor
 sheet stands in for is written as a claim, or the load is measured and found to be
 nothing.
 
-**`settleHandlerDeltas` is a third pool writer that fires no event.**
-`src/runtime/effects.ts` writes `store.levels[…]` directly during a settle and
-deliberately never fires `on empty`, so a handler that drains a pool to nothing is
-silent. It looks intentional — it stops a death handler recursing — but it is the same
-shape as the duplicate just collapsed and nothing in the file says which it is.
-*Closes when:* the file says which, or it goes through the one writer.
-
-**`applyDueBoundaries` discards `segment.stopped`.** A non-repeating deterministic
-action whose `on success:` carries `stop` reports *finished* rather than the reason the
-`stop` named, because `endAction` is called unconditionally after `applyOutcome`.
-Pre-existing and no test sees it.
-
-**`attempts:`'s retirement message says it "bounds the action".** True only for a
-non-repeating one — a repeating action's `attempts:` is a per-cycle budget, which is
-what sent this queue's own line down the wrong path for a session. *Closes when:* the
-message says which.
-
 ## From the first run somebody played, 2026-08-23
 
 Quoted from what they wrote at the turn it happened. The rest of that run's findings
@@ -309,10 +292,6 @@ answer with it — the row does not come back marked CHANGED, it just stops bein
 about anything. No file exists yet on this branch, so nothing has broken; the first
 review pass is when it starts to matter. *Closes when:* an orphaned row is reported
 rather than ignored.
-
-**A repeating action with `attempts:` never reaches `on unfinished:` as a
-terminator** — it fires the handler and restarts, so `grind until done` runs to the
-four-hour bound. Only a non-repeating action ends by attempts.
 
 **Two tests still live in the wrong module.** The hammers and their claims are in
 `content/tutorial-quests.dsl` and neither touches the quest — they are `tulsa`
