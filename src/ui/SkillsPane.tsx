@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Answer, Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { formatClock, tidy } from './format';
+import { GRID } from './sheetLayout';
 import { filled, perHour, skillPanels, untilNext, type SkillPanel, type XpMark } from './skillPanels';
 import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
@@ -47,7 +48,7 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="unbarred min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="mx-auto grid max-w-2xl grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">
+        <div className={`mx-auto max-w-2xl ${GRID}`}>
           {panels.map((panel) => (
             <button
               key={panel.id}
