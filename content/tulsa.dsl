@@ -804,7 +804,7 @@ look in again:
   on success:
     say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
   on failure:
-    say: The glass shows you exactly what you are carrying, and it is not enough to be looked at twice.
+    say: You need 1000 coin to perform this action.
 
 # entity oven
 examine: A stone oven, its coals still glowing.
