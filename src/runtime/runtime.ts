@@ -587,9 +587,15 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
 // Why an action a player was offered turns them away the moment they take it, in the words they
 // read — the one home for every such reason. An author's `on failure:` stands in place of all of
 // them.
-function whyRefused(action: Action, registry: Registry, state: GameState): Localized | undefined {
+function whyRefused(action: Action, registry: Registry, state: GameState, target?: string): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const item = (id: string): Localized => localizer.title('item', id);
+  if (target !== undefined) {
+    const location = registry.locations.get(state.location);
+    if (location && !isStanding(state, registry, location, target)) {
+      return localizer.engine('engine.target.absent', { target: actorTitle(target, registry, state) });
+    }
+  }
   if (action.requires && !requiresMet(action, state, registry)) {
     const missing = itemMissingFor(action.requires, state, registry);
     return missing === undefined ? localizer.engine('engine.requires.unmet') : localizer.engine('engine.requires.item', { item: item(missing) });
@@ -600,8 +606,8 @@ function whyRefused(action: Action, registry: Registry, state: GameState): Local
   return undefined;
 }
 
-function refuseAction(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
-  const because = whyRefused(action, registry, state);
+function refuseAction(action: Action, registry: Registry, state: GameState, target?: string): ArmResult | undefined {
+  const because = whyRefused(action, registry, state, target);
   if (because === undefined) return undefined;
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
   else state.log.push(because);
@@ -652,7 +658,7 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${actionId}`);
 
-  const refused = refuseAction(action, registry, state);
+  const refused = refuseAction(action, registry, state, targetId);
   if (refused) return refused;
 
   armFight(state, registry, actionId, action, targetId);

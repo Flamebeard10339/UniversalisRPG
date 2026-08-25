@@ -13,6 +13,7 @@ export const ENGINE_KEYS = [
   'engine.talk.to',
   'engine.requires.item',
   'engine.requires.unmet',
+  'engine.target.absent',
   'engine.inputs.short',
   'engine.inputs.grown',
   'engine.inputs.worn',
