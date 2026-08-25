@@ -90,6 +90,12 @@ time: 1
 on success:
   stop
 
+# action halt
+title: Halt
+time: 1
+on success:
+  stop
+
 # action plod
 title: Plod
 continuous
@@ -97,7 +103,7 @@ time: 600
 
 # entity player
 skills: fishing, lore
-uses: fish, chop, study, prime, pace, tap, quit, plod
+uses: fish, chop, study, prime, pace, tap, quit, halt, plod
 
 # location shore
 title: The Shore
@@ -188,6 +194,15 @@ describe('a summary says what stopped the span, in the words of whoever stopped 
 
   it('says the action called a halt where its own on success: wrote stop', () => {
     stoppedBy(until(act('quit')), 1, say().engine('engine.stopped.itself'));
+  });
+
+  it('says the same of an action that runs once, whose one outcome is settled by the boundary', () => {
+    stoppedBy(until(act('halt')), 1, say().engine('engine.stopped.itself'));
+  });
+
+  it('names the event that ended the same action, where reaching the outcome is what fired it', () => {
+    const fatal = loadInEnglish(`${WORLD}\n# event death\ntitle: Death\nresource: health\ntrigger: on empty\n\n# action drown\ntitle: Drown\ntime: 1\non success:\n  drain: 100 health\n\n# entity player\nuses: drown\non death:\n  stop\n`);
+    expect(said(until(act('drown')), fatal)).toContain(ran(1, say(fatal).engine('engine.stopped.event', { event: say(fatal).title('event', 'death') }), fatal));
   });
 
   it('says the journey arrived, five seconds down the one road there is', () => {
