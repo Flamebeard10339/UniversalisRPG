@@ -189,6 +189,59 @@ The long pole, and it is the owner's. `npm run review` is the sheet and
   *Moves when: the casing is ruled — title case everywhere, or an authored label kept
   exactly as its author wrote it. Applying either is headless.*
 
+- **Miki says nothing when two of his threads are open, and fixing it strands the
+  apology.** Crossed from `open-agent.md` on 2026-08-25, reproduced headlessly from a
+  fresh game on the owner's exact branch: talk, take *"I'd rather find my own way"*,
+  refuse again, leave by the window, come back, and talking says **nothing** and draws a
+  bare list labelled with each thread's first spoken line.
+
+  It is not a spent node, which is what it was misdiagnosed as twice. A `# quest`
+  stage's `tulsa.miki says:` block compiles its stage gate into the node's `when:`, and
+  `isThread` (`src/content/sections/dialogue.ts`) is `when !== undefined || ask !==
+  undefined` — so **every quest-given node is a thread**, including one the author wrote
+  `always` on. Fifteen of Miki's sixteen nodes are threads. With two open, `talk` returns
+  a cursor and pushes nothing to the log, and the list has no `ask:` phrases to label
+  itself with. This contradicts `settled.md`'s own rule that a node offering only
+  `always` is not a thread but what they say, and the node still records the intent —
+  `always` sits beside the quest's gate, so `isThread` could read it.
+
+  The obvious fix was measured and it costs a route. With `isThread = ask !== undefined
+  || (when !== undefined && !always)`, Miki speaks in both reproductions — but
+  `snubbed.miki.0` becomes an `otherwise` node offered only when no thread is open, and
+  `adrift.miki.0` is `sticky` on a flag that never goes false, so **a player who snubs
+  Miki and then steps outside can never apologise again** and the whole `apologised`
+  route is stranded. The suite would not catch it: `apology-route-full` apologises
+  before ever leaving the house. Today's ugly thread-list is what keeps that route
+  reachable.
+
+  *Moves when: the owner rules what talking does when a quest stage's `always` line and
+  another quest's `when:` thread are both open on one entity. Three answers were costed
+  — say the `always` line and then list the threads; keep the list but give quest nodes
+  `ask:` phrases so it reads as a conversation; or make `always` non-thread and rewrite
+  `snubbed`/`adrift` so nothing is stranded. Each is a writing decision with different
+  content consequences, and the engine change is one line once it is taken.*
+
+- **`leave-tutorial-island.adrift` opens on a premise that is false.** Found in the same
+  reproduction. Its gate is `tulsa.market-square.discovered`, and the module's own
+  comment justifies it as *"a place that is only discovered by having stood in it."*
+  Discovery spreads to adjacent locations, so landing on the beach one step out of the
+  house sets it — measured `true` immediately after `climb out`. Miki says *"So you found
+  the market"* to a player who has never left the sand, and this is what opens the second
+  quest early enough to collide with the item above.
+
+  *Moves when: the owner says what should actually gate that stage — standing in the
+  market is not a fact the corpus can currently state, so this is either a new condition
+  or a different line. The measurement is done either way.*
+
+- **Cluster planes are now unreachable in `tulsa`.** The smith's chest was the tutorial
+  on-ramp to them and it is `DEBUG` now, as asked. `combat-expansion`'s `armourers-chest`
+  still hands out jewels and whetstones so the mechanic is playable, but nothing in the
+  town introduces it.
+
+  *Moves when: the owner says where the on-ramp should be instead — or that the whetstone
+  ruling in `open-agent.md` removes the need for one, since gear that drops carrying its
+  own points needs no chest to hand out whetstones.*
+
 Everything below is from the first run somebody played, 2026-08-23, and is quoted
 from what they wrote at the turn it happened.
 

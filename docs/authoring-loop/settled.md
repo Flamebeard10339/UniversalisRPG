@@ -340,6 +340,17 @@ restarting it. Control returns after each cycle, which is what keeps breaking of
 mid-fight possible. A live driver (the GUI) ticks an armed action to completion on
 its own and always did.
 
+**One entity's offers stand together, and its minted action stands second among
+them.** `locationChoices` gathers what one entity offers into one run — its shop, its
+available actions, and the fight choices aimed at it, all of which already carry it as
+`choice.detail` — and `fightChoices` is asked per entity rather than sweeping the room
+a second time after everything has been offered. That sweep is why examine was last on
+a dresser, fourth on `herb-patch` and first on anything with `stats:`. `computeChoices`
+is the sole home: the app groups the list by `detail`, `play-cli` and the playbot print
+it in order, and none of the three sorts. Which action is minted stays where the
+minting is — `isMintedAction` reads the same `EXAMINE_FIELD` that `mintedActions`
+writes, so the runtime never spells the word.
+
 **In flight and offerable are different questions.** *Which action is seated here*
 is a fact about state and lives in `src/runtime/actionLookup.ts`, beneath action
 legality; *may it be performed* reads conditions. Conflating them has now caused

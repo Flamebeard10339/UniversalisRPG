@@ -233,28 +233,7 @@ regenerate a sheet whenever content changes on purpose, so a recording doing wor
 sheet stands in for is written as a claim, or the load is measured and found to be
 nothing.
 
-## From the first run somebody played, 2026-08-23
-
-Quoted from what they wrote at the turn it happened. The rest of that run's findings
-are reading and writing decisions and are in `open-human.md`; these three are rulings
-already taken with the words already supplied.
-
-- **The mirror's refusal is fancy about failing.** *"The message should just be:
-  'You need 1000 gold to perform this action'."* It currently answers *"The glass
-  shows you exactly what you are carrying, and it is not enough to be looked at
-  twice."*
-- **Smith's chest does not belong.** *"Remove completely. Make it a debug entity if
-  necessary."*
-- **Examine sits inconsistently in the choice list.** *"Sometimes examine first and
-  sometimes examine second. It should be consistent. Examine second."*
-
 ## Ours, and small
-
-**Miki's dialogue does not appear when it should.** From the first run, turn 26,
-after taking the *"I'd rather find my own way"* branch: *"Miki's dialogue doesn't
-appear when it should."* Talking again redrew the room and said nothing. Worth
-reproducing before believing the cause — a spent node and a silent conversation
-have been misdiagnosed here twice.
 
 **A reload starts a fresh game.** `openUniverse` calls `startSession`
 unconditionally, so closing the tab or refreshing loses the session: measured by
@@ -262,6 +241,25 @@ waiting 60 seconds, reloading, and coming back at 0. `/autosave` writes the live
 slot and `/restore` reads it back, so the pieces exist and nothing joins them. It
 costs an author a playtest and a player their game. *Closes when:* the app opens on
 what it last wrote, or refuses to lose it silently.
+
+**A `DEBUG` section's `title:` cannot survive a round trip.** `unsayDebug`
+(`src/content/load.ts`) empties a `DEBUG` section's locale rows, and the printer's
+`authored(field)` predicate (`src/content/serialize.ts`) reads that same table to decide
+whether a title was written — so it prints nothing and the reload derives a title from
+the id. Found by marking the smith's chest: `npm run probe -- content --round-trip`
+reported `entities: changed tulsa.smiths-chest` and named no cause. The corpus does not
+hold one today only because the chest's `title:` was deleted with it. *Closes when:* a
+`DEBUG` section prints back what it parsed, or the round-trip report names why it
+cannot.
+
+**A `DEBUG` section's `say:` reaches the terminal as its bare locale key.** Same
+emptied table, read at a different moment: the words are gone by the time the terminal
+asks for them, so the key is what a player sees. Caught by
+`scripts/printedWords.test.ts`, whose script opens the smith's chest to reach a cluster
+plane. Whether prose on a `DEBUG` section should be refused at load rather than said as
+a key is the shape of the answer — a section that says nothing in any language has no
+business carrying words. *Closes when:* a `DEBUG` section cannot reach a player with a
+locale key.
 
 **A proof that loads `standingSources()` may assume no `DEBUG` section stands
 there.** `translationSurvival` took its subjects from `[...shipped.items.keys()]`
