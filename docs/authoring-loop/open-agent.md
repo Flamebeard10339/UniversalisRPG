@@ -250,13 +250,25 @@ constraint: *"Keep it as small as possible. Nothing needs a verbose examine, etc
 
 Two things a lane settles before writing much of it, either of which can send it back:
 
-- **`settled.md` says the opposite about `DEBUG`, deliberately.** `# item
-  million-attack-hammer` lives in the module of the test that swings it *"not in a
-  testing module, because a file the load path has to be told to leave out is a rule
-  someone has to remember."* A shared fixture world is exactly that file. It is only
-  safe if its unreachability is **derived** — a guard proving no shipped load path can
-  reach it — rather than remembered. Build the guard first; if it cannot be derived, the
-  settled ruling wins and this line comes back.
+- **`settled.md` says the opposite about `DEBUG`, deliberately** — and the objection has
+  since been measured and does not stand, so this no longer gates the line. `# item
+  million-attack-hammer` lives in the module of the test that swings it *"not in a testing
+  module, because a file the load path has to be told to leave out is a rule someone has to
+  remember."* That is a real rule and it is about **a `.dsl` under `content/`**. Both
+  shipped entry points derive their sources from that directory and nothing else —
+  `shippedFiles()` in `src/content/shipped.ts` reads it with `readdirSync`, and
+  `SHIPPED_SOURCES` in `src/ui/shippedContent.ts` globs it — so **a fixture world that is
+  a `.ts` module outside `content/` is unreachable by construction rather than by
+  exclusion**: there is nothing to tell the loader to leave out, and so nothing to
+  remember. The unreachability is therefore derived in the strongest available sense, and
+  what a guard has to hold is the *other* half: that the exclusion list stays exactly one
+  entry long. It is one today — `LOCAL_CHANGES_MODULE_ID`, which is not shipped and does
+  not exist in the repository — and a claim pinning it to that one, with its reason, is
+  what stops a second being added quietly later.
+
+- **Do not put the fixture world under `content/`**, and do not grow the exclusion. That
+  is the whole of what the settled ruling was protecting, and it is the one way this line
+  can still go wrong.
 - **Then the `DEBUG` sections in the shipped corpus are worth re-asking about**, which
   is the owner's own follow-up. They stop being necessary the moment that guard exists,
   and not one moment before it.
