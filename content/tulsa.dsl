@@ -1370,12 +1370,17 @@ assert: has lockpick
 assert: searched
 expect: dresser-trinket-end
 
+// The two words for a place, told apart on the one line where the engine
+// makes the difference: picking the lock opens the road east, which puts the
+// sand on the map without anyone walking onto it.
 # test a-lockpick-opens-the-front-door
 run: dresser-trinket
 travel: guide-house
 use: entity.front-door.pick-lock
 assert: front-door.unlocked
 assert: beach.discovered
+assert: not beach.touched
+assert: guide-house.touched
 assert: xp.thieving = 4
 assert: time >= 4
 

@@ -148,7 +148,7 @@ x: 0, y: 0
 starting
 
 # save empty
-{"version":${SAVE_VERSION},"flags":{"camp.discovered":true}}
+{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"camp.touched":true}}
 `);
     expect(shown(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
     expect(shown(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
@@ -175,7 +175,7 @@ starting
     expect(state.slice(0, 4)).toEqual([
       'Location: tulsa.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}',
+      'Flags: {"tulsa.guide-house.touched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}',
       'Inventory: {}',
     ]);
     // Under the name the world gives a thing as well as the id it is addressed by: an id-only
