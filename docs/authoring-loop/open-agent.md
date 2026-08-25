@@ -54,14 +54,23 @@ that walks out of the house and back is part of closing this.
 
 ### The fight
 
-**An entity's own action can still be armed from off-location, and the fix is not a
-two-line widening.** The fight half of this is closed — a directive naming a foe that is not
-standing here is refused in the player's words — but `armAction` does not ask the same
-question of an **entity** whose action a directive names, so `use: entity.<felled-foe>.<action>`
-still arms. The lane that closed the fight half **probed the obvious widening**
-(`refuseAction(..., obj === 'entity' ? objId : undefined)`) and it fails **26 tests across 10
-files**: the corpus and the fixtures lean on arming an entity's action from off-location.
-That is a real piece of work with its own scope rather than a tail of the fight one, and the
-26 are the measurement to start from — read them before deciding whether they are wrong or
-the rule is. *Closes when:* naming an entity that is not here is answered the same way naming
-a foe that is not here now is, or it is written down why the two differ.
+**Three siblings of the arming question are unasked, and they were measured while it was
+answered.** All three are the same conflation one step over, all reachable only by a
+directive, and none is reached by anything shipped today — which is why they are one line
+rather than an emergency.
+
+- **`use: location.<other-room>.<action>` still arms.** `armAction` passes a target only for
+  `obj === 'entity'`, and `isElsewhere` cannot cover a room because location ids are not in
+  `entitiesStood`. Same shape, different list to ask.
+- **`standsAgain` and `fightLeftItsLocation` still ask `isStanding`**, so a fight or a
+  repeating depleting action against an entity no room stands would stop, or fail to re-arm.
+  Nothing reaches it today.
+- **`actionVisible` throws before `whyRefused` runs**, so an action `hidden if:` from the far
+  room raises `action hidden: …` instead of being refused in the player's own words. Two of
+  the 82 corpus doors hit this, and the sweep that found them skips them honestly rather than
+  asserting on the raise.
+
+*Closes when:* each is either asked the same way the entity question now is, or written down
+as differing with its reason. **The third is the one to think about first** — it is the
+`hidden if:` rule and the refusal rule meeting, and which of them owns that moment is a
+design answer rather than a patch.

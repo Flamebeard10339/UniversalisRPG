@@ -1203,6 +1203,20 @@ simply absent, and `hidden if:` removes an action rather than an entity. `apply`
 reach the refusal. A directive names an id outright and reaches past the offer list, which is
 the whole of the difference.
 
+**Nowhere is not elsewhere, and only elsewhere can be refused.** `armAction` asks the same
+question of an entity whose action a directive names that `armFightAction` asks of a foe, so
+`use: entity.<felled-foe>.<action>` is refused in `engine.target.absent` — *"There is no
+{target} here."* — exactly as a fight on it is. The question is **`isElsewhere`** in
+`src/runtime/population.ts`: the world places this entity somewhere, **and** it is not
+standing here. **The second half alone is the obvious widening and it fails 26 tests**,
+because every one of them names an entity *no room stands at all*: `tulsa.smiths-chest`, the
+`DEBUG` chest that is the only route to a cluster plane; `# entity player`, which is not in a
+room because you are it; and four fixture levers that exist to be named by a directive. An
+entity the world places nowhere has **no room to be missing from**, so *where is it, then*
+has no answer to give rather than the answer *not here*. `entitiesStood` already draws that
+line for the load-time rule about what a room stands, so this is one reading with two callers
+rather than a second one.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
