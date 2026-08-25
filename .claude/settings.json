@@ -10,7 +10,7 @@
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/one-long-job-at-a-time.sh"
+            "command": "bash .claude/hooks/report-running-long-jobs.sh"
           }
         ]
       }
