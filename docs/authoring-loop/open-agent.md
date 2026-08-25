@@ -186,6 +186,17 @@ the failure mode `one-home` exists to catch.
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
 
+**The shared fixture world has room, and the duplication was never only the seventeen.**
+Measured while it was built: **24 test modules still declare at least one of the six things
+`FIXTURE_WORLD` now holds** — a starting `# location camp`, `max-health` and `attack` bases,
+the `hale` and `keen` passives, and a plain item — mostly outside the seventeen the original
+whetstone measurement named: `fight`, `save`, `time`, `moments`, `conditions`, `buffs`,
+`span`, `play-cli` and others. The lane that built it did not force them, and it was right
+not to: several of those worlds *are* the arithmetic under test rather than furniture, which
+is the distinction that decides each one. *Closes when:* every module whose world is
+genuinely furniture stands on the shared one, and the report says which were left and why —
+because a module left behind with a reason is the answer, not a miss.
+
 **Dialogue does not animate.** Ruled: *"This should be a global variable that can
 optionally be edited/skipped by modals."* So a reveal rate is a setting with a default
 the lane picks and the owner tunes, and a modal may say it wants the words at once.
