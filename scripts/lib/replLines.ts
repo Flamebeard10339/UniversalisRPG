@@ -2,7 +2,7 @@ import { type EncounterFoe } from '../../src/runtime/encounter';
 import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
-import { type GroupRow } from '../../src/runtime/grouping';
+import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
 
 // What a command answered with, written out as lines a player reads. Both drivers that put words
@@ -37,12 +37,6 @@ export const printed = (line: ReplLine): string => `${' '.repeat(line.indent)}${
 export const oneLine = (localizer: Localizer, parts: readonly Localized[], gap: string): Localized => localizer.identifier(parts.join(gap));
 
 const shownLocations = new Set<string>();
-
-// A colour is not a word, so a terminal says the group instead of drawing it. The words are the
-// group's own `title:`, which is the same string the screen fills a cell for, rather than a second
-// name for the same thing kept here.
-export const grouped = (localizer: Localizer, group: GroupRow | undefined, said: Localized): Localized =>
-  group === undefined ? said : localizer.engine('engine.repl.grouped', { group: group.title, said });
 
 // A choice is answered by where it sits in the view's own list, so what is skipped here still
 // counts: the numbers a reader sees are the numbers the engine takes, with the ways out missing

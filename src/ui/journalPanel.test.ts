@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Answer, Localized } from '../runtime/localized';
 import type { JournalEntry } from '../runtime/session';
-import { journalRows, rowNamed, TONES } from './journalPanel';
+import { journalRows, rowNamed } from './journalPanel';
 
 type Entry = JournalEntry;
 
@@ -21,12 +21,10 @@ describe('the journal as a page reads it', () => {
     expect(rows.map((row) => row.standing)).toEqual(['complete', 'unstarted', 'started']);
   });
 
-  // The subjects are every standing the engine can publish, taken from the rows themselves, so one added later is held to having a colour.
-  it('has a colour for every standing a quest can be in', () => {
-    const standings = journalRows([entry('a', 'unstarted'), entry('b', 'started'), entry('c', 'complete')]).map((row) => row.standing);
+  it('carries the group the engine coloured the standing with, and holds none of its own', () => {
+    const [row] = journalRows([{ ...entry('going', 'started'), group: { id: 'core.quest-started' as Answer, title: 'Under way' as Localized, colour: '#fbbf24' } }]);
 
-    expect(new Set(Object.keys(TONES))).toEqual(new Set(standings));
-    for (const standing of standings) expect(TONES[standing]).toBeTruthy();
+    expect(row!.group).toEqual({ id: 'core.quest-started', title: 'Under way', colour: '#fbbf24' });
   });
 
   it('carries the lines and which of them are crossed off', () => {

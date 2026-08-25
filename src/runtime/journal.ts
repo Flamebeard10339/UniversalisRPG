@@ -4,11 +4,18 @@ import type { Registry } from '../content/registry';
 import { begun, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
 import { listedToPlayer } from '../content/sections';
 import { evaluateCondition, renderSegments } from './conditions';
+import { groupNamed, type GroupRow } from './grouping';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import type { GameState } from './state';
 
-// A quest nobody has touched, one under way, and one finished, which is the whole of what a journal tells them apart by.
-export type QuestStanding = 'unstarted' | 'started' | 'complete';
+// A quest nobody has touched, one under way, and one finished, which is the whole of what a journal tells them apart by. Each is a kind of thing a quest currently is, and the `# group` named beside it is where both its colour and its word are read off — so what tells them apart is authored, one surface fills with it and another says it, and a standing added here cannot reach a player as nothing.
+export const STANDING_GROUP = {
+  unstarted: 'core.quest-unstarted',
+  started: 'core.quest-started',
+  complete: 'core.quest-complete',
+} as const;
+
+export type QuestStanding = keyof typeof STANDING_GROUP;
 
 export interface JournalLine {
   stage: Answer;
@@ -22,6 +29,8 @@ export interface JournalEntry {
   title: Localized;
   stage: Answer;
   standing: QuestStanding;
+  // What the standing reaches a surface as: the colour a screen fills the row with, the word a terminal prints beside the title.
+  group?: GroupRow;
   // One line to each stage the quest has been through. A quest nobody has begun has been through nothing and reads as nothing, rather than reading out what has not happened yet.
   lines: JournalLine[];
 }
@@ -52,7 +61,8 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
           const said = spoken(localizer, state, registry, stage.log);
           return said === null ? [] : [{ stage: stage.name as Answer, said, struck: standing === 'complete' || stage !== at }];
         });
-  return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, lines };
+  const group = groupNamed(registry, localizer, STANDING_GROUP[standing]);
+  return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, ...(group === undefined ? {} : { group }), lines };
 }
 
 // Every quest the world declares, touched or not, in the order the world declares them. A journal that listed only what had been started would be a list of what the player already knows.

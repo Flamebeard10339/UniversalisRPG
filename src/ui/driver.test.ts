@@ -129,6 +129,21 @@ describe('the GUI driver', () => {
     expect(texts(driver).slice(before)).toEqual(shown(driver).said);
   });
 
+  // What a darkened screen draws above its choices is what the view it covers came with, and a screen
+  // the player opened for themselves came with nothing. The subjects are read off the shipped view —
+  // whatever it offers to look at, whatever quest it lists first — so neither is a name here.
+  it('hands a screen the player opened no words, however much was said before it', () => {
+    const driver = createDriver(SHIPPED_SOURCES);
+    const examine = shown(driver).choices.find((choice) => choice.id.endsWith('.examine'))!;
+    driver.choose(position(driver, examine.id));
+    expect(shown(driver).said.length).toBeGreaterThan(0);
+
+    driver.readQuest(shown(driver).journal[0]!.quest);
+
+    expect(shown(driver).modals.map((modal) => modal.name)).toEqual(['quest-journal']);
+    expect(shown(driver).said).toEqual([]);
+  });
+
   it('answers a modal by its published option key, and what was beneath comes back', () => {
     const driver = createDriver([engineLocale(), DRIVER_MODULE]);
     driver.choose(position(driver, 'talk:proving-ground.guide'));

@@ -3,8 +3,7 @@ import { asLocalized } from '../runtime/localizedFixture';
 import { loadModule } from '../content/load';
 import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
-import { answering, dismissal } from './asking';
-import type { LogEntry } from './transcript';
+import { dismissal } from './asking';
 
 const MODULE = `
 # location camp
@@ -109,26 +108,5 @@ describe('what a click away from a screen answers', () => {
     const asked: PlayView['modals'] = [{ name: 'held', leaving: 'close', options: [{ key: 'item', label: asLocalized('Item'), values: [{ value: 'blade', shown: asLocalized('Blade x1') }] }] }];
 
     expect(dismissal(asked)).toBeNull();
-  });
-});
-
-describe('what a darkened screen is answering', () => {
-  const spoke = (id: number, kind: LogEntry['kind'], text: string): LogEntry => ({ id, words: 'player', kind, tone: 'plain', text: asLocalized(text), repeats: 1 });
-
-  it('is every line just spoken, in the order they were said', () => {
-    const held = [spoke(1, 'place', 'Camp'), spoke(2, 'said', 'Halt.'), spoke(3, 'said', 'Who goes there?')];
-
-    expect(answering(held).map((line) => String(line.text))).toEqual(['Halt.', 'Who goes there?']);
-  });
-
-  it('stops at the first line that is nobody speaking, so it is this beat and not the history', () => {
-    const held = [spoke(1, 'said', 'Long ago.'), spoke(2, 'describe', 'A cold room.'), spoke(3, 'said', 'Halt.')];
-
-    expect(answering(held).map((line) => String(line.text))).toEqual(['Halt.']);
-  });
-
-  it('is nothing where the last thing that happened was not somebody speaking', () => {
-    expect(answering([spoke(1, 'said', 'Halt.'), spoke(2, 'message', 'You cannot go that way.')])).toEqual([]);
-    expect(answering([])).toEqual([]);
   });
 });

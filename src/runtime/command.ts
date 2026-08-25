@@ -19,6 +19,7 @@ import { startSaveId, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
+import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { waysOut } from './waysOut';
@@ -815,13 +816,12 @@ export const COMMANDS: readonly CommandSpec[] = [
       const entries = sessionJournal(ctx.session);
       if (quest !== '') return openJournal(ctx, entries, quest);
       if (entries.length === 0) return { output: [message('plain', localizer.engine('engine.repl.journal.none'))], quit: false, recorded: [] };
-      const heading = { unstarted: 'engine.repl.journal.untouched', started: 'engine.repl.journal.doing', complete: 'engine.repl.journal.done' } as const;
       return {
         output: entries.map((entry) => ({
           kind: 'message' as const,
           words: 'player' as const,
-          tone: entry.standing === 'complete' ? ('ok' as const) : ('plain' as const),
-          text: localizer.engine(heading[entry.standing], { quest: entry.title }),
+          tone: 'plain' as const,
+          text: grouped(localizer, entry.group, entry.title),
           detail: entry.lines.map((line) => (line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said)),
         })),
         quit: false,
