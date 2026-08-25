@@ -28,6 +28,58 @@ Not recorded through the playtest tool, so no `# test` stands behind any of it. 
 wants are the owner's own and are not in doubt; anything below that reads as a bug
 still has to be reproduced before it is diagnosed.
 
+Several of these crossed from `open-human.md` on 2026-08-25 when the ruling each waited
+on was taken. **The ruling is stated in the line and is authoritative** — a lane takes
+it as given rather than reopening it, and a lane that finds it cannot be held sends the
+line back with what it measured.
+
+### Grids, not lists
+
+**The pack is a flat list of full-width rows.** *"inventory is a grid instead of list
+just like the skills tab."* The pack, the stats page and the equipment page are three
+callers of one `Ledger`, a `<dl>` of truncated single-line rows. Ruled: **`Ledger` stays
+the one component that renders a sheet and takes a layout** — `list`, `grid`, `doll` —
+where `grid` is the shape `SkillsPane` already draws,
+`grid-cols-[repeat(auto-fill,minmax(6rem,1fr))]` (`src/ui/SkillsPane.tsx:50`). The pack
+asks for `grid`, the stats page keeps `list`. Text expands down far better than it
+expands sideways and Android's app drawer is the reference, so **a small font is
+acceptable and a small touch target is not**: the density cannot come out of the 44px
+floor `src/index.css:59` sets for every control. **A layout branches on the prop and on
+what an `Entry` carries, never on which page is calling** — a branch on the caller is
+the per-page table this repo counts commits against. *Closes when:* the pack is a grid
+and `Ledger` is still the only component that draws a sheet.
+
+**The equipment page wants a paper doll.** Same `Ledger`, fed by `worn(...)`
+(`src/ui/sheet.ts`). Where a slot sits on a body is a fact nothing declares — a `# slot`
+supplies display words and nothing else (`src/content/sections/slot.ts`). Ruled: **the
+position is declared on `# slot`**, joining the display words it already owns, and
+`Ledger`'s `doll` layout draws it. The slot vocabulary is the union of every
+`equipment-slots:`, so a slot can exist with no `# slot` at all; that slot, and a
+`# slot` that declares no position, both draw in a row beneath the doll. Nothing is a
+table kept in sync and no slot is unreachable. Two slots ship today, `mainhand` and
+`offhand` (`content/core.dsl:156`). *Closes when:* worn gear draws in declared slot
+positions and a slot with no declared position still draws.
+
+**The pack has no order the player owns.** The want is drag-and-drop to swap two items.
+`state.inventory` is a `Record<template, count>` and `packRows` reads its order off that
+(`src/runtime/itemInstance.ts:134`), so there is nothing to reorder and nothing a save
+would carry. `DragSheet` is the drag surface the map and the plane already share, and
+with the grid ruling the thing dragged is the cell. *Closes when:* the pack has a
+player-owned order that survives a save.
+
+**The action list is a wrapping row of pills.** `Home.tsx`'s `Sheet` draws
+`flex flex-wrap` with `grow basis-40`, grouped under each source's name, so no two rows
+are the same width and nothing lines up down the page. It takes `Ledger`'s `grid`
+layout, the same one the pack and the skills page draw. *Closes when:* the action list
+is that grid.
+
+**An entity's name is inert.** *"Clicking name/background of an action does the examine
+action."* Today the group heading `groupOffers` produces is plain text, and *Examine*
+stands as one more pill in the group beside it. Once there are cells: **the cell's name
+and background examine, and the control on it acts** — which takes a pill out of every
+group. *Closes when:* examine is reached from the cell rather than from a pill of its
+own.
+
 ### Chat readability, and the information dump
 
 **The dialogue modal hides the words it is answering.** From 2026-08-23: *"The dialogue
@@ -37,6 +89,73 @@ ordering it causes: **the GUI offers the choices before the player can read the 
 The modal darkens what is behind it, so the line being answered is the one thing that
 cannot be read while answering. *Closes when:* the spoken line is inside the modal,
 above its choices.
+
+**A new location dumps everything at once, and none of it has been examined.** Two
+rounds of play on the same subject. From 2026-08-23: *"There should be some sort of
+visual cue that I already examined this object."* From 2026-08-24, the larger form:
+something never examined shows as a question mark that hides its name and its actions
+and keeps only its background colour, so a room the player has not read is a short list
+of unknowns rather than a wall of text. Examining twice says the same words and a third
+time says nothing at all, because the node has fallen silent — and the player cannot
+tell those two apart either. Both rulings it waited on are taken. **The terminals mask
+too**: an unexamined entity reaches the REPL and the playbot as an unnamed placeholder
+whose only offer is *Examine*, so all three surfaces say the same words and the parity
+harness keeps its whole claim with nothing excused. **The playbot reveals a room free on
+arrival**, examining everything unexamined at no turn cost, so its runs stay about the
+quest and its turn budget keeps the meaning it had before the mask. *Closes when:* what
+has been examined is visible on the thing, an unexamined room costs less to read than it
+does now, and the mask reads the same in all three surfaces.
+
+**The chat history is one size throughout.** The want is a smaller font and tighter
+margins, with a **large** margin where the location changes. `KIND_CLASS.place`
+(`src/ui/Home.tsx:22`) is the one line that already knows a place changed, and it spends
+that knowledge on `pt-2` and small caps. Ruled: body at `text-sm` with `leading-snug`, a
+`detail` line at `text-xs`, and a place change taking `mt-6` and a hairline rule in
+place of a heading. *Closes when:* the history reads at those sizes and a new place is a
+break rather than a heading.
+
+### Colours, and the groups they would stand for
+
+**Every kind of message wants its own colour and the kinds do not have one each.**
+`src/ui/Home.tsx` holds `KIND_CLASS` for five line kinds and `TONE_CLASS` for four
+message tones, hardcoded there; `message` has no colour of its own and borrows its
+tone's. Ruled: **colour carries two meanings on two channels, and they never share
+one.** Text colour is voice — the player's own act, a character's words, the world
+describing itself, the engine speaking to the player, and a `detail` subordinate to the
+line above — so `message` gets a colour of its own and the tones decorate that voice
+rather than standing in for it. Fill is group, the item below, and it is what a chat
+background, a pack cell and an offer cell all take. A place change is a break, not a
+colour. *Closes when:* the two channels are separate and neither is read for the
+other's meaning.
+
+**An item declares nothing to colour it by, and an entity's only grouping is a combat
+bitmask.** `# item` declares `slot:`, `tags:`, `value:`, the `cluster-*` fields and
+`max-level:` and nothing that says what kind of thing it is
+(`src/content/sections/item.ts`); `faction:` is what an entity declares and
+`factionBits` is what it becomes (`src/content/load.ts`) — who fights whom, not what
+something is. One decision taken once for both: **a `# group` kind declares each group
+once**, its display word and its colour, and `# item` and `# entity` each gain a
+`group:` naming one. The colour is read off the group's own declaration, so the grouping
+and the palette are one file and nothing is listed twice. **The engine declares one
+standard group for items and one for entities, and anything naming none falls to its
+kind's**, so nothing is ever ungrouped and the fill has a colour everywhere. *Closes
+when:* an item and an entity each say their group once, a colour is read off it, and
+something declaring none still has one.
+
+**The REPL and the playbot have no grouping at all.** A colour is not a word, so the
+parity harness has nothing to say about one going missing — which is exactly why the
+terminals need it in words if the grouping is to be usable anywhere but the app. Ruled
+with the item above: the `[groupname]` prefix is the group's `title:`, so it is a line
+the moment `# group` exists. *Closes when:* a terminal line names its group.
+
+**The palette is twenty CSS variables and no author can reach it.** `src/index.css`
+holds the `--color-*` set and `tailwind.config.js` binds each to a Tailwind name, so it
+is already one home and already a limited palette. What is missing is that no DSL line
+writes one. Ruled: **a plain colour picker, and no constraint on the choice for now** —
+a `# group` names a colour and the surface that writes it is an ordinary picker. The
+guidance the owner asked for is deliberately not built and is in `open-human.md` under
+*Open questions, not yet work*, because it may turn out not to be needed. *Closes when:*
+a colour is writable from content and reachable from a picker.
 
 ### Notifications
 

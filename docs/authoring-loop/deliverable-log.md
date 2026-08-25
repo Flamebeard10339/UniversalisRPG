@@ -115,6 +115,16 @@ Nobody was looking for it.
 review` is the sheet. **This is Yonatan's and everything else is scheduled around
 it.**
 
+**8. The wants from the owner's own play are rulings now.** Grids, the examine mask and
+the colour grouping crossed out of `open-human.md` on 2026-08-25 with the decisions they
+waited on taken: `Ledger` stays the one component that renders a sheet and takes a
+layout, a `# slot` carries its own position on a body, an unexamined thing reads the
+same in all three surfaces while the playbot reveals a room free on arrival, text colour
+means voice and fill means group, and a `# group` declares each group once with its
+colour and a standard group catches anything naming none. What is left of that play in
+`open-human.md` is the typewriter's rate and whether picking a colour ever needs
+guidance — the second deliberately deferred, because a plain picker may be enough.
+
 Map churn is still deliberately deferred. `combat-expansion.proving-ground` sits at
 `tulsa.market-square`'s own square and hangs off the beach for want of anywhere
 better. A playtest names it better than a reading does.

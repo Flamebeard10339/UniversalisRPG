@@ -69,145 +69,18 @@ meant to measure, and the writing that comes out is his to accept either way.*
 
 Written 2026-08-24, out of playing on and off across several runs. **None of it was
 recorded through the playtest tool**, so no `# test` stands behind a line here and the
-turn each came from is not recoverable. The wants are the owner's own and are not in
-doubt; anything below that reads as a bug still has to be reproduced before it is
-diagnosed.
-
-### Grids, not lists
-
-**The pack is a flat list of full-width rows.** *"inventory is a grid instead of list
-just like the skills tab."* `SkillsPane` already draws the grid the rest wants —
-`grid-cols-[repeat(auto-fill,minmax(6rem,1fr))]`, `src/ui/SkillsPane.tsx:50` — while
-the pack, the stats page and the equipment page are three callers of one `Ledger`, a
-`<dl>` of truncated single-line rows. The reason is that text expands down far better
-than it expands sideways, and Android's app drawer is the reference. **A small font is
-acceptable and a small touch target is not**, so the density cannot come out of the
-44px floor `src/index.css` already sets for every control. *Closes when:* the pack is a
-grid. Three pages share `Ledger` and one of them is asking, so whether that is a second
-component or a mode on the one is the first thing to settle.
-
-*Moves when: that last question is ruled — a second component beside `Ledger`, or a
-mode on it. The item names it as the first thing to settle and nothing else is
-missing.*
-
-**The equipment page wants a paper doll.** Same `Ledger`, fed by `worn(...)`. Where a
-slot sits on a body is a fact nothing declares — a `# slot` supplies display words and
-nothing else (`src/content/sections/item.ts`, the note on `slot:`) — so the layout
-needs an owner, and if it does not get one it becomes a table kept in sync with the
-slots by hand. *Closes when:* worn gear is drawn in slot positions and the positions
-have one home.
-
-*Moves when: it is ruled which declaration carries a slot's position on a body. That
-is the one home the item is asking for, and an agent inventing it would be inventing
-the table this repo counts commits against.*
-
-**The pack has no order the player owns.** The want is drag-and-drop to swap two items.
-`state.inventory` is a `Record<template, count>` and `packRows` reads its order off
-that (`src/runtime/itemInstance.ts:134`), so there is nothing to reorder and nothing a
-save would carry. `DragSheet` is the drag surface the map and the plane already share.
-*Closes when:* the pack has a player-owned order that survives a save.
-
-*Moves when: the grid ruling above lands, because the thing being dragged is the cell.
-The half beneath it — an order `state.inventory` carries and a `# save` round-trips —
-is headless and could be taken on its own today.*
-
-**The action list is a wrapping row of pills.** `Home.tsx`'s `Sheet` draws
-`flex flex-wrap` with `grow basis-40`, grouped under each source's name, so no two rows
-are the same width and nothing lines up down the page. The want is the same grid as the
-pack and the skills page.
-
-*Moves with the pack's grid ruling: it is the same grid, so it is the same ruling.*
-
-**An entity's name is inert.** *"Clicking name/background of an action does the examine
-action."* Today the group heading `groupOffers` produces is plain text, and *Examine*
-stands as one more pill in the group beside it. Read as *the cell's name and background
-examine, the control on it acts*, it fits the grid want and takes a pill out of every
-group.
-
-*Moves with the pack's grid ruling: this is what a cell does once there are cells.*
+turn each came from is not recoverable. The rulings the rest of it turned on were taken
+2026-08-25 and the lines crossed to `open-agent.md` carrying them; what is left here is
+the one want nobody has put a number on.
 
 ### Chat readability, and the information dump
 
-**A new location dumps everything at once, and none of it has been examined.** Two
-rounds of play on the same subject. From 2026-08-23: *"There should be some sort of
-visual cue that I already examined this object."* From this round, the larger form:
-something never examined shows as a question mark that hides its name and its actions
-and keeps only its background colour, so a room the player has not read is a short list
-of unknowns rather than a wall of text. Examining twice says the same words and a third
-time says nothing at all, because the node has fallen silent — and the player cannot
-tell those two apart either. *Closes when:* what has been examined is visible on the
-thing, and an unexamined room costs less to read than it does now. Two questions ride
-on it: what the terminals do with a hidden name, and whether the playbot should
-auto-examine everything, since a bot that must examine before it can act spends a turn
-per entity to do it.
-
-*Moves when: those two questions are answered — what the terminals say for a hidden
-name, and whether the playbot auto-examines. Both change what the parity harness may
-be held to, so neither can be guessed.*
-
-**The chat history is one size throughout.** The want is a smaller font and tighter
-margins, with a **large** margin where the location changes. `KIND_CLASS.place`
-(`src/ui/Home.tsx:22`) is the one line that already knows a place changed, and it
-spends that knowledge on `pt-2` and small caps. *Closes when:* the history reads at a
-glance and a new place is a break rather than a heading.
-
-*Moves when: the owner names the sizes and the margin a place change gets. The wiring
-is one line once the numbers exist; what "reads at a glance" is, is his eye.*
-
-**Dialogue does not animate.** A typewriter reveal. **Explicitly low priority.**
+**Dialogue does not animate.** A typewriter reveal. **Explicitly low priority.** The
+chat's sizing was ruled beside it and deliberately left this unbuilt — text appears at
+once — so nothing now depends on it.
 
 *Moves when: a reveal rate is named. The mechanism is not in doubt; how fast it reads
 is the whole of the question.*
-
-### Colours, and the groups they would stand for
-
-**Every kind of message wants its own colour and the kinds do not have one each.**
-`src/ui/Home.tsx` holds `KIND_CLASS` for five line kinds and `TONE_CLASS` for four
-message tones, hardcoded there; `message` has no colour of its own and borrows its
-tone's. *Closes when:* the distinctions a player needs to make at a glance are the
-distinctions drawn.
-
-*Moves when: the owner says which distinctions those are. The item's own closing clause
-is that list, and nothing in the code supplies it.*
-
-**An item declares nothing to colour it by.** The want is different background colours
-for different items in the pack. `# item` declares `slot:`, `tags:`, `value:`, the
-`cluster-*` fields and `max-level:` and nothing that says what kind of thing it is
-(`src/content/sections/item.ts`), so a colour would have to be inferred from those or
-listed somewhere else — and a list is the failure mode this repo counts commits
-against. *Closes when:* an item says its own group once and the colour is read off it.
-
-*Moves when: the grouping is ruled — what it is called and what it ranges over. Adding
-the field and reading a colour off it is headless the moment that exists.*
-
-**An entity's only grouping is a combat bitmask.** `faction:` is what an entity
-declares and `factionBits` is what it becomes (`src/content/load.ts`): it says who
-fights whom, not what something is. Colouring and sorting the offer list by type needs
-a grouping that survives being shown to a player. *Closes when:* the same decision as
-the item one, taken once for both.
-
-*Moves with the item grouping above — the item itself says it is one decision taken
-once for both.*
-
-**The REPL and the playbot have no grouping at all.** The proposal is a `[groupname]`
-prefix on the line. A colour is not a word, so the parity harness has nothing to say
-about one going missing — which is exactly why the terminals need the prefix if the
-grouping is to be usable anywhere but the app.
-
-*Moves with the grouping ruling: the prefix is a line once there is a group to name.*
-
-**The palette is twenty CSS variables and no author can reach it.** `src/index.css`
-holds the `--color-*` set and `tailwind.config.js` binds each to a Tailwind name, so it
-is already one home and already a limited palette. What is missing is that no DSL line
-writes one, and that editing hex in a text file is awkward. The want is a colour wheel
-**and guidance with it** — a constrained palette, or one control that moves saturation
-uniformly — because the owner does not want to have to learn colour theory to change
-the game's colours. *Closes when:* the palette is writable from content, and the
-surface that writes it constrains the choice rather than offering a free wheel.
-
-*Moves when: the constraint is chosen — a fixed palette, or one control that moves
-saturation uniformly. The half that makes the palette writable from content is headless
-and could be taken on its own today.*
 
 ## A quest cannot hold all of its own state
 
@@ -449,3 +322,12 @@ starts being refusable.
 
 *Moves when: the owner rules it. Refusing to equip one of a stack of three is engine
 work the moment he says yes.*
+
+**Whether picking a colour needs guidance.** The want was a colour wheel **and
+guidance with it** — a constrained palette, or one control moving saturation uniformly
+— because the owner does not want to learn colour theory to change the game's colours.
+Ruled deliberately not now: a plain picker ships with the group colours, and whether a
+free choice actually goes wrong is a thing the corpus answers by having colours in it.
+
+*Moves when an author has picked enough colours to say whether the free wheel was a
+problem — a fact play produces, not information anyone can supply now.*
