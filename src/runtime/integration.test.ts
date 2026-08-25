@@ -1,9 +1,10 @@
 import { clearBuffs } from './buffs';
 import { readdirSync, readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, sampleStat, statValue, useFight } from './runtime';
+import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, sampleStat, statRange, statValue, useFight } from './runtime';
 import { restorePools } from './effects';
 import { isPoint } from '../grammar/range';
+import { populationCount } from '../content/sections/location';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
@@ -51,25 +52,29 @@ describe('shipped content', () => {
   }
 });
 
-// What a foe hits for is its own `stats:` line and nothing else, so a shipped foe that writes a
-// range hits for a different number every swing. That the fight path spends the range rather than
-// its midpoint is proved on a fixture in encounter.test.ts; here the subjects are the corpus's own.
-describe("a shipped foe's swing is what its sheet declares", () => {
+// A swing is spent out of the range its swinger stands at, so a shipped actor that writes a range
+// hits for a different number every time. The subjects are the corpus's own — the player among
+// them, on the same footing as anything it fights, which is the point of writing the spread on a
+// sheet. What an actor stands at is its sheet folded with what it carries, so it is asked for
+// rather than assumed: a foe carrying nothing stands where it wrote, and the player stands a melee
+// level above. That the fight path spends the range rather than its midpoint is proved on a
+// fixture in encounter.test.ts.
+describe("a shipped actor's swing is spent out of the range it stands at", () => {
   const ATTACK = 'core.attack';
   const ranged = [...shipped.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
 
-  it('is written by at least one of them, so the world keeps this exercised', () => {
-    expect(ranged.map((entity) => entity.id)).not.toEqual([]);
+  it('is written by more than one of them, so neither side of a fight carries this alone', () => {
+    expect(ranged.length).toBeGreaterThan(1);
   });
 
   for (const entity of ranged) {
-    it(`${entity.id} reads a different number swing to swing, inside what it wrote`, () => {
+    it(`${entity.id} reads a different number swing to swing, inside what it stands at`, () => {
       const state = createGameState();
-      const declared = entity.stats[ATTACK];
+      const standing = statRange(ATTACK, state, shipped, entity.id);
       const swings = Array.from({ length: 8 }, () => sampleStat(ATTACK, state, shipped, entity.id));
 
-      for (const swing of swings) expect(swing).toBeGreaterThanOrEqual(declared.min);
-      for (const swing of swings) expect(swing).toBeLessThanOrEqual(declared.max);
+      for (const swing of swings) expect(swing).toBeGreaterThanOrEqual(standing.min);
+      for (const swing of swings) expect(swing).toBeLessThanOrEqual(standing.max);
       expect(new Set(swings).size).toBeGreaterThan(1);
     });
   }
@@ -89,8 +94,13 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
 
   it('moves attack as rage accumulates, and moves nothing else at all', () => {
     const state = played('tulsa.rage-rises-as-swings-land');
+    // Where the route left the pool is the route's own `assert:` to say. What is needed here is
+    // only that it left one, and the readings below are taken at the ceiling the jewel grants.
+    expect(state.resources['combat-expansion.rage']).toBeGreaterThan(0);
+    const ceiling = toMilliUnits(statValue('combat-expansion.max-rage', state, shipped));
+
+    restorePools(state, { 'combat-expansion.rage': ceiling });
     const full = sheet(state, shipped);
-    expect(state.resources['combat-expansion.rage']).toBe(20000);
 
     restorePools(state, { 'combat-expansion.rage': 0 });
     const empty = sheet(state, shipped);
@@ -98,7 +108,7 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
     const moved = [...shipped.stats.keys()].filter((statId) => full[statId] !== empty[statId]);
     expect(moved).toEqual(['core.attack']);
 
-    restorePools(state, { 'combat-expansion.rage': 10000 });
+    restorePools(state, { 'combat-expansion.rage': ceiling / 2 });
     const half = sheet(state, shipped);
     expect(half['core.attack'] - empty['core.attack']).toBeCloseTo(full['core.attack'] - half['core.attack'], 10);
   });
@@ -262,9 +272,12 @@ describe('no shipped identifier is named after this content', () => {
 });
 
 describe('core health resource (Pass 2 end-to-end)', () => {
+  const cellarRats = registry.locations.get('tulsa.basement')!.entities.find((each) => each.entity === 'tulsa.giant-rat')!;
+
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
-    expect(state.resources['core.health']).toBe(toMilliUnits(30));
+    const full = state.resources['core.health'];
+    expect(full).toBe(toMilliUnits(30));
 
     state.location = 'tulsa.basement';
     useFight('core.melee-combat', 'tulsa.giant-rat', registry, state);
@@ -272,13 +285,18 @@ describe('core health resource (Pass 2 end-to-end)', () => {
 
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health'];
-    expect(state.flags['tulsa.rats-killed']).toBe(1);
-    expect(afterFighting).toBeLessThan(toMilliUnits(30));
+    // One Fight clears the cellar, so the tally is the population the room declares.
+    expect(state.flags['tulsa.rats-killed']).toBe(populationCount(cellarRats));
+    expect(afterFighting).toBeLessThan(full);
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
+    const unfed = statValue('core.regeneration', state, registry);
     grantBuff(state, PLAYER, registry.items.get('core.cooked-shrimp')!, state.time + secondsToMs(60));
+    const fed = statValue('core.regeneration', state, registry);
+    expect(fed).toBeGreaterThan(unfed);
+
     resolve(state, registry, state.time + secondsToMs(60));
-    expect(state.resources['core.health']).toBe(Math.min(toMilliUnits(30), afterFighting + toMilliUnits(3)));
+    expect(state.resources['core.health']).toBe(Math.min(full, afterFighting + toMilliUnits(fed)));
   });
 });

@@ -261,6 +261,7 @@ at: 3 1
 // struck, so one block is both the player's fight and the rat's bite.
 # action melee-combat
 title: Fight
+continuous
 rate: my attack-rate
 accuracy: my accuracy vs their evasion
 damage: my attack vs their defense
@@ -681,10 +682,16 @@ one of:
 // The player is an entity like any other, and declares everything that measures
 // it. The global `# stat` bases above are what something that names none falls
 // back to; they stopped being this sheet.
+//
+// The swing varies because the arm does, not because the weapon does: `attack`
+// is a range here for the same reason the rat writes `attack 6-8` on its own
+// sheet, and an unarmed player is as uneven as an armed one. Every level of
+// `melee` shifts both ends by one, and a weapon's `+n attack` shifts both ends
+// again, so *base plus level* reads straight off this line.
 # entity player
 title: You
 faction: player
-stats: max-health 30, attack 10, defense 5, attack-rate 25, accuracy 100, evasion 0
+stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
 skills: melee, cooking, thieving
 equipment-slots: mainhand, offhand
 uses: melee-combat
