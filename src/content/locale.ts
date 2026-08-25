@@ -11,6 +11,8 @@ export const ENGINE_KEYS = [
   'engine.travel.unknown-destination',
   'engine.craft.label',
   'engine.talk.to',
+  'engine.requires.item',
+  'engine.requires.unmet',
   'engine.inputs.short',
   'engine.inputs.grown',
   'engine.inputs.worn',

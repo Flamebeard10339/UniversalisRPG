@@ -93,7 +93,16 @@ describe('a location’s own actions', () => {
     const session = startSession(registry);
     const ids = view(session).choices.map((c) => c.id);
     expect(ids).toContain('use:location.shore.search-tideline');
-    expect(ids).not.toContain('use:location.shore.light-beacon');
+    expect(ids).toContain('use:location.shore.light-beacon');
+  });
+
+  it('offers one whose requires: does not stand, and refuses it when it is taken', () => {
+    const session = startSession(loadModule(WITH_ACTIONS));
+
+    const v = apply(session, 'use:location.shore.light-beacon');
+    expect(v.said).toHaveLength(1);
+    expect(String(v.said[0])).not.toContain('The beacon catches.');
+    expect(v.time).toBe(0);
   });
 
   it('runs one, scoping its bare references to the location that owns it', () => {

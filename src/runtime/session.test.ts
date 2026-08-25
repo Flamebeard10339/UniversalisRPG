@@ -15,6 +15,7 @@ import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choice
 import { skillLevel, xpForLevel } from './skills';
 
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
+import { actionLinesWritten } from '../grammar/action';
 
 // The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
 const tutorial = (): Registry => loadUniverse(withEngineLocale(standingSources()));
@@ -1732,5 +1733,121 @@ describe('an entity puts the offer it mints second', () => {
     expect(fought.length).toBeGreaterThan(0);
     expect(subjects.length).toBeGreaterThan(fought.length);
     for (const group of fought) expect(group.offers.map((offer) => offer.id).indexOf(group.minted!), `${group.at} / ${group.entity}`).toBe(1);
+  });
+});
+
+// The gates the grammar declares over whether an action is offered, read off its own field table
+// rather than listed here, so a third one added next month has to answer this claim.
+const OFFERED_WHEN = actionLinesWritten()
+  .filter((line) => line.family === 'offered when')
+  .map((line) => line.form.slice(0, line.form.indexOf(':')));
+
+const GATED = (field: string, condition: string): string => `
+# location room
+x: 0, y: 0
+starting
+entities:
+  thing
+
+# entity thing
+title: Thing
+poke:
+  instant
+  ${field}: ${condition}
+  say: The thing is poked.
+`;
+
+// `time` starts at zero, so one of these two stands and the other does not, whichever way a gate
+// reads its condition — which is what lets one claim ask every gate the same question.
+const STANDS = 'time < 100';
+const FAILS = 'time > 100';
+const POKE = 'use:entity.thing.poke';
+const POKED = 'The thing is poked.';
+
+describe('what takes an action off the list', () => {
+  const gated = (field: string, condition: string): PlaySession => startSession(loadInEnglish(GATED(field, condition)));
+  const offers = (field: string, condition: string): boolean => ids(view(gated(field, condition))).includes(POKE);
+
+  it('is `hidden if:` and nothing else, over every gate the grammar declares', () => {
+    expect(OFFERED_WHEN.length).toBeGreaterThan(1);
+    expect(OFFERED_WHEN.filter((field) => offers(field, STANDS) !== offers(field, FAILS))).toEqual(['hidden if']);
+  });
+
+  it('leaves every other gate offered in both worlds, and refuses it in the one where it bites', () => {
+    const others = OFFERED_WHEN.filter((field) => field !== 'hidden if');
+    expect(others.length).toBeGreaterThan(0);
+
+    for (const field of others) {
+      const taken = [STANDS, FAILS].map((condition) => {
+        const session = gated(field, condition);
+        expect(ids(view(session)), `${field}: ${condition}`).toContain(POKE);
+        return apply(session, POKE).said.map(String);
+      });
+      const refused = taken.filter((said) => !said.includes(POKED));
+      expect(taken.filter((said) => said.includes(POKED)), field).toHaveLength(1);
+      expect(refused, field).toHaveLength(1);
+      expect(refused[0]!.join(' '), field).not.toBe('');
+      expect(refused[0]!.join(' '), field).not.toContain('time');
+    }
+  });
+});
+
+const OVEN = `
+# item raw-chestnut
+title: Raw Chestnut
+examine: Green in the husk.
+
+# location kitchen
+x: 0, y: 0
+starting
+entities:
+  oven
+
+# entity oven
+title: Oven
+roast chestnuts:
+  instant
+  requires: has raw-chestnut
+  say: A chestnut pops from the embers.
+
+# entity shrine
+title: Shrine
+flags: blessed
+pray:
+  instant
+  requires: blessed
+  say: Nothing answers.
+
+# entity altar
+title: Altar
+flags: blessed
+kneel:
+  instant
+  requires: blessed
+  say: Nothing answers.
+  on failure:
+    say: The stone is cold, and you are not ready for it.
+`;
+
+describe('the words an unmet requires: refuses in', () => {
+  const kitchen = (): PlaySession => startSession(loadInEnglish(OVEN.replace('entities:\n  oven', 'entities:\n  oven\n  shrine\n  altar')));
+
+  it('names the item the player is short of, by the title the world gives it', () => {
+    expect(apply(kitchen(), 'use:entity.oven.roast-chestnuts').said.map(String)).toEqual(['You need Raw Chestnut for that.']);
+  });
+
+  it('says nothing about the condition where the condition is not an item', () => {
+    expect(apply(kitchen(), 'use:entity.shrine.pray').said.map(String)).toEqual(['You cannot do that yet.']);
+  });
+
+  it('stands aside for an author who wrote `on failure:`', () => {
+    expect(apply(kitchen(), 'use:entity.altar.kneel').said.map(String)).toEqual(['The stone is cold, and you are not ready for it.']);
+  });
+
+  it('leaves the world alone: a refused action arms nothing and takes no time', () => {
+    const session = kitchen();
+    const refused = apply(session, 'use:entity.oven.roast-chestnuts');
+    expect(refused.action).toBeNull();
+    expect(refused.time).toBe(0);
   });
 });
