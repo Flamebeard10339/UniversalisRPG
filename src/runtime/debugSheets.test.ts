@@ -136,6 +136,10 @@ DEBUG
 DEBUG
 at: 2 1
 
+# group probe-group
+DEBUG
+colour: #112233
+
 # variable probe-variable
 DEBUG
 value: 1
