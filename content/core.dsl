@@ -142,8 +142,10 @@ colour: #fbbf24
 // --- skills ---
 
 # skill thieving
+stat: attack
 
 # skill melee
+stat: attack
 
 # skill cooking
 

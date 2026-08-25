@@ -10,6 +10,7 @@ import { Item } from '../content/sections/item';
 import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
+import { skillTags } from '../content/sections/skill';
 import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, PLAYER } from './state';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
@@ -86,7 +87,7 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
   }
   for (const skillId of entity?.skills ?? []) {
     const skill = registry.skills.get(skillId);
-    if (skill) carriers.push({ tags: skill.tags });
+    if (skill) carriers.push({ tags: skillTags(skill) });
   }
   const race = actorId === PLAYER ? registry.races.get(state.player.race) : undefined;
   if (race) carriers.push({ tags: race.tags });

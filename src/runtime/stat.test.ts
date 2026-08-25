@@ -8,12 +8,14 @@ import type { Localized } from './localized';
 
 const TEST_REASON = 'because the test said so' as Localized;
 import { requiresMet } from './actions';
-import { seatedAction } from './actionLookup';
+import { actorEntity, seatedAction } from './actionLookup';
+import { xpForLevel } from './skills';
 import { performable } from './roster';
 import { handOver, HandOver, receiveItem } from './itemInstance';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { Registry } from '../content/registry';
-import { loadModule } from '../content/load';
+import { loadModule, loadUniverse } from '../content/load';
+import { shippedSources } from '../content/shipped';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
 
@@ -60,6 +62,21 @@ function withStrike(): GameState {
 }
 
 const clause = (source: string) => tagClause.parse(new Cursor(source));
+
+// What taking one skill to a level does to a world's stats: every stat the registry declares, read
+// before and after, and kept only where it moved. The subjects are the world's own, so a stat added
+// to it is weighed with nothing edited here.
+function movedByLevels(registry: Registry, skillId: string, level: number): Record<string, number> {
+  const state = createGameState('');
+  const before = [...registry.stats.keys()].map((statId) => [statId, statValue(statId, state, registry)] as const);
+  state.xp[skillId] = xpForLevel(level);
+  return Object.fromEntries(
+    before.flatMap(([statId, was]) => {
+      const by = statValue(statId, state, registry) - was;
+      return by === 0 ? [] : [[statId, by] as const];
+    }),
+  );
+}
 
 describe('range values in the grammar', () => {
   it('parses a bare number as a point range and a hyphenated pair as an interval', () => {
@@ -370,5 +387,39 @@ describe('the stat fold reads the seat, not offerability', () => {
     const { registry, state } = seated('gambler', 'overreach');
     expect(statValue('attack', state, registry)).toBe(9);
     expect(requiresMet(inTheSeat(state, registry), state, registry)).toBe(false);
+  });
+});
+
+// The subjects are every skill the shipped player holds, read off the world rather than named here,
+// so a skill the player gains next month is held to the same claim with nothing edited; and each is
+// asked about every stat the world declares, so a grant landing anywhere else is what fails.
+describe('a skill of the shipped player', () => {
+  const SHIPPED = loadUniverse(shippedSources());
+  const HELD = (actorEntity(SHIPPED, PLAYER)?.skills ?? []).map((id) => SHIPPED.skills.get(id)!);
+  const LEVEL = 9;
+
+  it('is more than one skill against more than a handful of stats, so nothing below is vacuous', () => {
+    expect(HELD.length).toBeGreaterThan(1);
+    expect(SHIPPED.stats.size).toBeGreaterThan(5);
+  });
+
+  it.each(HELD)('$id raises the stat it names by one for each level it gains, and no other stat at all', (skill) => {
+    expect(movedByLevels(SHIPPED, skill.id, LEVEL)).toEqual(skill.stat === undefined ? {} : { [skill.stat]: LEVEL - 1 });
+  });
+});
+
+// What a skill that names no stat does is the half of the rule the corpus need not always hold a
+// subject for, so both halves stand up here on a world of their own.
+describe('a skill weighed against one that names no stat', () => {
+  const REGISTRY = loadModule(['# stat guile', 'base: 2', '', '# skill lockpicking', 'stat: guile', '', '# skill whistling', '', '# entity player', 'skills: lockpicking, whistling'].join('\n'));
+
+  it('raises the stat it names, from the first level and by one for each after it', () => {
+    expect(statValue('guile', createGameState(''), REGISTRY)).toBe(3);
+    expect(movedByLevels(REGISTRY, 'lockpicking', 4)).toEqual({ guile: 3 });
+  });
+
+  it('raises nothing at any level where it names no stat', () => {
+    expect(movedByLevels(REGISTRY, 'whistling', 4)).toEqual({});
+    expect(movedByLevels(REGISTRY, 'whistling', 40)).toEqual({});
   });
 });
