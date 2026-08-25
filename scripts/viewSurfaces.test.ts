@@ -3,9 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { saidWords } from '../src/content/locale';
-import { newContext, runLine, type CommandContext } from '../src/runtime/command';
+import { LIVE_TICK_MS, newContext, runLine, type CommandContext, type LiveRun } from '../src/runtime/command';
+import type { Localizer } from '../src/runtime/localized';
 import { sessionLocalizer, startSession, view } from '../src/runtime/session';
 import { pageStorage } from '../src/ui/agent/pageStorage';
+import { asksNothing } from '../src/ui/asking';
 import { App } from '../src/ui/App';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
@@ -22,8 +24,8 @@ import {
   type SurfaceRun,
   type SurfaceStep,
 } from './lib/viewCoverage';
-import { printed } from './lib/replLines';
-import { formatResult } from './play-cli';
+import { printed, say } from './lib/replLines';
+import { driveRun, formatResult, openRepl } from './play-cli';
 import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 
 // One question, asked of all three drivers over one engine: no surface may lose a capability the
@@ -39,11 +41,16 @@ import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 const PARITY_EXCUSED: readonly PathExcuse[] = [
   {
     path: 'modals[].options[].label',
-    why: "a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it (ModalSheet's `onlyLeaves`). A terminal has no frame around a screen and names the question to say one is open at all",
+    why: 'a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it. A terminal has no frame around a screen and names the question to say one is open at all',
+    // The app's own judgement, asked rather than restated, so this covers the moments it covers and
+    // not the path. Every other screen's question is load-bearing — an item's own words, a jewel's —
+    // and a driver that dropped one fails here.
+    covers: (view) => asksNothing(view.modals),
   },
   {
     path: 'planes[].clusters[].positions[].title',
     why: 'the app names the node the player has picked and nothing on the lattice itself, since a tap is how a node is asked about there; a terminal has nothing to tap and so lays every node out as a table with its passive in a column',
+    covers: () => true,
   },
 ];
 
@@ -92,7 +99,10 @@ const SCRIPT: readonly string[] = [
   '/load tutorial-quests.miki-route-start',
   '/goto tulsa.basement',
   '/state',
-  'use: core.melee-combat on tulsa.giant-rat',
+  // Picked as a choice rather than typed as the directive behind it, which is the one shape that
+  // arms an action instead of applying it: a driver that can advance a run gets one to advance, and
+  // the live sheet a terminal draws while it runs is only reachable this way.
+  'fight:core.melee-combat:tulsa.giant-rat',
   '/state',
 ];
 
@@ -101,15 +111,63 @@ const registry = () => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 // The same script, walked once per driver, so a path is asked of each of them in the same state.
 const walkScript = (step: (line: string) => SurfaceStep): SurfaceStep[] => SCRIPT.map(step);
 
-function cliRun(): SurfaceStep[] {
-  const session = startSession(registry());
-  const ctx = newContext(session, view(session));
-  return walkScript((line) => {
+// A bound on a loop that stops itself: driveRun ends the run the tick it goes inactive and clears
+// the ticker, so this only decides how long a run that never ends is watched before the next line
+// interrupts it — which is what typing one does at the real terminal.
+const LIVE_TICKS_WATCHED = 200;
+
+// The terminal's own live loop, on a clock this walk turns by hand. Everything play-cli says while
+// an action runs it says through driveRun, so the sheet naming the action under way is reached here
+// the same way a player reaches it, rather than described a second time.
+function driveHere(run: LiveRun, localizer: Localizer): string[] {
+  const written: string[] = [];
+  const ticks: Array<(elapsedMs: number) => void> = [];
+  const stop = driveRun(
+    run,
+    localizer,
+    (text) => void written.push(text),
+    (result) => void written.push(...formatResult(result, localizer).map(printed)),
+    (tick) => {
+      ticks.push(tick);
+      return () => void (ticks.length = 0);
+    },
+  );
+  for (let watched = 0; watched < LIVE_TICKS_WATCHED && ticks.length > 0; watched++) ticks[0](LIVE_TICK_MS);
+  stop(true);
+  return written;
+}
+
+// The lines of the walk that came back with a run to advance, beside the steps themselves. A walk
+// where that list is empty puts play-cli in a shape it is never in — every claim below still
+// passes and the live sheet is never drawn — so the list is something to assert on, not a detail.
+interface TerminalWalk {
+  readonly steps: SurfaceStep[];
+  readonly armedBy: string[];
+}
+
+function cliWalk(driving: boolean): TerminalWalk {
+  const { context: ctx } = openRepl(SHIPPED_SOURCES, { driving });
+  const { session } = ctx;
+  const armedBy: string[] = [];
+  const steps = walkScript((line) => {
     const result = runLine(ctx, line);
-    const rendered = formatResult(result, sessionLocalizer(session)).map(printed).join('\n');
+    const localizer = sessionLocalizer(session);
+    if (result.live) armedBy.push(line);
+    const running = result.live ? [...(result.view?.said ?? []).map((said) => printed(say(said))), ...driveHere(result.live, localizer)] : [];
+    const rendered = [...formatResult(result, localizer).map(printed), ...running].join('\n');
     ctx.view = view(session);
     return { view: ctx.view, rendered };
   });
+  return { steps, armedBy };
+}
+
+// Both shapes of the one terminal, because `--live` on a TTY is a boolean and a boolean has no
+// third value. Driving, a choice arms an action and everything said while it runs is said through
+// the live sheet; not driving, the same choice resolves at once and `/state` is the only place an
+// action under way is named. Either walk alone leaves whatever only the other draws unproved.
+function cliRun(): TerminalWalk {
+  const walks = [true, false].map(cliWalk);
+  return { steps: walks.flatMap((walk) => walk.steps), armedBy: walks.flatMap((walk) => walk.armedBy) };
 }
 
 function botRun(): SurfaceStep[] {
@@ -158,9 +216,13 @@ function guiRun(): SurfaceStep[] {
 describe('no driver draws less of a live view than the others', () => {
   const runs = (): SurfaceRun[] => [
     { name: 'the playbot', steps: botRun() },
-    { name: 'play-cli', steps: cliRun() },
+    { name: 'play-cli', steps: cliRun().steps },
     { name: 'the GUI', steps: guiRun() },
   ];
+
+  it('the walk arms an action, so the sheet a terminal draws while one runs is drawn here at all', () => {
+    expect(cliRun().armedBy).not.toEqual([]);
+  });
 
   it('every leaf the same short run publishes reaches all three drivers, or none of them', () => {
     const drifting = driftingPaths(runs(), saidWords(registry().locales), PARITY_EXCUSED);

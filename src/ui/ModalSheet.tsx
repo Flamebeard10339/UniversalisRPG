@@ -1,12 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import type { PlayView } from '../runtime/session';
+import { onlyLeaves } from './asking';
 import { useMoment } from './transient';
 
 type Option = PlayView['modals'][number]['options'][number];
-
-// A question whose only answer is the one that leaves is not a question: what the
-// screen is showing is the whole of it, and clicking away is what there is to do.
-const onlyLeaves = (option: Option, leaving: string | undefined): boolean => leaving !== undefined && option.values?.length === 1 && option.values[0].value === leaving;
 
 export function ModalSheet({ option, onAnswer, onDismiss, leaving, children }: { option: Option; onAnswer: (key: string, value: string) => void; onDismiss?: () => void; leaving?: string; children?: ReactNode }): JSX.Element {
   const [typed, setTyped] = useState('');
