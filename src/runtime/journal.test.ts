@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { stageNow } from '../content/sections/quest';
 import { evaluateCondition } from './conditions';
-import { journal, standingLine } from './journal';
+import { loadUniverse } from '../content/load';
+import { shippedSources } from '../content/shipped';
+import { journal, standingLine, STANDING_GROUP, type QuestStanding } from './journal';
 import { createGameState } from './runtime';
 import { runTest } from './session';
 import type { GameState } from './state';
@@ -170,5 +172,33 @@ describe('a quest played through', () => {
     expect(runTest('takes-the-offer', played, state)).toEqual({ passed: true });
     expect(state.flags['finding-your-feet.offered']).toBe(true);
     expect(journal(played, state)).toMatchObject([{ stage: 'name-yourself', standing: 'started', lines: [{ said: 'Miki offered to show you the ropes.', struck: true }, { said: 'Miki wants you to name yourself.', struck: false }] }]);
+  });
+});
+
+// The subjects are every standing the engine can publish, read off the declaration that names them,
+// so a fourth added next month is held to naming a group of its own and to being told apart from the
+// other three. What tells them apart is a colour a world authored, which is what makes this a claim
+// about the corpus rather than about whatever draws the journal.
+describe('where a quest stands reaches a surface as a group', () => {
+  const shipped = loadUniverse(shippedSources());
+  const STANDINGS = Object.keys(STANDING_GROUP) as QuestStanding[];
+
+  it('names a group the world declares, and a colour for each', () => {
+    expect(STANDINGS.flatMap((each) => (shipped.groups.get(STANDING_GROUP[each])?.colour ? [] : [`${each} is coloured by ${STANDING_GROUP[each]}, which the world declares no colour for`]))).toEqual([]);
+  });
+
+  it('is a different colour for every one of them, so no two standings read alike', () => {
+    const colours = STANDINGS.map((each) => shipped.groups.get(STANDING_GROUP[each])!.colour);
+
+    expect(new Set(colours).size).toBe(STANDINGS.length);
+  });
+
+  it('publishes it on every entry the shipped journal carries', () => {
+    const state = createGameState();
+    state.location = [...shipped.locations.values()].find((each) => each.starting)!.id;
+    const entries = journal(shipped, state);
+
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.map((entry) => entry.group?.colour)).toEqual(entries.map((entry) => shipped.groups.get(STANDING_GROUP[entry.standing])!.colour));
   });
 });

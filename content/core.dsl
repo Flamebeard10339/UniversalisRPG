@@ -133,6 +133,22 @@ colour: #94a3b8
 standard for: entity
 colour: #fbbf24
 
+// Where a quest stands is a kind of thing the quest is, so it is said here with
+// everything else that is: the screen fills the row with the colour and a
+// terminal prints the word, off the one declaration.
+
+# group quest-unstarted
+title: Not started
+colour: #e5e7eb
+
+# group quest-started
+title: Under way
+colour: #fbbf24
+
+# group quest-complete
+title: Done
+colour: #34d399
+
 // --- flags ---
 
 // Running out of health is the engine's own event, and this is what the player

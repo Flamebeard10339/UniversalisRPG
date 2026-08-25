@@ -1,6 +1,6 @@
 import { mapOf, type Registry } from '../content/registry';
 import { registryMapOf } from '../content/sections';
-import { groupOf } from '../content/sections/group';
+import { groupOf, type Group } from '../content/sections/group';
 import { ownerRef } from './actions';
 import type { Answer, Localized, Localizer } from './localized';
 
@@ -13,15 +13,29 @@ export interface GroupRow {
   readonly colour: string;
 }
 
+const row = (localizer: Localizer, found: Group | undefined): GroupRow | undefined =>
+  found === undefined ? undefined : { id: found.id as Answer, title: localizer.title('group', found.id), colour: found.colour };
+
 // The group whatever is held under that id belongs to, read off the section itself rather than asked
 // of each caller, so a kind that gains a `group:` is published the same way with nothing edited here.
 // A world that declares no group for the kind publishes no field rather than an empty one.
 export function grouping(registry: Registry, localizer: Localizer, kind: string, id: string): { group?: GroupRow } {
   const name = registryMapOf(kind);
   const held = name === null ? undefined : (mapOf(registry, name).get(id) as { group?: string } | undefined);
-  const found = groupOf(registry.groups, kind, held?.group);
-  return found === undefined ? {} : { group: { id: found.id, title: localizer.title('group', found.id), colour: found.colour } };
+  const found = row(localizer, groupOf(registry.groups, kind, held?.group));
+  return found === undefined ? {} : { group: found };
 }
+
+// The group a world declares under a name, for what is a kind of thing without being a kind of
+// section — where a quest stands is one such, and is coloured and named off a `# group` like the
+// rest rather than out of whatever draws it.
+export const groupNamed = (registry: Registry, localizer: Localizer, id: string): GroupRow | undefined => row(localizer, registry.groups.get(id));
+
+// A colour is not a word, so a driver that cannot fill anything says the group instead. The words are
+// the group's own `title:`, which is the same string a screen fills a cell for, rather than a second
+// name for the same thing.
+export const grouped = (localizer: Localizer, group: GroupRow | undefined, said: Localized): Localized =>
+  group === undefined ? said : localizer.engine('engine.repl.grouped', { group: group.title, said });
 
 // What a choice says about whatever offers it: the address a surface keys a cell on, the name it
 // stands under and the group that colours it. Written once, so a choice minted from a new kind of

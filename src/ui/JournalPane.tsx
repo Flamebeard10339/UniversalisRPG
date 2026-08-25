@@ -1,5 +1,6 @@
 import type { PlayView } from '../runtime/session';
-import { journalRows, TONES } from './journalPanel';
+import { journalRows } from './journalPanel';
+import { fillOf } from './lineStyle';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
@@ -15,9 +16,9 @@ export function JournalPane({ view, words, onOpen }: { view: PlayView; words: Wo
       <ul className="mx-auto flex max-w-2xl flex-col">
         {rows.length === 0 ? <li className="py-6 text-center text-sm text-text-muted">{words('journal-empty')}</li> : null}
         {rows.map((row) => (
-          <li key={row.id} className="border-b border-border last:border-b-0">
-            <button data-drive="send" type="button" onClick={() => onOpen(row.id)} className="w-full py-3 text-left active:scale-[0.99]">
-              <span className={`text-sm font-semibold ${TONES[row.standing]}`}>{row.title}</span>
+          <li key={row.id} className="mb-2 last:mb-0">
+            <button data-drive="send" type="button" style={fillOf(row.group)} onClick={() => onOpen(row.id)} className="w-full rounded-xl border border-border px-3 py-3 text-left active:scale-[0.99]">
+              <span className="text-sm font-semibold">{row.title}</span>
             </button>
           </li>
         ))}
