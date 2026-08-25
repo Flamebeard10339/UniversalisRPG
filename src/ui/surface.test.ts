@@ -256,6 +256,17 @@ describe('the rules the driver is held to', () => {
     }
   });
 
+  // The pack has an order its owner chose and `swap:` is the directive that writes it, so the one
+  // function that moves a row lives in runtime and every surface reaches it by saying so. A screen
+  // that reordered its own copy would draw a pack that the save it came from does not hold, and it
+  // would be the second authority on where a thing sits.
+  it('moves a pack row by saying so, never by ordering a copy of its own', () => {
+    const ordering = SHIPPED.filter((source) => /(?:swappedOrder|inPlayerOrder|packOrder)/.test(source.text));
+
+    expect(ordering.map((source) => source.file), 'a module under src/ui reaches the pack order itself instead of sending swap:').toEqual([]);
+    expect(SHIPPED.filter((source) => /swap:\s*\$\{/.test(source.text)).map((source) => source.file), 'nothing under src/ui sends the swap directive at all, so the rule above holds vacuously').not.toHaveLength(0);
+  });
+
   it('reaches the agent directory only from a branch a production build folds away', () => {
     expect(AGENT_ONLY, 'the agent directory is empty, so every rule below holds vacuously').not.toHaveLength(0);
 

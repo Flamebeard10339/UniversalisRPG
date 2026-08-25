@@ -355,10 +355,3 @@ declines to write a start save, because the author's `load:` already places the 
 which is two rules where one would do. With `from` able to name a `# save`, the run always
 carries a start save, a `load:` in the history is the same fact stated twice, and the
 branch that decides between them is deleted rather than moved.
-
-**One function moves a pack row, and every surface calls it.** Ruled: *"Absolute parity
-between the surfaces. The runtime exposes a single function to move item from position X
-to position Y, swapping if necessary. Each of the play states can either call or not.
-Either way, the function is exposed and only exists in one place."* So the terminal's
-missing control was never the question — the question was where the move lives, and the
-answer is runtime, once. `swap:` stays the directive that records and replays it.

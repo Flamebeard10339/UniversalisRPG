@@ -543,7 +543,14 @@ state by the road state already takes, so `SaveField`, `SAVE_FIELDS` and `SPAN_V
 had to answer for it through `keyof GameState` rather than a list being edited. A row the
 order has never seen falls in behind the ones it has; a name the pack no longer holds
 draws nothing. `carried()` no longer sorts by name, which was a second answer to where a
-thing sits.
+thing sits. **`swappedOrder` in `src/runtime/packOrder.ts` is the only function that moves
+a row, and every surface reaches it by saying `swap: <one> with <other>`** — the app's
+`driver.swap` builds exactly that line, and a terminal accepts it typed, so neither has a
+control the other lacks and neither has an ordering of its own. A sweep in
+`src/ui/surface.test.ts` holds that: no module under `src/ui` may name `swappedOrder`,
+`inPlayerOrder` or `packOrder`, with a vacuity guard that something still sends the
+directive. A screen that reordered its own copy would draw a pack the save does not
+hold.
 
 **A plane shrinks from its leaves inward, and a socket never comes back.** A passive
 point refunds with no new state at all — `pointsSpent` is derived from the allocated
