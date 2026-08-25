@@ -1,6 +1,9 @@
 import type { ModalChoice } from './modalOption';
 import { describe, expect, it } from 'vitest';
-import { createGameState, GameState, travelSeconds } from './runtime';
+import { armAction, createGameState, GameState, travelSeconds } from './runtime';
+import { Action } from '../grammar/action';
+import { entitiesStood } from '../content/sections/location';
+import { initialState } from './save';
 import { itemInstance, receiveItem } from './itemInstance';
 import { Registry } from '../content/registry';
 import { FIXTURE_WORLD } from '../content/worldFixture';
@@ -1924,10 +1927,22 @@ uses: swing
 # entity scarecrow
 title: Scarecrow
 stats: max-health 1, dr 0
+straighten:
+  instant
+  say: You set the scarecrow straight on its pole.
 
 # entity gate-troll
 title: Gate Troll
 stats: max-health 1, dr 0
+haggle:
+  instant
+  say: The troll names a price and waits.
+
+# entity winch
+title: Winch
+crank:
+  instant
+  say: Something far off clunks and gives.
 
 # location camp
 entities: scarecrow
@@ -1986,5 +2001,112 @@ describe('a fight named on a foe that is not standing here', () => {
     const after = view(session);
     expect(after.action).toBeNull();
     expect(after.time).toBe(before);
+  });
+});
+
+// The same question of an entity's own action rather than of a foe, reached the same one way: the
+// room's offers are built from who stands in it, so only a directive names an entity that is not
+// there. What separates the winch from the troll is that no room stands the winch at all — it is
+// nowhere rather than somewhere else, which is what a lever a player can never walk up to is.
+describe('an entity action named on an entity that is not standing here', () => {
+  const yard = (): PlaySession => startSession(loadInEnglish(YARD));
+
+  const use = (session: PlaySession, entity: string, action: string): PlayView => {
+    view(session);
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: entity, actionId: action });
+    return view(session);
+  };
+
+  const offered = (session: PlaySession): string[] => view(session).choices.filter((choice) => choice.id.startsWith('use:entity.')).map((choice) => choice.id);
+
+  it('offers it while the entity stands, and stops offering it once the entity falls', () => {
+    const session = yard();
+    expect(offered(session)).toContain('use:entity.scarecrow.straighten');
+
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+    applyDirective(session, { kind: 'wait-out' });
+    expect(offered(session)).toEqual([]);
+  });
+
+  it('refuses a directive that names the felled entity, in the words a player reads', () => {
+    const session = yard();
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+    applyDirective(session, { kind: 'wait-out' });
+
+    expect(use(session, 'scarecrow', 'straighten').said.map(String)).toEqual(['There is no Scarecrow here.']);
+  });
+
+  it('refuses one standing in another room by the same words', () => {
+    expect(use(yard(), 'gate-troll', 'haggle').said.map(String)).toEqual(['There is no Gate Troll here.']);
+  });
+
+  it('leaves the world alone: it arms nothing and spends no time', () => {
+    const session = yard();
+    const before = view(session).time;
+    const after = use(session, 'gate-troll', 'haggle');
+
+    expect(after.action).toBeNull();
+    expect(after.time).toBe(before);
+  });
+
+  it('says nothing about where an entity no room stands is, and does what it was asked', () => {
+    expect(use(yard(), 'winch', 'crank').said.map(String)).toEqual(['Something far off clunks and gives.']);
+  });
+});
+
+// The subjects are the shipped world's own placements rather than a list, so an entity a room stands
+// next month is held to this with no edit — and the pair of claims is what makes the cut a rule
+// instead of a repair: being placed somewhere is what makes *not here* a thing that can be said.
+describe('every entity the shipped world places, named by a directive from a room that does not stand it', () => {
+  const registry = loadUniverse(shippedSources());
+  const placed = entitiesStood(registry.locations);
+  const rooms = [...registry.locations.values()];
+  const away = (entityId: string): string => rooms.find((room) => !room.entities.some((entry) => entry.entity === entityId))!.id;
+
+  const armedFrom = (entityId: string, action: Action, locationId: string): { armed: boolean; said: string } | undefined => {
+    const state = initialState(registry);
+    state.location = locationId;
+    try {
+      const armed = armAction('entity', entityId, actionAddress(action), registry, state).armed;
+      return { armed, said: state.log.length === 0 ? '' : String(state.log[state.log.length - 1]) };
+    } catch {
+      return undefined; // Hidden from where it was named, and never reaches the question below.
+    }
+  };
+
+  const doors = [...placed.keys()].flatMap((entityId) => (registry.entities.get(entityId)?.actions ?? []).map((action) => ({ entityId, action })));
+
+  it('arms nothing, and says there is no such thing here', () => {
+    const armed: string[] = [];
+    const unsaid: string[] = [];
+    const told: string[] = [];
+    const hidden: string[] = [];
+    for (const { entityId, action } of doors) {
+      const written = `${entityId}.${actionAddress(action)}`;
+      const attempt = armedFrom(entityId, action, away(entityId));
+      if (attempt === undefined) hidden.push(written);
+      else if (attempt.armed) armed.push(written);
+      else if (action.onFailure || /^There is no .+ here\.$/.test(attempt.said)) told.push(written);
+      else unsaid.push(`${written}: ${attempt.said}`);
+    }
+    expect(armed).toEqual([]);
+    expect(unsaid).toEqual([]);
+    expect(told.length, 'a door hidden from the far room never reaches the question, and most of them are not').toBeGreaterThan(hidden.length);
+  });
+
+  // Two of them in the shipped world, and the pair is the point: the entity the game is played as,
+  // and a DEBUG chest kept for the two growth recordings to name. Neither is anywhere to be missing from.
+  it('arms just the same for an entity no room stands anywhere, which is what a directive-only lever is', () => {
+    const nowhere = [...registry.entities.keys()].filter((entityId) => !placed.has(entityId));
+    const refused: string[] = [];
+
+    expect(nowhere.length).toBeGreaterThan(0);
+    for (const entityId of nowhere) {
+      for (const action of registry.entities.get(entityId)!.actions) {
+        const attempt = armedFrom(entityId, action, rooms[0]!.id);
+        if (attempt && !attempt.armed && attempt.said.startsWith('There is no ')) refused.push(`${entityId}.${actionAddress(action)}: ${attempt.said}`);
+      }
+    }
+    expect(refused).toEqual([]);
   });
 });

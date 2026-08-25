@@ -25,7 +25,7 @@ import { armedAction, Participant, participants, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
-import { applyRespawns, downOne, isStanding, nextRespawn, standing } from './population';
+import { applyRespawns, downOne, isElsewhere, isStanding, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/sections/action';
 import { Action, declaredId } from '../content/sections/entity';
 import { actionKind, isTwoSided } from '../grammar/action';
@@ -592,7 +592,7 @@ function whyRefused(action: Action, registry: Registry, state: GameState, target
   const item = (id: string): Localized => localizer.title('item', id);
   if (target !== undefined) {
     const location = registry.locations.get(state.location);
-    if (location && !isStanding(state, registry, location, target)) {
+    if (location && isElsewhere(state, registry, location, target)) {
       return localizer.engine('engine.target.absent', { target: actorTitle(target, registry, state) });
     }
   }
@@ -623,7 +623,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(ownerRef(obj, objId)) }));
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
-  const refused = refuseAction(action, registry, state);
+  const refused = refuseAction(action, registry, state, obj === 'entity' ? objId : undefined);
   if (refused) return refused;
 
   const repeating = actionKind(action) === 'continuous';
