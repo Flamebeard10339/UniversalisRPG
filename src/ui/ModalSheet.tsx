@@ -1,22 +1,22 @@
 import { useState, type ReactNode } from 'react';
+import type { Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { onlyLeaves } from './asking';
 import { VOICE_CLASS } from './lineStyle';
 import { useMoment } from './transient';
-import type { LogEntry } from './transcript';
 
 type Option = PlayView['modals'][number]['options'][number];
 
 // The words the sheet is answering, which the scrim behind it has taken away. They are drawn in the
 // voice they were said in, so a line reads the same whether it is in the history or in front of it.
-function Spoken({ lines }: { lines: readonly LogEntry[] }): JSX.Element | null {
+function Spoken({ lines }: { lines: readonly Localized[] }): JSX.Element | null {
   if (lines.length === 0) return null;
   return (
     <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
       <div className="unbarred flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
-        {lines.map((line) => (
-          <p key={line.id} className={`whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS[line.kind]}`}>
-            {line.text}
+        {lines.map((line, at) => (
+          <p key={at} className={`whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`}>
+            {line}
           </p>
         ))}
       </div>
@@ -36,7 +36,7 @@ export function ModalSheet({
   onAnswer: (key: string, value: string) => void;
   onDismiss?: () => void;
   leaving?: string;
-  spoken?: readonly LogEntry[];
+  spoken?: readonly Localized[];
   children?: ReactNode;
 }): JSX.Element {
   const [typed, setTyped] = useState('');
