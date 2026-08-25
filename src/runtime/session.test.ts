@@ -1897,3 +1897,94 @@ describe('the words an unmet requires: refuses in', () => {
     expect(refused.time).toBe(0);
   });
 });
+
+const YARD =
+  FIXTURE_WORLD +
+  `
+# stat dr
+
+# resource health
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# action swing
+title: swing
+continuous
+time: 1
+damage: my attack vs their dr
+depletes: their health
+
+# entity player
+stats: max-health 30, attack 10
+uses: swing
+
+# entity scarecrow
+title: Scarecrow
+stats: max-health 1, dr 0
+
+# entity gate-troll
+title: Gate Troll
+stats: max-health 1, dr 0
+
+# location camp
+entities: scarecrow
+
+# location bridge
+x: 1, y: 0
+entities: gate-troll
+`;
+
+// A fight reaches the engine two ways, and only one of them can name a foe that is not there. What
+// the room offers is built from who is standing in it, so a felled foe stops being offered at all —
+// nothing is hidden and nothing refuses. A directive names a foe outright, from a `# test` line or
+// the terminal, and reaches past the offer; that is the path with words to say.
+describe('a fight named on a foe that is not standing here', () => {
+  const yard = (): PlaySession => startSession(loadInEnglish(YARD));
+
+  const cleared = (): PlaySession => {
+    const session = yard();
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+    applyDirective(session, { kind: 'wait-out' });
+    return session;
+  };
+
+  const fightsOffered = (session: PlaySession): string[] => view(session).choices.filter((choice) => choice.id.startsWith('fight:')).map((choice) => choice.id);
+
+  it('offers the fight while the foe stands, and stops offering it once it falls', () => {
+    const session = yard();
+    expect(fightsOffered(session)).toEqual(['fight:swing:scarecrow']);
+
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+    applyDirective(session, { kind: 'wait-out' });
+    expect(fightsOffered(session)).toEqual([]);
+  });
+
+  it('refuses a directive that names the felled foe, in the words a player reads', () => {
+    const session = cleared();
+    view(session);
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+
+    expect(view(session).said.map(String)).toEqual(['There is no Scarecrow here.']);
+  });
+
+  it('refuses one standing in another room by the same words', () => {
+    const session = yard();
+    view(session);
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'gate-troll' });
+
+    expect(view(session).said.map(String)).toEqual(['There is no Gate Troll here.']);
+  });
+
+  it('leaves the world alone: it arms nothing and spends no time', () => {
+    const session = cleared();
+    const before = view(session).time;
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
+
+    const after = view(session);
+    expect(after.action).toBeNull();
+    expect(after.time).toBe(before);
+  });
+});

@@ -95,9 +95,20 @@ dent:
   time: 1
   say: Clang.
 
+# entity sparring-partner
+stats: max-health 40, dr 1
+allies: sparring-dog
+
+# entity sparring-dog
+stats: max-health 4, dr 0
+
 # location training-hall
 x: 0, y: 0
 entities: 3 training-dummy, anvil
+
+# location sparring-yard
+x: 1, y: 0
+entities: 2 sparring-partner
 `;
 
 function loaded(): Registry {
@@ -330,9 +341,13 @@ describe('how many of a foe are left is read off the population, not counted twi
 
   it('says nothing of a foe the location holds no population of', () => {
     const registry = loaded();
-    const state = inTheHall(registry);
-    armFightAction('strike', 'straw-man', registry, state);
+    const state = createGameState('sparring-yard');
+    initResources(state, registry);
+    armFightAction('strike', 'sparring-partner', registry, state);
 
-    expect(encounterView(state, registry)!.foes.map((foe) => [foe.id, foe.remaining])).toEqual([['straw-man', null]]);
+    expect(encounterView(state, registry)!.foes.map((foe) => [foe.id, foe.remaining])).toEqual([
+      ['sparring-partner', 2],
+      ['sparring-dog', null],
+    ]);
   });
 });
