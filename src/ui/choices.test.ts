@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { actionAddress } from '../content/sections/action';
+import { mintedActions } from '../content/sections/entity';
+import { useChoiceId } from '../content/sections/test';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { groupOffers, offerCells } from './choices';
@@ -47,11 +50,43 @@ describe('the offers on the sheet', () => {
     expect(cells.map((cell) => cell.offers.map((offer) => offer.label))).toEqual([['Talk to Miki'], ['ascend', 'descend'], ['look in']]);
   });
 
-  it('gives every cell a key of its own where nothing in particular is offering', () => {
+  it('lifts the offer that reads a thing onto the cell, so it is not a control beside the rest', () => {
+    const examine = useChoiceId({ kind: 'use', obj: 'entity', objId: 'smith', actionId: 'examine' });
+    const cells = offerCells([choice(examine, 'Examine', 'Smith'), choice('b', 'Trade', 'Smith')]);
+
+    expect(cells[0].examine?.label).toBe('Examine');
+    expect(cells[0].offers.map((offer) => offer.label)).toEqual(['Trade']);
+  });
+
+  it('picks that offer out by the address # entity mints it at, and not by a word of its own', () => {
+    const minted = mintedActions({ id: 'smith', examine: 'Soot to the elbows.' }, null);
+    expect(minted, 'an entity with an examine: mints nothing, so this claim holds vacuously').toHaveLength(1);
+
+    const id = useChoiceId({ kind: 'use', obj: 'entity', objId: 'smith', actionId: actionAddress(minted[0]) });
+
+    expect(offerCells([choice(id, 'Examine', 'Smith')])[0].examine?.id).toBe(id);
+  });
+
+  it('keeps the position of the offer it lifted, because the engine is still counting it', () => {
+    const examine = useChoiceId({ kind: 'use', obj: 'entity', objId: 'smith', actionId: 'examine' });
+    const cells = offerCells([choice('a', 'Trade', 'Smith'), choice(examine, 'Examine', 'Smith')]);
+
+    expect(cells[0].examine?.position).toBe(2);
+    expect(cells[0].offers.map((offer) => offer.position)).toEqual([1]);
+  });
+
+  it('gives a cell nothing to read where the thing it draws offers no examine at all', () => {
+    const cells = offerCells([choice('a', 'ascend', 'Stairs'), choice('b', 'Talk to Miki')]);
+
+    expect(cells.map((cell) => cell.examine)).toEqual([null, null]);
+  });
+
+  it('leaves a cell that nothing in particular offers with one offer on it, and no name over it', () => {
     const cells = offerCells([choice('a', 'Talk to Miki'), choice('b', 'Talk to Rowan')]);
 
-    expect(cells).toHaveLength(2);
-    expect(new Set(cells.map((cell) => cell.key)).size).toBe(2);
+    expect(cells.map((cell) => cell.name)).toEqual([null, null]);
+    expect(cells.map((cell) => cell.offers)).toHaveLength(2);
+    for (const cell of cells) expect(cell.offers).toHaveLength(1);
   });
 
   it('has nothing to draw when the engine is offering nothing', () => {

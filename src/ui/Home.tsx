@@ -45,7 +45,16 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
         {offerCells(choices).map((cell) => (
-          <div key={cell.key} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-panel">
+          <div key={String(cell.name ?? cell.offers[0]?.id)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
+            {cell.examine ? (
+              <button
+                data-drive="choose"
+                type="button"
+                aria-label={cell.examine.label}
+                onClick={() => onChoose(cell.examine!.position)}
+                className="absolute inset-0 w-full"
+              />
+            ) : null}
             {cell.name ? <p className="truncate px-2 py-1 text-center text-xs uppercase tracking-wide text-text-subtle">{cell.name}</p> : null}
             {cell.offers.map((offer) => (
               <button
@@ -53,7 +62,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
                 data-drive="choose"
                 type="button"
                 onClick={() => onChoose(offer.position)}
-                className="w-full border-t border-border px-2 py-2 text-xs font-medium transition-transform duration-75 first:border-t-0 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
+                className="relative z-10 w-full border-t border-border px-2 py-2 text-xs font-medium transition-transform duration-75 first:border-t-0 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
               >
                 {offer.label}
               </button>

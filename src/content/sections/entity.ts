@@ -60,11 +60,14 @@ export interface Entity extends AuthoredEntity {
   handlers: Handler[];
 }
 
-const EXAMINE_FIELD = 'examine';
+// The address an entity's `examine:` is minted at. A surface that has to pick that offer out of the
+// list — the sheet reads a thing by its cell rather than by a control of its own — asks here for the
+// address rather than writing the word down a second time.
+export const EXAMINE_FIELD = 'examine';
 
 // `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
 // the entity's own action list, saying the words under the key the field already holds them at, so
-// every driver offers it the way it offers any other action and none of them names examine at all.
+// every driver offers it the way it offers any other action.
 export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
