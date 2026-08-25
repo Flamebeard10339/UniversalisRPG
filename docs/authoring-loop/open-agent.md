@@ -157,6 +157,16 @@ the failure mode `one-home` exists to catch.
 The owner ruled these while reviewing the run. Each carries his answer; none is to be
 re-decided.
 
+**Miki teaches the plane when he hands over the gear.** Ruled, closing the on-ramp
+question: *"Miki needs an extra line of dialogue when he gives the player the sword and
+the shield encouraging the player to check the items in their inventory and opening up
+the modals."* So the on-ramp is words plus an affordance — the line should be able to put
+the player in front of the modal rather than only mentioning it. **The modal API has since
+landed and that affordance now exists**: a screen is opened by a line the way `/stat <id>`
+and `/quests <quest>` open theirs, so this is words plus one `open modal:`, with no
+component edit. *Closes when:* the line that hands over the gear can also put the player in
+front of what it is talking about.
+
 **The fixture world's second pass moved ten more modules and owes the other half of its
 answer.** `clusterPlane`, `conditions`, `fight`, `instances`, `moments`, `recipe`, `save`,
 `skillGrants`, `stopsOn` and `time` now stand on `FIXTURE_WORLD` — 23 modules import it,
