@@ -541,6 +541,19 @@ order has never seen falls in behind the ones it has; a name the pack no longer 
 draws nothing. `carried()` no longer sorts by name, which was a second answer to where a
 thing sits.
 
+**A plane shrinks from its leaves inward, and a socket never comes back.** A passive
+point refunds with no new state at all — `pointsSpent` is derived from the allocated
+arrays, so a position leaving one *is* the refund. The ruling that a jewel socket does
+not refund is built by refusing the unallocate outright rather than by removing the
+socket and withholding the point, because withholding would have needed a hand-kept
+`sunk` counter beside the plane and would have broken `isPlane` on saves already
+written. So semi-permanent is literal: a jewel put in a socket stays in it. The strand
+rule is general — taking back anything still allocated on a node is refused, and a
+socket is always an allocated slot node, so sockets are covered without being
+enumerated. Re-allocation cannot re-roll, structurally: allocate and unallocate are
+never handed an rng cursor, `fillSlot` is the only writer of a `Cluster` and refuses a
+filled slot, and unallocating never deletes one.
+
 **Gear drops carrying its points, and `item-level:` is what gives an item a plane.**
 `isBase` reads `itemLevel`, not `slot`. `receiveItem` was already the one arrival, so
 that is where a base is rolled and minted — which is what makes every base an instance
