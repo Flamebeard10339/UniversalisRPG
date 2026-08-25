@@ -111,6 +111,7 @@ const standingIn = (view: PlayView): Standing => ({ location: view.location.id, 
 export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
+  const [openStat, setOpenStat] = useState<string | null>(null);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
   const dev = snapshot.dev;
@@ -219,7 +220,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         />
       );
     }
-    if (subpage.id === 'stats') return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer)]} />;
+    if (subpage.id === 'stats')
+      return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer, openStat)]} onOpen={(id) => setOpenStat((held) => (held === id ? null : id))} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
