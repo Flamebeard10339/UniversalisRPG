@@ -5,7 +5,8 @@ import { Hex } from '../content/hex';
 import { clusterAt, ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
 import { allocate, Growth, itemInstance, receiveItem, slotJewel } from './itemInstance';
-import { initialState } from './save';
+import { initialState, loadSave, serializeSave } from './save';
+import { parseSaveSection } from '../content/sections/save';
 import { hitDamage, statValue } from './stats';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
@@ -29,6 +30,9 @@ base: 4
 # passive vigorous
 +10% max-health
 
+# passive lucky
++2-9 max-health
+
 # passive keen
 +4 attack
 
@@ -41,6 +45,15 @@ passives: 1 hale, 2 vigorous, 3 keen
 shape: point
 open-connections: e
 passives: 1 hale
+
+# cluster-jewel charm
+shape: point
+open-connections: e
+passives: 1 lucky
+
+# cluster-jewel forked
+shape: point
+open-connections: e, ne
 
 # cluster-jewel spark
 shape: point
@@ -103,6 +116,14 @@ cluster-effect: +25% max-health
 
 # item goad
 cluster-effect: +50% attack
+
+# item charm-jewel
+cluster-jewel: charm
+
+# item wide-slot-blade
+slot: mainhand
+item-level: 20
+origin-cluster: forked
 `;
 
 const registry = loadInEnglish(MODULE);
@@ -340,5 +361,63 @@ describe("a plane's contribution reaches combat", () => {
 
     equip(state, registry, '1');
     expect(health(state)).toBeCloseTo(44, 10);
+  });
+});
+
+// A range on a passive is the same roll-and-fix the item level is: one number drawn when the thing
+// enters the world, and every range that thing declares read at it.
+describe('a passive written as a range', () => {
+  const rolled = (state: GameState, hex: Hex): number => {
+    const payload = instancePayloads(registry, itemInstance(state, '1')!).find((each) => each.node.hex.q === hex.q && each.node.hex.r === hex.r)!;
+    if (payload.bonus.percent) throw new Error('a percent payload is no range');
+    expect(payload.bonus.amount.min).toBe(payload.bonus.amount.max);
+    return payload.bonus.amount.min;
+  };
+
+  const socketed = (jewels: number): GameState => {
+    const state = carrying({ 'wide-slot-blade': 1, 'charm-jewel': jewels });
+    for (const direction of (['e', 'ne'] as const).slice(0, jewels)) {
+      ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'slot', direction }));
+      ok(slotJewel(state, registry, '1', 'charm-jewel', ORIGIN, direction));
+    }
+    return state;
+  };
+
+  it('is one fixed number by the time the plane reports it, drawn from what the passive declares', () => {
+    const state = socketed(1);
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+
+    const worth = rolled(state, AT_E);
+    expect(worth).toBeGreaterThanOrEqual(2);
+    expect(worth).toBeLessThanOrEqual(9);
+  });
+
+  it('is the cluster\u2019s and not the jewel\u2019s, so two of one jewel in one plane roll apart', () => {
+    const seen = new Set<number>();
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const state = socketed(2);
+      const first = clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll;
+      const second = clusterAt(itemInstance(state, '1')!.plane, { q: 1, r: -1 })!.roll;
+      seen.add(first === second ? 0 : 1);
+    }
+    expect(seen).toEqual(new Set([1]));
+  });
+
+  it('comes back the same number after a save and a reload, because the roll is what was written', () => {
+    const state = socketed(1);
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+
+    const target = initialState(registry);
+    loadSave(target, parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }), registry);
+    expect(rolled(target, AT_E)).toBe(rolled(state, AT_E));
+  });
+
+  it('is fixed from the moment it is socketed, so allocating the position later changes nothing', () => {
+    const state = socketed(1);
+    const before = clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll;
+
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+    expect(clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll).toBe(before);
+    expect(rolled(state, AT_E)).toBe(rolled(state, AT_E));
   });
 });

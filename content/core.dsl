@@ -265,6 +265,11 @@ value: 60
 
 // --- passives ---
 //
+// A payload written as a range is rolled by the cluster that comes to carry it,
+// once, at the moment that cluster enters a plane — so what a jewel is worth is
+// settled when it is socketed and never again, and two of one jewel are two
+// different jewels.
+//
 // Flat and percent are separated by cluster rather than mixed inside one.
 // statRange folds a stat as (base + added) x (1 + increased), so a percent
 // passive is worth almost nothing until flat ones have been stacked: keeping
@@ -311,7 +316,7 @@ speed, +3 attack-rate
 speed, +10% attack-rate
 
 # passive keen-eye
-precision, +6 accuracy
+precision, +4-8 accuracy
 
 # passive marksman
 precision, +8 accuracy
@@ -320,13 +325,13 @@ precision, +8 accuracy
 precision, +12% accuracy
 
 # passive quickstep
-evasion, +8 evasion
+evasion, +6-10 evasion
 
 # passive evasive
 evasion, +15% evasion
 
 # passive fortune
-utility, +5 luck
+utility, +3-8 luck
 
 // --- cluster jewels ---
 //

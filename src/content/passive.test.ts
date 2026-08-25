@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './load';
-import { passiveRangeProblem } from './sections/passive';
 
 describe('# passive', () => {
   it('reads bare tags and stat-bonus payloads in one comma list', () => {
@@ -92,54 +91,15 @@ drain: 3 health from them
   });
 });
 
-describe('# passive refuses a range payload', () => {
-  it('rejects +5-8 accuracy, naming the clause it rejected', () => {
-    expect(() => loadModule('# stat accuracy\n\n# passive risky\n+5-8 accuracy')).toThrow(/\+5-8 accuracy is a range/);
-  });
+const RISKY = '# stat accuracy\n\n# passive risky\n+5-8 accuracy';
 
-  it('accepts the fixed payload a range was written as a typo of', () => {
-    expect(() => loadModule('# stat accuracy\n\n# passive steady\n+5 accuracy')).not.toThrow();
+describe('# passive takes a range payload, which the cluster carrying it rolls', () => {
+  it('reads +5-8 accuracy as the range it is', () => {
+    const registry = loadModule(RISKY);
+    expect(registry.passives.get('risky')!.tags).toEqual([{ kind: 'stat-bonus', statId: 'accuracy', percent: false, amount: { min: 5, max: 8 } }]);
   });
 
   it('still refuses a percent range, which tagClause itself already catches', () => {
-    expect(() => loadModule('# stat accuracy\n\n# passive risky\n+5-8% accuracy')).toThrow(/a percent stat bonus cannot be a range/);
-  });
-});
-
-describe('passiveRangeProblem', () => {
-  it('finds nothing wrong with a passive whose payloads are all fixed', () => {
-    const problem = passiveRangeProblem({
-      id: 'hale',
-      title: 'Hale',
-      onHit: [],
-      whenHit: [],
-      tags: [
-        {
-          kind: 'stat-bonus',
-          statId: 'max-health',
-          percent: false,
-          amount: { min: 15, max: 15 },
-        },
-      ],
-    });
-    expect(problem).toBeUndefined();
-  });
-
-  it('names the statId and the range when a payload is not fixed', () => {
-    const problem = passiveRangeProblem({
-      id: 'risky',
-      title: 'Risky',
-      onHit: [],
-      whenHit: [],
-      tags: [
-        {
-          kind: 'stat-bonus',
-          statId: 'accuracy',
-          percent: false,
-          amount: { min: 5, max: 8 },
-        },
-      ],
-    });
-    expect(problem).toMatch(/\+5-8 accuracy is a range/);
+    expect(() => loadModule(RISKY.replace('+5-8', '+5-8%'))).toThrow(/a percent stat bonus cannot be a range/);
   });
 });

@@ -1,6 +1,6 @@
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
-import { TagClause, tagClause, unrolledProblem } from '../../grammar/tagClause';
+import { TagClause, tagClause } from '../../grammar/tagClause';
 import { text } from '../../grammar/values';
 import { hooks, pruneHook, pruneTags, visitTags, type Loose } from '../refs';
 import { section } from './define';
@@ -13,8 +13,6 @@ export interface Passive extends HookCarrier {
   tags: TagClause[];
 }
 
-export const passiveRangeProblem = (passive: Passive): string | undefined => unrolledProblem(passive.tags, 'a passive has no moment to roll one');
-
 export const passive = section<Passive>()({
   kind: 'passive',
   ids: 'owned',
@@ -24,11 +22,14 @@ export const passive = section<Passive>()({
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
-    tags: { parser: list(tagClause), default: () => [] },
+    tags: {
+      parser: list(tagClause),
+      default: () => [],
+      note: 'a range here is rolled by the cluster that carries the passive, once, when that cluster enters a plane; a passive nothing sockets — one an entity carries — has no such moment and samples its range per swing, the way an item tag does',
+    },
     ...HOOK_FIELDS,
   },
   clauses: 'tags',
-  validate: passiveRangeProblem,
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     visitTags(held.tags, where, visit);

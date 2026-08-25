@@ -1,4 +1,5 @@
 import { Registry } from '../content/registry';
+import { isPoint, point, sampleCount } from '../grammar/range';
 import { BonusAmount, Counter } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
@@ -33,10 +34,18 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
   const payloads: ScaledPayload[] = [];
   for (const tag of registry.passives.get(passiveId)?.tags ?? []) {
     if (tag.kind !== 'stat-bonus') continue;
+    const bonus = rolledAt(tag, cluster.roll);
     const scale = clusterScale(registry, cluster.effects, tag.statId);
-    payloads.push(tag.per === undefined ? { node, statId: tag.statId, bonus: tag, scale } : { node, statId: tag.statId, bonus: tag, scale, per: tag.per });
+    payloads.push(tag.per === undefined ? { node, statId: tag.statId, bonus, scale } : { node, statId: tag.statId, bonus, scale, per: tag.per });
   }
   return payloads;
+}
+
+// The cluster drew one number when it entered the plane, and every range its jewel's passives declare
+// is read at that number. One roll a cluster and not one a payload, so a jewel is good or bad rather
+// than good in places, and a save that keeps the roll keeps every payload with it.
+function rolledAt(bonus: BonusAmount, roll: number): BonusAmount {
+  return bonus.percent || isPoint(bonus.amount) ? bonus : { percent: false, amount: point(sampleCount(bonus.amount, roll)) };
 }
 
 export function allocatedPositions(registry: Registry, plane: Plane): { hex: Hex; position: number; passiveId: string }[] {
