@@ -5,7 +5,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
+import type { Answer } from '../runtime/localized';
+import { asLocalized } from '../runtime/localizedFixture';
 import { App } from './App';
+import { Ledger } from './Ledger';
+import { LAYOUTS } from './sheetLayout';
 import { createDriver } from './driver';
 import { SPLIT_DEFAULT } from './gesture';
 import { BOUNDARIES, LAYERS, shownIn } from './nav';
@@ -97,5 +101,21 @@ describe('the tab bar of a screen showing more than one page', () => {
   it('lights every tab the strip is showing, not only the one it rests on', () => {
     expect(lit(bar(1))).toEqual(['home']);
     expect(lit(bar(2))).toEqual(['home', 'settings']);
+  });
+});
+
+// A language that writes longer words than English is the case a fixture can state and a screenshot
+// cannot: the name goes in whole and has to come out whole, in every shape a sheet is drawn in, so a
+// fourth layout has to answer this before it can ship.
+describe('a name longer than the cell it is drawn in', () => {
+  const LONG = asLocalized('Reichsstraßenbauverwaltungsschlüssel des Eisenschwertes');
+
+  it('is drawn whole, whichever way the sheet is laid out', () => {
+    for (const layout of LAYOUTS) {
+      const html = renderToStaticMarkup(<Ledger layout={layout} entries={[{ id: 'one' as Answer, name: LONG, value: asLocalized('1'), at: { column: 1, row: 1 } }]} />);
+
+      expect(html, layout).toContain(LONG);
+      expect(html, layout).not.toContain('truncate');
+    }
   });
 });

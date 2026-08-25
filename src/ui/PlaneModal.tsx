@@ -7,6 +7,7 @@ import { arrivalDelay, newlyDrawn, NODE_SIZE, planeGraph, type GraphEdge, type G
 import { Modal, ModalCard } from './Modal';
 import type { Declared } from './modalManner';
 import { nameOf, panelFor } from './planePanel';
+import { NAME } from './sheetLayout';
 import { useTestSurface } from './useTestSurface';
 import { playedAfter, useMoment } from './transient';
 import { panOnto, tapTarget } from './viewport';
@@ -213,7 +214,7 @@ export function PlaneModal({
       <div className="unbarred flex min-h-0 basis-[30%] flex-col overflow-y-auto border-b border-border bg-surface-raised px-4 py-2">
         <div className="mx-auto flex w-full max-w-2xl flex-col">
           <div className="flex items-baseline justify-between gap-3">
-            <p className="min-w-0 truncate text-base font-semibold">{plane.name}</p>
+            <p className={`min-w-0 text-base font-semibold ${NAME}`}>{plane.name}</p>
             {leaving === null ? null : (
               <button
                 data-drive="answer"

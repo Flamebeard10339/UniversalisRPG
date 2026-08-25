@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { Entry } from './sheet';
-import { doll, GRID } from './sheetLayout';
+import { doll, GRID, NAME } from './sheetLayout';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -33,6 +33,27 @@ describe('the grid every dense page is laid out on', () => {
   it('lets the width decide how many columns there are, rather than a page deciding for it', () => {
     expect(GRID).toContain('auto-fill');
     expect(GRID).toMatch(/minmax\(\d/);
+  });
+});
+
+// A name is as long as its language makes it, and every one of these is about a name being drawn
+// whole rather than to whatever width English happens to want. The subjects are whichever files take
+// the sheet's own way of drawing one, so a page that starts drawing names is held to it with nothing
+// edited here.
+describe('a name a sheet draws', () => {
+  const TAKING = SOURCES.filter((source) => source.file !== 'src/ui/sheetLayout.ts' && /\bNAME\b/.test(source.text));
+
+  it('is drawn by more than one page, which is why how to draw one is written apart from any of them', () => {
+    expect(TAKING.map((source) => source.file).length).toBeGreaterThan(1);
+  });
+
+  it('wraps rather than running off the edge of what is drawing it', () => {
+    expect(NAME).toContain('break-words');
+    expect(NAME).not.toContain('truncate');
+  });
+
+  it('is never cut off by the page that took it, in any of the words that page draws', () => {
+    expect(TAKING.filter((source) => source.text.includes('truncate')).map((source) => source.file)).toEqual([]);
   });
 });
 
