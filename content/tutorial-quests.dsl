@@ -70,10 +70,15 @@ stage bake-bread:
     A warm loaf! Well done, {player.name}.
     Keep it in your pack - eat it whenever you're hungry.
     Every swing and catch builds a skill, and skills raise your stats.
-    Here. Open up what you're carrying and put these on from there - your stats move the moment you do.
+    Here - a sword and a shield. Better than your fists, and they're yours.
     give: core.iron-sword
     give: core.wooden-shield
     Downstairs in the basement you'll find giant rats. Put them down and watch your stats work.
+    One thing first: they do nothing sat in your pack. Open up what you're carrying, have a look at the pair of them, and put them on - your stats move the moment you do.
+    // Last, so the screen lands under the conversation rather than over it: a
+    // node's results run before what it says is put up, so the pack is what the
+    // player finds on reading Miki out, and no line of his is talked over.
+    open modal: carried-items
     goto clear-the-rats
 
 stage clear-the-rats:
@@ -209,6 +214,11 @@ craft: bread
 assert: has core.bread
 talk: tulsa.miki
 choose: continue
+// Reading Miki out leaves the pack he opened standing, which is the whole of
+// what his handover line buys. Shut it and go down the stairs; nothing on this
+// route is worn, so what the screen was for is proved by its being there and
+// not by anything taken in it.
+submit-modal: item=close
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
 // rather than through the floor. One Fight clears the cellar: melee is
