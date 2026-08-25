@@ -1,5 +1,6 @@
 import { Registry } from '../content/registry';
 import { Shop } from '../content/sections/shop';
+import { heldName } from './carried';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import type { ModalChoice, ModalOption } from './modalOption';
 import { GameState, type ModalFrame } from './state';
@@ -35,10 +36,10 @@ export function rowOf(answer: Answer | undefined): { side: Side; item: string } 
   return { side, item: answer.slice(at + 1) };
 }
 
-const rows = (side: Side, trades: readonly Trade[], localizer: Localizer): ModalChoice[] =>
+const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer: Localizer): ModalChoice[] =>
   trades.map((trade) => ({
     value: rowAnswer(side, trade.item),
-    shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item: localizer.title('item', trade.item), price: trade.coin, count: trade.count }),
+    shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item: heldName(state, localizer, trade.item), price: trade.coin, count: trade.count }),
   }));
 
 export function shopOptions(frame: ShopFrame, state: GameState, registry: Registry): ModalOption[] {
@@ -49,7 +50,7 @@ export function shopOptions(frame: ShopFrame, state: GameState, registry: Regist
     {
       key: 'item',
       label: localizer.engine('engine.shop.counter', { coin: localizer.title('item', shop.coin), held: coinHeld(shop, state) }),
-      values: [...rows('buy', forSale(shop, state, registry), localizer), ...rows('sell', wanted(shop, state, registry), localizer), { value: LEAVE, shown: localizer.engine('engine.shop.close') }],
+      values: [...rows('buy', forSale(shop, state, registry), state, localizer), ...rows('sell', wanted(shop, state, registry), state, localizer), { value: LEAVE, shown: localizer.engine('engine.shop.close') }],
     },
   ];
 }
@@ -64,7 +65,7 @@ export function shopSubmit(frame: ShopFrame, _state: GameState, registry: Regist
 export function countOptions(frame: ShopCountFrame, state: GameState, registry: Registry): ModalOption[] {
   if (!registry.shops.has(frame.shop)) return [];
   const localizer = localizerOf(registry, state);
-  return [{ key: 'count', label: localizer.engine(frame.side === 'buy' ? 'engine.shop.count.buy' : 'engine.shop.count.sell', { item: localizer.title('item', frame.item) }), values: null }];
+  return [{ key: 'count', label: localizer.engine(frame.side === 'buy' ? 'engine.shop.count.buy' : 'engine.shop.count.sell', { item: heldName(state, localizer, frame.item) }), values: null }];
 }
 
 // A shop stays open across a trade: what comes back is a fresh counter, so it is re-read against what the player now carries and the shop now holds. Anything that is not a number to trade is how a player backs out of the question.

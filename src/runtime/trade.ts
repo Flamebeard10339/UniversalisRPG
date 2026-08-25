@@ -2,7 +2,8 @@ import { Registry } from '../content/registry';
 import { Item } from '../content/sections/item';
 import { buyPrice, declaredStock, replenished, replenishSteps, sellPrice, Shop, takesItem } from '../content/sections/shop';
 import { RuntimeError } from './error';
-import { handOver, HandOver, receiveItem, roomToPack, spendableCount } from './itemInstance';
+import { carriesItem, destroyItem, handOver, HandOver, isGrownCopy, itemTemplate, packRows, receiveItem, roomToPack, spendableCount } from './itemInstance';
+import { packKey } from './packOrder';
 import { GameState, ShopStock } from './state';
 
 export const isShopStock = (value: unknown): boolean => {
@@ -33,6 +34,10 @@ function write(state: GameState, shop: Shop, settled: ShopStock, counts: Record<
   state.shops[shop.id] = { at: settled.at, counts };
 }
 
+// One row of a counter. `item` is the string the thing traded answers to — an item on the buying
+// side, where a shop stocks templates and nothing else, and on the selling side whatever the pack
+// row answers to, so a grown copy is named as itself. Its price is read off the template either way:
+// what a copy fetches is its base's `value:`, not an answer to the points on it.
 export interface Trade {
   readonly item: string;
   readonly count: number;
@@ -52,13 +57,15 @@ export function forSale(shop: Shop, state: GameState, registry: Registry): Trade
   });
 }
 
-// What the player is carrying that this shop will take, priced one at a time.
+// What the player is carrying that this shop will take, priced one at a time, read off the pack's
+// own rows in the order the player put them in. So the counter offers exactly what the sheet draws:
+// a grown copy is on it as itself, and what is worn is not on it at all, without either rule being
+// written here.
 export function wanted(shop: Shop, state: GameState, registry: Registry): Trade[] {
-  return Object.keys(state.inventory).flatMap((itemId) => {
-    const item = itemOf(registry, itemId);
-    const count = spendableCount(state, itemId);
-    if (count <= 0 || !takesItem(shop, item)) return [];
-    return [{ item: itemId, count, coin: sellPrice(shop, item)! }];
+  return packRows(state).flatMap((row) => {
+    const item = itemOf(registry, row.template);
+    if (!takesItem(shop, item)) return [];
+    return [{ item: packKey(row), count: row.kind === 'stack' ? row.count : 1, coin: sellPrice(shop, item)! }];
   });
 }
 
@@ -82,11 +89,30 @@ export function buyProblem(shop: Shop, state: GameState, registry: Registry, ite
   return undefined;
 }
 
+// A grown copy is one thing standing in a row of its own, so the only count it answers to is one and
+// the only question is whether it is in the pack rather than on the player; a stack answers for as
+// many of it as can be parted with. Nothing worn is on offer either way.
+const onOffer = (state: GameState, itemId: string, count: number): boolean =>
+  isGrownCopy(state, itemId) ? count === 1 && carriesItem(state, itemId) : spendableCount(state, itemId) >= count;
+
+// The two doors a holding already leaves by, picked by which kind of row it stands in, answering with
+// the item that left so the shop's pile is counted in templates however the player named the copy.
+function partWith(state: GameState, itemId: string, count: number): string | undefined {
+  if (isGrownCopy(state, itemId)) {
+    const gone = destroyItem(state, itemId);
+    return gone.ok ? gone.item : undefined;
+  }
+  const given = HandOver.asked(state, itemId, count);
+  if (!given) return undefined;
+  handOver(state, given);
+  return given.item;
+}
+
 export function sellProblem(shop: Shop, state: GameState, registry: Registry, itemId: string, count: number): Refusal | undefined {
-  const item = itemOf(registry, itemId);
+  const item = itemOf(registry, itemTemplate(state, itemId));
   if (!item) return 'unknown-item';
   if (!takesItem(shop, item)) return 'untradable';
-  if (spendableCount(state, itemId) < count) return 'not-carried';
+  if (!onOffer(state, itemId, count)) return 'not-carried';
   // What is paid for the goods has to have somewhere to land too, or the sale would take the item
   // and hand back nothing.
   if (!roomToPack(state, registry, shop.coin)) return 'pack-full';
@@ -113,12 +139,11 @@ export function buy(shop: Shop, state: GameState, registry: Registry, itemId: st
 export function sell(shop: Shop, state: GameState, registry: Registry, itemId: string, count: number): Refusal | undefined {
   const refusal = sellProblem(shop, state, registry, itemId, count);
   if (refusal) return refusal;
-  const given = HandOver.asked(state, itemId, count);
-  if (!given) return 'not-carried';
+  const gone = partWith(state, itemId, count);
+  if (gone === undefined) return 'not-carried';
   const settled = settle(shop, state);
-  write(state, shop, settled, { ...settled.counts, [itemId]: (settled.counts[itemId] ?? 0) + count });
-  handOver(state, given);
-  receiveItem(state, registry, shop.coin, sellPrice(shop, itemOf(registry, itemId))! * count);
+  write(state, shop, settled, { ...settled.counts, [gone]: (settled.counts[gone] ?? 0) + count });
+  receiveItem(state, registry, shop.coin, sellPrice(shop, itemOf(registry, gone))! * count);
   return undefined;
 }
 

@@ -35,6 +35,13 @@ function nameOf(template: string, localizer: Localizer, copy: string | null): Lo
   return carriedName(localizer, 'item', template, copy);
 }
 
+// What one string a holding answers to is called, whether that string names an item or one grown
+// copy of one. The sheet and the counter ask the same question of the same string, so a copy is
+// never drawn under its template's name in one place and its own in the other.
+export function heldName(state: GameState, localizer: Localizer, id: string): Localized {
+  return nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null);
+}
+
 // The pack, row for row as the slot count reads it, and then what the player has on. A row here and
 // a slot there are the same thing by construction: both are `packRows`.
 export function carriedEntries(state: GameState, registry: Registry): CarriedEntry[] {
@@ -46,7 +53,8 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
       const name = nameOf(row.template, localizer, null);
       entries.push({ id: row.template, name, count: row.count, shown: localizer.engine('engine.carried.stack', { item: name, count: row.count }), grown: false, ...group });
     } else {
-      entries.push({ id: row.id, name: nameOf(row.template, localizer, row.id), count: 1, shown: nameOf(row.template, localizer, row.id), grown: true, ...group });
+      const name = heldName(state, localizer, row.id);
+      entries.push({ id: row.id, name, count: 1, shown: name, grown: true, ...group });
     }
   }
   for (const row of wornRows(state, registry)) {
@@ -76,7 +84,7 @@ export function wornRows(state: GameState, registry: Registry): WornRow[] {
       slot,
       title: localizer.title('slot', slot),
       item: id ?? null,
-      name: id === undefined ? null : nameOf(itemTemplate(state, id), localizer, isGrownCopy(state, id) ? id : null),
+      name: id === undefined ? null : heldName(state, localizer, id),
       ...(at === undefined ? {} : { at }),
     };
   });
