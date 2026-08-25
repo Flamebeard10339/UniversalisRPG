@@ -1,6 +1,7 @@
 import { mapOf, type Registry } from '../content/registry';
 import { registryMapOf } from '../content/sections';
 import { groupOf } from '../content/sections/group';
+import { ownerRef } from './actions';
 import type { Answer, Localized, Localizer } from './localized';
 
 // What kind of thing something is, published beside it: the word a player reads and the colour every
@@ -22,9 +23,14 @@ export function grouping(registry: Registry, localizer: Localizer, kind: string,
   return found === undefined ? {} : { group: { id: found.id, title: localizer.title('group', found.id), colour: found.colour } };
 }
 
-// What a choice says about whatever offers it: the name it stands under and the group that colours
-// it. Written once, so a choice minted from a new kind of owner carries both or neither.
-export const offeredBy = (registry: Registry, localizer: Localizer, kind: string, id: string): { detail: Localized; group?: GroupRow } => ({
-  detail: localizer.title(kind, id),
+// What a choice says about whatever offers it: the address a surface keys a cell on, the name it
+// stands under and the group that colours it. Written once, so a choice minted from a new kind of
+// owner carries all three or none.
+//
+// Masked, only the name is held back. The address still tells two things nobody has read apart, and
+// the group still fills them, which is the whole of what an unread thing shows.
+export const offeredBy = (registry: Registry, localizer: Localizer, kind: string, id: string, masked = false): { of: Answer; detail: Localized; group?: GroupRow } => ({
+  of: ownerRef(kind, id),
+  detail: masked ? localizer.engine('engine.entity.unexamined') : localizer.title(kind, id),
   ...grouping(registry, localizer, kind, id),
 });

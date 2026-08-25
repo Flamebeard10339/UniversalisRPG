@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
-import { applyDirective, PlaySession, startSession, view } from './session';
+import { applyDirective, PlaySession, readRoom, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 
 const MODULE = `
@@ -67,6 +67,7 @@ function grownFrom(save: string): PlaySession {
   const session = startSession(registry);
   applyDirective(session, { kind: 'load', save });
   expect(applyDirective(session, { kind: 'feed', target: 'blade', food: 'whetstone' }).failure).toBeUndefined();
+  readRoom(session);
   return session;
 }
 
