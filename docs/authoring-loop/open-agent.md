@@ -152,11 +152,20 @@ I am fighting the rat."*
 ### The fight
 
 **Damage never varies.** *"The player always does the same exact amount of damage. So
-does the rat."* Ruled by the owner on 2026-08-25: **an attack declares its range and a
-swing rolls inside it — `1-3` for the rat and `3-8` for the player.** Those two numbers
-are his and are not to be re-derived. Every other attack in the corpus needs a range,
-and those the lane drafts and he revises; a range is a form the DSL already spells
-elsewhere (`xp: cooking 40-80`), so this should not want a new one.
+does the rat."* Ruled by the owner on 2026-08-25, and **the two halves are not the same
+mechanism**:
+
+- **A foe's range is declared and literal.** The rat swings `1-3`. A range is a form the
+  DSL already spells elsewhere (`xp: cooking 40-80`), so this wants no new one.
+- **The player's range is derived, not declared.** *"The player's 3-8 should be part of
+  their skill level + base."* So `3-8` is a reading of what a starting player happens to
+  come out at, not a number to write down anywhere — it falls out of the base plus the
+  melee level, which under the skill ruling below is `+1 attack per level`. A lane that
+  writes `3-8` on the player has got this backwards.
+
+The spread the derivation produces is the lane's to draft and is explicitly **not**
+balanced yet: *"Balance will happen after."* What has to be true when this lands is that
+two swings differ and that the player's differ because of what the player is.
 
 **A fight does not chain.** *"Fighting the rat should auto start the next fight unless I
 cancel it."* Three consecutive `begin: use core.melee-combat on tulsa.giant-rat` turns
@@ -314,3 +323,152 @@ none of this: **one engine word travels engine key → `locale.ts` row → `labe
 `planePanel.ts` channel → JSX**, so four files move for one word; and the verb set is
 declared in `sections/test.ts` and then re-listed by two `case 'feed':` arms in
 `session.ts` and a third dispatch in `growth.ts`.
+
+---
+
+## Crossed from `open-human.md`, second pass, 2026-08-25
+
+Seventeen parked lines went to the owner after the playtest was read out and came back
+ruled. Each carries his answer; none is to be re-decided. What was left behind stands in
+`open-human.md`, and it is three lines.
+
+### The town
+
+**Tulsa's map is wrong and the fix is one shape, not four edits.** Ruled:
+*"combat-expansion should not need locations or entities. It is a list of jewels and
+items. The proving ground should be permanently moved as a static fixture in tulsa.
+Likewise, the beach should be removed outright, it no longer makes sense. Miki's house is
+adjacent to the market square."*
+
+Measured before filing, because the beach is load-bearing: **30 references across three
+modules.** Four shipped `# save` bodies stand on `tulsa.beach` and more carry
+`tulsa.beach.discovered`; seven `# test` scripts travel there; and
+`tulsa.window.climb-out` is `relocate: beach` — *"the only way out that never runs
+through Miki,"* by the module's own comment, so the drop needs somewhere to land. This is
+a content migration with a fixture sweep in it, not a map edit.
+
+Two consequences worth knowing before starting:
+
+- **`leave-tutorial-island.adrift` gets worse, not better.** Its gate is
+  `tulsa.market-square.discovered`, discovery spreads to adjacent locations, and the
+  ruling makes the market **adjacent to Miki's house** — so a stage that already opened a
+  step too early now opens on turn one. The *has stood in* work named above stops being
+  optional the moment this lands, and the two should land together.
+- **`combat-expansion` losing its locations is what removes the dependency edge** that
+  made a module about archetypes load the whole town. Check `layer-check` and the module
+  dependency list afterwards: if `combat-expansion` still names `tulsa`, the edit did not
+  finish.
+
+**Miki teaches the plane when he hands over the gear.** Ruled, closing the on-ramp
+question: *"Miki needs an extra line of dialogue when he gives the player the sword and
+the shield encouraging the player to check the items in their inventory and opening up
+the modals."* So the on-ramp is words plus an affordance — the line should be able to put
+the player in front of the modal rather than only mentioning it, which is the same
+mechanism the modal API line wants.
+
+**`# faction` drops its authored `title:`.** Ruled: *"Factions should have humanizeEn
+names, but they will not be shown to the player in the current version of the game."* So
+nothing authors a faction's words, anything needing a display name derives it through the
+one `humanizeEn`, and the field leaves `NOT_SAID` with two lines leaving the review
+sheet. Already costed: dropping it leaves `tsc` clean, loses exactly one derived test and
+adds no failure.
+
+### What a player has already touched
+
+**One list of what the player has interacted with, replacing two.** Ruled, and it is the
+largest shape in this pass: *"The `have I read this` for examine is the same exact thing
+as `discovered` for locations. We should strongly consider merging them as a list of
+things that the player has already interacted with."*
+
+Beside it, the standing rule that constrains how it is built: *"Dialogue should always be
+able to be said. We shouldn't need a dozen conditions or complicated logic to guarantee
+that an NPC can be talked to. We shouldn't even need complicated tests."* That is the
+same ruling as the thread line above arriving from the other direction — an NPC being
+sayable is not something a lane should be able to break with a gate.
+
+Today these are two mechanisms: `<entity>.examined` flags carry *have I read this* and
+drive the `?` mask, and `<location>.discovered` flags carry *have I been here* and drive
+the map, the journal and several quest gates. `leave-tutorial-island.adrift` is gated on
+one of them, and the *has stood in* condition the town work needs is a third thing of the
+same kind. **Fold all three questions before writing the merge**, because a merged list
+that still cannot say *stood in* as distinct from *heard of* has not merged anything.
+`one-home` is the procedure and this is exactly the case it is for.
+
+**Pin `choice.detail` with a direct test.** From the alias discussion: the specific hole
+is that mutating `formatChoices` in `scripts/lib/replLines.ts` to drop `choice.detail`
+**passes the suite**, because the parity harness counts words and `choices[].detail` and
+`entities[].title` hold identical word sets at `/look`. A focused test asserting a choice
+line carries what offers it closes that hole in about five lines and touches no harness.
+The general question — whether the view may declare aliases — stays in `open-human.md`
+and this does not pre-empt it.
+
+### Numbers and rules the owner ruled
+
+**Every skill grants +1 to its own stat per level.** Ruled: *"Yes, all skills should grant
++1 to their respective stat per level."* `# skill melee` and `thieving` carried an inert
+`stat-id: attack` with no `per-level:` anywhere; the dead declarations were deleted and
+this makes them live. The rule says **every**, so its proof derives its subjects from the
+skill list rather than naming melee and thieving — and a skill that names no stat is the
+case to settle first, because the rule has to mean something for it.
+
+**A grown copy inherits its base's price and can be sold.** Ruled: *"A grown copy inherits
+the price and can be sold. Since stack size is 1, there is no ambiguity if the player
+chooses to sell their weapon."* That answer deliberately kills the hard half — the price
+does **not** answer to the instance's modifiers or plane, it is the base's `value:` — so
+what is left is `Trade` carrying copy identity. `trade.test.ts` currently asserts the
+refusal, so the behaviour is pinned and that assertion is part of what changes.
+
+**Grown gear takes a pack slot; worn gear does not.** Ruled: *"The player effectively has
+their inventory + all of their equipment slots. So yes, the player can store an extra item
+per equipment slot. However, grown gear should also take a slot."* `state.inventory`
+excludes worn **and** grown today; only the second exclusion goes. Equipping therefore
+still frees capacity, and growing an item when the pack is full becomes refusable, which
+is the new refusal to write and prove.
+
+**A `# shop` accepts one of exactly two things.** Ruled: *"There are 2 states for a shop.
+Accepts any, or accepts stock. The second option is for shops that only accept items they
+already keep stocked."* So `accepts:` is a closed two-value field, `stock` means what the
+shop already lists, and the effective policy becomes readable off the shop instead of
+falling out of which items happen to carry a `value:`.
+
+**Two xp gains fold back into one line.** Ruled: *"+5 attack and +5 defense, should read
++10 attack, defense."* The grouping belongs in `sayingOf` over notices that share a count,
+not in the notice type — the lane costed that and it is small. **One thing to settle
+before writing it:** the previous fold read `+5 Attack, Defence`, and summing two
+different stats into `+10` says the player gained ten of something they did not. Take
+`+5 Attack, Defence` unless he says otherwise — the ruling is that they fold, and the
+arithmetic inside it reads like a slip rather than a decision.
+
+### The tools
+
+**A recorded run carries a start save and an ending save, always.** Ruled, both halves:
+*"of course it can have an ending save"* and *"yes and yes"* — so `KeptRun.from` may name
+a `# save` the corpus already holds instead of carrying bytes. This is what lets
+`/create-test` finally go through `runAsSections` as the one writer.
+
+**And the exception goes with it**, which is his own question turned into the answer:
+*"Why do we need an exception here in the first place? Why do we sometimes need to declare
+a savegame was loaded and sometimes not?"* Today a history already opening with `load:`
+declines to write a start save, because the author's `load:` already places the replay —
+which is two rules where one would do. With `from` able to name a `# save`, the run always
+carries a start save, a `load:` in the history is the same fact stated twice, and the
+branch that decides between them is deleted rather than moved.
+
+**One function moves a pack row, and every surface calls it.** Ruled: *"Absolute parity
+between the surfaces. The runtime exposes a single function to move item from position X
+to position Y, swapping if necessary. Each of the play states can either call or not.
+Either way, the function is exposed and only exists in one place."* So the terminal's
+missing control was never the question — the question was where the move lives, and the
+answer is runtime, once. `swap:` stays the directive that records and replays it.
+
+**Find what the suite's twenty-three seconds are actually made of, and report.** From
+*"development when npm test takes >30s is very annoying."* This is a measurement lane and
+it ends in a report, not a refactor — **nothing here authorises deleting a test.** What is
+already known: two-thirds of the CPU is import and transform rather than test bodies, it
+is a function of how many test **files** there are, `pool: 'threads'` makes it worse, and
+~450 full loads of the shipped corpus cost about a quarter of all test time. What is not
+known and is cheap to measure: **nothing memoizes a corpus load anywhere** — there is no
+cache in `src/content/` at all — so measure what a per-process memoized shipped-corpus
+load does to those 450, and measure whether the dev loop's real answer is that `npm test`
+is the gate while a watch-mode or changed-files run is the loop. Report both numbers; the
+decision after them is the owner's.

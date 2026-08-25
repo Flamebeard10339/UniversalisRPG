@@ -782,6 +782,18 @@ engine never hears about and a player who has just navigated somewhere has somet
 say about it. A run says on its first line when it was played and which commit it was
 played against.
 
+**The numbers stand until the world does, and balance is a pass of its own.** Ruled
+2026-08-25: *"This is a balance concern and is not part of the current playtest
+situation… Balance will happen after."* So the four race stats stand as chosen — human
+max-health, elf accuracy, dwarf defense, orc attack, with evasion and regeneration
+rejected as unusable at +5% of 0 and of 1 — and so do the item-level rolls
+(`iron-sword 3-8`, `heartwood-blade 12-18`, `proving-blade 6-10`) and the rolling
+passives. None of these is an open question; a lane that trips over one leaves it alone.
+
+**`packOrder` is in the save without a version bump, deliberately.** It is additive with
+a sparsest of `[]`, so all 32 corpus fixtures read back identically, and bumping would
+have meant a `migrate-saves` run across every `# save` body for no behavioural gain.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
@@ -807,6 +819,15 @@ played against.
 **The set of things to review derives itself** from the locale tables the engine
 builds off each kind's declared prose fields. Nothing is marked by hand to appear
 on the sheet, and `@@@` keeps meaning what it means.
+
+**Test telemetry is deferred, and no lane deletes a test to make the suite faster.**
+The sketch in `.planning/.scratch.md` — tracking runs, failures, mutation effectiveness
+and churn per test to find deletion candidates — was weighed against the measurement and
+put off: *"I would vastly prefer deferring it."* It also aims at the wrong cost. Two
+thirds of the suite's CPU is import and transform, which is a function of how many test
+**files** exist, not how many claims they hold — and this repo's claims deliberately
+derive their own subjects, so its files hold many claims each. Deleting tests would buy
+almost nothing and cost the coverage that makes the corpus safe to change.
 
 **The human review pass is deferred until the world settles, and until then a lane fixes
 dialogue directly.** The owner's ruling, 2026-08-25: *"we will directly fix all dialogue

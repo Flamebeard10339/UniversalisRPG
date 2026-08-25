@@ -139,16 +139,26 @@ other half of the loop working. Sixty turns through Miki's route on 2026-08-25, 
 through the playtest tool and marked reviewed by its filename. Twenty-one findings, and
 **every one of them turned out to be takeable** — the run states its own ruling nearly
 every time it complains, which is what a note written at the turn it happened buys you.
-Reading it out took the owner's rulings on eight more lines that had been parked, so
-`open-human.md` lost its whole review-pass heading, both never-moving balance
-observations and four settled questions, and `open-agent.md` went from an empty queue to
-a full one.
+
+Then the file itself emptied. Reading the run out took the owner's rulings on eight
+parked lines, and putting the rest in front of him took seventeen more the same day.
+**`open-human.md` went from twenty lines to three**, and `open-agent.md` from an empty
+queue to a full one. Most of what had been sitting there waiting on him turned out to be
+one-line answers nobody had asked for — which is the lesson of the session and is now
+item 1 of what he has to deliver.
 
 The rulings worth knowing without opening the file: **dialogue is drafted directly and
 the review pass waits for the world**; a way out is back on the action list, reversing
-`settled.md`; talking is offered as a choice of path with quests first; an attack
-declares a damage range and rolls in it; autosave writes every action; a run is marked
-reviewed by its filename and nothing prunes on a timer.
+`settled.md`; talking is offered as a choice of path with quests first; a foe declares a
+damage range while the player's derives from base plus skill level; every skill grants +1
+to its stat per level; autosave writes every action; **`have I read this` and
+`discovered` merge into one list of what the player has touched**; the beach is cut and
+the proving ground moves into Tulsa, which makes the *has stood in* gate compulsory
+rather than optional; a run is marked reviewed by its filename and nothing prunes on a
+timer.
+
+Three lines were left standing, and all three are honestly his: the quest sequencing,
+the alias question he asked for a conversation about, and a replay he has not watched.
 
 **10. The removal-cost question has an answer, it is the fixtures, and it is now ruled.**
 The owner asked whether cutting a feature could cost less. Measured on the whetstone: 57
@@ -170,8 +180,10 @@ better. A playtest names it better than a reading does.
 
 1. **The rulings still standing in `open-human.md`.** Most are one line, and every one
    of them has an italic clause naming exactly the decision that is missing. This is
-   now the shortest path to work: eight of them were answered in an hour on 2026-08-25
-   and the queue filled up behind them.
+   the shortest path to work by a wide margin — twenty-five of them were answered in one
+   day on 2026-08-25 and the whole agent queue filled up behind them. **When this file
+   is long, it is because nobody put it in front of him**, not because the questions are
+   hard.
 2. **More play, and the list of problems it produces.** Nothing substitutes for it, and
    the second run's yield says so — twenty-one findings, all of them actionable, from
    sixty turns. Runs go to `.planning/yonatan-playtests/` and get a `-reviewed` suffix

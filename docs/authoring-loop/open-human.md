@@ -19,303 +19,105 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
+**Three lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+seventeen of them in one sitting off the back of his second playtest — most of what
+this file held turned out to be one-line answers nobody had asked him for.
+
 ---
 
-## The next stretch of work
+## Tulsa first, then the quests one by one
 
-**Author each quest in order, with playbot testers in a loop.** Ten quest notes in
-`.planning/planning_quests/`, deliberately not levelled up before now — how much
-outline detail the loop actually needs is what the runs were meant to measure. The
-runs are cheap and the fixing is not, which is the asymmetry to plan around.
+**One task, not four.** Ruled 2026-08-25, folding together what were four separate
+headings here: the ten quest notes in `.planning/planning_quests/`, the eight `@@@`
+marks the corpus holds, the unreachable `sewer-toll-paid` road, and the deferred
+question of whether a quest can own all of its own state. *"This task needs to be
+combined with the next stretch of work… It is a single task. Once tulsa is ready we
+will start making quests one by one."*
 
-*Moves quest by quest, when the owner says a note is levelled enough to author from.
-The writing that comes out is his to accept either way.*
+So none of the four is separately answerable, and the ordering is settled: **the town
+is finished first**, and then each quest is written in turn with playbot testers in a
+loop. What the town still owes is in `open-agent.md` and is a full queue.
 
-## A quest cannot hold all of its own state
+The three facts a lane will need when this starts, kept here so they are not
+re-derived:
 
-**Deferred by the owner** in favour of the smaller members. The ruling stands:
-everything related to a quest belongs inside the quest file. Nothing today lets it.
-`tulsa.mirror` sets `mirror-done` and `tulsa.giant-rat` sets `rats-killed`; both
-are read only by `tutorial-quests`, and neither can move there, because `tulsa`
-does not depend on `tutorial-quests` and the engine refuses the upward reference:
+- **The eight `@@@` marks are entities waiting on quests** — the anvil on A Grand
+  Blade, Oolga's counter on Kill it with Fire, the hive mouth on Birds and the Bees.
+- **`sewer-toll-paid` is read and never set.** `castle-yard`'s road to
+  `sewer-entrance` is gated on it and nothing in the corpus sets it, so that road is
+  unreachable. It is Larry's toll, and it is written when Larry's quest is.
+- **A quest cannot hold all of its own state, and the engine refuses the fix.**
+  `tulsa.mirror` sets `mirror-done` and `tulsa.giant-rat` sets `rats-killed`; both
+  are read only by `tutorial-quests` and neither can move there, because `tulsa` does
+  not depend on `tutorial-quests`:
 
-    town [town] resolve: # entity town.mirror action "look in" set: names
-    errand.mirror-done, but errand is not this module or one of its dependencies
+      town [town] resolve: # entity town.mirror action "look in" set: names
+      errand.mirror-done, but errand is not this module or one of its dependencies
 
-A `# quest` hands **dialogue** to an upstream entity and cannot hand it an
-**action**, so moving the flag by moving what sets it does not work either. The
-corpus has zero `+` field edits and this is not an argument for inventing one.
+  A `# quest` hands **dialogue** to an upstream entity and cannot hand it an
+  **action**, so moving the flag by moving what sets it does not work either. The
+  corpus has zero `+` field edits and this is not an argument for inventing one.
+  Entity-private flags (`tulsa.mirror.done`) would work today and were rejected: they
+  re-home the flag without re-homing the quest, which is the requirement.
 
-*Closes when:* a quest module can own a whole interaction on an entity declared
-upstream of it. Until then the two flags stay where they are. Entity-private flags
-(`tulsa.mirror.done`) would work today and were rejected: they re-home the flag
-without re-homing the quest, which is the requirement.
+*Moves quest by quest, when the owner says the town is ready and a note is levelled
+enough to author from. The language design under the third bullet is engine work a
+lane can take and prove the moment the first quest actually needs it — which is the
+event that un-defers it, rather than a separate ruling.*
 
-*Moves when: the owner un-defers it. The language design after that is engine work an
-agent can take and prove; the deferral is the only thing holding it here.*
+## Whether the view may declare two paths aliases of one fact
 
-**`sewer-toll-paid` is read and never set.** `castle-yard`'s road to
-`sewer-entrance` is gated on it (`content/tulsa.dsl`) and nothing in the corpus
-sets it, so that road is unreachable. It is Larry's toll and belongs to a quest
-that is not written; it closes the same way.
+Held open for a conversation the owner asked for: *"I'm not convinced we need aliases
+in the first place. This needs a discussion. What are the pros and cons. What is the
+shape either path will take."* The discussion was had on 2026-08-25 and its substance
+is below, so it is not re-derived; what is left is the choice.
 
-*Moves when: Larry's toll is written, or the owner rules the road may be cut instead.*
+**What is broken.** The view-parity harness proves every string the engine puts in a
+view actually reaches a player on all three surfaces. It works by counting words, so
+when two paths carry the same word at the same moment neither is ever proved.
+Measured at `/look` in the Guide House: `choices[].detail` and `entities[].title`
+hold *identical* word sets, so mutating `formatChoices` in `scripts/lib/replLines.ts`
+to drop `choice.detail` entirely **passes the suite**.
 
-## Prose nobody can reach
+**Shape A — the view declares its aliases.** A declaration saying these paths are
+several names for one fact, after which the cheap rule (*a shared word must be drawn
+once per bearing path*) applies to everything else. Measured: the rule kills the
+mutant and raises exactly three false alarms — `location.title`, `planes[].name`,
+`action.label` — and all three are exactly the alias groups, so they look declarable.
+*Against it:* the declaration is a hand-kept list of what counts as one fact, which is
+the failure mode `CLAUDE.md` opens by naming. A new alias fails the harness until
+someone adds it; a path that stops being an alias keeps its exemption silently.
 
-The class is closed and what is left is one decision. `src/runtime/proseReach.test.ts`
-holds every field a kind declares as prose to being said to a player, subjects taken
-from `textFieldsOf` crossed with the corpus's own values, evidence from a sweep that
-stands the player in front of everything the registry declares.
+**Shape B — every driver reports its text keyed by the subject it hangs off.** Then
+aliasing falls out rather than being declared: same subject, same fact. Nothing is
+kept in sync. *Against it:* it is a change to all three drivers rather than to the
+harness, and it is the expensive path.
 
-**`# faction` declares a `title` no call site in the engine ever reads.** A faction is
-the bitmask `factionBits` builds in `src/content/load.ts`, and nothing in `src/`,
-`scripts/` or the app ever names one to a player — so two generated lines sit on the
-review sheet that no player can reach, forever. Measured: dropping `title` from
-`src/content/sections/faction.ts` leaves `tsc` clean, loses exactly one derived test
-and adds no failure, and takes two lines off the sheet. *Closes when:* a faction has a
-surface, or the field goes and its entry leaves `NOT_SAID`.
+**There is no shape C.** The obvious *"then stop carrying three names for one place"*
+does not exist: `location.title`, `discovered[].title` and `locations[].title` are
+three different **lists** that legitimately mention the same place, not three
+redundant paths to one field. Collapsing them is not available, and that was checked
+— a per-line unit gives the same answer, because those two share a chunk for exactly
+the reason they share a word.
 
-*Moves when: the owner rules whether a faction is ever named to a player. If it is not,
-dropping the field is a measured, headless change already costed.*
-RESPONSE: Factions should have humanizeEn names, but they will not be shown to the player
-in the current version of the game. 
+**The recommendation on file: neither, yet.** What is actually at risk is one mutant
+in a test harness, and the specific hole — `choice.detail` going missing unnoticed —
+is closed for about five lines by a direct test, which is queued in `open-agent.md`.
+Shape A buys the general case at the price of the one thing this repo spends 11.5% of
+its commits undoing. Shape B is what the repo's own doctrine selects and should be
+taken the next time a driver is open for another reason, not on its own account.
 
-## The town, and what it does not teach
+*Moves when: the owner picks a shape, or accepts the recommendation and this line is
+deleted with one sentence going to `settled.md` naming the blind spot and naming B as
+its answer if it ever matters.*
 
-**Cluster planes are now unreachable in `tulsa`.** The smith's chest was the tutorial
-on-ramp to them and it is `DEBUG` now, as asked. `combat-expansion`'s `armourers-chest`
-still hands out jewels so the mechanic is playable, but nothing in the town introduces
-it. The whetstone ruling removed the need for a chest that hands out whetstones — gear
-drops carrying its own points — so what is missing is the teaching, not the item.
+## Nobody has watched a replay back
 
-*Moves when: the owner says where a player first meets a plane. It is one sentence, and
-an agent picking the spot is deciding what the tutorial is about.*
-RESPONSE: Miki needs an extra line of dialogue when he gives the player the sword and the shield
-encouraging the player to check the items in their inventory and opening up the modals.
+Everything the replay decides is proved (`src/ui/replay.test.ts`, and the cursor
+through the driver in `src/ui/playtest.test.ts`); what nobody has watched is the tick
+itself, the bar, and whether 0.3s is the right default once a run with a long stretch
+of `page:` moves is played back. There are two recorded runs standing in
+`.planning/yonatan-playtests/` to watch.
 
-**`combat-expansion` and `tutorial-quests` depend on `tulsa`.** Each names one thing
-that moved — a road to the beach, and Miki — so a module about archetypes and a module
-about a quest both load the whole town. `combat-expansion.proving-ground` sits at
-`tulsa.market-square`'s own square and hangs off the beach for want of anywhere better.
-
-*Moves when: a playtest names where the proving ground should stand. Two runs have now
-gone through the town and neither reached it, which is itself the finding.*
-RESPONSE: combat-expansion should not need locations or entities. It is a list of jewels
-and items. The proving ground should be permanently moved as a static fixture in tulsa. 
-Likewise, the beach should be removed outright, it no longer makes sense. Miki's house 
-is adjacent to the market square.
-
-**The eight `@@@` marks the corpus holds** are `tulsa` entities waiting on quests that
-are not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
-hive mouth on Birds and the Bees.
-
-*Moves with the quests: these close when the modules that answer them are written, which
-is the item at the top of this file.*
-RESPONSE: This task needs to be combined with the next stretch of work, and a quest cannot 
-hold all of its own state. It is a single task. Once tulsa is ready we will start making 
-quests one by one. 
-
-## Balance nobody has played against
-
-Every number here was reasoned about and none was played against.
-
-**`# skill melee` and `thieving` carried an inert `stat-id: attack`** with no
-`per-level:` anywhere, folding nothing. The dead declarations were deleted. Making
-either live is now one line (`tags: +1 attack per level of melee`) but it is a
-combat balance change.
-
-*Moves when: the owner rules whether either folds into a stat. It is one line, and
-the line is a balance change nobody has played.*
-Yes, all skills should grant +1 to their respective stat per level. 
-
-**Three balance numbers came out of the item-level lane and none is the owner's.** The
-rolls are `iron-sword 3-8`, `heartwood-blade 12-18`, `proving-blade 6-10`; the rolling
-passives are Keen Eye `+4-8 accuracy`, Quickstep `+6-10 evasion`, Fortune `+3-8 luck`.
-They were chosen so the corpus's routes have points enough and so at least one rolled
-payload is actually walked, and each is a one-line edit. The damage ruling of
-2026-08-25 fixed two numbers beside these — the rat swings `1-3` and the player `3-8` —
-so `iron-sword`'s roll and the player's swing now read as the same span and are not the
-same fact.
-
-*Moves when: the owner rules the six. Each is one line, and the collision with the
-damage ranges is worth a glance while he is in there.*
-RESPONSE: This is a balance concern an is not part of the current playtest situation. 
-The player's 3-8 should be part of their skill level + base. Balance will happen after. 
-
-**What a counter pays for a grown copy, now that gear is unsellable.** Measured rather
-than assumed: a shop takes from the stack and a base never joins one, so `iron-sword`
-still carries `value: 24` and no counter will ever price it — `trade.test.ts` asserts
-the refusal, so the behaviour is pinned rather than accidental. Making a copy sellable
-means the price answers to that instance's own modifiers and plane, and `Trade` carries
-no copy identity.
-
-*Moves when: the owner rules what a grown copy is worth at a counter, or that gear
-simply is not sold. `Trade` carrying copy identity is engine work after the first
-answer and nothing at all after the second.*
-RESPONSE: A grown copy inherits the price and can be sold. Since stack size is 1, there 
-is no ambiguity if the player chooses to sell their weapon. 
-
-**Should worn gear take a slot?** It does not. The ruling said "the length of the
-inventory list", `state.inventory` literally excludes worn and grown, and worn gear
-is drawn under its own heading. If it should, equipping one of a stack of three
-starts being refusable.
-
-*Moves when: the owner rules it. Refusing to equip one of a stack of three is engine
-work the moment he says yes.*
-RESPONSE: The player effectively has their inventory + all of their equipment slots. 
-So yes, the player can store an extra item per equipment slot. However, grown gear should
-also take a slot. 
-
-## Ours, and small
-
-**Two paths holding the same words at the same moment cannot be told apart.** Crossed
-from `open-agent.md` on 2026-08-25 by the lane that fixed the other two parity lines.
-The proof counts per moment and credits a path only beyond what already-proved paths
-account for, and it still cannot see `choice.detail` going missing: mutating
-`formatChoices` in `scripts/lib/replLines.ts` to drop it passes the suite. Measured at
-`/look` in the Guide House, `choices[].detail` and `entities[].title` hold *identical*
-word sets — Miki, Front Door, Stairs, Mirror, Oven, Smith's Chest — so neither is ever
-proved, which needs a word with exactly one bearer, and the one occurrence in the
-`Here:` line credits both.
-
-The cheap rule that closes it — a shared word must be drawn once per bearing path —
-does fail the mutant, and raises three false alarms on a clean tree: `location.title`,
-`planes[].name`, `action.label`. None is a bug. `location.title` / `discovered[].title`
-/ `locations[].title` are three names for one place, and `carried[].name` /
-`planes[].title` / `planes[].name` are three names for one item, where drawing it once
-is right. So two paths bearing one word are sometimes two showings that must both
-appear and sometimes one fact reachable by several names, **and nothing in the view
-distinguishes them** — no counting rule over the rendered text can, because the same
-evidence supports both readings. The line's own suggested close does not work either,
-and that was checked: a per-line unit gives the same answer, because `location.title`
-and `discovered[].title` share a chunk for exactly the reason they share a word.
-*Closes when:* an alias and a distinct showing can be told apart.
-
-*Moves when: the owner rules whether the view may declare which paths are aliases of
-one fact. If it may, the demand rule above is correct and cheap, and the three false
-alarms are exactly the alias groups — they look declarable. If it may not, every driver
-has to report its text keyed by the subject it hangs off, which is a change to all
-three drivers rather than to the harness, and is the expensive path.*
-RESPONSE: I'm not convinced we need aliases in the first place. This needs a discussion. 
-What are the pros and cons. What is the shape either path will take. 
-
-**`accepts: any` is the default and no shop in the corpus says otherwise.** So
-every counter will buy anything carrying a `value:`, and pricing four items changed
-what three shops do without touching a shop. Item pricing and shop policy are one
-decision written in one place, and nobody reading a `# shop` can see it.
-
-*Moves when: the owner rules whether a `# shop` has to say what it accepts. Making the
-effective policy readable off the shop is headless after that.*
-RESPONSE: This is not an question. There are 2 states for a shop. Accepts any, or accepts stock. 
-The second option is for shops that only accept items they already keep stocked. 
-
-**Two-thirds of the suite's CPU is not test bodies.** Measured at 32 competing
-processes: 312s of import and 148s of transform against 176s of test time, across
-152 files. No amount of making a test body faster moves that, `pool: 'threads'`
-makes it worse, and it is a function of how many test *files* there are. Beside it,
-~450 full loads of the shipped corpus, ~105ms each idle and ~220ms under load —
-about a quarter of all test time, with a flat profile and no hot spot, growing with
-the corpus and with the UI. The shared fixture world now queued does **not** answer
-this: it removes declarations, not files, and a derived fixture world may well be
-loaded more often rather than less. *Closes when:* somebody decides what the suite's
-cost should be a function of.
-
-*Moves when: that decision is taken. The item's own closing clause is the missing
-information and more measurement does not supply it.*
-RESPONSE: This seems like a problem to me. Do we need so many tests? .scratch.md has a 
-section called test maintenance. Do we need to implement something like that now? I would
-vastly prefer deferring it, but development when npm test takes >30s is very annoying. 
-
-**A re-read and a node that has fallen silent still cannot be told apart, and the cause
-is not what it looked like.** Crossed from `open-agent.md` on 2026-08-25 as the half of
-the examine-mask line the mask does not close. The mask closes *have I read this* — a
-thing wearing its own name is read, a `?` is not. The other half was reproduced rather
-than guessed: repeating `talk:` says a sticky line every time and a spent node simply
-stops being offered, and repeating an examine always says the same words. **The silence
-is the transcript.** `appendOutputs` merges an identical consecutive line into the entry
-already held and bumps `repeats`, which `Line` draws as a `(2)` on the line above.
-Measured on the shipped mirror: examine twice gives `entries=4, repeats=1`; a third time
-gives `entries=4, repeats=2` — nothing moves at the bottom of the log, which is exactly
-*a third time says nothing at all*. The run of 2026-08-25 hit this from the other side
-and asked for the opposite of a collapse — *"There should be some sort of visual queue
-that I already examined this object"* — which the mask now gives on the cell but not in
-the log.
-
-*Moves when: the owner rules which of two. Either a re-read that collapses says something
-of its own — an engine line to the effect that this has been read already — or the
-collapsed line moves to the bottom of the log so the count is where the player is
-looking. Both are small; neither is derivable.*
-RESPONSE: Dialogue should always be able to be said. We shouldn't need a dozen conditions 
-or complicated logic to guarantee that an NPC can be talked to. We shouldn't even need 
-complicated tests. The `have I read this` for examine is the same exact thing as 
-`discovered` for locations. We should strongly consider merging them as a list of things
-that the player has already interacted with. 
-
-**`/create-test` still cannot go through the one writer, and what stops it is a contract
-nobody has written.** Crossed from `open-agent.md` on 2026-08-25. The cycle that was
-blamed is gone — `outcomeOf` and `refusedLine` moved down into `command.ts`,
-`layer-check` exits 0, and `buildCreateTest` reads `startSaveId` so the one fact the two
-writers disagreed about has one home, with a sweep requiring `runLog.ts` to be the only
-file minting a `-start` id. But `runAsSections` still is not the writer for the sections
-themselves, on the two counts the original line named, and neither is a decision a lane
-can take:
-
-- `/create-valid-test` appends `expect: <id>-end` and a second `# save` that a `KeptRun`
-  has nowhere to put. Appending to the test block is easy; **whether a recorded run may
-  have an ending save at all** is the question.
-  RESPONSE: of course it can have an ending save. 
-- A history already opening with `load:` deliberately emits no start save. `KeptRun`
-  cannot say that — `from` is the bytes, and in that case the session *did* take a start
-  save; the command simply declines to write it, because the author's own `load:`
-  already places the replay. Saying it needs `from` to become *bytes, or a `# save` the
-  corpus already holds*, which changes a type the app's playtest slot serializes.
-  RESPONSE: Why do we need an exception here in the first place? Why do we sometimes need
-  to declare a savegame was loaded and sometimes not?
-
-The lane's judgement, worth keeping: routing only the common case through
-`runAsSections` and slicing its output by index for the other two would be worse than
-what is there now.
-
-*Moves when: the owner rules whether a recorded run may carry an ending save, and
-whether `KeptRun.from` may name a `# save` instead of holding bytes. Both are one-line
-answers and the engine work after either is ordinary.*
-RESPONSE: Yes and yes. 
-
-**A pack reorder has no terminal control, and the save version was not bumped for it.**
-Two loose ends from the pack-order lane, neither of which blocks anything. The `swap:`
-directive is how a rearrangement records and replays, and a REPL player can type one, but
-nothing lists their pack keys except `/state` — so the order is a thing the app can drive
-and a terminal can only replay. Separately, `packOrder` was added to the save without
-bumping the version: it is additive with a sparsest of `[]`, so all 32 corpus fixtures
-read back identically, and bumping would have meant a `migrate-saves` run across every
-`# save` body for no behavioural gain.
-
-*Moves when: the owner says whether a terminal needs to reorder a pack at all — it may
-simply not be a terminal thing — and whether he wants the version bumped for tidiness.
-The bump is one line plus a migrate run.*
-RESPONSE: Absolute parity between the surfaces. The runtime exposes a single function to 
-move item from position X to position Y, swapping if necessary. Each of the play states 
-can either call or not. Either way, the function is exposed and only exists in one place. 
-
-**Two xp gains at once now read as two pills, not one line.** A turn granting `+5
-Attack` and `+5 Defence` used to fold into one pill, `+5 Attack, Defence`, because the
-old notes grouped by amount. A notice is now words and a merge key with no discriminant,
-and merging under the key alone is what makes adding a notification a line rather than a
-shape — so the grouping went, deliberately, as the mechanism the ruling asked to delete.
-Six rat kills still land as one line, because they share a key.
-
-*Moves when: the owner says whether he wants the grouped reading back. If he does, it
-belongs in `sayingOf` over notices that share a count, not in the notice type — the
-lane costed that and it is small; what nobody can decide for him is whether two pills
-read worse than one line.*
-RESPONSE: Yes, +5 attack and +5 defense, should read +10 attack, defense. 
-
-**Nobody has watched a replay back.** Everything the replay decides is proved
-(`src/ui/replay.test.ts`, and the cursor through the driver in `src/ui/playtest.test.ts`);
-what nobody has watched is the tick itself, the bar, and whether 0.3s is the right
-default once a run with a long stretch of `page:` moves is played back. There are two
-recorded runs standing in `.planning/yonatan-playtests/` to watch.
-
-*Moves when: he watches one and names the cadence. Nothing else answers it.*
-RESPONSE: Leave this here. I will do it later. 
+*Moves when: he watches one and names the cadence. Nothing else answers it — and he
+has said explicitly that he will do it later.*
