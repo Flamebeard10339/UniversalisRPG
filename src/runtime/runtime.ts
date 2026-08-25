@@ -42,7 +42,7 @@ import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs'
 import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
 import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
-import { describeCondition, evaluateCondition } from './conditions';
+import { describeCondition, evaluateCondition, itemMissingFor } from './conditions';
 import { spanStart, spanSummary, type SpanStart } from './span';
 import type { Terminator } from '../content/sections/test';
 
@@ -583,14 +583,27 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
 }
 
-function refuseUnpayableInputs(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
-  const { short, unspendable } = inputLimit(action, state);
-  if (short === undefined && unspendable === undefined) return undefined;
+// Why an action a player was offered turns them away the moment they take it, in the words they
+// read — the one home for every such reason. An author's `on failure:` stands in place of all of
+// them.
+function whyRefused(action: Action, registry: Registry, state: GameState): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const item = (id: string): Localized => localizer.title('item', id);
+  if (action.requires && !requiresMet(action, state, registry)) {
+    const missing = itemMissingFor(action.requires, state, registry);
+    return missing === undefined ? localizer.engine('engine.requires.unmet') : localizer.engine('engine.requires.item', { item: item(missing) });
+  }
+  const { short, unspendable } = inputLimit(action, state);
+  if (short !== undefined) return localizer.engine('engine.inputs.short', { item: item(short) });
+  if (unspendable !== undefined) return localizer.engine(unspendable.kind === 'grown' ? 'engine.inputs.grown' : 'engine.inputs.worn', { item: item(unspendable.item) });
+  return undefined;
+}
+
+function refuseAction(action: Action, registry: Registry, state: GameState): ArmResult | undefined {
+  const because = whyRefused(action, registry, state);
+  if (because === undefined) return undefined;
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-  else if (short !== undefined) state.log.push(localizer.engine('engine.inputs.short', { item: item(short) }));
-  else state.log.push(localizer.engine(unspendable!.kind === 'grown' ? 'engine.inputs.grown' : 'engine.inputs.worn', { item: item(unspendable!.item) }));
+  else state.log.push(because);
   return { armed: false };
 }
 
@@ -601,11 +614,10 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 
   const action = target.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(ownerRef(obj, objId)) }));
-  if (!requiresMet(action, state, registry)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
-  const unpayable = refuseUnpayableInputs(action, registry, state);
-  if (unpayable) return unpayable;
+  const refused = refuseAction(action, registry, state);
+  if (refused) return refused;
 
   const repeating = actionKind(action) === 'continuous';
   const duration = attemptDuration(action, state, registry);
@@ -637,11 +649,10 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
   if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
   if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
-  if (!requiresMet(action, state, registry)) throw new RuntimeError(`action requires unmet: ${actionId}`);
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${actionId}`);
 
-  const unpayable = refuseUnpayableInputs(action, registry, state);
-  if (unpayable) return unpayable;
+  const refused = refuseAction(action, registry, state);
+  if (refused) return refused;
 
   armFight(state, registry, actionId, action, targetId);
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };

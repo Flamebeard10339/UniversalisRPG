@@ -182,9 +182,12 @@ function sessionOver(registry: Registry, state: GameState): PlaySession {
 
 type Actable = { actions?: Action[] };
 
+// What an entity, a place or a thing in the pack puts in front of the player. `hidden if:` is the
+// only field that takes an action off this list: one whose `requires:` does not stand is offered,
+// and turns the player away in words when they take it.
 function actionAvailable(action: Action, state: GameState, registry: Registry): boolean {
   if (isTwoSided(action)) return false;
-  return requiresMet(action, state, registry) && actionVisible(action, state, registry);
+  return actionVisible(action, state, registry);
 }
 
 function availableActions(owner: Actable, state: GameState, registry: Registry): Action[] {
@@ -203,11 +206,13 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   return movesTo(action) === target;
 }
 
+// A road the place itself offers is dropped only where something standing here already walks it —
+// which an offer that would refuse does not, so a gated door never takes the plain way out with it.
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
   return standingHere(registry, state, location).some((entityId) => {
     const entity = registry.entities.get(entityId);
     if (!entity || masked.has(entityId)) return false;
-    return availableActions(entity, state, registry).some((action) => isFreeTravelAction(action, target));
+    return availableActions(entity, state, registry).some((action) => isFreeTravelAction(action, target) && requiresMet(action, state, registry));
   });
 }
 
@@ -245,7 +250,7 @@ function fightChoices(entityId: string, registry: Registry, state: GameState, lo
   for (const action of player.actions) {
     const id = declaredId(action);
     if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
-    if (!requiresMet(action, state, registry) || !actionVisible(action, state, registry)) continue;
+    if (!actionVisible(action, state, registry)) continue;
     if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
     choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });
   }

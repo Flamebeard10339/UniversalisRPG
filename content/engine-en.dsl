@@ -18,6 +18,8 @@ engine.travel.unknown-origin: unknown travel origin: {location}
 engine.travel.unknown-destination: unknown travel destination: {location}
 engine.craft.label: Craft {recipe}
 engine.talk.to: Talk to {entity}
+engine.requires.item: You need {item} for that.
+engine.requires.unmet: You cannot do that yet.
 engine.inputs.short: You don't have enough {item}.
 engine.inputs.grown: Your {item} has grown a plane of its own, and a grown item is never spent.
 engine.inputs.worn: Your {item} is the one you are wearing, and what you wear is never spent.

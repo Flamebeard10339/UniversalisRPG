@@ -80,6 +80,25 @@ export function evaluateCondition(condition: Condition, state: GameState, regist
 
 export const describeCondition = printCondition;
 
+// The item a condition wants the player holding, where not holding it is the whole of why the
+// condition does not stand. It answers a sentence somebody reads rather than a decision, so it
+// declines every shape it could only half-name: an `or` is satisfied by something else, and a `not`
+// is satisfied by putting the thing down.
+export function itemMissingFor(condition: Condition, state: GameState, registry: Registry): string | undefined {
+  switch (condition.kind) {
+    case 'has':
+      return evaluateCondition(condition, state, registry) ? undefined : condition.item;
+    case 'and':
+      for (const each of condition.conditions) {
+        const item = itemMissingFor(each, state, registry);
+        if (item !== undefined) return item;
+      }
+      return undefined;
+    default:
+      return undefined;
+  }
+}
+
 export function renderSegments(segments: TextSegment[], state: GameState, registry: Registry): string {
   return segments
     .map((segment) => {
