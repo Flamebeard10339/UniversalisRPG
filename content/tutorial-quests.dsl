@@ -26,23 +26,30 @@ stage offered:
   log: A guide called Miki offered to show me the ropes.
   tulsa.miki says:
     always
+    ask: Who are you, then?
     Greetings, adventurer! Welcome to UniversalisRPG.
     The name's Miki, your tutorial guide, here to walk you through your first steps.
     What do you say I show you the ropes?
     -> Sounds good. Teach me.
+      say: Splendid! We start with what gives an adventurer purpose: quests.
+      if not tulsa.mirror-done:
+        say: Your first task: find the mirror in this house and decide who you are, your name and your people.
+      if tulsa.mirror-done:
+        say: Though you have stood in front of the mirror already, by the look of you, so that one is done before I set it. Come tell me who you turned out to be.
       goto name-yourself
     -> I'd rather find my own way.
       goto snubbed
 
 stage name-yourself:
-  log: Miki says a quest begins with knowing who you are, and sent me off to find a mirror.
+  log: Miki says the first thing an adventurer needs is to know who they are. I am not sure I do.
   tulsa.miki says:
     always
-    again: The mirror's still waiting. Name yourself first, then we'll talk.
-    Splendid! We start with what gives an adventurer purpose: quests.
-    Your first task: find the mirror in this house and decide who you are, your name and your people.
+    sticky
+    ask: About that mirror.
+    The mirror's still waiting. Name yourself first, then we'll talk.
   tulsa.miki says:
     when: tulsa.mirror-done
+    ask: I know who I am now.
     There you are, {player.name}. A fine name.
     give: core.jug-of-water
     give: core.pot-of-flour
@@ -55,9 +62,11 @@ stage bake-bread:
   tulsa.miki says:
     always
     sticky
+    ask: About the bread.
     Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
   tulsa.miki says:
     when: has core.bread
+    ask: The loaf is out of the oven.
     A warm loaf! Well done, {player.name}.
     Keep it in your pack - eat it whenever you're hungry.
     Every swing and catch builds a skill, and skills raise your stats.
@@ -72,9 +81,11 @@ stage clear-the-rats:
   tulsa.miki says:
     always
     sticky
+    ask: About the rats.
     Still those rats, {player.name}? Downstairs, in the basement.
   tulsa.miki says:
     when: tulsa.rats-killed >= 3
+    ask: The rats are dealt with.
     Ha! Barely a scratch on you. You're a natural.
     Truth be told, there's little left I can teach you.
     So here's the last of it: get off this island. East, past the sand, and keep going - there's a whole world of skills out that way.
@@ -88,6 +99,7 @@ stage sendoff:
   tulsa.miki says:
     always
     sticky
+    ask: Anything else before I go?
     Still here? East, past the sand. I've nothing else for you.
 
 stage snubbed:
@@ -95,6 +107,7 @@ stage snubbed:
   tulsa.miki says:
     always
     sticky
+    ask: About what I said.
     Hmph. Suit yourself. Don't come crying when a door won't open.
     if has core.lockpick:
       set: tulsa.miki.angered
@@ -108,6 +121,7 @@ stage snubbed:
   tulsa.miki says:
     when: tulsa.rats-killed >= 3
     sticky
+    ask: I cleared out your rats.
     Rats are dealt with, then. That was never the hard part.
     if has core.lockpick:
       set: tulsa.miki.angered
@@ -121,10 +135,12 @@ stage apologised:
   tulsa.miki says:
     always
     sticky
+    ask: About squaring it with you.
     give: core.fishing-net
     Take the net. Bring me one fish out of it and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   tulsa.miki says:
     when: has core.fish
+    ask: I caught you your fish.
     A fish. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
     set: tulsa.front-door.unlocked
     goto sendoff
@@ -151,11 +167,13 @@ stage adrift:
   tulsa.miki says:
     when: tulsa.market-square.discovered
     sticky
+    ask: About this island of yours.
     So you found the market. That's the far side of the island, near enough. Off you go, then. I'll be here.
     goto adrift
   tulsa.miki says:
     when: tulsa.miki.angered
     sticky
+    ask: About your dresser.
     Went through my dresser, did you. Keep them - they'll get you further than I would have. I'll be here.
     goto adrift
 
@@ -164,6 +182,7 @@ stage adrift:
 # test quest-offered
 talk: tulsa.miki
 choose: Sounds good. Teach me.
+choose: continue
 assert: finding-your-feet.name-yourself
 
 // Opens on a save so the route is walked with the pools a played game has.
@@ -175,6 +194,7 @@ submit-modal: name=Rowan
 submit-modal: race=core.elf
 assert: tulsa.mirror-done
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.bake-bread
 assert: has core.jug-of-water
 craft: dough
@@ -182,6 +202,7 @@ assert: has core.dough
 craft: bread
 assert: has core.bread
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
 // rather than through the floor.
@@ -192,6 +213,7 @@ use: melee-combat on giant-rat until done
 assert: tulsa.rats-killed >= 3
 use: entity.stairs-up.ascend
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.sendoff
 assert: tulsa.front-door.unlocked
 travel: beach
@@ -201,6 +223,7 @@ travel: beach
 travel: guide-house
 talk: tulsa.miki
 choose: leave-tutorial-island.adrift.miki.0.said
+choose: continue
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
@@ -233,6 +256,7 @@ assert: tulsa.miki.angered
 // condition just turned true does not pick it up until asked again.
 talk: tulsa.miki
 choose: leave-tutorial-island.adrift.miki.1.said
+choose: continue
 assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
@@ -258,12 +282,14 @@ choose: I'd rather find my own way.
 talk: tulsa.miki
 choose: Actually - sorry. Show me the ropes after all.
 talk: tulsa.miki
+choose: continue
 assert: has core.fishing-net
 use: entity.stairs.ascend
 use: entity.window.fish
 assert: has core.fish
 use: entity.stairs-down.descend
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.sendoff
 assert: tulsa.front-door.unlocked
 travel: beach
@@ -272,6 +298,7 @@ travel: beach
 // instead, now that there is somewhere to have come back from.
 travel: guide-house
 talk: tulsa.miki
+choose: continue
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
@@ -291,12 +318,50 @@ use: entity.mirror.look-in
 submit-modal: name=Rowan
 submit-modal: race=core.elf
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.bake-bread and not has core.bread
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 craft: dough
 craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
+
+// --- the window into the apology ---
+//
+// The one way through the house nobody had walked, and the one that made the
+// list of threads matter: snub him, refuse again, drop out of the window, go far
+// enough to find the market, and come back in off the sand. Both quests have
+// something to say by then, so from here on every talk is a list — and the line
+// carrying the apology is in it, which is the whole claim. It is proved out here
+// and not on the ordinary apology route, because that route makes it up with him
+// before it ever leaves the house.
+# test the-apology-survives-going-out-of-the-window
+talk: tulsa.miki
+choose: I'd rather find my own way.
+talk: tulsa.miki
+choose: Not a chance.
+use: entity.stairs.ascend
+use: entity.window.climb-out
+travel: market-square
+travel: beach
+travel: guide-house
+assert: tulsa.market-square.discovered and not tulsa.front-door.unlocked
+talk: tulsa.miki
+choose: finding-your-feet.snubbed.miki.0.said
+choose: Actually - sorry. Show me the ropes after all.
+assert: finding-your-feet.apologised
+talk: tulsa.miki
+choose: finding-your-feet.apologised.miki.0.said
+choose: continue
+assert: has core.fishing-net
+use: entity.stairs.ascend
+use: entity.window.fish
+assert: has core.fish
+use: entity.stairs-down.descend
+talk: tulsa.miki
+choose: finding-your-feet.apologised.miki.1.said
+choose: continue
+assert: finding-your-feet.sendoff and tulsa.front-door.unlocked
 
 // --- saves ---
 

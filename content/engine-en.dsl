@@ -41,6 +41,7 @@ engine.modal.race.carries: {race} - {carries}
 engine.modal.race.bonus: {amount} {stat}
 engine.modal.race.and: {carries}, {more}
 engine.modal.choice: Choice
+engine.modal.read: Continue
 engine.modal.item: Item
 engine.modal.confirm: {verb} {item} for good?
 engine.carried.verb.grow: Grow

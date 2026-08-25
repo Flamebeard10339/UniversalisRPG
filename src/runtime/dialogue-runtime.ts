@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { costLimit } from './actions';
 import { ActionResult, itemCost } from '../grammar/actionResult';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
+import { Choice, Dialogue, DialogueNode, givenByQuest, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -24,13 +24,27 @@ function findNode(dialogue: Dialogue, name: string): DialogueNode {
 // Talking to somebody with more than one thread open is itself a menu, and nothing in the registry holds that one: which of their threads are open is a fact about the state now. The cursor standing on it names the entity and stands at no step, which no menu cursor does — a menu resumes after the step it was put at, so its index is always at least one.
 const AT_THE_THREADS = 0;
 
+// A node that has said its piece and put no list up has still put a beat in front of the player, and a conversation that is over the instant it is entered reads as a click that did nothing. So it stands at the words, with the one thing left to answer being that they have been read. It names nothing, because what is drawn above the answer is what the view came with and not anything this cursor could point at.
+const AT_WHAT_WAS_SAID = -1;
+
 const threadsCursor = (entityId: string): DialogueCursor => ({ dialogue: entityId, node: '', resumeIndex: AT_THE_THREADS, replay: false });
+
+const readCursor = (): DialogueCursor => ({ dialogue: '', node: '', resumeIndex: AT_WHAT_WAS_SAID, replay: false });
 
 const askedOf = (cursor: DialogueCursor): string | null => (cursor.resumeIndex === AT_THE_THREADS ? cursor.dialogue : null);
 
+export const standsAtWords = (cursor: DialogueCursor): boolean => cursor.resumeIndex === AT_WHAT_WAS_SAID;
+
+// What a step of a conversation leaves standing: whatever it put up to be answered, or — where it said something and put nothing up — the words themselves, with only being read left to answer. A step that said nothing at all leaves nothing standing, so a click that reaches a silent node does not put up a screen for a player to dismiss over nothing. One home, because talking to somebody and answering what they put up must not disagree about whether the player is owed a screen.
+function standingAfter(state: GameState, step: () => DialogueCursor | null): DialogueCursor | null {
+  const before = state.log.length;
+  const cursor = step();
+  return cursor !== null || state.log.length === before ? cursor : readCursor();
+}
+
 export function cursorProblem(localizer: Localizer, cursor: DialogueCursor, registry: Registry): Localized | null {
-  // A list of threads goes stale by emptying, which the screen already reads off having nothing left to answer with.
-  if (askedOf(cursor) !== null) return null;
+  // Words already said cannot go stale, and a list of threads goes stale by emptying, which the screen already reads off having nothing left to answer with.
+  if (standsAtWords(cursor) || askedOf(cursor) !== null) return null;
   const named = { dialogue: localizer.identifier(cursor.dialogue), node: localizer.identifier(cursor.node) };
   const dialogue = registry.dialogues.get(cursor.dialogue);
   if (!dialogue) return localizer.engine('engine.dialogue.stale.unloaded', named);
@@ -117,20 +131,26 @@ export function openerShown(registry: Registry, state: GameState, node: Dialogue
   return first ? spokenLine(registry, state, first) : localizer.identifier(node.name);
 }
 
-// Everything this entity has open to be talked about now, out of everything anyone has given it to say. Every thread reachable at this moment is offered at once and the player picks; what an entity says when no thread of theirs is open is offered only then. The order is the order of the words a player reads, so no module takes a place in the list by having loaded earlier.
+// Where one open node stands in the list a player is offered. A quest has priority over the rest of what somebody holds open, because it is the thing the player is already in the middle of; a thread of the entity's own comes after it; and what they say when nothing else is open is a fallback and not a line in a list, so it is offered only where nothing above it is.
+const QUEST = 0;
+const THREAD = 1;
+const OTHERWISE = 2;
+
+const standing = (dialogue: Dialogue, node: DialogueNode): number => (givenByQuest(dialogue) ? QUEST : isThread(node) ? THREAD : OTHERWISE);
+
+// Everything this entity has open to be talked about now, out of everything anyone has given it to say. Every thread reachable at this moment is offered at once and the player picks; what an entity says when no thread of theirs is open is offered only then. Within one standing the order is the order of the words a player reads, so no module takes a place in the list by having loaded earlier.
 export function openersNow(registry: Registry, state: GameState, entityId: string): Opener[] {
-  const threads: Array<Opener & { shown: Localized }> = [];
-  const otherwise: Array<Opener & { shown: Localized }> = [];
+  const open: Array<Opener & { shown: Localized; standing: number }> = [];
   for (const dialogue of spokenBy(registry.dialogues, entityId)) {
     for (const node of dialogue.nodes) {
       if (!offering(node) || !speaksNow(dialogue, node, state)) continue;
       if (node.when !== undefined && !evaluateCondition(node.when, state, registry)) continue;
       if (!nodeAffordable(dialogue, node, state)) continue;
-      (isThread(node) ? threads : otherwise).push({ dialogue, node, shown: openerShown(registry, state, node) });
+      open.push({ dialogue, node, shown: openerShown(registry, state, node), standing: standing(dialogue, node) });
     }
   }
-  const open = threads.length > 0 ? threads : otherwise;
-  return open.sort((left, right) => (left.shown < right.shown ? -1 : left.shown > right.shown ? 1 : 0)).map(({ dialogue, node }) => ({ dialogue, node }));
+  const asked = open.filter((each) => each.standing < OTHERWISE);
+  return (asked.length > 0 ? asked : open).sort((left, right) => left.standing - right.standing || (left.shown < right.shown ? -1 : left.shown > right.shown ? 1 : 0)).map(({ dialogue, node }) => ({ dialogue, node }));
 }
 
 // Whether talking to this entity would reach anything, and what it opens on where that is one thing.
@@ -143,7 +163,7 @@ export function talk(entityId: string, registry: Registry, state: GameState): Di
     throw new RuntimeError(`no node with anything to say in any dialogue owned by entity: ${entityId}`);
   }
   // One thread open is the whole of talking to them, so it is entered rather than put to them as a list of one.
-  if (open.length === 1) return enterNode(open[0].dialogue, open[0].node, registry, state);
+  if (open.length === 1) return standingAfter(state, () => enterNode(open[0].dialogue, open[0].node, registry, state));
   return threadsCursor(entityId);
 }
 
@@ -171,7 +191,11 @@ const picks = (answer: string, entry: MenuEntry): boolean => answer === String(e
 // What the .dsl writes on the line, which is what an author reading their own file has in front of them — not what the locale table now says, and without a note the engine drops anyway.
 const authoredWords = (line: Spoken): string => withoutNote(printSegments(line.segments)).trim();
 
+// What a player answers a beat with when there is nothing to decide. It is not authored, so it is answerable by the same word in every language and by its position, the way a line in a menu is.
+const READ = 'continue';
+
 export function menuChoices(cursor: DialogueCursor, registry: Registry, state: GameState): MenuEntry[] {
+  if (standsAtWords(cursor)) return [{ index: 0, display: localizerOf(registry, state).engine('engine.modal.read'), name: READ, named: false }];
   const asked = askedOf(cursor);
   if (asked !== null) return openersNow(registry, state, asked).map((opener, index) => ({ index, display: openerShown(registry, state, opener.node), name: visitCounter(opener.dialogue, opener.node), named: true }));
   return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice), name: authoredWords(entry.choice), named: false }));
@@ -187,15 +211,20 @@ export function choose(answer: string, cursor: DialogueCursor, registry: Registr
   const at = entries.findIndex((entry) => picks(answer, entry));
   if (at === -1) throw noneMatches(answer, entries);
 
+  // Reading what was said is the whole of answering it, and what it leaves behind is the conversation over.
+  if (standsAtWords(cursor)) return null;
+
   const asked = askedOf(cursor);
   if (asked !== null) {
     const opener = openersNow(registry, state, asked)[at];
-    return enterNode(opener.dialogue, opener.node, registry, state);
+    return standingAfter(state, () => enterNode(opener.dialogue, opener.node, registry, state));
   }
   const { dialogue, node } = resolveMenu(cursor, registry);
   const match = offered(cursor, registry, state)[at].choice;
 
-  applyResultsNow(state, registry, match.effects);
-  if (match.goto) return enterNode(dialogue, findNode(dialogue, match.goto), registry, state);
-  return runSteps(dialogue, node, registry, state, cursor.resumeIndex, cursor.replay);
+  return standingAfter(state, () => {
+    applyResultsNow(state, registry, match.effects);
+    if (match.goto) return enterNode(dialogue, findNode(dialogue, match.goto), registry, state);
+    return runSteps(dialogue, node, registry, state, cursor.resumeIndex, cursor.replay);
+  });
 }

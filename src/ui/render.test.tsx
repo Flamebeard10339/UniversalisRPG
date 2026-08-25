@@ -573,6 +573,13 @@ describe('what the shell puts on the screen', () => {
     for (const choice of menu.values!) expect(onScreen(readable(asked), choice.shown), choice.shown).toBe(true);
 
     driver.answer(menu.key, menu.values![0].value);
+
+    // Taking a line out of the menu leaves Miki still talking, and what he says next asks nothing:
+    // the shell is still up, carrying the one answer that says the beat has been read.
+    const beat = driver.snapshot().view.modals[0].options[0];
+    expect(asking(renderToStaticMarkup(<App driver={driver} />))).toBe(true);
+
+    driver.answer(beat.key, beat.values![0].value);
     const answered = renderToStaticMarkup(<App driver={driver} />);
 
     expect(asking(answered)).toBe(false);

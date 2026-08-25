@@ -25,7 +25,7 @@ import { declaredId, Entity, EXAMINED, isMintedAction } from '../content/section
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
+import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
@@ -284,15 +284,18 @@ interface Offered {
   minted: boolean;
 }
 
-// Everything one entity offers, gathered into the run a player reads as that entity's: its shop,
-// what it can be asked to do, and what the player can open on it. Every one of them carries the
-// entity as `choice.of`, which is the key a surface groups by.
+// Everything one entity offers, gathered into the run a player reads as that entity's: talking to
+// it, its shop, what it can be asked to do, and what the player can open on it. Every one of them
+// carries the entity as `choice.of`, which is the key a surface groups by.
 //
 // Masked, that run is the one offer that reads the thing, drawn under a placeholder — its name, its
 // words and everything else it could be asked for are what looking at it buys.
 function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer, masked: boolean): Offered[] {
   const source = offeredBy(registry, localizer, 'entity', entityId, masked);
   const offers: Offered[] = [];
+  if (!masked && reachedNow(registry, state, entityId) !== null) {
+    offers.push({ choice: { id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: source.detail }), ...source }, minted: false });
+  }
   if (!masked && entity.shop !== undefined && registry.shops.has(entity.shop)) {
     offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
   }
@@ -319,8 +322,6 @@ function mintedSecond(offers: readonly Offered[]): PlayChoice[] {
   return [rest[0]!, minted!, ...rest.slice(1)];
 }
 
-const canTalk = (entityId: string, registry: Registry, state: GameState): boolean => reachedNow(registry, state, entityId) !== null;
-
 function locationChoices(session: PlaySession): PlayChoice[] {
   const { registry } = session;
   const state = stateOf(session);
@@ -333,9 +334,6 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
-    if (!masked.has(entityId) && canTalk(entityId, registry, state)) {
-      choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
-    }
     choices.push(...mintedSecond(entityOffers(entity, entityId, registry, state, localizer, masked.has(entityId))));
   }
 
@@ -986,7 +984,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   if (replayed.failure !== null) return { passed: false, failure: replayed.failure };
 
   const open = topModal(state);
-  if (open) return { passed: false, failure: `modal left open: ${open.name}` };
+  if (open && awaitsAnAnswer(open)) return { passed: false, failure: `modal left open: ${open.name}` };
 
   return { passed: true };
 }

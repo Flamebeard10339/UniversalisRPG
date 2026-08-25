@@ -160,8 +160,12 @@ describe('the two drivers cannot drift', () => {
     inStep(repl, gui, at((choice) => choice.of === 'entity.tulsa.miki'));
     inStep(repl, gui, at((choice) => choice.id === 'talk:tulsa.miki'));
 
-    const asked = gui.snapshot().view.modals[0].options[0];
-    inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
+    // Two answers, and both go through the same table: the line taken out of Miki's menu, and then
+    // the beat it leaves him saying, which asks nothing but is still a screen somebody dismisses.
+    for (const _ of [0, 1]) {
+      const asked = gui.snapshot().view.modals[0].options[0];
+      inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
+    }
 
     expect(gui.snapshot().view.modals).toEqual([]);
   });
