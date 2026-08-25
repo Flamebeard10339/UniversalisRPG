@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
+import { isDebug } from '../content/sections';
 import { standingSources } from '../content/shipped';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { choose, openerShown, openersNow, talk } from './dialogue-runtime';
@@ -79,8 +80,16 @@ describe('a recording survives translation', () => {
   }
 });
 
-// Every entity anybody has written a word for, which is where a list of threads comes from.
-const owners = [...new Set([...registry.dialogues.values()].flatMap((dialogue) => (dialogue.owner === undefined ? [] : [dialogue.owner])))];
+const talkedTo = (holds: (dialogue: object) => boolean): ReadonlySet<string> =>
+  new Set([...registry.dialogues.values()].filter(holds).flatMap((dialogue) => (dialogue.owner === undefined ? [] : [dialogue.owner])));
+
+// Every entity anybody has written a word for, which is where a list of threads comes from. An
+// entity holding a DEBUG dialogue is not one of them: that dialogue says nothing in any language,
+// so its threads read the same in both and the claim below is about words it has not got. The mark
+// is read off the section rather than off whether the locale carries the words, so a node whose
+// words really are missing still fails here rather than quietly leaving the sweep.
+const silenced = talkedTo(isDebug);
+const owners = [...talkedTo((dialogue) => !isDebug(dialogue))].filter((owner) => !silenced.has(owner));
 
 const threadsOf = (entityId: string, language: string): string[] => openersNow(registry, createGameState('', language), entityId).map((opener) => `${opener.dialogue.id}.${opener.node.name}`);
 

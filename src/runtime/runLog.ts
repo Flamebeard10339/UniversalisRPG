@@ -1,5 +1,4 @@
 import { NOTE_FIELDS, parseDirectiveLine, printDirective, type NoteName } from '../content/sections/test';
-import type { CommandResult } from './command';
 import type { Answer } from './localized';
 
 // What a played run records, for both harnesses that record one: the model's loop in
@@ -131,12 +130,6 @@ export const startSaveId = (run: string): Answer => `${run}-start`;
 export function runAsSections(kept: KeptRun, header?: RunHeader): string[][] {
   return [[`# save ${startSaveId(kept.run.id)}`, kept.from], runAsTest(kept, header)];
 }
-
-export const outcomeOf = (result: CommandResult): TurnOutcome => (refusedLine(result) ? 'refused' : 'applied');
-
-// The engine, not a harness, decides what a line refuses: an error-toned message is the one signal
-// command.ts already gives every driver, so this is not a second validation layer beside runLine.
-export const refusedLine = (result: CommandResult): boolean => result.output.some((output) => output.kind === 'message' && output.tone === 'error');
 
 // A run outlives the tab it was played in. Holding one is what recording *is* — there is no
 // second flag saying the mode is on, so a reload picks the run back up where it was.

@@ -1,7 +1,7 @@
-import { noted, savedGameFromSerialized, stageLocalSections, type CommandContext, type CommandResult } from './command';
+import { noted, stageLocalSections, type CommandContext, type CommandResult } from './command';
 import { runAsSections, type KeptRun, type RunHeader } from './runLog';
 import { createGameState } from './runtime';
-import { loadSave } from './save';
+import { loadSave, savedGameFromSerialized } from './save';
 
 // A run the author played lands in the game they are playing, so a reload runs through what they
 // just did. It lands as the sections runLog writes and through the one load-and-adopt path, which

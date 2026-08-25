@@ -23,12 +23,12 @@ export function createSaveContext(driver: SlotDriver, now: () => number): SaveCo
   return save;
 }
 
-export function entitledSlot(save: SaveContext): Answer | null {
+function entitledSlot(save: SaveContext): Answer | null {
   const slot = liveSlot(save);
   return stateOf(save.store, slot).kind === 'empty' ? slot : null;
 }
 
-type SlotState = { kind: 'empty' } | { kind: 'held'; slot: Slot } | { kind: 'unreadable' };
+export type SlotState = { kind: 'empty' } | { kind: 'held'; slot: Slot } | { kind: 'unreadable' };
 
 function stateOf(store: SlotStore, name: string): SlotState {
   try {
@@ -47,6 +47,10 @@ function datable(store: SlotStore, name: string): Slot | null {
 
 export function liveSlot(save: SaveContext): string {
   return save.dev ? DEV_SLOT : PLAYER_SLOT;
+}
+
+export function liveHolding(save: SaveContext): SlotState {
+  return stateOf(save.store, liveSlot(save));
 }
 
 export function cadenceOrNone(save: SaveContext): number | null {

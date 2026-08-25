@@ -17,6 +17,7 @@ import { serializeSession, sessionLocalizer, view } from '../src/runtime/session
 import {
   createTicker,
   newContext,
+  resumptionNotes,
   runLine,
   type AuthoringContext,
   type CommandContext,
@@ -348,6 +349,7 @@ async function main(): Promise<void> {
 
   const repl = openRepl(sources, { authoring, save: args.savesDir ? fileSaves(args.savesDir) : undefined, driving: liveMode });
   for (const problem of repl.opened.problems) console.error(`Problem: ${problem.message}`);
+  print(resumptionNotes(repl.opened.resumed).flatMap((said) => formatOutput(said, sessionLocalizer(repl.context.session))));
   const ctx = repl.context;
   const localizer = (): Localizer => sessionLocalizer(ctx.session);
   print(repl.opening);

@@ -9,6 +9,7 @@ import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/transla
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule, renderLocalChangesModule } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
+import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
 import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
 import {
@@ -1081,17 +1082,17 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     expect(recorded().recorder.history).toEqual(['travel: ruins', 'wait: 1']);
   });
 
-  it('/create-test emits a # test prepended with load: <id>-start and a matching # save, and registers both', () => {
+  it('emits the # save and # test a run is written as, under the name every writer of one reads', () => {
     const { ctx, session } = recorded();
     const result = runLine(ctx, '/create-test foo');
 
     expect(messages(result)[0].text).toBe(`Created test 'foo' (2 steps).`);
     expect(authoredBlocks(result)).toEqual([
-      ['# save foo-start', `{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"ruins.discovered":true}}`],
-      ['# test foo', 'load: foo-start', 'travel: ruins', 'wait: 1'],
+      [`# save ${startSaveId('foo')}`, `{"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"ruins.discovered":true}}`],
+      ['# test foo', `load: ${startSaveId('foo')}`, 'travel: ruins', 'wait: 1'],
     ]);
     expect(session.registry.tests.has('foo')).toBe(true);
-    expect(session.registry.saves.has('foo-start')).toBe(true);
+    expect(session.registry.saves.has(startSaveId('foo'))).toBe(true);
   });
 
   it('/create-test on an id that already exists errors instead of overwriting', () => {
@@ -1133,7 +1134,7 @@ describe('the recorder: /create-test and /create-valid-test', () => {
       expect(errors(result), command).toEqual(['no start save was taken when this session began']);
     }
     expect(session.registry.tests.has('unsaved')).toBe(false);
-    expect(session.registry.saves.has('unsaved-start')).toBe(false);
+    expect(session.registry.saves.has(startSaveId('unsaved'))).toBe(false);
     expect(session.registry.saves.has('unsaved-end')).toBe(false);
   });
 

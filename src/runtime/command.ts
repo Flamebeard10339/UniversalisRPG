@@ -14,7 +14,9 @@ import {
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
-import { type ParsedSave } from '../content/sections/save';
+import type { Resumption } from './openUniverse';
+import { startSaveId, type TurnOutcome } from './runLog';
+import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
 import { sessionJournal, type JournalEntry } from './session';
@@ -233,9 +235,15 @@ function invalidChoice(answer: string): Said {
   return says('engine.command.invalid-choice', { choice: anId(JSON.stringify(answer)) });
 }
 
-function refusedLine(ctx: CommandContext, problem: string | Said): CommandResult {
+function refusal(ctx: CommandContext, problem: string | Said): CommandResult {
   return typeof problem === 'string' ? noted('error', problem) : said('error', say(sessionLocalizer(ctx.session), problem));
 }
+
+// The engine, not a harness, decides what a line refuses: an error-toned message is the one signal
+// every driver already gets, so this is not a second validation layer beside runLine.
+export const refusedLine = (result: CommandResult): boolean => result.output.some((output) => output.kind === 'message' && output.tone === 'error');
+
+export const outcomeOf = (result: CommandResult): TurnOutcome => (refusedLine(result) ? 'refused' : 'applied');
 
 function shown(next: PlayView, before: CommandOutput[] = []): CommandResult {
   return { view: next, output: [...before, { kind: 'view', view: next, reread: false }], quit: false, recorded: [] };
@@ -503,38 +511,26 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   }
 }
 
-export function savedGameFromSerialized(serialized: string): ParsedSave | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(serialized);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-  const { version, ...diff } = parsed as { version: number } & Record<string, unknown>;
-  return { version, diff };
-}
-
 function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean }): CommandResult {
   const { recorder, session } = ctx;
   if (recorder.history.length === 0) return noted('error', 'nothing recorded yet');
 
-  const startSaveId = `${id}-start`;
+  const startSave = startSaveId(id);
   const endSaveId = `${id}-end`;
   const first = recorder.history[0];
   const usesStartSave = !(first.startsWith('load:') || first.startsWith('load '));
 
-  const startSave = usesStartSave ? savedGameFromSerialized(recorder.startSave) : null;
-  if (usesStartSave && !startSave) return noted('error', 'no start save was taken when this session began');
+  const started = usesStartSave ? savedGameFromSerialized(recorder.startSave) : null;
+  if (usesStartSave && !started) return noted('error', 'no start save was taken when this session began');
 
   const idTaken =
     session.registry.tests.has(id) ||
-    (usesStartSave && session.registry.saves.has(startSaveId)) ||
+    (usesStartSave && session.registry.saves.has(startSave)) ||
     (opts.valid && session.registry.saves.has(endSaveId));
   if (idTaken) return noted('error', `test '${id}' already exists`);
 
   const lines = [...recorder.history];
-  if (usesStartSave) lines.unshift(`load: ${startSaveId}`);
+  if (usesStartSave) lines.unshift(`load: ${startSave}`);
   if (opts.valid) lines.push(`expect: ${endSaveId}`);
 
   const directives: Directive[] = [];
@@ -547,12 +543,12 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   const endSaveSerialized = opts.valid ? serializeSession(session) : undefined;
   const endSave = endSaveSerialized === undefined ? null : savedGameFromSerialized(endSaveSerialized);
 
-  if (startSave) session.registry.saves.set(startSaveId, startSave);
+  if (started) session.registry.saves.set(startSave, started);
   if (endSave) session.registry.saves.set(endSaveId, endSave);
   session.registry.tests.set(id, { id, directives });
 
   const blocks: string[][] = [];
-  if (usesStartSave) blocks.push([`# save ${startSaveId}`, recorder.startSave]);
+  if (usesStartSave) blocks.push([`# save ${startSave}`, recorder.startSave]);
   if (endSaveSerialized !== undefined) blocks.push([`# save ${endSaveId}`, endSaveSerialized]);
   blocks.push([`# test ${id}`, ...lines]);
 
@@ -611,6 +607,15 @@ const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosav
 const UNREADABLE_CADENCE = 'the slot the cadence lives in does not hold one, so nothing is saved on a cadence: /autosave <s> sets it again';
 
 const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
+
+// What an opening says about the game it did or did not pick back up, in one place, so no driver
+// spells its own. A slot that was left alone is said in error words: it is the one thing here a
+// player cannot see for themselves, because the world in front of them looks like a new game.
+export function resumptionNotes(resumed: Resumption): ToolMessage[] {
+  if (resumed.kind === 'new') return [];
+  if (resumed.kind === 'kept') return [note('error', `slot ${resumed.slot} holds a game this build cannot open, so it was left alone and this is a new one: ${resumed.why}`, [UNREADABLE_SLOT])];
+  return [note('ok', `Picked up slot ${resumed.slot}.`), ...prunedNotes(resumed.pruned)];
+}
 
 function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;
@@ -1115,7 +1120,7 @@ export function runCommand(ctx: CommandContext, spec: CommandSpec, arg: ArgTypes
 
 export function runLine(ctx: CommandContext, line: string): CommandResult {
   const parsed = parseLine(ctx, line);
-  if (isProblem(parsed)) return refusedLine(ctx, parsed.problem);
+  if (isProblem(parsed)) return refusal(ctx, parsed.problem);
   return runCommand(ctx, parsed.spec, parsed.arg);
 }
 
@@ -1203,7 +1208,7 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, ar
 
 function applyChoice(ctx: CommandContext, index: number): CommandResult {
   const choice = ctx.view.choices[index - 1];
-  if (!choice) return refusedLine(ctx, invalidChoice(String(index)));
+  if (!choice) return refusal(ctx, invalidChoice(String(index)));
   try {
     return { ...shown(apply(ctx.session, choice.id)), recorded: [recordedForChoice(choice)] };
   } catch (error) {
@@ -1213,7 +1218,7 @@ function applyChoice(ctx: CommandContext, index: number): CommandResult {
 
 function driveChoice(ctx: CommandContext, index: number): CommandResult {
   const choice = ctx.view.choices[index - 1];
-  if (!choice) return refusedLine(ctx, invalidChoice(String(index)));
+  if (!choice) return refusal(ctx, invalidChoice(String(index)));
 
   let opening: PlayView;
   try {
