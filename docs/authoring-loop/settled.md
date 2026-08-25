@@ -709,6 +709,15 @@ the asked-for modules would report the rest of the ledger as orphaned. A key a
 `# locale` declares is not in `registry.locales.base`, which is why a registry-only
 derivation would have been wrong.
 
+**The suite is green at seventy-nine processes, and the debt for that is paid.** Seven
+concurrent runs on a 24-core box, six in agent worktrees and one in the checkout: the
+repo's own guard counted 66 competing processes before the seventh started, so 79 with
+its own workers. All seven passed 3936 tests in 163 files, nothing failed and nothing
+timed out. The slowest run took 109.7s against the 120s hang detector, which is the
+closest that number has come to mattering and the reason it is a hang detector and not a
+budget. Idle is about 23s, so the whole cost of that contention is a fourfold slowdown
+and no reds — which is what the worker cap was put there to buy.
+
 **How long the runner waits for a test lives once, in `vite.config.ts`.** It is a
 hang detector at 120 seconds, not a budget, and no test states its own — the two
 hand-kept per-test budgets are deleted. Every red `npm test` has produced on this

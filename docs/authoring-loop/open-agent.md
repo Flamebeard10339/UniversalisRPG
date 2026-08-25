@@ -40,10 +40,3 @@ plane — there is no unallocate of any kind, free or costly, to build that rule
 *Closes when:* a plane can shrink, and refuses to shrink out from under a jewel.
 
 ## Ours, and small
-
-**A green suite under heavy load is still owed.** The lane that fixed the clock
-measured green at 13 processes and, separately, green at 32 with the new clock on
-the pre-split tree. Nobody has run the whole suite at 70 with the split in place,
-which is where twelve tests used to fail. *Closes when:* that run is taken.
-
-
