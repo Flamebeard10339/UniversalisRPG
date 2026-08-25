@@ -142,7 +142,7 @@ describe('equipment', () => {
     expect(tutorial.items.get(sword)!.slot).toBe('mainhand');
     expect(tutorial.items.get(shield)!.slot).toBe('offhand');
 
-    const state = createGameState('tulsa.beach');
+    const state = createGameState('tulsa.market-square');
     initResources(state, tutorial);
     const bareAttack = statValue('core.attack', state, tutorial);
     const bareDefense = statValue('core.defense', state, tutorial);

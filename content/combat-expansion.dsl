@@ -21,10 +21,14 @@
 // A passive and a cluster jewel may share an id — `retribution` and
 // `wracking-blades` do — because ids are per kind and the jewel is named after
 // the passive that is the point of it.
+//
+// It is a list and stands nowhere: no location, no entity, no place a player
+// walks to. The region that wants these puts a crate of them somewhere and owns
+// the routes that prove them, which is why nothing here names a town.
 
 # info combat-expansion
 version: 1.0.0
-dependencies: core, tulsa
+dependencies: core
 
 // --- rage ---
 //
@@ -239,11 +243,10 @@ cluster-jewel: wracking-blades
 # item creeping-rot-jewel
 cluster-jewel: creeping-rot
 
-// --- the ground they are proved on ---
+// --- the blade they are grown on, and the crate they arrive in ---
 //
-// One way out and no way in: where the archetype jewels sit in the world is
-// not this module's question, and a room the player can leave is the smallest
-// thing that does not strand anyone who is put in it.
+// Where the crate stands is the region's business and not this module's, which
+// is why nothing below is a place or a thing standing in one.
 
 # item proving-blade
 title: Proving Blade
@@ -262,244 +265,13 @@ give: 1 retribution-jewel
 give: 1 wracking-blades-jewel
 give: 1 creeping-rot-jewel
 
-# entity armourers-chest
-title: Armourer's Chest
-examine: A long crate, stencilled, and nobody has come for it.
-flags: emptied
-open:
-  instant
-  hidden if: emptied
-  roll: archetype-cache
-  set: emptied
-  say: Six jewels and a plain blade with room in it for one of them.
-
-// Deep enough to survive a fight long enough to watch a pool fill, and it
-// swings nothing back, so what a test reads off the player came from what the
-// player is carrying.
-# entity proving-post
-title: Proving Post
-examine: A banded post, chest high, and it has taken worse than you.
-stats: max-health 2000, defense 0, evasion 0, accuracy 0
-
-// Carries a passive and declares no action at all. Whatever hits it is hurt by
-// hitting it, which is the whole of what an actor-carried persistent effect is
-// for.
-# entity spined-urchin
-title: Spined Urchin
-examine: A knot of black spines around something that has not moved in years.
-stats: max-health 2000, defense 0, evasion 0, accuracy 0
-passives: retribution
-
-# location proving-ground
-x: 3, y: 0
-examine: A walled yard behind the armoury, sand raked flat and stained.
-adjacent:
-  tulsa.beach
-entities:
-  armourers-chest, proving-post, spined-urchin
-
-// --- tests ---
-//
-// Every route below opens on this or on a copy of it, because where the
-// archetype content sits in the world is out of this module's scope and a save
-// is the smallest thing that puts a player in front of it.
-
-# save at-the-proving-ground
-{"version":13,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true}}
-
-// Recorded from live sessions with /create-valid-test, so what each route
-// spells is what a player typed and the closing sheet is where that session
-// ended. Regenerate the same way when this content changes on purpose.
-//
-// The sheets close on `expect only:`, which compares just the keys the save
-// names, and what each route actually claims is written above it as `assert:`.
-// A buff held by the struck party and an enemy's pool are the two things no
-// condition can name — those stay the sheet's to say.
-//
-// Every route grows the same plain blade, and the crate hands it over already
-// a copy of its own with its level rolled: the base's bare east slot takes the
-// jewel, and what differs between the routes is which positions the points
-// were spent on.
-
-// The berserker's resource. Rage is granted only by a landed swing and bled
-// back only by the passive that grants it, so the whole of what the closing
-// sheet records about the pool came from the hexagon this route allocated.
-# test rage-rises-as-swings-land
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with wrath-jewel
-// Position 1 is the entry the slot put the jewel's root on; the hub is one
-// step from it and is where the signature passive sits.
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 7
-equip: 1
-use: core.melee-combat on proving-post
-wait: 30
-// rising-fury is the only source of max-rage on this route, so the stat root
-// reading 20 back is the jewel's allocation and nothing else.
-assert: stat.max-rage = 20
-// Thirteen landed swings granted 39 where the rate bled 15 back over the same
-// thirty seconds, so the pool is not merely up: it is against its ceiling.
-assert: resource.rage = 20
-expect only: rage-rises-as-swings-land-end
-
-// The other half of the same arc, and the half a stack count cannot have: the
-// rate keeps running once the swinging stops.
-# test rage-drains-when-the-swinging-stops
-run: rage-rises-as-swings-land
-cancel
-wait: 60
-// The pool still exists — the passive granting the ceiling is still allocated —
-// and a minute of the rate with nothing granting has emptied it.
-assert: stat.max-rage = 20
-assert: resource.rage = 0
-expect only: rage-drains-when-the-swinging-stops-end
-
-// What the route below counts with, and a save that puts it in the player's
-// hand. One evasion a stack, on a stat nothing else this route moves, so the
-// number the claim rests on is one this file writes rather than the balance of
-// the payload being counted: `accelerated-vigor` may be worth anything at all
-// and six held is still six read.
+// What a route counting stacks counts with. One evasion a stack, on a stat no
+// such route moves otherwise, so the number a claim rests on is one this file
+// writes rather than the balance of the payload being counted:
+// `accelerated-vigor` may be worth anything at all and six held is still six
+// read.
 # item vigor-tally
 DEBUG
 slot: offhand
 +1 evasion per stack of accelerated-vigor
-
-# save at-the-proving-ground-with-a-tally
-DEBUG
-{"version":13,"location":"combat-expansion.proving-ground","flags":{"combat-expansion.proving-ground.discovered":true},"inventory":{"combat-expansion.vigor-tally":1}}
-
-// The gate is a wrapper and the payload stacks, so what a minute of swinging
-// leaves the player holding is several instances of one declaration, each on
-// its own clock, rather than one that keeps being refreshed. `quickening` is
-// allocated beside `spurred` and reads how many are held; the two are separate
-// passives on separate points, which is what makes them separable.
-# test accelerated-vigor-stacks-behind-its-gate
-DEBUG
-load: at-the-proving-ground-with-a-tally
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with wrath-jewel
-// Round the outer ring rather than across the hub, so the rage passive is not
-// allocated and nothing in this sheet came from it.
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 2
-allocate: 1 at 1,0 position 6
-allocate: 1 at 1,0 position 5
-equip: 1
-equip: vigor-tally
-use: core.melee-combat on proving-post
-wait: 60
-// Eight instances held at the end of the minute, counted and not inferred: the
-// tally is one evasion a stack and nothing else on this route touches that
-// stat, so the reading is the number of them rather than arithmetic over the
-// base attack-rate, the payload's own figure and the passive that reads how
-// many are held, none of which the count answers to.
-assert: stat.evasion = 8
-// The arithmetic the count above refuses to do, which is the other half of the
-// pair and the only reading `quickening` reaches: 25 of base and eight stacks
-// of a payload worth +2 is 41 added, raised 24% by a passive reading eight at
-// 3% apiece. A `quickening` granting nothing reads 41, and a payload worth
-// anything else moves the added half.
-assert: stat.attack-rate = 50.84
-expect only: accelerated-vigor-stacks-behind-its-gate-end
-
-// The payload's own duration is the only thing that ends a stack — nothing
-// refreshes one once the swinging stops — and each runs on the clock it was
-// granted on rather than all of them together. Half a minute after the last
-// swing the earliest two have lifted and six are held; a minute after it none
-// are. A payload that lasted longer than its declaration says would read eight
-// at both.
-# test accelerated-vigor-lifts-on-each-stacks-own-clock
-DEBUG
-run: accelerated-vigor-stacks-behind-its-gate
-cancel
-wait: 30
-assert: stat.evasion = 6
-wait: 30
-assert: stat.evasion = 0
-
-// The debuff is held by the struck party rather than by the swinger, which is
-// what the closing sheet shows: the venom is under the post's name and its
-// health is falling faster than the swings alone took it.
-# test poison-holds-the-struck-enemy
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with creeping-rot-jewel
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 7
-equip: 1
-use: core.melee-combat on proving-post
-wait: 10
-// The swinger's own regeneration is untouched. Venom is -30 on a stat whose
-// base is 1, so a swinger holding its own venom would read well under zero;
-// this is the half of "on them" that the player's sheet can say. That the post
-// holds it, and that its health is falling faster than the swings took it, is
-// the closing sheet's to say — no condition names another actor's buffs.
-assert: stat.regeneration > 0
-expect only: poison-holds-the-struck-enemy-end
-
-// Nothing refreshes it once the swinging stops, and the duration on the
-// declaration is the only thing that says when it ends.
-//
-// `expect:` and not `expect only:`, because the claim is an absence: the post
-// no longer holds the venom. `expect only:` compares just the keys a save
-// names, and a sheet recorded after the buff lifted has stopped naming it —
-// which would leave this passing in a world where poison never expires. Only
-// the whole sheet can say a thing is gone. No assertion can stand in either:
-// the buff is on the struck party and the condition roots read the player.
-# test poison-lifts-when-its-own-duration-runs-out
-run: poison-holds-the-struck-enemy
-cancel
-wait: 30
-expect: poison-lifts-when-its-own-duration-runs-out-end
-
-// Thorns, carried by something that swings nothing and declares no action at
-// all. The urchin never attacks, so nothing but the thorns can have taken any
-// health off the player: five landed swings at five apiece is 25 of the 30 the
-// player has, and only regeneration gave any of it back.
-# test striking-a-thorned-enemy-costs-the-striker
-load: at-the-proving-ground
-use: core.melee-combat on spined-urchin
-wait: 10
-assert: resource.core.health < 10
-expect only: striking-a-thorned-enemy-costs-the-striker-end
-
-// The take-back rule walked from shipped content rather than only from a unit
-// test: a leaf comes back for its point, a node something still stands on is
-// refused, and a socket is refused whatever else is true of it.
-# test a-plane-unwinds-from-its-leaves-and-never-out-from-under-a-jewel
-DEBUG
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with wrath-jewel
-refuse: unallocate 1 at 0,0 slot e
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 2
-refuse: unallocate 1 at 1,0 position 1
-unallocate: 1 at 1,0 position 2
-unallocate: 1 at 1,0 position 1
-
-// --- the sheets those routes ended on ---
-
-# save rage-rises-as-swings-land-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"resources":{"combat-expansion.rage":20000},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1796980,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":1634748446}
-
-# save rage-drains-when-the-swinging-stops-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":92400,"rng":1634748446}
-
-# save accelerated-vigor-stacks-behind-its-gate-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1","offhand":"combat-expansion.vigor-tally"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":75342},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":77293},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":95043},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":101535},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":103025},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":105773},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":108315},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":113035}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":581,"attemptsMade":39}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1439360,"combat-expansion.rage":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":2921578386}
-
-# save poison-holds-the-struck-enemy-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"buffs":{"combat-expansion.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.proving-post"}},"actors":{"combat-expansion.proving-post":{"resources":{"core.health":1925206,"combat-expansion.rage":0},"rateRemainders":{"core.health":40000}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":1044821574}
-
-# save poison-lifts-when-its-own-duration-runs-out-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1},"flags":{"combat-expansion.proving-ground.discovered":true,"combat-expansion.proving-ground.touched":true,"tulsa.beach.discovered":true,"combat-expansion.armourers-chest.emptied":true},"equipped":{"mainhand":"1"},"location":"combat-expansion.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":1044821574}
-
-# save striking-a-thorned-enemy-costs-the-striker-end
-{"version":13,"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.beach.discovered":true},"resources":{"core.health":5206},"resourceRateRemainders":{"core.health":40000},"location":"combat-expansion.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":false,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"combat-expansion.spined-urchin"}},"actors":{"combat-expansion.spined-urchin":{"resources":{"core.health":1940206,"combat-expansion.rage":0},"rateRemainders":{"core.health":40000}}}},"time":12400,"rng":278522923}
 

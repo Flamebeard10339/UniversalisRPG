@@ -99,7 +99,7 @@ Suppose the view shows:
   choices:
     id=talk:tulsa.miki :: Talk to Miki
     id=use:entity.tulsa.mirror.look-in :: Look in the mirror
-    id=travel:tulsa.beach :: Travel to the beach
+    id=travel:tulsa.market-square :: Travel to the market square
 
 A reasonable reply is:
 

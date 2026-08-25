@@ -88,19 +88,19 @@ stage clear-the-rats:
     ask: The rats are dealt with.
     Ha! Barely a scratch on you. You're a natural.
     Truth be told, there's little left I can teach you.
-    So here's the last of it: get off this island. East, past the sand, and keep going - there's a whole world of skills out that way.
+    So here's the last of it: get off this island. Out the front door and up the road, and keep going - there's a whole world of skills out that way.
     set: tulsa.front-door.unlocked
     Go on. Make some trouble worth telling stories about.
     goto sendoff
 
 stage sendoff:
-  log: Miki says he has nothing left to teach me, and that the way off is east, past the sand.
+  log: Miki says he has nothing left to teach me, and that the way off is out the front door and up the road.
   complete
   tulsa.miki says:
     always
     sticky
     ask: Anything else before I go?
-    Still here? East, past the sand. I've nothing else for you.
+    Still here? Out the door and up the road. I've nothing else for you.
 
 stage snubbed:
   log: I turned Miki down. He took it badly, and the front door has not opened since.
@@ -152,17 +152,17 @@ stage apologised:
 //
 // The door route's trigger is market-square.touched rather than
 // front-door.unlocked itself: a quest's stage only ever advances when the
-// entity its dialogue is pinned to is talked to, and the door's own unlock —
-// like reaching the beach it opens onto — happens while Miki can still be
-// talked to, one talk before a player has anywhere to travel to. `touched` and
-// not `discovered`, because standing anywhere puts its neighbours on the map:
-// the market is discovered from the sand, and Miki would say you had found it
-// to someone who never left the beach. Gating on having stood there means Miki
-// still gives his ordinary sendoff on the way out; this quest is what he has to
-// say once you come back for one more word.
+// entity its dialogue is pinned to is talked to, and the door's own unlock
+// happens while Miki can still be talked to, one talk before a player has
+// anywhere to travel to. `touched` and not `discovered`, because standing
+// anywhere puts its neighbours on the map: unlocking the door puts the market
+// on it, and Miki would say you had found it to someone still standing in his
+// front room. Gating on having stood there means Miki still gives his ordinary
+// sendoff on the way out; this quest is what he has to say once you come back
+// for one more word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
-log: East of the sand there is a town, and it goes on a while. Miki still calls this an island.
+log: Up the road there is a town, and it goes on a while. Miki still calls this an island.
 
 stage adrift:
   log: Miki had his last word about my leaving. Neither of us has moved since.
@@ -221,14 +221,14 @@ assert: tulsa.front-door.unlocked
 travel: market-square
 // Same second-talk shape as the apology route below: the eternal quest only
 // picks up once the market district has been stood in, so a talk had while
-// still inside the house — or from the sand, which only puts the market on the
-// map — would repeat the ordinary sendoff instead.
+// still inside the house — where unlocking the door only puts the market on
+// the map — would repeat the ordinary sendoff instead.
 travel: guide-house
 talk: tulsa.miki
 choose: leave-tutorial-island.adrift.miki.0.said
 choose: continue
 assert: leave-tutorial-island.adrift
-travel: beach
+travel: market-square
 expect only: left-mikis-house
 // This route's own sheet, on top of the ground all three converge on: the rats'
 // drops, the visits, the xp, the pools, the clock and the rng cursor. A scalar
@@ -303,7 +303,7 @@ travel: guide-house
 talk: tulsa.miki
 choose: continue
 assert: leave-tutorial-island.adrift
-travel: beach
+travel: market-square
 expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See apology-route-full-end for why this isn't miki-route-end.
@@ -332,8 +332,8 @@ journal: finding-your-feet says Miki gave me water and flour. The two of them ma
 // --- the window into the apology ---
 //
 // The one way through the house nobody had walked, and the one that made the
-// list of threads matter: snub him, refuse again, drop out of the window, go far
-// enough to find the market, and come back in off the sand. Both quests have
+// list of threads matter: snub him, refuse again, drop out of the window into
+// the market, and walk back in through his front room. Both quests have
 // something to say by then, so from here on every talk is a list — and the line
 // carrying the apology is in it, which is the whole claim. It is proved out here
 // and not on the ordinary apology route, because that route makes it up with him
@@ -345,10 +345,8 @@ talk: tulsa.miki
 choose: Not a chance.
 use: entity.stairs.ascend
 use: entity.window.climb-out
-travel: market-square
-travel: beach
 travel: guide-house
-assert: tulsa.market-square.discovered and not tulsa.front-door.unlocked
+assert: tulsa.market-square.touched and not tulsa.front-door.unlocked
 talk: tulsa.miki
 choose: finding-your-feet.snubbed.miki.0.said
 choose: Actually - sorry. Show me the ropes after all.
@@ -369,19 +367,19 @@ assert: finding-your-feet.sendoff and tulsa.front-door.unlocked
 // --- saves ---
 
 // What all three routes out of the house genuinely land on, named once
-// instead of asserted three times: the same beach, the same house explored,
+// instead of asserted three times: the same square, the same house explored,
 // the same quest picked up. `finding-your-feet.sendoff` and
 // `front-door.unlocked` are each true for two of the three routes and false
 // for the third — the thief never gets the ordinary sendoff — so those two
 // stay proven by each route's own `assert:` instead.
 # save left-mikis-house
-{"version":13,"location":"tulsa.beach","flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tulsa.beach.discovered":true,"tulsa.market-square.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true}}
+{"version":13,"location":"tulsa.market-square","flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tulsa.market-square.discovered":true,"tulsa.market-square.touched":true,"tutorial-quests.leave-tutorial-island.adrift":true}}
 
 # save miki-route-start
 {"version":13}
 
 # save miki-route-end
-{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":4},"flags":{"tulsa.guide-house.touched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.basement.touched":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.beach.touched":true,"tulsa.market-square.discovered":true,"combat-expansion.proving-ground.discovered":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":24629},"location":"tulsa.beach","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":34400,"rng":3953799810,"player":{"name":"Rowan","race":"core.elf"}}
+{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":4},"flags":{"tulsa.guide-house.touched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.name-yourself":true,"tulsa.mirror-done":true,"tutorial-quests.finding-your-feet.bake-bread":true,"tutorial-quests.finding-your-feet.clear-the-rats":true,"tulsa.basement.touched":true,"tulsa.rats-killed":3,"tulsa.front-door.unlocked":true,"tulsa.market-square.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.name-yourself.miki.1.said":1,"tutorial-quests.finding-your-feet.bake-bread.miki.1.said":1,"tutorial-quests.finding-your-feet.clear-the-rats.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":24529},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"tulsa.basement":{"tulsa.giant-rat":{"down":3,"due":[]}}},"time":28400,"rng":3953799810,"player":{"name":"Rowan","race":"core.elf"}}
 
 // The thief's own closing sheet — not the door route's. A route that never
 // bakes or fights lands on different holdings, a different clock and a
@@ -389,8 +387,8 @@ assert: finding-your-feet.sendoff and tulsa.front-door.unlocked
 // sheets; what genuinely converges across all of them is left-mikis-house,
 // which each of them also closes on.
 # save thieving-route-full-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"combat-expansion.proving-ground.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tulsa.dresser.searched":true,"tulsa.miki.angered":true,"tutorial-quests.leave-tutorial-island.adrift":true,"tulsa.beach.discovered":true,"tulsa.market-square.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":25000},"location":"tulsa.beach","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.dresser.searched":true,"tulsa.guide-house.touched":true,"tulsa.basement.discovered":true,"tulsa.miki.angered":true,"tutorial-quests.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":25000},"location":"tulsa.market-square","rng":2617077404}
 
 // The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
-{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-quests.finding-your-feet.apologised":true,"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house.touched":true,"tulsa.basement.discovered":true,"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.beach.touched":true,"tulsa.market-square.discovered":true,"combat-expansion.proving-ground.discovered":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.beach","time":15000}
+{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"tutorial-quests.finding-your-feet.offered":true,"tutorial-quests.finding-your-feet.snubbed":true,"tutorial-quests.finding-your-feet.apologised":true,"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house.touched":true,"tulsa.basement.discovered":true,"tulsa.front-door.unlocked":true,"tulsa.market-square.discovered":true,"tutorial-quests.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tutorial-quests.leave-tutorial-island.adrift":true},"visits":{"tutorial-quests.finding-your-feet.offered.miki.0.said":1,"tutorial-quests.finding-your-feet.snubbed.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.0.said":1,"tutorial-quests.finding-your-feet.apologised.miki.1.said":1,"tutorial-quests.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}

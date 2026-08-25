@@ -83,7 +83,7 @@ stats: attack 0, max-health 10, swings-per-minute 60
     const registry = tutorial();
     const session = startSession(registry);
     expect(() => apply(session, 'use:entity.tulsa.front-door.pick-lock')).toThrow();
-    expect(() => apply(session, 'travel:tulsa.beach')).toThrow();
+    expect(() => apply(session, 'travel:tulsa.market-square')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
 
@@ -367,25 +367,25 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     expect(choiceIds).not.toContain('travel:tulsa.guide-house-upstairs');
   });
 
-  // The road out of the guide house is `beach while front-door.unlocked`, so the door already
-  // governed it and was still only a thing to look at. Now the door is what the player walks
-  // through, and the room stops drawing a way out beside it that nothing in the room offers.
+  // The road out of the guide house is `market-square while front-door.unlocked`, so the door
+  // already governed it and was still only a thing to look at. Now the door is what the player
+  // walks through, and the room stops drawing a way out beside it that nothing in the room offers.
   it('hands the road out of the house to the front door once the door will open', () => {
     const registry = tutorial();
     const locked = ids(view(startSession(registry)));
 
-    expect(locked).not.toContain('travel:tulsa.beach');
+    expect(locked).not.toContain('travel:tulsa.market-square');
     expect(locked).not.toContain('use:entity.tulsa.front-door.step-outside');
 
     // A masked thing offers nothing but the look that reads it, so the road stands until the
     // player has met the door — which is the fallback that keeps a room from stranding anyone.
     const session = primed(registry, { flags: { 'tulsa.front-door.unlocked': true } });
-    expect(ids(view(session))).toContain('travel:tulsa.beach');
+    expect(ids(view(session))).toContain('travel:tulsa.market-square');
     readRoom(session);
     const opened = ids(view(session));
 
     expect(opened).toContain('use:entity.tulsa.front-door.step-outside');
-    expect(opened).not.toContain('travel:tulsa.beach');
+    expect(opened).not.toContain('travel:tulsa.market-square');
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {

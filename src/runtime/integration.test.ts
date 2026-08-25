@@ -75,8 +75,8 @@ describe("a shipped foe's swing is what its sheet declares", () => {
   }
 });
 
-describe('combat-expansion, read off the routes it ships', () => {
-  const POST = 'combat-expansion.proving-post';
+describe('the archetype jewels, read off the routes tulsa ships', () => {
+  const POST = 'tulsa.proving-post';
 
   const played = (testId: string): GameState => {
     const state = createGameState();
@@ -88,7 +88,7 @@ describe('combat-expansion, read off the routes it ships', () => {
     Object.fromEntries([...registry.stats.keys()].map((statId) => [statId, statValue(statId, state, registry, actorId)]));
 
   it('moves attack as rage accumulates, and moves nothing else at all', () => {
-    const state = played('combat-expansion.rage-rises-as-swings-land');
+    const state = played('tulsa.rage-rises-as-swings-land');
     const full = sheet(state, shipped);
     expect(state.resources['combat-expansion.rage']).toBe(20000);
 
@@ -113,18 +113,18 @@ describe('combat-expansion, read off the routes it ships', () => {
       return statValue('core.attack-rate', state, shipped) - bare;
     };
 
-    expect(reading('combat-expansion.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
-    expect(reading('combat-expansion.rage-rises-as-swings-land', 1)).toBeCloseTo(2, 10);
+    expect(reading('tulsa.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
+    expect(reading('tulsa.rage-rises-as-swings-land', 1)).toBeCloseTo(2, 10);
 
-    const one = reading('combat-expansion.accelerated-vigor-stacks-behind-its-gate', 1);
-    const five = reading('combat-expansion.accelerated-vigor-stacks-behind-its-gate', 5);
+    const one = reading('tulsa.accelerated-vigor-stacks-behind-its-gate', 1);
+    const five = reading('tulsa.accelerated-vigor-stacks-behind-its-gate', 5);
     expect(one).toBeGreaterThan(2);
     expect(five).toBeGreaterThan(5 * one);
   });
 
   it('holds poison on the struck party and on nobody else, and makes its pool fall', () => {
-    const poisoned = played('combat-expansion.poison-holds-the-struck-enemy');
-    const clean = played('combat-expansion.poison-holds-the-struck-enemy');
+    const poisoned = played('tulsa.poison-holds-the-struck-enemy');
+    const clean = played('tulsa.poison-holds-the-struck-enemy');
     clearBuffs(clean, [POST]);
 
     expect(buffsOf(poisoned, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
@@ -142,15 +142,15 @@ describe('combat-expansion, read off the routes it ships', () => {
   });
 
   it('lifts the debuff on its own clock, with nothing else asked to end it', () => {
-    expect(buffsOf(played('combat-expansion.poison-lifts-when-its-own-duration-runs-out'), POST)).toEqual([]);
+    expect(buffsOf(played('tulsa.poison-lifts-when-its-own-duration-runs-out'), POST)).toEqual([]);
   });
 
   it('costs a striker what the thorned enemy it struck carries', () => {
-    const state = played('combat-expansion.striking-a-thorned-enemy-costs-the-striker');
+    const state = played('tulsa.striking-a-thorned-enemy-costs-the-striker');
     const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
     const struck = state.resources['core.health'];
 
-    expect(shipped.entities.get('combat-expansion.spined-urchin')!.blocks).toEqual([]);
+    expect(shipped.entities.get('tulsa.spined-urchin')!.blocks).toEqual([]);
 
     // The pool fell by what thorns took net of what regeneration gave back, so the same span is run
     // again with nothing to fight, opened where the fight left off: what it gains is what to add back.
