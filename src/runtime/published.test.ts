@@ -67,6 +67,7 @@ function speaksForTheTool(members: ts.NodeArray<ts.TypeElement>): boolean {
 
 const BELOW_THE_BRAND: ReadonlyArray<{ field: string; why: string }> = [
   { field: 'ClusterEffect.statId', why: 'a stat id, declared by `ClusterEffect` in src/content/item.ts, which sits under the layer that declares the brand' },
+  { field: 'GroupRow.colour', why: 'a colour, which is neither words a player reads nor a name anything is addressed by: it is drawn, and a terminal that cannot draw one prints the group\'s `title` beside it instead' },
 ];
 
 const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [

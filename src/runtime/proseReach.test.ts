@@ -218,7 +218,7 @@ describe('every prose field a kind declares reaches a player', () => {
     const without = (dropped: string): string[] => unsaidFields(written, surfaces.filter((surface) => surface.name !== dropped));
     const excused = NOT_SAID.map((each) => each.field);
 
-    expect(without('standing somewhere')).toEqual([...excused, 'entity.examine', 'location.examine', 'location.title', 'quest.title', 'slot.title'].sort());
+    expect(without('standing somewhere')).toEqual([...excused, 'entity.examine', 'group.title', 'location.examine', 'location.title', 'quest.title', 'slot.title'].sort());
     expect(without('the carried screen')).toEqual([...excused, 'item.examine'].sort());
     expect(without('a plane')).toEqual([...excused, 'cluster-jewel.examine'].sort());
   });

@@ -12,6 +12,7 @@ import { localeKey } from '../locale';
 import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { MintedAction, section } from './define';
 import { Dialogue, spokenBy } from './dialogue';
+import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
 
 export type { Action } from '../../grammar/action';
@@ -39,6 +40,7 @@ export interface AuthoredEntity extends HookCarrier {
   id: string;
   title: string;
   examine?: string;
+  group?: string;
   capabilities: string[];
   stats: Record<string, Range>;
   skills: string[];
@@ -149,8 +151,9 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   text: ['title', EXAMINE_FIELD],
   fields: {
     title: TITLE_FIELD,
+    group: GROUP_FIELD,
     examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words and nothing else` },
-    hiddenIf: { parser: condition, keyword: 'hidden if' },
+    hiddenIf:{ parser: condition, keyword: 'hidden if' },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
       parser: list(id),

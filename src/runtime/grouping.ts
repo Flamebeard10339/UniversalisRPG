@@ -1,0 +1,30 @@
+import { mapOf, type Registry } from '../content/registry';
+import { registryMapOf } from '../content/sections';
+import { groupOf } from '../content/sections/group';
+import type { Answer, Localized, Localizer } from './localized';
+
+// What kind of thing something is, published beside it: the word a player reads and the colour every
+// surface fills with. One answer for both, so a terminal that names the group and a screen that
+// paints it cannot come to disagree about what something is.
+export interface GroupRow {
+  readonly id: Answer;
+  readonly title: Localized;
+  readonly colour: string;
+}
+
+// The group whatever is held under that id belongs to, read off the section itself rather than asked
+// of each caller, so a kind that gains a `group:` is published the same way with nothing edited here.
+// A world that declares no group for the kind publishes no field rather than an empty one.
+export function grouping(registry: Registry, localizer: Localizer, kind: string, id: string): { group?: GroupRow } {
+  const name = registryMapOf(kind);
+  const held = name === null ? undefined : (mapOf(registry, name).get(id) as { group?: string } | undefined);
+  const found = groupOf(registry.groups, kind, held?.group);
+  return found === undefined ? {} : { group: { id: found.id, title: localizer.title('group', found.id), colour: found.colour } };
+}
+
+// What a choice says about whatever offers it: the name it stands under and the group that colours
+// it. Written once, so a choice minted from a new kind of owner carries both or neither.
+export const offeredBy = (registry: Registry, localizer: Localizer, kind: string, id: string): { detail: Localized; group?: GroupRow } => ({
+  detail: localizer.title(kind, id),
+  ...grouping(registry, localizer, kind, id),
+});

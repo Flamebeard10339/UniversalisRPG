@@ -10,10 +10,11 @@ import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
 import { memberKey, Namespace } from './namespace';
-import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
+import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, localeKey } from './locale';
-import { contentSectionMaps, isCheckedKind, isDebug, sections, sectionFor, type Section } from './sections';
+import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, sectionFor, type Section } from './sections';
+import { groupOf } from './sections/group';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -217,6 +218,44 @@ describe('a field whose values are names', () => {
         const held = holding(owner, each);
         return owner.prune(held as never, cutting(other(each.kind)), `# ${owner.kind} probe`) === held ? [] : [`${where} reacts to a # ${other(each.kind)} being removed`];
       }),
+    ).toEqual([]);
+  });
+});
+
+// The subjects are every kind that writes a group at all, read off its own declaration, so a kind
+// given a group next month is held to the same four claims with nothing edited here.
+describe('a kind that says what group it belongs to', () => {
+  const GROUPED = sections().filter((owner) => owner.names.some((each) => each.kind === 'group'));
+  const registry = (): Registry => loadUniverseWithDiagnostics(CORPUS).registry;
+
+  it('is more than one kind, so nothing below is vacuous', () => {
+    expect(GROUPED.length).toBeGreaterThan(1);
+  });
+
+  it('has exactly one group the world declares standard for it', () => {
+    const groups = [...registry().groups.values()];
+    expect(GROUPED.flatMap((owner) => {
+      const standard = groups.filter((each) => each.standardFor.includes(owner.kind));
+      return standard.length === 1 ? [] : [`# ${owner.kind} falls to ${standard.length} standard groups`];
+    })).toEqual([]);
+  });
+
+  it('finds a coloured group for every section of it the corpus writes, whether or not that section names one', () => {
+    const world = registry();
+    expect(
+      GROUPED.flatMap((owner) =>
+        [...mapOf(world, registryMapOf(owner.kind)!)].flatMap(([id, value]) => {
+          const found = groupOf(world.groups, owner.kind, (value as { group?: string }).group);
+          return found === undefined ? [`# ${owner.kind} ${id} belongs to no group`] : [];
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('is the only thing a group may stand standard for, so no standard is written for a kind that names none', () => {
+    const kinds = new Set(GROUPED.map((owner) => owner.kind));
+    expect(
+      [...registry().groups.values()].flatMap((each) => each.standardFor.filter((kind) => !kinds.has(kind)).map((kind) => `# group ${each.id} stands standard for ${kind}, which writes no group:`)),
     ).toEqual([]);
   });
 });

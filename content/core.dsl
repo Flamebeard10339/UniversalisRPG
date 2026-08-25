@@ -114,6 +114,21 @@ trigger: inventory-changed
 
 # faction player
 
+// --- groups ---
+
+// What something is, said once and read wherever it is drawn. A region declares
+// groups of its own — a weapon, a beast, a townsfolk — and anything that names
+// none falls to whichever of these is standard for its kind, so nothing is ever
+// ungrouped and every fill has a colour.
+
+# group thing
+standard for: item
+colour: #94a3b8
+
+# group creature
+standard for: entity
+colour: #fbbf24
+
 // --- flags ---
 
 // Running out of health is the engine's own event, and this is what the player

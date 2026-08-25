@@ -13,6 +13,7 @@ import { entity } from './entity';
 import { event } from './event';
 import { faction } from './faction';
 import { flag } from './flag';
+import { group } from './group';
 import { info } from './info';
 import { item } from './item';
 import { locale } from './locale';
@@ -33,7 +34,7 @@ import { test } from './test';
 import { variable } from './variable';
 
 // A thunk, not a const: a kind's file may reach this module, and a list built while one member is still loading holds an undefined.
-const declared = () => [stat, skill, race, item, shop, passive, clusterJewel, faction, event, action, entity, location, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
+const declared = () => [stat, skill, race, item, shop, passive, clusterJewel, faction, group, event, action, entity, location, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 
