@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Cursor, DslError } from '../grammar/parser';
-import { addRanges, midpoint, point, range, scaleRange } from '../grammar/range';
+import { addRanges, isPoint, midpoint, point, range, type Range, scaleRange } from '../grammar/range';
 import { ActiveAction, createGameState, equip, GameState, grantBuff, hitDamage, initResources, minDamage, PLAYER, sampleStat, statRange, statValue } from './runtime';
 import { restorePools } from './effects';
 import { endAction } from './actionEnd';
@@ -407,6 +407,29 @@ describe('a skill of the shipped player', () => {
 
   it.each(HELD)('$id raises the stat it names by one for each level it gains, and no other stat at all', (skill) => {
     expect(movedByLevels(SHIPPED, skill.id, LEVEL)).toEqual(skill.stat === undefined ? {} : { [skill.stat]: LEVEL - 1 });
+  });
+
+  // The claim above reads midpoints, which cannot see a spread at all. Where the stat the skill
+  // raises is one the player declares as a range, the grant has to move both ends together or the
+  // player's swing would tighten as they trained — so the same subjects are asked again about the
+  // ends, and a stat the player writes flat drops out rather than being named here as an exception.
+  it('shifts both ends of a stat the player swings unevenly, and widens it by nothing', () => {
+    const at = (skillId: string, statId: string, level: number): Range => {
+      const state = createGameState('');
+      state.xp[skillId] = xpForLevel(level);
+      return statRange(statId, state, SHIPPED);
+    };
+    const spread = HELD.filter((skill) => skill.stat !== undefined && !isPoint(statRange(skill.stat, createGameState(''), SHIPPED)));
+    expect(spread.length).toBeGreaterThan(0);
+
+    for (const skill of spread) {
+      const first = at(skill.id, skill.stat!, 1);
+      const raised = at(skill.id, skill.stat!, LEVEL);
+
+      expect(raised.min - first.min).toBe(LEVEL - 1);
+      expect(raised.max - first.max).toBe(LEVEL - 1);
+      expect(raised.max - raised.min).toBe(first.max - first.min);
+    }
   });
 });
 
