@@ -111,10 +111,13 @@ against a **hand-written union of every parameter any label takes**, so a label
 with a new one threw rather than being covered. It reads them off the labels now.
 Nobody was looking for it.
 
-**6. `npm test` is trustworthy, and now measured under load.** 3936 tests in 163 files,
-about twenty-three seconds idle. Seven concurrent runs on a 24-core box — 79 processes —
-all passed, slowest 109.7s against the 120s hang detector. That was the last debt from
-the clock work.
+**6. `npm test` is trustworthy, measured under load, and its twenty-three seconds are
+now accounted for.** 3964 tests in 164 files. Seven concurrent runs on a 24-core box — 79
+processes — all passed, slowest 109.7s against the 120s hang detector, which was the last
+debt from the clock work. The *why is it twenty-three seconds* question has since been
+answered by measurement rather than guessed at: it is import and transform, the corpus is
+not the cost, and a cache for it buys CPU and no wall clock. The numbers are in
+`settled.md` and the one decision left is his.
 
 **7. The writing is still the long pole and nothing is in front of it.** `npm run
 review` is the sheet. **This is Yonatan's and everything else is scheduled around
@@ -131,8 +134,9 @@ on arrival; a `# group` says what something is and colour carries voice and fill
 channels that never share; there is one notification surface and a notification is words
 and a merge key with no kind; gear drops carrying rolled points and the whetstone is
 gone; a plane can shrink and refuses to shrink out from under a jewel; a road costs a
-flat three seconds and a way out left the action list — which he has since played and
-reversed, and the flat three seconds is the half that survived.
+flat three seconds. A way out had left the action list, which he played and reversed —
+the flat three seconds is the half that survived, and the reversal has since landed by
+deleting the rule rather than inverting it.
 
 **9. The second playtest emptied more of `open-human.md` than it filled**, which is the
 other half of the loop working. Sixty turns through Miki's route on 2026-08-25, recorded
@@ -175,6 +179,31 @@ guard exists.
 Map churn is still deliberately deferred. `combat-expansion.proving-ground` sits at
 `tulsa.market-square`'s own square and hangs off the beach for want of anywhere
 better. A playtest names it better than a reading does.
+
+**11. The queue that playtest filled is being worked through, and the engine half of it
+is done.** Twenty-six commits on 2026-08-25 after the queue was written, five lanes in
+worktrees with the orchestrator merging and keeping these files. What has closed: every
+skill grants +1 to the stat it names per level, derived from that one word; a foe dies
+below one and the rat declares its own swing range; there is one `humanizeEn` and a
+generated action label reads through it, which moved 32 lines off the sheet a human reads
+and cost `# faction` its `title:`; a grown copy is on the counter at its base price and
+takes a pack row; a way out is back on the action list; an unmet `requires:` is offered
+and refused in words; a quest's standing is a colour the corpus authors; the journal draws
+its own view; a room with nothing in it says so.
+
+**Three of those were not what they looked like, which is the pattern worth keeping.**
+`finding-your-feet` did complete — the colour that would have said so was `text-ok`, a
+class naming nothing, and the proof that should have caught it asserted the class string
+was truthy. The Title Case sweep of the corpus was impossible, because an inline action
+label physically cannot carry a capital, and the real defect was one generated name not
+passing through `humanizeEn`. And the feared wall of refusals could not happen: the whole
+corpus carries six `requires:`, in four rooms.
+
+What is left divides cleanly. **The town migration and the merged *what the player has
+touched* list are the two large shapes**, and they land together because the *has stood
+in* condition falls out of the second and the first is what makes it compulsory. **The
+modal API is the third**, and three queued lines say outright that they land with it.
+Everything else is GUI polish from the same playtest.
 
 ## What Yonatan has to deliver
 
