@@ -28,6 +28,12 @@
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  /* Every size in the app is a rem off this one, so the whole scale moves
+     together from here and no component carries its own idea of large. A
+     percentage rather than a px keeps a reader who has set their browser's
+     text bigger: they still get bigger, a little under what they asked for.
+     The 44px touch floor is absolute and does not move with it. */
+  font-size: 93.75%;
 }
 
 /* The page itself does not zoom. Two surfaces do -- the map and an item's plane

@@ -187,8 +187,6 @@ plane and the equip are surfaces the modal has elsewhere and not here, and the w
 is the one of the three with a derived proof available — a label long enough to wrap is
 a fixture, not a screenshot.
 
-**The font is a little large.** *"Less reduce the font by a little."*
-
 ### The quest journal
 
 **Neither quest is coloured by its state.** *"Neither quest is yellow (yellow=started,
