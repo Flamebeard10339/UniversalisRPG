@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
-import { dismissal } from './asking';
+import { answering, dismissal } from './asking';
 import { addressable, type Standing } from './authoringSurface';
 import type { Driver } from './driver';
 import { editControls } from './editControls';
@@ -334,7 +334,7 @@ export function App({
         />
         {asking && plane ? <PlaneModal plane={plane} option={asking} words={words} onAnswer={driver.answer} /> : null}
         {asking && !plane ? (
-          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value}>
+          <ModalSheet option={asking} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={answering(snapshot.transcript.entries)}>
             {questRead ? <QuestBody entry={questRead} words={words} /> : null}
           </ModalSheet>
         ) : null}
