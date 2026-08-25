@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DIRECTIONS, Direction, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode, rotate } from '../content/hex';
 import { loadInEnglish } from '../content/engineLocale';
+import { loadUniverse } from '../content/load';
 import { Registry } from '../content/registry';
+import { shippedSources } from '../content/shipped';
+import { getShape } from '../content/shapes';
+import { positionPayloads } from './clusterEffect';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import {
   allocateNode,
@@ -10,16 +14,19 @@ import {
   isAllocated,
   isPlane,
   neighbours,
+  nodeKey,
   ORIGIN,
   originPlane,
   Plane,
   placementAt,
+  planeClusters,
   pointsSpent,
   positionOnEdge,
   repairPlane,
   rootPosition,
   slotDirections,
   slotState,
+  unallocateNode,
 } from './clusterPlane';
 import { localizerFor } from './localized';
 import { say, type Said } from './said';
@@ -47,7 +54,20 @@ open-connections: e, ne, nw, sw, se
 passives: 1 hale
 `;
 
-const registry = loadInEnglish(COMMON + CROSSROADS);
+const ROLLED = `
+# stat attack
+base: 4
+
+# passive keen
++1-1000 attack
+
+# cluster-jewel keenring
+shape: ring
+open-connections: e
+passives: 1 keen
+`;
+
+const registry = loadInEnglish(COMMON + CROSSROADS + ROLLED);
 const english = localizerFor(registry, 'en');
 const words = (said: Said | undefined): string | undefined => (said === undefined ? undefined : say(english, said));
 const withoutCrossroads = loadInEnglish(COMMON);
@@ -239,6 +259,172 @@ describe('allocation', () => {
     const plane = originPlane('ringlet', 0.5);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 7), PLENTY))).toMatch(/ring has no position 7 \(1-6\)/);
     expect(words(allocateNode(registry, plane, slot(ORIGIN, 'sw'), PLENTY))).toMatch(/no jewel slot on the sw edge/);
+  });
+});
+
+describe('unallocation', () => {
+  it('gives the point back, and leaves the node standing there to be taken again', () => {
+    const plane = originPlane('ringlet', 0.5);
+    allocateAll(plane, [position(ORIGIN, 2), position(ORIGIN, 3)]);
+
+    expect(unallocateNode(registry, plane, position(ORIGIN, 3))).toBeUndefined();
+    expect(pointsSpent(plane)).toBe(1);
+    expect(isAllocated(registry, plane, position(ORIGIN, 3))).toBe(false);
+    expect(allocateNode(registry, plane, position(ORIGIN, 3), PLENTY)).toBeUndefined();
+    expect(pointsSpent(plane)).toBe(2);
+  });
+
+  it('refuses a node nobody allocated, and a hexagon holding no cluster', () => {
+    const plane = originPlane('ringlet', 0.5);
+    expect(words(unallocateNode(registry, plane, position(ORIGIN, 4)))).toBe('position 4 of 0,0 is not allocated, so there is nothing there to take back');
+    expect(words(unallocateNode(registry, plane, slot(ORIGIN, 'e')))).toBe('the e slot of 0,0 is not allocated, so there is nothing there to take back');
+    expect(words(unallocateNode(registry, plane, position(at(9, 9), 1)))).toBe('no cluster stands in 9,9');
+  });
+
+  it('refuses the root the plane starts on, which cost nothing to have', () => {
+    const plane = originPlane('ringlet', 0.5);
+    expect(words(unallocateNode(registry, plane, position(ORIGIN, 1)))).toBe('position 1 of 0,0 is where the plane starts, and cost no point to take');
+    expect(pointsSpent(plane)).toBe(0);
+  });
+
+  it('refuses a jewel socket, empty or filled, so its point is spent for good', () => {
+    const plane = reachedEastSlot();
+    const spent = pointsSpent(plane);
+    expect(words(unallocateNode(registry, plane, slot(ORIGIN, 'e')))).toBe('the e slot of 0,0 is a jewel socket, and a socket is spent for good — a jewel put in one stays in it');
+
+    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
+    expect(words(unallocateNode(registry, plane, slot(ORIGIN, 'e')))).toBe('the e slot of 0,0 is a jewel socket, and a socket is spent for good — a jewel put in one stays in it');
+    expect(pointsSpent(plane)).toBe(spent);
+    expect(clusterAt(plane, at(1, 0))).toBeDefined();
+  });
+
+  it('refuses a node another allocation stands on, naming what would be stranded', () => {
+    const plane = reachedEastSlot();
+    expect(words(unallocateNode(registry, plane, position(ORIGIN, 2)))).toBe('position 2 of 0,0 cannot be taken back while position 3 of 0,0 stands on it');
+    expect(words(unallocateNode(registry, plane, position(ORIGIN, 4)))).toBe('position 4 of 0,0 cannot be taken back while the e slot of 0,0 stands on it');
+    expect(pointsSpent(plane)).toBe(4);
+  });
+
+  it('refuses a corridor a socketed jewel is reached through, however far back it stands', () => {
+    const plane = reachedEastSlot();
+    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
+    allocateAll(plane, [position(at(1, 0), 1)]);
+
+    for (const index of [2, 3, 4]) {
+      expect(words(unallocateNode(registry, plane, position(ORIGIN, index))), String(index)).toMatch(/cannot be taken back while/);
+    }
+    expect(unallocateNode(registry, plane, position(at(1, 0), 1))).toBeUndefined();
+  });
+});
+
+describe('a jewel already socketed', () => {
+  const CHILD = at(1, 0);
+
+  function socketedKeenring(): { plane: Plane; root: number; drawn: RngCursor } {
+    const plane = reachedEastSlot();
+    const drawn = cursor();
+    fillSlot(registry, plane, ORIGIN, 'e', 'keenring', drawn);
+    const root = rootPosition(placed(plane, CHILD).jewel);
+    allocateAll(plane, [position(CHILD, root)]);
+    return { plane, root, drawn };
+  }
+
+  it('reads its payloads at a roll a different roll would move', () => {
+    const { plane, root } = socketedKeenring();
+    const shifted = socketedKeenring();
+    shifted.plane[hexKey(CHILD)]!.roll = clusterAt(plane, CHILD)!.roll < 0.5 ? 0.99 : 0.01;
+
+    expect(positionPayloads(registry, shifted.plane, CHILD, root)).not.toEqual(positionPayloads(registry, plane, CHILD, root));
+  });
+
+  it('keeps that roll through a position given back and taken again, and draws nothing new', () => {
+    const { plane, root, drawn } = socketedKeenring();
+    const before = positionPayloads(registry, plane, CHILD, root);
+    const roll = clusterAt(plane, CHILD)!.roll;
+    const cursorAfterFilling = drawn.rng;
+
+    expect(unallocateNode(registry, plane, position(CHILD, root))).toBeUndefined();
+    expect(clusterAt(plane, CHILD)!.roll).toBe(roll);
+    expect(allocateNode(registry, plane, position(CHILD, root), PLENTY)).toBeUndefined();
+
+    expect(clusterAt(plane, CHILD)!.roll).toBe(roll);
+    expect(drawn.rng).toBe(cursorAfterFilling);
+    expect(positionPayloads(registry, plane, CHILD, root)).toEqual(before);
+  });
+});
+
+function everyNode(where: Registry, plane: Plane): PlaneNode[] {
+  const nodes: PlaneNode[] = [];
+  for (const { hex } of planeClusters(plane)) {
+    const placement = placementAt(where, plane, hex);
+    if (!placement) continue;
+    for (let index = 1; index <= getShape(placement.jewel.shape).positionCount; index++) nodes.push(position(hex, index));
+    for (const direction of slotDirections(placement)) nodes.push(slot(hex, direction));
+  }
+  return nodes;
+}
+
+function fillWhole(where: Registry, plane: Plane): void {
+  for (let growing = true; growing; ) {
+    growing = false;
+    for (const node of everyNode(where, plane)) {
+      if (allocateNode(where, plane, node, PLENTY) === undefined) growing = true;
+    }
+  }
+}
+
+// A plane that can shrink can be shrunk into a graph growing alone could never have made, so the
+// claim is over the corpus's own jewels and over an arbitrary order of taking back: whatever order a
+// player finds, the plane a load would have to repair is never reached, and nothing left standing is
+// left standing silently.
+describe('every cluster jewel the corpus declares', () => {
+  const corpus = loadUniverse(shippedSources());
+  const declared = [...corpus.clusterJewels.values()].map((jewel) => jewel.id);
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(declared.length).toBeGreaterThan(5);
+  });
+
+  it.each(declared)('unwinds from %s without ever reaching a plane a load would repair', (jewel) => {
+    const plane = originPlane(jewel, 0.5);
+    fillWhole(corpus, plane);
+    const sockets = everyNode(corpus, plane).filter((node) => node.kind === 'slot' && isAllocated(corpus, plane, node));
+
+    for (let shrinking = true; shrinking; ) {
+      shrinking = false;
+      for (const node of everyNode(corpus, plane)) {
+        if (unallocateNode(corpus, plane, node) !== undefined) continue;
+        shrinking = true;
+        expect(repairPlane(corpus, plane).map(words)).toEqual([]);
+      }
+    }
+
+    expect(sockets.filter((node) => !isAllocated(corpus, plane, node))).toEqual([]);
+    for (const node of everyNode(corpus, plane)) {
+      if (!isAllocated(corpus, plane, node)) continue;
+      expect(unallocateNode(corpus, plane, node), nodeKey(node)).toBeDefined();
+    }
+  });
+
+  it.each(declared)('gives every point back from %s when no socket was ever taken', (jewel) => {
+    const plane = originPlane(jewel, 0.5);
+    const shape = getShape(corpus.clusterJewels.get(jewel)!.shape);
+    for (let growing = true; growing; ) {
+      growing = false;
+      for (const node of everyNode(corpus, plane)) {
+        if (node.kind === 'slot') continue;
+        if (allocateNode(corpus, plane, node, PLENTY) === undefined) growing = true;
+      }
+    }
+    expect(pointsSpent(plane)).toBe(shape.positionCount - 1);
+
+    for (let shrinking = true; shrinking; ) {
+      shrinking = false;
+      for (const node of everyNode(corpus, plane)) {
+        if (unallocateNode(corpus, plane, node) === undefined) shrinking = true;
+      }
+    }
+    expect(pointsSpent(plane)).toBe(0);
   });
 });
 

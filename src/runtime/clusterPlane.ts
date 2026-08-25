@@ -221,6 +221,48 @@ function drop(plane: Plane, node: PlaneNode): void {
   else cluster.allocatedPositions = cluster.allocatedPositions.filter((each) => each !== node.position);
 }
 
+function allocatedReach(registry: Registry, plane: Plane, without?: PlaneNode): Set<string> {
+  const reached = new Set<string>();
+  const placement = placementAt(registry, plane, ORIGIN);
+  if (!placement) return reached;
+  const root: PlaneNode = { hex: ORIGIN, kind: 'position', position: rootPosition(placement.jewel) };
+  const cut = without === undefined ? null : nodeKey(without);
+  if (cut === nodeKey(root)) return reached;
+  reached.add(nodeKey(root));
+  const frontier: PlaneNode[] = [root];
+  while (frontier.length > 0) {
+    const node = frontier.pop()!;
+    for (const next of neighbours(registry, plane, node)) {
+      const key = nodeKey(next);
+      if (key === cut || reached.has(key) || !isAllocated(registry, plane, next)) continue;
+      reached.add(key);
+      frontier.push(next);
+    }
+  }
+  return reached;
+}
+
+export function unallocateRefusal(registry: Registry, plane: Plane, node: PlaneNode): Said | undefined {
+  const cluster = clusterAt(plane, node.hex);
+  const placement = cluster === undefined ? undefined : placementOf(registry, cluster);
+  if (!cluster || !placement) return says('engine.plane.no-cluster', { hex: anId(hexKey(node.hex)) });
+  const at = describeNode(node);
+  if (!isAllocated(registry, plane, node)) return says('engine.plane.not-allocated', { node: at });
+  if (node.kind === 'slot') return says('engine.plane.socket-spent', { node: at });
+  if (cluster.entry === null && node.position === rootPosition(placement.jewel)) return says('engine.plane.plane-root', { node: at });
+
+  const reached = allocatedReach(registry, plane, node);
+  const stranded = allocatedNodes(plane).find((each) => nodeKey(each) !== nodeKey(node) && !reached.has(nodeKey(each)));
+  return stranded === undefined ? undefined : says('engine.plane.strands', { node: at, stranded: describeNode(stranded) });
+}
+
+export function unallocateNode(registry: Registry, plane: Plane, node: PlaneNode): Said | undefined {
+  const refusal = unallocateRefusal(registry, plane, node);
+  if (refusal) return refusal;
+  drop(plane, node);
+  return undefined;
+}
+
 function dropUnplaceable(registry: Registry, plane: Plane, repairs: Said[]): boolean {
   let changed = false;
   for (const [key, cluster] of Object.entries(plane)) {
@@ -274,18 +316,8 @@ function dropVanishedEffects(registry: Registry, plane: Plane, repairs: Said[]):
 }
 
 function dropUnreachableAllocations(registry: Registry, plane: Plane, repairs: Said[]): void {
-  const placement = placementAt(registry, plane, ORIGIN);
-  if (!placement) return;
-  const frontier: PlaneNode[] = [{ hex: ORIGIN, kind: 'position', position: rootPosition(placement.jewel) }];
-  const reached = new Set<string>([nodeKey(frontier[0]!)]);
-  while (frontier.length > 0) {
-    const node = frontier.pop()!;
-    for (const next of neighbours(registry, plane, node)) {
-      if (reached.has(nodeKey(next)) || !isAllocated(registry, plane, next)) continue;
-      reached.add(nodeKey(next));
-      frontier.push(next);
-    }
-  }
+  if (!placementAt(registry, plane, ORIGIN)) return;
+  const reached = allocatedReach(registry, plane);
   for (const node of allocatedNodes(plane)) {
     if (reached.has(nodeKey(node))) continue;
     repairs.push(says('engine.plane.repair.unreachable', { node: describeNode(node) }));
