@@ -13,7 +13,7 @@ import { memberKey, Namespace } from './namespace';
 import { everyActionTable, formatModuleDiagnostic, mapOf } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, localeKey } from './locale';
-import { contentSectionMaps, isDebug, isNamespacedKind, sections, sectionFor, type Section } from './sections';
+import { contentSectionMaps, isCheckedKind, isDebug, sections, sectionFor, type Section } from './sections';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -222,8 +222,8 @@ describe('a field whose values are names', () => {
 });
 
 describe('what a reference is checked against', () => {
-  // A reference is checked only where its kind is namespaced: `resolve` rewrites nothing for a global id and `validateSectionReferences` asks nothing about it, so a kind that something names while declaring `ids: 'global'` takes whatever an author writes and fails when a player reaches it. The subjects are every kind a schema field names and every kind the corpus's own references ask about, so neither a field nor a result site added next month can put one back.
-  it('leaves no kind that anything names holding ids nothing resolves', () => {
+  // A name is refused where nothing declares it only under a kind saying its vocabulary is declared, so a kind that something names while leaving its vocabulary open takes whatever an author writes and fails when a player reaches it. The subjects are every kind a schema field names and every kind the corpus's own references ask about, so neither a field nor a result site added next month can leave one unchecked.
+  it('leaves no kind that anything names holding names nothing answers for', () => {
     const registry = loadUniverseWithDiagnostics(CORPUS).registry;
     const referenced = new Set(sections().flatMap((each) => each.names.map((named) => named.kind)));
     for (const [kind, primary] of contentSectionMaps()) {
@@ -231,7 +231,13 @@ describe('what a reference is checked against', () => {
     }
 
     expect(referenced.size).toBeGreaterThan(0);
-    for (const kind of referenced) expect(isNamespacedKind(kind), kind).toBe(true);
+    for (const kind of referenced) expect(isCheckedKind(kind), kind).toBe(true);
+  });
+
+  // The two declarations are otherwise free of each other, but a module-scoped name has to be looked up to be written down: `resolve` rewrites one into the key the world holds it under, and there is no such key for a name nothing declared. A global name is already its own key, so it is the one that may be left open.
+  it.each(sections().map((each) => each.kind))('%s does not own ids it declines to answer for', (kind) => {
+    const owner = sectionFor(kind)!;
+    if (owner.ids === 'owned') expect(owner.vocabulary).toBe('declared');
   });
 });
 

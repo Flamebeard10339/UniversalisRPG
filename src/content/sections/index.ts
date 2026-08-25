@@ -3,7 +3,7 @@ import { DslError, Span } from '../../grammar/parser';
 import { RawSection, splitSections } from '../../grammar/structure';
 import { Visit } from '../refs';
 import { MEMBER_KINDS } from '../namespace';
-import { Maps, PrintContext, Section } from './define';
+import { Ids, Maps, PrintContext, Section } from './define';
 
 import { action, type ActionTextOwner } from './action';
 import { clusterJewel } from './clusterJewel';
@@ -97,20 +97,27 @@ export const actionOwnerKinds = (): readonly SectionKind[] => kindsWhere((each) 
 
 export { isActionOwnerKind, isDebug, DEBUG_MARK, EVERY_SECTION } from './define';
 
+// Where a name of this kind is kept apart from the same word written in another module. A member kind's key hangs beneath the section that declared it, so it is scoped however that section's id is.
+export const idScopeOf = (kind: string): Ids => sectionFor(kind)?.ids ?? (MEMBER_KINDS.includes(kind) ? 'owned' : 'none');
+
+// A kind whose ids a module owns, so one written under it is qualified and one written at it is rewritten into the key the world holds it under.
+export const isOwnedKind = (kind: string): boolean => idScopeOf(kind) === 'owned';
+
+// A kind that answers for every name of it there is, so one nothing declared is refused where it is written.
+export const isCheckedKind = (kind: string): boolean => sectionFor(kind)?.vocabulary === 'declared' || MEMBER_KINDS.includes(kind);
+
 export const registryMapOf = (kind: string): string | null => sectionFor(kind)?.map ?? null;
 
 export const contentSectionMaps = (): readonly (readonly [SectionKind, string])[] => sections().flatMap((each) => (each.map === null ? [] : [[each.kind, each.map] as const]));
 
 export const textFieldsOf = (kind: string): readonly string[] | undefined => sectionFor(kind)?.text;
 
-export type { Named } from './define';
+export type { Named, Ids, Vocabulary } from './define';
 export type { Section, PrintContext, Maps };
 
 export function parseModule(source: string): ModuleSection[] {
   return splitSections(source).map(parseSectionOf);
 }
-
-export const isNamespacedKind = (kind: string): boolean => ownedSectionKinds().includes(kind as SectionKind) || MEMBER_KINDS.includes(kind);
 
 export function actionSlugProblem(owner: ActionTextOwner, label: string, taken: ReadonlyMap<string, string>, minted: ReadonlyMap<string, string>): string | undefined {
   const slug = owner.field;

@@ -15,7 +15,7 @@ import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseMod
 import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
 import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
-import { isNamespacedKind } from './sections';
+import { isOwnedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
 import { Pruning, ReferenceKind, Visit } from './refs';
@@ -219,7 +219,7 @@ function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, Readonl
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
       if (!isDebug(section.value)) continue;
-      const namespace = isNamespacedKind(kind) ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
+      const namespace = isOwnedKind(kind) ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
       prefixes.push(...kinds.map((under) => localeKey(namespace, under, id, '')));
     }
   }
@@ -738,7 +738,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   registry.roads = closeAdjacency(registry.locations);
   for (const [kind, byId] of merged) {
     for (const [id, section] of byId) {
-      const owned = isNamespacedKind(kind);
+      const owned = isOwnedKind(kind);
       if (owned && !registry.namespace.has(kind, id)) continue;
       const namespace = owned ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
       try {

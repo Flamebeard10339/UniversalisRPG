@@ -33,6 +33,7 @@ export const parseSaveSection = sectionParser((raw: RawSection): SaveSection => 
 export const save = section<SaveSection>()({
   kind: 'save',
   ids: 'owned',
+  vocabulary: 'declared',
   maps: {
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, { version: value.version, diff: value.diff }]],
   },

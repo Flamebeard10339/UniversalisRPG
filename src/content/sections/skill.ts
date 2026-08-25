@@ -16,6 +16,7 @@ export interface Skill {
 export const skill = section<Skill>()({
   kind: 'skill',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'skills',
   text: ['title'],
   fields: {

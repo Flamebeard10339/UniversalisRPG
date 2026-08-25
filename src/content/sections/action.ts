@@ -43,6 +43,7 @@ export const action = section<ActionDeclaration>()({
   says: (value) => actionResultLists(value),
   kind: 'action',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'actions',
   grammar: [{ form: 'title: <text>', example: 'title: Chop Wood' }, ...actionLinesWritten()],
   parse: (raw) => {

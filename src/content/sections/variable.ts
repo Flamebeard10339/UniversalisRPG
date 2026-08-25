@@ -9,6 +9,7 @@ export interface Variable {
 export const variable = section<Variable>()({
   kind: 'variable',
   ids: 'global',
+  vocabulary: 'declared',
   map: 'variables',
   fields: {
     value: { parser: decimal },

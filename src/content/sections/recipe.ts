@@ -104,6 +104,7 @@ export const recipe = section<Recipe>()({
   says: (value) => actionResultLists(recipeAction(value)),
   kind: 'recipe',
   ids: 'owned',
+  vocabulary: 'declared',
   maps: {
     recipes: (value) => [[value.id, value]],
     recipeActions: (value) => [[value.id, recipeAction(value)]],

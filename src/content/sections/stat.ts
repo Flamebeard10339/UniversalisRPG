@@ -11,6 +11,7 @@ export interface Stat {
 export const stat = section<Stat>()({
   kind: 'stat',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'stats',
   text: ['title'],
   fields: {

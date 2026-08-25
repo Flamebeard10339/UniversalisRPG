@@ -13,6 +13,7 @@ export interface Race {
 export const race = section<Race>()({
   kind: 'race',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'races',
   text: ['title'],
   fields: {

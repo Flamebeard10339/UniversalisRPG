@@ -10,6 +10,7 @@ export interface Slot {
 export const slot = section<Slot>()({
   kind: 'slot',
   ids: 'global',
+  vocabulary: 'open',
   map: 'slots',
   text: ['title'],
   fields: {

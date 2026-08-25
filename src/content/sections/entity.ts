@@ -133,6 +133,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   says: (value) => [...value.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block))), value.onHit, value.whenHit],
   kind: 'entity',
   ids: 'owned',
+  vocabulary: 'declared',
   maps: {
     entities: (value: AuthoredEntity): readonly (readonly [string, Entity])[] => [[value.id, { ...value, actions: [], handlers: [] }]],
   },

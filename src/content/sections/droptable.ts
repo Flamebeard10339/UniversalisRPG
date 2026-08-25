@@ -13,6 +13,7 @@ export const droptable = section<DropTable>()({
   says: (value) => [value.results],
   kind: 'droptable',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'dropTables',
   grammar: resultGrammar(),
   parse: (raw) => {

@@ -9,6 +9,7 @@ export interface Faction {
 export const faction = section<Faction>()({
   kind: 'faction',
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'factions',
   text: ['title'],
   fields: {

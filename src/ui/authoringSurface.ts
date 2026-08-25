@@ -1,6 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
-import { isNamespacedKind } from '../content/sections';
+import { isOwnedKind } from '../content/sections';
 import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
@@ -25,7 +25,7 @@ const HEADER_KIND = 'info';
 const normalized = (text: string): string => text.replace(/\r\n?/g, '\n');
 
 const addressOf = (module: string, kind: string, id: string): string =>
-  module === LOCAL_CHANGES_MODULE_ID || !isNamespacedKind(kind) ? id : qualify(module, id);
+  module === LOCAL_CHANGES_MODULE_ID || !isOwnedKind(kind) ? id : qualify(module, id);
 
 export function sectionsIn(source: ModuleSource): Section[] {
   const text = normalized(source.text);

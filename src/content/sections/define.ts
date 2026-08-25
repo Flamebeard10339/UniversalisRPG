@@ -12,8 +12,11 @@ import { parametersOf } from '../../grammar/values';
 
 export type { PrintContext };
 
-// `owned` qualifies the id with its module's namespace, `global` means one name across every module, `none` declares nothing anyone can name.
+// Where a kind's own ids are kept apart. `owned` qualifies the id with its module's namespace, `global` means one name across every module, `none` declares nothing anyone can name. This says nothing about what happens where one of these is named — `Vocabulary` does.
 export type Ids = 'owned' | 'global' | 'none';
+
+// Whether a name of this kind is held to what the world declares. `declared` refuses one nothing declared, where it is written; `open` takes whatever an author writes, which is what a kind whose vocabulary is written somewhere other than its own sections has to do.
+export type Vocabulary = 'declared' | 'open';
 
 export type Maps = Record<string, Map<string, never>>;
 
@@ -55,6 +58,7 @@ export type Lands<V, M extends Record<string, unknown>> = {
 export interface Section<V extends { id: string } = { id: string }, M extends Record<string, unknown> = Record<string, unknown>> {
   kind: string;
   ids: Ids;
+  vocabulary: Vocabulary;
   map: string | null;
   maps: Lands<V, M>;
   nestsActions: boolean;
@@ -77,6 +81,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
 interface Common<V extends { id: string }> {
   kind: string;
   ids: Ids;
+  vocabulary: Vocabulary;
   // Where the actions written under this kind reach, said as the rest of "offered …". A kind that nests actions is the only thing that knows this — nothing in the engine can tell an item the player carries from an entity that stays where it stands — so declaring the reach is how a kind declares that it nests them at all.
   nestsActions?: string;
   // The actions a section of this kind offers that its author did not write as an action block. Read off the value, since a kind mints one only where the field it compiles is written.
@@ -187,7 +192,7 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, map, maps, nestsActions, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, vocabulary, map, maps, nestsActions, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
@@ -249,6 +254,7 @@ export const section =
     return {
       kind,
       ids,
+      vocabulary,
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions: nestsActions !== undefined,

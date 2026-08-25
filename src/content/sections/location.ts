@@ -198,6 +198,7 @@ export const location = section<Location, 'starting', 'actions'>()({
   says: (value) => value.actions.flatMap(actionResultLists),
   ...SCHEMA,
   ids: 'owned',
+  vocabulary: 'declared',
   map: 'locations',
   nestsActions: 'only while the player is standing here',
   text: ['title', 'examine'],
