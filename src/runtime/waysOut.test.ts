@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from './localizedFixture';
 import type { PlayChoice } from './session';
-import { onActionList, waysOut } from './waysOut';
+import { waysOut } from './waysOut';
 
 const offer = (id: string, leadsTo?: string): PlayChoice => ({ id, kind: leadsTo ? 'travel' : 'action', label: asLocalized(id), ...(leadsTo === undefined ? {} : { leadsTo }) });
 
@@ -33,24 +33,5 @@ describe('which offer is the way to a place', () => {
 
   it('carries the words the engine put on the offer, so nobody names a destination twice', () => {
     expect(waysOut([offer('travel:beach', 'beach')])[0].label).toBe('travel:beach');
-  });
-});
-
-describe('what the action list is for', () => {
-  it('keeps what this place is offering', () => {
-    expect([offer('look'), offer('talk to miki')].filter(onActionList).length).toBe(2);
-  });
-
-  it('drops a walk away, however near it goes, because a walk is reached from the map', () => {
-    const near: PlayChoice = { ...offer('travel:beach', 'beach'), legs: 1 };
-    const far: PlayChoice = { ...offer('travel:attic', 'attic'), legs: 4 };
-
-    expect([near, far].filter(onActionList)).toEqual([]);
-  });
-
-  it("keeps an entity own action that happens to move the player, since the entity is offering it", () => {
-    const stairs: PlayChoice = { id: 'use:entity.stairs.ascend', kind: 'action', label: asLocalized('ascend'), leadsTo: 'landing' };
-
-    expect([stairs].filter(onActionList)).toEqual([stairs]);
   });
 });

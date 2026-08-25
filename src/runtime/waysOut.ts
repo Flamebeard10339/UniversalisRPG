@@ -1,11 +1,6 @@
 import type { Answer, Localized } from './localized';
 import type { PlayChoice } from './session';
 
-// A travel choice is not something here offering itself, it is the way out of here — so it belongs
-// on the map and not on the list of what this place can be done to. An entity's own action that
-// happens to move the player stays on the list, because the entity is the one offering it.
-export const onActionList = (choice: PlayChoice): boolean => choice.kind !== 'travel';
-
 export interface WayOut {
   readonly to: Answer;
   // Where the choice sits in the view's own list, which is how a player answers it.

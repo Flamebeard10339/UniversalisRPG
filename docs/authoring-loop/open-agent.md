@@ -101,16 +101,6 @@ more than it costs.
 
 ### The action list
 
-**A way out is not on the action list, and the owner has reversed that ruling.** *"We
-have to revert the concept of location actions not being visible. I was wrong. It isn't
-very intuitive to have to open the map to change locations."* Measured at the start of
-the shipped corpus: the Guide House offers six choices and **none of them leaves the
-building** — `waysOut` finds only the two the stairs offer, and the stairs are an
-entity's own action rather than a road. `onActionList` in `src/runtime/waysOut.ts` is
-the one rule and it is one line. *Closes when:* a road is on the list again, and
-`settled.md`'s paragraph is corrected with it — the flat three seconds stands, the
-second half of that sentence does not.
-
 **The front door does not open onto anything.** *"Clicking on the front door doesn't
 allow me to walk through it."* `# entity front-door` (`content/tulsa.dsl:776`) carries
 `examine:` and a `pick lock:` that is `hidden if: unlocked`, so on a shipped save the

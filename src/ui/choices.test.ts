@@ -39,14 +39,14 @@ describe('the offers on the sheet', () => {
     expect(groupOffers([])).toEqual([]);
   });
 
-  it('leaves out the places, near and far alike, since a way out is reached from the map', () => {
+  it('keeps the places, near and far alike, since a way out is how a player leaves without opening the map', () => {
     const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: asLocalized('Travel to Yard'), leadsTo: 'yard', legs: 1 };
     const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: asLocalized('Travel to Ford'), leadsTo: 'ford', legs: 3 };
 
     const groups = groupOffers([choice('a', 'Talk to Miki'), near, far, choice('b', 'Look around')]);
 
-    expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'b']);
-    expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 4]);
+    expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'travel:yard', 'travel:ford', 'b']);
+    expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 2, 3, 4]);
   });
 
   it("keeps a staircase, which is an entity's own action and only happens to move the player", () => {
@@ -116,14 +116,14 @@ describe('the offers on the sheet', () => {
     expect(offerCells([])).toEqual([]);
   });
 
-  it('withdraws a walk-away offer only where the map is drawing the place it leads to', () => {
+  it('offers a walk-away on the sheet and draws the place it leads to on the map, both', () => {
     const at = (id: string, z: number, ...adjacent: string[]): Place => ({ id, title: asLocalized(id.toUpperCase()), x: 0, y: 0, z, adjacent: adjacent.map((to) => ({ to, open: true })) });
     const discovered = [at('landing', 1, 'hall'), at('hall', 0, 'landing', 'cellar'), at('cellar', -1, 'hall')];
     const walk: PlayView['choices'][number] = { id: 'travel:cellar', kind: 'travel', label: asLocalized('Travel to Cellar'), leadsTo: 'cellar', legs: 2 };
     const offers = [choice('a', 'Talk to Miki'), walk];
     const view = { discovered, location: { id: 'landing' }, choices: offers } as unknown as PlayView;
 
-    expect(groupOffers(offers).flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a']);
+    expect(groupOffers(offers).flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'travel:cellar']);
     const drawn = drawnFor(view, null);
     expect(drawn.plane).toBe(1);
     expect(drawn.sheet.nodes.map((node) => node.place.id)).toContain('cellar');

@@ -3,7 +3,6 @@ import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { type GroupRow } from '../../src/runtime/grouping';
-import { onActionList } from '../../src/runtime/waysOut';
 import { formatPlane } from '../planeView';
 
 // What a command answered with, written out as lines a player reads. Both drivers that put words
@@ -50,7 +49,6 @@ export const grouped = (localizer: Localizer, group: GroupRow | undefined, said:
 // from among them rather than renumbered away.
 function formatChoices(choices: PlayChoice[], localizer: Localizer): PlayerLine[] {
   return choices.flatMap((choice, index) => {
-    if (!onActionList(choice)) return [];
     const numbered = choice.detail
       ? localizer.engine('engine.repl.choice.owned', { index: index + 1, owner: grouped(localizer, choice.group, choice.detail), choice: choice.label })
       : localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.label });

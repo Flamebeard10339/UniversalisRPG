@@ -526,17 +526,17 @@ subjects from a registry map while claiming about words. Both read the mark off
 words, so a node whose words genuinely are missing still fails rather than quietly
 leaving the sweep. The other five were clean.
 
-**A road costs a flat three seconds, and whether a way out is on the action list is one
-rule in one place.** `travel-seconds` is the tunable and `travel-seconds-per-unit` is
-gone, along with `locationDistance` — nothing derives a travel time from map coordinates
-any more, which was a mechanism that got worse as the world grew rather than a number
-that was too big. `onActionList` in `src/runtime/waysOut.ts` is that one rule, read by
-the app, the REPL and the playbot; `aWalkAway` is deleted, having been the same
-judgement applied to only the multi-leg half. `waysOut` lives in runtime so `/map` and
-the app's map read one list. **What that rule currently answers is not settled** — it
-says a way out is not on the list, the owner reversed that on 2026-08-25 having played
-it, and the reversal is in `open-agent.md`. The one-place-ness is what is settled here,
-and it is why the reversal is one line.
+**A road costs a flat three seconds, and every choice a view publishes is on the action
+list.** `travel-seconds` is the tunable and `travel-seconds-per-unit` is gone, along with
+`locationDistance` — nothing derives a travel time from map coordinates any more, which
+was a mechanism that got worse as the world grew rather than a number that was too big.
+There is no rule any more saying which choices reach the list. `onActionList` said a way
+out did not; the owner reversed that on 2026-08-25 having played it, and a predicate that
+answers *yes* to everything is not a seam, it is a thing to remember — so it was deleted
+rather than inverted, and the app, the REPL and the playbot each draw the view's own list
+whole. `aWalkAway` had gone earlier, having been the same judgement applied to only the
+multi-leg half. `waysOut` lives in runtime and is the map's reader, so `/map` and the
+app's map read one list: a way out now stands on both surfaces, which is the point.
 
 **The pack has an order its owner chose, and `swap:` is how it is written.** It reaches
 state by the road state already takes, so `SaveField`, `SAVE_FIELDS` and `SPAN_VOICE` all

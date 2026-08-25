@@ -50,7 +50,6 @@ function calls(source: { text: string }): string[] {
 
 const DISPATCHES = [
   'askedOption',
-  'onActionList',
   'waysOut',
   'BASE_LANGUAGE',
   'createTicker',

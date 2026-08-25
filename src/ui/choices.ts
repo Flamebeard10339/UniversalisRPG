@@ -2,7 +2,6 @@ import { EXAMINE_FIELD } from '../content/sections/entity';
 import { parseUseChoiceId } from '../content/sections/test';
 import type { Answer, Localized } from '../runtime/localized';
 import type { GroupRow, PlayView } from '../runtime/session';
-import { onActionList } from '../runtime/waysOut';
 
 export interface Offer {
   id: Answer;
@@ -36,7 +35,6 @@ const reads = (offer: Offer): boolean => parseUseChoiceId(String(offer.id))?.act
 export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
   const groups: OfferGroup[] = [];
   choices.forEach((choice, at) => {
-    if (!onActionList(choice)) return;
     const of = choice.of ?? null;
     const offer = { id: choice.id, label: choice.label, position: at + 1 };
     const held = groups.find((each) => each.of === of);
