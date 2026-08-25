@@ -22,30 +22,30 @@ describe('the suite runs a React effect', () => {
   it('runs an effect declared by a src/ui hook, and the effect reaches the channel', () => {
     const channel = createTransientChannel();
     function Host(): JSX.Element {
-      return <span>{useMoment('note', true, 'a-subject')}</span>;
+      return <span>{useMoment('linger', true, 'a-subject')}</span>;
     }
 
-    expect(channel.notes()).toHaveLength(0);
+    expect(channel.playedSince(0).moments).toHaveLength(0);
     const unmount = mounted(
       <TransientProvider value={channel}>
         <Host />
       </TransientProvider>,
     );
-    expect(channel.notes().length).toBeGreaterThan(0);
+    expect(channel.playedSince(0).moments.length).toBeGreaterThan(0);
     unmount();
   });
 
   it('does not reach the channel when the moment does not play', () => {
     const channel = createTransientChannel();
     function Host(): JSX.Element {
-      return <span>{useMoment('note', false, 'a-subject')}</span>;
+      return <span>{useMoment('linger', false, 'a-subject')}</span>;
     }
     const unmount = mounted(
       <TransientProvider value={channel}>
         <Host />
       </TransientProvider>,
     );
-    expect(channel.notes()).toHaveLength(0);
+    expect(channel.playedSince(0).moments).toHaveLength(0);
     unmount();
   });
 });

@@ -212,7 +212,7 @@ describe('the browser test harness', () => {
     const expiring: Array<() => void> = [];
     const channel = createTransientChannel({ schedule: (expire) => void expiring.push(expire) });
     const surfaces = createSurfaceRegistry();
-    surfaces.register('shell', () => ({ actions: { layer: () => void channel.play('note', 'briefer than the settle') } }));
+    surfaces.register('shell', () => ({ actions: { layer: () => void channel.note({ key: 'brief', count: 0, words: asLocalized('briefer than the settle') }) } }));
     const harness = installTestHarness(driver(snapshot(), [], channel), {}, {
       settle: async () => void expiring.splice(0).forEach((expire) => expire()),
       surfaces,
@@ -220,7 +220,7 @@ describe('the browser test harness', () => {
 
     const [result] = await harness.batch([{ target: 'shell.layer', value: 'map' }]);
 
-    expect(channel.notes()).toEqual([]);
+    expect(channel.notices()).toEqual([]);
     expect(result.played.map((moment) => [moment.kind, moment.subject])).toEqual([['note', 'briefer than the settle']]);
   });
 
