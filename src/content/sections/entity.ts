@@ -71,7 +71,7 @@ export function mintedActions(value: { id: string; examine?: string }, namespace
   return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said] } as Action];
 }
 
-const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ address: declaredId(action)!, from: `${EXAMINE_FIELD}:` }));
+const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ action, from: `${EXAMINE_FIELD}:` }));
 
 // Whether walking up to this entity is worth a player's turn. `actions` is asked after linking, so
 // an entity's own blocks, what it `uses:` and what its `examine:` mints are one question here.

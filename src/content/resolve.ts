@@ -1,4 +1,5 @@
 import { Action } from '../grammar/action';
+import { actionAddress, actionTextSection } from './sections/action';
 import { actionSlug } from './locale';
 import { DslError } from '../grammar/parser';
 import { EntityBlock, isHandlerBlock } from './sections/entity';
@@ -81,7 +82,7 @@ export function actionAddresses(kind: string, value: MemberOwner): string[] {
   const used = addedMembers<string>(value.uses).map(lastSegment);
   const inline = [...addedMembers<Action>(value.actions), ...addedMembers<EntityBlock>(value.blocks).filter((block) => !isHandlerBlock(block))] as Action[];
   const minted = sectionFor(kind)?.mintedActions?.(value) ?? [];
-  return [...used, ...minted.map((one) => one.address), ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
+  return [...used, ...minted.map((one) => actionAddress(one.action)), ...inline.filter((block) => !used.includes(lastSegment(block.label))).map((block) => actionSlug(block.label))];
 }
 
 type Members = (value: { id: string }) => readonly MemberName[];
@@ -148,6 +149,11 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
   });
 
   for (const { kind, value } of createdSections(module)) {
+    // An action minted under a section of its own takes that section's id, so it is declared where an authored one's would be and an author who writes the same heading is told rather than silently overwritten.
+    for (const minted of sectionFor(kind)?.mintedActions?.(value) ?? []) {
+      const under = actionTextSection(kind, value.id, minted.action);
+      if (under.kind !== kind || under.id !== value.id) namespace.mint(under.kind, under.id, minted.from);
+    }
     const scope = idScopeOf(kind);
     if (scope === 'none' || value.id === undefined || value.id.includes('.')) continue;
     if (kind === 'flag' && value.id === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);

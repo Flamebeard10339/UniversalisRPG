@@ -1,4 +1,4 @@
-import { actionBody, actionLines } from '../../grammar/action';
+import { Action, actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
 import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
@@ -39,9 +39,9 @@ export const isDebug = (value: object | undefined): boolean => (value as { debug
 // Laid on the value rather than held in a table beside it, so every hand a section passes through — a merge, a build, a prune that spreads it, a printer — carries the mark without knowing it is there.
 const asDebug = <V extends object>(value: V): V => Object.defineProperty(value, 'debug', { enumerable: true, configurable: true, value: true });
 
-// An action a section of this kind offers that its author did not write as an action block: the address it takes, and the line an author reads it under.
+// An action a section of this kind offers that its author did not write as an action block: the action itself, which says where it is addressed and whose words it is, and the line an author reads it under.
 export interface MintedAction {
-  address: string;
+  action: Action;
   from: string;
 }
 

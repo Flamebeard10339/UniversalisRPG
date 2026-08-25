@@ -3,6 +3,7 @@ import { loadUniverse } from '../content/load';
 import { localeKey } from '../content/locale';
 import type { Registry } from '../content/registry';
 import { registryMapOf, sectionFor, sections } from '../content/sections';
+import { actionAddress } from '../content/sections/action';
 import { parseUseChoiceId } from '../content/sections/test';
 import { shippedSources } from '../content/shipped';
 import { withoutNote } from '../grammar/note';
@@ -96,7 +97,7 @@ function standing(registry: Registry, standings: ReadonlyMap<string, string>): s
   const session = startSession(registry);
   const mints = (obj: string, objId: string, actionId: string): boolean => {
     const value = mapOf(registry, obj)?.get(objId);
-    return value !== undefined && (sectionFor(obj)?.mintedActions?.(value as never) ?? []).some((one) => one.address === actionId);
+    return value !== undefined && (sectionFor(obj)?.mintedActions?.(value as never) ?? []).some((one) => actionAddress(one.action) === actionId);
   };
   for (const save of standings.values()) {
     const stand = (): void => void applyDirective(session, { kind: 'load', save });

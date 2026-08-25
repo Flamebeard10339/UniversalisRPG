@@ -4,7 +4,7 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionTextKey, actionTextOwner } from './sections/action';
+import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
@@ -107,7 +107,7 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
 }
 
 function recordActionText(registry: Registry, languages: ReadonlyMap<string | null, string>, kind: string, id: string, actions: readonly Action[], value: { id: string }): void {
-  const minted = new Map((sectionFor(kind)?.mintedActions?.(value) ?? []).map((one) => [one.address, one.from]));
+  const minted = new Map((sectionFor(kind)?.mintedActions?.(value) ?? []).map((one) => [actionAddress(one.action), one.from]));
   const taken = new Map<string, string>();
   for (const action of actions) {
     const owner = actionTextOwner(registry.namespace, kind, id, action);

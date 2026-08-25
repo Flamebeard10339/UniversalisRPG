@@ -19,6 +19,7 @@ const SELF = 'self';
 export class Namespace {
   private readonly declared = new Map<string, Map<string, string | null>>();
   private readonly modules = new Set<string>();
+  private readonly minted = new Map<string, string>();
   readonly all = new Set<string | null>();
 
   private keys(kind: string): Map<string, string | null> {
@@ -33,11 +34,28 @@ export class Namespace {
     for (const id of ids) this.modules.add(id);
   }
 
-  declare(kind: string, namespace: string | null, id: string): string {
-    const key = qualify(namespace, id);
+  private put(kind: string, namespace: string | null, key: string): string {
     this.all.add(namespace);
     this.keys(kind).set(key, namespace);
     return key;
+  }
+
+  private refuseSquat(kind: string, key: string, from: string): never {
+    throw new DslError(`# ${kind} ${key} is already minted by ${from}, which keys its own words under that name: give this section another id`);
+  }
+
+  declare(kind: string, namespace: string | null, id: string): string {
+    const key = qualify(namespace, id);
+    const from = this.minted.get(`${kind} ${key}`);
+    if (from !== undefined) this.refuseSquat(kind, key, from);
+    return this.put(kind, namespace, key);
+  }
+
+  // A name the engine puts in a kind's id space on an author's behalf, minted the same way by every section that mints it and so held at the root rather than under any one of them. Nothing may be authored there: the two would file their words under one key and whichever loaded last would silently win.
+  mint(kind: string, id: string, from: string): string {
+    if (!this.minted.has(`${kind} ${id}`) && this.has(kind, id)) this.refuseSquat(kind, id, from);
+    this.minted.set(`${kind} ${id}`, from);
+    return this.put(kind, null, id);
   }
 
   declareMember(kind: string, ownerKind: string, owner: string, name: string): string {
@@ -65,6 +83,7 @@ export class Namespace {
     };
     const next = new Namespace();
     next.declareModules([...this.modules].map(under));
+    for (const [at, from] of this.minted) next.minted.set(at, from);
     for (const held of this.all) next.all.add(held === from ? to : held);
     for (const [kind, keys] of this.declared) {
       const into = next.keys(kind);

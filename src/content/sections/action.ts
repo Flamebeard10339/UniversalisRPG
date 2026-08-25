@@ -25,9 +25,14 @@ export interface ActionTextOwner {
   field: string;
 }
 
-export function actionTextOwner(namespace: Namespace, kind: string, ownerId: string, action: Action): ActionTextOwner {
+// The section an action's words are filed under. An action carrying an id of its own is a `# action` however it came to be written, so its label is that section's to hold rather than each thing that offers it; one without belongs to whatever nests it.
+export function actionTextSection(kind: string, ownerId: string, action: Action): { kind: string; id: string } {
   const declared = declaredId(action);
-  const owner = declared === undefined ? { kind, id: ownerId } : { kind: 'action', id: declared };
+  return declared === undefined ? { kind, id: ownerId } : { kind: 'action', id: declared };
+}
+
+export function actionTextOwner(namespace: Namespace, kind: string, ownerId: string, action: Action): ActionTextOwner {
+  const owner = actionTextSection(kind, ownerId, action);
   return {
     ...owner,
     namespace: namespace.ownerOf(owner.kind, owner.id) ?? null,

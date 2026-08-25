@@ -131,9 +131,18 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
   });
 
   it('names the line that minted an address, rather than the action nobody wrote, when an author keys as it too', () => {
-    const clashing = ['# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.', '', '# entity mirror', 'examine: A tall mirror.', 'uses: examine'].join('\n');
+    // Under a module of its own, so the `# action` is `hall.examine` and the two only meet where the mirror offers both.
+    const clashing = ['# info hall', 'version: 1.0.0', '', '# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.', '', '# entity mirror', 'examine: A tall mirror.', 'uses: examine'].join('\n');
 
     expect(() => loadModule(clashing)).toThrow(/examine: already offers an action addressed examine, which "Give It A Long Look" keys as too/);
+  });
+
+  it('refuses an authored section standing on the id a minted action already took, written either way round', () => {
+    const authored = ['# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.'];
+    const minting = ['# entity mirror', 'examine: A tall mirror.'];
+
+    expect(() => loadModule([...authored, '', ...minting].join('\n'))).toThrow(/# action examine is already minted by examine:/);
+    expect(() => loadModule([...minting, '', ...authored].join('\n'))).toThrow(/# action examine is already minted by examine:/);
   });
 
   it('takes an address opening with a digit, and refuses one that is no key at all', () => {
