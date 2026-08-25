@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { armFightAction, createGameState, GameState, initResources, resolve, useAction } from './runtime';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { compareSave, loadSave, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 
-const SHEET = `
-# stat attack
-base: 4
-
+const SHEET =
+  FIXTURE_WORLD +
+  `
 # stat dr
 
 # stat attack-rate
 base: 60
-
-# stat max-health
 
 # stat blind
 base: 0
@@ -80,9 +78,7 @@ stats: max-health 100000, attack 4, attack-rate 60, blind 0, uncanny 400
 skills: ${ratSkills}
 ${ratUses}
 
-# location burrow
-x: 0, y: 0
-starting
+# location camp
 entities: rat
 `;
 
@@ -92,7 +88,7 @@ const BOTH_SIDED = arena('swing', 'hide, ducking, gnawing', 'uses: swing');
 
 function fought(source: string, action: string, seconds: number): GameState {
   const registry = loadInEnglish(source);
-  const state = createGameState('burrow');
+  const state = createGameState('camp');
   initResources(state, registry);
   armFightAction(action, 'rat', registry, state);
   resolve(state, registry, secondsToMs(seconds));
@@ -133,7 +129,7 @@ describe('the player is not special', () => {
 describe('one accumulator, and one place that writes it', () => {
   it('lands in the same store the xp: result writes, and says so the same way', () => {
     const registry = loadInEnglish(ONE_SIDED);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('swing', 'rat', registry, state);
     resolve(state, registry, secondsToMs(70));
@@ -143,7 +139,7 @@ describe('one accumulator, and one place that writes it', () => {
 
   it('keeps the save shape it inherited, so a state that earned a grant reloads clean', () => {
     const registry = loadInEnglish(ONE_SIDED);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('swing', 'rat', registry, state);
     resolve(state, registry, secondsToMs(4));
@@ -153,7 +149,7 @@ describe('one accumulator, and one place that writes it', () => {
     expect(Object.keys(diff.xp)).toEqual(['melee', 'hide']);
     expect(compareSave(state, { version, diff }, registry)).toEqual([]);
 
-    const reloaded = createGameState('burrow');
+    const reloaded = createGameState('camp');
     expect(loadSave(reloaded, { version, diff }, registry)).toEqual([]);
     expect(reloaded.xp).toEqual(state.xp);
   });
@@ -168,7 +164,7 @@ describe('a grant costs nothing when nobody wrote one', () => {
       walks += 1;
       return values();
     };
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('swing', 'rat', registry, state);
     resolve(state, registry, secondsToMs(120));
@@ -195,7 +191,7 @@ describe('the resolve loop does not grow with the skills declared', () => {
     const padded = loadInEnglish(`${ONE_SIDED}\n${padding}\n`);
     expect(padded.skills.size).toBeGreaterThan(300);
 
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, padded);
     armFightAction('swing', 'rat', padded, state);
     resolve(state, padded, secondsToMs(20));
@@ -212,16 +208,13 @@ describe('an entity with no sheet at all', () => {
   });
 });
 
-const OUTCOMES = `
-# stat attack
-base: 4
-
+const OUTCOMES =
+  FIXTURE_WORLD +
+  `
 # stat dr
 
 # stat attack-rate
 base: 60
-
-# stat max-health
 
 # resource health
 max: max-health
@@ -272,16 +265,14 @@ stats: max-health 8, attack 4, attack-rate 60
 faction: vermin
 stats: max-health 10000, attack 4, attack-rate 60
 
-# location burrow
-x: 0, y: 0
-starting
+# location camp
 entities: rat, tortoise
 `;
 
 describe('an action that reached its end, and one that did not', () => {
   it('trains the performer on the completion it reached', () => {
     const registry = loadInEnglish(OUTCOMES);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('duel', 'rat', registry, state);
     resolve(state, registry, secondsToMs(4));
@@ -292,7 +283,7 @@ describe('an action that reached its end, and one that did not', () => {
 
   it('trains the performer on the attempts: bound it ran out of instead', () => {
     const registry = loadInEnglish(OUTCOMES);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('skirmish', 'tortoise', registry, state);
     resolve(state, registry, secondsToMs(4));
@@ -303,7 +294,7 @@ describe('an action that reached its end, and one that did not', () => {
 
   it('grants once per completion a batched span produced', () => {
     const registry = loadInEnglish(OUTCOMES);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     useAction('action', 'forage', 'forage', registry, state);
     resolve(state, registry, secondsToMs(10));
@@ -314,7 +305,7 @@ describe('an action that reached its end, and one that did not', () => {
 
   it('grants once per completion a repeated span produced, and no more', () => {
     const registry = loadInEnglish(OUTCOMES);
-    const state = createGameState('burrow');
+    const state = createGameState('camp');
     initResources(state, registry);
     armFightAction('skirmish', 'tortoise', registry, state);
     state.activeAction!.repeating = true;
