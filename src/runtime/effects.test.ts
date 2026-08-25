@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MODAL_SCREENS } from '../grammar/actionResult';
 import { point } from '../grammar/range';
-import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
+import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools, standWhereTheyAre } from './effects';
+import { DISCOVERED } from '../content/sections/location';
+import { TOUCHED } from '../content/sections/define';
+import { loadUniverseWithDiagnostics } from '../content/load';
+import { shippedSources } from '../content/shipped';
+import { roadsFrom } from './journey';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { applyResultsNow, createGameState, GameState, initResources, PLAYER } from './runtime';
 import { Registry } from '../content/registry';
@@ -256,5 +261,48 @@ describe('applyResults: watching what was applied', () => {
 
     expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
     expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);
+  });
+});
+
+// The two words the engine has for a place, told apart over every location the corpus declares
+// rather than over one that was easy to pick. Standing somewhere is the only thing that touches it,
+// and the same step puts every neighbour the roads open on the map without touching any of them —
+// so a `when:` asking whether the player has been here means something a `when:` asking whether
+// they have heard of it does not. A location written next month is held to this with no edit.
+describe('standing in a place the corpus declares', () => {
+  const world = loadUniverseWithDiagnostics(shippedSources()).registry;
+  const everywhere = [...world.locations.keys()];
+
+  const stood = (id: string): GameState => {
+    const state = createGameState(id);
+    standWhereTheyAre(state, world);
+    return state;
+  };
+
+  const flagged = (state: GameState, flag: string): string[] =>
+    Object.keys(state.flags)
+      .filter((key) => key.endsWith(`.${flag}`))
+      .map((key) => key.slice(0, -flag.length - 1))
+      .sort();
+
+  const openOut = (id: string): string[] => roadsFrom(id, world, stood(id));
+
+  it('is asked of enough places, with enough roads between them, for what is below to mean something', () => {
+    expect(everywhere.length).toBeGreaterThan(20);
+    expect(everywhere.filter((id) => openOut(id).length > 0).length).toBeGreaterThan(20);
+  });
+
+  it.each(everywhere)('touches %s and nowhere else, however many roads run out of it', (id) => {
+    expect(flagged(stood(id), TOUCHED)).toEqual([id]);
+  });
+
+  it.each(everywhere)('puts %s on the map together with every neighbour its open roads reach, and nothing further', (id) => {
+    expect(flagged(stood(id), DISCOVERED)).toEqual([...new Set([id, ...openOut(id)])].sort());
+  });
+
+  it('leaves every place with a road out of it heard of from somewhere nobody stood, which is the whole difference between the two', () => {
+    const heardOnly = everywhere.filter((id) => flagged(stood(id), DISCOVERED).length > flagged(stood(id), TOUCHED).length);
+    expect(heardOnly).toEqual(everywhere.filter((id) => openOut(id).length > 0));
+    expect(heardOnly.length).toBeGreaterThan(20);
   });
 });
