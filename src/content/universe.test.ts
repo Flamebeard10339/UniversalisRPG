@@ -537,8 +537,8 @@ describe('a generated action label is an English entry too (c5)', () => {
     expect(isla('es').locales.base.has('isla.entity.puerta.abrir-puerta')).toBe(false);
   });
 
-  it('leaves the label itself alone, because it is what a player is shown', () => {
-    expect(isla('es').actions.get('isla.abrir-puerta')?.label).toBe('Abrir Puerta');
+  it('leaves the label itself an address, because the words a player is shown come off the table', () => {
+    expect(isla('es').actions.get('isla.abrir-puerta')?.label).toBe('abrir-puerta');
   });
 
   it('records an authored label whatever language it is in', () => {

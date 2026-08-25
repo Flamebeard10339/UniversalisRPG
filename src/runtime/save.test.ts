@@ -9,7 +9,7 @@ import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneS
 import { parseSaveSection } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actionLookup';
-import { actionAddress } from '../content/sections/action';
+import { actionAddress, actionWords } from '../content/sections/action';
 import { type Registry } from '../content/registry';
 import { CRAFT_ADDRESS } from '../content/sections/recipe';
 import { loadUniverse } from '../content/load';
@@ -622,12 +622,12 @@ describe('a walk under way survives its destination being retitled', () => {
     expect(JSON.parse(serializeSave(walking(), loadInEnglish(ISLAND('Far Beach')))).activeAction.actionSlug).toBe(TRAVEL_ADDRESS);
   });
 
-  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+  it('reads back as words that are not the address, so reaching for the wrong one does not arm', () => {
     const registry = loadInEnglish(ISLAND('Far Beach'));
     const action = travelAction('isla.shore', 'isla.far', registry);
 
     expect(actionAddress(action)).toBe(TRAVEL_ADDRESS);
-    expect(action.label).not.toBe(TRAVEL_ADDRESS);
+    expect(actionWords(action).text).not.toBe(TRAVEL_ADDRESS);
   });
 
   it('keeps the walk when the destination is retitled underneath it', () => {
@@ -678,11 +678,11 @@ describe('a craft under way stores an id, not the sentence it is offered as', ()
     expect(JSON.parse(serializeSave(cooking(), universe('pan'))).activeAction.actionSlug).toBe(CRAFT_ADDRESS);
   });
 
-  it('holds a label that is not the address, so reaching for the wrong one does not arm', () => {
+  it('reads back as words that are not the address, so reaching for the wrong one does not arm', () => {
     const action = universe('pan').recipeActions.get('cocina.pan')!;
 
     expect(actionAddress(action)).toBe(CRAFT_ADDRESS);
-    expect(action.label).not.toBe(CRAFT_ADDRESS);
+    expect(actionWords(action).text).not.toBe(CRAFT_ADDRESS);
   });
 
   it('keeps the craft when the recipe is retitled underneath it', () => {

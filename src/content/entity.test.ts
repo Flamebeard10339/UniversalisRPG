@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './load';
-import { EXAMINED } from './sections/entity';
+import { EXAMINE_FIELD, EXAMINED } from './sections/entity';
 
 const room = (...lines: string[]): string => ['# location shore', 'x: 0, y: 0', 'starting', 'entities:', '  bollard', '', '# entity bollard', 'title: A Bollard', ...lines].join('\n');
 
@@ -10,7 +10,7 @@ describe('# entity examine:', () => {
     const [action, ...rest] = registry.entities.get('bollard')!.actions;
 
     expect(rest).toEqual([]);
-    expect(action.label).toBe('Examine');
+    expect(action.label).toBe(EXAMINE_FIELD);
     expect(action.kind).toBe('instant');
     expect(action.results).toEqual([
       { kind: 'say', text: 'Iron, and cold to the hand.', key: 'entity.bollard.examine' },

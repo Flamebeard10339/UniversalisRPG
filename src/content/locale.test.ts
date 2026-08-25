@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { declaredId, type Action } from './sections/entity';
-import { actionAddress, type ActionTextOwner } from './sections/action';
+import { actionAddress, actionWords, type ActionTextOwner } from './sections/action';
 import { actionSlug, localeKey, missingTranslations, unmatchedLocaleKeys } from './locale';
 import { actionSlugProblem, contentSectionMaps, isDebug } from './sections';
 import { everyActionTable, mapOf, type Registry } from './registry';
@@ -99,12 +99,13 @@ describe('what a locale covers, and what it invents (c7)', () => {
 });
 
 describe('an action is keyed on what addresses it, not on what it says', () => {
-  it('keys an inline block on a slug of the label it is headed with', () => {
+  it('keys an inline block on a slug of the label it is headed with, and reads it back as words', () => {
     const loaded = base();
 
     expect(loaded.locales.base.get('island.entity.crab.pick-up')).toEqual({
-      text: 'pick up',
+      text: 'Pick Up',
       language: 'en',
+      generated: true,
     });
     expect(loaded.entities.get('island.crab')?.actions[0].label).toBe('pick up');
   });
@@ -172,7 +173,7 @@ describe('an action declared once carries one key, however many owners perform i
 
   it('writes the words under the declaration, in the language the declaration was written in', () => {
     for (const { action } of spoken) {
-      expect(island.locales.base.get(declarationKey(action))?.text).toBe(action.label);
+      expect(island.locales.base.get(declarationKey(action))?.text).toBe(actionWords(action).text);
       expect(island.locales.base.get(declarationKey(action))?.language).toBe('en');
     }
   });
@@ -241,11 +242,9 @@ describe('the report covers every key the engine asks for (c7)', () => {
   it('reports a key no module has any text for, in every language', () => {
     const loaded = loadUniverse([{ name: 'isla', text: SPANISH_MODULE }]);
 
-    expect([...loaded.locales.base]).toEqual([
-      ['isla.entity.puerta.abrir', { text: 'abrir', language: 'es' }],
-      ['isla.entity.puerta.say.0', { text: 'se abre', language: 'es' }],
-    ]);
+    expect([...loaded.locales.base]).toEqual([['isla.entity.puerta.say.0', { text: 'se abre', language: 'es' }]]);
     expect(missingTranslations(loaded.locales, 'es')).toContain('isla.entity.puerta.title');
+    expect(missingTranslations(loaded.locales, 'es')).toContain('isla.entity.puerta.abrir');
     expect(missingTranslations(loaded.locales, 'en')).toContain('isla.entity.puerta.title');
   });
 

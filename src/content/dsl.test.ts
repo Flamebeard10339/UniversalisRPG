@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
 import { declaredBy } from './references';
+import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
 import type { Written } from '../grammar/parser';
-import { text } from '../grammar/values';
+import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
 import { memberKey, Namespace } from './namespace';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
-import { everySaid, localeKey } from './locale';
+import { everySaid, GENERATED_FIELD, localeKey } from './locale';
 import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { groupOf } from './sections/group';
 import { canSerialize, roundTripUniverse } from './serialize';
@@ -614,6 +615,30 @@ describe('an action the corpus writes', () => {
     );
 
     expect([...new Set(unoffered)]).toEqual([]);
+  });
+});
+
+// A name is offered to a player as a name — the title of a thing, or the label on an action — and it
+// begins the way the one casing function would begin it. The subjects are the registry's own action
+// tables and every entry filed under the field a title is generated at, so a kind, a field or a
+// label written next month is held to this with no edit here. Only the first letter is asked:
+// English title case lowers the minor words inside a name — `Orb of the Edge` — and `humanizeEn`
+// has no opinion about those, so asking after the first word would refuse writing that is right.
+describe('a name the corpus offers', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const begun = (name: string): string => humanizeEn(name.slice(0, 1)) + name.slice(1);
+  const NAMES = [
+    ...[...registry.locales.base].flatMap(([key, entry]) => (key.endsWith(`.${GENERATED_FIELD}`) ? [{ at: key, name: entry.text }] : [])),
+    ...everyActionTable(registry).flatMap(([kind, id, held]) => held.map((action) => ({ at: `# ${kind} ${id} ${actionAddress(action)}`, name: actionWords(action).text }))),
+  ];
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(NAMES.length).toBeGreaterThan(200);
+    expect(NAMES.some(({ name }) => name.includes(' '))).toBe(true);
+  });
+
+  it('begins with the letter humanizeEn would begin it with, so nothing reaches a player as the address it is reached by', () => {
+    expect(NAMES.filter(({ name }) => name !== begun(name)).map(({ at, name }) => `${at}: ${JSON.stringify(name)}`)).toEqual([]);
   });
 });
 

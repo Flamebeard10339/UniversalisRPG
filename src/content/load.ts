@@ -4,7 +4,7 @@ import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields 
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionAddress, actionTextKey, actionTextOwner } from './sections/action';
+import { actionAddress, actionTextKey, actionTextOwner, actionWords } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
@@ -117,10 +117,11 @@ function recordActionText(registry: Registry, languages: ReadonlyMap<string | nu
     const language = languages.get(owner.namespace) ?? DEFAULT_LANGUAGE;
     const key = actionTextKey(owner);
     registry.locales.addressable.add(key);
-    if (action.generatedLabel && language !== DEFAULT_LANGUAGE) continue;
+    const words = actionWords(action);
+    if (words.generated && language !== DEFAULT_LANGUAGE) continue;
     recordBase(registry, key, {
-      text: action.label,
-      ...(action.generatedLabel ? { generated: true as const } : {}),
+      text: words.text,
+      ...(words.generated ? { generated: true as const } : {}),
       language,
     });
   }

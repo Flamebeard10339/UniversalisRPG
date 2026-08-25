@@ -110,9 +110,13 @@ export const id: Parser<string> = {
 
 export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
 
+// The one place a word is cased for a player to read. An address is written either way an
+// author is allowed to write one — a hyphenated id or a spaced entry label — so both separate
+// words here, which also makes this its own fixed point: humanizing what it returned returns it.
 export const humanizeEn = (id: string): string =>
   lastSegment(id)
-    .split('-')
+    .split(/[\s-]+/)
+    .filter((word) => word !== '')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 

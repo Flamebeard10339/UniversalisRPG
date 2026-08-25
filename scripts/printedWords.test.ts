@@ -9,6 +9,7 @@ import { BASE_LANGUAGE, localizerFor } from '../src/runtime/localized';
 import { COMMANDS, newContext, runLine, type CommandContext } from '../src/runtime/command';
 import { serializeSession, startSession, view, type PlayView } from '../src/runtime/session';
 import { shippedModules } from './lib/layers';
+import { stripComments } from './lib/stripComments';
 import { formatResult, printed, type ReplLine } from './play-cli';
 
 const modules = shippedModules();
@@ -48,6 +49,33 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
     });
 
     expect(offenders.sort()).toEqual([]);
+  });
+});
+
+// Casing a name is one decision, and a second function making it is how `ascend` came to stand
+// beside `Talk to Miki`. The subjects are every module the layer rule sweeps, so a file written next
+// month is asked without anybody remembering to add it here — which is the whole difference between
+// this and a test that names today's callers. Comments are stripped, so prose about the rule is not
+// mistaken for a breach of it.
+describe('one function cases a name for a player (c1, c2)', () => {
+  const CASES_A_LETTER = /\.to(?:Locale)?UpperCase\s*\(/;
+  const HOME = 'src/grammar/values.ts';
+  const stripped = (file: string): string => stripComments(readFileSync(file, 'utf8')).join('\n');
+
+  it('is declared where the sweep exempts, and cases a letter there, so nothing below is vacuous', () => {
+    expect(modules).toContain(HOME);
+    expect(stripped(HOME)).toMatch(/export const humanizeEn\b/);
+    expect(CASES_A_LETTER.test(stripped(HOME))).toBe(true);
+  });
+
+  it('cases a letter nowhere else in the shipped tree, so no second humanizeEn can grow', () => {
+    expect(modules.filter((file) => file !== HOME && CASES_A_LETTER.test(stripped(file)))).toEqual([]);
+  });
+
+  it('is what every name the engine writes for itself comes through, so none is cased by hand', () => {
+    const callers = modules.filter((file) => file !== HOME && /\bhumanizeEn\b/.test(stripped(file)));
+
+    expect(callers).not.toEqual([]);
   });
 });
 

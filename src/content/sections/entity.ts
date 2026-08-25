@@ -7,7 +7,7 @@ import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
-import { duration, humanizeEn, id, text } from '../../grammar/values';
+import { duration, id, text } from '../../grammar/values';
 import { localeKey } from '../locale';
 import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { MintedAction, section } from './define';
@@ -80,7 +80,7 @@ export function mintedActions(value: { id: string; examine?: string }, namespace
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
   const marked: ActionResult = { kind: 'set', variable: `${value.id}.${EXAMINED}` };
-  return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said, marked] } as Action];
+  return [{ id: EXAMINE_FIELD, label: EXAMINE_FIELD, generatedLabel: true, kind: 'instant', results: [said, marked] } as Action];
 }
 
 const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ action, from: `${EXAMINE_FIELD}:` }));

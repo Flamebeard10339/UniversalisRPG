@@ -1147,7 +1147,7 @@ roast:
     applyDirective(session, { kind: 'load', save: 'midbake' });
 
     const v = view(session);
-    expect(v.action).toEqual({ label: 'roast', progress: 0, attempts: 0, completion: null });
+    expect(v.action).toEqual({ label: 'Roast', progress: 0, attempts: 0, completion: null });
   });
 });
 

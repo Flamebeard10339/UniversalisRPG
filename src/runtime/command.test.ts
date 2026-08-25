@@ -907,7 +907,7 @@ describe('the live clock', () => {
   it('names the action a tick finishes from the tick before, since the view that ends it has none', () => {
     const { started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
     started.live!.tick(2000);
-    expect(started.live!.tick(2000)).toMatchObject({ active: false, label: 'strike' });
+    expect(started.live!.tick(2000)).toMatchObject({ active: false, label: 'Strike' });
   });
 
   it('counts down an untargeted action whose plain damage: reads under 1 — the one shape that publishes a completion', () => {
@@ -1042,7 +1042,7 @@ ring:
     const again = started.live!.tick(4000);
     expect(again.active).toBe(false);
     expect(again.time).toBe(4);
-    expect(again.label).toBe('strike');
+    expect(again.label).toBe('Strike');
   });
 
   it('names the action it is driving from its own last tick, not from state another command can move', () => {
@@ -1050,7 +1050,7 @@ ring:
     started.live!.tick(1000);
     runLine(ctx, '/load fresh');
     expect(ctx.view.action).toBeNull();
-    expect(started.live!.tick(3000)).toMatchObject({ active: false, label: 'strike' });
+    expect(started.live!.tick(3000)).toMatchObject({ active: false, label: 'Strike' });
   });
 
   it('isChoiceLine names the choice a line picks, and nothing else', () => {

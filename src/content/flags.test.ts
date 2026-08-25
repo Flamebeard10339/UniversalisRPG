@@ -231,7 +231,7 @@ describe('an action a field edit takes away', () => {
       loadUniverse([BASE, readd, wants('watcher')])
         .entities.get('base.dresser')!
         .actions.map((action) => action.label),
-    ).toEqual(['Pry']);
+    ).toEqual(['pry']);
   });
 
   const shelf = module('base', '# entity shelf', 'dust it:', '  instant', '  say: puff');

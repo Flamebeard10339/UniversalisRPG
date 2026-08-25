@@ -4,7 +4,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
-import { decimal, humanizeEn, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
+import { decimal, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
 import { put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
@@ -60,7 +60,7 @@ function compile(recipe: Recipe): ActionDeclaration {
   const cadence: Pick<Action, 'rate' | 'time'> = rate !== undefined ? { rate } : recipe.time !== undefined ? { time: recipe.time } : {};
   const action: ActionDeclaration = {
     id: CRAFT_ADDRESS,
-    label: humanizeEn(CRAFT_ADDRESS),
+    label: CRAFT_ADDRESS,
     generatedLabel: true,
     kind: 'rate' in cadence || 'time' in cadence ? 'continuous' : 'instant',
     results,
