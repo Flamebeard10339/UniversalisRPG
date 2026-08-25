@@ -1,16 +1,21 @@
 import type { LiveProgress } from '../runtime/command';
 import { fillPercent, remainingBadge } from './format';
 import { Meter } from './Meter';
-import { FILL_TRANSITION } from './transient';
+import { FILL_TRANSITION, useMoment } from './transient';
 
 export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCancel: () => void }): JSX.Element {
+  const working = useMoment('underway', progress.active, String(progress.label));
+
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{progress.label}</p>
+          <p className="truncate text-sm font-medium">
+            {progress.label}
+            {progress.detail === undefined ? null : <span className="ml-2 text-xs font-normal text-text-subtle">{progress.detail}</span>}
+          </p>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-panel">
-            <div className="h-full bg-accent" style={{ ...FILL_TRANSITION, width: `${fillPercent(progress.progress, 1)}%` }} />
+            <div className={`${working} h-full bg-accent`} style={{ ...FILL_TRANSITION, width: `${fillPercent(progress.progress, 1)}%` }} />
           </div>
         </div>
         <button

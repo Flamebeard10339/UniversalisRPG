@@ -5,7 +5,6 @@ import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
-import { LiveSheet } from './LiveSheet';
 import { restingAt, startedAt } from './logRest';
 import { GRID } from './sheetLayout';
 import { Splitter } from './Splitter';
@@ -66,18 +65,15 @@ export function Home({
   words,
   commandLine,
   onChoose,
-  onCancel,
   onSend,
 }: {
   snapshot: DriverSnapshot;
   words: Words;
   commandLine: boolean;
   onChoose: (position: number) => void;
-  onCancel: () => void;
   onSend: (line: string) => void;
 }): JSX.Element {
   const view = snapshot.view;
-  const live = snapshot.live;
   const surface = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const [split, setSplit] = useState(SPLIT_DEFAULT);
@@ -115,27 +111,20 @@ export function Home({
           </div>
         </div>
 
-        {live || !drawsNothing(view.choices) ? (
+        {drawsNothing(view.choices) ? (
+          <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
+            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
+          </div>
+        ) : (
           <>
             <Splitter
               onGrab={() => void (held.current = split)}
               onDrag={(dy) => setSplit(splitFrom(held.current, dy, surface.current?.clientHeight ?? 0))}
             />
-            <div className="flex min-h-0 flex-col border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              {live ? (
-                <div className="shrink-0 border-b border-border">
-                  <LiveSheet progress={live} onCancel={onCancel} />
-                </div>
-              ) : null}
-              <div className="unbarred min-h-0 flex-1 overflow-y-auto">
-                <Sheet choices={view.choices} words={words} onChoose={onChoose} />
-              </div>
+            <div className="unbarred min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
+              <Sheet choices={view.choices} words={words} onChoose={onChoose} />
             </div>
           </>
-        ) : (
-          <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
-            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
-          </div>
         )}
       </div>
 

@@ -14,6 +14,7 @@ import { recorded, remembered, type Editing, type MapWhere } from './editorMemor
 import { Home } from './Home';
 import { JournalPane } from './JournalPane';
 import { Ledger } from './Ledger';
+import { LiveSheet } from './LiveSheet';
 import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
@@ -188,7 +189,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
     if (layer.id === 'home') {
       if (subpage.id === 'home')
-        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onCancel={driver.cancel} onSend={driver.send} />;
+        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onSend={driver.send} />;
       if (subpage.id === 'edit') return <EditPane held={held} words={words} />;
       return subpage.id === 'settings' ? (
         <SettingsPane
@@ -300,6 +301,11 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           />
           <Notices channel={driver.transient} />
         </main>
+        {snapshot.live === null ? null : (
+          <div className="shrink-0 border-t border-border bg-surface-raised">
+            <LiveSheet progress={snapshot.live} onCancel={driver.cancel} />
+          </div>
+        )}
         <TabBar
           words={words}
           tabs={here.shown}

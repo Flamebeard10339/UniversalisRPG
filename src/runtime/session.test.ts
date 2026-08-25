@@ -1136,6 +1136,18 @@ roast:
     expect(() => wait(session, 3)).not.toThrow();
   });
 
+  // The other half — an action aimed at nothing saying nothing — is the `midbake` claim below,
+  // whose `toEqual` holds the whole shape and so fails on a field appearing where none belongs.
+  it('says who the action under way is aimed at, addressed and named the way a choice says what offers it', () => {
+    const session = startSession(loadInEnglish(FIGHT_MODULE));
+    view(session);
+
+    const v = apply(session, 'fight:hit:dummy');
+
+    expect(v.action!.of).toBe('entity.dummy');
+    expect(v.action!.detail).toBe('Dummy');
+  });
+
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);

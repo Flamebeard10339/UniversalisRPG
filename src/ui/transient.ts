@@ -4,7 +4,7 @@ import { merged, NOTICE_LIFETIME_MS, sayingOf, type Notice, type Shown } from '.
 
 export const SETTLE_MS = 220;
 
-export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny';
+export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway';
 
 const DRAWN_AS: Record<MomentKind, string> = {
   arrival: 'arrived',
@@ -14,6 +14,7 @@ const DRAWN_AS: Record<MomentKind, string> = {
   sprout: 'sprouted',
   linger: 'lingered',
   deny: 'denied',
+  underway: 'underway',
 };
 
 export const FILL_TRANSITION = { transitionProperty: 'width', transitionTimingFunction: 'linear', transitionDuration: `${LIVE_TICK_MS}ms` };

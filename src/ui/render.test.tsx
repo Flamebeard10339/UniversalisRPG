@@ -445,7 +445,10 @@ describe('what the shell puts on the screen', () => {
     }
   });
 
-  it('draws the run above the choices, which it does not withdraw', () => {
+  // Below every page rather than inside one: the run is drawn after the last thing any layer draws,
+  // which is what puts it on the lower band whichever layer the player is standing on. The subjects
+  // are the sheet's own rows, so the claim keeps meaning this if a page is added.
+  it('draws the run below every page, without withdrawing the choices', () => {
     const driver = stocked();
     const idle = driver.snapshot().view.choices;
     const running = idle.find((choice) => choice.id === ROAST)!.label;
@@ -453,11 +456,13 @@ describe('what the shell puts on the screen', () => {
 
     driver.choose(position(driver, ROAST));
     const under = engineRuns(renderToStaticMarkup(<App driver={driver} />));
+    const paged = driver.snapshot().view.stats.map((row) => row.title);
 
     expect(under).toContain(running);
     expect(under).toContain(other);
-    expect(under.indexOf(running)).toBeLessThan(under.indexOf(other));
+    expect(paged.length).toBeGreaterThan(3);
     expect(under.indexOf(running)).toBeLessThan(under.lastIndexOf(running));
+    for (const word of paged) expect(under.lastIndexOf(running), word).toBeGreaterThan(under.lastIndexOf(word));
 
     driver.cancel();
     const stopped = engineRuns(renderToStaticMarkup(<App driver={driver} />));

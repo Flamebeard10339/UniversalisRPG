@@ -208,7 +208,8 @@ function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
 function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
   if (action === null) return [];
   const counting = action.completion === null ? '' : `, ${tidy(action.completion)} to count`;
-  return [field('action', `${action.label} ${tidy(action.progress)} after ${action.attempts}${counting}`)];
+  const aimedAt = action.detail === undefined ? '' : ` · ${action.detail}`;
+  return [field('action', `${action.label}${aimedAt} ${tidy(action.progress)} after ${action.attempts}${counting}`)];
 }
 
 // Coordinates put a location on an integer lattice, but what can be walked is `adjacent`, and

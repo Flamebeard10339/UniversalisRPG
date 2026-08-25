@@ -1175,6 +1175,8 @@ export interface LivePool {
 
 export interface LiveProgress {
   label: Localized;
+  // Who is being fought, carried beside the label the same way the view carries it.
+  detail?: Localized;
   active: boolean;
   time: number;
   progress: number;
@@ -1210,6 +1212,7 @@ function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, ar
 
   return {
     label,
+    ...(action.detail === undefined ? {} : { detail: action.detail }),
     active: true,
     time: next.time,
     progress: action.progress,
