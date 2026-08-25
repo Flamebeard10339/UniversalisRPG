@@ -486,18 +486,24 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
   settleHandlerDeltas(state, registry, segment);
 }
 
+export const HANDLER_SETTLE_PASSES = 8;
+
 function settleHandlerDeltas(state: GameState, registry: Registry, segment: Segment): void {
-  if (segment.deltas.size === 0) {
-    if (segment.stopped) endAction(state, segment.stopped);
-    return;
-  }
-  const stores = poolStores(state);
-  for (const resource of registry.resources.values()) {
-    for (const store of stores) {
-      const delta = getDelta(segment.deltas, store.actorId, resource.id);
-      if (delta === 0) continue;
-      const max = toMilliUnits(statValue(resource.max, state, registry, store.actorId));
-      store.levels[resource.id] = Math.min(max, Math.max(0, (store.levels[resource.id] ?? 0) + delta));
+  for (let pass = 0; segment.deltas.size > 0; pass++) {
+    if (pass >= HANDLER_SETTLE_PASSES) {
+      throw new RuntimeError(`settling pools: handlers moved a pool again on ${HANDLER_SETTLE_PASSES} passes running — an event handler is feeding the pool that fired it`);
+    }
+    const pending = segment.deltas;
+    segment.deltas = new Map();
+    const stores = poolStores(state);
+    for (const resource of registry.resources.values()) {
+      for (const store of stores) {
+        const delta = getDelta(pending, store.actorId, resource.id);
+        if (delta === 0) continue;
+        const current = store.levels[resource.id] ?? 0;
+        const max = toMilliUnits(statValue(resource.max, state, registry, store.actorId));
+        setPoolLevel(segment, store, resource, current, current + delta, max);
+      }
     }
   }
   if (segment.stopped) endAction(state, segment.stopped);
