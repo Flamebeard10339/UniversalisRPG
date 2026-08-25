@@ -60,21 +60,6 @@ outside its four lines. *Closes when:* the route hands over one net however many
 it is walked. **It moves `apology-route-full-end`'s sheet**, so do not take it beside
 anything else regenerating a route.
 
-**`leave-tutorial-island.adrift` opens on a premise that is false**, which is what
-makes the collision above reachable so early. Its gate is
-`tulsa.market-square.discovered` and the module's own comment justifies it as *"a place
-that is only discovered by having stood in it"* — but discovery spreads to adjacent
-locations, so landing on the beach one step out of the house sets it, measured `true`
-immediately after `climb out`. Miki says *"So you found the market"* to a player who has
-never left the sand. *Closes when:* the corpus can state *has stood in*, and the stage
-is gated on that. **Since threads became a named list this is no longer silence but
-noise**: `adrift.miki.0` is sticky on a flag that never goes false, so *About this island
-of yours.* stands on every talk from the moment the market is found, for a player who has
-never left the sand. Standing in a place is not a fact anything can state today, so this is
-a small piece of engine work before it is a content edit — and rewriting the line to be
-true of the beach is the cheaper answer if the lane measures the new condition as worth
-more than it costs.
-
 ### The action list
 
 ### The fight
@@ -289,11 +274,6 @@ the player in front of the modal rather than only mentioning it, which is the sa
 mechanism the modal API line wants.
 
 ### What a player has already touched
-
-**One list of what the player has interacted with, replacing two.** Ruled, and it is the
-largest shape in this pass: *"The `have I read this` for examine is the same exact thing
-as `discovered` for locations. We should strongly consider merging them as a list of
-things that the player has already interacted with."*
 
 Beside it, the standing rule that constrains how it is built: *"Dialogue should always be
 able to be said. We shouldn't need a dozen conditions or complicated logic to guarantee

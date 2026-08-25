@@ -603,11 +603,34 @@ lets a rebalanced range reach gear already standing in the world. One roll per *
 rather than per payload, so a jewel comes out good or bad rather than good in places, and
 two of one jewel in one plane are two different jewels.
 
+**`discovered` means heard of, `touched` means stood in, and they are two facts.** The
+merge the owner asked for is real but is not the one that was named: *have I read this*
+and *have I stood here* are the same fact under two kinds and are now one flag,
+`<id>.touched`, named once as `TOUCHED` on the contract in `sections/define.ts` beside the
+`flags` slot it fills — a third kind joins by declaring it, not by minting a word.
+*Heard of* cannot join them, because **discovery spreads one hop**: `standWhereTheyAre`
+writes `here.touched` and `here.discovered` and spreads only `discovered`, so a player on
+the sand has the market on their map having never stood in it. That is what
+`leave-tutorial-island.adrift` was gated on, and the module comment claiming `discovered`
+meant *stood in* was simply false. **Deriving `discovered` from `touched` was measured and
+rejected twice over:** a conditional road that later closes would *un*-discover a place
+already walked, making the map non-monotonic while `journey.reachable` refuses undiscovered
+targets; and the derivation would have to live as a per-flag special case inside the generic
+flag reader in `conditions.ts`, the one file that spells no content flag name at all. The
+proof takes its subjects from every location the corpus declares — standing touches that
+place and nowhere else, and puts every open neighbour on the map untouched.
+
+**`<id>.examined` is gone, and an old save is pruned rather than refused.** `SAVE_VERSION`
+stays 13 because the change is additive: `.discovered` keeps its name and meaning, and a
+save carrying `.examined` loads with that flag pruned and a warning. An entity a player had
+read shows `?` again until re-examined, which is one action and nothing gates on it. No
+shipped save carried it. Stood-in history from before the change is lost, so a returning
+player walks to the market once — which is what the line asks for.
+
 **An unexamined thing is masked in the view, so all three surfaces mask alike.** Having
-been looked at is per-entity state on the road `# location` already takes for
-`discovered`: `# entity` declares `flags: [EXAMINED]` and `mintedActions` puts the set
-beside its `say:`, so the write lives where the mint lives and no runtime file spells the
-word. The mask is written once, in `sessionStatus` and `locationChoices`, and no renderer
+been looked at is the same `touched` a place is stood in with: `# entity` and `# location`
+both declare `flags: [TOUCHED]`, and `mintedActions` puts the set beside its `say:`, so the
+write lives where the mint lives and no runtime file spells the word. The mask is written once, in `sessionStatus` and `locationChoices`, and no renderer
 was taught anything — which is why the parity harness keeps its whole claim with no new
 excuse. Two rules came with it, both measured: an entity with no `examine:` is never
 masked, because it mints no offer that could lift the mask and masking it would void the
