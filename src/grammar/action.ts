@@ -177,12 +177,16 @@ function readsWith(written: string, parser: Parser<unknown>): ActionValue {
   };
 }
 
+export const ATTEMPTS_BUDGET =
+  'a budget for one cycle: an action that runs once ends when it is spent, while a `continuous` one runs its `on unfinished:` and begins its next cycle';
+
 const ACTION_FIELDS: readonly (Filled & {
   written: string;
   label: RegExp;
   name: keyof Omit<Action, 'label' | 'results'>;
   parser: Parser<unknown>;
   family: string;
+  note?: string;
 })[] = [
   { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when' },
   { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', parser: optionalCondition, family: 'offered when' },
@@ -194,7 +198,7 @@ const ACTION_FIELDS: readonly (Filled & {
   { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', parser: contest, family: 'what it is contested on' },
   { written: 'damage', label: /damage:[ \t]*/, name: 'damage', parser: contest, family: 'what it is contested on' },
   { written: 'depletes', label: /depletes:[ \t]*/, name: 'depletes', parser: depleted, family: 'what it is contested on' },
-  { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes' },
+  { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes', note: ATTEMPTS_BUDGET },
   { written: 'stops on', label: /stops on:[ \t]*/, name: 'stopsOn', parser: stoppers, family: 'how long it takes' },
 ];
 
@@ -223,7 +227,7 @@ const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   },
   {
     label: /escape after[ \t]+/,
-    message: "escape after was retired — write `attempts: N`, which bounds the action at N of the performer's attempts",
+    message: `escape after was retired — write \`attempts: N\`, which is ${ATTEMPTS_BUDGET}`,
   },
   {
     label: /on escape:[ \t]*/,
@@ -363,7 +367,7 @@ const clauseLines = (): readonly Written[] =>
 const actionFieldLines = (): readonly Written[] =>
   ACTION_FIELDS.flatMap((field) => {
     // What the field says its placeholders hold stands over what the parser says, since one parser writes the values of fields that name different kinds.
-    const said = { family: field.family, ...filledBy(field.parser), ...filledBy(field) };
+    const said = { family: field.family, ...(field.note === undefined ? {} : { note: field.note }), ...filledBy(field.parser), ...filledBy(field) };
     const held = blockOf(field.parser);
     return [
       ...paired(field.parser.forms, field.parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: `${field.written}: ${field.parser.forms[at]!}`, example: `${field.written}: ${example}`, ...said }])),
