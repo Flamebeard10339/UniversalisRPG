@@ -5,12 +5,13 @@ import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
+import { holdsStat, statFocus, statOptions, statStale, statSubmit, LEAVE as STAT_LEAVE } from './statScreen';
 import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, LEAVE as SHOP_LEAVE } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
 // What the screen standing open is about, where it is about something the view publishes elsewhere. A plane and a quest are both read beside the question rather than in it.
-export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer };
+export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer } | { readonly kind: 'stat'; readonly stat: Answer };
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
@@ -83,6 +84,14 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: holdsQuest,
     focus: questFocus,
     leaves: QUEST_LEAVE,
+  },
+  'stat-breakdown': {
+    options: (frame, state, registry) => statOptions(frame, state, registry),
+    submit: (frame) => statSubmit(frame),
+    holds: holdsStat,
+    stale: statStale,
+    focus: statFocus,
+    leaves: STAT_LEAVE,
   },
   shop: {
     options: shopOptions,

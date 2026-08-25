@@ -41,24 +41,28 @@ const share = (title: string, amount: number, increased = 0): StatShare => ({ ti
 
 describe('what a stat is made of, read out', () => {
   it('names every share and signs what it is worth, in the order the engine folded them', () => {
-    expect(madeOf([share('Base', 10), share('Melee', 1), share('Iron Sword', 4)])).toBe('Base +10 · Melee +1 · Iron Sword +4');
+    expect(madeOf([share('Base', 10), share('Melee', 1), share('Iron Sword', 4)])).toEqual([
+      { title: 'Base', worth: '+10' },
+      { title: 'Melee', worth: '+1' },
+      { title: 'Iron Sword', worth: '+4' },
+    ]);
   });
 
   it('says a percentage as one, and a share on both channels as both', () => {
-    expect(madeOf([share('Blade', 2, 18)])).toBe('Blade +2 +18%');
-    expect(madeOf([share('Ring', 0, 25)])).toBe('Ring +25%');
+    expect(madeOf([share('Blade', 2, 18)])[0].worth).toBe('+2 +18%');
+    expect(madeOf([share('Ring', 0, 25)])[0].worth).toBe('+25%');
   });
 
   it('reads a ranged share as the range it is', () => {
-    expect(madeOf([{ title: asLocalized('Base'), added: { min: 3, max: 8 }, increased: 0 }])).toBe('Base +3-8');
+    expect(madeOf([{ title: asLocalized('Base'), added: { min: 3, max: 8 }, increased: 0 }])[0].worth).toBe('+3-8');
   });
 
   it('still says a share worth nothing, because a base nothing touches is the whole answer', () => {
-    expect(madeOf([share('Base', 0)])).toBe('Base +0');
+    expect(madeOf([share('Base', 0)])).toEqual([{ title: 'Base', worth: '+0' }]);
   });
 
   it('draws nothing for a stat that published no shares at all', () => {
-    expect(madeOf([])).toBe('');
+    expect(madeOf([])).toEqual([]);
   });
 });
 
@@ -85,12 +89,12 @@ describe('the counted rows the engine publishes, as a sheet draws them', () => {
     ]);
   });
 
-  it('says where a number came from only for the row the player pressed', () => {
+  // Where a number came from is a screen of its own now, so the sheet row says the number and nothing
+  // else: a row that also carried the shares had to run them together into one line of small text.
+  it('says the number and never what it is made of, however many shares the row carries', () => {
     const rows = [number('regeneration', 'Regeneration', 6, [share('Base', 1), share('Bread', 5)]), number('luck', 'Luck', 2, [share('Base', 2)])];
 
-    expect(counted(rows, localizer, 'regeneration').map((entry) => entry.detail)).toEqual([undefined, 'Base +1 · Bread +5']);
-    expect(counted(rows, localizer, null).every((entry) => entry.detail === undefined)).toBe(true);
-    expect(counted(rows, localizer, 'nothing-of-the-sort').every((entry) => entry.detail === undefined)).toBe(true);
+    expect(counted(rows, localizer).every((entry) => entry.detail === undefined)).toBe(true);
   });
 
   it('has nothing to draw for a player carrying nothing', () => {

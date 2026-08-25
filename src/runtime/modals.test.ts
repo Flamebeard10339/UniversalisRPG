@@ -763,6 +763,10 @@ describe('nothing a player answers with carries words', () => {
     '# info forge',
     'version: 1.0.0',
     '',
+    '# stat vigour',
+    'title: Vigour',
+    'base: 4',
+    '',
     '# location camp',
     'x: 0, y: 0',
     'starting',
@@ -861,6 +865,9 @@ describe('nothing a player answers with carries words', () => {
   const walked = new Set<string>();
   const leavable: { name: string; offers: boolean }[] = [];
 
+  // Whatever the fixture's first stat is, so the screen is walked without this naming one.
+  const statId = (session: PlaySession): string => view(session).stats[0].id;
+
   const rows = (session: PlaySession): string[] => {
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     const open = view(session).modals;
@@ -926,6 +933,12 @@ describe('nothing a player answers with carries words', () => {
     applyDirective(session, { kind: 'open-modal', modal: 'quest-journal' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'quest', value: 'forge.an-errand' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
+
+    applyDirective(session, { kind: 'open-modal', modal: 'stat-breakdown' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'stat', value: statId(session) });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
     return values;

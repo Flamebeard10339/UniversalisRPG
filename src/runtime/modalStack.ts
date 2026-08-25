@@ -2,6 +2,7 @@ import { RuntimeError } from './error';
 import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
 import { questFrame, sameQuest } from './questScreen';
+import { sameStat, statFrame } from './statScreen';
 import { sameCount, sameShop, shopFrame } from './shopScreen';
 import type { ModalScreen } from '../grammar/actionResult';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
@@ -21,6 +22,7 @@ const OPENERS: { [K in ModalScreen]: () => Frame<K> } = {
   'choose-race': () => ({ name: 'choose-race', answers: {} }),
   'carried-items': () => carriedFrame(),
   'quest-journal': () => questFrame(),
+  'stat-breakdown': () => statFrame(),
 };
 
 const SAME: { [K in ModalName]: Same<K> | null } = {
@@ -29,6 +31,7 @@ const SAME: { [K in ModalName]: Same<K> | null } = {
   'carried-items': null,
   'item-plane': samePlane,
   'quest-journal': sameQuest,
+  'stat-breakdown': sameStat,
   shop: sameShop,
   'shop-count': sameCount,
   dialogue: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,

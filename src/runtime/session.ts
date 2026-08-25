@@ -42,7 +42,7 @@ import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
-import { offeredBy, type GroupRow } from './grouping';
+import { grouping, offeredBy, type GroupRow } from './grouping';
 export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
@@ -96,6 +96,10 @@ export interface StatShare {
 // bonus is a row the bonus did not reach.
 export interface StatRow extends CountedRow {
   from: StatShare[];
+  // What kind of measure this is, read off the stat's own `group:`. It is what the character sheet
+  // keeps its tabs by, so which page a stat is on is a fact the world declares and not one a screen
+  // holds a list of.
+  group?: GroupRow;
 }
 
 export interface SkillRow extends CountedRow {
@@ -610,6 +614,7 @@ function statRow(statId: string, state: GameState, registry: Registry, localizer
     id: statId,
     title: localizer.title('stat', statId),
     value: midpoint(foldStat(breakdown)),
+    ...grouping(registry, localizer, 'stat', statId),
     from: [
       { title: localizer.engine('engine.stat.base'), added: breakdown.base, increased: 0 },
       ...breakdown.parts.map((part) => ({ title: localizer.content(part.source.kind, part.source.id, part.source.field), added: part.added, increased: part.increased })),

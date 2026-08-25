@@ -1411,6 +1411,7 @@ const SHAPED_IN_DEV: Record<string, string> = { '<N>': '1', '<enter>': '', '<dir
 const ACTS_ON: Record<string, string> = {
   '/inventory': 'gold',
   '/quests': 'a-quest',
+  '/stat': 'tap',
   '/goto': 'camp',
   '/wait': '1',
   '/speed': '2',

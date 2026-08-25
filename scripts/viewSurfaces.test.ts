@@ -94,6 +94,7 @@ const SCRIPT: readonly string[] = [
   '/quests',
   '/quests tutorial-quests.finding-your-feet',
   'submit-modal: close=close',
+  '/stat',
   '/load tulsa.growing-through-the-inventory-screen-end',
   '/look',
   '/state',

@@ -33,7 +33,9 @@ import { ReplayBar } from './ReplayBar';
 import { pageAt } from './replay';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
-import { carried, counted, identity, worn } from './sheet';
+import { StatBody } from './StatBody';
+import { StatsPane } from './StatsPane';
+import { carried, worn } from './sheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
@@ -113,7 +115,6 @@ const standingIn = (view: PlayView): Standing => ({ location: view.location.id, 
 export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
-  const [openStat, setOpenStat] = useState<string | null>(null);
   const [editing, setEditing] = useEditing(driver, remembering);
   const view = snapshot.view;
   const dev = snapshot.dev;
@@ -123,6 +124,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const reading = view.focus;
   const plane = reading?.kind === 'plane' ? (view.planes.find((each) => each.instance === reading.instance) ?? null) : null;
   const questRead = reading?.kind === 'quest' ? (view.journal.find((entry) => entry.quest === reading.quest) ?? null) : null;
+  const statRead = reading?.kind === 'stat' ? (view.stats.find((row) => row.id === reading.stat) ?? null) : null;
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
   useNotices(view, words, driver.transient);
@@ -225,8 +227,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         />
       );
     }
-    if (subpage.id === 'stats')
-      return <Ledger entries={[...identity(view.player), ...counted(view.stats, localizer, openStat)]} onOpen={(id) => setOpenStat((held) => (held === id ? null : id))} />;
+    if (subpage.id === 'stats') return <StatsPane view={view} localizer={localizer} onOpen={driver.readStat} />;
     if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
@@ -321,6 +322,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         {asking && !plane ? (
           <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said}>
             {questRead ? <QuestBody entry={questRead} words={words} /> : null}
+            {statRead ? <StatBody row={statRead} /> : null}
           </ModalSheet>
         ) : null}
       </div>

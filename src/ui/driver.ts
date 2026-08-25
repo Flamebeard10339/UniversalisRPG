@@ -103,6 +103,7 @@ export interface Driver {
   open(item: string): void;
   swap(one: string, other: string): void;
   readQuest(quest: string): void;
+  readStat(stat: string): void;
   cancel(): void;
   localizer(): Localizer;
   serialized(): string;
@@ -382,6 +383,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     open: (item) => send(`/inv ${item}`),
     swap: (one, other) => send(`swap: ${one} with ${other}`),
     readQuest: (quest) => send(`/quests ${quest}`),
+    readStat: (stat) => send(`/stat ${stat}`),
     localizer: () => sessionLocalizer(context.session),
     cancel: () => close(true),
     serialized: () => serializeSession(context.session),

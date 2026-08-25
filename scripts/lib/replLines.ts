@@ -113,6 +113,10 @@ export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
     const lines = entry.lines.map((line) => say(line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said, 2));
     return [say(entry.title), ...(lines.length > 0 ? lines : [say(localizer.engine('engine.shell.journal.untouched'), 2)])];
   }
+  // A stat's shares are drawn as a column of signed figures, which is a shape a scrollback cannot
+  // hold; the terminal has `/stat` for the numbers themselves and says nothing more beside the
+  // screen than it said before the screen existed.
+  if (focus.kind === 'stat') return [];
   const plane = v.planes.find((each) => each.instance === focus.instance);
   if (!plane) return [];
   // What is being grown, named before the diagram of it: a plane drawn with nothing above it left

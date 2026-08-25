@@ -37,10 +37,16 @@ dependencies: core, tulsa
 // the passive has a pool at all, so the rate below reaches nothing until one is
 // allocated.
 
+// Both are upkeep on the character sheet rather than fighting: a pool that fills
+// while you swing and empties while you do not is not what a blow is decided by,
+// and rage drain is the stat the owner named as the one he did not want on the
+// front page.
 # stat max-rage
+group: core.upkeep
 
 # stat rage-drain
 base: -30
+group: core.upkeep
 
 # resource rage
 rate: rage-drain

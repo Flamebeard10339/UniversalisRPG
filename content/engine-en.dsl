@@ -168,6 +168,9 @@ engine.shell.inventory: Inventory
 engine.journal.which: Which quest?
 engine.journal.reading: Quest
 engine.journal.close: Close
+engine.stat.which: Which stat?
+engine.stat.reading: Stat
+engine.stat.close: Close
 engine.shell.journal: Journal
 engine.shell.journal.empty: You have taken nothing on yet.
 engine.shell.sheet.empty: Nothing to do here.
@@ -253,6 +256,8 @@ engine.repl.modal.free: submit-modal: {option}=<text>
 engine.repl.journal.none: You have taken nothing on yet.
 engine.repl.journal.struck: (done) {said}
 engine.repl.journal.unknown: no quest is called {quest}
+engine.repl.stat: {stat} — {value}
+engine.repl.stat.unknown: no stat is called {stat}
 engine.repl.state.location: Location: {location}
 engine.repl.state.time: Elapsed simulated time: {time}s
 engine.repl.state.flags: Flags: {flags}

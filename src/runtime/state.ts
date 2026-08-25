@@ -104,6 +104,7 @@ export type ModalFrame =
   | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
   | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }
   | { readonly name: 'quest-journal'; readonly answers: ModalAnswers; readonly quest: string }
+  | { readonly name: 'stat-breakdown'; readonly answers: ModalAnswers; readonly stat: string }
   | { readonly name: 'shop'; readonly answers: ModalAnswers; readonly shop: string }
   | { readonly name: 'shop-count'; readonly answers: ModalAnswers; readonly shop: string; readonly side: 'buy' | 'sell'; readonly item: string }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };

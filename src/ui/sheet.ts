@@ -39,21 +39,20 @@ function amounts(added: Range, increased: number): string[] {
   return said;
 }
 
-// What a stat is made of, as the row under it: every share the engine folded, named and signed, in
-// the order the engine folded them. A share that moves nothing still stands — the base of a stat
-// nothing touches is the whole answer to where its number came from.
-export function madeOf(shares: readonly StatShare[]): string {
-  return shares
-    .map((share) => {
-      const said = amounts(share.added, share.increased);
-      return [share.title, ...(said.length > 0 ? said : [signed(0)])].join(' ');
-    })
-    .join(' · ');
+// What a stat is made of, share by share: every share the engine folded, named and signed, in the
+// order the engine folded them. A share that moves nothing still stands — the base of a stat nothing
+// touches is the whole answer to where its number came from. One row each rather than one line for
+// all of them, because the screen that draws them is a screen and not a line under a row.
+export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; worth: string }> {
+  return shares.map((share) => {
+    const said = amounts(share.added, share.increased);
+    return { title: share.title, worth: (said.length > 0 ? said : [signed(0)]).join(' ') };
+  });
 }
 
-export function counted(rows: readonly StatRow[], localizer: Localizer, opened: string | null = null): Entry[] {
+export function counted(rows: readonly StatRow[], localizer: Localizer): Entry[] {
   return rows
-    .map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)), ...(row.id === opened ? { detail: localizer.identifier(madeOf(row.from)) } : {}) }))
+    .map((row) => ({ id: row.id, name: row.title, value: localizer.identifier(tidy(row.value)) }))
     .sort(byName);
 }
 
