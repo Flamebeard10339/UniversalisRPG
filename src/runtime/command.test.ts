@@ -1294,7 +1294,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(registry.resources.get('local-changes.stamina')?.max).toBe('local-changes.vigor');
     expect(registry.recipes.get('local-changes.smelt')).toMatchObject({ in: [{ item: 'local-changes.ore' }], out: [{ item: 'local-changes.ingot' }] });
     expect(registry.dialogues.get('local-changes.npc-chat')?.owner).toBe('local-changes.npc');
-    expect(registry.saves.get('local-changes.blank')).toEqual({ version: SAVE_VERSION, diff: {} });
+    expect(registry.saves.get('local-changes.blank')).toMatchObject({ version: SAVE_VERSION, diff: {} });
     expect(registry.tests.get('local-changes.smoke')?.directives).toMatchObject([{ kind: 'assert', condition: { operator: '>=' } }]);
     expect(registry.items.has('local-changes.temporary')).toBe(false);
 

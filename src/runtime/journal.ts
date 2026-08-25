@@ -2,6 +2,7 @@ import type { ActionResult } from '../grammar/actionResult';
 import type { Condition } from '../grammar/condition';
 import type { Registry } from '../content/registry';
 import { begun, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
+import { listedToPlayer } from '../content/sections';
 import { evaluateCondition, renderSegments } from './conditions';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import type { GameState } from './state';
@@ -56,5 +57,5 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
 
 // Every quest the world declares, touched or not, in the order the world declares them. A journal that listed only what had been started would be a list of what the player already knows.
 export function journal(registry: Registry, state: GameState): JournalEntry[] {
-  return [...registry.quests.values()].flatMap((quest) => entryFor(registry, state, quest) ?? []);
+  return listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest) ?? []);
 }
