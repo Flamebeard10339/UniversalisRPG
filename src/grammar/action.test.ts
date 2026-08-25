@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Action, actionBody, actionLines, assembledActionProblem, isTwoSided } from './action';
+import { Action, actionBody, actionLines, actionLinesWritten, assembledActionProblem, ATTEMPTS_BUDGET, isTwoSided } from './action';
 import { ActionResult, hookResultList } from './actionResult';
 import { Cursor } from './parser';
 import { splitSections } from './structure';
@@ -145,6 +145,14 @@ describe('how an action ends', () => {
   it('has deleted escape after and on escape:, and says what replaced each', () => {
     expect(refusal('escape after 20')).toContain('write `attempts: N`');
     expect(refusal('on escape: give: 1 bread')).toContain('write `on unfinished:`');
+  });
+
+  it('says which of the two things attempts: does, in the same words wherever an author meets it', () => {
+    const offered = actionLinesWritten().filter((line) => line.form.startsWith('attempts:'));
+    expect(offered.length).toBeGreaterThan(0);
+    for (const line of offered) expect(line.note).toBe(ATTEMPTS_BUDGET);
+    expect(refusal('escape after 20')).toContain(ATTEMPTS_BUDGET);
+    expect(ATTEMPTS_BUDGET).toContain('continuous');
   });
 
   it('names no event by default, so nothing an action does not ask for ends it', () => {

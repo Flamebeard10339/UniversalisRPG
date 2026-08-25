@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { applyResults, getDelta, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
+import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { createGameState, GameState, initResources, PLAYER } from './runtime';
+import { applyResultsNow, createGameState, GameState, initResources, PLAYER } from './runtime';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { toMilliUnits } from './units';
@@ -33,13 +33,61 @@ one of:
 roll: spoils
 `;
 
+// Handlers that move pools: one empties a second pool, and one, when primed, feeds the pool that
+// fired it.
+const HANDLERS = `
+# stat max-health
+base: 20
+
+# stat max-mana
+base: 20
+
+# stat max-charge
+base: 10
+
+# resource health
+max: max-health
+
+# resource mana
+max: max-mana
+
+# resource charge
+start: 0
+max: max-charge
+
+# event death
+resource: health
+trigger: on empty
+
+# event mana-gone
+resource: mana
+trigger: on empty
+
+# event charged
+resource: charge
+trigger: on full
+
+# flag primed
+
+# entity player
+on death:
+  say: You black out.
+  drain: 100 mana
+  if primed:
+    restore: charge
+on mana-gone:
+  say: The mana is gone.
+on charged:
+  restore: charge
+`;
+
 function watched(): { seen: ResultApplication[]; observer: ResultObserver } {
   const seen: ResultApplication[] = [];
   return { seen, observer: (_segment, application) => seen.push(application) };
 }
 
-function fresh(): { registry: Registry; state: GameState } {
-  const registry = loadInEnglish(MODULE);
+function fresh(source = MODULE): { registry: Registry; state: GameState } {
+  const registry = loadInEnglish(source);
   const state = createGameState();
   initResources(state, registry);
   return { registry, state };
@@ -95,6 +143,27 @@ describe('applyResults: the actor a result applies to', () => {
 
     expect(getDelta(segment.deltas, 'brute', 'health')).toBe(toMilliUnits(-75));
     expect(getDelta(segment.deltas, PLAYER, 'health')).toBe(0);
+  });
+});
+
+describe('what an event handler does to a pool', () => {
+  const faint = (state: GameState, registry: Registry): void =>
+    applyResultsNow(state, registry, [{ kind: 'pool', resource: 'health', delta: point(-100) }]);
+
+  it('empties a second pool as loudly as anything else would, firing its on empty', () => {
+    const { registry, state } = fresh(HANDLERS);
+
+    faint(state, registry);
+
+    expect(state.resources.mana).toBe(0);
+    expect(state.log).toEqual(['You black out.', 'The mana is gone.']);
+  });
+
+  it('refuses handlers that keep feeding the pool that fired them, rather than settling forever', () => {
+    const { registry, state } = fresh(HANDLERS);
+    state.flags.primed = true;
+
+    expect(() => faint(state, registry)).toThrow(`${HANDLER_SETTLE_PASSES} passes running`);
   });
 });
 

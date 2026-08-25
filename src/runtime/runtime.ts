@@ -418,7 +418,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
             applyOutcome(segment, action, outcome, 1);
             settlePools(state, registry, [], 0, segment.deltas);
             grantActionFoodBuff(state, registry);
-            endAction(state, outcomeReached(state, registry, outcome));
+            if (state.activeAction) endAction(state, segment.stopped ?? outcomeReached(state, registry, outcome));
             changed = true;
           }
         }
