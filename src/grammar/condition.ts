@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser } from './parser';
-import { decimal, id, number, REFERENCE } from './values';
+import { DECIMAL, decimal, id, number, REFERENCE } from './values';
 
 export interface Reference {
   path: string[];
@@ -61,6 +61,44 @@ export const visitedNode = (path: readonly string[]): readonly string[] | null =
 
 export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=' | '!=';
 
+// A figure an author wrote, and how many decimals they wrote it to.
+export interface Threshold {
+  value: number;
+  places: number;
+}
+
+const readAt = (value: number, places: number): number => {
+  if (places === 0) return value;
+  const scale = 10 ** places;
+  return Math.round(value * scale) / scale;
+};
+
+// An author's literal declares the precision it is compared at, so the figure their own arithmetic
+// gives is one they can write: the engine's answer is read to as many decimals as the literal has
+// and then weighed by the operator as written, which leaves `<`, `=` and `>` still dividing the
+// line between them. A whole number writes no decimals and is weighed as it stands.
+export function holds(value: number, operator: ComparisonOperator, right: Threshold): boolean {
+  const at = readAt(value, right.places);
+  switch (operator) {
+    case '>':
+      return at > right.value;
+    case '<':
+      return at < right.value;
+    case '>=':
+      return at >= right.value;
+    case '<=':
+      return at <= right.value;
+    case '=':
+      return at === right.value;
+    case '!=':
+      return at !== right.value;
+    default: {
+      const unreached: never = operator;
+      return unreached;
+    }
+  }
+}
+
 export type Condition =
   | { kind: 'and'; conditions: Condition[] }
   | { kind: 'or'; conditions: Condition[] }
@@ -69,7 +107,7 @@ export type Condition =
       kind: 'comparison';
       left: Reference;
       operator: ComparisonOperator;
-      right: number;
+      right: Threshold;
     }
   | { kind: 'has'; item: string; count: number }
   | { kind: 'reference'; reference: Reference };
@@ -95,6 +133,14 @@ function parseHas(cursor: Cursor): Condition | null {
   return { kind: 'has', item, count };
 }
 
+function parseThreshold(cursor: Cursor): Threshold {
+  const written = cursor.peek(DECIMAL)?.[0] ?? '';
+  const value = decimal.parse(cursor);
+  return { value, places: written.split('.')[1]?.length ?? 0 };
+}
+
+export const printThreshold = (value: Threshold): string => value.value.toFixed(value.places);
+
 function parsePrimary(cursor: Cursor): Condition {
   const has = parseHas(cursor);
   if (has !== null) return has;
@@ -106,7 +152,7 @@ function parsePrimary(cursor: Cursor): Condition {
       kind: 'comparison',
       left: reference,
       operator: comparison.trim() as ComparisonOperator,
-      right: decimal.parse(cursor),
+      right: parseThreshold(cursor),
     };
   }
   return { kind: 'reference', reference };
@@ -131,12 +177,12 @@ function parseOr(cursor: Cursor): Condition {
 
 export const printReference = (value: Reference): string => value.path.join('.');
 
-function printCondition(value: Condition): string {
+export function printCondition(value: Condition): string {
   switch (value.kind) {
     case 'reference':
       return printReference(value.reference);
     case 'comparison':
-      return `${printReference(value.left)} ${value.operator} ${decimal.print(value.right)}`;
+      return `${printReference(value.left)} ${value.operator} ${printThreshold(value.right)}`;
     case 'has':
       return value.count === 1 ? `has ${value.item}` : `has ${number.print(value.count)} ${value.item}`;
     case 'not':

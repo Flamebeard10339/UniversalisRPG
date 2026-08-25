@@ -402,14 +402,7 @@ assert: stat.evasion = 8
 // of a payload worth +2 is 41 added, raised 24% by a passive reading eight at
 // 3% apiece. A `quickening` granting nothing reads 41, and a payload worth
 // anything else moves the added half.
-//
-// Written as a hundredth-wide band and not as `= 50.84`, which is the figure
-// that arithmetic gives and which the engine cannot be asked for: 41 x 1.24 is
-// held as 50.839999999999996, so exact equality refuses the only literal an
-// author would write. The band is a workaround and the wall behind it is a
-// line in open-agent.md.
-assert: stat.attack-rate >= 50.83
-assert: stat.attack-rate <= 50.84
+assert: stat.attack-rate = 50.84
 expect only: accelerated-vigor-stacks-behind-its-gate-end
 
 // The payload's own duration is the only thing that ends a stack — nothing

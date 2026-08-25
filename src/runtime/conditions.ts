@@ -1,4 +1,4 @@
-import { Condition, type EngineRoot, isEngineRoot, Reference, visitedNode } from '../grammar/condition';
+import { Condition, type EngineRoot, holds, isEngineRoot, printCondition, Reference, visitedNode } from '../grammar/condition';
 import { TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { GameState, PLAYER_SHEET, type PlayerField } from './state';
@@ -61,22 +61,7 @@ export function evaluateCondition(condition: Condition, state: GameState, regist
       return truthy(resolveReference(condition.reference, state, registry));
     case 'comparison': {
       const left = resolveReference(condition.left, state, registry);
-      const value = typeof left === 'number' ? left : Number(left ?? 0);
-      switch (condition.operator) {
-        case '>':
-          return value > condition.right;
-        case '<':
-          return value < condition.right;
-        case '>=':
-          return value >= condition.right;
-        case '<=':
-          return value <= condition.right;
-        case '=':
-          return value === condition.right;
-        case '!=':
-          return value !== condition.right;
-      }
-      break;
+      return holds(typeof left === 'number' ? left : Number(left ?? 0), condition.operator, condition.right);
     }
     case 'not':
       return !evaluateCondition(condition.condition, state, registry);
@@ -93,26 +78,7 @@ export function evaluateCondition(condition: Condition, state: GameState, regist
   }
 }
 
-export function describeCondition(condition: Condition): string {
-  switch (condition.kind) {
-    case 'reference':
-      return condition.reference.path.join('.');
-    case 'comparison':
-      return `${condition.left.path.join('.')} ${condition.operator} ${condition.right}`;
-    case 'not':
-      return `not ${describeCondition(condition.condition)}`;
-    case 'and':
-      return condition.conditions.map(describeCondition).join(' and ');
-    case 'or':
-      return condition.conditions.map(describeCondition).join(' or ');
-    case 'has':
-      return condition.count === 1 ? `has ${condition.item}` : `has ${condition.count} ${condition.item}`;
-    default: {
-      const unreached: never = condition;
-      return unreached;
-    }
-  }
-}
+export const describeCondition = printCondition;
 
 export function renderSegments(segments: TextSegment[], state: GameState, registry: Registry): string {
   return segments

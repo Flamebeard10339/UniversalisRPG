@@ -129,7 +129,7 @@ function said(directive: Directive, of: Registry = registry): Localized[] {
 
 const until = (inner: Directive, terminator: Terminator = 'done'): Directive => ({ kind: 'until', inner, until: terminator });
 
-const BELOW_TEN: Terminator = { kind: 'comparison', left: { path: ['resource', 'health'] }, operator: '<', right: 10 };
+const BELOW_TEN: Terminator = { kind: 'comparison', left: { path: ['resource', 'health'] }, operator: '<', right: { value: 10, places: 0 } };
 
 const ran = (span: number, reason: Localized, of: Registry = registry): Localized => say(of).engine('engine.span.ran', { span, reason });
 
