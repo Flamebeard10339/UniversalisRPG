@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../content/load';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { Registry } from '../content/registry';
 import { buyPrice, sellPrice } from '../content/sections/shop';
 import { initialState } from './save';
@@ -13,10 +14,10 @@ import { buy, coinHeld, countProblem, forSale, sell, stockNow, wanted } from './
 
 const MINUTE = 60_000;
 
-const MODULE = `
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   pedlar
 

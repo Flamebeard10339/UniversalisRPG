@@ -1,10 +1,40 @@
+import { readdirSync } from 'fs';
 import { describe, expect, it } from 'vitest';
+import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from './localChanges';
 import { formatModuleDiagnostic } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
-import { moduleSource, shippedFiles, standingSources } from './shipped';
+import { CORPUS_DIR, moduleSource, shippedFiles, standingSources } from './shipped';
 import { parseModuleSource } from './universe';
 
 const ids = (): string[] => shippedFiles().map((file) => file.replace(/\.dsl$/, ''));
+
+const packOf = (id: string): string | undefined => parseModuleSource(moduleSource(id)).info.pack;
+
+const inCorpus = (): string[] =>
+  readdirSync(CORPUS_DIR)
+    .filter((name) => name.endsWith('.dsl'))
+    .map((name) => name.replace(/\.dsl$/, ''))
+    .sort();
+
+// Nothing the corpus holds is left out of it by hand. A fixture world that a test wants and a
+// player must never reach is a `.ts` outside `content/`, which no shipped entry point can name;
+// the alternative — a `.dsl` here and a second id in the filter that skips it — is the rule
+// someone has to remember, and it fails below. What may legally be missing is derived rather
+// than listed: a module in this directory that does not ship has to say for itself that it is
+// local, which the file an author plays against does and no shipped module does.
+describe('what content/ holds and what ships', () => {
+  it('differ only by a module whose own # info declares it local', () => {
+    const shipped = new Set(ids());
+    expect(shipped.size).toBeGreaterThan(0);
+
+    for (const id of inCorpus().filter((id) => !shipped.has(id))) expect(packOf(id)).toBe('local');
+  });
+
+  it('are told apart by a pack: the local-changes file writes about itself and no shipped module writes', () => {
+    expect(parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule([]) }).info.pack).toBe('local');
+    expect(ids().map(packOf)).toEqual(ids().map(() => undefined));
+  });
+});
 
 function hasSomewhereToStand(subset: readonly string[]): boolean {
   const { registry, diagnostics } = loadUniverseWithDiagnostics(subset.map(moduleSource));

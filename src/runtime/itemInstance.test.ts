@@ -9,6 +9,7 @@ import { allocate, carriesItem, destroyItem, Growth, Destruction, itemInstance, 
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 
 const RINGLET = `
 # cluster-jewel ringlet
@@ -17,17 +18,9 @@ open-connections: e, ne
 passives: 1 hale, 4 stout
 `;
 
-const COMMON = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat max-health
-base: 30
-
-# passive hale
-+10 max-health
-
+const COMMON =
+  FIXTURE_WORLD +
+  `
 # passive stout
 +5 max-health
 
@@ -42,8 +35,6 @@ origin-cluster: ringlet
 
 # item wooden-shield
 slot: offhand
-
-# item ration
 `;
 
 const CROSSROADS = `
@@ -84,9 +75,9 @@ const refusalOf = (outcome: Growth | Destruction): string => (outcome.ok ? 'not 
 
 describe('a base arrives already a copy of its own', () => {
   it('mints an instance a copy rather than deepening a stack, because each one rolled its own level', () => {
-    const state = carrying({ 'iron-sword': 3, ration: 4 });
+    const state = carrying({ 'iron-sword': 3, rope: 4 });
 
-    expect(state.inventory).toEqual({ ration: 4 });
+    expect(state.inventory).toEqual({ rope: 4 });
     expect(Object.keys(state.instances.byId)).toEqual(['1', '2', '3']);
     expect(instance(state, '1')).toMatchObject({ kind: 'item', template: 'iron-sword' });
     expect(packedCount(state, 'iron-sword')).toBe(3);
@@ -110,24 +101,24 @@ describe('a base arrives already a copy of its own', () => {
   });
 
   it('leaves an item declaring no level a stack, worn or not', () => {
-    const state = carrying({ 'wooden-shield': 2, ration: 1 });
+    const state = carrying({ 'wooden-shield': 2, rope: 1 });
 
     expect(state.instances.byId).toEqual({});
-    expect(state.inventory).toEqual({ 'wooden-shield': 2, ration: 1 });
+    expect(state.inventory).toEqual({ 'wooden-shield': 2, rope: 1 });
   });
 });
 
 describe('an item with no level has no plane', () => {
   it('refuses every growth verb, leaving the stack and what it would have consumed whole', () => {
-    const state = carrying({ ration: 4, 'crossroads-jewel': 2 });
+    const state = carrying({ rope: 4, 'crossroads-jewel': 2 });
     const notABase = (id: string): string => `${id} is not a base: only an item you can wear has a plane to grow`;
 
-    expect(refusalOf(allocate(state, registry, 'ration', position(ORIGIN, 1)))).toBe(notABase('ration'));
+    expect(refusalOf(allocate(state, registry, 'rope', position(ORIGIN, 1)))).toBe(notABase('rope'));
     expect(refusalOf(allocate(state, registry, 'crossroads-jewel', position(ORIGIN, 1)))).toBe(notABase('crossroads-jewel'));
     expect(refusalOf(slotJewel(state, registry, 'crossroads-jewel', 'crossroads-jewel', ORIGIN, 'e'))).toBe(notABase('crossroads-jewel'));
 
     expect(state.instances.byId).toEqual({});
-    expect(state.inventory).toEqual({ ration: 4, 'crossroads-jewel': 2 });
+    expect(state.inventory).toEqual({ rope: 4, 'crossroads-jewel': 2 });
   });
 
   it('refuses a base named by its template, because the points belong to a copy and not to the item', () => {
@@ -203,7 +194,7 @@ describe('growing an item', () => {
 
   it('refuses an item that is no cluster jewel, and one the player does not carry', () => {
     const state = fourPoints();
-    expect(refusalOf(slotJewel(state, registry, '1', 'ration', ORIGIN, 'e'))).toBe('ration is not a cluster jewel');
+    expect(refusalOf(slotJewel(state, registry, '1', 'rope', ORIGIN, 'e'))).toBe('rope is not a cluster jewel');
     state.inventory['crossroads-jewel'] = 0;
     expect(refusalOf(slotJewel(state, registry, '1', 'crossroads-jewel', ORIGIN, 'e'))).toBe('you carry no crossroads-jewel');
   });
@@ -285,20 +276,20 @@ describe('an instance across a reload', () => {
 
 describe('destroying a carried item', () => {
   it('takes one copy off a stack and leaves the rest countable', () => {
-    const state = carrying({ ration: 3 });
+    const state = carrying({ rope: 3 });
 
-    expect(destroyItem(state, 'ration')).toEqual({ ok: true, item: 'ration' });
-    expect(state.inventory).toEqual({ ration: 2 });
-    expect(packedCount(state, 'ration')).toBe(2);
+    expect(destroyItem(state, 'rope')).toEqual({ ok: true, item: 'rope' });
+    expect(state.inventory).toEqual({ rope: 2 });
+    expect(packedCount(state, 'rope')).toBe(2);
   });
 
   it('takes an emptied stack out of what the player carries rather than leaving a count of none', () => {
-    const state = carrying({ ration: 1 });
+    const state = carrying({ rope: 1 });
 
-    expect(destroyItem(state, 'ration')).toEqual({ ok: true, item: 'ration' });
+    expect(destroyItem(state, 'rope')).toEqual({ ok: true, item: 'rope' });
     expect(state.inventory).toEqual({});
-    expect(carriesItem(state, 'ration')).toBe(false);
-    expect(refusalOf(destroyItem(state, 'ration'))).toBe('you carry no ration');
+    expect(carriesItem(state, 'rope')).toBe(false);
+    expect(refusalOf(destroyItem(state, 'rope'))).toBe('you carry no rope');
   });
 
   it('destroys a grown copy with the plane it holds, and gives nothing back to the stack', () => {

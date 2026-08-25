@@ -2,6 +2,7 @@ import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
 import { DslError } from '../grammar/parser';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { loadUniverse } from '../content/load';
 import { grow, growLine } from './growth';
 import { itemInstance, itemLevel, receiveItem, type Growth } from './itemInstance';
@@ -12,17 +13,9 @@ import { localizerFor } from './localized';
 import { say } from './said';
 import { inEnglish } from './sayFixture';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat attack
-base: 4
-
-# passive keen
-+4 attack
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # cluster-jewel core
 shape: point
 open-connections: e, ne
@@ -43,9 +36,6 @@ cluster-jewel: spark
 
 # item goad
 cluster-effect: +50% attack
-
-# item rope
-
 `;
 
 const registry = loadInEnglish(MODULE);

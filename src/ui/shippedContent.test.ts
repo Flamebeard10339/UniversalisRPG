@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shippedFiles } from '../content/shipped';
+import { shippedFiles, shippedSources } from '../content/shipped';
 import { createDriver } from './driver';
 import { SHIPPED_SOURCES } from './shippedContent';
 
@@ -13,6 +13,13 @@ describe('the content the build carries', () => {
   it('bundles every shipped DSL as text, with no path left for the browser to fetch', () => {
     expect(SHIPPED_SOURCES.map((source) => source.name)).toEqual(authored);
     for (const source of SHIPPED_SOURCES) expect(source.text).toMatch(/^#[ \t]/m);
+  });
+
+  // The page reads `content/` a second way, so it is a second place something could be left out
+  // of. What may legally be missing from either is derived in `src/content/shipped.test.ts`, and
+  // this is what carries that claim across to the page.
+  it('carries the same text the filesystem answer carries, so neither leaves out what the other ships', () => {
+    expect(SHIPPED_SOURCES.map((source) => source.text)).toEqual(shippedSources().map((source) => source.text));
   });
 
   it('opens a session out of what it bundled', () => {

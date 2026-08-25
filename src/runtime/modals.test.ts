@@ -2,6 +2,7 @@ import type { ModalChoice, ModalOption } from './modalOption';
 import { type ModalFrame } from './state';
 import { describe, expect, it } from 'vitest';
 import { Registry } from '../content/registry';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
@@ -18,7 +19,9 @@ import { applyResultsNow } from './effects';
 import { askedOption } from './command';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
 
-const STACKING_MODULE = `
+const STACKING_MODULE =
+  FIXTURE_WORLD +
+  `
 # race human
 
 # race elf
@@ -28,8 +31,6 @@ const STACKING_MODULE = `
 # race orc
 
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
 
@@ -52,10 +53,10 @@ node greeting:
   -> Say nothing.
 `;
 
-const TWO_NPC_MODULE = `
+const TWO_NPC_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
   scholar
@@ -95,7 +96,9 @@ node greeting:
   -> Leave the scholar.
 `;
 
-const ANSWER_OPENS_MODULE = `
+const ANSWER_OPENS_MODULE =
+  FIXTURE_WORLD +
+  `
 # race human
 
 # race elf
@@ -105,8 +108,6 @@ const ANSWER_OPENS_MODULE = `
 # race orc
 
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
 
@@ -129,10 +130,10 @@ node after:
   -> Nod.
 `;
 
-const GATED_MENU_MODULE = `
+const GATED_MENU_MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
   hermit
@@ -485,14 +486,9 @@ describe('opening and answering', () => {
   });
 });
 
-const CARRIED_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# item rope
-title: Rope
-
+const CARRIED_MODULE =
+  FIXTURE_WORLD +
+  `
 # save coiled
 {"version":${SAVE_VERSION},"inventory":{"rope":1}}
 `;
@@ -559,11 +555,9 @@ describe('the carried-items screen, as a frame like any other', () => {
   });
 });
 
-const GROWING_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const GROWING_MODULE =
+  FIXTURE_WORLD +
+  `
 # cluster-jewel core
 shape: point
 open-connections: e
@@ -574,18 +568,13 @@ slot: mainhand
 item-level: 4
 origin-cluster: core
 
-# item rope
-title: Rope
-
 # save stocked
 {"version":${SAVE_VERSION},"inventory":{"rope":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.5,"plane":{"0,0":{"jewel":"core","entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 `;
 
-const PLANE_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
+const PLANE_MODULE =
+  FIXTURE_WORLD +
+  `
 # cluster-jewel ring
 shape: ring
 open-connections: e
@@ -963,14 +952,9 @@ describe('nothing a player answers with carries words', () => {
   });
 });
 
-const GATHERED_MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# item rope
-title: Rope
-
+const GATHERED_MODULE =
+  FIXTURE_WORLD +
+  `
 # item flask
 title: Flask
 

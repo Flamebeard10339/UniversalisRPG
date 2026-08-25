@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { applyClusterEffect, instancePayloads } from './clusterEffect';
 import { Hex } from '../content/hex';
 import { clusterAt, ORIGIN } from './clusterPlane';
@@ -11,30 +12,16 @@ import { hitDamage, statValue } from './stats';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat max-health
-base: 30
-
-# stat attack
-base: 4
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # stat dr
-
-# passive hale
-+10 max-health
 
 # passive vigorous
 +10% max-health
 
 # passive lucky
 +2-9 max-health
-
-# passive keen
-+4 attack
 
 # cluster-jewel twin
 shape: spindle

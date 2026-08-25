@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { Direction } from '../content/hex';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
@@ -11,23 +12,9 @@ import { initialState } from './save';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
 
-const MODULE = `
-# location camp
-x: 0, y: 0
-starting
-
-# stat max-health
-base: 30
-
-# stat attack
-base: 4
-
-# passive hale
-+10 max-health
-
-# passive keen
-+4 attack
-
+const MODULE =
+  FIXTURE_WORLD +
+  `
 // The two counter sources, so what the report says about each is read off a
 // real declaration rather than a hand-built one.
 # passive raging
@@ -93,8 +80,6 @@ cluster-jewel: ring-of-hale
 
 # item goad
 cluster-effect: +50% attack
-
-# item rope
 `;
 
 const registry = loadInEnglish(MODULE);
