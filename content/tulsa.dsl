@@ -1051,7 +1051,7 @@ owner = miki
 node greeting:
   always
   Well met. Miki, they call me - I keep an eye on this stretch of coast.
-  There's a mirror upstairs if you've a mind to know your own face, and rats in the basement if you haven't.
+  There's a mirror over there if you've a mind to know your own face, and rats in the basement if you haven't.
 
 // --- saves ---
 

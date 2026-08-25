@@ -78,6 +78,8 @@ surface, or the field goes and its entry leaves `NOT_SAID`.
 
 *Moves when: the owner rules whether a faction is ever named to a player. If it is not,
 dropping the field is a measured, headless change already costed.*
+RESPONSE: Factions should have humanizeEn names, but they will not be shown to the player
+in the current version of the game. 
 
 ## The town, and what it does not teach
 
@@ -89,6 +91,8 @@ drops carrying its own points — so what is missing is the teaching, not the it
 
 *Moves when: the owner says where a player first meets a plane. It is one sentence, and
 an agent picking the spot is deciding what the tutorial is about.*
+RESPONSE: Miki needs an extra line of dialogue when he gives the player the sword and the shield
+encouraging the player to check the items in their inventory and opening up the modals.
 
 **`combat-expansion` and `tutorial-quests` depend on `tulsa`.** Each names one thing
 that moved — a road to the beach, and Miki — so a module about archetypes and a module
@@ -97,6 +101,10 @@ about a quest both load the whole town. `combat-expansion.proving-ground` sits a
 
 *Moves when: a playtest names where the proving ground should stand. Two runs have now
 gone through the town and neither reached it, which is itself the finding.*
+RESPONSE: combat-expansion should not need locations or entities. It is a list of jewels
+and items. The proving ground should be permanently moved as a static fixture in tulsa. 
+Likewise, the beach should be removed outright, it no longer makes sense. Miki's house 
+is adjacent to the market square.
 
 **The eight `@@@` marks the corpus holds** are `tulsa` entities waiting on quests that
 are not written — the anvil on A Grand Blade, Oolga's counter on Kill it with Fire, the
@@ -104,16 +112,13 @@ hive mouth on Birds and the Bees.
 
 *Moves with the quests: these close when the modules that answer them are written, which
 is the item at the top of this file.*
+RESPONSE: This task needs to be combined with the next stretch of work, and a quest cannot 
+hold all of its own state. It is a single task. Once tulsa is ready we will start making 
+quests one by one. 
 
 ## Balance nobody has played against
 
 Every number here was reasoned about and none was played against.
-
-**Which stat each race raises is an agent's guess**, not a ruling: human
-max-health, elf accuracy, dwarf defense, orc attack. Evasion and regeneration were
-unusable at +5% of 0 and of 1.
-
-*Moves when: the owner rules the four. The edit is one line each.*
 
 **`# skill melee` and `thieving` carried an inert `stat-id: attack`** with no
 `per-level:` anywhere, folding nothing. The dead declarations were deleted. Making
@@ -122,6 +127,7 @@ combat balance change.
 
 *Moves when: the owner rules whether either folds into a stat. It is one line, and
 the line is a balance change nobody has played.*
+Yes, all skills should grant +1 to their respective stat per level. 
 
 **Three balance numbers came out of the item-level lane and none is the owner's.** The
 rolls are `iron-sword 3-8`, `heartwood-blade 12-18`, `proving-blade 6-10`; the rolling
@@ -134,6 +140,8 @@ same fact.
 
 *Moves when: the owner rules the six. Each is one line, and the collision with the
 damage ranges is worth a glance while he is in there.*
+RESPONSE: This is a balance concern an is not part of the current playtest situation. 
+The player's 3-8 should be part of their skill level + base. Balance will happen after. 
 
 **What a counter pays for a grown copy, now that gear is unsellable.** Measured rather
 than assumed: a shop takes from the stack and a base never joins one, so `iron-sword`
@@ -145,6 +153,8 @@ no copy identity.
 *Moves when: the owner rules what a grown copy is worth at a counter, or that gear
 simply is not sold. `Trade` carrying copy identity is engine work after the first
 answer and nothing at all after the second.*
+RESPONSE: A grown copy inherits the price and can be sold. Since stack size is 1, there 
+is no ambiguity if the player chooses to sell their weapon. 
 
 **Should worn gear take a slot?** It does not. The ruling said "the length of the
 inventory list", `state.inventory` literally excludes worn and grown, and worn gear
@@ -153,6 +163,9 @@ starts being refusable.
 
 *Moves when: the owner rules it. Refusing to equip one of a stack of three is engine
 work the moment he says yes.*
+RESPONSE: The player effectively has their inventory + all of their equipment slots. 
+So yes, the player can store an extra item per equipment slot. However, grown gear should
+also take a slot. 
 
 ## Ours, and small
 
@@ -184,6 +197,8 @@ one fact. If it may, the demand rule above is correct and cheap, and the three f
 alarms are exactly the alias groups — they look declarable. If it may not, every driver
 has to report its text keyed by the subject it hangs off, which is a change to all
 three drivers rather than to the harness, and is the expensive path.*
+RESPONSE: I'm not convinced we need aliases in the first place. This needs a discussion. 
+What are the pros and cons. What is the shape either path will take. 
 
 **`accepts: any` is the default and no shop in the corpus says otherwise.** So
 every counter will buy anything carrying a `value:`, and pricing four items changed
@@ -192,6 +207,8 @@ decision written in one place, and nobody reading a `# shop` can see it.
 
 *Moves when: the owner rules whether a `# shop` has to say what it accepts. Making the
 effective policy readable off the shop is headless after that.*
+RESPONSE: This is not an question. There are 2 states for a shop. Accepts any, or accepts stock. 
+The second option is for shops that only accept items they already keep stocked. 
 
 **Two-thirds of the suite's CPU is not test bodies.** Measured at 32 competing
 processes: 312s of import and 148s of transform against 176s of test time, across
@@ -206,6 +223,9 @@ cost should be a function of.
 
 *Moves when: that decision is taken. The item's own closing clause is the missing
 information and more measurement does not supply it.*
+RESPONSE: This seems like a problem to me. Do we need so many tests? .scratch.md has a 
+section called test maintenance. Do we need to implement something like that now? I would
+vastly prefer deferring it, but development when npm test takes >30s is very annoying. 
 
 **A re-read and a node that has fallen silent still cannot be told apart, and the cause
 is not what it looked like.** Crossed from `open-agent.md` on 2026-08-25 as the half of
@@ -226,6 +246,11 @@ the log.
 of its own — an engine line to the effect that this has been read already — or the
 collapsed line moves to the bottom of the log so the count is where the player is
 looking. Both are small; neither is derivable.*
+RESPONSE: Dialogue should always be able to be said. We shouldn't need a dozen conditions 
+or complicated logic to guarantee that an NPC can be talked to. We shouldn't even need 
+complicated tests. The `have I read this` for examine is the same exact thing as 
+`discovered` for locations. We should strongly consider merging them as a list of things
+that the player has already interacted with. 
 
 **`/create-test` still cannot go through the one writer, and what stops it is a contract
 nobody has written.** Crossed from `open-agent.md` on 2026-08-25. The cycle that was
@@ -239,11 +264,14 @@ can take:
 - `/create-valid-test` appends `expect: <id>-end` and a second `# save` that a `KeptRun`
   has nowhere to put. Appending to the test block is easy; **whether a recorded run may
   have an ending save at all** is the question.
+  RESPONSE: of course it can have an ending save. 
 - A history already opening with `load:` deliberately emits no start save. `KeptRun`
   cannot say that — `from` is the bytes, and in that case the session *did* take a start
   save; the command simply declines to write it, because the author's own `load:`
   already places the replay. Saying it needs `from` to become *bytes, or a `# save` the
   corpus already holds*, which changes a type the app's playtest slot serializes.
+  RESPONSE: Why do we need an exception here in the first place? Why do we sometimes need
+  to declare a savegame was loaded and sometimes not?
 
 The lane's judgement, worth keeping: routing only the common case through
 `runAsSections` and slicing its output by index for the other two would be worse than
@@ -252,6 +280,7 @@ what is there now.
 *Moves when: the owner rules whether a recorded run may carry an ending save, and
 whether `KeptRun.from` may name a `# save` instead of holding bytes. Both are one-line
 answers and the engine work after either is ordinary.*
+RESPONSE: Yes and yes. 
 
 **A pack reorder has no terminal control, and the save version was not bumped for it.**
 Two loose ends from the pack-order lane, neither of which blocks anything. The `swap:`
@@ -265,6 +294,9 @@ read back identically, and bumping would have meant a `migrate-saves` run across
 *Moves when: the owner says whether a terminal needs to reorder a pack at all — it may
 simply not be a terminal thing — and whether he wants the version bumped for tidiness.
 The bump is one line plus a migrate run.*
+RESPONSE: Absolute parity between the surfaces. The runtime exposes a single function to 
+move item from position X to position Y, swapping if necessary. Each of the play states 
+can either call or not. Either way, the function is exposed and only exists in one place. 
 
 **Two xp gains at once now read as two pills, not one line.** A turn granting `+5
 Attack` and `+5 Defence` used to fold into one pill, `+5 Attack, Defence`, because the
@@ -277,6 +309,7 @@ Six rat kills still land as one line, because they share a key.
 belongs in `sayingOf` over notices that share a count, not in the notice type — the
 lane costed that and it is small; what nobody can decide for him is whether two pills
 read worse than one line.*
+RESPONSE: Yes, +5 attack and +5 defense, should read +10 attack, defense. 
 
 **Nobody has watched a replay back.** Everything the replay decides is proved
 (`src/ui/replay.test.ts`, and the cursor through the driver in `src/ui/playtest.test.ts`);
@@ -285,3 +318,4 @@ default once a run with a long stretch of `page:` moves is played back. There ar
 recorded runs standing in `.planning/yonatan-playtests/` to watch.
 
 *Moves when: he watches one and names the cadence. Nothing else answers it.*
+RESPONSE: Leave this here. I will do it later. 
