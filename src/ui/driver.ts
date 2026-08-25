@@ -8,7 +8,7 @@ import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
-import { fileRun } from '../runtime/runFiling';
+import { dropRun, fileRun, stagedRuns, type FiledRun } from '../runtime/runFiling';
 import type { Answer } from '../runtime/localized';
 import type { Directive } from '../content/sections/test';
 import { advances, clamped, REPLAY_SPEED } from './replay';
@@ -86,6 +86,11 @@ export interface PlaytestControls {
   moved(where: string): void;
   // The run as the `# test` section that replays it, under the name it was minted with.
   written(): string;
+  // The runs already filed into the game, read fresh rather than kept in the snapshot: a list only
+  // whoever is drawing it wants, and one the engine's own clock has no reason to recompute.
+  filed(): readonly FiledRun[];
+  // Dropping one, both its sections in the one edit that files them.
+  drop(run: string): void;
 }
 
 export interface Driver {
@@ -423,6 +428,12 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       attach: (turn, notes) => changing(() => record.attach(turn, notes)),
       moved: (where) => changing(() => record.moved(where)),
       written: () => record.written(),
+      filed: () => stagedRuns(context),
+      drop: (run) => {
+        const result = dropRun(context, run);
+        current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
+        publish();
+      },
     },
     reopen,
     clearLocalChanges: () => {

@@ -1,0 +1,108 @@
+import { describe, expect, it } from 'vitest';
+import { engineLocale, loadInEnglish } from '../content/engineLocale';
+import { initialLocalChangesModule, listLocalSections, localSectionHeadings } from '../content/localChanges';
+import type { ModuleSource } from '../content/universe';
+import { newContext, stagedSections, type AuthoringContext, type CommandContext, type CommandResult } from './command';
+import { dropRun, fileRun, filedRuns, stagedRuns } from './runFiling';
+import { runAsSections, type KeptRun } from './runLog';
+import { serializeSession, startSession, view } from './session';
+
+const WORLD = `
+# info base
+version: 1.0.0
+
+# location camp
+x: 0, y: 0
+starting
+
+# item coin
+title: Coin
+`;
+
+const PLAYED = { at: '2026-08-25T09:00:00.000Z', built: 'a test' };
+
+interface Standing {
+  ctx: CommandContext;
+  onDisk: () => string;
+}
+
+function standing(): Standing {
+  const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: WORLD }];
+  let held = initialLocalChangesModule(['base']);
+  const authoring: AuthoringContext = {
+    baseSources,
+    dependencies: ['base'],
+    localSource: { name: 'local-changes', text: held },
+    writeLocalChanges: (text) => void (held = text),
+    readLocalChanges: () => held,
+  };
+  const session = startSession(loadInEnglish(WORLD));
+  const ctx = newContext(session, view(session), { recorder: { history: [], startSave: serializeSession(session) }, authoring });
+  return { ctx, onDisk: () => held };
+}
+
+const keptAs = (id: string, ctx: CommandContext): KeptRun => ({ run: { id, log: [] }, from: serializeSession(ctx.session) });
+
+function file(ctx: CommandContext, id: string): CommandResult {
+  const result = fileRun(ctx, keptAs(id, ctx), PLAYED);
+  expect(result.output.filter((out) => out.kind === 'message' && out.tone === 'error')).toEqual([]);
+  return result;
+}
+
+const errors = (result: CommandResult): string[] => result.output.flatMap((out) => (out.kind === 'message' && out.tone === 'error' ? [out.text] : []));
+
+describe('a filed run is the sections filing wrote, and dropping one takes those', () => {
+  it('takes exactly what filing writes, derived from the filing rather than named here', () => {
+    const kept: KeptRun = { run: { id: 'run-a', log: [] }, from: '{"version":0}' };
+    const written = runAsSections(kept).map((block) => block[0]);
+    const staged = written.map((heading) => {
+      const [, kind, id] = /^# (\S+) (\S+)$/.exec(heading)!;
+      return { kind, id, text: heading };
+    });
+
+    const [run] = filedRuns(staged);
+
+    expect(run.id).toBe('run-a');
+    expect(run.sections.map((at) => `# ${at.kind} ${at.id}`)).toEqual(written);
+  });
+
+  it('lists a run whose starting save has already gone by hand, and claims only what is left', () => {
+    const kept: KeptRun = { run: { id: 'run-b', log: [] }, from: '{"version":0}' };
+    const [, walked] = runAsSections(kept);
+
+    const [run] = filedRuns([{ kind: 'test', id: 'run-b', text: walked.join('\n') }]);
+
+    expect(run.sections).toEqual([{ kind: 'test', id: 'run-b' }]);
+  });
+
+  it('drops both sections of the run asked for and leaves every other section standing', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+    file(ctx, 'run-two');
+    expect(stagedRuns(ctx).map((run) => run.id)).toEqual(['run-one', 'run-two']);
+
+    const dropped = dropRun(ctx, 'run-one');
+
+    expect(errors(dropped)).toEqual([]);
+    expect(localSectionHeadings(onDisk())).toEqual(['# save run-two-start', '# test run-two']);
+    expect(stagedRuns(ctx).map((run) => run.id)).toEqual(['run-two']);
+    expect([...ctx.session.registry.tests.keys()]).toEqual(['local-changes.run-two']);
+    expect([...ctx.session.registry.saves.keys()]).toEqual(['local-changes.run-two-start']);
+  });
+
+  it('says so and writes nothing when the run named is not filed here', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+    const before = onDisk();
+
+    expect(errors(dropRun(ctx, 'run-two'))).toEqual(['no run called run-two is filed here.']);
+    expect(onDisk()).toBe(before);
+  });
+
+  it('reads the staged sections through the same file the commands edit', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+
+    expect(stagedSections(ctx)).toEqual(listLocalSections(onDisk()));
+  });
+});

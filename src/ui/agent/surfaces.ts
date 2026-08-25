@@ -62,12 +62,20 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
   const { run, controls } = held;
   const log = run?.log ?? null;
   return {
-    state: () => ({ recording: run !== null, id: run?.id ?? null, turns: log?.length ?? 0, about: log === null ? null : feedbackOn(log), written: controls.written() }),
+    state: () => ({
+      recording: run !== null,
+      id: run?.id ?? null,
+      turns: log?.length ?? 0,
+      about: log === null ? null : feedbackOn(log),
+      written: controls.written(),
+      filed: controls.filed().map((each) => ({ id: each.id, sections: each.sections.map((at) => `# ${at.kind} ${at.id}`) })),
+    }),
     actions: {
       recording: (value) => {
         if (value === true) controls.start();
         else controls.stop();
       },
+      drop: (value) => controls.drop(String(value)),
       attach: (value) => {
         if (log === null) throw new Error('no run is being recorded');
         const about = feedbackOn(log);

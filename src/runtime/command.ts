@@ -11,11 +11,12 @@ import {
   localSectionHeadings,
   renderLocalChangesModule,
   upsertLocalSection,
+  type LocalSection,
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import type { Resumption } from './openUniverse';
-import { startSaveId, type TurnOutcome } from './runLog';
+import { startSaveId, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
@@ -33,9 +34,11 @@ import {
   enterDev,
   leaveDev,
   liveSlot,
+  NEVER,
   saveNow,
   saveReport,
-  setAutosaveSeconds,
+  setAutosaveCadence,
+  type Cadence,
   type SaveContext,
   type SlotWrites,
 } from './saveSlots';
@@ -164,6 +167,7 @@ interface ArgTypes {
   section: SectionArg;
   local: LocalOp;
   setting: SettingOp;
+  cadence: Cadence;
   choice: number;
 }
 
@@ -475,6 +479,47 @@ export function stageLocalSections(ctx: CommandContext, sections: readonly strin
   }
 }
 
+const addressed = (at: SectionAddress): string => `# ${at.kind} ${at.id}`;
+
+// Sections taken back out of the local changes together and adopted once — the counterpart of
+// stageLocalSections, and the only way anything leaves. What was filed as several sections is
+// dropped as several sections, so the registry never stands over half of one.
+export function dropLocalSections(ctx: CommandContext, sections: readonly SectionAddress[]): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  try {
+    const source = localSourceNow(authoring);
+    if (!source.read) return source.refusal;
+    let text = source.text;
+    const dropped: SectionAddress[] = [];
+    for (const at of sections) {
+      const next = deleteLocalSection(text, authoring.dependencies, at.kind, at.id);
+      if (!next.deleted) continue;
+      text = next.text;
+      dropped.push(at);
+    }
+    if (dropped.length === 0) return noted('error', `no local ${sections.map(addressed).join(' or ')} is staged.`);
+    return commitLocalChanges(ctx, authoring, text, `Deleted local ${dropped.map(addressed).join(', ')}.`);
+  } catch (error) {
+    if (error instanceof DslError) return noted('error', error.message);
+    return refused(error);
+  }
+}
+
+// What the local changes hold right now, for whatever is drawing a list of them. A file there is no
+// surface for, or one nothing here can read, holds nothing to list — the refusals belong to the
+// acts that edit it, and a list is not one.
+export function stagedSections(ctx: CommandContext): readonly LocalSection[] {
+  const authoring = ctx.authoring;
+  if (!authoring) return [];
+  try {
+    const source = localSourceNow(authoring);
+    return source.read ? listLocalSections(source.text) : [];
+  } catch {
+    return [];
+  }
+}
+
 const runSectionEdit = (ctx: CommandContext, section: SectionArg): CommandResult => stageLocalSections(ctx, [localSectionSource(section)]);
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
@@ -495,13 +540,8 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
         return { output: [{ kind: 'source', words: 'tool', lines: localChangesNow(authoring).trimEnd().split('\n') }], quit: false, recorded: [] };
       case 'clear':
         return commitLocalChanges(ctx, authoring, renderLocalChangesModule(authoring.dependencies), `Cleared ${LOCAL_CHANGES_MODULE_ID}.`);
-      case 'delete': {
-        const source = localSourceNow(authoring);
-        if (!source.read) return source.refusal;
-        const next = deleteLocalSection(source.text, authoring.dependencies, op.kind, op.id);
-        if (!next.deleted) return noted('error', `no local # ${op.kind} ${op.id} is staged.`);
-        return commitLocalChanges(ctx, authoring, next.text, `Deleted local # ${op.kind} ${op.id}.`);
-      }
+      case 'delete':
+        return dropLocalSections(ctx, [{ kind: op.kind, id: op.id }]);
       default: {
         const unreached: never = op;
         return unreached;
@@ -597,7 +637,7 @@ function slotStanding(save: SaveContext): string[] {
   const report = saveReport(save);
   return [
     `writing ${report.slot}, dev mode ${report.dev ? 'on' : 'off'}${WHY_NOT[report.writes]}`,
-    `autosave ${report.autosaveSeconds === null ? `— ${UNREADABLE_CADENCE}` : report.autosaveSeconds === 0 ? 'never' : `every ${report.autosaveSeconds}s`}`,
+    `autosave ${cadenceStanding(report.autosave)}`,
     ...report.slots.map((slot) => `${slot.name.padEnd(SLOT_COLUMN)} ${slotAge(save, slot.writtenAt)}`),
   ];
 }
@@ -606,7 +646,11 @@ const NOT_ADOPTED = 'this session did not come out of that slot, so autosave wil
 
 const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosave leaves them alone: look at the file, or /save to replace it';
 
-const UNREADABLE_CADENCE = 'the slot the cadence lives in does not hold one, so nothing is saved on a cadence: /autosave <s> sets it again';
+const UNREADABLE_CADENCE = `the slot the cadence lives in does not hold one, so nothing is autosaved: /autosave <s> or /autosave ${NEVER} sets it again`;
+
+// A cadence is a least interval, so no interval at all is every action rather than none of them.
+const cadenceStanding = (cadence: Cadence | null): string =>
+  cadence === null ? `— ${UNREADABLE_CADENCE}` : cadence === NEVER ? NEVER : cadence === 0 ? 'after every action' : `every ${cadence}s`;
 
 const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
 
@@ -619,12 +663,15 @@ export function resumptionNotes(resumed: Resumption): ToolMessage[] {
   return [note('ok', `Picked up slot ${resumed.slot}.`), ...prunedNotes(resumed.pruned)];
 }
 
+// Said only where the engine tried to write and could not. A slot it is deliberately leaving alone
+// is not a failure and is not said here: that is a standing fact `saveReport.writes` answers, which
+// `/slots` and `/state` read on demand, and whatever left the session unadopted — a game this build
+// could not open, dev mode letting go of one — said so once at the moment it did. Repeating it under
+// every action told a player who asked for nothing what an author who typed /autosave wanted to know.
 function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;
   try {
-    const outcome = autosave(ctx.save, () => serializeSession(ctx.session));
-    if (outcome.kind === 'held') return note('warn', `autosave held: slot ${outcome.slot} — ${NOT_ADOPTED}`);
-    if (outcome.kind === 'unreadable') return note('warn', `autosave held: slot ${outcome.slot} — ${UNREADABLE_SLOT}`);
+    autosave(ctx.save, () => serializeSession(ctx.session));
     return null;
   } catch (error) {
     if (error instanceof RuntimeError) return note('error', `autosave: ${error.message}`);
@@ -974,18 +1021,19 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/autosave',
-    arg: 'number',
-    argHint: '<s>',
-    summary: 'set the autosave cadence in seconds; 0 never',
+    arg: 'cadence',
+    argHint: `<s|${NEVER}>`,
+    summary: `set the least seconds between autosaves; 0 after every action, ${NEVER} not at all`,
     parse: (rest) => {
+      if (rest === NEVER) return NEVER;
       const seconds = Number(rest);
-      if (rest === '' || !Number.isFinite(seconds) || seconds < 0) return { problem: `/autosave requires seconds, 0 for never, got ${JSON.stringify(rest)}` };
+      if (rest === '' || !Number.isFinite(seconds) || seconds < 0) return { problem: `/autosave requires seconds or ${NEVER}, got ${JSON.stringify(rest)}` };
       return seconds;
     },
-    run: (ctx, seconds) =>
+    run: (ctx, cadence) =>
       withSaves(ctx, (save) => {
-        setAutosaveSeconds(save, seconds);
-        return noted('ok', seconds === 0 ? 'Autosave off.' : `Autosave every ${seconds}s.`);
+        setAutosaveCadence(save, cadence);
+        return noted('ok', `Autosave ${cadenceStanding(cadence)}.`);
       }),
   }),
   define({

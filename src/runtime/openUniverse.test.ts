@@ -6,7 +6,7 @@ import { FALLBACK_SOURCE, openUniverse, REQUIREMENTS, type RequirementId } from 
 import { BASE, BASE_ID, CELL_COUNT, OPENING_CELLS, sourcesOf } from './openUniverseFixture';
 import { resumptionNotes } from './command';
 import { SAVE_VERSION } from './save';
-import { autosave, createSaveContext, PLAYER_SLOT, setAutosaveSeconds, saveNow, writesLive, type SaveContext } from './saveSlots';
+import { autosave, createSaveContext, PLAYER_SLOT, setAutosaveCadence, saveNow, writesLive, type SaveContext } from './saveSlots';
 import { serializeSession, view, wait, type PlaySession } from './session';
 import { memoryDriver, type SlotDriver } from './store';
 
@@ -155,7 +155,7 @@ describe('a session opened over the fallback is no slot\'s game (c4)', () => {
     openUniverse([], { save: stood });
     openUniverse([BASE], { save: played });
 
-    for (const save of [stood, played]) setAutosaveSeconds(save, 1);
+    for (const save of [stood, played]) setAutosaveCadence(save, 1);
 
     expect(writesLive(stood)).toBe('not-ours');
     expect(autosave(stood, () => 'bytes')).toEqual({ kind: 'held', slot: PLAYER_SLOT });
@@ -173,7 +173,7 @@ describe('a session opened over the fallback is no slot\'s game (c4)', () => {
 
     expect(save.synced).toBe(PLAYER_SLOT);
     expect(writesLive(save)).toBe('yes');
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     expect(autosave(save, () => 'bytes')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
   });
 
@@ -222,7 +222,7 @@ describe('an opening stands on what the live slot last held (c5)', () => {
     openUniverse([BASE], { save });
 
     expect(writesLive(save)).toBe('yes');
-    setAutosaveSeconds(save, 1);
+    setAutosaveCadence(save, 1);
     tick(2_000);
     expect(autosave(save, () => 'bytes')).toEqual({ kind: 'wrote', slot: PLAYER_SLOT });
   });
@@ -268,7 +268,7 @@ describe('an opening stands on what the live slot last held (c5)', () => {
       expect(serializeSession(answer.session), where).toBe(serializeSession(openUniverse([BASE]).session));
 
       const before = driver.read(PLAYER_SLOT);
-      setAutosaveSeconds(save, 1);
+      setAutosaveCadence(save, 1);
       autosave(save, () => 'bytes');
 
       expect(driver.read(PLAYER_SLOT), where).toBe(before);

@@ -59,6 +59,8 @@ const DISPATCHES = [
   'openUniverse',
   'openWithLocalCleared',
   'fileRun',
+  'stagedRuns',
+  'dropRun',
   'runLine',
   'serializeSession',
   'sessionLocalizer',

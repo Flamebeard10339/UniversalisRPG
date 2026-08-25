@@ -871,6 +871,7 @@ describe('a save that will not load changes nothing and says why (c7)', () => {
 
   it('says so when the live slot is absent, empty or unreadable, and plays on', () => {
     const game = playing();
+    runLine(game.ctx, '/autosave never');
     runLine(game.ctx, 'use: entity.chest.open');
     const before = serializeSession(game.ctx.session);
 
@@ -918,16 +919,38 @@ describe('a save that will not load changes nothing and says why (c7)', () => {
   });
 });
 
-describe('autosave fires on a cadence and zero means never (c4)', () => {
-  it('writes nothing at all until somebody asks for a cadence', () => {
+describe('autosave writes after every act, and never is a word of its own (c4)', () => {
+  it('writes after every act with nobody having asked for anything, and stops on the word', () => {
     const game = playing();
 
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+    runLine(game.ctx, 'use: entity.chest.open');
+    expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));
+
+    runLine(game.ctx, '/autosave never');
+    const stopped = game.slot(PLAYER_SLOT);
     for (let each = 0; each < 5; each += 1) {
       runLine(game.ctx, 'use: entity.chest.open');
       game.pass(60_000);
     }
 
-    expect(existsSync(game.dir) ? readdirSync(game.dir) : []).toEqual([]);
+    expect(game.slot(PLAYER_SLOT)).toBe(stopped);
+    expect(game.slot(PLAYER_SLOT)).not.toBe(serializeSession(game.ctx.session));
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
+  it('takes seconds or the word, and says which when it is given neither', () => {
+    const game = playing();
+
+    expect(errorsOf(runLine(game.ctx, '/autosave'))[0]).toMatch(/\/autosave requires seconds or never, got ""/);
+    expect(errorsOf(runLine(game.ctx, '/autosave sideways'))[0]).toMatch(/got "sideways"/);
+    expect(errorsOf(runLine(game.ctx, '/autosave -1'))[0]).toMatch(/got "-1"/);
+
+    expect(errorsOf(runLine(game.ctx, '/autosave 0'))).toEqual([]);
+    expect(linesOf(runLine(game.ctx, '/slots'))[1]).toBe('autosave after every action');
+    expect(errorsOf(runLine(game.ctx, '/autosave never'))).toEqual([]);
+    expect(linesOf(runLine(game.ctx, '/slots'))[1]).toBe('autosave never');
     rmSync(game.dir, { recursive: true, force: true });
   });
 
@@ -989,25 +1012,32 @@ describe('autosave fires on a cadence and zero means never (c4)', () => {
     const game = playing(SAVING_SOURCE, true);
     runLine(game.ctx, '/autosave 2');
     const result = armed(game.ctx, 'use:entity.chest.haul');
-    writeFileSync(path.join(game.dir, `${AUTOSAVE_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'often' }), 'utf8');
+    (game.save.store as { write: (name: string, payload: string) => unknown }).write = (name) => {
+      throw new RuntimeError(`slot ${name} cannot be written`);
+    };
 
     for (let tick = 0; tick < 3; tick += 1) {
       game.pass(1_000);
       result.live!.tick(1_000);
     }
 
-    expect(errorsOf(result.live!.end(true))[0]).toMatch(/autosave: slot autosave does not hold a cadence/);
+    expect(errorsOf(result.live!.end(true))[0]).toMatch(/autosave: slot player cannot be written/);
     rmSync(game.dir, { recursive: true, force: true });
   });
 
-  it('says so rather than crashing when the cadence slot holds something that is not a cadence', () => {
+  it('stops autosaving and says so only when asked, when the cadence slot holds something that is not one', () => {
     const game = playing();
     runLine(game.ctx, '/autosave 5');
+    runLine(game.ctx, 'use: entity.chest.open');
+    const written = game.slot(PLAYER_SLOT);
     writeFileSync(path.join(game.dir, `${AUTOSAVE_SLOT}.slot`), JSON.stringify({ writtenAt: 1, payload: 'often' }), 'utf8');
+    game.pass(60_000);
 
     const result = runLine(game.ctx, 'use: entity.chest.open');
-    expect(errorsOf(result)[0]).toMatch(/autosave: slot autosave does not hold a cadence/);
-    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(1);
+    expect(errorsOf(result)).toEqual([]);
+    expect(game.slot(PLAYER_SLOT)).toBe(written);
+    expect(linesOf(runLine(game.ctx, '/slots'))[1]).toMatch(/the slot the cadence lives in does not hold one/);
+    expect(sessionStatus(game.ctx.session).inventory.gold).toBe(2);
     rmSync(game.dir, { recursive: true, force: true });
   });
 });
@@ -1015,6 +1045,7 @@ describe('autosave fires on a cadence and zero means never (c4)', () => {
 describe('no load path advances time (c5)', () => {
   it('leaves the clock at what the payload holds, through a # save, an import and a slot', () => {
     const game = playing();
+    runLine(game.ctx, '/autosave never');
 
     runLine(game.ctx, '/load stashed');
     expect(sessionStatus(game.ctx.session).time).toBe(42);
@@ -1095,7 +1126,7 @@ describe('dev mode moves which slot is written, through the same table (c9, c10,
   it('answers which slot is live and whether the mode is on, rather than leaving it to be inferred (c13)', () => {
     const game = playing();
 
-    expect(linesOf(runLine(game.ctx, '/slots'))).toEqual(['writing player, dev mode off', 'autosave never']);
+    expect(linesOf(runLine(game.ctx, '/slots'))).toEqual(['writing player, dev mode off', 'autosave after every action']);
 
     runLine(game.ctx, '/autosave 30');
     runLine(game.ctx, '/dev on');
@@ -1135,7 +1166,8 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
     const first = runLine(next, 'use: entity.chest.open');
 
     expect(game.slot(PLAYER_SLOT)).toBe(played);
-    expect(first.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(true);
+    expect(first.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(false);
+    expect(linesOf(runLine(next, '/slots'))[0]).toMatch(/writing player, dev mode off — this session did not come out of that slot/);
 
     expect(errorsOf(runLine(next, '/restore'))).toEqual([]);
     expect(sessionStatus(next.session).inventory.gold).toBe(3);
@@ -1167,7 +1199,8 @@ describe('a session writes back only what it came out of (c4, c7, c9)', () => {
       game.pass(3_600_000);
       const after = runLine(game.ctx, 'use: entity.chest.open');
       expect(game.slot(PLAYER_SLOT)).toBe(played);
-      expect(after.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(true);
+      expect(after.output.some((each) => each.kind === 'message' && each.tone === 'warn')).toBe(false);
+      expect(linesOf(runLine(game.ctx, '/slots'))[0]).toMatch(/writing player, dev mode off — this session did not come out of that slot/);
 
       runLine(game.ctx, '/save');
       expect(game.slot(PLAYER_SLOT)).toBe(serializeSession(game.ctx.session));

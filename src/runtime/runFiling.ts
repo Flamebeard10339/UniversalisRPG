@@ -1,5 +1,7 @@
-import { noted, stageLocalSections, type CommandContext, type CommandResult } from './command';
-import { runAsSections, type KeptRun, type RunHeader } from './runLog';
+import type { LocalSection } from '../content/localChanges';
+import type { Answer } from './localized';
+import { dropLocalSections, noted, stagedSections, stageLocalSections, type CommandContext, type CommandResult } from './command';
+import { runAsSections, runSections, RUN_SECTION, type KeptRun, type RunHeader, type SectionAddress } from './runLog';
 import { createGameState } from './runtime';
 import { loadSave, savedGameFromSerialized } from './save';
 
@@ -30,4 +32,33 @@ export function fileRun(ctx: CommandContext, kept: KeptRun, header: RunHeader): 
     ctx,
     runAsSections(kept, header).map((block) => block.join('\n')),
   );
+}
+
+// A run standing in the local changes, and which sections it is made of. Nothing else answers
+// either question, so what a list shows and what dropping one takes cannot come apart.
+export interface FiledRun {
+  readonly id: Answer;
+  readonly sections: readonly SectionAddress[];
+}
+
+// Every filed run among the sections staged, in the order they were filed. A run is what filing one
+// writes, so it is picked out by the section runSections says a run is — and it carries whichever
+// of that pair is actually there, so a run whose start save has already gone by hand is still a run
+// and dropping it still takes only what remains.
+export function filedRuns(staged: readonly LocalSection[]): FiledRun[] {
+  const held = new Set(staged.map((section) => `${section.kind} ${section.id}`));
+  return staged
+    .filter((section) => section.kind === RUN_SECTION)
+    .map((run) => ({ id: run.id, sections: runSections(run.id).filter((at) => held.has(`${at.kind} ${at.id}`)) }));
+}
+
+export const stagedRuns = (ctx: CommandContext): FiledRun[] => filedRuns(stagedSections(ctx));
+
+// Dropping a run takes both its sections in one edit, so the game is never left holding a `# test`
+// whose starting save has gone. There is no timer over this: a run the author has not exported yet
+// is theirs to keep for as long as they like.
+export function dropRun(ctx: CommandContext, id: string): CommandResult {
+  const run = stagedRuns(ctx).find((each) => each.id === id);
+  if (!run) return noted('error', `no run called ${id} is filed here.`);
+  return dropLocalSections(ctx, run.sections);
 }
