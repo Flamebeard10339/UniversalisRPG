@@ -192,18 +192,6 @@ a fixture, not a screenshot.
 
 ### The quest journal
 
-**Neither quest is coloured by its state.** *"Neither quest is yellow (yellow=started,
-white=unstarted, green=finished)."* Ruled by the note: those three states, those three
-colours, and the colour comes off the group channel rather than out of a component.
-
-**The journal draws the last few chat messages.** *"The finding your feet quest shows
-the last few chat messages."*
-
-**`finding-your-feet` does not complete.** *"Finding your feet quest isn't done?"* The
-run walked the mirror, the bread and three rats and the quest still read unfinished.
-Reproduce from the run's own `# save` before believing any cause — `settled.md` holds
-seven occasions where the first-named cause was one layer too low.
-
 ### Modals
 
 **Every modal is its own thing.** The owner's, written into `open-human.md` on

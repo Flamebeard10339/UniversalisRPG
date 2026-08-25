@@ -829,6 +829,26 @@ being written a second time: a copy is offered under its instance id, and a pric
 resolves through the template, so the plane and the points on a copy move it not at all.
 `engine.pack.full` is the refusal a player reads when a row is what is missing.
 
+**A quest's standing is a colour the corpus authors, and one declaration says which.**
+Three `# group`s in `content/core.dsl` hold white, yellow and green; `STANDING_GROUP` in
+`src/runtime/journal.ts` is the one mapping from standing to group, and `QuestStanding`
+is `keyof typeof STANDING_GROUP` — so the type and the mapping are the same object and a
+fourth standing cannot exist without a colour. The entry carries an ordinary `GroupRow`,
+the app fills a cell from it and `/quests` says the word, which is the two channels a
+group already has. The terminal's own second copy of the standings — three
+`engine.repl.journal.*` keys and a `tone:` ternary — is deleted, and `grouped` moved to
+`src/runtime/grouping.ts` so the command and the terminal share one function. **The
+previous proof could not have caught the bug it was written for**: it asserted
+`TONES[standing]` was truthy, and the value was `text-ok`, a class naming no colour in
+`tailwind.config.js`, so a finished quest was drawn in nothing.
+
+**`PlayView.said` is the lines that came with this view, and nothing reconstructs it.**
+`view()` drains the log each step, so the field already answers *what was just said*. The
+app used to hand a modal `answering(transcript.entries)` — the trailing run of `said`
+lines in the whole history, whenever they were said — which is why a quest sheet drew the
+last few chat messages. That guess is deleted rather than sharpened; a modal takes
+`view.said`.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

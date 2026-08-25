@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Eight lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Nine lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -203,3 +203,17 @@ standards.
 
 *Moves when: he picks one. Either is a one-line change in `src/grammar/values.ts` and
 nothing downstream depends on the answer, which is why the lane did not guess.*
+
+## Whether a quest's standing is a fill or coloured lettering
+
+Ruled: *"yellow=started, white=unstarted, green=finished"*, and it is built — but the lane
+drew it as a **fill**, a colour wash with a coloured edge on the row, rather than as
+coloured title text. It made that call rather than asking because `settled.md` is explicit
+that text colour is voice and fill is group, and the ruling itself said the colour comes
+off the group channel; recolouring the title would put two facts on one channel. The words
+beside it are *Not started* / *Under way* / *Done*, and the colours are `#e5e7eb`,
+`#fbbf24`, `#34d399`.
+
+*Moves when: he looks at it and says fill or lettering. If lettering, it is a different
+ruling about what the text channel carries and `settled.md` moves with it; the colours and
+the words themselves are one-line edits in `content/core.dsl` either way.*
