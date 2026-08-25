@@ -1042,10 +1042,23 @@ page, which reads the same directory a second way. Both were proved to fire by a
 real `.dsl` and a second filter.
 
 **Removing a piece of shared test furniture now touches one file.** That is what this line
-was for: the original measurement found seventeen test modules each declaring their own
-copy of the item being deleted. The wider finding is that the duplication was never only
-those seventeen — **24 modules still declare at least one of the six**, mostly outside the
-ruled scope, so the fixture has room to absorb more.
+was for: the original measurement found seventeen test modules each declaring their own copy
+of the item being deleted. **31 files import `FIXTURE_WORLD`**, and every test module that
+still declares furniture has been read and left on purpose. The reasons fall into five
+kinds, and they are the test to apply to a new module rather than a list to keep:
+
+- **A tuned arena** — `max-health: 100000`, `attack-rate: 25`, an accuracy the contest turns
+  on. The numbers *are* the arithmetic being measured.
+- **A deliberately baseless stat** — and this one is a trap. **Sections merge, and a later
+  `# stat` with no `base:` inherits the earlier one's**, so prepending the fixture would hand
+  a pool of 30 to something written to have none. `time.test.ts` and `hooks.test.ts` turn on
+  exactly that.
+- **A deliberate minimum** — a one-line world, or a module with *no* starting location, where
+  the sparseness is the claim.
+- **The module text itself is the input** — the rewriting tools measure comments, blank lines,
+  heading order and ids embedded in `# save` JSON.
+- **The world is the subject** — a road graph a content reader is asked about, a location
+  whose own actions are under test, references that exist to be found.
 
 **A run always carries a start save, and `KeptRun.from` says whether it holds one or names
 one.** `RunStart` is `{ bytes }` or `{ save }`, `startsAtSave` is the one predicate, and

@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Twenty lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Twenty-one lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -432,3 +432,15 @@ all at once."* Two calls the lane made rather than guessed at, both cheap to rev
 
 *Moves when: he watches it and says. Both are small and neither blocks anything; the numbers
 are his to tune whatever he decides about the shape.*
+
+## Whether `src/ui/testFixtures.ts` should fold into the shared world
+
+The one module the fixture sweep could not decide. `FIXTURE_DSL` — a keep, a yard, a warden,
+a sword and a shield — is already a single home used by exactly one file, and its own comment
+says the world is deliberately generic. Folding it in works mechanically but saves only one
+`x/y/starting` triple, and it costs renaming `fixture.keep` and `fixture.yard` throughout
+`editControls.test.ts`, which has assertions keyed on those addresses.
+
+*Moves when: he says whether one triple is worth churning a file's addresses. Either answer
+is fine and nothing waits on it — it is here rather than guessed at because the trade is
+genuinely close.*

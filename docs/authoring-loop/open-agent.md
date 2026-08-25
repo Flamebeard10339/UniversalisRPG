@@ -166,17 +166,3 @@ landed and that affordance now exists**: a screen is opened by a line the way `/
 and `/quests <quest>` open theirs, so this is words plus one `open modal:`, with no
 component edit. *Closes when:* the line that hands over the gear can also put the player in
 front of what it is talking about.
-
-**The fixture world's second pass moved ten more modules and owes the other half of its
-answer.** `clusterPlane`, `conditions`, `fight`, `instances`, `moments`, `recipe`, `save`,
-`skillGrants`, `stopsOn` and `time` now stand on `FIXTURE_WORLD` — 23 modules import it,
-up from 13, and 121 lines of duplicated furniture are gone with **no change to the claim
-count**, which is the signal that no test's meaning moved. The lane doing it was killed
-mid-gates by a spend limit and never wrote its report, so **what is missing is the list of
-modules it left and why**. That list is the deliverable as much as the migration: a module
-whose world *is* the arithmetic under test is a correct thing to leave, and saying so is
-what stops the next pass re-opening it. *Closes when:* every remaining test module that
-declares a starting `# location camp`, a `max-health` or `attack` base, `hale`, `keen` or a
-plain item has been read and either moved or written down with its reason. **Counting the
-string is the wrong measure** — a module that prepends the fixture still writes
-`# location camp` again to add its own `entities:`, because sections merge.
