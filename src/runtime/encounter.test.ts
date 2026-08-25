@@ -82,6 +82,13 @@ on death:
 # entity iron-golem
 stats: max-health 3, dr 99
 
+# entity clay-golem
+stats: max-health 3.5, dr 99
+
+# entity wild-boar
+stats: max-health 500, wild-attack 4-7
+uses: flail
+
 # entity anvil
 // One-sided — an ordinary action, which must open no encounter at all.
 dent:
@@ -212,6 +219,35 @@ describe('damage against a target pool', () => {
 
     resolve(state, registry, secondsToMs(3));
     expect(state.activeAction).toBeNull();
+  });
+
+  it('is down a whole unit short of nothing, so a sliver of health is never a standing foe', () => {
+    const registry = loaded();
+    const state = started(registry);
+    useFight('chip', 'clay-golem', registry, state);
+    expect(state.activeAction!.actors!['clay-golem'].resources.health).toBe(toMilliUnits(2.5));
+
+    resolve(state, registry, secondsToMs(2));
+    expect(state.activeAction!.actors!['clay-golem'].resources.health).toBe(toMilliUnits(1.5));
+
+    resolve(state, registry, secondsToMs(3));
+    expect(state.activeAction).toBeNull();
+  });
+
+  it('spends a foe its own declared range, so two of its swings differ', () => {
+    const registry = loaded();
+    const state = started(registry);
+    armFightAction('chip', 'wild-boar', registry, state);
+
+    const levels: number[] = [];
+    for (let t = 1; t <= 4; t++) {
+      resolve(state, registry, secondsToMs(t));
+      levels.push(state.resources['health']);
+    }
+    const bites = levels.map((level, i) => (i === 0 ? toMilliUnits(30) : levels[i - 1]) - level);
+    for (const bite of bites) expect(bite).toBeGreaterThanOrEqual(toMilliUnits(4));
+    for (const bite of bites) expect(bite).toBeLessThanOrEqual(toMilliUnits(7));
+    expect(new Set(bites).size).toBeGreaterThan(1);
   });
 
   it('samples ranged damage per hit rather than averaging it', () => {

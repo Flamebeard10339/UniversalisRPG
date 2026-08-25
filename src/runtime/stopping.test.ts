@@ -220,13 +220,17 @@ describe('a pool running out stops the fight', () => {
     expect(state.log.filter((line) => line === 'You black out.')).toHaveLength(1);
   });
 
-  it('stops a deterministic drain on its exact second too', () => {
+  // Thirty health bled at sixty a minute is one a second, so it falls under one at 29.001s: the
+  // twenty-ninth blessing is paid and the thirtieth is not. The pool keeps the 0.999 it fell to —
+  // being spent and being empty are different facts, and this treadmill's on-empty block does not
+  // restore.
+  it('stops a deterministic drain the instant it falls under one, which is not a whole second', () => {
     const { registry, state } = started();
     armAction('entity', 'treadmill', 'run', registry, state);
     resolve(state, registry, secondsToMs(100));
 
-    expect(state.inventory['blessing']).toBe(30);
-    expect(state.resources['health']).toBe(0);
+    expect(state.inventory['blessing']).toBe(29);
+    expect(state.resources['health']).toBe(toMilliUnits(0.999));
     expect(state.activeAction).toBeNull();
   });
 

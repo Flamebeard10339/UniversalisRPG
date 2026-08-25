@@ -12,10 +12,12 @@ import {
   eventsFor,
   fireEvents,
   getDelta,
+  isSpent,
   newSegment,
   Segment,
   relocateTo,
   settlePools,
+  spendable,
 } from './effects';
 import { actorTitle, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
 import { armedAction, Participant, participants, seatOf } from './roster';
@@ -39,7 +41,7 @@ import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
 import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
-import { msUntilEmpty, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
+import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
 import { describeCondition, evaluateCondition } from './conditions';
 import { spanStart, spanSummary, type SpanStart } from './span';
 import type { Terminator } from '../content/sections/test';
@@ -70,7 +72,7 @@ function drainedAPool(segment: Segment): boolean {
     if (eventsFor(registry, resource.id, 'on empty').length === 0) continue;
     const delta = getDelta(segment.deltas, PLAYER, resource.id);
     if (delta >= 0) continue;
-    if ((state.resources[resource.id] ?? 0) + delta <= 0) return true;
+    if (isSpent((state.resources[resource.id] ?? 0) + delta)) return true;
   }
   return false;
 }
@@ -135,14 +137,14 @@ function completionsBeforeDrain(action: Action, state: GameState, registry: Regi
 
   let completions = Infinity;
   for (const resourceId of sites.unplannable) {
-    if ((state.resources[resourceId] ?? 0) > 0) completions = 1;
+    if (!isSpent(state.resources[resourceId] ?? 0)) completions = 1;
   }
   for (const [resourceId, milliPerCompletion] of sites.milliPerCompletion) {
     const current = state.resources[resourceId] ?? 0;
-    if (current <= 0) continue;
+    if (isSpent(current)) continue;
     const rate = registry.resources.get(resourceId)!.rate;
     const alsoRated = rate !== undefined && statValue(rate, state, registry) < 0;
-    completions = Math.min(completions, alsoRated ? 1 : Math.ceil(current / milliPerCompletion));
+    completions = Math.min(completions, alsoRated ? 1 : Math.ceil(spendable(current) / milliPerCompletion));
   }
   return completions;
 }
@@ -180,8 +182,8 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
     const ratePerMinute = statValue(resource.rate, state, registry);
     if (ratePerMinute >= 0) continue;
     const current = state.resources[resource.id] ?? 0;
-    if (current <= 0) continue;
-    const emptyIn = msUntilEmpty(current, toMilliUnits(ratePerMinute), state.resourceRateRemainders[resource.id] ?? 0);
+    if (isSpent(current)) continue;
+    const emptyIn = msToDrain(spendable(current), toMilliUnits(ratePerMinute), state.resourceRateRemainders[resource.id] ?? 0);
     const emptyInstant = state.time + emptyIn;
     if (emptyInstant < boundary.at) boundary = { at: emptyInstant, source: { kind: 'resource', resourceId: resource.id } };
   }
@@ -228,7 +230,7 @@ interface SwingOutcome {
 }
 
 function emptied(segment: Segment, actorId: string, resourceId: string): boolean {
-  return poolLevel(segment.state, segment.registry, actorId, resourceId) + getDelta(segment.deltas, actorId, resourceId) <= 0;
+  return isSpent(poolLevel(segment.state, segment.registry, actorId, resourceId) + getDelta(segment.deltas, actorId, resourceId));
 }
 
 function felledBy(segment: Segment, action: Action, self: string, other: string, reached: readonly string[]): string[] {
