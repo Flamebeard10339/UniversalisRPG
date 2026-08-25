@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MODAL_SCREENS } from '../grammar/actionResult';
 import { point } from '../grammar/range';
 import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools } from './effects';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
@@ -6,6 +7,10 @@ import { applyResultsNow, createGameState, GameState, initResources, PLAYER } fr
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { toMilliUnits } from './units';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { mintedName } from '../grammar/values';
+
+const OPENING_ONE = mintedName('name-yourself', DEFAULT_LANGUAGE);
 
 const MODULE = `
 # stat max-health
@@ -214,6 +219,20 @@ describe('applyResults: watching what was applied', () => {
     expect(state.log).toEqual([]);
   });
 
+  // Subjects derived from the whole of what `open modal:` may name, so a screen the language opens
+  // next month is held to the same line with nothing edited here.
+  it('tells a player a screen opened in the screen own words, for every screen a world may open', () => {
+    expect(MODAL_SCREENS.length).toBeGreaterThan(0);
+    for (const screen of MODAL_SCREENS) {
+      const { registry, state } = fresh();
+      applyResults(newSegment(state, registry), [{ kind: 'open-modal', modal: screen }], PLAYER);
+
+      expect(state.log, screen).toHaveLength(1);
+      expect(state.log[0], `${screen} reaches the player as the address the engine keys it by`).not.toContain(screen);
+      expect(state.log[0], screen).toContain(mintedName(screen, DEFAULT_LANGUAGE));
+    }
+  });
+
   it('narrates a modal once per batch through the observers a segment carries by default', () => {
     const { registry, state } = fresh();
     const wired = newSegment(state, registry);
@@ -223,7 +242,8 @@ describe('applyResults: watching what was applied', () => {
       { kind: 'give', item: 'coin', amount: { min: 1, max: 4 } },
     ], PLAYER, 5);
 
-    expect(state.log).toEqual(['modal:name-yourself']);
+    expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
+    expect(state.log[0], 'a screen names itself to a player in words, never as the address the engine keys it by').not.toContain('name-yourself');
     expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
   });
 
@@ -234,7 +254,7 @@ describe('applyResults: watching what was applied', () => {
 
     applyResults(segment, [{ kind: 'open-modal', modal: 'name-yourself' }], PLAYER);
 
-    expect(state.log).toEqual(['modal:name-yourself']);
+    expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
     expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);
   });
 });

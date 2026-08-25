@@ -5,6 +5,7 @@ import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { withoutNote } from '../grammar/note';
+import { mintedName } from '../grammar/values';
 
 declare const LOCALIZED: unique symbol;
 
@@ -44,6 +45,10 @@ export interface Localizer {
   spoken(key: string): Localized;
   line(key: string, render: (segments: TextSegment[]) => string): Localized;
   identifier(id: string): Localized;
+  // An address handed to a player as words, for the things nothing declares and so nothing can have
+  // named — a modal screen, above all. `identifier` puts the address itself in front of them, which
+  // is right where a reader is meant to be able to type it back.
+  minted(id: string): Localized;
 }
 
 export const BASE_LANGUAGE = 'en';
@@ -70,6 +75,7 @@ export function localizerFor(registry: Registry, language: string): Localizer {
     spoken: (key) => (pattern(locales, language, key) ?? key) as Localized,
     line: (key, render) => render(parseSegments(self.spoken(key), 0)) as Localized,
     identifier: (id) => id as Localized,
+    minted: (id) => mintedName(id, language) as Localized,
   };
   return self;
 }

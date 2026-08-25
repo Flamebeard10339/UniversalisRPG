@@ -1,5 +1,6 @@
 import { Cursor, DslError, Parser, Span } from './parser';
 import { range, Range } from './range';
+import { DEFAULT_LANGUAGE } from './section';
 
 export function refuseRange(cursor: Cursor, complaint: string): void {
   const start = cursor.pos;
@@ -119,6 +120,11 @@ export const humanizeEn = (id: string): string =>
     .filter((word) => word !== '')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+
+// The whole of what the engine does when it has to put a name in front of a player and nobody
+// wrote one. Casing is English, so a world playing in another language is given the plain last
+// segment rather than words cased by the wrong rules.
+export const mintedName = (id: string, language: string): string => (language === DEFAULT_LANGUAGE ? humanizeEn(id) : lastSegment(id));
 
 export interface Quantified {
   item: string;
