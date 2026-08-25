@@ -160,6 +160,7 @@ export const ENGINE_KEYS = [
   'engine.shell.command',
   'engine.shell.run',
   'engine.shell.level',
+  'engine.shell.levelled',
   'engine.shell.points',
   'engine.shell.spent',
   'engine.shell.ready',
