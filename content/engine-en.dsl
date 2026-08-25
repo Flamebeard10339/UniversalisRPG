@@ -181,6 +181,7 @@ engine.shell.global: World
 engine.shell.every-kind: Every kind
 engine.shell.section: Section
 engine.shell.grammar: Grammar
+engine.shell.colour: Colour
 engine.shell.starting: lines start this way
 engine.shell.undeclared: is not declared anywhere yet
 engine.shell.step-in: →
@@ -227,6 +228,7 @@ engine.replay.done: The run has played out.
 engine.replay.close: Close
 engine.repl.place: {location} ({id})
 engine.repl.here: Here: {entities}
+engine.repl.grouped: [{group}] {said}
 engine.repl.clock: [time: {time}s]
 engine.repl.pool: {resource}: {meter}
 engine.repl.swing: Your swing {meter}

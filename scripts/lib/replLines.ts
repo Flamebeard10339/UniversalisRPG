@@ -2,6 +2,7 @@ import { type EncounterFoe } from '../../src/runtime/encounter';
 import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
+import { type GroupRow } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
 
 // What a command answered with, written out as lines a player reads. Both drivers that put words
@@ -37,10 +38,16 @@ export const oneLine = (localizer: Localizer, parts: readonly Localized[], gap: 
 
 const shownLocations = new Set<string>();
 
+// A colour is not a word, so a terminal says the group instead of drawing it. The words are the
+// group's own `title:`, which is the same string the screen fills a cell for, rather than a second
+// name for the same thing kept here.
+export const grouped = (localizer: Localizer, group: GroupRow | undefined, said: Localized): Localized =>
+  group === undefined ? said : localizer.engine('engine.repl.grouped', { group: group.title, said });
+
 function formatChoices(choices: PlayChoice[], localizer: Localizer): PlayerLine[] {
   return choices.map((choice, index) => {
     const numbered = choice.detail
-      ? localizer.engine('engine.repl.choice.owned', { index: index + 1, owner: choice.detail, choice: choice.label })
+      ? localizer.engine('engine.repl.choice.owned', { index: index + 1, owner: grouped(localizer, choice.group, choice.detail), choice: choice.label })
       : localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.label });
     return say(numbered, 2);
   });
@@ -183,7 +190,7 @@ const formatSheet = (status: PlayStatus): ToolLine[] => {
 function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   const lines = [dumped(localizer, 'engine.repl.state.inventory', status.inventory)];
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
-  if (status.carried.length > 0) lines.push(field('carried', status.carried.map((row) => `${row.shown}${row.name === row.shown ? '' : ` [${row.name}]`} x${row.count}${row.worn ? ` worn:${row.worn.title}` : ''}`).join(', ')));
+  if (status.carried.length > 0) lines.push(field('carried', status.carried.map((row) => `${grouped(localizer, row.group, row.shown)}${row.name === row.shown ? '' : ` [${row.name}]`} x${row.count}${row.worn ? ` worn:${row.worn.title}` : ''}`).join(', ')));
   lines.push(dumped(localizer, 'engine.repl.state.xp', Object.fromEntries(status.xp.map((row) => [named(row.title, row.id), row.value]))));
   // Every slot, worn or bare — a slot printed only once something is in it leaves an empty-handed
   // session with nothing to name when it wants to put something on.

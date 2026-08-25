@@ -39,6 +39,8 @@ import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
+import { offeredBy, type GroupRow } from './grouping';
+export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
 
@@ -47,6 +49,7 @@ export interface PlayChoice {
   kind: PlayChoiceKind;
   label: Localized;
   detail?: Localized;
+  group?: GroupRow;
   leadsTo?: Answer;
   legs?: number;
 }
@@ -219,7 +222,7 @@ function fightChoices(entityId: string, registry: Registry, state: GameState, lo
     if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
     if (!requiresMet(action, state, registry) || !actionVisible(action, state, registry)) continue;
     if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-    choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), detail: localizer.title('entity', entityId) });
+    choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });
   }
   return choices;
 }
@@ -233,15 +236,15 @@ interface Offered {
 // what it can be asked to do, and what the player can open on it. Every one of them carries the
 // entity as `choice.detail`, which is the key the app already groups by.
 function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer): Offered[] {
-  const detail = localizer.title('entity', entityId);
+  const offered = offeredBy(registry, localizer, 'entity', entityId);
   const offers: Offered[] = [];
   if (entity.shop !== undefined && registry.shops.has(entity.shop)) {
-    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: detail }), detail }, minted: false });
+    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: offered.detail }), ...offered }, minted: false });
   }
   for (const action of availableActions(entity, state, registry)) {
     const slug = actionAddress(action);
     offers.push({
-      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), detail, leadsTo: movesTo(action) },
+      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), ...offered, leadsTo: movesTo(action) },
       minted: isMintedAction(action),
     });
   }
@@ -281,7 +284,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const action of availableActions(location, state, registry)) {
     const slug = actionAddress(action);
-    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), detail: localizer.title('location', location.id) });
+    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), ...offeredBy(registry, localizer, 'location', location.id) });
   }
 
   for (const [itemId] of itemCopies(state)) {
@@ -289,7 +292,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     if (!item) continue;
     for (const action of availableActions(item, state, registry)) {
       const slug = actionAddress(action);
-      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), detail: localizer.title('item', itemId) });
+      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), ...offeredBy(registry, localizer, 'item', itemId) });
     }
   }
 

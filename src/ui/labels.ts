@@ -40,6 +40,7 @@ export const LABELS = {
   'every-kind': 'engine.shell.every-kind',
   section: 'engine.shell.section',
   grammar: 'engine.shell.grammar',
+  colour: 'engine.shell.colour',
   starting: 'engine.shell.starting',
   undeclared: 'engine.shell.undeclared',
   'step-in': 'engine.shell.step-in',

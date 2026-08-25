@@ -1,31 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { offerCells } from './choices';
 import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
+import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
 import { LiveSheet } from './LiveSheet';
 import { GRID } from './sheetLayout';
 import { Splitter } from './Splitter';
-import type { LogEntry, LogKind } from './transcript';
+import type { LogEntry } from './transcript';
 import { useMoment } from './transient';
 import type { Words } from './words';
-
-const TONE_CLASS: Record<MessageTone, string> = {
-  plain: 'text-text',
-  ok: 'text-success',
-  warn: 'text-warning',
-  error: 'rounded-md border-l-2 border-danger bg-danger-surface px-2 py-1 text-danger-text',
-};
-
-const KIND_CLASS: Record<LogKind, string> = {
-  said: 'text-text',
-  place: 'pt-2 text-sm font-semibold uppercase tracking-wide text-accent',
-  describe: 'italic text-text-muted',
-  message: '',
-  detail: 'pl-3 text-sm text-text-subtle',
-};
 
 const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
 
@@ -33,7 +18,7 @@ function Line({ entry }: { entry: LogEntry }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
   return (
-    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 leading-relaxed ${WORDS_CLASS[entry.words]} ${KIND_CLASS[entry.kind]} ${tone}`}>
+    <p className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
       {entry.repeats > 1 ? <span className="tabular-nums text-text-subtle">{`(${entry.repeats}) `}</span> : null}
       {entry.text}
     </p>
@@ -45,7 +30,7 @@ function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: 
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
         {offerCells(choices).map((cell) => (
-          <div key={String(cell.name ?? cell.offers[0]?.id)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
+          <div key={String(cell.name ?? cell.offers[0]?.id)} style={fillOf(cell.group)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
             {cell.examine ? (
               <button
                 data-drive="choose"
@@ -117,7 +102,7 @@ export function Home({
             following.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <= NEAR_BOTTOM_PX;
           }}
         >
-          <div className="mx-auto flex max-w-2xl flex-col gap-2">
+          <div className="mx-auto flex max-w-2xl flex-col gap-1">
             {entries.map((entry) => (
               <Line key={entry.id} entry={entry} />
             ))}

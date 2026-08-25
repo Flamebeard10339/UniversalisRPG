@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addressable, NOWHERE, searching, searchHint, STATES, type Section, type Standing } from './authoringSurface';
-import { draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, TONES, tonesIn, type EditActs, type EditControls } from './editControls';
+import { colourIn, draftIn, editControls, kindsIn, openedIn, rowsIn, sectionKey, TONES, tonesIn, type EditActs, type EditControls } from './editControls';
 import { FORGOTTEN, type Editing } from './editorMemory';
 import { FIXTURE_SOURCES } from './testFixtures';
 
@@ -30,6 +30,7 @@ const EXERCISED: Record<keyof EditControls, true> = {
   text: true,
   cursor: true,
   take: true,
+  fill: true,
   stepIn: true,
   stepOut: true,
   scroll: true,
@@ -293,5 +294,35 @@ describe('what a row in the list wears', () => {
 
   it('wears only states the search asks for, so a colour and an is: term are one question', () => {
     expect(TONES.map(([state]) => state).filter((state) => STATES[state] === undefined)).toEqual([]);
+  });
+});
+
+// The picker is offered by the grammar rather than by a page that knows which field is which: a
+// hole a colour goes in is one written with the colour parser, under whatever keyword and whatever
+// kind.
+describe('the control a colour hole is edited with', () => {
+  const GROUP = '# group weapon\n';
+
+  const standing = (draft: string): Editing => ({ ...FORGOTTEN, surface: 'global', draft, cursor: draft.length });
+
+  const held = (draft: string): Pick<Parameters<typeof colourIn>[0], 'sections' | 'declared' | 'editing'> => ({ sections: addressed, declared: addressed, editing: standing(draft) });
+
+  it('stands on the colour already written where the cursor is', () => {
+    expect(colourIn(held(`${GROUP}colour: #22d3ee`))).toBe('#22d3ee');
+  });
+
+  it('opens on a colour of its own where nothing readable is written there yet', () => {
+    expect(colourIn(held(`${GROUP}colour: `))).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('is not offered where the cursor stands in a hole a colour does not go in', () => {
+    expect(colourIn(held(`${GROUP}title: Weapon`))).toBeNull();
+    expect(colourIn(held('# item sword\nvalue: 3'))).toBeNull();
+  });
+
+  it('writes what it was given into that hole and nowhere else', () => {
+    const shown = watching(standing(`${GROUP}colour: #22d3ee`));
+    shown.controls.fill('#ff0000');
+    expect(shown.at[0]!.draft).toBe(`${GROUP}colour: #ff0000`);
   });
 });

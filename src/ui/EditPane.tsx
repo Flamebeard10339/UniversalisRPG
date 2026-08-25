@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { searching, searchHint } from './authoringSurface';
-import { amissWith, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, tonesIn, type EditHeld } from './editControls';
+import { amissWith, colourIn, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, tonesIn, type EditHeld } from './editControls';
 import { pathOf } from './grammarPath';
 import { splitFrom } from './gesture';
 import { gathered, shownIn } from './offerGroups';
@@ -26,6 +26,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   const amiss = amissWith(held);
   const draft = draftIn(sections, editing);
   const path = pathOf(offering, draft, editing.cursor, (shapes) => `${shapes} ${words('starting')}`);
+  const colour = colourIn(held);
 
   useTestSurface('edit', held);
 
@@ -243,6 +244,20 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
                       </span>
                     ))}
                   </div>
+                  {colour === null ? null : (
+                    <input
+                      data-drive="edit.fill"
+                      type="color"
+                      aria-label={words('colour')}
+                      value={colour}
+                      onMouseDown={() => void (taken.current = true)}
+                      onChange={(event) => {
+                        taken.current = true;
+                        controls.fill(event.target.value);
+                      }}
+                      className="mt-1 w-full rounded-lg border border-border bg-panel"
+                    />
+                  )}
                   {offering.filling?.holds === undefined || offering.filling.holds.words.length === 0 ? null : (
                     <>
                       <div className="px-0 text-text">{'<operators>'}</div>

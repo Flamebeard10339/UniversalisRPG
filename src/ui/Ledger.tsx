@@ -1,3 +1,4 @@
+import { fillOf } from './lineStyle';
 import type { Entry } from './sheet';
 import { doll, GRID, type Layout } from './sheetLayout';
 import { TOUCH_FLOOR } from './viewport';
@@ -25,7 +26,7 @@ function Row({ entry, onOpen }: { entry: Entry; onOpen?: (id: string) => void })
 function Cell({ entry, onOpen }: { entry: Entry; onOpen?: (id: string) => void }): JSX.Element {
   return (
     <div
-      style={{ minHeight: TOUCH_FLOOR, ...(entry.at === undefined ? {} : { gridColumn: entry.at.column, gridRow: entry.at.row }) }}
+      style={{ minHeight: TOUCH_FLOOR, ...fillOf(entry.group), ...(entry.at === undefined ? {} : { gridColumn: entry.at.column, gridRow: entry.at.row }) }}
       className="relative flex flex-col justify-center rounded-2xl border border-border bg-surface-raised px-2 py-2 transition-transform duration-75 active:scale-[0.98] active:border-accent"
     >
       <Opener entry={entry} onOpen={onOpen} />

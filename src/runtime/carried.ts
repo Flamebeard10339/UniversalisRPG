@@ -1,6 +1,7 @@
 import { Registry } from '../content/registry';
 import type { Place } from '../content/sections/slot';
 import { carriedName } from './carriedName';
+import { grouping, type GroupRow } from './grouping';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { isGrownCopy, itemTemplate, packRows, wornCopy } from './itemInstance';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
@@ -11,6 +12,7 @@ export interface CarriedEntry {
   readonly count: number;
   readonly shown: Localized;
   readonly grown: boolean;
+  readonly group?: GroupRow;
   readonly worn?: { readonly slot: Answer; readonly title: Localized };
 }
 
@@ -38,11 +40,12 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
   const localizer = localizerOf(registry, state);
   const entries: CarriedEntry[] = [];
   for (const row of packRows(state)) {
+    const group = grouping(registry, localizer, 'item', row.template);
     if (row.kind === 'stack') {
       const name = nameOf(row.template, localizer, null);
-      entries.push({ id: row.template, name, count: row.count, shown: localizer.engine('engine.carried.stack', { item: name, count: row.count }), grown: false });
+      entries.push({ id: row.template, name, count: row.count, shown: localizer.engine('engine.carried.stack', { item: name, count: row.count }), grown: false, ...group });
     } else {
-      entries.push({ id: row.id, name: nameOf(row.template, localizer, row.id), count: 1, shown: nameOf(row.template, localizer, row.id), grown: true });
+      entries.push({ id: row.id, name: nameOf(row.template, localizer, row.id), count: 1, shown: nameOf(row.template, localizer, row.id), grown: true, ...group });
     }
   }
   for (const row of wornRows(state, registry)) {
@@ -54,6 +57,7 @@ export function carriedEntries(state: GameState, registry: Registry): CarriedEnt
       count: 1,
       shown: localizer.engine('engine.carried.worn', { item: row.name, slot: row.title }),
       grown,
+      ...grouping(registry, localizer, 'item', itemTemplate(state, row.item)),
       worn: { slot: row.slot, title: row.title },
     });
   }

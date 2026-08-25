@@ -38,7 +38,14 @@ import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 // printing — and needs no excuse from anybody. The list below is only for where they genuinely
 // differ, which is why it is one list and not one per driver: an excuse for a *difference*
 // belongs to no single surface.
+// A group is a colour, and a colour is not a word. The app fills the cell with it and has nothing
+// to say; a terminal cannot fill anything, so it prints the group's own `title:` beside what it
+// belongs to — which is the whole reason the word exists on the row at all. Held to each row that
+// carries one, so a driver that stopped saying it where it has no fill still fails.
+const DRAWN_RATHER_THAN_SAID = 'a group reaches the app as the colour it fills a cell with, which a terminal cannot draw and says in words instead. Neither surface has lost anything the other kept: the fill and the word are the same fact on the two channels each can carry';
+
 const PARITY_EXCUSED: readonly PathExcuse[] = [
+  ...['choices[].group', 'carried[].group'].map((path) => ({ path, why: DRAWN_RATHER_THAN_SAID, covers: () => true })),
   {
     path: 'modals[].options[].label',
     why: 'a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it. A terminal has no frame around a screen and names the question to say one is open at all',
