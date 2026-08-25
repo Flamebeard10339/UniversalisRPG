@@ -1493,10 +1493,11 @@ submit-modal: verb=equip
 open-modal: carried-items
 submit-modal: item=close
 // A worn item's plane is folded into the wearer's stats, so this one number is
-// both halves of what `verb=equip` did: 14 is the player's own 10, the iron
-// sword's 2, and the 2 that `whetted` carries at position 1 of the ring slotted
-// two hexes out. Nothing else on this route touches attack.
-assert: stat.attack = 14
+// both halves of what `verb=equip` did: 16 is the player's own 10, the 1 each
+// that melee and thieving grant for standing at level 1, the iron sword's 2,
+// and the 2 that `whetted` carries at position 1 of the ring slotted two hexes
+// out. Nothing else on this route touches attack.
+assert: stat.attack = 16
 expect only: growing-through-the-inventory-screen-end
 
 // Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
