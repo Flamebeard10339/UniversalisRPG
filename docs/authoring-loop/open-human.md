@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Fifteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Sixteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -336,3 +336,33 @@ mints for itself — so the grammar page never mentioned `discovered`, and now n
 whether completion is the authority for those. If the oracle owes them, it is an agent line
 with an obvious shape; if not, this is deleted and one sentence goes to `settled.md` saying
 which surface answers for minted names.*
+
+## Whether the shipped corpus still needs its `DEBUG` sections
+
+Your own follow-up, and it is answerable now that the fixture world exists — but the answer
+is not the one the follow-up assumed, so it comes back to you rather than being taken.
+
+**Measured:** 17 `DEBUG` marks, 264 lines, three modules — `tulsa.dsl` 9 (154 lines: the two
+hammers, the smith's chest, two saves, four tests), `combat-expansion.dsl` 5 (75 lines),
+`core.dsl` 3 (35 lines). Removing the *mechanism* touches about 14 files: the mark and its
+merge and print rules in `sections/define.ts`, the prose refusal and locale sweep in
+`load.ts`, the reachability refusal in `references.ts`, twelve `listedToPlayer` call sites
+across four runtime files, and `debugSheets.test.ts` deleted outright with claims edited in
+five more.
+
+**Why the fixture world is not the home for them.** A `.ts` fixture cannot be driven from
+the CLI — `npm run probe`, `npm run play` and `--test <id>` take files, directories or
+stdin — and **eight of the seventeen are `# save` and `# test` bodies you drive from a
+terminal**, standing on shipped ids. The home that would work is a `.dsl` outside
+`content/`, say `fixtures/debug.dsl` depending on `tulsa`: unreachable by construction just
+as the `.ts` is, no exclusion added, and still drivable.
+
+**What that trades away is real.** Today the engine *proves* a player cannot reach a DEBUG
+thing — anything reachable that names one is refused at load, and the locale sweep
+guarantees it says nothing in any language. In a separate file that proof weakens to *we did
+not load it*. And it reverses `settled.md`'s ruling that `# item million-attack-hammer` lives
+in the module of the test that swings it.
+
+*Moves when: he says whether that trade is worth 264 lines and a mechanism. If yes it is a
+substantial agent line with a known shape; if no, this is deleted and one sentence goes to
+`settled.md` saying the DEBUG mechanism stays and why the fixture world did not replace it.*

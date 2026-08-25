@@ -191,56 +191,6 @@ optionally be edited/skipped by modals."* So a reveal rate is a setting with a d
 the lane picks and the owner tunes, and a modal may say it wants the words at once.
 Explicitly low priority; it is here because it is no longer blocked.
 
-**A shared fixture world, kept as small as it can be.** Ruled: build it. The measurement
-that asked for it: removing the whetstone touched 57 files, and **seventeen of them were
-test modules each declaring their own `# item whetstone` with its own
-`item-experience: 1000`** — `itemInstance`, `modals` ×3, `session` ×2, `item`,
-`carriedItem`, `carriedScreen`, `clusterEffect`, `command`, `equipment`, `growth`,
-`itemContribution`, `pack`, `planeReport`, `planeScreen`, `stat`, `trade`. His
-constraint: *"Keep it as small as possible. Nothing needs a verbose examine, etc."*
-
-Two things a lane settles before writing much of it, either of which can send it back:
-
-- **`settled.md` says the opposite about `DEBUG`, deliberately** — and the objection has
-  since been measured and does not stand, so this no longer gates the line. `# item
-  million-attack-hammer` lives in the module of the test that swings it *"not in a testing
-  module, because a file the load path has to be told to leave out is a rule someone has to
-  remember."* That is a real rule and it is about **a `.dsl` under `content/`**. Both
-  shipped entry points derive their sources from that directory and nothing else —
-  `shippedFiles()` in `src/content/shipped.ts` reads it with `readdirSync`, and
-  `SHIPPED_SOURCES` in `src/ui/shippedContent.ts` globs it — so **a fixture world that is
-  a `.ts` module outside `content/` is unreachable by construction rather than by
-  exclusion**: there is nothing to tell the loader to leave out, and so nothing to
-  remember. The unreachability is therefore derived in the strongest available sense, and
-  what a guard has to hold is the *other* half: that the exclusion list stays exactly one
-  entry long. It is one today — `LOCAL_CHANGES_MODULE_ID`, which is not shipped and does
-  not exist in the repository — and a claim pinning it to that one, with its reason, is
-  what stops a second being added quietly later.
-
-- **Do not put the fixture world under `content/`**, and do not grow the exclusion. That
-  is the whole of what the settled ruling was protecting, and it is the one way this line
-  can still go wrong.
-- **Then the `DEBUG` sections in the shipped corpus are worth re-asking about**, which
-  is the owner's own follow-up. They stop being necessary the moment that guard exists,
-  and not one moment before it.
-
-The smaller second answer from the same measurement can be taken separately and needs
-none of this: **one engine word travels engine key → `locale.ts` row → `labels.ts` id →
-`planePanel.ts` channel → JSX**, so four files move for one word; and the verb set is
-declared in `sections/test.ts` and then re-listed by two `case 'feed':` arms in
-`session.ts` and a third dispatch in `growth.ts`.
-
----
-
-## Crossed from `open-human.md`, second pass, 2026-08-25
-
-Seventeen parked lines went to the owner after the playtest was read out and came back
-ruled. Each carries his answer; none is to be re-decided. What was left behind stood in
-`open-human.md` and was three lines; seven more have crossed back since, each carrying
-what the lane that hit it had already measured.
-
-### The town
-
 **Tulsa's map is wrong and the fix is one shape, not four edits.** Ruled:
 *"combat-expansion should not need locations or entities. It is a list of jewels and
 items. The proving ground should be permanently moved as a static fixture in tulsa.

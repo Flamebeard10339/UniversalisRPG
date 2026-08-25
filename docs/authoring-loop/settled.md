@@ -1019,6 +1019,30 @@ back through `noticeKey` — the same function every watcher mints a key with, s
 written into a key and what is read out of one is one rule. A notice counting nothing is a
 whole sentence and never folds.
 
+**A test world's shared furniture is a `.ts` outside `content/`, and nothing shipped can
+reach it.** `FIXTURE_WORLD` in `src/content/worldFixture.ts` holds only the intersection
+thirteen test modules were each spelling — a starting `# location camp`, two stat bases,
+two passives and one plain item — and every blade, jewel and orb stayed with the test that
+tunes it. It is unreachable **by construction rather than by exclusion**: both entry points
+derive their sources from `content/` and nothing else, `shippedFiles()` with `readdirSync`
+and `SHIPPED_SOURCES` with a glob, so there is no rule for anyone to remember. Sections
+merge within a source, so a world wanting more of the camp writes `# location camp` again
+and adds to it.
+
+**What may legally be missing from `content/` is derived from what the file says about
+itself.** The guard in `src/content/shipped.test.ts` takes the directory listing minus
+`shippedFiles()` and holds every member to declaring `pack: local` in its own `# info` —
+not to a name — with a vacuity half proving `renderLocalChangesModule` writes that pack and
+no shipped module does. `src/ui/shippedContent.test.ts` carries the claim across to the
+page, which reads the same directory a second way. Both were proved to fire by adding a
+real `.dsl` and a second filter.
+
+**Removing a piece of shared test furniture now touches one file.** That is what this line
+was for: the original measurement found seventeen test modules each declaring their own
+copy of the item being deleted. The wider finding is that the duplication was never only
+those seventeen — **24 modules still declare at least one of the six**, mostly outside the
+ruled scope, so the fixture has room to absorb more.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.
