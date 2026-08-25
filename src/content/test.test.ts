@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseModule } from './sections';
 import { DslError } from '../grammar/parser';
+import type { Threshold } from '../grammar/condition';
 import { parseDirectiveLine, printDirective } from './sections/test';
 import { MODAL_SCREENS } from '../grammar/actionResult';
 
@@ -107,7 +108,7 @@ describe('test: composable in-game scripts', () => {
           kind: 'comparison',
           left: { path: ['skills', 'combat', 'visits'] },
           operator: '>=',
-          right: 3,
+          right: { value: 3, places: 0 },
         },
       },
       {
@@ -118,8 +119,11 @@ describe('test: composable in-game scripts', () => {
   });
 
   it('weighs a threshold against a number the engine can hold, and still refuses a range for one', () => {
-    const [section] = parseModule(['# test folded', 'assert: stat.attack >= 1.5', 'assert: resource.health < -0.25'].join('\n')) as { value: { directives: { condition: { right: number } }[] } }[];
-    expect(section.value.directives.map((directive) => directive.condition.right)).toEqual([1.5, -0.25]);
+    const [section] = parseModule(['# test folded', 'assert: stat.attack >= 1.5', 'assert: resource.health < -0.25'].join('\n')) as { value: { directives: { condition: { right: Threshold } }[] } }[];
+    expect(section.value.directives.map((directive) => directive.condition.right)).toEqual([
+      { value: 1.5, places: 1 },
+      { value: -0.25, places: 2 },
+    ]);
 
     expect(() => parseModule(['# test folded', 'assert: stat.attack >= 1.5-2.5'].join('\n'))).toThrow(/threshold, not a quantity/);
     expect(() => parseModule(['# test folded', 'assert: has 1.5 plank'].join('\n'))).toThrow(DslError);

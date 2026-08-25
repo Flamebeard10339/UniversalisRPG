@@ -118,8 +118,8 @@ describe('evaluateCondition', () => {
   it('reads a node visit counter off a dotted <node-name>.visits reference', () => {
     const state = createGameState();
     state.visits.toll = 5;
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 5 }, state, registry)).toBe(true);
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: 6 }, state, registry)).toBe(false);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: { value: 5, places: 0 } }, state, registry)).toBe(true);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['toll', 'visits'] }, operator: '>=', right: { value: 6, places: 0 } }, state, registry)).toBe(false);
   });
 
   it('combines with not/and/or', () => {
@@ -182,7 +182,7 @@ describe('applyResult', () => {
 
   it('flips a >= count condition true once enough add: increments land', () => {
     const state = createGameState();
-    const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: 3 };
+    const condition: Condition = { kind: 'comparison', left: { path: ['rats-killed'] }, operator: '>=', right: { value: 3, places: 0 } };
     expect(evaluateCondition(condition, state, registry)).toBe(false);
     applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
     applyResultsNow(state, registry, [{ kind: 'add', variable: 'rats-killed', amount: 1 }]);
@@ -673,7 +673,7 @@ describe('a deterministic batch settles `on empty:` at the completion that drain
 
 describe('what an engine root reads', () => {
   const registry = loadInEnglish('');
-  const reads = (path: string[], state: GameState, right: number): boolean => evaluateCondition({ kind: 'comparison', left: { path }, operator: '=', right }, state, registry);
+  const reads = (path: string[], state: GameState, right: number): boolean => evaluateCondition({ kind: 'comparison', left: { path }, operator: '=', right: { value: right, places: 0 } }, state, registry);
 
   it('reads an xp total, a pool and a held count as numbers a comparison can bound', () => {
     const state = createGameState();

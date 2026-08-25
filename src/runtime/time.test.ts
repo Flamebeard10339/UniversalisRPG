@@ -29,8 +29,8 @@ describe('time reference', () => {
   it('is readable via an ordinary comparison condition', () => {
     const state = createGameState();
     advanceTime(state, secondsToMs(100));
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>=', right: 100 }, state, registry)).toBe(true);
-    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>', right: 100 }, state, registry)).toBe(false);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>=', right: { value: 100, places: 0 } }, state, registry)).toBe(true);
+    expect(evaluateCondition({ kind: 'comparison', left: { path: ['time'] }, operator: '>', right: { value: 100, places: 0 } }, state, registry)).toBe(false);
   });
 
   it('interpolates into rendered text', () => {

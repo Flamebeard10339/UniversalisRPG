@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { condition } from '../grammar/condition';
+import { comparison, condition, holds, type ComparisonOperator, type Condition } from '../grammar/condition';
 import { Action, entity } from './sections/entity';
 import { item } from './sections/item';
 import { location } from './sections/location';
@@ -680,7 +680,7 @@ describe('dialogue', () => {
       kind: 'comparison',
       left: { path: ['toll', 'visits'] },
       operator: '>=',
-      right: 5,
+      right: { value: 5, places: 0 },
     });
     expect(value.nodes[0].steps[1]).toEqual({
       kind: 'menu',
@@ -732,7 +732,7 @@ describe('condition grammar', () => {
       kind: 'comparison',
       left: { path: ['stat', 'attack'] },
       operator: '>',
-      right: 10,
+      right: { value: 10, places: 0 },
     });
   });
 
@@ -751,6 +751,50 @@ describe('condition grammar', () => {
 
   it('parses a hyphenated id starting with has- as a plain reference, not the has predicate', () => {
     expect(parse('has-shrimp')).toEqual(ref('has-shrimp'));
+  });
+
+  const weigh = (value: number, written: string): boolean => {
+    const parsed = parse(`stat.attack ${written}`) as Extract<Condition, { kind: 'comparison' }>;
+    return holds(value, parsed.operator, parsed.right);
+  };
+
+  it('weighs the engine answer at the precision the literal was written to', () => {
+    expect(weigh(41 * 1.24, '= 50.84')).toBe(true);
+    expect(weigh(41 * 1.24, '= 50.8')).toBe(true);
+    expect(weigh(41 * 1.24, '= 50.839')).toBe(false);
+    expect(weigh(50.8351, '= 50.84')).toBe(true);
+    expect(weigh(50.8349, '= 50.84')).toBe(false);
+  });
+
+  it('leaves a whole number meaning the figure itself, decimals and all', () => {
+    expect(weigh(41, '= 41')).toBe(true);
+    expect(weigh(41.4, '= 41')).toBe(false);
+    expect(weigh(9.7, '< 10')).toBe(true);
+  });
+
+  it('leaves every operator agreeing on which side of the literal a value fell', () => {
+    // Each operator said in terms of which of <, = and > a value fell under, so one added to the
+    // grammar with no word here fails the claim rather than going unweighed.
+    const derived: Record<ComparisonOperator, (fell: ComparisonOperator) => boolean> = {
+      '<': (fell) => fell === '<',
+      '=': (fell) => fell === '=',
+      '>': (fell) => fell === '>',
+      '<=': (fell) => fell !== '>',
+      '>=': (fell) => fell !== '<',
+      '!=': (fell) => fell !== '=',
+    };
+    expect(Object.keys(derived).sort()).toEqual([...comparison.forms].sort());
+
+    for (const literal of ['50.84', '50.8', '41', '0.5'])
+      for (const value of [41 * 1.24, 50.835, 50.8349, 41, 41.4, 0.4999, 0.5]) {
+        const fell = (['<', '=', '>'] as const).filter((operator) => weigh(value, `${operator} ${literal}`));
+        expect(fell).toHaveLength(1);
+        for (const [operator, agrees] of Object.entries(derived)) expect(weigh(value, `${operator} ${literal}`)).toBe(agrees(fell[0]));
+      }
+  });
+
+  it('prints a literal back with the decimals it was written to', () => {
+    for (const source of ['stat.attack = 50.84', 'stat.attack = 50.80', 'stat.attack >= 41', 'resource.health < -0.25']) expect(condition.print(parse(source))).toBe(source);
   });
 });
 
