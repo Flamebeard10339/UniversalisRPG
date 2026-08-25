@@ -12,6 +12,15 @@ export interface OfferGroup {
   offers: Offer[];
 }
 
+// One box on the sheet. What one object offers is one cell under that object's name; what nothing
+// in particular offers is a cell each, so a travel and a talk are the same size as everything else
+// rather than a row of their own.
+export interface OfferCell {
+  key: string;
+  name: Localized | null;
+  offers: Offer[];
+}
+
 const aWalkAway = (choice: PlayView['choices'][number]): boolean => choice.legs !== undefined && choice.legs > 1;
 
 export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
@@ -25,4 +34,12 @@ export function groupOffers(choices: PlayView['choices']): OfferGroup[] {
     else groups.push({ source, offers: [offer] });
   });
   return groups;
+}
+
+export function offerCells(choices: PlayView['choices']): OfferCell[] {
+  return groupOffers(choices).flatMap((group): OfferCell[] =>
+    group.source === null
+      ? group.offers.map((offer) => ({ key: String(offer.id), name: null, offers: [offer] }))
+      : [{ key: String(group.source), name: group.source, offers: group.offers }],
+  );
 }

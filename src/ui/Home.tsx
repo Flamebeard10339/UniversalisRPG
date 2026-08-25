@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MessageTone } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
-import { groupOffers } from './choices';
+import { offerCells } from './choices';
 import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
 import { SPLIT_DEFAULT, splitFrom } from './gesture';
 import { LiveSheet } from './LiveSheet';
+import { GRID } from './sheetLayout';
 import { Splitter } from './Splitter';
 import type { LogEntry, LogKind } from './transcript';
 import { useMoment } from './transient';
@@ -41,25 +42,25 @@ function Line({ entry }: { entry: LogEntry }): JSX.Element {
 
 function Sheet({ choices, onChoose }: { choices: PlayView['choices']; onChoose: (position: number) => void }): JSX.Element {
   return (
-    <div className="flex flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
-      {groupOffers(choices).map((group) => (
-        <div key={group.source ?? ''} className="flex flex-col gap-1">
-          {group.source ? <p className="px-1 text-xs uppercase tracking-wide text-text-subtle">{group.source}</p> : null}
-          <div className="flex flex-wrap gap-2">
-            {group.offers.map((offer) => (
+    <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
+      <div className={`mx-auto max-w-2xl ${GRID}`}>
+        {offerCells(choices).map((cell) => (
+          <div key={cell.key} className="flex flex-col overflow-hidden rounded-2xl border border-border bg-panel">
+            {cell.name ? <p className="truncate px-2 py-1 text-center text-xs uppercase tracking-wide text-text-subtle">{cell.name}</p> : null}
+            {cell.offers.map((offer) => (
               <button
                 key={offer.id}
                 data-drive="choose"
                 type="button"
                 onClick={() => onChoose(offer.position)}
-                className="grow basis-40 rounded-xl border border-border bg-panel px-3 py-2 text-sm font-medium transition-transform duration-75 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
+                className="w-full border-t border-border px-2 py-2 text-xs font-medium transition-transform duration-75 first:border-t-0 active:scale-[0.97] active:bg-accent-strong active:text-accent-text"
               >
                 {offer.label}
               </button>
             ))}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

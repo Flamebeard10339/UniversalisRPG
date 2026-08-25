@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
-import { groupOffers } from './choices';
+import { groupOffers, offerCells } from './choices';
 import { drawnFor, type Place } from './discovery';
 
 const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized(label), ...(detail ? { detail: asLocalized(detail) } : {}) });
@@ -38,6 +38,24 @@ describe('the offers on the sheet', () => {
 
     expect(groups.flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a', 'travel:yard']);
     expect(groups[0].offers.map((offer) => offer.position)).toEqual([1, 2]);
+  });
+
+  it('draws what one object offers as one cell under its name, and everything else a cell each', () => {
+    const cells = offerCells([choice('a', 'Talk to Miki'), choice('b', 'ascend', 'Stairs'), choice('c', 'look in', 'Mirror'), choice('d', 'descend', 'Stairs')]);
+
+    expect(cells.map((cell) => cell.name)).toEqual([null, 'Stairs', 'Mirror']);
+    expect(cells.map((cell) => cell.offers.map((offer) => offer.label))).toEqual([['Talk to Miki'], ['ascend', 'descend'], ['look in']]);
+  });
+
+  it('gives every cell a key of its own where nothing in particular is offering', () => {
+    const cells = offerCells([choice('a', 'Talk to Miki'), choice('b', 'Talk to Rowan')]);
+
+    expect(cells).toHaveLength(2);
+    expect(new Set(cells.map((cell) => cell.key)).size).toBe(2);
+  });
+
+  it('has nothing to draw when the engine is offering nothing', () => {
+    expect(offerCells([])).toEqual([]);
   });
 
   it('withdraws a walk-away offer only where the map is drawing the place it leads to', () => {
