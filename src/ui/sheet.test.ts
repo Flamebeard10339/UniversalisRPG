@@ -23,7 +23,6 @@ const plane = (over: Partial<Plane> = {}): Plane => ({
   title: asLocalized('Blade'),
   name: asLocalized('Modified Blade'),
   level: 3,
-  maxLevel: 20,
   spent: 1,
   remaining: 2,
   links: [],

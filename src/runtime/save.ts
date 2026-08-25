@@ -21,7 +21,7 @@ import { emptyPlayerSheet, PLAYER, PLAYER_FIELDS, templateOf } from './state';
 import { isSettingName, isSettingSheet, standingChoice, standingSettings, type SettingSheet } from './settings';
 
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
-export const SAVE_VERSION = 12;
+export const SAVE_VERSION = 13;
 
 export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'carriedTold'>;
 

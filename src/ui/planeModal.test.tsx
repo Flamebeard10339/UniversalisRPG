@@ -13,7 +13,7 @@ const OPENING = [
   'load: growing-a-heartwood-blade-start',
   'use: entity.smiths-chest.open',
   'open-modal: carried-items',
-  'submit-modal: item=core.iron-sword',
+  'submit-modal: item=2',
   'submit-modal: verb=grow',
 ];
 

@@ -148,7 +148,7 @@ describe('one accumulator, and one place that writes it', () => {
     armFightAction('swing', 'rat', registry, state);
     resolve(state, registry, secondsToMs(4));
 
-    expect(SAVE_VERSION).toBe(12);
+    expect(SAVE_VERSION).toBe(13);
     const { version, ...diff } = JSON.parse(serializeSave(state, registry));
     expect(Object.keys(diff.xp)).toEqual(['melee', 'hide']);
     expect(compareSave(state, { version, diff }, registry)).toEqual([]);

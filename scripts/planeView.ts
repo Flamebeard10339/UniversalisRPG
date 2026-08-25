@@ -91,7 +91,6 @@ function heading(plane: PlaneReport, worn: boolean, localizer: Localizer): Local
   return localizer.engine(worn ? 'engine.repl.plane.heading.worn' : 'engine.repl.plane.heading', {
     plane: plane.name,
     level: plane.level,
-    max: plane.maxLevel,
     spent: plane.spent,
     points,
   });

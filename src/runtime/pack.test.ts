@@ -11,7 +11,7 @@ import { applyResultsNow } from './effects';
 import { armAction } from './runtime';
 import { carriedEntries } from './carried';
 import { equip, unequip } from './equipment';
-import { feedItem, packRows, receiveItem } from './itemInstance';
+import { packRows, receiveItem } from './itemInstance';
 import { initialState, loadSave, SAVE_VERSION } from './save';
 import { parseSaveSection } from '../content/sections/save';
 import { applyDirective, startSession, view } from './session';
@@ -46,11 +46,7 @@ title: coin
 # item blade
 title: blade
 slot: mainhand
-max-level: 10
-
-# item whetstone
-title: whetstone
-item-experience: 1000
+item-level: 4
 
 # action gather
 title: gather
@@ -126,12 +122,10 @@ describe('how many things the pack holds', () => {
     const state = standing(registry);
     receiveItem(state, registry, 'pebble', 4);
     receiveItem(state, registry, 'blade', 2);
-    receiveItem(state, registry, 'whetstone', 1);
-    expect(feedItem(state, registry, 'blade', 'whetstone').ok).toBe(true);
 
     const rows = packRows(state);
     expect(rows.length).toBe(3);
-    expect(shown(state, registry).slice(0, rows.length)).toEqual(['pebble x4', 'blade x1', 'Modified blade']);
+    expect(shown(state, registry).slice(0, rows.length)).toEqual(['pebble x4', 'Modified blade', 'Modified blade']);
   });
 
   it('does not count what is worn, which the sheet draws under its own heading', () => {
@@ -141,9 +135,9 @@ describe('how many things the pack holds', () => {
     receiveItem(state, registry, 'pebble', 1);
     expect(packRows(state).length).toBe(2);
 
-    expect(equip(state, registry, 'blade')).toBe(true);
+    expect(equip(state, registry, '1')).toBe(true);
     expect(packRows(state).length).toBe(1);
-    expect(shown(state, registry)).toEqual(['pebble x1', 'blade (Mainhand)']);
+    expect(shown(state, registry)).toEqual(['pebble x1', 'Modified blade (Mainhand)']);
   });
 });
 
@@ -163,12 +157,12 @@ describe('something arriving at a pack with no room', () => {
     const registry = twoSlots();
     const state = standing(registry);
     receiveItem(state, registry, 'blade', 1);
-    equip(state, registry, 'blade');
+    equip(state, registry, '1');
     receiveItem(state, registry, 'pebble', 1);
     receiveItem(state, registry, 'twig', 1);
 
     expect(unequip(state, registry, 'mainhand')).toBe(false);
-    expect(state.equipped).toEqual({ mainhand: 'blade' });
+    expect(state.equipped).toEqual({ mainhand: '1' });
     expect(packRows(state).length).toBe(2);
   });
 
@@ -197,19 +191,12 @@ describe('something arriving at a pack with no room', () => {
     expect(state.inventory.stone).toBe(4);
   });
 
-  it('refuses to grow 1 of 2 blades, which would stand beside the stack, and grows the last one, which replaces it', () => {
+  it('takes as many blades as there are rows for and turns the rest away, because no two of them share one', () => {
     const registry = twoSlots();
-    const beside = standing(registry);
-    receiveItem(beside, registry, 'blade', 2);
-    receiveItem(beside, registry, 'whetstone', 1);
-    expect(feedItem(beside, registry, 'blade', 'whetstone').ok).toBe(false);
-    expect(packRows(beside).length).toBe(2);
+    const state = standing(registry);
 
-    const replacing = standing(registry);
-    receiveItem(replacing, registry, 'blade', 1);
-    receiveItem(replacing, registry, 'whetstone', 1);
-    expect(feedItem(replacing, registry, 'blade', 'whetstone').ok).toBe(true);
-    expect(packRows(replacing).length).toBe(1);
+    expect(receiveItem(state, registry, 'blade', 3)).toBe(2);
+    expect(packRows(state).length).toBe(2);
   });
 });
 

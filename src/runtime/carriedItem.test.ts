@@ -12,13 +12,15 @@ entities:
 
 # item blade
 slot: mainhand
+item-level: 4
 examine: A plain steel blade.
 polish:
   instant
   say: You work the edge to a shine.
 
-# item whetstone
-item-experience: 1000
+# item hauberk
+title: Hauberk
+slot: offhand
 
 # item sharp-blade
 examine: A blade with a killing edge.
@@ -38,23 +40,30 @@ grind:
   time: 1
   take: 1 blade
   give: 1 sharp-blade
+mend:
+  instant
+  take: 1 hauberk
+  say: She hammers the rings back true.
 
 # recipe sharpen
 in: 1 blade
 out: sharp-blade
 say: You grind the blade to a killing edge.
 
-// The one blade, worn. Re-recorded for c21: written under the invariant it
-// replaced, this fixture carried the blade and wore it at once, which now spells
-// two blades and is not what any test below is about.
+// A base is a copy of its own from the moment it drops, so every fixture below
+// spells its blades as instances and none of them is ever in a stack.
 # save one-blade
-{"version":${SAVE_VERSION},"inventory":{"whetstone":1},"equipped":{"mainhand":"blade"}}
+{"version":${SAVE_VERSION},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save carried-blade
-{"version":${SAVE_VERSION},"inventory":{"blade":1,"whetstone":1}}
+{"version":${SAVE_VERSION},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save two-blades
-{"version":${SAVE_VERSION},"inventory":{"blade":2,"whetstone":1},"equipped":{"mainhand":"blade"}}
+{"version":${SAVE_VERSION},"equipped":{"mainhand":"1"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"blade","payload":{"roll":0.75,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+// The one thing here that does stack, worn with none left behind it.
+# save one-hauberk
+{"version":${SAVE_VERSION},"equipped":{"offhand":"hauberk"}}
 `;
 
 const registry = loadInEnglish(MODULE);
@@ -66,7 +75,6 @@ function choices(session: PlaySession): string[] {
 function grownFrom(save: string): PlaySession {
   const session = startSession(registry);
   applyDirective(session, { kind: 'load', save });
-  expect(applyDirective(session, { kind: 'feed', target: 'blade', food: 'whetstone' }).failure).toBeUndefined();
   return session;
 }
 
@@ -126,32 +134,20 @@ describe('a grown copy is never spent', () => {
 
   it('refuses a cost a worn stack copy alone covers, and leaves it on', () => {
     const session = startSession(registry);
-    applyDirective(session, { kind: 'load', save: 'one-blade' });
-    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'temper' });
+    applyDirective(session, { kind: 'load', save: 'one-hauberk' });
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'mend' });
 
     const played = view(session);
-    expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
-    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: 'blade', name: 'Blade' }]);
+    expect(played.said).toContain('Your Hauberk is the one you are wearing, and what you wear is never spent.');
+    expect(played.equipment).toEqual([{ slot: 'offhand', title: 'Offhand', item: 'hauberk', name: 'Hauberk' }]);
   });
 
-  it('stops a repeating action when the stack runs dry, rather than running on nothing', () => {
-    const session = grownFrom('two-blades');
-    applyDirective(session, { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'grind' } });
-    applyDirective(session, { kind: 'wait', seconds: 30 });
-
-    const played = view(session);
-    expect(played.inventory['sharp-blade']).toBe(1);
-    expect(played.inventory.blade).toBeUndefined();
-    expect(played.grown).toEqual({ '1': 'blade' });
-  });
-
-  it('spends the stack, and only the stack, when one is still there', () => {
+  it('refuses however many copies are held, because a base never joins the stack a cost is taken from', () => {
     const session = grownFrom('two-blades');
     applyDirective(session, { kind: 'craft', recipe: 'sharpen' });
 
     const played = view(session);
-    expect(played.inventory['sharp-blade']).toBe(1);
-    expect(played.inventory.blade).toBeUndefined();
-    expect(played.grown).toEqual({ '1': 'blade' });
+    expect(played.inventory['sharp-blade']).toBeUndefined();
+    expect(played.grown).toEqual({ '1': 'blade', '2': 'blade' });
   });
 });

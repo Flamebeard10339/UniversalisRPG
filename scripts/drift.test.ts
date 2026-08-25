@@ -86,7 +86,6 @@ const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
   ['verb', 'grow'],
   ['plane', 'allocate: slot e'],
   ['plane', 'slot: e with core.crossroads-jewel'],
-  ['plane', "feed: with core.masters-whetstone"],
   ['plane', 'go: 1,0'],
   ['plane', 'allocate: position 1'],
   ['plane', 'allocate: slot ne'],
@@ -167,13 +166,13 @@ describe('the two drivers cannot drift', () => {
   it('walks the crafting route through both drivers, gesture against typed line', () => {
     const { repl, gui } = bothDrivers();
     inStep(repl, gui, 'use: entity.tulsa.smiths-chest.open');
-    inStep(repl, gui, '/inv core.iron-sword', () => gui.open('core.iron-sword'));
+    inStep(repl, gui, '/inv 2', () => gui.open('2'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 
     expect(gui.snapshot().view.modals).toEqual([]);
     const grown = JSON.parse(gui.serialized()) as SerializedGrowth;
-    expect(Object.keys(grown.instances.byId['1'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
-    expect(grown.equipped).toEqual({ mainhand: '1' });
+    expect(Object.keys(grown.instances.byId['2'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
+    expect(grown.equipped).toEqual({ mainhand: '2' });
   });
 });
 

@@ -590,7 +590,6 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'equip':
     case 'unequip':
     case 'setting':
-    case 'feed':
     case 'slot':
     case 'allocate':
     case 'apply':
@@ -785,7 +784,6 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       state.settings = chosenSetting(state.settings, directive.setting, choice);
       return {};
     }
-    case 'feed':
     case 'slot':
     case 'allocate':
     case 'apply':

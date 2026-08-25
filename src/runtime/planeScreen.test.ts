@@ -8,7 +8,7 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { carriedFrame } from './carried';
 import { equip } from './equipment';
 import { growLine } from './growth';
-import { grownItems, wornCopy } from './itemInstance';
+import { grownItems, receiveItem, wornCopy } from './itemInstance';
 import { planeReport } from './planeReport';
 import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { initialState } from './save';
@@ -40,7 +40,7 @@ open-connections: e
 # item blade
 title: Blade
 slot: mainhand
-max-level: 20
+item-level: 2
 origin-cluster: core
 
 # item spark-jewel
@@ -51,19 +51,15 @@ cluster-jewel: spark
 title: Ember Jewel
 cluster-jewel: spark
 
-# item whetstone
-title: Whetstone
-item-experience: 1000
-
 # item rope
 title: Rope
 `;
 
 const registry = loadInEnglish(MODULE);
 
-function carrying(inventory: Record<string, number>): GameState {
+function carrying(holdings: Record<string, number>): GameState {
   const state = initialState(registry);
-  Object.assign(state.inventory, inventory);
+  for (const [id, count] of Object.entries(holdings)) receiveItem(state, registry, id, count);
   return state;
 }
 
@@ -81,25 +77,23 @@ function walk(state: GameState, from: ModalFrame | null, answers: readonly strin
   return frame;
 }
 
-const plane = (state: GameState, answers: readonly string[], target = 'blade'): PlaneFrame => {
+const plane = (state: GameState, answers: readonly string[], target = '1'): PlaneFrame => {
   const frame = walk(state, planeFrame(target), answers);
   if (frame === null || frame.name !== 'item-plane') throw new Error('the screen did not come back');
   return frame;
 };
 
-const FED = ['feed: with whetstone', 'feed: with whetstone'];
-
 describe('what the plane screen lists', () => {
-  it('lists the positions and slots a point may go to, and the food a copy takes', () => {
-    const state = carrying({ blade: 1, whetstone: 1, rope: 1 });
+  it('lists the positions and slots a point may go to', () => {
+    const state = carrying({ blade: 1, rope: 1 });
 
-    expect(values(planeFrame('blade'), state)).toEqual(['allocate: slot e', 'allocate: slot ne', 'feed: with whetstone', BACK]);
+    expect(values(planeFrame('1'), state)).toEqual(['allocate: slot e', 'allocate: slot ne', BACK]);
   });
 
   it('lists one value per open slot and jewel that fits it, and no jewel the player has none of', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1, 'ember-jewel': 1, rope: 1 });
+    const state = carrying({ blade: 1, 'spark-jewel': 1, 'ember-jewel': 1, rope: 1 });
 
-    expect(values(plane(state, [...FED, 'allocate: slot e']), state)).toEqual([
+    expect(values(plane(state, ['allocate: slot e']), state)).toEqual([
       'slot: e with spark-jewel',
       'slot: e with ember-jewel',
       'allocate: slot ne',
@@ -108,59 +102,56 @@ describe('what the plane screen lists', () => {
   });
 
   it('lists the hexagons a step from this one, from either side of the slot joining them', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 2 });
-    const grown = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
+    const state = carrying({ blade: 1, 'spark-jewel': 2 });
+    const grown = plane(state, ['allocate: slot e', 'slot: e with spark-jewel']);
 
     expect(values(grown, state)).toEqual(['go: 1,0', 'allocate: slot ne', BACK]);
     expect(values({ ...grown, hex: '1,0' }, state)).toEqual(['go: 0,0', 'allocate: position 1', BACK]);
   });
 
   it('publishes the value that leaves beside every question, and only it for a copy that has gone', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+    const state = carrying({ blade: 1 });
 
-    expect([...values(planeFrame('blade'), state)].pop()).toBe(BACK);
+    expect([...values(planeFrame('1'), state)].pop()).toBe(BACK);
     expect(values(planeFrame('rope'), state)).toEqual([BACK]);
-    expect(values(planeFrame('blade', '9,9'), state)).toEqual([BACK]);
+    expect(values(planeFrame('1', '9,9'), state)).toEqual([BACK]);
   });
 });
 
 describe('the modal prefills and never narrows', () => {
   it('publishes each growth as the directive it becomes, less what the frame holds', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+    const state = carrying({ blade: 1 });
 
     const completed: Record<string, string> = {
-      'allocate: slot e': 'allocate: blade at 0,0 slot e',
-      'allocate: slot ne': 'allocate: blade at 0,0 slot ne',
+      'allocate: slot e': 'allocate: 1 at 0,0 slot e',
+      'allocate: slot ne': 'allocate: 1 at 0,0 slot ne',
     };
 
-    expect(values(planeFrame('blade'), state).filter((value) => value !== BACK)).toEqual([...Object.keys(completed), 'feed: with whetstone']);
+    expect(values(planeFrame('1'), state).filter((value) => value !== BACK)).toEqual(Object.keys(completed));
     for (const [value, line] of Object.entries(completed)) {
-      expect(line.replace(' blade at 0,0', '').replace(' blade', '')).toBe(value);
-      expect(parseDirectiveLine(line)).toEqual(expect.objectContaining({ target: 'blade' }));
+      expect(line.replace(' 1 at 0,0', '')).toBe(value);
+      expect(parseDirectiveLine(line)).toEqual(expect.objectContaining({ target: '1' }));
     }
   });
 
   it('spells the id of the item an argument points at, and never its title', () => {
-    const state = carrying({ blade: 1, whetstone: 3, 'spark-jewel': 1 });
-    const screen = plane(state, [...FED, 'allocate: slot e']);
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
+    const screen = plane(state, ['allocate: slot e']);
     const published = values(screen, state);
     const shown = (planeOptions(screen, state, registry)[0].values ?? []).map((choice) => choice.shown);
 
     expect(published).toContain('slot: e with spark-jewel');
-    expect(published).toContain('feed: with whetstone');
-    expect(published.some((value) => value.includes('Spark Jewel') || value.includes('Whetstone'))).toBe(false);
+    expect(published.some((value) => value.includes('Spark Jewel'))).toBe(false);
     expect(shown).toContain('slot: e with Spark Jewel');
     expect(parseDirectiveLine('slot: 1 at 0,0 e with spark-jewel')).toEqual(expect.objectContaining({ target: '1' }));
   });
 
   it('reaches byte-identical state from the screen and from the directives typed in full', () => {
-    const answered = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
-    const typed = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    const answered = carrying({ blade: 1, 'spark-jewel': 1 });
+    const typed = carrying({ blade: 1, 'spark-jewel': 1 });
 
-    plane(answered, [...FED, 'allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0', 'allocate: position 1']);
+    plane(answered, ['allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0', 'allocate: position 1']);
     for (const line of [
-      'feed: blade with whetstone',
-      'feed: 1 with whetstone',
       'allocate: 1 at 0,0 slot e',
       'slot: 1 at 0,0 e with spark-jewel',
       'allocate: 1 at 1,0 position 1',
@@ -175,25 +166,25 @@ describe('the modal prefills and never narrows', () => {
 
 describe('what the screen does with an answer', () => {
   it('changes the focused hexagon and no game state at all', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
-    const grown = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
+    const grown = plane(state, ['allocate: slot e', 'slot: e with spark-jewel']);
     const before = JSON.stringify(state);
 
     expect(walk(state, grown, ['go: 1,0'])).toEqual(planeFrame('1', '1,0'));
     expect(JSON.stringify(state)).toBe(before);
   });
 
-  it('grows a base still in its stack and comes back holding the copy that minted', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+  it('grows the copy the screen was opened on, and comes back holding it', () => {
+    const state = carrying({ blade: 1 });
 
-    expect(walk(state, planeFrame('blade'), ['feed: with whetstone'])).toEqual(planeFrame('1'));
+    expect(walk(state, planeFrame('1'), ['allocate: slot e'])).toEqual(planeFrame('1'));
     expect(grownItems(state)).toEqual({ '1': 'blade' });
   });
 
   it('routes a slotting and an allocation to the growth verbs already shipped', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
 
-    plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
+    plane(state, ['allocate: slot e', 'slot: e with spark-jewel']);
     expect(planeReport(registry, state, '1')?.clusters.map((cluster) => [cluster.hex, cluster.jewel])).toEqual([
       ['0,0', 'core'],
       ['1,0', 'spark'],
@@ -202,8 +193,8 @@ describe('what the screen does with an answer', () => {
   });
 
   it('states what the plane said, leaves the screen where it was, and moves nothing', () => {
-    const state = carrying({ blade: 1, whetstone: 1, 'spark-jewel': 1 });
-    const spent = plane(state, ['feed: with whetstone', 'allocate: slot e', 'slot: e with spark-jewel', 'allocate: slot ne', 'go: 1,0']);
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
+    const spent = plane(state, ['allocate: slot e', 'slot: e with spark-jewel', 'allocate: slot ne', 'go: 1,0']);
     const before = JSON.stringify(state);
 
     const refused = walk(state, spent, ['allocate: position 1']);
@@ -215,8 +206,8 @@ describe('what the screen does with an answer', () => {
   });
 
   it('returns an inventory frame with that copy still selected, and an empty one for a copy that has gone', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
-    const grown = plane(state, ['feed: with whetstone']);
+    const state = carrying({ blade: 1 });
+    const grown = plane(state, ['allocate: slot e']);
 
     expect(walk(state, grown, [BACK])).toEqual(carriedFrame({ item: '1' }));
     expect(walk(state, planeFrame('rope'), [BACK])).toEqual(carriedFrame());
@@ -225,48 +216,48 @@ describe('what the screen does with an answer', () => {
 
 describe('what the screen has in hand', () => {
   it('names the copy and the hexagon, whichever way the copy is carried', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
 
-    expect(planeFocus(planeFrame('blade'))).toEqual({ kind: 'plane', instance: 'blade', hex: '0,0' });
-    const walked = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0']);
+    expect(planeFocus(planeFrame('1'))).toEqual({ kind: 'plane', instance: '1', hex: '0,0' });
+    const walked = plane(state, ['allocate: slot e', 'slot: e with spark-jewel', 'go: 1,0']);
     expect(planeFocus(walked)).toEqual({ kind: 'plane', instance: '1', hex: '1,0' });
     expect(planeReport(registry, state, planeFocus(walked).instance)?.clusters.map((cluster) => cluster.hex)).toContain('1,0');
   });
 
   it('names them the same whatever the plane last said', () => {
-    expect(planeFocus(planeFrame('blade', '1,0', says('engine.plane.no-points', { node: anId('position 1 of 1,0') })))).toEqual({ kind: 'plane', instance: 'blade', hex: '1,0' });
+    expect(planeFocus(planeFrame('1', '1,0', says('engine.plane.no-points', { node: anId('position 1 of 1,0') })))).toEqual({ kind: 'plane', instance: '1', hex: '1,0' });
   });
 });
 
 describe('what a saved frame may still point at', () => {
   it('refuses a frame growing a copy the player no longer carries', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+    const state = carrying({ blade: 1 });
 
-    expect(planeStale(planeFrame('blade'), state, registry)).toBeNull();
+    expect(planeStale(planeFrame('1'), state, registry)).toBeNull();
     expect(planeStale(planeFrame('rope'), state, registry)).toBe('it grows rope, which the player no longer carries');
     expect(planeStale(planeFrame('9'), state, registry)).toBe('it grows 9, which the player no longer carries');
   });
 
   it('names the slot, and not the spelling for it, when a frame grows one that has emptied', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+    const state = carrying({ blade: 1 });
 
     expect(planeStale(planeFrame(wornCopy('mainhand')), state, registry)).toBe('it grows what was worn in mainhand, and that slot is empty');
 
-    equip(state, registry, 'blade');
+    equip(state, registry, '1');
     expect(planeStale(planeFrame(wornCopy('mainhand')), state, registry)).toBeNull();
   });
 
   it('refuses a frame holding a hexagon that plane has no cluster in', () => {
-    const state = carrying({ blade: 1, whetstone: 1 });
+    const state = carrying({ blade: 1 });
 
-    expect(planeStale(planeFrame('blade', '1,0'), state, registry)).toBe('it holds 1,0, where that plane has no cluster');
+    expect(planeStale(planeFrame('1', '1,0'), state, registry)).toBe('it holds 1,0, where that plane has no cluster');
   });
 });
 
 describe('what the heading says', () => {
   it('says the cluster in focus in its own words, and the hexagon it moved off in the base’s', () => {
-    const state = carrying({ blade: 1, whetstone: 2, 'spark-jewel': 1 });
-    const grown = plane(state, [...FED, 'allocate: slot e', 'slot: e with spark-jewel']);
+    const state = carrying({ blade: 1, 'spark-jewel': 1 });
+    const grown = plane(state, ['allocate: slot e', 'slot: e with spark-jewel']);
 
     expect(label({ ...grown, hex: '1,0' }, state)).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire.');
     expect(label(grown, state)).toBe('Modified Blade at 0,0');
@@ -290,9 +281,10 @@ describe('a frame carries a key, not a sentence', () => {
 
   const refusedIn = (language: string): { frame: PlaneFrame; state: GameState } => {
     const state = initialState(bilingual, language);
-    Object.assign(state.inventory, { blade: 1, whetstone: 2, 'spark-jewel': 1 });
-    let frame: ModalFrame | null = planeFrame('blade');
-    for (const answer of [...FED, 'allocate: slot e', 'slot: e with spark-jewel', 'allocate: slot ne', 'go: 1,0', 'allocate: position 1']) {
+    receiveItem(state, bilingual, 'blade', 1);
+    receiveItem(state, bilingual, 'spark-jewel', 1);
+    let frame: ModalFrame | null = planeFrame('1');
+    for (const answer of ['allocate: slot e', 'slot: e with spark-jewel', 'allocate: slot ne', 'go: 1,0', 'allocate: position 1']) {
       if (frame === null || frame.name !== 'item-plane') throw new Error(`no plane screen to answer ${answer} on`);
       const published = (planeOptions(frame, state, bilingual)[0].values ?? []).map((choice) => choice.value);
       expect(published, language).toContain(answer);
@@ -333,7 +325,7 @@ describe('a cluster jewel the corpus writes examine: on', () => {
   const owners = [...new Set(written.map((each) => corpus.namespace.ownerOf('cluster-jewel', each.id)))].filter((owner): owner is string => owner !== null);
   const PROBES = {
     name: 'jewel-probe',
-    text: ['# info jewel-probe', 'version: 1.0.0', 'dependencies:', ...owners.map((owner) => `  ${owner}`), ...written.flatMap((each) => ['', `# item probe-${each.id.replace(/\./g, '-')}`, 'slot: mainhand', `origin-cluster: ${each.id}`])].join('\n'),
+    text: ['# info jewel-probe', 'version: 1.0.0', 'dependencies:', ...owners.map((owner) => `  ${owner}`), ...written.flatMap((each) => ['', `# item probe-${each.id.replace(/\./g, '-')}`, 'slot: mainhand', 'item-level: 1', `origin-cluster: ${each.id}`])].join('\n'),
   };
   const probed = loadUniverse([...shippedSources(), PROBES]);
 
@@ -344,8 +336,9 @@ describe('a cluster jewel the corpus writes examine: on', () => {
   it('says those words on the screen that stands the player in it, so nothing is written for nobody to read', () => {
     const unread = written.filter((each) => {
       const state = initialState(probed);
-      state.inventory[probeOf(each.id)] = 1;
-      const published = publishModal(planeFrame(probeOf(each.id)), state, probed);
+      const minted = String(state.instances.next);
+      receiveItem(state, probed, probeOf(each.id), 1);
+      const published = publishModal(planeFrame(minted), state, probed);
       return !published.options.some((option) => option.label.includes(withoutNote(each.examine!)));
     });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './load';
+import { isBase } from './sections/item';
 
 const JEWEL = ['# stat max-health', '# passive hale', '# cluster-jewel keen-edge', 'shape: point', 'open-connections: e', 'passives: 1 hale'].join('\n');
 
@@ -20,7 +21,7 @@ describe('# item cluster-jewel:', () => {
 });
 
 describe('# item origin-cluster:', () => {
-  const SWORD = ['# item heartwood-blade', 'slot: mainhand'].join('\n');
+  const SWORD = ['# item heartwood-blade', 'slot: mainhand', 'item-level: 3-8'].join('\n');
 
   it('names the # cluster-jewel standing at hex (0,0) of the base plane', () => {
     const registry = loadModule([JEWEL, SWORD, 'origin-cluster: keen-edge'].join('\n'));
@@ -37,12 +38,12 @@ describe('# item origin-cluster:', () => {
     expect(() => loadModule([JEWEL, SWORD, 'origin-cluster: keen-edge', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item heartwood-blade: cluster-jewel: makes heartwood-blade a jewel/);
   });
 
-  it('refuses a jewel that is also wearable, since a base is spelled slot: and a base can be grown', () => {
-    expect(() => loadModule([JEWEL, '# item keen-edge-jewel', 'slot: mainhand', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item keen-edge-jewel: cluster-jewel: makes keen-edge-jewel a jewel, which is exclusive with the slot:/);
+  it('refuses a jewel that is also a base, since a base is spelled item-level: and a base carries a plane', () => {
+    expect(() => loadModule([JEWEL, '# item keen-edge-jewel', 'slot: mainhand', 'item-level: 3-8', 'cluster-jewel: keen-edge'].join('\n'))).toThrow(/# item keen-edge-jewel: cluster-jewel: makes keen-edge-jewel a jewel, which is exclusive with the item-level:/);
   });
 
-  it('refuses an origin-cluster: on an item nothing can wear, because only a base has a plane', () => {
-    expect(() => loadModule([JEWEL, '# item whetstone', 'origin-cluster: keen-edge'].join('\n'))).toThrow(/# item whetstone: origin-cluster: is the cluster hex \(0,0\) of whetstone's plane, and only a base has one/);
+  it('refuses an origin-cluster: on an item that declares no level, because only a base has a plane', () => {
+    expect(() => loadModule([JEWEL, '# item ration', 'origin-cluster: keen-edge'].join('\n'))).toThrow(/# item ration: origin-cluster: is the cluster hex \(0,0\) of ration's plane, and only a base has one: give it an item-level:/);
   });
 });
 
@@ -63,8 +64,8 @@ describe('# item cluster-effect:', () => {
     expect(() => loadModule('# item orb\ncluster-effect: +25% nope')).toThrow(/# item orb cluster-effect: names an unknown stat: nope/);
   });
 
-  it('refuses an item declaring both slot: and cluster-effect:, since a base has no orb role', () => {
-    expect(() => loadModule('# stat max-health\n\n# item warding-blade\nslot: mainhand\ncluster-effect: +25% max-health')).toThrow(/# item warding-blade: cluster-effect: makes warding-blade an orb, which is exclusive with the slot: that makes it a base/);
+  it('refuses an item declaring both item-level: and cluster-effect:, since a base has no orb role', () => {
+    expect(() => loadModule('# stat max-health\n\n# item warding-blade\nslot: mainhand\nitem-level: 3-8\ncluster-effect: +25% max-health')).toThrow(/# item warding-blade: cluster-effect: makes warding-blade an orb, which is exclusive with the item-level: that makes it a base/);
   });
 
   it('refuses an item declaring both origin-cluster: and cluster-effect:, for the same reason one field over', () => {
@@ -73,15 +74,24 @@ describe('# item cluster-effect:', () => {
   });
 });
 
-describe('# item item-experience: and max-level:', () => {
-  it('reads item-experience: as a flat grant', () => {
-    const registry = loadModule('# item whetstone\nitem-experience: 1000');
-    expect(registry.items.get('whetstone')!.itemExperience).toBe(1000);
+describe('# item item-level:', () => {
+  it('reads a range, and a bare number as the range that rolls one way', () => {
+    const registry = loadModule('# item iron-sword\nslot: mainhand\nitem-level: 3-8\n\n# item practice-blade\nslot: mainhand\nitem-level: 2');
+    expect(registry.items.get('iron-sword')!.itemLevel).toEqual({ min: 3, max: 8 });
+    expect(registry.items.get('practice-blade')!.itemLevel).toEqual({ min: 2, max: 2 });
   });
 
-  it('defaults max-level: to 99, and reads an explicit lower ceiling', () => {
-    const registry = loadModule('# item iron-sword\nmax-level: 10\n\n# item heartwood-blade');
-    expect(registry.items.get('iron-sword')!.maxLevel).toBe(10);
-    expect(registry.items.get('heartwood-blade')!.maxLevel).toBe(99);
+  it('is what makes an item a base, so an item declaring none has no plane at all', () => {
+    const registry = loadModule('# item wooden-shield\nslot: offhand');
+    expect(registry.items.get('wooden-shield')!.itemLevel).toBeUndefined();
+    expect(isBase(registry.items.get('wooden-shield')!)).toBe(false);
+  });
+
+  it('refuses a level that lets a base drop with no points to spend', () => {
+    expect(() => loadModule('# item iron-sword\nslot: mainhand\nitem-level: 0-4')).toThrow(/# item iron-sword: item-level: is how many points one of these drops carrying, and 0-4 lets one drop with none/);
+  });
+
+  it('refuses a level on an item nothing can wear, because a plane is only read off worn gear', () => {
+    expect(() => loadModule('# item ration\nitem-level: 3-8')).toThrow(/# item ration: item-level: gives ration a plane, and a plane is only ever read off what the player is wearing/);
   });
 });

@@ -4,8 +4,9 @@ import { applyClusterEffect, instancePayloads } from './clusterEffect';
 import { Hex } from '../content/hex';
 import { clusterAt, ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
-import { allocate, feedItem, Growth, itemInstance, slotJewel } from './itemInstance';
-import { initialState } from './save';
+import { allocate, Growth, itemInstance, receiveItem, slotJewel } from './itemInstance';
+import { initialState, loadSave, serializeSave } from './save';
+import { parseSaveSection } from '../content/sections/save';
 import { hitDamage, statValue } from './stats';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
@@ -29,6 +30,9 @@ base: 4
 # passive vigorous
 +10% max-health
 
+# passive lucky
++2-9 max-health
+
 # passive keen
 +4 attack
 
@@ -41,6 +45,15 @@ passives: 1 hale, 2 vigorous, 3 keen
 shape: point
 open-connections: e
 passives: 1 hale
+
+# cluster-jewel charm
+shape: point
+open-connections: e
+passives: 1 lucky
+
+# cluster-jewel forked
+shape: point
+open-connections: e, ne
 
 # cluster-jewel spark
 shape: point
@@ -60,27 +73,33 @@ mod-slots: 1
 
 # item blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 
 # item plated-blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 +10 max-health
 
 # item chain-blade
 slot: mainhand
+item-level: 20
 origin-cluster: node
 
 # item spark-blade
 slot: mainhand
+item-level: 20
 origin-cluster: spark
 
 # item wide-blade
 slot: mainhand
+item-level: 20
 origin-cluster: quad
 
 # item tight-blade
 slot: mainhand
+item-level: 20
 origin-cluster: tight
 
 # item node-jewel
@@ -98,8 +117,13 @@ cluster-effect: +25% max-health
 # item goad
 cluster-effect: +50% attack
 
-# item whetstone
-item-experience: 1000
+# item charm-jewel
+cluster-jewel: charm
+
+# item wide-slot-blade
+slot: mainhand
+item-level: 20
+origin-cluster: forked
 `;
 
 const registry = loadInEnglish(MODULE);
@@ -111,17 +135,15 @@ function ok(outcome: Growth): string {
   return outcome.instance;
 }
 
-function carrying(inventory: Record<string, number>): GameState {
+function carrying(holdings: Record<string, number>): GameState {
   const state = initialState(registry);
-  Object.assign(state.inventory, inventory);
+  for (const [id, count] of Object.entries(holdings)) receiveItem(state, registry, id, count);
   return state;
 }
 
 function grown(itemId: string, positions: number[], extra: Record<string, number> = {}): GameState {
-  const state = carrying({ [itemId]: 1, whetstone: positions.length + 1, ...extra });
-  let target = ok(feedItem(state, registry, itemId, 'whetstone'));
-  for (let fed = 0; fed < positions.length; fed++) target = ok(feedItem(state, registry, target, 'whetstone'));
-  for (const position of positions) ok(allocate(state, registry, target, { hex: ORIGIN, kind: 'position', position }));
+  const state = carrying({ [itemId]: 1, ...extra });
+  for (const position of positions) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
   return state;
 }
 
@@ -195,10 +217,12 @@ describe('applying a cluster effect', () => {
     expect(state.inventory['lesser-orb']).toBe(1);
   });
 
-  it('grows a stack copy into an instance the way every other verb does', () => {
+  it('spends the orb on the copy it names and leaves the other copy of the same base alone', () => {
     const state = carrying({ blade: 2, 'lesser-orb': 1 });
-    expect(applyClusterEffect(state, registry, 'blade', 'lesser-orb', ORIGIN)).toEqual({ ok: true, instance: '1' });
-    expect(state.inventory).toEqual({ blade: 1, 'lesser-orb': 0 });
+    expect(applyClusterEffect(state, registry, '2', 'lesser-orb', ORIGIN)).toEqual({ ok: true, instance: '2' });
+    expect(state.inventory).toEqual({ 'lesser-orb': 0 });
+    expect(clusterAt(itemInstance(state, '2')!.plane, ORIGIN)!.effects).toEqual(['lesser-orb']);
+    expect(clusterAt(itemInstance(state, '1')!.plane, ORIGIN)!.effects).toEqual([]);
   });
 
   it('refuses a jewel in inventory as its target, leaving both items stacked and uninstanced', () => {
@@ -255,9 +279,8 @@ describe('an effect scales a payload without moving it between channels', () => 
 
 describe('an effect stops at its cluster and a percent payload does not', () => {
   const twoClusters = (): GameState => {
-    const state = carrying({ 'chain-blade': 1, 'node-jewel': 1, 'lesser-orb': 1, whetstone: 3 });
-    let target = ok(feedItem(state, registry, 'chain-blade', 'whetstone'));
-    for (let fed = 1; fed < 3; fed++) target = ok(feedItem(state, registry, target, 'whetstone'));
+    const state = carrying({ 'chain-blade': 1, 'node-jewel': 1, 'lesser-orb': 1 });
+    const target = '1';
     ok(allocate(state, registry, target, { hex: ORIGIN, kind: 'slot', direction: 'e' }));
     ok(slotJewel(state, registry, target, 'node-jewel', ORIGIN, 'e'));
     ok(allocate(state, registry, target, { hex: AT_E, kind: 'position', position: 1 }));
@@ -310,13 +333,13 @@ describe('what the runtime reports', () => {
   });
 });
 
-describe('a worn stack contributes its cluster jewel\'s free root passive', () => {
-  it('grants the same passive before and after a feed that spends no point', () => {
-    const state = carrying({ 'chain-blade': 1, whetstone: 1 });
-    equip(state, registry, 'chain-blade');
+describe("a worn copy contributes its cluster jewel's free root passive", () => {
+  it('grants it from the moment the copy dropped, before any point has been spent', () => {
+    const state = carrying({ 'chain-blade': 1 });
+    equip(state, registry, '1');
     expect(health(state)).toBeCloseTo(40, 10);
 
-    ok(feedItem(state, registry, 'chain-blade', 'whetstone'));
+    ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'slot', direction: 'e' }));
     expect(health(state)).toBeCloseTo(40, 10);
   });
 });
@@ -338,5 +361,63 @@ describe("a plane's contribution reaches combat", () => {
 
     equip(state, registry, '1');
     expect(health(state)).toBeCloseTo(44, 10);
+  });
+});
+
+// A range on a passive is the same roll-and-fix the item level is: one number drawn when the thing
+// enters the world, and every range that thing declares read at it.
+describe('a passive written as a range', () => {
+  const rolled = (state: GameState, hex: Hex): number => {
+    const payload = instancePayloads(registry, itemInstance(state, '1')!).find((each) => each.node.hex.q === hex.q && each.node.hex.r === hex.r)!;
+    if (payload.bonus.percent) throw new Error('a percent payload is no range');
+    expect(payload.bonus.amount.min).toBe(payload.bonus.amount.max);
+    return payload.bonus.amount.min;
+  };
+
+  const socketed = (jewels: number): GameState => {
+    const state = carrying({ 'wide-slot-blade': 1, 'charm-jewel': jewels });
+    for (const direction of (['e', 'ne'] as const).slice(0, jewels)) {
+      ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'slot', direction }));
+      ok(slotJewel(state, registry, '1', 'charm-jewel', ORIGIN, direction));
+    }
+    return state;
+  };
+
+  it('is one fixed number by the time the plane reports it, drawn from what the passive declares', () => {
+    const state = socketed(1);
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+
+    const worth = rolled(state, AT_E);
+    expect(worth).toBeGreaterThanOrEqual(2);
+    expect(worth).toBeLessThanOrEqual(9);
+  });
+
+  it('is the cluster\u2019s and not the jewel\u2019s, so two of one jewel in one plane roll apart', () => {
+    const seen = new Set<number>();
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const state = socketed(2);
+      const first = clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll;
+      const second = clusterAt(itemInstance(state, '1')!.plane, { q: 1, r: -1 })!.roll;
+      seen.add(first === second ? 0 : 1);
+    }
+    expect(seen).toEqual(new Set([1]));
+  });
+
+  it('comes back the same number after a save and a reload, because the roll is what was written', () => {
+    const state = socketed(1);
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+
+    const target = initialState(registry);
+    loadSave(target, parseSaveSection({ kind: 'save', id: 'x', body: [{ text: serializeSave(state, registry), span: { start: 0, end: 0 }, children: [] }], span: { start: 0, end: 0 } }), registry);
+    expect(rolled(target, AT_E)).toBe(rolled(state, AT_E));
+  });
+
+  it('is fixed from the moment it is socketed, so allocating the position later changes nothing', () => {
+    const state = socketed(1);
+    const before = clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll;
+
+    ok(allocate(state, registry, '1', { hex: AT_E, kind: 'position', position: 1 }));
+    expect(clusterAt(itemInstance(state, '1')!.plane, AT_E)!.roll).toBe(before);
+    expect(rolled(state, AT_E)).toBe(rolled(state, AT_E));
   });
 });

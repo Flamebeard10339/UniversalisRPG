@@ -61,7 +61,6 @@ export type Directive =
   | { kind: 'wait-out' }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
-  | { kind: 'feed'; target: string; food: string }
   | {
       kind: 'slot';
       target: string;
@@ -80,7 +79,7 @@ export type Directive =
   | { kind: 'refused' }
   | { kind: 'page'; layer: string; subpage: string };
 
-export type GrowthDirective = Extract<Directive, { kind: 'feed' | 'slot' | 'allocate' | 'apply' }>;
+export type GrowthDirective = Extract<Directive, { kind: 'slot' | 'allocate' | 'apply' }>;
 
 // `done` is a fact about the action system — nothing is under way — not a fact about game state, so no engine root could ever spell it and it stays a word rather than a condition.
 export type Terminator = 'done' | Condition;
@@ -142,7 +141,6 @@ const EQUIP = new RegExp(`^equip:[ \\t]*(?<item>${CARRIED})$`);
 const UNEQUIP = new RegExp(`^unequip:[ \\t]*(?<slot>${PATH})$`);
 
 const GROWTH_PAYLOAD = {
-  feed: `(?<target>${CARRIED})[ \\t]+with[ \\t]+(?<food>${PATH})`,
   slot: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?<direction>${DIRECTION})[ \\t]+with[ \\t]+(?<jewel>${PATH})`,
   allocate: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+(?:position[ \\t]+(?<position>[0-9]+)|slot[ \\t]+(?<direction>${DIRECTION}))`,
   apply: `(?<target>${CARRIED})[ \\t]+at[ \\t]+(?<hex>${HEX})[ \\t]+with[ \\t]+(?<effect>${PATH})`,
@@ -158,7 +156,6 @@ const REFUSE_VERB = /^refuse:/;
 const REFUSE = new RegExp(`^refuse:[ \\t]*(?<verb>${GROWTH_VERBS.join('|')})[ \\t]+(?<rest>.+)$`);
 
 const GROWTH_FORM: Readonly<Record<GrowthVerb, string>> = {
-  feed: '<target> with <item>',
   slot: '<target> at <q>,<r> <direction> with <jewel item>',
   allocate: '<target> at <q>,<r> position <n>, or <target> at <q>,<r> slot <direction>',
   apply: '<target> at <q>,<r> with <effect item>',
@@ -192,7 +189,6 @@ type Groups = Record<string, string | undefined>;
 
 function growth(verb: GrowthVerb, text: string, groups: Groups): GrowthDirective {
   const target = groups.target as string;
-  if (verb === 'feed') return { kind: 'feed', target, food: groups.food as string };
 
   const hex = parseHexKey(groups.hex as string);
   if (!hex) throw new DslError(`malformed hex address (expected <q>,<r> with no leading zeroes): ${text}`);
@@ -411,8 +407,6 @@ export function printDirective(value: Directive): string {
       return `equip: ${value.item}`;
     case 'unequip':
       return `unequip: ${value.slot}`;
-    case 'feed':
-      return `feed: ${value.target} with ${value.food}`;
     case 'slot':
       return `slot: ${value.target} at ${hexKey(value.hex)} ${value.direction} with ${value.jewel}`;
     case 'allocate':
@@ -511,12 +505,11 @@ export const test = section<Test>()({
     },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
-    { form: 'feed: <item> with <item>', example: 'feed: cluster-jewel with fervour' },
     { form: 'slot: <item> at <q>,<r> <direction> with <jewel item>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
     { form: 'allocate: <item> at <q>,<r> position <n>', example: 'allocate: cluster-jewel at 0,0 position 1' },
     { form: 'allocate: <item> at <q>,<r> slot <direction>', example: 'allocate: cluster-jewel at 0,0 slot ne' },
     { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
-    { form: 'refuse: <the growth directive that must not take>', example: 'refuse: feed cluster-jewel with fervour' },
+    { form: 'refuse: <the growth directive that must not take>', example: 'refuse: slot cluster-jewel at 0,0 ne with small-jewel' },
     ...MODAL_SCREENS.map((screen) => ({ form: `open-modal: ${screen}`, example: `open-modal: ${screen}` })),
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },
     ...NOTE_FIELDS.map((field) => ({
@@ -598,10 +591,6 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'equip':
       putCarried(value, 'item', `${where} equip:`, visit);
-      return;
-    case 'feed':
-      putCarried(value, 'target', `${where} feed:`, visit);
-      put(value, 'food', 'item', `${where} feed: with`, visit);
       return;
     case 'slot':
       putCarried(value, 'target', `${where} slot:`, visit);

@@ -1,7 +1,7 @@
 import type { ModalChoice } from './modalOption';
 import { describe, expect, it } from 'vitest';
 import { createGameState, GameState, travelSecondsPerUnit } from './runtime';
-import { feedItem, itemInstance } from './itemInstance';
+import { itemInstance, receiveItem } from './itemInstance';
 import { Registry } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
@@ -13,7 +13,7 @@ import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
-import { inEnglish } from './sayFixture';
+
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 
 // The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
@@ -687,11 +687,12 @@ equipment-slots: hand
 # item gauntlet
 title: Gauntlet
 slot: hand
-max-level: 10
+item-level: 4
 +3 might
 
-# item oil
-item-experience: 1000
+# item mitten
+title: Mitten
+slot: hand
 `;
 
 // One of every shape an in-flight action comes in: contested and depleting, plain and timed, and
@@ -824,20 +825,20 @@ describe('what the engine publishes', () => {
   it('names a grown copy beside the stacks, and offers it as its own row to wear', () => {
     const registry = loadInEnglish(GROWN_MODULE);
     const grownState = createGameState('camp');
-    Object.assign(grownState.inventory, { gauntlet: 2, oil: 1 });
-    const grown = feedItem(grownState, registry, 'gauntlet', 'oil');
-    if (!grown.ok) throw new Error(inEnglish(registry, grown.refused));
+    Object.assign(grownState.inventory, { mitten: 1 });
+    receiveItem(grownState, registry, 'gauntlet', 1);
+    const grown = { instance: '1' };
 
     const { version: _version, ...diff } = JSON.parse(serializeSave(grownState, registry)) as SaveDiff & { version: number };
     const session = primed(registry, diff);
 
     const carried = view(session);
-    expect(carried.inventory).toEqual({ gauntlet: 1 });
+    expect(carried.inventory).toEqual({ mitten: 1 });
     expect(carried.grown).toEqual({ [grown.instance]: 'gauntlet' });
     expect(statValueOf(carried, 'might')).toBe(4);
 
     expect(carried.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false },
       { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet', grown: true },
     ]);
 
@@ -846,7 +847,7 @@ describe('what the engine publishes', () => {
     expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Modified Gauntlet' }]);
     expect(statValueOf(armed, 'might')).toBe(7);
     expect(armed.carried).toEqual([
-      { id: 'gauntlet', name: 'Gauntlet', count: 1, shown: 'Gauntlet x1', grown: false },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false },
       { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (Hand)', grown: true, worn: { slot: 'hand', title: 'Hand' } },
     ]);
   });
@@ -1271,39 +1272,35 @@ passives: 1 hale
 title: Blade
 slot: hand
 origin-cluster: node
-max-level: 2
+item-level: 2
 
 # item node-jewel
 cluster-jewel: node
-
-# item whetstone
-item-experience: 1000
 
 # item lesser-orb
 cluster-effect: +25% max-health
 
 # test grow-a-blade
-feed: blade with whetstone
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with node-jewel
 allocate: 1 at 1,0 position 1
 apply: 1 at 1,0 with lesser-orb
-refuse: feed 1 with whetstone
-refuse: feed 1 with lesser-orb
+refuse: allocate 1 at 0,0 slot e
 refuse: slot 1 at 0,0 e with node-jewel
-refuse: allocate 1 at 1,0 slot e
+refuse: apply 1 at 1,0 with lesser-orb
 assert: has lesser-orb
 
 # test refusal-is-not-a-pass
 refuse: apply 1 at 0,0 with lesser-orb
 `;
 
-describe('the four growth verbs through the directive surface', () => {
+describe('the three growth verbs through the directive surface', () => {
   const registry = loadInEnglish(GROWTH_MODULE);
 
   function stocked(): GameState {
     const state = createGameState('camp');
-    Object.assign(state.inventory, { blade: 1, 'node-jewel': 1, whetstone: 2, 'lesser-orb': 2 });
+    receiveItem(state, registry, 'blade', 1);
+    Object.assign(state.inventory, { 'node-jewel': 1, 'lesser-orb': 2 });
     return state;
   }
 
@@ -1311,10 +1308,9 @@ describe('the four growth verbs through the directive surface', () => {
     const state = stocked();
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
 
-    expect(state.inventory).toEqual({ blade: 0, 'node-jewel': 0, whetstone: 1, 'lesser-orb': 1 });
+    expect(state.inventory).toEqual({ 'node-jewel': 0, 'lesser-orb': 1 });
     const grown = itemInstance(state, '1');
-    expect(grown?.experience).toBe(1000);
-    expect(grown?.plane['1,0']).toEqual({ jewel: 'node', entry: 'e', allocatedPositions: [1], allocatedSlots: [], effects: ['lesser-orb'] });
+    expect(grown?.plane['1,0']).toEqual({ jewel: 'node', entry: 'e', roll: expect.any(Number), allocatedPositions: [1], allocatedSlots: [], effects: ['lesser-orb'] });
   });
 
   it('fails a refuse: whose growth the plane allowed', () => {
@@ -1330,12 +1326,14 @@ describe('the four growth verbs through the directive surface', () => {
     const session = primed(registry, { inventory: { blade: 1 } });
     const before = view(session).said.length;
 
-    expect(applyDirective(session, { kind: 'feed', target: 'blade', food: 'whetstone' })).toEqual({ failure: 'you carry no whetstone' });
-    expect(view(session).said.slice(before)).toContain('you carry no whetstone');
+    expect(applyDirective(session, { kind: 'slot', target: 'blade', hex: { q: 0, r: 0 }, direction: 'e', jewel: 'node-jewel' })).toEqual({
+      failure: 'blade is not a base: only an item you can wear has a plane to grow',
+    });
+    expect(view(session).said.slice(before)).toContain('blade is not a base: only an item you can wear has a plane to grow');
     expect(sessionStatus(session).grown).toEqual({});
   });
 
-  it('mints only on a growth that succeeded', () => {
+  it('mints once a base, however much is grown on it afterwards', () => {
     const state = stocked();
     expect(runTest('grow-a-blade', registry, state)).toEqual({ passed: true });
     expect(Object.keys(state.instances.byId)).toEqual(['1']);
@@ -1393,18 +1391,18 @@ describe('a missing translation shows its key, in every direction', () => {
   });
 
   it('shows the key on what a refused growth says, and the translation where a locale supplies one', () => {
-    const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location playa', 'x: 0, y: 0', 'starting', '', '# item cuerda-larga', 'slot: hand', 'max-level: 1', '', '# item miga', 'item-experience: 5'].join('\n');
+    const ISLA = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location playa', 'x: 0, y: 0', 'starting', '', '# item cuerda-larga', 'slot: hand', 'item-level: 1', '', '# item miga'].join('\n');
     const saidOnRefusal = (...extra: ModuleSource[]): string[] => {
       const registry = loadUniverse([engineLocale(), { name: 'isla', text: ISLA }, ...extra]);
-      registry.saves.set('carried', { version: SAVE_VERSION, diff: { inventory: { 'isla.cuerda-larga': 1, 'isla.miga': 2 } } });
+      registry.saves.set('carried', { version: SAVE_VERSION, diff: { inventory: { 'isla.miga': 2 } } });
       const session = startSession(registry, 'es');
       applyDirective(session, { kind: 'load', save: 'carried' });
-      applyDirective(session, { kind: 'feed', target: 'isla.cuerda-larga', food: 'isla.miga' });
+      applyDirective(session, { kind: 'allocate', target: 'isla.cuerda-larga', node: { hex: { q: 0, r: 0 }, kind: 'slot', direction: 'e' } });
       return view(session).said;
     };
 
-    expect(saidOnRefusal()).toEqual(['engine.growth.max-level']);
-    expect(saidOnRefusal({ name: 'isla-es', text: ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  isla', '', '# locale es', 'isla.item.cuerda-larga.title: Cuerda Larga', 'engine.growth.max-level: {item} ya alcanzo su nivel {level}, que es el maximo'].join('\n') })).toEqual(['Cuerda Larga ya alcanzo su nivel 1, que es el maximo']);
+    expect(saidOnRefusal()).toEqual(['engine.growth.not-a-base']);
+    expect(saidOnRefusal({ name: 'isla-es', text: ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  isla', '', '# locale es', 'isla.item.cuerda-larga.title: Cuerda Larga', 'engine.growth.not-a-base: {item} no es una base'].join('\n') })).toEqual(['isla.cuerda-larga no es una base']);
   });
 });
 
@@ -1435,42 +1433,50 @@ describe('a craft is one string with one key', () => {
   });
 });
 
+
+// A base drops as a copy of its own, so a fixture that wants one carried spells it as an instance.
+const aCopyOf = (template: string, jewel: string | null): Record<string, unknown> => ({
+  kind: 'item',
+  template,
+  payload: { roll: 0.5, plane: { '0,0': { jewel, entry: null, roll: 0.5, allocatedPositions: [], allocatedSlots: [], effects: [] } } },
+});
+
+const oneCopy = (template: string, jewel: string | null): Record<string, unknown> => ({ instances: { next: 2, byId: { '1': aCopyOf(template, jewel) } } });
+
 describe('every screen a title reaches is played in one language', () => {
-  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'origin-cluster: core'].join('\n');
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'item-level: 1', 'origin-cluster: core'].join('\n');
   const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada'].join('\n');
 
   const carrying = (language: string): PlayView => {
     const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
-    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: oneCopy('forge.blade', 'forge.core') as never });
     const session = startSession(registry, language);
     applyDirective(session, { kind: 'load', save: 'armed' });
     return view(session);
   };
 
   it('names what the player carries in the language being played', () => {
-    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Blade']);
-    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['Espada']);
+    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Modified Blade']);
+    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['engine.item.modified']);
   });
 
   it('names the plane that copy carries the same way, and every title it reports', () => {
-    expect(carrying('en').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Blade', 'Blade', 'Core']]);
-    expect(carrying('es').planes.map((plane) => [plane.name, plane.title, plane.clusters[0].title])).toEqual([['Espada', 'Espada', 'forge.cluster-jewel.core.title']]);
+    expect(carrying('en').planes.map((plane) => [plane.title, plane.clusters[0].title])).toEqual([['Blade', 'Core']]);
+    expect(carrying('es').planes.map((plane) => [plane.title, plane.clusters[0].title])).toEqual([['Espada', 'forge.cluster-jewel.core.title']]);
   });
 
   it('shows the key on those screens too where the played language has none', () => {
-    expect(carrying('fr').carried.map((entry) => entry.name)).toEqual(['forge.item.blade.title']);
-    expect(carrying('fr').planes.map((plane) => plane.name)).toEqual(['forge.item.blade.title']);
     expect(carrying('fr').planes.map((plane) => plane.title)).toEqual(['forge.item.blade.title']);
   });
 });
 
 describe('a modal names what it is about in the language being played', () => {
-  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'max-level: 1', 'origin-cluster: core'].join('\n');
+  const FORGE = ['# info forge', 'version: 1.0.0', '', '# location camp', 'x: 0, y: 0', 'starting', '', '# cluster-jewel core', 'shape: point', 'open-connections: e', '', '# item blade', 'title: Blade', 'slot: mainhand', 'item-level: 1', 'origin-cluster: core'].join('\n');
   const FORGE_ES = ['# info forge-es', 'version: 1.0.0', 'dependencies:', '  forge', '', '# locale es', 'forge.item.blade.title: Espada', 'engine.plane.heading: {plane} en {hex}', 'engine.modal.item: Objeto'].join('\n');
 
   const carrying = (language: string): PlaySession => {
     const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
-    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1 } } });
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: oneCopy('forge.blade', 'forge.core') as never });
     const session = startSession(registry, language);
     applyDirective(session, { kind: 'load', save: 'armed' });
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
@@ -1489,8 +1495,8 @@ describe('a modal names what it is about in the language being played', () => {
   });
 
   it('heads the plane screen with the copy it is of, named in it', () => {
-    expect(grown('en').modals[0].options[0].label).toBe('Blade at 0,0');
-    expect(grown('es').modals[0].options[0].label).toBe('Espada en 0,0');
+    expect(grown('en').modals[0].options[0].label).toBe('Modified Blade at 0,0');
+    expect(grown('es').modals[0].options[0].label).toBe('engine.item.modified en 0,0');
   });
 });
 
@@ -1556,12 +1562,8 @@ describe('a modal answer is spelled in the base language on every screen, and on
     '# item blade',
     'title: Blade',
     'slot: mainhand',
-    'max-level: 20',
+    'item-level: 20',
     'origin-cluster: core',
-    '',
-    '# item whetstone',
-    'title: Whetstone',
-    'item-experience: 1000',
     '',
     '# race human',
     '',
@@ -1578,15 +1580,14 @@ describe('a modal answer is spelled in the base language on every screen, and on
     '  forge',
     '',
     '# locale es',
-    'forge.item.whetstone.title: Piedra',
     'engine.carried.verb.grow: Cultiva',
     'forge.race.elf.title: Elfo',
-    'engine.plane.feed: alimenta: con {item}',
+    'engine.plane.allocate.slot: asigna: ranura {direction}',
   ].join('\n');
 
   const opened = (language: string): PlaySession => {
     const registry = loadUniverse([engineLocale(), { name: 'forge', text: FORGE }, { name: 'forge-es', text: FORGE_ES }]);
-    registry.saves.set('armed', { version: SAVE_VERSION, diff: { inventory: { 'forge.blade': 1, 'forge.whetstone': 2 } } });
+    registry.saves.set('armed', { version: SAVE_VERSION, diff: oneCopy('forge.blade', 'forge.core') as never });
     const session = startSession(registry, language);
     applyDirective(session, { kind: 'load', save: 'armed' });
     return session;
@@ -1606,14 +1607,14 @@ describe('a modal answer is spelled in the base language on every screen, and on
   const verbs = (language: string): readonly ModalChoice[] => {
     const session = opened(language);
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
+    submitModal(session, { item: choices(session)[0]!.value });
     return choices(session);
   };
 
   const moves = (language: string): readonly ModalChoice[] => {
     const session = opened(language);
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
-    submitModal(session, { item: choices(session).find((choice) => choice.value.endsWith('blade'))!.value });
+    submitModal(session, { item: choices(session)[0]!.value });
     submitModal(session, { verb: 'grow' });
     return choices(session);
   };
@@ -1625,19 +1626,19 @@ describe('a modal answer is spelled in the base language on every screen, and on
     expect(answers(races('es'))).toEqual(answers(races('en')));
     expect(answers(verbs('es'))).toEqual(answers(verbs('en')));
     expect(answers(moves('es'))).toEqual(answers(moves('en')));
-    expect(answers(moves('en'))).toContain('feed: with forge.whetstone');
+    expect(answers(moves('en'))).toContain('allocate: slot e');
   });
 
   it('reads them as the words the engine says in the played language', () => {
     expect(words(races('en'))).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
     expect(words(verbs('en'))).toEqual(['Grow', 'Equip', 'Destroy', 'Close']);
-    expect(words(moves('en'))).toContain('feed: with Whetstone');
+    expect(words(moves('en'))).toContain('allocate: slot e');
   });
 
   it('shows the key for every word the played language has no entry for', () => {
     expect(words(races('es'))).toEqual(['forge.race.human.title', 'Elfo', 'forge.race.dwarf.title', 'forge.race.orc.title']);
     expect(words(verbs('es'))).toEqual(['Cultiva', 'engine.carried.verb.equip', 'engine.carried.verb.destroy', 'engine.carried.close']);
-    expect(words(moves('es'))).toContain('alimenta: con Piedra');
+    expect(words(moves('es'))).toContain('asigna: ranura e');
     expect(words(moves('es'))).toContain('engine.plane.back');
   });
 });

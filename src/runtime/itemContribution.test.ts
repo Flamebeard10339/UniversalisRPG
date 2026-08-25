@@ -5,7 +5,7 @@ import { midpoint } from '../grammar/range';
 import { applyClusterEffect } from './clusterEffect';
 import { ORIGIN } from './clusterPlane';
 import { equip } from './equipment';
-import { allocate, feedItem, Growth, itemInstance, itemTemplate } from './itemInstance';
+import { allocate, Growth, itemInstance, itemTemplate, receiveItem } from './itemInstance';
 import { itemContribution, StatContribution } from './itemContribution';
 import { restorePools } from './effects';
 import { initialState } from './save';
@@ -58,16 +58,19 @@ passives: 1 hale, 2 raging
 
 # item blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 
 # item plated-blade
 slot: mainhand
+item-level: 20
 origin-cluster: twin
 +10 max-health
 +2 attack
 
 # item goading-blade
 slot: mainhand
+item-level: 20
 origin-cluster: goad
 
 # item broad-blade
@@ -84,8 +87,6 @@ cluster-effect: +25% max-health
 # item edge-orb
 cluster-effect: +25% attack
 
-# item whetstone
-item-experience: 1000
 `;
 
 const registry = loadModule(MODULE);
@@ -95,17 +96,15 @@ function ok(outcome: Growth): string {
   return outcome.instance;
 }
 
-function carrying(inventory: Record<string, number>): GameState {
+function carrying(holdings: Record<string, number>): GameState {
   const state = initialState(registry);
-  Object.assign(state.inventory, inventory);
+  for (const [id, count] of Object.entries(holdings)) receiveItem(state, registry, id, count);
   return state;
 }
 
 function grown(itemId: string, positions: number[], extra: Record<string, number> = {}): GameState {
-  const state = carrying({ [itemId]: 1, whetstone: positions.length + 1, ...extra });
-  let target = ok(feedItem(state, registry, itemId, 'whetstone'));
-  for (let fed = 0; fed < positions.length; fed++) target = ok(feedItem(state, registry, target, 'whetstone'));
-  for (const position of positions) ok(allocate(state, registry, target, { hex: ORIGIN, kind: 'position', position }));
+  const state = carrying({ [itemId]: 1, ...extra });
+  for (const position of positions) ok(allocate(state, registry, '1', { hex: ORIGIN, kind: 'position', position }));
   return state;
 }
 
@@ -147,10 +146,12 @@ describe('itemContribution', () => {
     expect(itemContribution(registry, registry.items.get('broad-blade')!, undefined)).toEqual([{ statId: 'max-health', added: { min: 5, max: 9 }, increased: 0 }]);
   });
 
-  it("reads a stack copy off the item's default plane, so carrying one answers before it is grown", () => {
-    const item = registry.items.get('blade')!;
-    expect(itemContribution(registry, item, undefined)).toEqual(contribution(grown('blade', []), '1'));
-    expect(itemContribution(registry, item, undefined)).toEqual([{ statId: 'max-health', added: { min: 10, max: 10 }, increased: 0 }]);
+  it('reads a template with no copy behind it off its own tags alone, since the plane belongs to the copy', () => {
+    const item = registry.items.get('plated-blade')!;
+    expect(itemContribution(registry, item, undefined)).toEqual([
+      { statId: 'attack', added: { min: 2, max: 2 }, increased: 0 },
+      { statId: 'max-health', added: { min: 10, max: 10 }, increased: 0 },
+    ]);
   });
 
   it('answers with an item that has no plane at all, from its tags alone', () => {
@@ -212,11 +213,11 @@ describe('the stat fold spends what this fold assembled', () => {
     }
   });
 
-  it('spends a worn stack copy through the same answer', () => {
+  it('spends a worn copy that has spent no point through the same answer', () => {
     const state = carrying({ blade: 1 });
-    equip(state, registry, 'blade');
+    equip(state, registry, '1');
 
-    const worth = on(itemContribution(registry, registry.items.get('blade')!, undefined), 'max-health');
+    const worth = on(contribution(state, '1'), 'max-health');
     expect(statValue('max-health', state, registry)).toBeCloseTo((30 + midpoint(worth.added)) * (1 + worth.increased / 100), 10);
   });
 });

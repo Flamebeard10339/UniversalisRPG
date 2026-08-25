@@ -285,15 +285,10 @@ describe('begin: arm-only directive', () => {
   });
 });
 
-describe('the four growth verbs', () => {
+describe('the three growth verbs', () => {
   const parsed = (line: string) => parseDirectiveLine(line);
 
   it('parses one verb per way an item grows, addressing a hex the way a plane keys one', () => {
-    expect(parsed('feed: heartwood-blade with whetstone')).toEqual({
-      kind: 'feed',
-      target: 'heartwood-blade',
-      food: 'whetstone',
-    });
     expect(parsed('slot: 1 at 0,0 e with node-jewel')).toEqual({
       kind: 'slot',
       target: '1',
@@ -320,16 +315,15 @@ describe('the four growth verbs', () => {
   });
 
   it('takes a target spelled as an item id or as a minted instance id, and nothing else', () => {
-    expect(parsed('feed: mod.heartwood-blade with whetstone')).toMatchObject({
+    expect(parsed('apply: mod.heartwood-blade at 0,0 with lesser-orb')).toMatchObject({
       target: 'mod.heartwood-blade',
     });
-    expect(parsed('feed: 12 with whetstone')).toMatchObject({ target: '12' });
-    expect(() => parsed('feed: 1a with whetstone')).toThrow(/malformed feed: payload/);
+    expect(parsed('apply: 12 at 0,0 with lesser-orb')).toMatchObject({ target: '12' });
+    expect(() => parsed('apply: 1a at 0,0 with lesser-orb')).toThrow(/malformed apply: payload/);
   });
 
   it('names the offending line for a malformed payload rather than reading as an unknown directive', () => {
-    expect(() => parsed('feed: heartwood-blade')).toThrow(/malformed feed: payload \(expected <target> with <item>\)/);
-    expect(() => parsed('slot: 1 at 0,0 with node-jewel')).toThrow(/malformed slot: payload/);
+    expect(() => parsed('slot: 1 at 0,0 with node-jewel')).toThrow(/malformed slot: payload \(expected <target> at <q>,<r> <direction> with <jewel item>\)/);
     expect(() => parsed('allocate: 1 at 0,0 position e')).toThrow(/malformed allocate: payload/);
     expect(() => parsed('allocate: 1 at 0,0 slot up')).toThrow(/malformed allocate: payload/);
     expect(() => parsed('apply: 1 with lesser-orb')).toThrow(/malformed apply: payload/);
@@ -343,9 +337,9 @@ describe('the four growth verbs', () => {
 
 describe('refuse: the outcome under test', () => {
   it('wraps each growth verb with its payload inline', () => {
-    expect(parseDirectiveLine('refuse: feed 1 with whetstone')).toEqual({
+    expect(parseDirectiveLine('refuse: apply 1 at 0,0 with lesser-orb')).toEqual({
       kind: 'refuse',
-      inner: { kind: 'feed', target: '1', food: 'whetstone' },
+      inner: { kind: 'apply', target: '1', hex: { q: 0, r: 0 }, effect: 'lesser-orb' },
     });
     expect(parseDirectiveLine('refuse: allocate 1 at 0,0 position 2')).toEqual({
       kind: 'refuse',
@@ -358,8 +352,8 @@ describe('refuse: the outcome under test', () => {
   });
 
   it('rejects a verb whose refusal is not a value the plane returns', () => {
-    expect(() => parseDirectiveLine('refuse: travel beach')).toThrow(/unknown refuse: verb \(expected one of feed, slot, allocate, apply\)/);
-    expect(() => parseDirectiveLine('refuse: feed 1')).toThrow(/malformed feed: payload/);
+    expect(() => parseDirectiveLine('refuse: travel beach')).toThrow(/unknown refuse: verb \(expected one of slot, allocate, apply\)/);
+    expect(() => parseDirectiveLine('refuse: apply 1')).toThrow(/malformed apply: payload/);
   });
 });
 

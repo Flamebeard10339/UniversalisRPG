@@ -15,6 +15,7 @@ import { CRAFT_ADDRESS } from '../content/sections/recipe';
 import { loadUniverse } from '../content/load';
 import { GameState, type ModalFrame } from './state';
 import { toMilliUnits } from './units';
+import { receiveItem } from './itemInstance';
 
 const MODULE = `
 # location camp
@@ -30,6 +31,10 @@ base: 3
 # item charm
 slot: neck
 +2 might
+
+# item blade
+slot: hand
+item-level: 2
 
 # flag done
 
@@ -197,13 +202,13 @@ describe('loadSave', () => {
   it('carries a plane screen across a round trip while the copy it grows is still carried', () => {
     const registry = loadInEnglish(MODULE);
     const state = createGameState();
-    state.inventory.charm = 1;
-    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' });
+    receiveItem(state, registry, 'blade', 1);
+    (state.modals as ModalFrame[]).push({ name: 'item-plane', answers: {}, target: '1', hex: '0,0' });
 
     const { version, ...diff } = JSON.parse(serializeSave(state, registry));
     const restored = createGameState();
     expect(loadSave(restored, { version, diff }, registry)).toEqual([]);
-    expect(restored.modals).toEqual([{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }]);
+    expect(restored.modals).toEqual([{ name: 'item-plane', answers: {}, target: '1', hex: '0,0' }]);
   });
 
   it('closes a modal frame the loaded registry cannot answer, and reports it, instead of restoring it', () => {

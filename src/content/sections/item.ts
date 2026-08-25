@@ -3,11 +3,11 @@ import { Action, actionBody } from '../../grammar/action';
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
+import { range, Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
 import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
 import { section } from './define';
-import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
 
 export interface ClusterEffect {
@@ -25,10 +25,8 @@ export interface Item extends HookCarrier {
   clusterJewel?: string;
   originCluster?: string;
   clusterEffect?: ClusterEffect;
-  itemExperience?: number;
-  maxLevel: number;
+  itemLevel?: Range;
   value?: number;
-  group?: string;
 }
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
@@ -49,22 +47,26 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
   examples: ['+25% max-health', '-10% max-health'],
 };
 
-export const DEFAULT_MAX_LEVEL = 99;
-
-export const isBase = (item: Item): boolean => item.slot !== undefined;
+export const isBase = (item: Item): boolean => item.itemLevel !== undefined;
 
 function roleProblem(item: Item): string | undefined {
   if (item.value !== undefined && item.value <= 0) {
     return `value: is what a shop prices one of these at, and ${item.value} prices it at nothing: leave the line out and ${item.id} is untradable`;
   }
+  if (item.itemLevel !== undefined && item.itemLevel.min < 1) {
+    return `item-level: is how many points one of these drops carrying, and ${range.print(item.itemLevel)} lets one drop with none: the lowest a base rolls is 1`;
+  }
+  if (item.itemLevel !== undefined && item.slot === undefined) {
+    return `item-level: gives ${item.id} a plane, and a plane is only ever read off what the player is wearing: give it a slot: or drop the field`;
+  }
   if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
-    return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+    return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'item-level:' : 'origin-cluster:'} that makes it a base`;
   }
   if (item.clusterEffect !== undefined && (isBase(item) || item.originCluster !== undefined)) {
-    return `cluster-effect: makes ${item.id} an orb, which is exclusive with the ${isBase(item) ? 'slot:' : 'origin-cluster:'} that makes it a base`;
+    return `cluster-effect: makes ${item.id} an orb, which is exclusive with the ${isBase(item) ? 'item-level:' : 'origin-cluster:'} that makes it a base`;
   }
   if (item.originCluster !== undefined && !isBase(item)) {
-    return `origin-cluster: is the cluster hex (0,0) of ${item.id}'s plane, and only a base has one: give it a slot: or drop the field`;
+    return `origin-cluster: is the cluster hex (0,0) of ${item.id}'s plane, and only a base has one: give it an item-level: or drop the field`;
   }
   return undefined;
 }
@@ -79,21 +81,18 @@ export const item = section<Item, never, 'actions'>()({
   text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,
-    group: GROUP_FIELD,
     examine: { parser: text },
-    slot: { parser: id, note:'the slots are every id any equipment-slots: names, so this declares one as much as it uses one; a # slot only supplies display words for it' },
+    slot: { parser: id, note: 'the slots are every id any equipment-slots: names, so this declares one as much as it uses one; a # slot only supplies display words for it' },
+    itemLevel: {
+      parser: range,
+      keyword: 'item-level',
+      note: 'how many points one of these drops carrying, rolled once on arrival and fixed on that copy; declaring it is what gives the item a plane, and what makes two copies different enough that neither joins a stack',
+    },
     tags: { parser: list(tagClause), default: () => [] },
     clusterJewel: { parser: id, keyword: 'cluster-jewel', names: { id: 'cluster-jewel' } },
     originCluster: { parser: id, keyword: 'origin-cluster', names: { id: 'cluster-jewel' }, standsWithout: true },
     clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
-    itemExperience: { parser: number, keyword: 'item-experience' },
     value: { parser: number, note: 'what one of these is worth in coin, and the only thing that makes it tradable: an item declaring no value is one no shop will price' },
-    maxLevel: {
-      parser: number,
-      default: () => DEFAULT_MAX_LEVEL,
-      keyword: 'max-level',
-      printed: 'unless-default',
-    },
     ...HOOK_FIELDS,
   },
   clauses: 'tags',

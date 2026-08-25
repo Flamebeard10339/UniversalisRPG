@@ -6,10 +6,10 @@ import { loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import { standingSources } from '../content/shipped';
 import { parseSaveSection } from '../content/sections/save';
-import { carriesItem, feedItem, packedCount } from './itemInstance';
+import { allocate, carriesItem, packedCount, receiveItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
-import { inEnglish } from './sayFixture';
+
 
 const MODULE = `
 # stat attack
@@ -52,15 +52,16 @@ uses: strike
 
 # item attack-bonus
 slot: mainhand
-max-level: 10
++2 attack
+
+# item honed-blade
+slot: mainhand
+item-level: 4
 +2 attack
 
 # item defense-bonus
 slot: offhand
 +2 defense
-
-# item whetstone
-item-experience: 1000
 `;
 
 function loaded(source = MODULE): Registry {
@@ -191,25 +192,24 @@ describe('carried and worn are disjoint', () => {
 
   it('lists a worn grown copy under equipment and counts it nowhere the player carries', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    const grownId = fed(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    const grownId = dropped(state, registry, 'honed-blade');
 
     equip(state, registry, grownId);
     expect(state.equipped).toEqual({ mainhand: grownId });
-    expect(packedCount(state, 'attack-bonus')).toBe(0);
+    expect(packedCount(state, 'honed-blade')).toBe(0);
     expect(carriesItem(state, grownId)).toBe(false);
 
     unequip(state, registry, 'mainhand');
-    expect(packedCount(state, 'attack-bonus')).toBe(1);
+    expect(packedCount(state, 'honed-blade')).toBe(1);
     expect(carriesItem(state, grownId)).toBe(true);
-    expect(state.inventory).toEqual({ 'attack-bonus': 0, whetstone: 0 });
+    expect(state.inventory).toEqual({});
   });
 
   it('gives back what a slot was holding when another copy takes it', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    const grownId = fed(state, registry, 'attack-bonus');
-    state.inventory['attack-bonus'] = 1;
+    const state = carrying(registry, { 'attack-bonus': 1 });
+    const grownId = dropped(state, registry, 'honed-blade');
 
     equip(state, registry, 'attack-bonus');
     equip(state, registry, grownId);
@@ -219,7 +219,7 @@ describe('carried and worn are disjoint', () => {
     equip(state, registry, 'attack-bonus');
     expect(state.equipped).toEqual({ mainhand: 'attack-bonus' });
     expect(carriesItem(state, grownId)).toBe(true);
-    expect(packedCount(state, 'attack-bonus')).toBe(1);
+    expect(packedCount(state, 'honed-blade')).toBe(1);
   });
 
   it('wears a second copy out of a stack that still has one, and refuses once the stack is empty', () => {
@@ -247,10 +247,9 @@ function carrying(registry: Registry, stacks: Record<string, number>): GameState
   return state;
 }
 
-function fed(state: GameState, registry: Registry, target: string): string {
-  const outcome = feedItem(state, registry, target, 'whetstone');
-  if (!outcome.ok) throw new Error(inEnglish(registry, outcome.refused));
-  return outcome.instance;
+function dropped(state: GameState, registry: Registry, itemId: string): string {
+  if (receiveItem(state, registry, itemId, 1) !== 1) throw new Error(`nothing arrived for ${itemId}`);
+  return String(state.instances.next - 1);
 }
 
 function reloaded(state: GameState, registry: Registry): GameState {
@@ -262,12 +261,12 @@ function reloaded(state: GameState, registry: Registry): GameState {
 describe('a grown item is worn like any other', () => {
   const BARE = 10;
 
-  it('can be worn at all, though growing it took it out of its stack', () => {
+  it('can be worn at all, though it never was in a stack', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    const grownId = fed(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    const grownId = dropped(state, registry, 'honed-blade');
 
-    expect(state.inventory['attack-bonus']).toBe(0);
+    expect(state.inventory['honed-blade']).toBeUndefined();
     equip(state, registry, grownId);
     expect(state.equipped['mainhand']).toBe(grownId);
     expect(statValue('attack', state, registry)).toBe(BARE + 2);
@@ -275,51 +274,53 @@ describe('a grown item is worn like any other', () => {
 
   it('grants nothing while it is carried and not worn', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    fed(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    dropped(state, registry, 'honed-blade');
     expect(statValue('attack', state, registry)).toBe(BARE);
   });
 
-  it('keeps granting its +2 attack through being modified while worn', () => {
+  it('keeps granting its +2 attack through being grown while worn', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    equip(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    const grownId = dropped(state, registry, 'honed-blade');
+    equip(state, registry, grownId);
     expect(statValue('attack', state, registry)).toBe(BARE + 2);
 
-    const grownId = fed(state, registry, 'attack-bonus');
+    expect(allocate(state, registry, grownId, { hex: { q: 0, r: 0 }, kind: 'slot', direction: 'e' }).ok).toBe(true);
     expect(state.equipped['mainhand']).toBe(grownId);
     expect(statValue('attack', state, registry)).toBe(BARE + 2);
   });
 
-  it('leaves a slot on the stack when growing one copy did not empty it', () => {
+  it('leaves the copy in the slot alone when another copy of the same base is grown', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 2, whetstone: 1 });
-    equip(state, registry, 'attack-bonus');
-    const grownId = fed(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    const worn = dropped(state, registry, 'honed-blade');
+    const spare = dropped(state, registry, 'honed-blade');
+    equip(state, registry, worn);
 
-    expect(state.equipped['mainhand']).toBe('attack-bonus');
-    expect(grownId).not.toBe('attack-bonus');
+    expect(allocate(state, registry, spare, { hex: { q: 0, r: 0 }, kind: 'slot', direction: 'e' }).ok).toBe(true);
+    expect(state.equipped['mainhand']).toBe(worn);
     expect(statValue('attack', state, registry)).toBe(BARE + 2);
   });
 
   it('is still worn, and still worth the same, after a reload', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    equip(state, registry, fed(state, registry, 'attack-bonus'));
+    const state = carrying(registry, {});
+    equip(state, registry, dropped(state, registry, 'honed-blade'));
 
     const target = reloaded(state, registry);
     expect(target.equipped).toEqual(state.equipped);
     expect(statValue('attack', target, registry)).toBe(statValue('attack', state, registry));
   });
 
-  it('is unequipped when the item it grew from leaves the content', () => {
+  it('is unequipped when the item it is a copy of leaves the content', () => {
     const registry = loaded();
-    const state = carrying(registry, { 'attack-bonus': 1, whetstone: 1 });
-    const grownId = fed(state, registry, 'attack-bonus');
+    const state = carrying(registry, {});
+    const grownId = dropped(state, registry, 'honed-blade');
     equip(state, registry, grownId);
 
-    const warnings = pruneStateForRegistry(state, loaded(MODULE.replace('# item attack-bonus\nslot: mainhand\nmax-level: 10\n+2 attack\n', '')));
-    expect(warnings.map((warning) => warning.message)).toContain(`Removed instance ${grownId} because its template attack-bonus is not loaded.`);
+    const warnings = pruneStateForRegistry(state, loaded(MODULE.replace('# item honed-blade\nslot: mainhand\nitem-level: 4\n+2 attack\n', '')));
+    expect(warnings.map((warning) => warning.message)).toContain(`Removed instance ${grownId} because its template honed-blade is not loaded.`);
     expect(warnings.map((warning) => warning.message)).toContain(`Unequipped mainhand because its item ${grownId} is not loaded.`);
     expect(state.equipped['mainhand']).toBeUndefined();
   });

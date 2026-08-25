@@ -1058,73 +1058,73 @@ node greeting:
 // --- saves ---
 
 # save in-town
-{"version":12,"location":"tulsa.market-square"}
+{"version":13,"location":"tulsa.market-square"}
 
 // What the tutorial puts in a player's hands and nothing takes back off them,
 // standing in the row that would buy either.
 # save in-town-with-mikis-sword-and-shield
-{"version":12,"location":"tulsa.market-row","inventory":{"core.iron-sword":1,"core.wooden-shield":1}}
+{"version":13,"location":"tulsa.market-row","inventory":{"core.iron-sword":1,"core.wooden-shield":1}}
 
 // A pocket of curios out of the tutorial's rats, which is what a new arrival
 // has to trade with and the whole of the town's on-ramp to money. The drawer
 // and the rats between them hand out about this many.
 # save in-town-with-bent-coins
-{"version":12,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
+{"version":13,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
 // Out of a fight and back in the square with eleven of thirty left, which is
 // about what the three playtest runs walked away from the cellar rats holding.
 # save hurt-in-town
-{"version":12,"location":"tulsa.market-square","resources":{"core.health":11000}}
+{"version":13,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
 // Down the back way with the lockpick from Miki's dresser, which is what
 // anybody who came here for the barred door would be carrying.
 # save at-the-sewer-junction
-{"version":12,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
+{"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
 # save dresser-trinket-end
-{"version":12,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"tulsa.dresser.searched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true},"resources":{},"location":"tulsa.guide-house-upstairs","rng":2617077404}
 
 # save explored-and-unlocked
-{"version":12,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
+{"version":13,"flags":{"tulsa.front-door.unlocked":true,"tulsa.beach.discovered":true}}
 
 // Standing at the oven with something to roast. Nothing in the world grants a
 // raw chestnut, so this save is the only way the continuous cadence is reached.
 # save chestnuts-in-hand
-{"version":12,"inventory":{"core.raw-chestnut":3}}
+{"version":13,"inventory":{"core.raw-chestnut":3}}
 
 # save axe-at-the-swamp-edge
-{"version":12,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
+{"version":13,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
-{"version":12,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
+{"version":13,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":12,"inventory":{"core.heartwood-blade":0,"core.iron-sword":0,"core.whetstone":2,"core.masters-whetstone":1,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":0,"core.crossroads-jewel":0,"core.orb-of-vitality":0,"core.orb-of-the-edge":1,"core.lesser-orb-of-the-edge":0,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"experience":14000,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"experience":20000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
 
 # save growing-through-the-inventory-screen-end
-{"version":12,"inventory":{"core.heartwood-blade":1,"core.iron-sword":0,"core.whetstone":6,"core.masters-whetstone":3,"core.keen-edge-jewel":0,"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.crossroads-jewel":0,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"experience":10000,"plane":{"0,0":{"jewel":null,"entry":null,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
 
 // A purse with the price of a second look in it, and a purse a coin short of
 // one, standing in the room the mirror is in.
 # save at-the-mirror-with-a-thousand-coin
-{"version":12,"location":"tulsa.guide-house","inventory":{"core.coin":1000}}
+{"version":13,"location":"tulsa.guide-house","inventory":{"core.coin":1000}}
 
 # save at-the-mirror-one-coin-short
-{"version":12,"location":"tulsa.guide-house","inventory":{"core.coin":999}}
+{"version":13,"location":"tulsa.guide-house","inventory":{"core.coin":999}}
 
 # save renamed-at-the-mirror
-{"version":12,"player":{"name":"Wren","race":"core.orc"},"inventory":{"core.coin":0}}
+{"version":13,"player":{"name":"Wren","race":"core.orc"},"inventory":{"core.coin":0}}
 
 # save named-once-with-nine-hundred-and-ninety-nine-coin
-{"version":12,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
+{"version":13,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
 
 # save armed-with-a-million-attack-hammer
 DEBUG
-{"version":12,"inventory":{"tulsa.million-attack-hammer":1}}
+{"version":13,"inventory":{"tulsa.million-attack-hammer":1}}
 
 # save armed-with-an-eight-a-swing-hammer
 DEBUG
-{"version":12,"inventory":{"tulsa.eight-a-swing-hammer":1}}
+{"version":13,"inventory":{"tulsa.eight-a-swing-hammer":1}}
 
 // --- tests ---
 
@@ -1397,10 +1397,15 @@ assert: beach.discovered
 // Regenerate with /create-valid-test when this content changes on purpose.
 //
 // What this route claims is written as its refusals — each one names a growth
-// the plane must not take, and there are eight of them. The plane itself is
-// what no condition can name, so the sheet keeps it: `instances` is compared
-// whole even under `expect only:`, so every hex, jewel, point and orb below is
-// still pinned exactly.
+// the plane must not take, and there are six of them. The plane itself is what
+// no condition can name, so the sheet keeps it: `instances` is compared whole
+// even under `expect only:`, so every hex, jewel, point and orb below is still
+// pinned exactly — and so is every roll, which is how a recorded run proves a
+// level is drawn once and never drawn again.
+//
+// The chest hands out two blades, and each arrives already a copy of its own
+// with its level rolled: the Heartwood Blade is 1 and the Iron Sword is 2, and
+// neither was ever in a stack to be lifted out of one.
 //
 // The Heartwood Blade's origin is a spindle whose root, position 1, is
 // allocated from the start and free. Both of its jewel slots hang off position
@@ -1409,17 +1414,12 @@ assert: beach.discovered
 DEBUG
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
-// An orb grants no item experience, and nothing else in the game moves it.
-refuse: feed heartwood-blade with orb-of-vitality
+// A template names no copy: the points belong to the id the chest handed
+// over, and an item id is not one of them.
+refuse: allocate heartwood-blade at 0,0 position 2
 // Out of adjacency: position 3 touches only position 2 and the two slots,
 // and the point to pay for it is in hand.
-refuse: allocate heartwood-blade at 0,0 position 3
-// The first verb the plane allows is what mints the copy. The two refusals
-// above left the stack whole, so this one still names an item, not an id.
-feed: heartwood-blade with whetstone
-feed: 1 with whetstone
-feed: 1 with whetstone
-feed: 1 with whetstone
+refuse: allocate 1 at 0,0 position 3
 allocate: 1 at 0,0 position 2
 allocate: 1 at 0,0 position 3
 allocate: 1 at 0,0 slot ne
@@ -1428,8 +1428,7 @@ allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with crossroads-jewel
 // Slotting is permanent: a filled slot refuses a second jewel forever.
 refuse: slot 1 at 0,0 e with causeway-jewel
-feed: 1 with masters-whetstone
-// Allocation is permanent too, and this is asked with six points spare so
+// Allocation is permanent too, and this is asked with points still spare so
 // that having none cannot be the reason.
 refuse: allocate 1 at 0,0 position 2
 allocate: 1 at 1,-1 position 1
@@ -1446,8 +1445,6 @@ allocate: 1 at 1,0 position 1
 refuse: allocate 1 at 1,0 slot nw
 refuse: slot 1 at 1,0 nw with causeway-jewel
 allocate: 1 at 1,0 slot ne
-// Level 11 bought eleven points and all eleven are spent.
-refuse: allocate 1 at 1,0 slot se
 apply: 1 at 1,-1 with orb-of-the-edge
 apply: 1 at 1,-1 with lesser-orb-of-the-edge
 // Two effects naming one stat pool to 35% rather than compounding to 37.5%.
@@ -1458,11 +1455,7 @@ refuse: apply 1 at 1,-1 with orb-of-the-bulwark
 // scaling the increased channel rather than the added one.
 apply: 1 at 0,0 with orb-of-vitality
 // The ordinary base, whose hex (0,0) is the bare east slot every base falls
-// back to. Two Master's Whetstones carry it to the level 10 it is capped at,
-// and feeding it again is refused with the whetstone intact.
-feed: iron-sword with masters-whetstone
-feed: 2 with masters-whetstone
-refuse: feed 2 with masters-whetstone
+// back to. It came out of the same chest, with a level rolled the same way.
 allocate: 2 at 0,0 slot e
 slot: 2 at 0,0 e with causeway-jewel
 expect only: growing-a-heartwood-blade-end
@@ -1479,22 +1472,18 @@ expect only: growing-a-heartwood-blade-end
 // and to the one slotted beyond that, allocates on both, leaves the plane for
 // the inventory it was opened from, and equips the copy it just grew.
 //
-// That the copy is worn is asserted below. That it is, by c21, no longer in the
-// stack it was grown from is the sheet's: `has` and the `inventory` root both
-// count a worn copy as held, so the stack falling to zero is a fact only
-// `inventory.core.iron-sword` in the save body can state.
+// The chest handed the sword over as a copy already, so the inventory names it
+// by id: the row the player opens is 2, and the points it spends below were
+// rolled when the chest was opened rather than bought afterwards.
 # test growing-through-the-inventory-screen
 DEBUG
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
 open-modal: carried-items
-submit-modal: item=core.iron-sword
+submit-modal: item=2
 submit-modal: verb=grow
 submit-modal: plane=allocate: slot e
 submit-modal: plane=slot: e with core.crossroads-jewel
-// A base still in its stack is minted by the first growth, so the level the
-// next allocation spends is bought after the copy exists rather than before.
-submit-modal: plane=feed: with core.masters-whetstone
 submit-modal: plane=go: 1,0
 submit-modal: plane=allocate: position 1
 submit-modal: plane=allocate: slot ne

@@ -32,10 +32,6 @@ interface PlaneMove {
   readonly subject?: Localized;
 }
 
-function onCopy(frame: PlaneFrame, verb: string, tail: string, shown: Localized, subject?: Localized): PlaneMove {
-  return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} ${tail}`, focus: frame.hex, subject };
-}
-
 function onHexagon(frame: PlaneFrame, verb: string, tail: string, shown: Localized, on?: Answer, subject?: Localized): PlaneMove {
   return { value: `${verb}: ${tail}`, shown, line: `${verb}: ${frame.target} at ${frame.hex} ${tail}`, focus: frame.hex, on, subject };
 }
@@ -76,9 +72,6 @@ function movesOn(frame: PlaneFrame, report: PlaneReport | undefined, state: Game
   for (const position of here.positions) {
     if (position.standing !== 'available') continue;
     moves.push(onHexagon(frame, 'allocate', `position ${position.position}`, localizer.engine('engine.plane.allocate.position', { position: position.position }), position.node));
-  }
-  for (const food of stacked(state, registry, (item) => item.itemExperience !== undefined)) {
-    moves.push(onCopy(frame, 'feed', `with ${food.id}`, localizer.engine('engine.plane.feed', { item: food.name }), food.name));
   }
   return moves;
 }

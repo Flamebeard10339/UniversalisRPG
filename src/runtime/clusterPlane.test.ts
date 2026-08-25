@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DIRECTIONS, Direction, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode, rotate } from '../content/hex';
 import { loadInEnglish } from '../content/engineLocale';
 import { Registry } from '../content/registry';
+import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import {
   allocateNode,
   clusterAt,
@@ -59,6 +60,8 @@ const placed = (plane: Plane, hex: Hex, where: Registry = registry) => placement
 
 const PLENTY = 99;
 
+const cursor = (): RngCursor => ({ rng: DEFAULT_RNG_SEED });
+
 function allocateAll(plane: Plane, nodes: PlaneNode[]): void {
   for (const node of nodes) {
     const refusal = allocateNode(registry, plane, node, PLENTY);
@@ -67,27 +70,27 @@ function allocateAll(plane: Plane, nodes: PlaneNode[]): void {
 }
 
 function reachedEastSlot(): Plane {
-  const plane = originPlane('ringlet');
+  const plane = originPlane('ringlet', 0.5);
   allocateAll(plane, [position(ORIGIN, 2), position(ORIGIN, 3), position(ORIGIN, 4), slot(ORIGIN, 'e')]);
   return plane;
 }
 
 describe('the origin cluster', () => {
   it('is a point with one open east connection when the base declares none of its own', () => {
-    const plane = originPlane(null);
+    const plane = originPlane(null, 0.5);
     expect(slotDirections(placed(plane, ORIGIN))).toEqual(['e']);
     expect(slotState(registry, plane, ORIGIN, 'e')).toBe('open');
     expect(isPlane(plane)).toBe(true);
   });
 
   it('is the base own cluster when it declares one, standing unrotated', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(placed(plane, ORIGIN).rotation).toBe(0);
     expect(slotDirections(placed(plane, ORIGIN))).toEqual(['e', 'ne']);
   });
 
   it('has its root allocated from the start, and costs a point for every other node', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(isAllocated(registry, plane, position(ORIGIN, 1))).toBe(true);
     expect(pointsSpent(plane)).toBe(0);
 
@@ -98,8 +101,8 @@ describe('the origin cluster', () => {
 
 describe('the rotation a slotted cluster stands at', () => {
   const landed = (direction: Direction): Plane => ({
-    ...originPlane('crossroads'),
-    [hexKey(at(NEIGHBOR_DELTA[direction].q, NEIGHBOR_DELTA[direction].r))]: { jewel: 'ringlet', entry: direction, allocatedPositions: [], allocatedSlots: [], effects: [] },
+    ...originPlane('crossroads', 0.5),
+    [hexKey(at(NEIGHBOR_DELTA[direction].q, NEIGHBOR_DELTA[direction].r))]: { jewel: 'ringlet', entry: direction, roll: 0.5, allocatedPositions: [], allocatedSlots: [], effects: [] },
   });
 
   it('carries the root west edge onto the edge it entered through, through every one of the six', () => {
@@ -132,42 +135,42 @@ describe('the rotation a slotted cluster stands at', () => {
 describe('slotting a jewel', () => {
   it('places its cluster in the neighbouring hex and records the edge it came through', () => {
     const plane = reachedEastSlot();
-    expect(fillSlot(registry, plane, ORIGIN, 'e', 'crossroads')).toBeUndefined();
-    expect(clusterAt(plane, at(1, 0))).toEqual({ jewel: 'crossroads', entry: 'e', allocatedPositions: [], allocatedSlots: [], effects: [] });
+    expect(fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor())).toBeUndefined();
+    expect(clusterAt(plane, at(1, 0))).toEqual({ jewel: 'crossroads', entry: 'e', roll: expect.any(Number), allocatedPositions: [], allocatedSlots: [], effects: [] });
     expect(slotState(registry, plane, ORIGIN, 'e')).toBe('filled');
   });
 
   it('costs no point of its own, so the jewel is the whole price', () => {
     const plane = reachedEastSlot();
     const before = pointsSpent(plane);
-    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads');
+    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
     expect(pointsSpent(plane)).toBe(before);
   });
 
   it('refuses an edge carrying no slot at all', () => {
     const plane = reachedEastSlot();
-    expect(words(fillSlot(registry, plane, ORIGIN, 'sw', 'crossroads'))).toMatch(/no jewel slot on the sw edge of 0,0/);
+    expect(words(fillSlot(registry, plane, ORIGIN, 'sw', 'crossroads', cursor()))).toMatch(/no jewel slot on the sw edge of 0,0/);
   });
 
   it('refuses a slot nobody has allocated', () => {
-    const plane = originPlane('ringlet');
-    expect(words(fillSlot(registry, plane, ORIGIN, 'e', 'crossroads'))).toMatch(/has not been allocated/);
+    const plane = originPlane('ringlet', 0.5);
+    expect(words(fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor()))).toMatch(/has not been allocated/);
     expect(clusterAt(plane, at(1, 0))).toBeUndefined();
   });
 
   it('refuses a second jewel in a slot that already holds one', () => {
     const plane = reachedEastSlot();
-    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads');
-    expect(words(fillSlot(registry, plane, ORIGIN, 'e', 'ringlet'))).toMatch(/already holds a jewel/);
+    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
+    expect(words(fillSlot(registry, plane, ORIGIN, 'e', 'ringlet', cursor()))).toMatch(/already holds a jewel/);
     expect(clusterAt(plane, at(1, 0))!.jewel).toBe('crossroads');
   });
 });
 
 function twoNeighbouringChildren(): Plane {
   const plane = reachedEastSlot();
-  fillSlot(registry, plane, ORIGIN, 'e', 'crossroads');
+  fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
   allocateAll(plane, [slot(ORIGIN, 'ne')]);
-  fillSlot(registry, plane, ORIGIN, 'ne', 'crossroads');
+  fillSlot(registry, plane, ORIGIN, 'ne', 'crossroads', cursor());
   allocateAll(plane, [position(at(1, 0), 1)]);
   return plane;
 }
@@ -178,7 +181,7 @@ describe('a hex holds at most one cluster', () => {
     expect(slotState(registry, plane, at(1, 0), 'nw')).toBe('blocked');
 
     const spent = pointsSpent(plane);
-    expect(words(fillSlot(registry, plane, at(1, 0), 'nw', 'ringlet'))).toMatch(/blocked: a cluster already stands in 1,-1/);
+    expect(words(fillSlot(registry, plane, at(1, 0), 'nw', 'ringlet', cursor()))).toMatch(/blocked: a cluster already stands in 1,-1/);
     expect(words(allocateNode(registry, plane, slot(at(1, 0), 'nw'), PLENTY))).toMatch(/blocked: a cluster already stands in 1,-1/);
     expect(pointsSpent(plane)).toBe(spent);
     expect(Object.keys(plane).sort()).toEqual(['0,0', '1,-1', '1,0']);
@@ -194,7 +197,7 @@ describe('a hex holds at most one cluster', () => {
 
 describe('allocation', () => {
   it('asks for a neighbour and not a parent, so a ring is walked either way round', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     allocateAll(plane, [position(ORIGIN, 6), position(ORIGIN, 5)]);
     expect(allocateNode(registry, plane, position(ORIGIN, 4), PLENTY)).toBeUndefined();
 
@@ -204,7 +207,7 @@ describe('allocation', () => {
   });
 
   it('treats an unfilled position as a node: it costs a point, grants nothing and conducts', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(registry.clusterJewels.get('ringlet')!.positions[2]).toBeUndefined();
     expect(allocateNode(registry, plane, position(ORIGIN, 2), PLENTY)).toBeUndefined();
     expect(pointsSpent(plane)).toBe(1);
@@ -212,20 +215,20 @@ describe('allocation', () => {
   });
 
   it('refuses a node nothing allocated touches, and the refusal costs nothing', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 4), PLENTY))).toMatch(/position 4 of 0,0 touches nothing allocated/);
     expect(words(allocateNode(registry, plane, slot(ORIGIN, 'e'), PLENTY))).toMatch(/the e slot of 0,0 touches nothing allocated/);
     expect(pointsSpent(plane)).toBe(0);
   });
 
   it('refuses when no point remains, and the refusal costs nothing', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 2), 0))).toMatch(/costs a point and none remain/);
     expect(pointsSpent(plane)).toBe(0);
   });
 
   it('refuses a node twice, the pre-allocated root included', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     allocateAll(plane, [position(ORIGIN, 2)]);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 2), PLENTY))).toMatch(/already allocated/);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 1), PLENTY))).toMatch(/already allocated/);
@@ -233,7 +236,7 @@ describe('allocation', () => {
   });
 
   it('refuses a position the shape does not have, and an edge with no slot on it', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     expect(words(allocateNode(registry, plane, position(ORIGIN, 7), PLENTY))).toMatch(/ring has no position 7 \(1-6\)/);
     expect(words(allocateNode(registry, plane, slot(ORIGIN, 'sw'), PLENTY))).toMatch(/no jewel slot on the sw edge/);
   });
@@ -263,7 +266,7 @@ describe('a plane whose content moved underneath it', () => {
 
   it('drops a cluster stranded by the slot it entered through going away', () => {
     const plane = reachedEastSlot();
-    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads');
+    fillSlot(registry, plane, ORIGIN, 'e', 'crossroads', cursor());
     allocateAll(plane, [position(at(1, 0), 1)]);
 
     expect(repairPlane(narrowed, plane).map(words)).toContainEqual('dropped the crossroads cluster at 1,0, which entered through a e slot of 0,0 that is gone');
@@ -271,7 +274,7 @@ describe('a plane whose content moved underneath it', () => {
   });
 
   it('drops what nothing allocated reaches any more, so the corridor cannot be paid for twice', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     allocateAll(plane, [position(ORIGIN, 2), position(ORIGIN, 3)]);
     clusterAt(plane, ORIGIN)!.allocatedPositions = [3];
 
@@ -280,14 +283,14 @@ describe('a plane whose content moved underneath it', () => {
   });
 
   it('drops an effect whose declaration is gone', () => {
-    const plane = originPlane('ringlet');
+    const plane = originPlane('ringlet', 0.5);
     clusterAt(plane, ORIGIN)!.effects = ['orb-of-vigour'];
     expect(repairPlane(registry, plane).map(words)).toEqual(['dropped the orb-of-vigour effect on the cluster at 0,0, whose declaration is gone']);
     expect(clusterAt(plane, ORIGIN)!.effects).toEqual([]);
   });
 
   it('leaves an origin standing whose own declaration went, because an item always has a plane', () => {
-    const plane = originPlane('crossroads');
+    const plane = originPlane('crossroads', 0.5);
     expect(repairPlane(withoutCrossroads, plane).map(words)).toEqual(["the origin cluster crossroads is not loaded, so the base's own cluster stands in its place"]);
     expect(clusterAt(plane, ORIGIN)!.jewel).toBeNull();
   });
