@@ -67,13 +67,20 @@ export interface Entity extends AuthoredEntity {
 // address rather than writing the word down a second time.
 export const EXAMINE_FIELD = 'examine';
 
+// The flag every entity owns saying its `examine:` has been run, which is why it is declared by the
+// kind rather than by an author: having read a thing is the game's own state, a save carries it
+// under this name, and a condition may read it wherever a flag is read.
+export const EXAMINED = 'examined';
+
 // `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
 // the entity's own action list, saying the words under the key the field already holds them at, so
-// every driver offers it the way it offers any other action.
+// every driver offers it the way it offers any other action — and it marks itself run, so nothing
+// else has to notice that it was.
 export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
-  return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said] } as Action];
+  const marked: ActionResult = { kind: 'set', variable: `${value.id}.${EXAMINED}` };
+  return [{ id: EXAMINE_FIELD, label: humanizeEn(EXAMINE_FIELD), generatedLabel: true, kind: 'instant', results: [said, marked] } as Action];
 }
 
 const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ action, from: `${EXAMINE_FIELD}:` }));
@@ -139,6 +146,7 @@ const entityBlock: EntryBody = {
 };
 
 export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
+  flags: [EXAMINED],
   says: (value) => [...value.blocks.flatMap((block) => (isHandlerBlock(block) ? [block.results] : actionResultLists(block))), value.onHit, value.whenHit],
   kind: 'entity',
   ids: 'owned',
