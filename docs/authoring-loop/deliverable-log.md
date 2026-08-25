@@ -4,13 +4,24 @@ Branch `authoring-loop-and-playbot`. Items 3 and 5 of the content dream. This fi
 is the agreement about what is being built and what "done" means. It is tracked, so
 a session that picks this branch up cold starts here.
 
-**Three files, and they do not overlap:**
+**Four files, and they do not overlap. This one names the other three, and that
+naming is what `npm run handoff` reads the folder off — in both directions, so a
+name here with no file behind it is reported:**
 
 - **this one** — what the branch is for, and what phase it is in
-- **`open.md`** — everything still wrong. A line is deleted the day it closes
+- **`open-agent.md`** — everything still wrong whose shape is settled and whose
+  proof is headless: `npm test`, `npm run probe`, `npm run oracle`, `tsc`
+- **`open-human.md`** — everything still wrong that waits on Yonatan: his play,
+  his reading of the writing, and the rulings nobody else can take. Every line
+  there carries one italic clause naming what would move it to `open-agent.md`,
+  or saying plainly that nothing would
 - **`settled.md`** — what is already true, for an agent starting cold
 
-Nothing is struck through anywhere. If it is done it is gone, and git holds why.
+A line is deleted the day it closes, and one that changes hands crosses between
+the two open files rather than being marked in place. That rule is the repo's,
+not this folder's — `CLAUDE.md` and the `hand-over` skill own it, and the skill
+says how a handback is written. Nothing is struck through anywhere. If it is done
+it is gone, and git holds why.
 
 ---
 
@@ -113,8 +124,8 @@ better. A playtest names it better than a reading does.
 1. **The review pass over the writing.** `npm run review`, resumable through
    `content/reviewed.tsv`.
 2. **A playtest of his own, and the list of problems it produces.** Nothing
-   substitutes for it. It is what the GUI playtesting mode in `open.md` exists to
-   record.
+   substitutes for it. It is what the GUI playtesting mode in `open-human.md`
+   exists to record.
 3. Nothing else. The reload question is closed and the quest notes stay as they are
    until the town has been played.
 

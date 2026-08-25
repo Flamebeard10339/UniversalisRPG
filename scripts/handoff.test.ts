@@ -1,7 +1,8 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { complaintsIn, featureFolders, folderLines } from './handoff';
+import { complaintsIn, featureFolders, folderLines, namesInLog } from './handoff';
 
-const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', missing: [], complaints: [], unlinked: [], since: 0, lastWrote: 'abc1234 something', ...over });
+const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', companions: ['open.md', 'settled.md'], complaints: [], unlinked: [], gone: [], since: 0, lastWrote: 'abc1234 something', ...over });
 
 describe('what a folder has to say before a session hands it over', () => {
   it('names a line that was struck through instead of deleted', () => {
@@ -18,12 +19,21 @@ describe('what a folder has to say before a session hands it over', () => {
     expect(complaintsIn('open.md', ['## Blocking the writing pass', '', '**Empty prose is said as silence.** Closes when the engine refuses it.'].join('\n'))).toEqual([]);
   });
 
-  it('asks for all three the moment a folder keeps one', () => {
-    expect(folder({ missing: ['settled.md'] }).join('\n')).toContain('no settled.md');
+  // The folder's shape is whatever the log says it is, so a folder that splits what is still wrong into two files needs no second rule here.
+  it('reads a folder\'s files off the log that names them, whatever they are called', () => {
+    expect(namesInLog('- `open-agent.md` — headless\n- `open-human.md` — the owner\'s\n- `settled.md` — true now\n\nItem 5 is `docs/specs/a-turn-costs-what-the-last-turn-did.md`.')).toEqual(['open-agent.md', 'open-human.md', 'settled.md']);
   });
 
-  it('says a log that never names the other two leaves a reader stranded', () => {
+  it('says a log that stands alone hands nothing over', () => {
+    expect(folder({ companions: [] }).join('\n')).toContain('deliverable-log.md stands alone');
+  });
+
+  it('says a log that never names a file beside it leaves a reader stranded', () => {
     expect(folder({ unlinked: ['open.md'] }).join('\n')).toContain('deliverable-log.md never names open.md');
+  });
+
+  it('says a log naming a file that is no longer there has gone stale', () => {
+    expect(folder({ gone: ['open.md'] }).join('\n')).toContain('deliverable-log.md names open.md, and no such file stands beside it');
   });
 
   // The one thing a reader cannot see for themselves. Under the threshold it is reported and not complained about, because a doc written a few commits ago is current, not stale.
@@ -33,6 +43,6 @@ describe('what a folder has to say before a session hands it over', () => {
   });
 
   it('finds the folders that hand over, from the tree rather than from a list here', () => {
-    expect(featureFolders()).toContain('docs\\authoring-loop'.replace('\\', '/').replace('/', require('node:path').sep));
+    expect(featureFolders()).toContain(path.join('docs', 'authoring-loop'));
   });
 });

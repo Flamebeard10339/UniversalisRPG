@@ -6,7 +6,7 @@ is history: git holds why, and the commit that settled a line is where the
 reasoning lives. If a line here is wrong, the code changed and the line should be
 deleted, not annotated.
 
-Nothing open lives here. That is `open.md`.
+Nothing open lives here. That is `open-agent.md` and `open-human.md`.
 
 ## The language
 

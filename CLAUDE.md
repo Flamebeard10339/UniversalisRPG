@@ -62,15 +62,19 @@ module; replace one only having read what you are replacing.
 
 # Work that outlives a session
 
-A feature that runs longer than one sitting hands over through three files in
+A feature that runs longer than one sitting hands over through four files in
 `docs/<feature>/`: `deliverable-log.md` says what it is for and what phase it is
-in, `open.md` is what is still wrong, `settled.md` is what someone starting cold
-has to know. **Read all three before touching that work, and keep them current as
-you go.** A finding left only in a session transcript is lost.
+in, `open-agent.md` is what is still wrong that a lane can close on its own,
+`open-human.md` is what is still wrong that waits on the author, and `settled.md`
+is what someone starting cold has to know. **Read all four before touching that
+work, and keep them current as you go.** A finding left only in a session
+transcript is lost.
 
 Nothing is struck through in any of them — **done means deleted**, and the commit
-that closed a line is where its reasoning lives. A folder where a finished heading
-and an open one look alike has stopped answering the one question it is for.
+that closed a line is where its reasoning lives. An open line that changes hands
+**crosses between the two open files rather than being marked in place**, in
+either direction. A folder where a finished heading and an open one look alike
+has stopped answering the one question it is for.
 
 `npm run handoff` says which of those folders have drifted from the work. The
 `hand-over` skill is the procedure for writing them and for closing a session out.

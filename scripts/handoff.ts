@@ -6,17 +6,19 @@ const usage = [
   'Usage: npm run handoff',
   '',
   'Asks whether the folders a session hands over through are still telling the',
-  'truth. A feature that runs longer than one session keeps three files under',
-  'docs/<feature>/ — deliverable-log.md says what it is for, open.md is what is',
-  'still wrong, settled.md is what a cold agent has to know. Nothing is struck',
-  'through in any of them: done means deleted.',
+  'truth. A feature that runs longer than one session keeps a deliverable-log.md',
+  'under docs/<feature>/ saying what the work is for, and beside it the files that',
+  'log names — what is still wrong, and what a cold agent has to know. The log is',
+  'the folder index, so this reads the naming both ways: a file the log never',
+  'names strands a reader, and a name the log holds with no file behind it is the',
+  'log gone stale. Nothing is struck through in any of them: done means deleted.',
   '',
   'It reports rather than gates. The one thing it can measure that a reader',
   'cannot is how much work has landed since the docs were last written, which is',
   'the number that says whether they have drifted.',
 ].join('\n');
 
-const KEPT = ['deliverable-log.md', 'open.md', 'settled.md'] as const;
+const LOG = 'deliverable-log.md';
 
 const WORK = ['src', 'content', 'scripts'];
 
@@ -38,23 +40,31 @@ export function complaintsIn(file: string, text: string): Complaint[] {
   return complaints;
 }
 
+export function namesInLog(text: string): string[] {
+  const written = [...text.matchAll(/(?:^|[^\w./\\-])([\w-]+\.md)/g)].map((found) => found[1]);
+  return [...new Set(written)];
+}
+
 export interface Folder {
   name: string;
-  missing: string[];
+  companions: string[];
   complaints: Complaint[];
   unlinked: string[];
+  gone: string[];
   since: number;
   lastWrote: string;
 }
 
 function reviewFolder(dir: string): Folder {
-  const held = KEPT.filter((name) => existsSync(path.join(dir, name)));
-  const missing = KEPT.filter((name) => !held.includes(name));
-  const complaints = held.filter((name) => name !== 'deliverable-log.md').flatMap((name) => complaintsIn(name, readFileSync(path.join(dir, name), 'utf8')));
+  const log = readFileSync(path.join(dir, LOG), 'utf8');
+  const companions = readdirSync(dir).filter((name) => name !== LOG && name.endsWith('.md'));
+  const complaints = companions.flatMap((name) => complaintsIn(name, readFileSync(path.join(dir, name), 'utf8')));
 
-  const log = existsSync(path.join(dir, 'deliverable-log.md')) ? readFileSync(path.join(dir, 'deliverable-log.md'), 'utf8') : '';
-  const unlinked = held.filter((name) => name !== 'deliverable-log.md' && !log.includes(name));
+  const named = namesInLog(log);
+  const unlinked = companions.filter((name) => !named.includes(name));
+  const gone = named.filter((name) => name !== LOG && !companions.includes(name) && !existsSync(name));
 
+  const held = [LOG, ...companions];
   const written = held.map((name) => git('log', '-1', '--format=%H %h %s', '--', path.join(dir, name))).filter((line) => line !== '');
   const newest = written[0] ?? '';
   let since = 0;
@@ -67,16 +77,20 @@ function reviewFolder(dir: string): Folder {
     lastWrote = written[at].split(' ').slice(1).join(' ');
     since = Number(git('rev-list', '--count', `${commits[at]}..HEAD`, '--', ...WORK));
   }
-  return { name: path.basename(dir), missing, complaints, unlinked, since, lastWrote };
+  return { name: path.basename(dir), companions, complaints, unlinked, gone, since, lastWrote };
 }
+
+export const wrongIn = (folder: Folder): number =>
+  folder.complaints.length + folder.unlinked.length + folder.gone.length + (folder.companions.length === 0 ? 1 : 0);
 
 export function folderLines(folder: Folder): string[] {
   const lines = [`docs/${folder.name}/`];
   const say = (mark: string, text: string): void => void lines.push(`  ${mark} ${text}`);
-  if (folder.missing.length > 0) say('--', `no ${folder.missing.join(', ')} — a folder that keeps one of the three keeps all three`);
-  else say('ok', 'deliverable-log, open and settled all present');
+  if (folder.companions.length === 0) say('--', `${LOG} stands alone — a folder that hands over keeps what is still wrong and what is settled in files beside it`);
+  else say('ok', `${LOG} and the ${folder.companions.length} file(s) it names: ${folder.companions.join(', ')}`);
   for (const complaint of folder.complaints) say('--', `${complaint.file}: ${complaint.says}`);
-  for (const name of folder.unlinked) say('--', `deliverable-log.md never names ${name}, so a reader starting there will not find it`);
+  for (const name of folder.unlinked) say('--', `${LOG} never names ${name}, so a reader starting there will not find it`);
+  for (const name of folder.gone) say('--', `${LOG} names ${name}, and no such file stands beside it`);
   if (folder.since === 0) say('ok', 'nothing has landed since these were last written');
   else say(folder.since > 8 ? '--' : 'ok', `${folder.since} commit(s) under ${WORK.join('/')} since these were last written — the last was ${folder.lastWrote}`);
   return lines;
@@ -85,7 +99,7 @@ export function folderLines(folder: Folder): string[] {
 export function handoffLines(dirs: readonly string[]): string[] {
   if (dirs.length === 0) return ['no docs/<feature>/ folder keeps a deliverable-log, so nothing here is handed over between sessions'];
   const folders = dirs.map(reviewFolder);
-  const wrong = folders.flatMap((folder) => [...folder.missing, ...folder.complaints, ...folder.unlinked]).length;
+  const wrong = folders.reduce((count, folder) => count + wrongIn(folder), 0);
   const stale = folders.filter((folder) => folder.since > 8).length;
   return [
     ...folders.flatMap((folder) => [...folderLines(folder), '']),
@@ -97,7 +111,7 @@ export const featureFolders = (root = 'docs'): string[] =>
   readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(root, entry.name))
-    .filter((dir) => KEPT.some((name) => existsSync(path.join(dir, name))));
+    .filter((dir) => existsSync(path.join(dir, LOG)));
 
 function main(): void {
   if (process.argv.includes('--help')) {
