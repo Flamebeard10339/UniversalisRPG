@@ -308,13 +308,13 @@ out: 1 mix
 });
 
 describe('travel is a flat-timed journey', () => {
-  const module = `
+  const module =
+    FIXTURE_WORLD +
+    `
 # variable travel-seconds
 value: 7
 
 # location camp
-x: 0, y: 0
-starting
 adjacent:
   beach
 
@@ -444,10 +444,10 @@ describe('cancelAction', () => {
 });
 
 describe('runTest: begin:/wait:/cancel directives', () => {
-  const module = `
-# location workshop
-x: 0, y: 0
-starting
+  const module =
+    FIXTURE_WORLD +
+    `
+# location camp
 entities:
   oven
 
@@ -461,16 +461,16 @@ roast:
   give: 1 roasted-chestnut
 
 # test roast-instant
-travel: workshop
+travel: camp
 use: entity.oven.roast
 
 # test roast-begin-then-wait
-travel: workshop
+travel: camp
 begin: use entity.oven.roast
 wait: 4
 
 # test roast-begin-partial-cancel
-travel: workshop
+travel: camp
 begin: use entity.oven.roast
 wait: 2
 cancel
@@ -1789,10 +1789,10 @@ const OFFERED_WHEN = actionLinesWritten()
   .filter((line) => line.family === 'offered when')
   .map((line) => line.form.slice(0, line.form.indexOf(':')));
 
-const GATED = (field: string, condition: string): string => `
-# location room
-x: 0, y: 0
-starting
+const GATED = (field: string, condition: string): string =>
+  FIXTURE_WORLD +
+  `
+# location camp
 entities:
   thing
 
@@ -1839,14 +1839,14 @@ describe('what takes an action off the list', () => {
   });
 });
 
-const OVEN = `
+const OVEN =
+  FIXTURE_WORLD +
+  `
 # item raw-chestnut
 title: Raw Chestnut
 examine: Green in the husk.
 
-# location kitchen
-x: 0, y: 0
-starting
+# location camp
 entities:
   oven
 

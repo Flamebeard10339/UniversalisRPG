@@ -34,12 +34,10 @@ import {
   type Recorder,
 } from './command';
 
-const CARRYING_MODULE = `
+const CARRYING_MODULE =
+  FIXTURE_WORLD +
+  `
 # skill smithing
-
-# location forge
-x: 0, y: 0
-starting
 
 # item gauntlet
 title: Gauntlet
@@ -912,7 +910,9 @@ describe('the live clock', () => {
   });
 
   it('counts down an untargeted action whose plain damage: reads under 1 — the one shape that publishes a completion', () => {
-    const TAPPING_MODULE = `
+    const TAPPING_MODULE =
+      FIXTURE_WORLD +
+      `
 # stat tap
 base: 0.2
 
@@ -920,8 +920,6 @@ base: 0.2
 base: 60
 
 # location camp
-x: 0, y: 0
-starting
 entities:
   bell
 
@@ -1157,13 +1155,14 @@ describe('the recorder: /create-test and /create-valid-test', () => {
   });
 });
 
-const AUTHORING_MODULE = `
+const AUTHORING_MODULE =
+  `
 # info base
 version: 1.0.0
-
+` +
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   chest
 

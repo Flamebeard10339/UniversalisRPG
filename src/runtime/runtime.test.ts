@@ -8,6 +8,7 @@ import { IMPLICIT_TARGET_FULL } from './encounter';
 import { restorePools } from './effects';
 import type { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { PLAYER_FIELDS, PLAYER_SHEET } from './state';
 import { secondsToMs, toMilliUnits } from './units';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
@@ -506,7 +507,9 @@ out: 1 cooked-shrimp
   });
 });
 
-const DRAIN_MODULE = `
+const DRAIN_MODULE =
+  FIXTURE_WORLD +
+  `
 # stat max-vigor
 base: 30
 
@@ -565,9 +568,7 @@ on ichor-gone:
 on ash-settled:
   say: The ash settles.
 
-# location den
-x: 0, y: 0
-starting
+# location camp
 entities: grindstone, millstone, wheel, bellows
 
 # entity grindstone
@@ -609,7 +610,7 @@ work:
 describe('a deterministic batch settles `on empty:` at the completion that drains the pool', () => {
   function grinding(entity: string, action: string, splits: number[]): GameState {
     const registry = loadInEnglish(DRAIN_MODULE);
-    const state = createGameState('den');
+    const state = createGameState('camp');
     initResources(state, registry);
     armAction('entity', entity, action, registry, state);
     for (const seconds of splits) resolve(state, registry, secondsToMs(seconds));

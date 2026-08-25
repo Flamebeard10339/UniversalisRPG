@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadModule } from '../content/load';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { SAVE_VERSION } from '../runtime/save';
 import { applyDirective, startSession, submitModal, view, type PlaySession, type PlayView } from '../runtime/session';
 import { dismissal } from './asking';
 
-const MODULE = `
+const MODULE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   sage
 

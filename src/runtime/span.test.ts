@@ -4,11 +4,11 @@ import { Registry } from '../content/registry';
 import { Directive, Terminator } from '../content/sections/test';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor } from './localized';
 import { applyDirective, startSession, view } from './session';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 
-const WORLD = `
-# stat max-health
-base: 30
-
+const WORLD =
+  FIXTURE_WORLD +
+  `
 # stat max-focus
 base: 5
 
@@ -105,10 +105,7 @@ time: 600
 skills: fishing, lore
 uses: fish, chop, study, prime, pace, tap, quit, halt, plod
 
-# location shore
-title: The Shore
-x: 0, y: 0
-starting
+# location camp
 adjacent: dunes
 
 # location dunes

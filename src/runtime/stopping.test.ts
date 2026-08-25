@@ -3,6 +3,7 @@ import { restorePools } from './effects';
 import { armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_MS, useAction, WaitedOut } from './runtime';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
@@ -380,7 +381,9 @@ describe('a start condition that stops holding', () => {
 
 // One grind, read five ways. A quarter of the tree a swing and two swings allowed is a cycle that
 // runs out, so `on unfinished:` is reached on every reading below and only the terminator changes.
-const GRIND = `
+const GRIND =
+  FIXTURE_WORLD +
+  `
 # stat felling
 base: 0.25
 
@@ -389,9 +392,7 @@ base: 0.25
 # event giving-up
 trigger: unfinished
 
-# location grove
-x: 0, y: 0
-starting
+# location camp
 entities: dead-alder
 
 # entity dead-alder
@@ -408,7 +409,7 @@ const CYCLE_SECONDS = 2;
 
 function grinding(rewrite: (source: string) => string = (source) => source): { waited: WaitedOut; state: GameState } {
   const registry = loadInEnglish(rewrite(GRIND));
-  const state = createGameState('grove');
+  const state = createGameState('camp');
   initResources(state, registry);
   useAction('entity', 'dead-alder', 'grind', registry, state);
   return { waited: resolveUnderWay(state, registry), state };

@@ -1,20 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { initialLocalChangesModule, listLocalSections, localSectionHeadings } from '../content/localChanges';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import type { ModuleSource } from '../content/universe';
 import { newContext, stagedSections, type AuthoringContext, type CommandContext, type CommandResult } from './command';
 import { dropRun, fileRun, filedRuns, stagedRuns } from './runFiling';
 import { runAsSections, type KeptRun } from './runLog';
 import { serializeSession, startSession, view } from './session';
 
-const WORLD = `
+const WORLD =
+  `
 # info base
 version: 1.0.0
-
-# location camp
-x: 0, y: 0
-starting
-
+` +
+  FIXTURE_WORLD +
+  `
 # item coin
 title: Coin
 `;

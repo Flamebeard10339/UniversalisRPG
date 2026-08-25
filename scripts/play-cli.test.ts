@@ -9,6 +9,7 @@ import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/conten
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import { standingSources } from '../src/content/shipped';
+import { FIXTURE_WORLD } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
@@ -28,11 +29,9 @@ const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrint
 
 const TUTORIAL: readonly ModuleSource[] = standingSources();
 
-const PLANE_SOURCE = `
-# location camp
-x: 0, y: 0
-starting
-
+const PLANE_SOURCE =
+  FIXTURE_WORLD +
+  `
 # cluster-jewel core
 shape: point
 open-connections: e
@@ -143,14 +142,13 @@ describe('play-cli renders what a command result says happened', () => {
   });
 
   it('marks a match, a mismatch and a refusal with this driver’s own glyphs', () => {
-    const ctx = driver(`
-# location camp
-x: 0, y: 0
-starting
-
+    const ctx = driver(
+      FIXTURE_WORLD +
+        `
 # save empty
 {"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"camp.touched":true}}
-`);
+`,
+    );
     expect(shown(runLine(ctx, '/assert time >= 0'))).toEqual(['✓ time >= 0 matches']);
     expect(shown(runLine(ctx, '/assert time < 0'))).toEqual(['⚠ time < 0']);
     expect(shown(runLine(ctx, '/expect empty'))).toEqual(['✓ empty matches']);
@@ -200,12 +198,12 @@ starting
   // open one would be telling an author they can walk somewhere they cannot. The corpus has no
   // shut road between two discovered places, so this branch is only reachable from a fixture.
   it('marks a road the map draws but the world will not let anyone walk', () => {
-    const ctx = driver(`
+    const ctx = driver(
+      FIXTURE_WORLD +
+        `
 # flag gate-open
 
 # location camp
-x: 0, y: 0
-starting
 adjacent:
   vault while gate-open
 
@@ -214,7 +212,8 @@ x: 1, y: 0
 
 # save both-found
 {"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"vault.discovered":true}}
-`);
+`,
+    );
     runLine(ctx, '/load both-found');
     const lines = shown(runLine(ctx, '/state'));
 
@@ -298,7 +297,9 @@ x: 1, y: 0
   });
 });
 
-const LIVE_MODULE = `
+const LIVE_MODULE =
+  FIXTURE_WORLD +
+  `
 # stat tap
 base: 0.2
 
@@ -306,8 +307,6 @@ base: 0.2
 base: 60
 
 # location camp
-x: 0, y: 0
-starting
 entities:
   oven
   anvil
@@ -693,10 +692,10 @@ describe('play-cli drives a live run', () => {
   });
 });
 
-const SAVING_SOURCE = `
+const SAVING_SOURCE =
+  FIXTURE_WORLD +
+  `
 # location camp
-x: 0, y: 0
-starting
 entities:
   chest
 
@@ -722,14 +721,11 @@ haul:
 load: stranger
 `;
 
-const EXPORT_SOURCE = `
+const EXPORT_SOURCE =
+  `
 # info exported
 version: 0.0.0
-
-# location camp
-x: 0, y: 0
-starting
-`;
+` + FIXTURE_WORLD;
 
 interface Playing {
   ctx: CommandContext;
