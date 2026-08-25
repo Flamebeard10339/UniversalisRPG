@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
-import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkLine, waysOut, type Place } from './discovery';
+import { waysOut } from '../runtime/waysOut';
+import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkLine, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -43,7 +44,7 @@ describe('one plane of the map', () => {
     const withAttic = [...HOUSE, place('attic', 5, 5, 1, 'landing')];
     const walk: PlayView['choices'][number] = { id: 'travel:attic', kind: 'travel', label: asLocalized('Travel to Attic'), leadsTo: 'attic', legs: 2 };
 
-    const ids = sheetAt(withAttic, 'hall', 0, waysOut([walk])).nodes.map((node) => node.place.id);
+    const ids = sheetAt(withAttic, 'hall', 0, new Map(waysOut([walk]).map((way) => [way.to, way.at]))).nodes.map((node) => node.place.id);
 
     expect(ids).toContain('attic');
   });
@@ -150,35 +151,6 @@ describe('where a place is drawn', () => {
 
       expect(new Set(points).size, `on plane ${plane}`).toBe(points.length);
     }
-  });
-});
-
-describe('which offer is the way to a place', () => {
-  const offer = (id: string, leadsTo?: string): PlayView['choices'][number] => ({ id, kind: leadsTo ? 'travel' : 'action', label: asLocalized(id), leadsTo });
-
-  it('answers with the position a driver dispatches it at, counting from one', () => {
-    const ways = waysOut([offer('look'), offer('travel:beach', 'beach'), offer('travel:cove', 'cove')]);
-
-    expect(ways.get('beach')).toBe(2);
-    expect(ways.get('cove')).toBe(3);
-  });
-
-  it('takes a staircase, which publishes an action and not a travel', () => {
-    const stairs: PlayView['choices'][number] = { id: 'use:entity.stairs.ascend', kind: 'action', label: asLocalized('ascend'), leadsTo: 'landing' };
-
-    expect(waysOut([stairs]).get('landing')).toBe(1);
-  });
-
-  it('leaves out an offer that goes nowhere, so it can never be dispatched by a tap on a place', () => {
-    const ways = waysOut([offer('roast chestnuts'), offer('talk to miki')]);
-
-    expect([...ways.keys()]).toEqual([]);
-  });
-
-  it('keeps the first of two ways to one place, which is the order the engine offered them', () => {
-    const ways = waysOut([offer('a'), offer('travel:beach', 'beach'), offer('use:entity.path.walk', 'beach')]);
-
-    expect(ways.get('beach')).toBe(2);
   });
 });
 
