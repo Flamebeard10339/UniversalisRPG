@@ -279,7 +279,7 @@ describe('a run an author played in the app', () => {
 
   it('refuses a run whose starting save this build cannot read, since nothing here migrates one', () => {
     const slots = memoryDriver();
-    slotStore(slots, () => 0).write(PLAYTEST_SLOT, serializeRun({ run: { id: runId(PLAYED.at), log: [] }, from: `{"version":${SAVE_VERSION - 1}}` }));
+    slotStore(slots, () => 0).write(PLAYTEST_SLOT, serializeRun({ run: { id: runId(PLAYED.at), log: [] }, from: { bytes: `{"version":${SAVE_VERSION - 1}}` } }));
     const driver = playingWith(slots);
 
     const filing = driver.playtest.stop();

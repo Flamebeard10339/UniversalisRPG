@@ -79,7 +79,7 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
     run: () => held?.run ?? null,
     kept: () => held,
     start: (from) => {
-      held = { run: { id: runId(header().at), log: [] }, from };
+      held = { run: { id: runId(header().at), log: [] }, from: { bytes: from } };
       keep();
     },
     stop: () => {

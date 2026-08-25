@@ -393,7 +393,7 @@ function stoppedBy(log: readonly RunLogEntry[]): string | null {
 export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
   const system = systemPromptFor(options.mode);
   const ctx = newContext(options.session, view(options.session));
-  const from = serializeSession(options.session);
+  const from = { bytes: serializeSession(options.session) };
   const id = runId(options.at);
   const log: RunLogEntry[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {

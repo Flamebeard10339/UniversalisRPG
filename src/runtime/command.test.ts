@@ -1114,6 +1114,15 @@ describe('the recorder: /create-test and /create-valid-test', () => {
     expect(runTest('bar', loadInEnglish(pasted), createGameState()).passed).toBe(true);
   });
 
+  it('adopts exactly the sections it emits, so nothing lands under a name the written form does not use', () => {
+    const { ctx, session } = recorded();
+    const written = authoredBlocks(runLine(ctx, '/create-valid-test bar')).map((block) => block[0]);
+
+    const adopted = [...[...session.registry.saves.keys()].map((id) => `# save ${id}`), ...[...session.registry.tests.keys()].map((id) => `# test ${id}`)];
+
+    expect(adopted.filter((heading) => heading.includes(' bar')).sort()).toEqual([...written].sort());
+  });
+
   it('does not prepend a second load:/-start save when the history already begins with load:', () => {
     const { ctx } = fixture(TRAVEL_MODULE);
     ctx.recorder.history.push('load: someplace');
