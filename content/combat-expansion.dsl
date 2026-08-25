@@ -401,7 +401,27 @@ wait: 60
 // base attack-rate, the payload's own figure and the passive that reads how
 // many are held, none of which the count answers to.
 assert: stat.evasion = 6
+// The arithmetic the count above refuses to do, which is the other half of the
+// pair and the only reading `quickening` reaches: 25 of base and six stacks of
+// a payload worth +2 is 37 added, raised 18% by a passive reading six at 3%
+// apiece. A `quickening` granting nothing reads 37, and a payload worth
+// anything else moves the added half.
+assert: stat.attack-rate = 43.66
 expect only: accelerated-vigor-stacks-behind-its-gate-end
+
+// The payload's own duration is the only thing that ends a stack — nothing
+// refreshes one once the swinging stops — and each runs on the clock it was
+// granted on rather than all of them together. Half a minute after the last
+// swing the first has lifted and five are held; a minute after it none are. A
+// payload that lasted longer than its declaration says would read six at both.
+# test accelerated-vigor-lifts-on-each-stacks-own-clock
+DEBUG
+run: accelerated-vigor-stacks-behind-its-gate
+cancel
+wait: 30
+assert: stat.evasion = 5
+wait: 30
+assert: stat.evasion = 0
 
 // The debuff is held by the struck party rather than by the swinger, which is
 // what the closing sheet shows: the venom is under the post's name and its

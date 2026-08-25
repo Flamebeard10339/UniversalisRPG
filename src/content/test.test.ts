@@ -117,6 +117,14 @@ describe('test: composable in-game scripts', () => {
     ]);
   });
 
+  it('weighs a threshold against a number the engine can hold, and still refuses a range for one', () => {
+    const [section] = parseModule(['# test folded', 'assert: stat.attack >= 1.5', 'assert: resource.health < -0.25'].join('\n')) as { value: { directives: { condition: { right: number } }[] } }[];
+    expect(section.value.directives.map((directive) => directive.condition.right)).toEqual([1.5, -0.25]);
+
+    expect(() => parseModule(['# test folded', 'assert: stat.attack >= 1.5-2.5'].join('\n'))).toThrow(/threshold, not a quantity/);
+    expect(() => parseModule(['# test folded', 'assert: has 1.5 plank'].join('\n'))).toThrow(DslError);
+  });
+
   it('accepts fully-qualified names emitted by CLI authoring and recording', () => {
     const source = [
       '# test replay',

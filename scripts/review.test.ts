@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { shippedSources } from '../src/content/shipped';
-import { parseLedger, printLedger, sheetFor, sheetLines, through } from './review';
+import { LEDGER, orphanLines, orphansIn, parseLedger, printLedger, sheetFor, sheetLines, through } from './review';
 
 const town = (...lines: string[]): string => ['# info town', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', ...lines].join('\n');
 
@@ -86,6 +86,35 @@ describe('the sheet a reviewer reads', () => {
 
     expect(through(written, 'lamp').map((section) => section.id)).toEqual(['shore', 'rope', 'lamp']);
     expect(() => through(written, 'nowhere')).toThrow('town writes no section called nowhere');
+  });
+
+  it('names a row whose key moved, since a rewrite comes back CHANGED but a move comes back as nothing at all', () => {
+    const text = town('', '# item lamp', 'examine: A lamp.');
+    const { registry } = loadUniverseWithDiagnostics([{ name: 'town.dsl', text }]);
+    const written = sheetFor(registry, 'town', 'content/town.dsl', text);
+    const held = new Map(written.sections.flatMap((section) => section.said).map((said) => [said.key, said.hash]));
+    expect(orphansIn([written], held)).toEqual([]);
+
+    const moved = town('', '# item hurricane-lamp', 'examine: A lamp.');
+    const after = sheetFor(loadUniverseWithDiagnostics([{ name: 'town.dsl', text: moved }]).registry, 'town', 'content/town.dsl', moved, held);
+
+    expect(after.sections.flatMap((section) => section.said).some((said) => said.standing === 'changed')).toBe(false);
+    expect(orphansIn([after], held)).toEqual(['town.item.lamp.examine', 'town.item.lamp.title']);
+    expect(orphanLines(orphansIn([after], held)).join('\n')).toContain('town.item.lamp.examine');
+  });
+
+  it('calls nothing an orphan while the corpus still says it, whichever module says it', () => {
+    const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
+    const everySheet = parsed.map((module) => sheetFor(registry, module.info.id, module.source.name, module.source.text));
+    const held = new Map(everySheet.flatMap((sheet) => sheet.sections.flatMap((section) => section.said)).map((said) => [said.key, said.hash]));
+
+    expect(held.size).toBeGreaterThan(100);
+    expect(orphansIn(everySheet, held)).toEqual([]);
+    expect(orphanLines([])).toEqual([]);
+  });
+
+  it('says where the rows it is talking about are kept', () => {
+    expect(orphanLines(['town.item.lamp.title']).join('\n')).toContain(LEDGER);
   });
 
   it('reads back a ledger it wrote, so what one sitting marked the next one finds', () => {

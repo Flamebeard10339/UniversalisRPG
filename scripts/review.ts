@@ -62,6 +62,10 @@ const usage = [
   'read. Rewrite a line someone signed off and it comes back marked CHANGED, so no',
   'line stays approved against writing nobody saw. Edit first, then mark: a mark is',
   'taken from what the file says at the moment it is written.',
+  '',
+  'A row whose key the corpus no longer says is named at the foot of the run, and',
+  'left alone: a locale key that moves takes its answer with it, and deciding what',
+  'becomes of that answer is the reader\'s, not this tool\'s.',
 ].join('\n');
 
 export interface Spoken {
@@ -180,6 +184,24 @@ function saidLines(said: Said): string[] {
 
 export const isLeft = (said: Said): boolean => said.standing !== 'reviewed';
 
+const keysOf = (sheet: Sheet): string[] => [...sheet.sections.flatMap((section) => section.said), ...sheet.loose].map((said) => said.key);
+
+// Rows the ledger holds that nothing says any more. A locale key that moves takes a person's "I read this" answer with it — the row does not come back CHANGED, it stops being about anything — so it is read off the same walk that writes the ledger, and wants every module's sheet rather than the ones a run asked to see.
+export const orphansIn = (everySheet: readonly Sheet[], held: ReadonlyMap<string, string>): string[] => {
+  const said = new Set(everySheet.flatMap(keysOf));
+  return [...held.keys()].filter((key) => !said.has(key)).sort();
+};
+
+export const orphanLines = (orphans: readonly string[]): string[] =>
+  orphans.length === 0
+    ? []
+    : [
+        `${orphans.length} row(s) in ${LEDGER} are against lines the corpus no longer says, so the answer each carries has stopped being about anything:`,
+        ...orphans.map((key) => `  ${key}`),
+        'A key that moved wants its row moved with it; a line that is gone wants its row gone. Neither is done for you, because the answer a row carries belongs to whoever read the line.',
+        '',
+      ];
+
 export function sheetLines(sheet: Sheet, all = false): string[] {
   const every = sheet.sections.flatMap((section) => section.said);
   const left = every.filter(isLeft);
@@ -253,10 +275,9 @@ function main(): void {
   }
 
   const held = readLedger();
-  const sheets = wanted.map((id) => {
-    const module = parsed.find((each) => each.info.id === id)!;
-    return sheetFor(registry, id, `content/${module.source.name}`, module.source.text, held);
-  });
+  const everySheet = parsed.map((module) => sheetFor(registry, module.info.id, `content/${module.source.name}`, module.source.text, held));
+  const sheets = wanted.map((id) => everySheet.find((sheet) => sheet.module === id)!);
+  const orphans = orphanLines(orphansIn(everySheet, held));
 
   if (marking) {
     const sheet = sheets[0];
@@ -271,10 +292,12 @@ function main(): void {
     for (const section of covered) for (const said of section.said) held.set(said.key, said.hash);
     writeFileSync(LEDGER, printLedger(held));
     console.log(`read through ${covered[covered.length - 1]?.id ?? '(nothing)'}: ${marked.length} line(s) across ${covered.length} section(s) marked, in ${LEDGER}.`);
+    if (orphans.length > 0) console.log(orphans.join('\n'));
     return;
   }
 
   for (const sheet of sheets) console.log(sheetLines(sheet, asked.all).join('\n'));
+  if (orphans.length > 0) console.log(orphans.join('\n'));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
