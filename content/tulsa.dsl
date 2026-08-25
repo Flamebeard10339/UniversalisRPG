@@ -889,7 +889,7 @@ fish:
 # entity giant-rat
 title: Giant Rat
 examine: A hunched rat claws at an overturned crate, eyes red in the dark.
-stats: attack 8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
+stats: attack 6-8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
 uses: melee-combat
 hidden if: rats-killed >= 3
 on death:

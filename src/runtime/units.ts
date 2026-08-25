@@ -23,6 +23,6 @@ export function divideRateRemainder(acc: number): { units: number; remainder: nu
   return { units, remainder: acc - units * MS_PER_MINUTE };
 }
 
-export function msUntilEmpty(current: number, rateMilliPerMinute: number, remainder: number): number {
-  return Math.ceil((MS_PER_MINUTE * (1 - current) - 1 - remainder) / rateMilliPerMinute);
+export function msToDrain(slack: number, rateMilliPerMinute: number, remainder: number): number {
+  return Math.ceil((MS_PER_MINUTE * (1 - slack) - 1 - remainder) / rateMilliPerMinute);
 }

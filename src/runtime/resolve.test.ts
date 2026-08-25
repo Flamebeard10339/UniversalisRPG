@@ -904,7 +904,10 @@ on dried:
 `);
     const state = createGameState();
     initResources(state, registry);
-    (state.resources as Record<string, number>)['pool'] = 0.5;
+    // A carried remainder no run reaches — the engine keeps one under a minute's worth — which is
+    // what it takes to make a resource ask for a boundary in the past at all.
+    (state.resources as Record<string, number>)['pool'] = toMilliUnits(1);
+    state.resourceRateRemainders['pool'] = -30000;
 
     expect(() => resolve(state, registry, secondsToMs(5))).toThrow(RuntimeError);
     expect(() => resolve(state, registry, secondsToMs(5))).toThrow('resource pool put a boundary at -29999, before the current instant 0');
@@ -931,7 +934,8 @@ on dried:
 `);
     const state = createGameState();
     initResources(state, registry);
-    (state.resources as Record<string, number>)['pool'] = 0.5;
+    (state.resources as Record<string, number>)['pool'] = toMilliUnits(1);
+    state.resourceRateRemainders['pool'] = -1;
 
     expect(() => resolve(state, registry, secondsToMs(5))).toThrow(RuntimeError);
     expect(() => resolve(state, registry, secondsToMs(5))).toThrow(/resource pool/);

@@ -1,8 +1,9 @@
 import { clearBuffs } from './buffs';
 import { readdirSync, readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, statValue, useFight } from './runtime';
+import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, sampleStat, statValue, useFight } from './runtime';
 import { restorePools } from './effects';
+import { isPoint } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
@@ -46,6 +47,30 @@ describe('shipped content', () => {
   for (const id of shipped.tests.keys()) {
     it(`test "${id}" passes`, () => {
       expect(runTest(id, shipped, createGameState())).toEqual({ passed: true });
+    });
+  }
+});
+
+// What a foe hits for is its own `stats:` line and nothing else, so a shipped foe that writes a
+// range hits for a different number every swing. That the fight path spends the range rather than
+// its midpoint is proved on a fixture in encounter.test.ts; here the subjects are the corpus's own.
+describe("a shipped foe's swing is what its sheet declares", () => {
+  const ATTACK = 'core.attack';
+  const ranged = [...shipped.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
+
+  it('is written by at least one of them, so the world keeps this exercised', () => {
+    expect(ranged.map((entity) => entity.id)).not.toEqual([]);
+  });
+
+  for (const entity of ranged) {
+    it(`${entity.id} reads a different number swing to swing, inside what it wrote`, () => {
+      const state = createGameState();
+      const declared = entity.stats[ATTACK];
+      const swings = Array.from({ length: 8 }, () => sampleStat(ATTACK, state, shipped, entity.id));
+
+      for (const swing of swings) expect(swing).toBeGreaterThanOrEqual(declared.min);
+      for (const swing of swings) expect(swing).toBeLessThanOrEqual(declared.max);
+      expect(new Set(swings).size).toBeGreaterThan(1);
     });
   }
 });

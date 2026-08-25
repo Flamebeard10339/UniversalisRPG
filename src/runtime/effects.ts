@@ -20,7 +20,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { GameState, PLAYER } from './state';
 import { hitChance, statValue } from './stats';
-import { divideRateRemainder, toMilliUnits } from './units';
+import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -445,6 +445,18 @@ function poolStores(state: GameState): PoolStore[] {
   return stores;
 }
 
+// A pool that has fallen under one whole unit is spent, and whoever holds it is down. The engine
+// counts in milli-units, so the threshold is a thousand of them. The level itself stays where it
+// fell: whether a pool is spent and what is left in it are different questions, and a pool nobody
+// binds an event to is an ordinary number that has to survive a span being split anywhere.
+export const SPENT_BELOW = MILLI_UNITS;
+
+// How much may still come off a pool before it is spent, so a planner asking when that happens and
+// a settle asking whether it has read the same threshold.
+export const spendable = (level: number): number => level - SPENT_BELOW + 1;
+
+export const isSpent = (level: number): boolean => spendable(level) <= 0;
+
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
@@ -454,7 +466,7 @@ function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, cu
   }
   const clamped = Math.min(max, Math.max(0, raw));
   store.levels[resource.id] = clamped;
-  if (raw < current && current > 0 && clamped <= 0) fireEvents(segment, store.actorId, 'on empty', resource.id);
+  if (raw < current && !isSpent(current) && isSpent(clamped)) fireEvents(segment, store.actorId, 'on empty', resource.id);
   return clamped === raw ? 'stored' : 'clamped';
 }
 
