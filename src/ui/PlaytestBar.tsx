@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Localizer } from '../runtime/localized';
 import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../runtime/runLog';
+import { Modal, ModalCard } from './Modal';
 import { edited, feedbackOn, turnsPlayed } from './playtest';
 import type { Words } from './words';
 
@@ -10,11 +11,15 @@ function Sheet({ turn, line, held, words, localizer, onKeep, onDiscard }: { turn
   const [notes, setNotes] = useState(held);
 
   return (
-    <div role="dialog" aria-modal className="fixed inset-0 z-50 flex flex-col justify-end gap-3 bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8">
-      <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
-        <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">
-          {words('playtest-turn', { turn })} — {words('playtest-about', { line: localizer.identifier(line) })}
-        </p>
+    <Modal manner={{}} subject={line} onDismiss={onDiscard}>
+      <ModalCard
+        subject={line}
+        title={
+          <>
+            {words('playtest-turn', { turn })} — {words('playtest-about', { line: localizer.identifier(line) })}
+          </>
+        }
+      >
         <div className="unbarred flex max-h-[60vh] flex-col gap-3 overflow-y-auto">
           {NOTE_FIELDS.map((field) => (
             <label key={field.name} className="flex flex-col gap-1 text-sm text-text">
@@ -37,8 +42,8 @@ function Sheet({ turn, line, held, words, localizer, onKeep, onDiscard }: { turn
             {words('playtest-discard')}
           </button>
         </div>
-      </div>
-    </div>
+      </ModalCard>
+    </Modal>
   );
 }
 

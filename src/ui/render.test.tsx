@@ -548,7 +548,7 @@ describe('what the shell puts on the screen', () => {
     expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`aria-label="${running}"`);
 
     const field = { key: 'name', label: asLocalized('Name'), values: null };
-    expect(renderToStaticMarkup(<ModalSheet option={field} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
+    expect(renderToStaticMarkup(<ModalSheet option={field} manner={{}} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
   });
 
   it('moves a bar over exactly one tick of the cadence both drivers read', () => {
@@ -576,13 +576,13 @@ describe('what the shell puts on the screen', () => {
   it('renders a modal it has never heard of from the option alone', () => {
     const unheard = { key: 'heading', label: asLocalized('Which way from here'), values: [{ value: 'widdershins', shown: asLocalized('widdershins') }, { value: 'deosil', shown: asLocalized('deosil') }] };
 
-    const html = renderToStaticMarkup(<ModalSheet option={unheard} onAnswer={() => undefined} />);
+    const html = renderToStaticMarkup(<ModalSheet option={unheard} manner={{}} onAnswer={() => undefined} />);
 
     expect(readable(html)).toEqual([unheard.label, ...unheard.values.map((choice) => choice.shown)]);
   });
 
   it('renders a free-text option as a field with no listed answer', () => {
-    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: asLocalized('Name'), values: null }} onAnswer={() => undefined} />);
+    const html = renderToStaticMarkup(<ModalSheet option={{ key: 'name', label: asLocalized('Name'), values: null }} manner={{}} onAnswer={() => undefined} />);
 
     expect(readable(html), 'the field is named over it, and named again on the button that submits it').toEqual(['Name', 'Name']);
     expect(html).toContain('<input');

@@ -105,7 +105,7 @@ engine.shop.refused.not-carried: You are not carrying that many.
 engine.shop.refused.not-afforded: You cannot afford that.
 engine.shop.refused.not-a-count: That is not a number of things to trade.
 engine.shop.refused.pack-full: Your pack is full — there is nowhere to put it.
-engine.modal.opened: modal:{modal}
+engine.modal.opened: A screen opens: {modal}.
 engine.prune.race: Cleared the player's race because {race} is not loaded.
 engine.prune.setting: Put setting {setting} back where it stands because {value} is not one of the ways it can be played.
 engine.prune.record: Removed {path} {id} because its {kind} is not loaded.

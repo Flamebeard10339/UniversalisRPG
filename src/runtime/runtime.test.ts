@@ -10,6 +10,8 @@ import type { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { PLAYER_FIELDS, PLAYER_SHEET } from './state';
 import { secondsToMs, toMilliUnits } from './units';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { mintedName } from '../grammar/values';
 import { runTest } from './session';
 
 const MODULE = `
@@ -204,7 +206,7 @@ describe('applyResult', () => {
   it('logs and stacks a modal on open-modal', () => {
     const state = createGameState();
     applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'name-yourself' }]);
-    expect(state.log).toContain('modal:name-yourself');
+    expect(state.log).toEqual([expect.stringContaining(mintedName('name-yourself', DEFAULT_LANGUAGE))]);
     expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
   });
 });

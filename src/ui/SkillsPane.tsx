@@ -2,12 +2,18 @@ import { useState } from 'react';
 import type { Answer, Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { formatClock, tidy } from './format';
+import { Modal, ModalCard } from './Modal';
+import type { Declared } from './modalManner';
 import { GRID } from './sheetLayout';
 import { filled, perHour, skillPanels, untilNext, type SkillPanel, type XpMark } from './skillPanels';
 import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
 import type { Crossings } from './levelling';
 import type { Words } from './words';
+
+// A skill's figures are about the ring the player just pressed, so the panel stays on the page that
+// holds the rings and leaves the bar along the bottom where the thumb left it.
+const PANEL: Declared = { over: 'pane' };
 
 const RING_RADIUS = 17;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
@@ -66,14 +72,8 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
       </div>
 
       {shown === null ? null : (
-        <div
-          data-drive="dismiss"
-          role="dialog"
-          aria-modal
-          onClick={(event) => void (event.target === event.currentTarget && setOpened(null))}
-          className="absolute inset-0 z-50 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]"
-        >
-          <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
+        <Modal manner={PANEL} subject={shown.id} onDismiss={() => setOpened(null)}>
+          <ModalCard subject={shown.id}>
             <p className="text-base font-semibold">{shown.title}</p>
             <dl className="mt-2 flex flex-col gap-1">
               <Fact name={words('level')} value={tidy(shown.level)} />
@@ -82,8 +82,8 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
               <Fact name={words('an-hour')} value={rate === null ? '—' : tidy(Math.round(rate))} />
               <Fact name={words('until-next')} value={left === null ? '—' : formatClock(Math.round(left))} />
             </dl>
-          </div>
-        </div>
+          </ModalCard>
+        </Modal>
       )}
     </div>
   );

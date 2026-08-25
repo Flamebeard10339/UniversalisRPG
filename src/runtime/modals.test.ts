@@ -8,6 +8,8 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { answerModal, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
 import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
 import { MODAL_SCREENS } from '../grammar/actionResult';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { localizerFor } from './localized';
 import { shippedSources } from '../content/shipped';
 import { SAVE_VERSION } from './save';
 import { receiveItem } from './itemInstance';
@@ -233,6 +235,19 @@ describe('the modal stack', () => {
     v = submitModal(session, { name: 'Rowan' });
     expect(v.modals).toEqual([]);
     expect(v.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: null });
+  });
+
+  // Every screen the engine knows, not only the ones a world may open by name: a frame the engine
+  // mints itself still reaches a player through the warning that closes it on a stale save.
+  it('has words for every screen it knows, none of them the address it keys the screen by', () => {
+    const localizer = localizerFor(loadInEnglish(STACKING_MODULE), DEFAULT_LANGUAGE);
+
+    expect(MODAL_NAMES.length).toBeGreaterThan(0);
+    for (const name of MODAL_NAMES) {
+      const words = localizer.minted(name);
+      expect(words, name).not.toBe(name);
+      expect(words, `${name} reaches a player still spelt as an address`).toMatch(/^[A-Z][a-z]*( [A-Z][a-z]*)*$/);
+    }
   });
 
   it('offers only the options still to be answered, and nothing about how to draw them', () => {

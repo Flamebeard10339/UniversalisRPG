@@ -214,7 +214,7 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   }
 
   for (const { name, reason } of pruneModals(state, registry)) {
-    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: named(name), reason }));
+    addWarning(warnings, `modals.${name}`, name, localizer.engine('engine.prune.modal', { modal: localizer.minted(name), reason }));
   }
 
   const journey = state.journey;

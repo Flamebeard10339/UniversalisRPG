@@ -1,31 +1,15 @@
 import { useState, type ReactNode } from 'react';
-import type { Localized } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
 import { onlyLeaves } from './asking';
-import { VOICE_CLASS } from './lineStyle';
-import { useMoment } from './transient';
+import { Modal, ModalCard } from './Modal';
+import type { Localized } from '../runtime/localized';
+import type { Declared } from './modalManner';
 
 type Option = PlayView['modals'][number]['options'][number];
 
-// The words the sheet is answering, which the scrim behind it has taken away. They are drawn in the
-// voice they were said in, so a line reads the same whether it is in the history or in front of it.
-function Spoken({ lines }: { lines: readonly Localized[] }): JSX.Element | null {
-  if (lines.length === 0) return null;
-  return (
-    <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
-      <div className="unbarred flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
-        {lines.map((line, at) => (
-          <p key={at} className={`whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`}>
-            {line}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function ModalSheet({
   option,
+  manner,
   onAnswer,
   onDismiss,
   leaving,
@@ -33,6 +17,7 @@ export function ModalSheet({
   children,
 }: {
   option: Option;
+  manner: Declared;
   onAnswer: (key: string, value: string) => void;
   onDismiss?: () => void;
   leaving?: string;
@@ -40,17 +25,12 @@ export function ModalSheet({
   children?: ReactNode;
 }): JSX.Element {
   const [typed, setTyped] = useState('');
-  const darkened = useMoment('darken', true, option.key);
-  const risen = useMoment('rise', true, option.key);
-  const asks = !onlyLeaves(option, leaving);
+  const asksNothing = onlyLeaves(option, leaving);
 
   return (
-    <div role="dialog" aria-modal data-drive={onDismiss ? 'dismiss' : undefined} onClick={onDismiss ? (event) => event.target === event.currentTarget && onDismiss() : undefined} className={`${darkened} fixed inset-0 z-50 flex flex-col ${asks ? 'justify-end' : 'justify-center'} gap-3 bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-8`}>
-      {children}
-      <Spoken lines={spoken} />
-      {asks ? (
-        <div key={option.key} className={`${risen} mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4`}>
-          <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{option.label}</p>
+    <Modal manner={manner} asksNothing={asksNothing} subject={option.key} onDismiss={onDismiss} spoken={spoken} about={children}>
+      {asksNothing ? null : (
+        <ModalCard key={option.key} subject={option.key} title={option.label}>
           {option.values ? (
             <div className="unbarred flex max-h-[60vh] flex-col gap-2 overflow-y-auto">
               {option.values.map((choice) => (
@@ -79,8 +59,8 @@ export function ModalSheet({
               </button>
             </form>
           )}
-        </div>
-      ) : null}
-    </div>
+        </ModalCard>
+      )}
+    </Modal>
   );
 }

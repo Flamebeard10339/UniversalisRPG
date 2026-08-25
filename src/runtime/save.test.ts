@@ -214,12 +214,12 @@ describe('loadSave', () => {
   it('closes a modal frame the loaded registry cannot answer, and reports it, instead of restoring it', () => {
     const registry = loadInEnglish(MODULE);
     for (const [frame, message] of [
-      [{ name: 'haggling', answers: {} }, 'Closed modal haggling because it is not a modal this engine knows.'],
-      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal dialogue because dialogue gone is not loaded.'],
-      [{ name: 'name-yourself', answers: { name: 'Rowan' } }, 'Closed modal name-yourself because it was saved with every option already answered.'],
-      [{ name: 'choose-race', answers: { race: 'wyvern' } }, 'Closed modal choose-race because it has no race that takes "wyvern".'],
-      [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal item-plane because it grows charm, which the player no longer carries.'],
-      [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal item-plane because it grows 4, which the player no longer carries.'],
+      [{ name: 'haggling', answers: {} }, 'Closed modal Haggling because it is not a modal this engine knows.'],
+      [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal Dialogue because dialogue gone is not loaded.'],
+      [{ name: 'name-yourself', answers: { name: 'Rowan' } }, 'Closed modal Name Yourself because it was saved with every option already answered.'],
+      [{ name: 'choose-race', answers: { race: 'wyvern' } }, 'Closed modal Choose Race because it has no race that takes "wyvern".'],
+      [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal Item Plane because it grows charm, which the player no longer carries.'],
+      [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal Item Plane because it grows 4, which the player no longer carries.'],
     ] as const) {
       const state = createGameState();
       const warnings = loadSave(state, { version: SAVE_VERSION, diff: { modals: [frame] } as never }, registry);

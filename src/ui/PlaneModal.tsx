@@ -4,6 +4,8 @@ import type { PlayView } from '../runtime/session';
 import { DragSheet, useSheetHold } from './DragSheet';
 import { signed, tidy } from './format';
 import { arrivalDelay, newlyDrawn, NODE_SIZE, planeGraph, type GraphEdge, type GraphNode, type Plane, type PlaneGraph, type Standing } from './planeGraph';
+import { Modal, ModalCard } from './Modal';
+import type { Declared } from './modalManner';
 import { nameOf, panelFor } from './planePanel';
 import { useTestSurface } from './useTestSurface';
 import { playedAfter, useMoment } from './transient';
@@ -14,6 +16,10 @@ type Option = PlayView['modals'][number]['options'][number];
 type Choice = NonNullable<Option['values']>[number];
 type Payload = GraphNode['payloads'][number];
 type Contribution = Plane['contributions'][number];
+
+// The jewel picker belongs to the lattice it is picking for, so it stays inside it rather than
+// taking the app: the node the player just pressed is still there to look at behind it.
+const PICKER: Declared = { over: 'pane' };
 
 const RING: Record<Standing, string> = {
   allocated: 'border-accent bg-accent-strong text-accent-text',
@@ -148,11 +154,13 @@ function useSprouts(graph: PlaneGraph): { nodes: ReadonlySet<Answer>; edges: Rea
 export function PlaneModal({
   plane,
   option,
+  manner,
   words,
   onAnswer,
 }: {
   plane: Plane;
   option: Option;
+  manner: Declared;
   words: Words;
   onAnswer: (key: string, value: string) => void;
 }): JSX.Element {
@@ -164,7 +172,6 @@ export function PlaneModal({
   const graph = useMemo(() => planeGraph(plane), [plane]);
   const sprouted = useSprouts(graph);
   const hold = useSheetHold(graph.points, buttons, String(graph.nodes.length));
-  const darkened = useMoment('darken', true, plane.instance);
 
   const choices: readonly Choice[] = option.values ?? [];
   const panel = panelFor(graph, chosen, choices);
@@ -199,13 +206,10 @@ export function PlaneModal({
   useTestSurface('plane', { plane, graph, chosen, picking, controls: { press: (key) => press(graph.nodes.find((each) => each.key === key)!), pick: setPicking, settle: hold.settle } });
 
   const name = nameOf(panel, words);
+  const leave = leaving === null ? undefined : () => onAnswer(option.key, leaving.value);
 
   return (
-    <div
-      role="dialog"
-      aria-modal
-      className={`${darkened} fixed inset-0 z-50 flex flex-col bg-scrim pt-[env(safe-area-inset-top)]`}
-    >
+    <Modal manner={manner} subject={plane.instance} onDismiss={leave}>
       <div className="unbarred flex min-h-0 basis-[30%] flex-col overflow-y-auto border-b border-border bg-surface-raised px-4 py-2">
         <div className="mx-auto flex w-full max-w-2xl flex-col">
           <div className="flex items-baseline justify-between gap-3">
@@ -214,7 +218,7 @@ export function PlaneModal({
               <button
                 data-drive="answer"
                 type="button"
-                onClick={() => onAnswer(option.key, leaving.value)}
+                onClick={leave}
                 className="shrink-0 rounded-xl border border-border bg-panel px-3 text-xs text-text-subtle transition-transform duration-75 active:scale-[0.97] active:text-accent"
               >
                 {leaving.shown}
@@ -284,9 +288,8 @@ export function PlaneModal({
       </DragSheet>
 
       {picking && node !== null ? (
-        <div data-drive="dismiss" onClick={(event) => void (event.target === event.currentTarget && setPicking(false))} className="absolute inset-0 z-10 flex flex-col justify-end bg-scrim px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)]">
-          <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
-            <p className="mb-3 text-xs uppercase tracking-wide text-text-subtle">{words('insert')}</p>
+        <Modal manner={PICKER} subject={node.key} onDismiss={() => setPicking(false)}>
+          <ModalCard subject={node.key} title={words('insert')}>
             <div className="unbarred flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
               {jewels.map((choice) => (
                 <button
@@ -300,9 +303,9 @@ export function PlaneModal({
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+          </ModalCard>
+        </Modal>
       ) : null}
-    </div>
+    </Modal>
   );
 }

@@ -4,6 +4,8 @@ import { loadInEnglish } from '../content/engineLocale';
 import { Registry } from '../content/registry';
 import { applyResultsNow, createGameState, grantBuff, PLAYER } from './runtime';
 import { GameState } from './state';
+import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { mintedName } from '../grammar/values';
 
 const ITEMS = ['# item bones', '# item coins', '# item gem', '# item tail'];
 
@@ -170,7 +172,7 @@ describe('a stochastic group is applied count times, not scaled once', () => {
     const { registry } = fight('give: 1 bones');
     const state = createGameState();
     applyResultsNow(state, registry, [{ kind: 'open-modal', modal: 'name-yourself' }, { kind: 'give', item: 'coins', amount: { min: 1, max: 4 } }], 5);
-    expect(state.log.filter((line) => line === 'modal:name-yourself')).toHaveLength(1);
+    expect(state.log.filter((line) => line.includes(mintedName('name-yourself', DEFAULT_LANGUAGE)))).toHaveLength(1);
     expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
   });
 
