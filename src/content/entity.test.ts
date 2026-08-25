@@ -1,17 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from './load';
+import { EXAMINED } from './sections/entity';
 
 const room = (...lines: string[]): string => ['# location shore', 'x: 0, y: 0', 'starting', 'entities:', '  bollard', '', '# entity bollard', 'title: A Bollard', ...lines].join('\n');
 
 describe('# entity examine:', () => {
-  it('is offered as an action addressed examine, which says those words and nothing else', () => {
+  it('is offered as an action addressed examine, which says those words and marks the thing read', () => {
     const registry = loadModule(room('examine: Iron, and cold to the hand.'));
     const [action, ...rest] = registry.entities.get('bollard')!.actions;
 
     expect(rest).toEqual([]);
     expect(action.label).toBe('Examine');
     expect(action.kind).toBe('instant');
-    expect(action.results).toEqual([{ kind: 'say', text: 'Iron, and cold to the hand.', key: 'entity.bollard.examine' }]);
+    expect(action.results).toEqual([
+      { kind: 'say', text: 'Iron, and cold to the hand.', key: 'entity.bollard.examine' },
+      { kind: 'set', variable: `bollard.${EXAMINED}` },
+    ]);
+    expect(registry.namespace.has('flag', `bollard.${EXAMINED}`)).toBe(true);
   });
 
   it('says those words under the key the field already holds them at, rather than a second copy of them', () => {

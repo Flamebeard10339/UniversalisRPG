@@ -9,7 +9,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
 import { COMMANDS, runLine, type AuthoringContext, type CommandResult } from '../src/runtime/command';
 import { createSaveContext } from '../src/runtime/saveSlots';
-import { serializeSession } from '../src/runtime/session';
+import { serializeSession, type PlayChoice } from '../src/runtime/session';
 import { slotStore, type SlotDriver } from '../src/runtime/store';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
@@ -154,8 +154,11 @@ describe('the two drivers cannot drift', () => {
 
   it('answers a modal through the shared table, by the line the table parses', () => {
     const { repl, gui } = bothDrivers();
-    const talk = String(gui.snapshot().view.choices.findIndex((choice) => choice.id === 'talk:tulsa.miki') + 1);
-    inStep(repl, gui, talk);
+    const at = (found: (choice: PlayChoice) => boolean): string => String(gui.snapshot().view.choices.findIndex(found) + 1);
+
+    // Nobody has read this room, so the only thing Miki offers either driver is the look that reads her.
+    inStep(repl, gui, at((choice) => choice.of === 'entity.tulsa.miki'));
+    inStep(repl, gui, at((choice) => choice.id === 'talk:tulsa.miki'));
 
     const asked = gui.snapshot().view.modals[0].options[0];
     inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));

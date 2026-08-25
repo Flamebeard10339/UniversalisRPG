@@ -7,7 +7,13 @@ import type { PlayView } from '../runtime/session';
 import { groupOffers, offerCells } from './choices';
 import { drawnFor, type Place } from './discovery';
 
-const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized(label), ...(detail ? { detail: asLocalized(detail) } : {}) });
+// Whatever offers a choice is named as the engine names it and drawn as the engine draws it, which
+// is one call there and is why the fixture cannot hand out one without the other.
+const offeredBy = (source: string): Pick<PlayView['choices'][number], 'of' | 'detail'> => ({ of: `entity.${source.toLowerCase().replace(/ /g, '-')}`, detail: asLocalized(source) });
+
+const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized(label), ...(detail ? offeredBy(detail) : {}) });
+
+const unread = (id: string, of: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized('Examine'), of, detail: asLocalized('?') });
 
 describe('the offers on the sheet', () => {
   it('gathers what one object offers, in the order the engine listed it', () => {
@@ -87,6 +93,17 @@ describe('the offers on the sheet', () => {
     expect(cells.map((cell) => cell.name)).toEqual([null, null]);
     expect(cells.map((cell) => cell.offers)).toHaveLength(2);
     for (const cell of cells) expect(cell.offers).toHaveLength(1);
+  });
+
+  // Everything nobody has read yet is drawn under the same placeholder, so a sheet keyed on the
+  // words would gather a whole unread room into one box with one way into it.
+  it('keeps two things nobody has read apart, though they are drawn under the same name', () => {
+    const cells = offerCells([unread('use:entity.dresser.examine', 'entity.dresser'), unread('use:entity.cabinet.examine', 'entity.cabinet')]);
+
+    expect(cells.map((cell) => cell.of)).toEqual(['entity.dresser', 'entity.cabinet']);
+    expect(cells.map((cell) => cell.name)).toEqual(['?', '?']);
+    expect(cells.map((cell) => cell.examine?.id)).toEqual(['use:entity.dresser.examine', 'use:entity.cabinet.examine']);
+    expect(cells.flatMap((cell) => cell.offers)).toEqual([]);
   });
 
   it('has nothing to draw when the engine is offering nothing', () => {

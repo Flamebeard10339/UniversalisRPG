@@ -1,6 +1,6 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, ownerRef, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
 import { findActionOwner, travelAction, travelPair } from './actionLookup';
 import {
   applyResults,
@@ -598,7 +598,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
 
   const action = target.actions?.find((each) => actionAddress(each) === actionId);
-  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(`${obj}.${objId}`) }));
+  if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(ownerRef(obj, objId)) }));
   if (!requiresMet(action, state, registry)) throw new RuntimeError(`action requires unmet: ${obj}.${objId}.${actionId}`);
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
@@ -612,12 +612,12 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   }
 
   const active: ActiveAction = {
-    ownerRef: `${obj}.${objId}`,
+    ownerRef: ownerRef(obj, objId),
     actionSlug: actionId,
     repeating,
     implicitTarget: IMPLICIT_TARGET_FULL,
     cadences: { [PLAYER]: newCadence() },
-    roster: { [PLAYER]: { ownerRef: `${obj}.${objId}`, actionSlug: actionId, target: objId } },
+    roster: { [PLAYER]: { ownerRef: ownerRef(obj, objId), actionSlug: actionId, target: objId } },
   };
   state.activeAction = active;
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
@@ -658,7 +658,7 @@ export function useFight(actionId: string, targetId: string, registry: Registry,
 
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
   const active = state.activeAction;
-  if (active?.ownerRef === `${obj}.${objId}` && active.actionSlug === actionId) {
+  if (active?.ownerRef === ownerRef(obj, objId) && active.actionSlug === actionId) {
     advanceUnderWayCycle(state, registry);
     return;
   }

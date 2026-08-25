@@ -13,7 +13,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
-import { serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
+import { readRoom, serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
 import { COMMANDS, NO_SAVES, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
 import { AUTOSAVE_SLOT, DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT, type SaveContext } from '../src/runtime/saveSlots';
 import { driveRun, fileAuthoring, fileSaves, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
@@ -69,6 +69,15 @@ function driver(text: string | readonly ModuleSource[], speed = 1, driving = fal
   return newContext(session, view(session), { recorder, speed, driving });
 }
 
+// /look re-reads what the context is holding, so a room read behind its back is read again here.
+// Reading one says what it reads, and those lines are drained so what comes next is the room.
+function read(ctx: CommandContext): CommandContext {
+  readRoom(ctx.session);
+  view(ctx.session);
+  ctx.view = view(ctx.session);
+  return ctx;
+}
+
 function armed(ctx: CommandContext, choiceId: string) {
   const index = ctx.view.choices.findIndex((choice) => choice.id === choiceId) + 1;
   expect(index, choiceId).toBeGreaterThan(0);
@@ -79,8 +88,7 @@ function armed(ctx: CommandContext, choiceId: string) {
 
 describe('play-cli renders what a command result says happened', () => {
   it('prints a view as narration, location, occupants, pools, modals, choices and the clock', () => {
-    const ctx = driver(TUTORIAL);
-    const lines = shown(runLine(ctx, '/look'));
+    const lines = shown(runLine(read(driver(TUTORIAL)), '/look'));
 
     expect(lines[0]).toBe('Guide House (tulsa.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
@@ -88,6 +96,18 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[3]).toBe('Health: ██████████ 30/30');
     expect(lines).toContain('  1) Talk to Miki');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
+  });
+
+  // The mask is written into the view, so a terminal draws it without being taught to: the room
+  // arrives as a list of unknowns and the names come out of it one look at a time.
+  it('names nothing here the player has not read, and every name once they have', () => {
+    const ctx = driver(TUTORIAL);
+    const unread = shown(runLine(ctx, '/look'))[2];
+
+    expect(unread).toContain('?');
+    expect(unread).not.toContain('Miki');
+
+    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {

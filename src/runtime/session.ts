@@ -8,7 +8,7 @@ import { itemCopies, Growth, grownItems } from './itemInstance';
 import { grow } from './growth';
 import { planeReports, type PlaneReport } from './planeReport';
 import { actionAddress } from '../content/sections/action';
-import { parseOwnerRef } from './actions';
+import { ownerRef, parseOwnerRef } from './actions';
 import { TRAVEL_PAIR } from './actionLookup';
 import { locationNamed, relocateTo, spreadDiscovery } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
@@ -18,8 +18,8 @@ export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { hasPool } from './stats';
-import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, type PlayerField } from './state';
-import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
+import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
+import { declaredId, Entity, EXAMINED, isMintedAction } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
@@ -48,6 +48,10 @@ export interface PlayChoice {
   id: Answer;
   kind: PlayChoiceKind;
   label: Localized;
+  // The address of whatever offers this choice, of which `detail` is the words. A surface that puts
+  // one thing's offers together keys on this and not on the words, because everything a player has
+  // not read is called the same thing.
+  of?: Answer;
   detail?: Localized;
   group?: GroupRow;
   leadsTo?: Answer;
@@ -107,7 +111,8 @@ export interface SettingRow {
 
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
-  entities: Array<{ id: Answer; title: Localized }>;
+  // What stands here, and whether the view is holding its name back because nobody has read it yet.
+  entities: Array<{ id: Answer; title: Localized; masked: boolean }>;
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: Answer; title: Localized; current: number; max: number; display: ResourceDisplay }>;
@@ -196,12 +201,30 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   return movesTo(action) === target;
 }
 
-function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState): boolean {
+function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
   return standingHere(registry, state, location).some((entityId) => {
     const entity = registry.entities.get(entityId);
-    if (!entity) return false;
+    if (!entity || masked.has(entityId)) return false;
     return availableActions(entity, state, registry).some((action) => isFreeTravelAction(action, target));
   });
+}
+
+// What stands here that the player has not read yet. Such a thing publishes no name and no offer
+// but the one that reads it, so a room nobody has looked at is a short list of unknowns rather than
+// everything it holds at once.
+//
+// Two things are deliberately never masked. One with no `examine:` mints no offer that could lift
+// the mask, so masking it would leave it standing with nothing a player could ever do; and a foe in
+// the fight under way is already met, while running its examine would disarm that fight, which is
+// the one way this could take a player's answer away from them.
+function maskedHere(registry: Registry, state: GameState, location: Location): ReadonlySet<string> {
+  const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
+  const masked = new Set<string>();
+  for (const entityId of standingHere(registry, state, location)) {
+    if (truthy(state.flags[`${entityId}.${EXAMINED}`]) || fighting.has(entityId)) continue;
+    if (registry.entities.get(entityId)?.actions.some(isMintedAction)) masked.add(entityId);
+  }
+  return masked;
 }
 
 const standingHere = (registry: Registry, state: GameState, location: Location): string[] => standing(state, registry, location).map((entry) => entry.entity);
@@ -234,21 +257,25 @@ interface Offered {
 
 // Everything one entity offers, gathered into the run a player reads as that entity's: its shop,
 // what it can be asked to do, and what the player can open on it. Every one of them carries the
-// entity as `choice.detail`, which is the key the app already groups by.
-function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer): Offered[] {
-  const offered = offeredBy(registry, localizer, 'entity', entityId);
+// entity as `choice.of`, which is the key a surface groups by.
+//
+// Masked, that run is the one offer that reads the thing, drawn under a placeholder — its name, its
+// words and everything else it could be asked for are what looking at it buys.
+function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer, masked: boolean): Offered[] {
+  const source = offeredBy(registry, localizer, 'entity', entityId, masked);
   const offers: Offered[] = [];
-  if (entity.shop !== undefined && registry.shops.has(entity.shop)) {
-    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: offered.detail }), ...offered }, minted: false });
+  if (!masked && entity.shop !== undefined && registry.shops.has(entity.shop)) {
+    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
   }
   for (const action of availableActions(entity, state, registry)) {
+    if (masked && !isMintedAction(action)) continue;
     const slug = actionAddress(action);
     offers.push({
-      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), ...offered, leadsTo: movesTo(action) },
+      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), ...source, leadsTo: movesTo(action) },
       minted: isMintedAction(action),
     });
   }
-  for (const choice of fightChoices(entityId, registry, state, localizer)) offers.push({ choice, minted: false });
+  if (!masked) for (const choice of fightChoices(entityId, registry, state, localizer)) offers.push({ choice, minted: false });
   return offers;
 }
 
@@ -271,15 +298,16 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   const location = registry.locations.get(state.location);
   if (!location) return [];
   const localizer = localizerOf(registry, state);
+  const masked = maskedHere(registry, state, location);
   const choices: PlayChoice[] = [];
 
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
     if (!entity) continue;
-    if (canTalk(entityId, registry, state)) {
+    if (!masked.has(entityId) && canTalk(entityId, registry, state)) {
       choices.push({ id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: localizer.title('entity', entityId) }) });
     }
-    choices.push(...mintedSecond(entityOffers(entity, entityId, registry, state, localizer)));
+    choices.push(...mintedSecond(entityOffers(entity, entityId, registry, state, localizer, masked.has(entityId))));
   }
 
   for (const action of availableActions(location, state, registry)) {
@@ -301,17 +329,37 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     const station = recipe.requiresCapability
       ? standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!))
       : undefined;
-    const detail = station === undefined ? undefined : localizer.title('entity', station);
-    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: craftLabel(localizer, recipe.id), detail });
+    if (station !== undefined && masked.has(station)) continue;
+    const source = station === undefined ? {} : offeredBy(registry, localizer, 'entity', station);
+    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: craftLabel(localizer, recipe.id), ...source });
   }
 
   for (const edge of effectiveAdjacent(registry, location.id)) {
     if (edge.condition && !evaluateCondition(edge.condition, state, registry)) continue;
-    if (entityAliasesTravelTo(location, edge.target, registry, state)) continue;
+    if (entityAliasesTravelTo(location, edge.target, registry, state, masked)) continue;
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
   }
 
   return choices;
+}
+
+// Reading a room: every mask standing in it lifted at once, which costs a player nothing but the
+// looking. A driver that is not a person takes it on arrival — the playbot, so its turns go on the
+// quest, and a proof walking the shipped world, which asks what a room offers a reader.
+export function readRoom(session: PlaySession): void {
+  for (const choice of unreadHere(sessionStatus(session))) {
+    if (computeChoices(session).some((each) => each.id === choice.id)) applyDirective(session, choiceToDirective(choice));
+  }
+}
+
+// Every offer a masked thing here is making, which is the look that reads it and nothing else. It
+// is a fact about the published view rather than about the session, so a driver holding only a view
+// reads a room by the same answer the engine masked it by. Nothing is offered while an action is
+// under way or a screen is open, because taking one of these would drop what is already going on.
+export function unreadHere(status: PlayStatus): PlayChoice[] {
+  if (status.action !== null || status.modals.length > 0) return [];
+  const masked = new Set(status.entities.filter((entity) => entity.masked).map((entity) => ownerRef('entity', entity.id)));
+  return status.choices.filter((choice) => choice.of !== undefined && masked.has(choice.of));
 }
 
 function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[] {
@@ -429,10 +477,11 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
 
   const localizer = localizerOf(registry, state);
+  const masked = maskedHere(registry, state, location);
   const entities: PlayStatus['entities'] = [];
   for (const entityId of standingHere(registry, state, location)) {
     const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, title: localizer.title('entity', entity.id) });
+    if (entity) entities.push({ id: entity.id, masked: masked.has(entity.id), title: offeredBy(registry, localizer, 'entity', entity.id, masked.has(entity.id)).detail });
   }
 
   return {

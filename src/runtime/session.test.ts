@@ -11,7 +11,7 @@ import { isMintedAction } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
 
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
@@ -402,6 +402,7 @@ enter:
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
     const session = primed(tutorial(), { inventory: { 'core.dough': 2 } });
+    readRoom(session);
 
     beginAction(session, 'craft:core.bread');
     const baked = wait(session, 4);
@@ -1345,8 +1346,11 @@ describe('a missing translation shows its key, in every direction', () => {
   const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', 'adjacent:', '  cove', '', '# entity crab', 'title: Giant Crab', 'examine: It sidles, and keeps one eye on you.', '', '# location cove', 'x: 1, y: 0'].join('\n');
   const SPANISH = ['# info island-es', 'version: 1.0.0', 'dependencies:', '  island', '', '# locale es', 'island.location.shore.title: Orilla', 'engine.travel.to: Viaja a {destination}'].join('\n');
 
-  const played = (language: string, ...extra: ModuleSource[]): PlayView =>
-    view(startSession(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, ...extra]), language));
+  const played = (language: string, ...extra: ModuleSource[]): PlayView => {
+    const session = startSession(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, ...extra]), language);
+    readRoom(session);
+    return view(session);
+  };
 
   it('plays the language the module declared with the text the module authored', () => {
     const v = played('en');
@@ -1688,6 +1692,7 @@ describe('an entity puts the offer it mints second', () => {
     for (const location of registry.locations.values()) {
       const session = startSession(registry);
       applyDirective(session, { kind: 'goto', location: location.id });
+      readRoom(session);
       const status = sessionStatus(session);
       if (status.location.id !== location.id) continue;
       for (const standing of status.entities) {
@@ -1695,7 +1700,7 @@ describe('an entity puts the offer it mints second', () => {
         found.push({
           at: location.id,
           entity: standing.id,
-          offers: status.choices.filter((choice) => choice.detail === standing.title),
+          offers: status.choices.filter((choice) => choice.of === `entity.${standing.id}`),
           minted: minted && useChoiceId({ kind: 'use', obj: 'entity', objId: standing.id, actionId: actionAddress(minted) }),
         });
       }

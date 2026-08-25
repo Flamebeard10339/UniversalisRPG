@@ -9,6 +9,8 @@ import { copiesOf, spendable } from './itemInstance';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { type ActiveAction, GameState } from './state';
 
+export const ownerRef = (obj: string, objId: string): string => `${obj}.${objId}`;
+
 export function parseOwnerRef(ownerRef: string): { obj: string; objId: string } {
   const dot = ownerRef.indexOf('.');
   return { obj: ownerRef.slice(0, dot), objId: ownerRef.slice(dot + 1) };

@@ -13,7 +13,7 @@ import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, typ
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
 import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
-import { adoptRegistry, loadSaved, serializeSession, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
@@ -59,6 +59,7 @@ Every turn ends with exactly one JSON object, matching this shape:
 "line" is sent to the same command line a human plays this game through, verbatim and unmodified — there is no second channel and no structured alternative. Two shapes of "line" cover almost every turn:
 
 - If the view lists choices, "line" is a choice id copied character-for-character from one of them. Never invent an id, never guess one from a pattern you have seen elsewhere, never renumber or reorder a list to make one up. If the id is not printed in this turn's view, it does not exist for this turn.
+- Anything printed as "?" is something nobody has looked at yet, and looking at it is the only thing it offers until someone has. That is not a fault and not a missing name: take the look, and the thing's own name and everything else it offers come back at once.
 - If the view shows an open screen (a modal — dialogue, character creation, an inventory screen, a crafting confirmation, anything the world is actively asking you), "line" is "submit-modal: <key>=<value>", using the exact key the screen names and, when it lists values, one of those values verbatim. Free-text fields (like a character's name) take a short plain-text value instead of a listed one. A modal always takes priority: while one is open there are no choices alongside it, and you must answer it before anything else happens.
 
 Beyond those two shapes, the command line also answers to a small set of direct actions a player — never this game's own authors — may use without a choice being offered first:
@@ -342,6 +343,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   if (!reloaded.ok) return { turn: deps.turn, outcome: 'reload-failed', detail: reloaded.message, notes: NO_NOTES };
   for (const warning of reloaded.pruned) deps.report(`turn ${deps.turn} [pruned] ${warning.message}`);
 
+  readRoom(deps.ctx.session);
   deps.ctx.view = view(deps.ctx.session);
   const localizer = sessionLocalizer(deps.ctx.session);
   const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };

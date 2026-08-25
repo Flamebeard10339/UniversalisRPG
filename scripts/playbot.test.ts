@@ -469,6 +469,31 @@ adjacent:
     expect(() => openSession(registry, 'no-such-fixture-at-all')).toThrow(/no # save with that id/);
   });
 
+  // A run's turns are its budget, and the mask must not spend any of them: the room is read before
+  // the model is asked anything, so a turn still buys a move on the quest. The subjects come off the
+  // view the loop actually handed over, so a thing standing somewhere next month is covered here.
+  it('reads the room on arrival, so no turn is spent lifting a mask and nothing reaches the model under one', async () => {
+    const session = startSession(played());
+    const ctx = newContext(session, view(session));
+    const asked: TurnRequest[] = [];
+    const client: ModelClient = {
+      send: async (request) => {
+        asked.push(request);
+        return wellBehavedReply(session);
+      },
+    };
+
+    const masked = sessionStatus(session).entities.filter((entity) => entity.masked);
+    expect(masked.length, 'the opening room has to hold a mask for this to be asking anything').toBeGreaterThan(0);
+
+    const entry = await runTurn({ ctx, read: tutorialReader, client, system: 'system', log: [], turn: 1, report: () => undefined });
+
+    expect(entry.turn).toBe(1);
+    expect(asked).toHaveLength(1);
+    expect(ctx.view.entities.filter((entity) => entity.masked)).toEqual([]);
+    for (const entity of masked) expect(asked[0].view, entity.id).toContain(String(ctx.view.entities.find((each) => each.id === entity.id)!.title));
+  });
+
   it('renderView describes the offered choices and the current location', () => {
     const session = startSession(played());
     const text = renderView({ ...sessionStatus(session), said: [] } as unknown as Parameters<typeof renderView>[0], sessionLocalizer(session));

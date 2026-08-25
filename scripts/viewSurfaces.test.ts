@@ -106,6 +106,9 @@ const SCRIPT: readonly string[] = [
   '/load tutorial-quests.miki-route-start',
   '/goto tulsa.basement',
   '/state',
+  // Nothing offers a fight against something nobody has looked at, so the rat is read first — which
+  // is also how every driver is asked to draw the mask and then the thing behind it.
+  'use:entity.tulsa.giant-rat.examine',
   // Picked as a choice rather than typed as the directive behind it, which is the one shape that
   // arms an action instead of applying it: a driver that can advance a run gets one to advance, and
   // the live sheet a terminal draws while it runs is only reachable this way.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
-import { applyDirective, PlaySession, startSession, view } from './session';
+import { applyDirective, PlaySession, readRoom, startSession, view } from './session';
 import { SAVE_VERSION } from './save';
 
 const MODULE = `
@@ -75,6 +75,7 @@ function choices(session: PlaySession): string[] {
 function grownFrom(save: string): PlaySession {
   const session = startSession(registry);
   applyDirective(session, { kind: 'load', save });
+  readRoom(session);
   return session;
 }
 

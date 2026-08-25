@@ -28,7 +28,6 @@ const WORKSHOP = {
     '',
     '# entity lathe',
     'title: Lathe',
-    'examine: A lathe, belt slack.',
     'turn a spindle:',
     '  time: 4',
     '  on success:',
