@@ -8,6 +8,7 @@ import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
 import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
 import { section } from './define';
+import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
 
 export interface ClusterEffect {
@@ -26,6 +27,7 @@ export interface Item extends HookCarrier {
   originCluster?: string;
   clusterEffect?: ClusterEffect;
   itemLevel?: Range;
+  group?: string;
   value?: number;
 }
 
@@ -81,6 +83,7 @@ export const item = section<Item, never, 'actions'>()({
   text: ['title', 'examine'],
   fields: {
     title: TITLE_FIELD,
+    group: GROUP_FIELD,
     examine: { parser: text },
     slot: { parser: id, note: 'the slots are every id any equipment-slots: names, so this declares one as much as it uses one; a # slot only supplies display words for it' },
     itemLevel: {
