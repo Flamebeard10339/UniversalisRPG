@@ -45,12 +45,10 @@ engine.carried.verb.unequip: Unequip
 engine.carried.verb.destroy: Destroy
 engine.carried.close: Close
 engine.carried.confirmed: Go ahead
-engine.growth.max-level: {item} is already at level {level}, which is its maximum
 engine.growth.no-copy: you carry no {item}
 engine.growth.no-worn: you wear nothing in {slot}
 engine.growth.unknown-item: there is no item or item instance called {item}
 engine.growth.not-a-base: {item} is not a base: only an item you can wear has a plane to grow
-engine.growth.no-experience: {item} grants no item experience
 engine.growth.not-a-jewel: {item} is not a cluster jewel
 engine.pack.full: Your pack is full, so the {item} stays where it is.
 engine.plane.base: Base
@@ -58,7 +56,6 @@ engine.plane.go: Go to {hex}
 engine.plane.slot: slot: {direction} with {jewel}
 engine.plane.allocate.slot: allocate: slot {direction}
 engine.plane.allocate.position: allocate: position {position}
-engine.plane.feed: feed: with {item}
 engine.plane.back: Back to inventory
 engine.plane.heading: {plane} at {hex}
 engine.plane.heading.said: {heading} — {said}
@@ -144,7 +141,6 @@ engine.shell.recentre: Recentre
 engine.shell.socket: Jewel socket
 engine.shell.allocate: Allocate
 engine.shell.insert: Socket a jewel
-engine.shell.feed: Feed
 engine.shell.empty: Empty
 engine.shell.experience: Experience
 engine.shell.to-next: To next level
@@ -254,8 +250,8 @@ engine.repl.live.pool: {resource} {current}/{max}
 engine.repl.live.counting: hits:{attempts} completion:{completion}
 engine.repl.live.stop: (press any key to stop)
 engine.repl.opening: Type /help for commands (/state and /inventory show your progress).
-engine.repl.plane.heading: {plane} — level {level}/{max}, {spent} spent, {points}
-engine.repl.plane.heading.worn: {plane} — worn — level {level}/{max}, {spent} spent, {points}
+engine.repl.plane.heading: {plane} — level {level}, {spent} spent, {points}
+engine.repl.plane.heading.worn: {plane} — worn — level {level}, {spent} spent, {points}
 engine.repl.plane.points.one: 1 point left
 engine.repl.plane.points.many: {points} points left
 engine.repl.plane.cluster: {hex}  {jewel} · {shape} · {from} · mods {mods}/{slots}

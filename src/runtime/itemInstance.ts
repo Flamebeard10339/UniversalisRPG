@@ -1,18 +1,19 @@
 import { Direction, Hex, PlaneNode } from '../content/hex';
-import { Item } from '../content/sections/item';
+import { isBase, Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
+import { sampleCount } from '../grammar/range';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
 import { localizerOf } from './localized';
-import { anId, aCopy, aCount, says, type Said } from './said';
+import { isRoll, nextRandom } from './rng';
+import { anId, says, type Said } from './said';
 import { inventorySlots } from './tuning';
-import { skillLevel } from './skills';
 import { createGameState, GameState } from './state';
 
 export const ITEM_INSTANCE = 'item';
 
 export interface ItemInstance {
-  experience: number;
+  roll: number;
   plane: Plane;
 }
 
@@ -25,7 +26,7 @@ const refused = (reason: Said): Refusal => ({ ok: false, refused: reason });
 export function isItemInstance(payload: unknown): payload is ItemInstance {
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) return false;
   const held = payload as Record<string, unknown>;
-  return typeof held.experience === 'number' && Number.isInteger(held.experience) && held.experience >= 0 && isPlane(held.plane);
+  return isRoll(held.roll) && isPlane(held.plane);
 }
 
 defineInstanceKind<ItemInstance>(ITEM_INSTANCE, {
@@ -175,16 +176,33 @@ function writeStack(state: GameState, itemId: string, delta: number): number {
   return after - before;
 }
 
-// The one arrival, so the one place an arrival can be turned away: a stack that is already open
-// takes any depth, and a first copy needs a row the pack may not have. Nothing is lost silently —
-// what could not arrive is said in the log, and the caller reads the count that moved.
+// The one arrival, so the one place an arrival can be turned away and the one place a base is
+// rolled: a stack that is already open takes any depth, and a first copy needs a row the pack may
+// not have. A base never joins a stack — the roll it arrives with is what makes two of them
+// different — so each one asks for a row of its own. Nothing is lost silently: what could not
+// arrive is said in the log, and the caller reads the count that moved.
 export function receiveItem(state: GameState, registry: Registry, itemId: string, count: number): number {
   if (count <= 0) return 0;
+  const item = registry.items.get(itemId);
+  if (item && isBase(item)) {
+    let arrived = 0;
+    while (arrived < count) {
+      if (!packHasRoom(state, registry)) break;
+      createInstance(state, ITEM_INSTANCE, itemId, mintBase(state, item));
+      arrived += 1;
+    }
+    if (arrived < count) packFull(state, registry, itemId);
+    return arrived;
+  }
   if (copiesOf(state, itemId).stack === 0 && !packHasRoom(state, registry)) {
     packFull(state, registry, itemId);
     return 0;
   }
   return writeStack(state, itemId, count);
+}
+
+export function mintBase(state: GameState, item: Item): ItemInstance {
+  return { roll: nextRandom(state), plane: basePlane(item, nextRandom(state))! };
 }
 
 // What `canHandOver` answered with, and the only thing `handOver` takes. Its constructor is private
@@ -291,7 +309,7 @@ export function stripHoldings(state: GameState): number {
 }
 
 export function itemLevel(payload: ItemInstance, item: Item): number {
-  return Math.min(skillLevel(payload.experience), item.maxLevel);
+  return item.itemLevel === undefined ? 0 : sampleCount(item.itemLevel, payload.roll);
 }
 
 export function pointsRemaining(payload: ItemInstance, item: Item): number {
@@ -311,49 +329,23 @@ const take = (state: GameState, itemId: string): void => {
   if (parting) handOver(state, parting);
 };
 
+// A base is minted where it arrives, so everything below grows a copy that already stands: there is
+// no stack to lift one out of and no plane to invent on the way.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
   const copy = named(state, target);
   const standing = grown(state, copy);
-  const template = itemTemplate(state, target);
-  const item = registry.items.get(template);
+  if (!standing) return refused(says('engine.growth.not-a-base', { item: anId(target) }));
+
+  const item = registry.items.get(standing.template);
   if (!item) return refused(says('engine.growth.unknown-item', { item: anId(target) }));
+  if (consumes !== undefined && spendableCount(state, consumes) < 1) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
 
-  const plane = basePlane(item);
-  if (!plane) return refused(says('engine.growth.not-a-base', { item: anId(template) }));
-
-  const source = standing ? undefined : stackCopy(state, target);
-  if (!standing && !source) return refused(says('engine.growth.no-copy', { item: anId(template) }));
-  if (consumes !== undefined && spendableCount(state, consumes) < (source?.from === 'stack' && consumes === template ? 2 : 1)) return refused(says('engine.growth.no-copy', { item: anId(consumes) }));
-
-  // Growing one of several leaves the stack standing and adds a copy beside it, which is a row the
-  // pack may not have. Growing the last one, or the one being worn, moves a row rather than adding one.
-  if (source?.from === 'stack' && copiesOf(state, template).stack > 1 && !packHasRoom(state, registry)) return refused(says('engine.pack.full', { item: aCopy('item', template) }));
-
-  const payload = standing?.payload ?? { experience: 0, plane };
-  const problem = growing.change(payload, item);
+  const problem = growing.change(standing.payload, item);
   if (problem) return refused(problem);
 
   if (consumes !== undefined) take(state, consumes);
-  if (!source) return { ok: true, instance: copy };
-  if (source.from === 'stack') take(state, template);
-  const minted = createInstance(state, ITEM_INSTANCE, template, payload);
-  if (source.from === 'slot') state.equipped[source.slot] = minted;
-  return { ok: true, instance: minted };
-}
-
-export function feedItem(state: GameState, registry: Registry, target: string, food: string): Growth {
-  const experience = registry.items.get(food)?.itemExperience;
-  if (experience === undefined) return refused(says('engine.growth.no-experience', { item: anId(food) }));
-  return growItem(state, registry, {
-    target,
-    consumes: food,
-    change: (payload, item) => {
-      if (itemLevel(payload, item) >= item.maxLevel) return says('engine.growth.max-level', { item: aCopy('item', item.id), level: aCount(item.maxLevel) });
-      payload.experience += experience;
-      return undefined;
-    },
-  });
+  return { ok: true, instance: copy };
 }
 
 export function slotJewel(state: GameState, registry: Registry, target: string, jewelItem: string, hex: Hex, direction: Direction): Growth {
@@ -362,7 +354,7 @@ export function slotJewel(state: GameState, registry: Registry, target: string, 
   return growItem(state, registry, {
     target,
     consumes: jewelItem,
-    change: (payload) => fillSlot(registry, payload.plane, hex, direction, jewel),
+    change: (payload) => fillSlot(registry, payload.plane, hex, direction, jewel, state),
   });
 }
 

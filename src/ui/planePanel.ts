@@ -19,7 +19,6 @@ export interface PanelView {
   standing: LabelId | null;
   acts: Choice | null;
   jewels: readonly Choice[];
-  feeds: readonly Choice[];
   leaves: Choice | null;
   walks: Choice | null;
 }
@@ -35,7 +34,6 @@ export function panelFor(graph: PlaneGraph, chosen: Answer | null, choices: read
     standing: node === null ? null : node.free ? 'free' : STANDING[node.standing],
     acts: choices.find((choice) => actsOn(choice, node?.key) && choice.subject === undefined) ?? null,
     jewels: choices.filter((choice) => actsOn(choice, node?.key) && choice.subject !== undefined),
-    feeds: choices.filter((choice) => choice.on === undefined && choice.subject !== undefined),
     leaves: choices.find((choice) => choice.on === undefined && choice.subject === undefined) ?? null,
     walks: choices.find((choice) => actsOn(choice, node?.hex)) ?? null,
   };

@@ -2,13 +2,11 @@ import { RuntimeError } from './error';
 import { Registry } from '../content/registry';
 import { GrowthDirective, isGrowthDirective, parseDirectiveLine } from '../content/sections/test';
 import { applyClusterEffect } from './clusterEffect';
-import { allocate, feedItem, Growth, slotJewel } from './itemInstance';
+import { allocate, Growth, slotJewel } from './itemInstance';
 import { GameState } from './state';
 
 export function grow(state: GameState, registry: Registry, directive: GrowthDirective): Growth {
   switch (directive.kind) {
-    case 'feed':
-      return feedItem(state, registry, directive.target, directive.food);
     case 'slot':
       return slotJewel(state, registry, directive.target, directive.jewel, directive.hex, directive.direction);
     case 'allocate':

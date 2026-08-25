@@ -6,9 +6,9 @@ import { BonusAmount, Counter } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { positionPayloads } from './clusterEffect';
-import { basePlane, isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, pointsSpent, positionOnEdge, slotDirections, slotState } from './clusterPlane';
+import { isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, pointsSpent, positionOnEdge, slotDirections, slotState } from './clusterPlane';
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
-import { hasStackCopy, itemCopies, grownItems, isGrownCopy, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining, wornCopy } from './itemInstance';
+import { grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
 import { counterLevels } from './stats';
 
@@ -70,7 +70,6 @@ export interface PlaneReport {
   readonly title: Localized;
   readonly name: Localized;
   readonly level: number;
-  readonly maxLevel: number;
   readonly spent: number;
   readonly remaining: number;
   readonly clusters: ClusterReport[];
@@ -163,23 +162,17 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
   };
 }
 
-function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; grown: boolean; payload: ItemInstance } | undefined {
+function targeted(registry: Registry, state: GameState, target: string): { item: Item; template: string; payload: ItemInstance } | undefined {
   const template = itemTemplate(state, target);
   const item = registry.items.get(template);
-  if (!item) return undefined;
-
-  const live = itemInstance(state, target);
-  if (live) return { item, template, grown: true, payload: live };
-  if (!hasStackCopy(state, target)) return undefined;
-
-  const plane = basePlane(item);
-  return plane === undefined ? undefined : { item, template, grown: false, payload: { experience: 0, plane } };
+  const payload = itemInstance(state, target);
+  return item && payload ? { item, template, payload } : undefined;
 }
 
 export function planeReport(registry: Registry, state: GameState, target: string): PlaneReport | undefined {
   const targets = targeted(registry, state, target);
   if (!targets) return undefined;
-  const { item, template, grown, payload } = targets;
+  const { item, template, payload } = targets;
   const localizer = localizerOf(registry, state);
 
   const clusters = planeClusters(payload.plane)
@@ -190,9 +183,8 @@ export function planeReport(registry: Registry, state: GameState, target: string
     instance: target,
     template,
     title: localizer.title('item', template),
-    name: carriedName(localizer, 'item', template, grown ? target : null),
+    name: carriedName(localizer, 'item', template, target),
     level: itemLevel(payload, item),
-    maxLevel: item.maxLevel,
     spent: pointsSpent(payload.plane),
     remaining: pointsRemaining(payload, item),
     clusters,
@@ -225,7 +217,5 @@ function linksAcross(registry: Registry, plane: Plane, clusters: readonly Cluste
 }
 
 export function planeReports(registry: Registry, state: GameState): PlaneReport[] {
-  const stacks = [...itemCopies(state).keys()];
-  const slots = Object.entries(state.equipped).flatMap(([slot, id]) => (isGrownCopy(state, id) ? [] : [wornCopy(slot)]));
-  return [...Object.keys(grownItems(state)), ...stacks, ...slots].flatMap((id) => planeReport(registry, state, id) ?? []);
+  return Object.keys(grownItems(state)).flatMap((id) => planeReport(registry, state, id) ?? []);
 }

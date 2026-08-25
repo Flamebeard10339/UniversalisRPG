@@ -3,6 +3,7 @@ import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, parseHexK
 import { isBase, Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
+import { isRoll, nextRandom, RngCursor } from './rng';
 import { aCount, anId, says, type Said } from './said';
 
 export const ORIGIN: Hex = { q: 0, r: 0 };
@@ -10,6 +11,7 @@ export const ORIGIN: Hex = { q: 0, r: 0 };
 export interface Cluster {
   jewel: string | null;
   entry: Direction | null;
+  roll: number;
   allocatedPositions: number[];
   allocatedSlots: Direction[];
   effects: string[];
@@ -135,15 +137,15 @@ export function pointsSpent(plane: Plane): number {
   return Object.values(plane).reduce((total, cluster) => total + cluster.allocatedPositions.length + cluster.allocatedSlots.length, 0);
 }
 
-export function originPlane(jewel: string | null): Plane {
-  return { [hexKey(ORIGIN)]: { jewel, entry: null, allocatedPositions: [], allocatedSlots: [], effects: [] } };
+export function originPlane(jewel: string | null, roll: number): Plane {
+  return { [hexKey(ORIGIN)]: { jewel, entry: null, roll, allocatedPositions: [], allocatedSlots: [], effects: [] } };
 }
 
-export function basePlane(item: Item): Plane | undefined {
-  return isBase(item) ? originPlane(item.originCluster ?? null) : undefined;
+export function basePlane(item: Item, roll: number): Plane | undefined {
+  return isBase(item) ? originPlane(item.originCluster ?? null, roll) : undefined;
 }
 
-export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: Direction, jewel: string): Said | undefined {
+export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: Direction, jewel: string, cursor: RngCursor): Said | undefined {
   const state = slotState(registry, plane, hex, direction);
   const problem = slotProblem(state, hex, direction);
   if (problem) return problem;
@@ -151,7 +153,7 @@ export function fillSlot(registry: Registry, plane: Plane, hex: Hex, direction: 
   if (state === 'filled') return says('engine.plane.slot-filled', at);
   if (!isAllocated(registry, plane, { hex, kind: 'slot', direction })) return says('engine.plane.slot-unallocated', at);
 
-  plane[hexKey(step(hex, direction))] = { jewel, entry: direction, allocatedPositions: [], allocatedSlots: [], effects: [] };
+  plane[hexKey(step(hex, direction))] = { jewel, entry: direction, roll: nextRandom(cursor), allocatedPositions: [], allocatedSlots: [], effects: [] };
   return undefined;
 }
 
@@ -185,6 +187,7 @@ function isCluster(value: unknown, atOrigin: boolean): value is Cluster {
   if (!isRecord(value)) return false;
   if (!(value.jewel === null || typeof value.jewel === 'string')) return false;
   if (atOrigin ? value.entry !== null : !(typeof value.entry === 'string' && isDirection(value.entry))) return false;
+  if (!isRoll(value.roll)) return false;
   if (!Array.isArray(value.allocatedPositions) || !value.allocatedPositions.every((each) => Number.isInteger(each) && each >= 1)) return false;
   if (!Array.isArray(value.allocatedSlots) || !value.allocatedSlots.every((each) => typeof each === 'string' && isDirection(each))) return false;
   if (!Array.isArray(value.effects) || !value.effects.every((each) => typeof each === 'string')) return false;
@@ -225,7 +228,7 @@ function dropUnplaceable(registry: Registry, plane: Plane, repairs: Said[]): boo
     changed = true;
     if (key === hexKey(ORIGIN)) {
       repairs.push(says('engine.plane.repair.origin', { jewel: anId(String(cluster.jewel)) }));
-      plane[key] = originPlane(null)[key]!;
+      plane[key] = originPlane(null, cluster.roll)[key]!;
     } else {
       repairs.push(says('engine.plane.repair.cluster', { jewel: anId(String(cluster.jewel)), hex: anId(key) }));
       delete plane[key];

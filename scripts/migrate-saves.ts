@@ -34,7 +34,26 @@ export interface ShapeChange {
 
 export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
 
-export const SHAPE_CHANGE: ShapeChange | null = noFieldMoved(12);
+// An item copy keeps the roll it dropped with where it kept experience, and so does every cluster
+// in its plane. A roll of 0 is the bottom of whatever range its item declares, which is the only
+// answer a rewrite can give: the level a fixture had was bought, and what it was bought towards is
+// gone.
+const rerolledCopies: ShapeChange = {
+  writtenFor: 13,
+  declared: 'every item copy and every cluster in its plane keeps a roll',
+  moved(body) {
+    const table = body.instances as { byId?: Record<string, { kind?: string; payload?: Record<string, unknown> }> } | undefined;
+    for (const held of Object.values(table?.byId ?? {})) {
+      if (held.kind !== 'item' || !held.payload) continue;
+      delete held.payload.experience;
+      held.payload.roll = 0;
+      for (const cluster of Object.values((held.payload.plane ?? {}) as Record<string, Record<string, unknown>>)) cluster.roll = 0;
+    }
+    return body;
+  },
+};
+
+export const SHAPE_CHANGE: ShapeChange | null = rerolledCopies;
 
 export function isStaleDeclaration(change: ShapeChange | null): boolean {
   return change !== null && change.writtenFor !== SAVE_VERSION;

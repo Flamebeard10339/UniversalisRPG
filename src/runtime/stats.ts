@@ -96,7 +96,7 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
     const item = registry.items.get(itemTemplate(state, wornId));
     if (!item) continue;
     carriers.push({ hooks: item, item, wornId });
-    for (const passiveId of carriedPassives(registry, item, itemInstance(state, wornId))) {
+    for (const passiveId of carriedPassives(registry, itemInstance(state, wornId))) {
       const carrier = passiveCarrier(registry, passiveId, false);
       if (carrier) carriers.push(carrier);
     }

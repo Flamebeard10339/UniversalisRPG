@@ -168,7 +168,7 @@ export function PlaneModal({
 
   const choices: readonly Choice[] = option.values ?? [];
   const panel = panelFor(graph, chosen, choices);
-  const { node, acts: acting, jewels, feeds: feeding, leaves: leaving } = panel;
+  const { node, acts: acting, jewels, leaves: leaving } = panel;
 
   const press = (pressed: GraphNode): void => {
     setChosen(pressed.key);
@@ -224,33 +224,13 @@ export function PlaneModal({
           <dl className="flex flex-wrap gap-x-4">
             <div className="flex items-baseline gap-1">
               <dt className="text-xs uppercase tracking-wide text-text-subtle">{words('level')}</dt>
-              <dd className="text-sm tabular-nums">{`${tidy(plane.level)}/${tidy(plane.maxLevel)}`}</dd>
+              <dd className="text-sm tabular-nums">{tidy(plane.level)}</dd>
             </div>
             <Points key={denied} remaining={plane.remaining} denied={denied > 0} words={words} />
           </dl>
           <hr className="my-2 border-border" />
           {node === null ? (
-            <>
-              <Fold contributions={plane.contributions} />
-              {feeding.length === 0 ? null : (
-                <>
-                  <p className="mt-3 text-xs uppercase tracking-wide text-text-subtle">{words('feed')}</p>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {feeding.map((choice) => (
-                      <button
-                        key={choice.value}
-                        data-drive="answer"
-                        type="button"
-                        onClick={() => onAnswer(option.key, choice.value)}
-                        className="rounded-xl border border-border bg-panel px-3 text-sm transition-transform duration-75 active:scale-[0.98] active:bg-accent-strong active:text-accent-text"
-                      >
-                        {choice.subject}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
+            <Fold contributions={plane.contributions} />
           ) : (
             <>
               <p className="text-sm font-semibold">{name}</p>
