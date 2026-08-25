@@ -111,19 +111,30 @@ function turnLines(entry: RunLogEntry): string[] {
   return [...(entry.outcome === 'refused' ? attempted(entry.line) : entry.directives), ...notesOf(entry.notes)];
 }
 
-// A run as the `# test` that replays it, which is the only written form a run has: what each turn
-// settled into, whether the engine refused it, and what its player said about it, in the order it
-// happened. A turn neither harness's player took — a reply that could not be read, a reload that
-// failed — is a fact about the harness rather than about the world, and is left to the harness's
-// own report.
-export function runAsTest(kept: KeptRun, header?: RunHeader): string[] {
+// A run as the `# test` that replays it, which is the only written form a run has: where it began,
+// what each turn settled into, whether the engine refused it, what its player said about it, and —
+// where its harness took one — the sheet it finished on. A turn neither harness's player took — a
+// reply that could not be read, a reload that failed — is a fact about the harness rather than
+// about the world, and is left to the harness's own report.
+function runLines(kept: KeptRun, header?: RunHeader): string[] {
   const { run } = kept;
-  return [heading(runSections(run.id)[1]), `load: ${startSaveId(run.id)}`, ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]), ...run.log.flatMap(turnLines)];
+  return [
+    `load: ${startsAtSave(kept.from) ? kept.from.save : startSaveId(run.id)}`,
+    ...(header === undefined ? [] : [`note: played ${header.at} against ${header.built}`]),
+    ...run.log.flatMap(turnLines),
+    // The whole sheet rather than the keys it names, which is the form that has to earn itself: a
+    // run is a record of a whole session, and what it claims is that replaying it reproduces that
+    // world — including a key the state has stopped holding, which no narrower form can say.
+    ...(kept.ends === undefined ? [] : [`expect: ${endSaveId(run.id)}`]),
+  ];
 }
 
-// The saved game a run walks forward from, under the run's own name. Every harness that writes a
-// run reads the name off this rather than spelling the suffix a second time.
+// The saved game a run walks forward from, and the sheet it ends on, under the run's own name.
+// Every harness that writes a run reads the names off these rather than spelling a suffix a second
+// time.
 export const startSaveId = (run: string): Answer => `${run}-start`;
+
+export const endSaveId = (run: string): Answer => `${run}-end`;
 
 export interface SectionAddress {
   readonly kind: Answer;
@@ -133,24 +144,39 @@ export interface SectionAddress {
 // The kind a run is written as, which is also the kind whatever lists filed runs picks them out by.
 export const RUN_SECTION = 'test';
 
-const START_SECTION = 'save';
+const SAVE_SECTION = 'save';
 
 const heading = (at: SectionAddress): string => `# ${at.kind} ${at.id}`;
 
-// Which two sections a recorded run is, by name and in the order they are filed: where it started,
-// and what was done from there. Writing one and dropping one read this same pair, so neither act
-// can be about a different set of sections than the other.
-export function runSections(run: string): readonly [SectionAddress, SectionAddress] {
+// Every section a run of this name could be filed as, in the order they are written: where it
+// began, the sheet it ended on, and what was done in between. A run brings whichever of them its
+// own harness wrote — one starting at a `# save` the world already holds brings no start of its
+// own, and one nobody asked a sheet of ends on none — so filing writes a subset of this and
+// dropping takes back whatever of it is there. Neither act can be about a different set of sections
+// than the other.
+export function runSections(run: string): readonly [SectionAddress, SectionAddress, SectionAddress] {
   return [
-    { kind: START_SECTION, id: startSaveId(run) },
+    { kind: SAVE_SECTION, id: startSaveId(run) },
+    { kind: SAVE_SECTION, id: endSaveId(run) },
     { kind: RUN_SECTION, id: run },
   ];
 }
 
-// Every harness that files a run — the app, the playbot, /create-test — writes these and not its
-// own pair.
+// A run as the sections it is filed as, each under the address it is filed at. Every harness that
+// files a run — the app, the playbot, /create-test — writes these and not its own list, and
+// whatever adopts one into a live registry walks the same pairs, so nothing can land under a name
+// the written form does not use.
+export function runBlocks(kept: KeptRun, header?: RunHeader): (readonly [SectionAddress, readonly string[]])[] {
+  const [start, end, walked] = runSections(kept.run.id);
+  return [
+    ...(startsAtSave(kept.from) ? [] : [[start, [kept.from.bytes]] as const]),
+    ...(kept.ends === undefined ? [] : [[end, [kept.ends]] as const]),
+    [walked, runLines(kept, header)] as const,
+  ];
+}
+
 export function runAsSections(kept: KeptRun, header?: RunHeader): string[][] {
-  return [[heading(runSections(kept.run.id)[0]), kept.from], runAsTest(kept, header)];
+  return runBlocks(kept, header).map(([at, body]) => [heading(at), ...body]);
 }
 
 // A run outlives the tab it was played in. Holding one is what recording *is* — there is no
@@ -164,20 +190,39 @@ export interface RecordedRun {
   readonly log: readonly RunLogEntry[];
 }
 
-// The run as its harness keeps it: the run, and the saved game it walks forward from. An author
-// starts recording partway through a session, so a replay beginning at a new game would begin
-// somewhere else entirely. It holds the run rather than extending it, because nothing draws a saved
-// game and `from` has no business on the surface the app hands its own panels.
+// Where a run walks forward from. There is always one — a run is a replay and a replay has to begin
+// somewhere — and it is either the bytes its harness took when the run started or a `# save` the
+// world already holds. A run that names one does not own it, so filing brings no save and dropping
+// takes none.
+export type RunStart = { readonly bytes: string } | { readonly save: Answer };
+
+export const startsAtSave = (from: RunStart): from is { readonly save: Answer } => 'save' in from;
+
+// A history that opens by loading a saved game has already said where the run begins, so that is
+// where it begins and the line is not its first move. Writing both would state one fact twice,
+// which is why nothing downstream of this asks again whether a run declares its own start.
+export function runStart(history: readonly string[], taken: string): { readonly from: RunStart; readonly lines: readonly string[] } {
+  const opening = history[0] === undefined ? null : parseDirectiveLine(history[0]);
+  if (opening?.kind === 'load') return { from: { save: opening.save }, lines: history.slice(1) };
+  return { from: { bytes: taken }, lines: history };
+}
+
+// The run as its harness keeps it: the run, where it walks forward from, and the sheet it ended on
+// where its harness took one. An author starts recording partway through a session, so a replay
+// beginning at a new game would begin somewhere else entirely. It holds the run rather than
+// extending it, because nothing draws a saved game and neither end has any business on the surface
+// the app hands its own panels.
 export interface KeptRun {
   readonly run: RecordedRun;
-  readonly from: string;
+  readonly from: RunStart;
+  readonly ends?: string;
 }
 
 // A `# test` id is a path segment and a path segment opens with a letter, which an instant does not.
 export const runId = (at: string): Answer => `run-${at.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}`;
 
 export function serializeRun(kept: KeptRun): string {
-  return JSON.stringify({ ...kept.run, from: kept.from });
+  return JSON.stringify({ ...kept.run, from: kept.from, ends: kept.ends });
 }
 
 const isEntry = (value: unknown): value is RunLogEntry => {
@@ -186,14 +231,27 @@ const isEntry = (value: unknown): value is RunLogEntry => {
   return Number.isInteger(held.turn) && typeof held.outcome === 'string' && typeof held.detail === 'string' && typeof held.notes === 'object' && held.notes !== null;
 };
 
+// A run kept before a start could be a name kept its bytes as plain text, and that is still what
+// they are. Reading one as anything else would lose a sitting the author is in the middle of.
+function keptStart(from: unknown): RunStart | null {
+  if (typeof from === 'string') return { bytes: from };
+  if (typeof from !== 'object' || from === null) return null;
+  const held = from as Record<string, unknown>;
+  if (typeof held.save === 'string') return { save: held.save };
+  return typeof held.bytes === 'string' ? { bytes: held.bytes } : null;
+}
+
 // A run kept between sittings is read back leniently: a run this cannot make sense of is a run
 // nobody can act on, and refusing to open the app over one would cost the author the session.
 export function parseRun(payload: string | null): KeptRun | null {
   if (payload === null) return null;
   try {
     const held = JSON.parse(payload) as Record<string, unknown>;
-    if (typeof held !== 'object' || held === null || typeof held.id !== 'string' || typeof held.from !== 'string') return null;
-    return Array.isArray(held.log) && held.log.every(isEntry) ? { run: { id: held.id, log: held.log as RunLogEntry[] }, from: held.from } : null;
+    if (typeof held !== 'object' || held === null || typeof held.id !== 'string') return null;
+    const from = keptStart(held.from);
+    if (from === null) return null;
+    if (!Array.isArray(held.log) || !held.log.every(isEntry)) return null;
+    return { run: { id: held.id, log: held.log as RunLogEntry[] }, from, ends: typeof held.ends === 'string' ? held.ends : undefined };
   } catch {
     return null;
   }

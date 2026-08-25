@@ -16,7 +16,7 @@ import {
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import type { Resumption } from './openUniverse';
-import { startSaveId, type SectionAddress, type TurnOutcome } from './runLog';
+import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
@@ -557,45 +557,42 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   const { recorder, session } = ctx;
   if (recorder.history.length === 0) return noted('error', 'nothing recorded yet');
 
-  const startSave = startSaveId(id);
-  const endSaveId = `${id}-end`;
-  const first = recorder.history[0];
-  const usesStartSave = !(first.startsWith('load:') || first.startsWith('load '));
+  const { from, lines } = runStart(recorder.history, recorder.startSave);
+  if (!startsAtSave(from) && savedGameFromSerialized(from.bytes) === null) return noted('error', 'no start save was taken when this session began');
 
-  const started = usesStartSave ? savedGameFromSerialized(recorder.startSave) : null;
-  if (usesStartSave && !started) return noted('error', 'no start save was taken when this session began');
+  const kept: KeptRun = {
+    run: { id, log: lines.map((line, index) => turnRecord(index + 1, line, 'applied', [line], null)) },
+    from,
+    ends: opts.valid ? serializeSession(session) : undefined,
+  };
+  const blocks = runBlocks(kept);
 
-  const idTaken =
-    session.registry.tests.has(id) ||
-    (usesStartSave && session.registry.saves.has(startSave)) ||
-    (opts.valid && session.registry.saves.has(endSaveId));
-  if (idTaken) return noted('error', `test '${id}' already exists`);
+  const registryOf = (at: SectionAddress): Map<string, unknown> => (at.kind === RUN_SECTION ? session.registry.tests : session.registry.saves);
+  if (blocks.some(([at]) => registryOf(at).has(at.id))) return noted('error', `test '${id}' already exists`);
 
-  const lines = [...recorder.history];
-  if (usesStartSave) lines.unshift(`load: ${startSave}`);
-  if (opts.valid) lines.push(`expect: ${endSaveId}`);
-
-  const directives: Directive[] = [];
-  for (const directiveLine of lines) {
-    const directive = parseDirectiveLine(directiveLine);
-    if (!directive) return noted('error', `internal: recorded line does not parse: ${directiveLine}`);
-    directives.push(directive);
+  // The session that wrote a run holds it at once, so /test replays it without a reload. It lands
+  // section by section off the same list that goes out as text: nothing here decides which sections
+  // there are or what they are called.
+  const landing: (() => void)[] = [];
+  for (const [at, body] of blocks) {
+    if (at.kind === RUN_SECTION) {
+      const directives: Directive[] = [];
+      for (const directiveLine of body) {
+        const directive = parseDirectiveLine(directiveLine);
+        if (!directive) return noted('error', `internal: recorded line does not parse: ${directiveLine}`);
+        directives.push(directive);
+      }
+      landing.push(() => session.registry.tests.set(at.id, { id: at.id, directives }));
+    } else {
+      const saved = savedGameFromSerialized(body.join('\n'));
+      if (!saved) return noted('error', `internal: recorded save does not read back: ${at.id}`);
+      landing.push(() => session.registry.saves.set(at.id, saved));
+    }
   }
-
-  const endSaveSerialized = opts.valid ? serializeSession(session) : undefined;
-  const endSave = endSaveSerialized === undefined ? null : savedGameFromSerialized(endSaveSerialized);
-
-  if (started) session.registry.saves.set(startSave, started);
-  if (endSave) session.registry.saves.set(endSaveId, endSave);
-  session.registry.tests.set(id, { id, directives });
-
-  const blocks: string[][] = [];
-  if (usesStartSave) blocks.push([`# save ${startSave}`, recorder.startSave]);
-  if (endSaveSerialized !== undefined) blocks.push([`# save ${endSaveId}`, endSaveSerialized]);
-  blocks.push([`# test ${id}`, ...lines]);
+  for (const land of landing) land();
 
   return {
-    output: [note('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', words: 'tool', blocks }],
+    output: [note('plain', `Created test '${id}' (${recorder.history.length} steps).`), { kind: 'authored', words: 'tool', blocks: runAsSections(kept) }],
     quit: false,
     recorded: [],
   };

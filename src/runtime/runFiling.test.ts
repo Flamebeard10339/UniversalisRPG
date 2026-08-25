@@ -41,7 +41,7 @@ function standing(): Standing {
   return { ctx, onDisk: () => held };
 }
 
-const keptAs = (id: string, ctx: CommandContext): KeptRun => ({ run: { id, log: [] }, from: serializeSession(ctx.session) });
+const keptAs = (id: string, ctx: CommandContext): KeptRun => ({ run: { id, log: [] }, from: { bytes: serializeSession(ctx.session) } });
 
 function file(ctx: CommandContext, id: string): CommandResult {
   const result = fileRun(ctx, keptAs(id, ctx), PLAYED);
@@ -53,7 +53,7 @@ const errors = (result: CommandResult): string[] => result.output.flatMap((out) 
 
 describe('a filed run is the sections filing wrote, and dropping one takes those', () => {
   it('takes exactly what filing writes, derived from the filing rather than named here', () => {
-    const kept: KeptRun = { run: { id: 'run-a', log: [] }, from: '{"version":0}' };
+    const kept: KeptRun = { run: { id: 'run-a', log: [] }, from: { bytes: '{"version":0}' }, ends: '{"version":0}' };
     const written = runAsSections(kept).map((block) => block[0]);
     const staged = written.map((heading) => {
       const [, kind, id] = /^# (\S+) (\S+)$/.exec(heading)!;
@@ -67,12 +67,35 @@ describe('a filed run is the sections filing wrote, and dropping one takes those
   });
 
   it('lists a run whose starting save has already gone by hand, and claims only what is left', () => {
-    const kept: KeptRun = { run: { id: 'run-b', log: [] }, from: '{"version":0}' };
+    const kept: KeptRun = { run: { id: 'run-b', log: [] }, from: { bytes: '{"version":0}' } };
     const [, walked] = runAsSections(kept);
 
     const [run] = filedRuns([{ kind: 'test', id: 'run-b', text: walked.join('\n') }]);
 
     expect(run.sections).toEqual([{ kind: 'test', id: 'run-b' }]);
+  });
+
+  it('files one section for a run walking forward from a save the world already holds, and dropping it leaves that save', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+
+    const named: KeptRun = { run: { id: 'run-two', log: [] }, from: { save: 'local-changes.run-one-start' } };
+    expect(errors(fileRun(ctx, named, PLAYED))).toEqual([]);
+    expect(localSectionHeadings(onDisk())).toEqual(['# save run-one-start', '# test run-one', '# test run-two']);
+    expect(stagedRuns(ctx).find((run) => run.id === 'run-two')!.sections).toEqual([{ kind: 'test', id: 'run-two' }]);
+
+    expect(errors(dropRun(ctx, 'run-two'))).toEqual([]);
+    expect(localSectionHeadings(onDisk())).toEqual(['# save run-one-start', '# test run-one']);
+  });
+
+  it('says so and writes nothing when the run names a save this world does not hold', () => {
+    const { ctx, onDisk } = standing();
+    const before = onDisk();
+
+    const named: KeptRun = { run: { id: 'run-three', log: [] }, from: { save: 'nowhere' } };
+
+    expect(errors(fileRun(ctx, named, PLAYED))).toEqual(['the save this run walks forward from cannot be read here: this world holds no # save nowhere']);
+    expect(onDisk()).toBe(before);
   });
 
   it('drops both sections of the run asked for and leaves every other section standing', () => {

@@ -1,7 +1,7 @@
 import type { LocalSection } from '../content/localChanges';
 import type { Answer } from './localized';
 import { dropLocalSections, noted, stagedSections, stageLocalSections, type CommandContext, type CommandResult } from './command';
-import { runAsSections, runSections, RUN_SECTION, type KeptRun, type RunHeader, type SectionAddress } from './runLog';
+import { runAsSections, runSections, RUN_SECTION, startsAtSave, type KeptRun, type RunHeader, type SectionAddress } from './runLog';
 import { createGameState } from './runtime';
 import { loadSave, savedGameFromSerialized } from './save';
 
@@ -15,10 +15,11 @@ const because = (error: unknown): string => (error instanceof Error ? error.mess
 // it was played cannot read that game back. Filing it anyway would write a `# test` whose first
 // line always fails.
 function unreadableStart(kept: KeptRun, ctx: CommandContext): string | null {
-  const from = savedGameFromSerialized(kept.from);
-  if (from === null) return 'it does not read as a saved game';
+  const { from } = kept;
+  const started = startsAtSave(from) ? ctx.session.registry.saves.get(from.save) ?? null : savedGameFromSerialized(from.bytes);
+  if (started === null) return startsAtSave(from) ? `this world holds no # save ${from.save}` : 'it does not read as a saved game';
   try {
-    loadSave(createGameState(), from, ctx.session.registry);
+    loadSave(createGameState(), started, ctx.session.registry);
     return null;
   } catch (error) {
     return because(error);
@@ -43,8 +44,9 @@ export interface FiledRun {
 
 // Every filed run among the sections staged, in the order they were filed. A run is what filing one
 // writes, so it is picked out by the section runSections says a run is — and it carries whichever
-// of that pair is actually there, so a run whose start save has already gone by hand is still a run
-// and dropping it still takes only what remains.
+// of that list is actually there. A run that walks forward from a save the world already holds
+// filed none of its own and takes none away; one nobody asked a sheet of filed no ending save; and
+// a start removed by hand is still a run that drops what remains.
 export function filedRuns(staged: readonly LocalSection[]): FiledRun[] {
   const held = new Set(staged.map((section) => `${section.kind} ${section.id}`));
   return staged
