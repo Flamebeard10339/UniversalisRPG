@@ -43,7 +43,7 @@ engine.modal.race.and: {carries}, {more}
 engine.modal.choice: Choice
 engine.modal.item: Item
 engine.modal.confirm: {verb} {item} for good?
-engine.carried.verb.grow: Grow
+engine.carried.verb.grow: Skill Tree
 engine.carried.verb.equip: Equip
 engine.carried.verb.unequip: Unequip
 engine.carried.verb.destroy: Destroy

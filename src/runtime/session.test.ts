@@ -1695,7 +1695,7 @@ describe('a modal answer is spelled in the base language on every screen, and on
 
   it('reads them as the words the engine says in the played language', () => {
     expect(words(races('en'))).toEqual(['Human', 'Elf', 'Dwarf', 'Orc']);
-    expect(words(verbs('en'))).toEqual(['Grow', 'Equip', 'Destroy', 'Close']);
+    expect(words(verbs('en'))).toEqual(['Skill Tree', 'Equip', 'Destroy', 'Close']);
     expect(words(moves('en'))).toContain('allocate: slot e');
   });
 
