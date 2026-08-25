@@ -3,7 +3,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { spokenBy } from '../content/sections/dialogue';
 import { createGameState, GameState, RuntimeError } from './runtime';
 import { receiveItem } from './itemInstance';
-import { choose, menuChoices, openerShown, openersNow, reachedNow, talk } from './dialogue-runtime';
+import { choose, menuChoices, openerShown, openersNow, reachedNow, standsAtWords, talk } from './dialogue-runtime';
 
 const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# flag greeted', '# flag asked', '', '# entity miki', 'title: Miki'].join('\n');
 
@@ -43,11 +43,11 @@ describe('what an entity has to say', () => {
 describe('every thread an entity holds open is put to the player at once', () => {
   const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
 
-  it('opens the one thread outright, so an entity with a single thing to say costs no click', () => {
+  it('opens the one thread outright, so an entity with a single thing to say costs no click to reach', () => {
     const registry = loaded(own);
     const state = createGameState();
 
-    expect(talk('miki', registry, state)).toBeNull();
+    expect(standsAtWords(talk('miki', registry, state)!)).toBe(true);
     expect(state.log).toEqual(['Fine weather for it.']);
   });
 
@@ -65,7 +65,7 @@ describe('every thread an entity holds open is put to the player at once', () =>
     expect(state.log).toEqual([]);
     expect(menuChoices(cursor, registry, state).map((each) => each.display)).toEqual(['Fine weather for it.', 'Since you are here — there is a thing I need.']);
 
-    expect(choose('1', cursor, registry, state)).toBeNull();
+    expect(standsAtWords(choose('1', cursor, registry, state)!)).toBe(true);
     expect(state.log).toEqual(['Since you are here — there is a thing I need.']);
   });
 
@@ -281,5 +281,43 @@ describe('a node that hands something over to a pack with no room for it', () =>
 
     expect(state.log.map(String)).toEqual(['Here, take this.', 'Your pack is full, so the coin stays where it is.']);
     expect(state.inventory).toEqual({ pebble: 1 });
+  });
+});
+
+// The line the owner met as "the second dialogue with miki doesn't pop up a modal (because there
+// is no choice)": words that arrive with nothing to answer land in the log behind whatever the
+// player is looking at, and a click that visibly does nothing is what they read instead.
+describe('a node that says its piece and puts up no list', () => {
+  const spoken = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  sticky', '  Fine weather for it.'].join('\n');
+  const silent = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  Fine weather for it.', '  goto quietly', '', 'node quietly:', '  set: greeted'].join('\n');
+
+  it('stands at what it said, with the one thing left to answer being that it has been read', () => {
+    const registry = loaded(spoken);
+    const state = createGameState();
+
+    const cursor = talk('miki', registry, state)!;
+    expect(menuChoices(cursor, registry, state).map((each) => String(each.display))).toEqual(['Continue']);
+    expect(choose('continue', cursor, registry, state)).toBeNull();
+  });
+
+  it('is answerable by where it stands as well as by the word, the way every other list is', () => {
+    const registry = loaded(spoken);
+    const state = createGameState();
+
+    expect(choose('0', talk('miki', registry, state)!, registry, state)).toBeNull();
+  });
+
+  // A spent node holds back everything it says and still follows its goto, so a second visit can be
+  // offered and put nothing in front of anybody — and a screen carrying no words and asking no
+  // question is a click to dismiss over nothing.
+  it('leaves nothing standing where the visit said nothing at all', () => {
+    const registry = loaded(silent);
+    const state = createGameState();
+
+    expect(standsAtWords(talk('miki', registry, state)!)).toBe(true);
+    state.log.length = 0;
+
+    expect(talk('miki', registry, state)).toBeNull();
+    expect(state.log).toEqual([]);
   });
 });

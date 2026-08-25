@@ -24,7 +24,7 @@ import { declaredId, Entity, EXAMINED, isMintedAction } from '../content/section
 import { isTwoSided } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
-import { answerModal, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
+import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { Registry } from '../content/registry';
@@ -946,7 +946,7 @@ export function runTest(testId: string, registry: Registry, state: GameState, st
   if (replayed.failure !== null) return { passed: false, failure: replayed.failure };
 
   const open = topModal(state);
-  if (open) return { passed: false, failure: `modal left open: ${open.name}` };
+  if (open && awaitsAnAnswer(open)) return { passed: false, failure: `modal left open: ${open.name}` };
 
   return { passed: true };
 }

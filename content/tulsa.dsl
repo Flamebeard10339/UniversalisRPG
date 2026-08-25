@@ -1269,6 +1269,7 @@ load: in-town
 travel: kelsa-farmhouse
 talk: kelsa
 choose: I am here about the bees.
+choose: continue
 assert: kelsa.the-third-hive.visits = 1
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
@@ -1333,10 +1334,13 @@ travel: tavern-street
 travel: sha-dynastys
 talk: sunny
 choose: sunny.the-stove
+choose: continue
 talk: sunny
 choose: sunny.the-bottle
+choose: continue
 talk: sunny
 choose: sunny.the-animals
+choose: continue
 assert: sunny.the-stove.visits = 1
 assert: sunny.the-bottle.visits = 1
 assert: sunny.the-animals.visits = 1

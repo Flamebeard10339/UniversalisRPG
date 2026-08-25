@@ -34,6 +34,7 @@ export const ENGINE_KEYS = [
   'engine.modal.race.bonus',
   'engine.modal.race.and',
   'engine.modal.choice',
+  'engine.modal.read',
   'engine.modal.item',
   'engine.modal.confirm',
   'engine.carried.verb.grow',

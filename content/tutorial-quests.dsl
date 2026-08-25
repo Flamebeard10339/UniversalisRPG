@@ -182,6 +182,7 @@ stage adrift:
 # test quest-offered
 talk: tulsa.miki
 choose: Sounds good. Teach me.
+choose: continue
 assert: finding-your-feet.name-yourself
 
 // Opens on a save so the route is walked with the pools a played game has.
@@ -193,6 +194,7 @@ submit-modal: name=Rowan
 submit-modal: race=core.elf
 assert: tulsa.mirror-done
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.bake-bread
 assert: has core.jug-of-water
 craft: dough
@@ -200,6 +202,7 @@ assert: has core.dough
 craft: bread
 assert: has core.bread
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.clear-the-rats
 // A fight is bounded by its location, so the rats are fought where they stand
 // rather than through the floor.
@@ -210,6 +213,7 @@ use: melee-combat on giant-rat until done
 assert: tulsa.rats-killed >= 3
 use: entity.stairs-up.ascend
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.sendoff
 assert: tulsa.front-door.unlocked
 travel: beach
@@ -219,6 +223,7 @@ travel: beach
 travel: guide-house
 talk: tulsa.miki
 choose: leave-tutorial-island.adrift.miki.0.said
+choose: continue
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
@@ -251,6 +256,7 @@ assert: tulsa.miki.angered
 // condition just turned true does not pick it up until asked again.
 talk: tulsa.miki
 choose: leave-tutorial-island.adrift.miki.1.said
+choose: continue
 assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
@@ -276,12 +282,14 @@ choose: I'd rather find my own way.
 talk: tulsa.miki
 choose: Actually - sorry. Show me the ropes after all.
 talk: tulsa.miki
+choose: continue
 assert: has core.fishing-net
 use: entity.stairs.ascend
 use: entity.window.fish
 assert: has core.fish
 use: entity.stairs-down.descend
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.sendoff
 assert: tulsa.front-door.unlocked
 travel: beach
@@ -290,6 +298,7 @@ travel: beach
 // instead, now that there is somewhere to have come back from.
 travel: guide-house
 talk: tulsa.miki
+choose: continue
 assert: leave-tutorial-island.adrift
 travel: beach
 expect only: left-mikis-house
@@ -309,6 +318,7 @@ use: entity.mirror.look-in
 submit-modal: name=Rowan
 submit-modal: race=core.elf
 talk: tulsa.miki
+choose: continue
 assert: finding-your-feet.bake-bread and not has core.bread
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 craft: dough

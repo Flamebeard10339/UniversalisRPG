@@ -1,7 +1,7 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModal } from './modalStack';
-import { choose, cursorProblem, menuChoices } from './dialogue-runtime';
+import { choose, cursorProblem, menuChoices, standsAtWords } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
@@ -29,6 +29,10 @@ interface ModalDefinition<F extends ModalFrame> {
   stale?(frame: F, state: GameState, registry: Registry): Localized | null;
   focus?(frame: F): Focus | undefined;
   leaves?: Answer;
+  // Whether this screen puts nothing to the player but what it is already showing. A screen says so
+  // itself rather than being worked out from the options it offers, because a list of one is still a
+  // decision and being the only race in the world does not make choosing it not choosing.
+  asksNothing?(frame: F): boolean;
 }
 
 function carriedWords(localizer: Localizer, tag: TagClause): Localized {
@@ -107,8 +111,14 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     },
     holds: (value) => isCursor(value.cursor),
     stale: (frame, state, registry) => cursorProblem(localizerOf(registry, state), frame.cursor, registry),
+    asksNothing: (frame) => standsAtWords(frame.cursor),
   },
 };
+
+// A recording that stops with a screen still up has walked away from a question, which is a failure
+// and reads as one. A beat somebody has only to read is not a question — a player who put the game
+// down while the last thing said was still on screen recorded exactly that.
+export const awaitsAnAnswer = (frame: ModalFrame): boolean => definitionFor(frame).asksNothing?.(frame) !== true;
 
 export const MODAL_NAMES: readonly ModalName[] = Object.keys(DEFINITIONS) as ModalName[];
 
