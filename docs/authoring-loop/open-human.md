@@ -19,7 +19,7 @@ observation, which belongs in git. It is deleted. A line that arrives here from
 that same clause written out of what the lane had already measured.
 `deliverable-log.md` states when a line crosses, in both directions.
 
-**Eleven lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
+**Fourteen lines stand here.** The queue emptied on 2026-08-25, when the owner ruled
 seventeen of them in one sitting off the back of his second playtest — most of what
 this file held turned out to be one-line answers nobody had asked him for. Five of the
 eight arrived back the same day, each measured by the lane that hit it.
@@ -265,3 +265,45 @@ relax the rule and let the view carry an app-only vocabulary.
 and nothing else changes. If yes, the second half is his call too, because relaxing
 "nothing about how to draw them" is a rule the suite currently enforces and a lane will not
 take it down on its own.*
+
+## What the band under every page should carry
+
+The run under way is now drawn below whatever page you are on, which is what you asked
+for. What it carries is the question: today that is the label, the bar, the cancel button
+**and the pool meters** — your health and each foe's. During a fight on the character sheet
+that is roughly 150px of permanent furniture, and on the home page your own health meter is
+then drawn twice, once in the band and once in `StatusBanner`.
+
+*Moves when: he says whether the band is the whole sheet or just label, bar and cancel with
+the foe meters staying on the home page. Either is a small edit in `App.tsx`; the lane did
+not guess because both readings of "it should exist on lower banner" are defensible and one
+of them draws a number twice.*
+
+## Whether `/state` should say where a stat's number came from
+
+The app answers it behind a press. The terminal does not, and the view-parity harness passes
+anyway because no driver draws `stats[].from[].title` during its run — the app draws it only
+behind a press the harness never makes. The lane left it deliberately rather than by
+oversight: `settled.md` costs `/state` at about 620 tokens over ten turns for the playbot,
+and a per-stat breakdown would inflate a number that was measured on purpose.
+
+Beside it, one small thing with the same answer either way: a `DEBUG` carrier has no words
+by rule, so `combat-expansion.vigor-tally`'s buff shows as a locale key on the breakdown.
+Only reachable from a DEBUG save, and it is what the engine already does for anything
+wordless.
+
+*Moves when: he says whether the terminal should answer it too, and whether a wordless
+carrier should fall back to `humanizeEn` rather than showing its key. The first is a real
+cost against a measured budget, which is why it is his; the second is one line either way.*
+
+## Whether an autosave slot already holding "0" means never
+
+`/autosave 0` used to mean *never* and now means *after every action*, which is the
+direction of the ruling. An author whose `autosave` slot already holds `"0"` will therefore
+start being written after every action rather than not at all. The lane wrote no migration
+and said so: the cadence lives outside the portable save, so this reaches only somebody with
+that slot already set on this machine.
+
+*Moves when: he says whether an existing `"0"` should be read as `never` for the sake of
+whoever set it meaning never. It is a few lines in `cadenceOrUnreadable` and a claim beside
+it; doing it wrong silently changes what a slot means, which is why it was not guessed.*

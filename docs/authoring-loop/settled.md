@@ -908,6 +908,61 @@ plain last segment otherwise — reached through `Localizer.minted`, and `# info
 their subjects from `MODAL_SCREENS` and `MODAL_NAMES`: every screen's opening line carries
 the minted words and never the address.
 
+**The run under way is drawn below whatever page the player is on, and it is a band rather
+than a banner.** `LiveSheet` sits in `src/ui/App.tsx` between the paged column and the tab
+bar. It is not a banner because `VStack`'s banners sit *between* layers — `LocationBanner`
+is the lower one on the map and `StatusBanner` the lower one on home, the character sheet
+has none at all — so no banner is below every page and only a band outside the column is.
+
+**A travel seats the road in the same seat a fight seats its target.** *Only a fight seats a
+target* was believed and is false; it made the band read a location id where a foe's name
+goes. Whatever reads `state.activeAction.roster[player].target` asks the registry whether
+what it found names an entity.
+
+**A stat's shares are the number folded up, not a second account of it.** `statRange` is
+`foldStat(statBreakdown(...))`, and `statBreakdown` walks the same `modifierCarriers` list
+that produced the number, so a share that went missing changes the number instead of
+quietly disagreeing with it. Every carrier answers `{kind, id, field}` and
+`localizer.content` reads its name off that, so nothing tables what contributes to what.
+`increased` is a percentage everywhere; it was a fraction at three sites and a percentage
+in `itemContribution`, which is two conventions for one field.
+
+**A turn leaves the log resting on the first line that turn produced.** The decision is
+`startedAt` / `restingAt` in `src/ui/logRest.ts` and the component only measures. Two cases
+that look like bugs and are not: a turn whose only line repeats the standing last line
+anchors on that line, because the transcript counts a repeat rather than minting a second
+entry; and resting never goes past the end, so a fight ticking one line a turn still reads
+as a scrollback.
+
+**A cadence is the least time to leave between autosaves, and `never` is a word rather
+than a quantity.** `Cadence = number | 'never'` in `src/runtime/saveSlots.ts`;
+`DEFAULT_CADENCE` is `0`, which is no minimum, so **every action writes**. The default lives
+in the engine and the app asks for nothing — measured, because the flip is inside the
+suite's own run-to-run spread. `autosaveSeconds` is deleted rather than renamed: it threw
+on an unreadable cadence, and its only caller ran under every action.
+
+**That a slot is not being autosaved is said on demand, never under an action.** *This
+session did not come out of that slot* is a standing fact, not an event: `saveReport.writes`
+holds it, `/slots` and `/state` read it, and every act that makes it true says so once at
+the moment it does. The per-action path reports only a write it tried and could not make.
+Making the cadence slot answer that question instead would put a second meaning on one
+piece of state and would still repeat the line every turn.
+
+**A filed run is the pair `runSections` names, and dropping one takes both in one edit.**
+`runSections` in `src/runtime/runLog.ts` is the single answer to which two sections a run
+is, so filing writes exactly what dropping takes; `dropLocalSections` is the counterpart of
+`stageLocalSections`, adopting once so the registry never holds a `# test` whose `load:`
+save has gone. The list is on the settings page. **Nothing prunes on a timer** — refused,
+because it destroys runs the author has not exported.
+
+**The road out of a room belongs to whatever in the room offers a free way to the same
+place.** `entityAliasesTravelTo` drops the plain road where a standing entity's own action
+relocates and says and does nothing else; that is why a basement is reached by descending
+and why the front door, not a road beside it, is what a player walks out of the guide house
+through. **A masked thing offers nothing but the look that reads it**, so the plain road
+stands until the player has met the door and nobody is stranded by a door they have not
+looked at.
+
 ## The tools
 
 - `npm run probe -- content --test <id>` runs one `# test` in about a second.

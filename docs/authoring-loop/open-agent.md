@@ -38,12 +38,6 @@ evidence a line exists, and the measurement is the evidence about its cause.
 
 ### What the chat says, and when
 
-**The chat does not scroll to what the turn just said.** *"Talking to miki, I have to
-scroll down to see the dialogue. I should see just what Miki said, not everything
-before as well."* *Closes when:* a turn leaves the log positioned on the first line
-that turn produced. Which entry a turn starts at is a pure decision and belongs beside
-the component.
-
 **A node that says words and offers no choice reaches the player as nothing.** *"The
 second dialogue with miki doesn't pop up a modal (because there is no choice) the choice
 should be `continue`."* *Closes when:* such a node draws the same modal every other node
@@ -103,18 +97,6 @@ true of the beach is the cheaper answer if the lane measures the new condition a
 more than it costs.
 
 ### The action list
-
-**The action progress bar is invisible on the map.** *"It should exist on lower banner
-regardless of whether I'm on home, or on the map."* This is also what the
-travel-progress question in `open-human.md` was waiting on, and it crosses here with
-it: the first run's *"the map doesn't show a progress of how far along the travel is, so
-it reads as a bug like the game is frozen"* is the same bar in the same place. Flat-band
-travel landed at three seconds, so the bar is the whole of what is left. *Closes when:*
-the bar is on the lower banner and a travel shows in it, whatever page the player is on.
-
-**A running action does not animate, and nothing says who is being fought.** *"The
-currently running action should animate when running. The game should acknowledge that
-I am fighting the rat."*
 
 ### The fight
 
@@ -178,9 +160,17 @@ same fact or a different one is the lane's first question, and `one-home` is the
 procedure for answering it. Which stat lands where is authoring the lane drafts and the
 owner revises.
 
-**A stat does not say where its number came from.** *"I tried to click on regeneration
-stat to see what was causing the number 6. A modal didn't open describing the bread
-eating bonus."* *Closes when:* pressing a stat says what is adding to it, by name.
+**A stat's breakdown is drawn on a sheet row rather than on the modal that now exists.**
+Pressing a stat says what is adding to it, by name, through the simplest surface that was
+already there — `Ledger`'s `onOpen` and `Entry.detail`. The modal API landed the same day
+and this should move onto it, and the lane that built the breakdown costed the move: **the
+runtime does not change at all.** The shares are already on the view as `StatRow.from` and
+the words are already one function, `madeOf` in `src/ui/sheet.ts`. What moves is the
+`openStat` `useState` in `App.tsx` and the third parameter of `counted`, both deleted;
+`onOpen` points at whatever opens the modal — its sibling today is `driver.open`, which
+sends `/inv <id>` and sets `view.focus`, so a stat wants the equivalent `/stat <id>` and a
+`Focus` case — and the body renders from `row.from`, one row per share, which a modal can
+afford and a sheet row cannot. *Closes when:* the breakdown is a modal like every other.
 
 **Three things wrong with the item modal, in one turn.** *"Clicking on an item in the
 inventory flashes the ?chat? on the screen for a single frame. I can't seem to interact
@@ -227,25 +217,6 @@ and under the dialogue policy it is a lane's to write.
 optionally be edited/skipped by modals."* So a reveal rate is a setting with a default
 the lane picks and the owner tunes, and a modal may say it wants the words at once.
 Explicitly low priority; it is here because it is no longer blocked.
-
-**Autosave writes after every action.** Ruled by the owner, and measured while ruling
-it: a session serializes in **0.013 ms** to **165 bytes** on the shipped corpus, so the
-cadence question was never about cost. `DEFAULT_AUTOSAVE_SECONDS` is `0` and four proofs
-encode *never*; setting a cadence surfaced an author's warning — *"autosave held: slot
-player — this session did not come out of that slot"* — to a player on turn one, and
-**separating those two readings of `held` is part of this line**, not a follow-on. A
-warning meant for an author who typed `/autosave` is noise to a player who asked for no
-cadence at all.
-
-**A filed run is dropped by hand, and nothing prunes.** Ruled: *"Can I just delete them
-manually for now?"* — and today he can, from a terminal: `/local delete test <run-id>`
-and `/local delete save <run-id>-start`, two commands per run, through
-`deleteLocalSection` (`src/content/localChanges.ts:135`). What is missing is the surface
-in the app, which is where the runs actually pile up: each stopped run mints its own id
-from the clock, so `upsertLocalSection` never replaces one and `local-changes` grows by
-two sections per playtest forever. *Closes when:* the playtest list can drop a run, both
-its sections at once, through that same function. Nothing prunes on a timer — that was
-refused, because it destroys runs the author has not exported yet.
 
 **A shared fixture world, kept as small as it can be.** Ruled: build it. The measurement
 that asked for it: removing the whetstone touched 57 files, and **seventeen of them were
