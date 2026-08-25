@@ -63,9 +63,9 @@ export interface PlayChoice {
 
 export interface PlayAction {
   label: Localized;
-  // Who the action under way is aimed at, said the way a choice says what offers it. Only a fight
-  // seats a target, and the seat is where the target is read from, so nothing here decides which
-  // actions have one.
+  // Who the action under way is aimed at, said the way a choice says what offers it. The seat is
+  // where the target is read from and the registry is asked whether it names an entity, because a
+  // seat also carries addresses that are not one — a travel seats the road it is walking.
   of?: Answer;
   detail?: Localized;
   progress: number;
@@ -636,7 +636,7 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   const localizer = localizerOf(registry, state);
   const action = armedAction(state, registry);
   const target = active.roster?.[PLAYER]?.target;
-  const aimed = target ? offeredBy(registry, localizer, 'entity', target) : undefined;
+  const aimed = target !== undefined && registry.entities.has(target) ? offeredBy(registry, localizer, 'entity', target) : undefined;
   return {
     label: actionUnderWay(localizer, obj, objId, action),
     ...(aimed === undefined ? {} : { of: aimed.of, detail: aimed.detail }),

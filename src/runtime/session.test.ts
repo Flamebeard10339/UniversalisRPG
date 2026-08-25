@@ -1148,6 +1148,31 @@ roast:
     expect(v.action!.detail).toBe('Dummy');
   });
 
+  // A seat carries an address, and not every address is an entity: walking a road seats the road.
+  it('is aimed at nobody when what the seat holds is not an entity', () => {
+    const road = `
+# location camp
+title: Camp
+x: 0, y: 0
+starting
+adjacent: hut
+
+# location hut
+title: Hut
+x: 1, y: 0
+
+# entity player
+`;
+    const session = startSession(loadInEnglish(road));
+    view(session);
+
+    const v = beginAction(session, 'travel:hut');
+
+    expect(v.action!.label).toContain('Hut');
+    expect(v.action!.of).toBeUndefined();
+    expect(v.action!.detail).toBeUndefined();
+  });
+
   it('publishes an action a save left without a player clock instead of dying on the next look', () => {
     const registry = loadInEnglish(module);
     const session = startSession(registry);
