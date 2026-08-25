@@ -5,7 +5,7 @@ import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
-import { type AuthoringContext, createTicker, newContext, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, newContext, resumptionNotes, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
 import { fileRun } from '../runtime/runFiling';
@@ -131,6 +131,7 @@ function open(opened: OpenedUniverse, authoring: AuthoringContext, save: SaveCon
     output: [
       ...before,
       ...opened.problems.map((problem): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: problem.message })),
+      ...resumptionNotes(opened.resumed),
       { kind: 'view', view: first, reread: false },
     ],
   };

@@ -14,7 +14,8 @@ import {
 } from '../content/localChanges';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
-import { type ParsedSave } from '../content/sections/save';
+import type { Resumption } from './openUniverse';
+import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
 import { describeCondition } from './runtime';
 import { sessionJournal, type JournalEntry } from './session';
@@ -503,18 +504,6 @@ function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   }
 }
 
-export function savedGameFromSerialized(serialized: string): ParsedSave | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(serialized);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
-  const { version, ...diff } = parsed as { version: number } & Record<string, unknown>;
-  return { version, diff };
-}
-
 function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean }): CommandResult {
   const { recorder, session } = ctx;
   if (recorder.history.length === 0) return noted('error', 'nothing recorded yet');
@@ -611,6 +600,15 @@ const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosav
 const UNREADABLE_CADENCE = 'the slot the cadence lives in does not hold one, so nothing is saved on a cadence: /autosave <s> sets it again';
 
 const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
+
+// What an opening says about the game it did or did not pick back up, in one place, so no driver
+// spells its own. A slot that was left alone is said in error words: it is the one thing here a
+// player cannot see for themselves, because the world in front of them looks like a new game.
+export function resumptionNotes(resumed: Resumption): ToolMessage[] {
+  if (resumed.kind === 'new') return [];
+  if (resumed.kind === 'kept') return [note('error', `slot ${resumed.slot} holds a game this build cannot open, so it was left alone and this is a new one: ${resumed.why}`, [UNREADABLE_SLOT])];
+  return [note('ok', `Picked up slot ${resumed.slot}.`), ...prunedNotes(resumed.pruned)];
+}
 
 function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;

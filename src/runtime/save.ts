@@ -274,6 +274,18 @@ export function serializeSave(state: GameState, registry: Registry): string {
   return JSON.stringify({ version: SAVE_VERSION, ...diff });
 }
 
+export function savedGameFromSerialized(serialized: string): ParsedSave | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return null;
+  const { version, ...diff } = parsed as { version: number } & Record<string, unknown>;
+  return { version, diff };
+}
+
 function checkSave(saved: ParsedSave): void {
   if (saved.version !== SAVE_VERSION) {
     throw new RuntimeError(`save version mismatch: expected ${SAVE_VERSION}, got ${saved.version}`);

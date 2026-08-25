@@ -78,6 +78,7 @@ const DISPATCHES = [
   'outcomeOf',
   'PLAYTEST_SLOT',
   'refusedLine',
+  'resumptionNotes',
   'serializeRun',
   'turnRecord',
 ];
