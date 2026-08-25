@@ -326,6 +326,43 @@ craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
+// --- the window into the apology ---
+//
+// The one way through the house nobody had walked, and the one that made the
+// list of threads matter: snub him, refuse again, drop out of the window, go far
+// enough to find the market, and come back in off the sand. Both quests have
+// something to say by then, so from here on every talk is a list — and the line
+// carrying the apology is in it, which is the whole claim. It is proved out here
+// and not on the ordinary apology route, because that route makes it up with him
+// before it ever leaves the house.
+# test the-apology-survives-going-out-of-the-window
+talk: tulsa.miki
+choose: I'd rather find my own way.
+talk: tulsa.miki
+choose: Not a chance.
+use: entity.stairs.ascend
+use: entity.window.climb-out
+travel: market-square
+travel: beach
+travel: guide-house
+assert: tulsa.market-square.discovered and not tulsa.front-door.unlocked
+talk: tulsa.miki
+choose: finding-your-feet.snubbed.miki.0.said
+choose: Actually - sorry. Show me the ropes after all.
+assert: finding-your-feet.apologised
+talk: tulsa.miki
+choose: finding-your-feet.apologised.miki.0.said
+choose: continue
+assert: has core.fishing-net
+use: entity.stairs.ascend
+use: entity.window.fish
+assert: has core.fish
+use: entity.stairs-down.descend
+talk: tulsa.miki
+choose: finding-your-feet.apologised.miki.1.said
+choose: continue
+assert: finding-your-feet.sendoff and tulsa.front-door.unlocked
+
 // --- saves ---
 
 // What all three routes out of the house genuinely land on, named once
