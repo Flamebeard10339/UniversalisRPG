@@ -338,6 +338,18 @@ arithmetic inside it reads like a slip rather than a decision.
 a `# save` the corpus already holds instead of carrying bytes. This is what lets
 `/create-test` finally go through `runAsSections` as the one writer.
 
+**Two things measured 2026-08-25 that the line was written before.** First, **the layering
+cycle that stopped `/create-test` going through the shared writer is gone.** A lane once
+reported it could not collapse them because `runLog.ts` imported a type from `command.ts`,
+so the reverse import closed a cycle and `layer-check` exited 1. `runLog.ts` now imports
+only `../content/sections/test` and `./localized`, while `command.ts` imports *from*
+`runLog.ts` — one direction, no cycle — so `runAsSections` is reachable from
+`buildCreateTest` today. Second, **the branch to delete is `usesStartSave` in
+`buildCreateTest` (`src/runtime/command.ts:563`)**, computed as *the history does not open
+with `load:`*, and it gates four separate things: whether a start save is read, whether the
+id is treated as taken, whether `load:` is unshifted onto the lines, and whether a `# save`
+block is emitted. That is the one rule the ruling replaces.
+
 **And the exception goes with it**, which is his own question turned into the answer:
 *"Why do we need an exception here in the first place? Why do we sometimes need to declare
 a savegame was loaded and sometimes not?"* Today a history already opening with `load:`
