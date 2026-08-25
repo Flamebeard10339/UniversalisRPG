@@ -141,9 +141,9 @@ export const begun = (quest: Quest, at: QuestStage | undefined, set: (flag: stri
 // A goto inside a quest names a stage, so the line that takes it sets that stage's flag. Nothing else in the language moves a quest along, and nothing else needs to.
 const reaching = (quest: Quest, stage: string): ActionResult => ({ kind: 'set', variable: flagOf(quest, stage) });
 
-// A line an entity is given here with no `when:` and no `ask:` of its own is what they say at this stage while none of their other lines here applies. Written into the condition rather than settled when it is asked, so nothing downstream has to know a stage wrote two lines for one mouth.
+// A line an entity is given here with no `when:` of its own is what they say at this stage while none of their other lines here applies. Written into the condition rather than settled when it is asked, so nothing downstream has to know a stage wrote two lines for one mouth. `ask:` does not exempt a line from it: naming a line says what to call it in the list, not which moment is its turn.
 const otherwise = (stage: QuestStage, speech: QuestSpeech): Condition[] =>
-  speech.node.when !== undefined || speech.node.ask !== undefined
+  speech.node.when !== undefined
     ? []
     : stage.speech.filter((each) => each !== speech && each.owner === speech.owner && each.node.when !== undefined).map((each) => not(each.node.when!));
 
@@ -157,6 +157,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, rea
     // The place in the stage as well as who says it: one stage may give one entity more than one thing to say — a line for arriving and a line for coming back with the bread — and two dialogues under one id would be one dialogue.
     id: `${quest.id}.${stage.name}.${lastSegment(speech.owner)}.${said}`,
     owner: speech.owner,
+    fromQuest: quest.id,
     nodes: [
       {
         ...node,

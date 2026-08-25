@@ -26,23 +26,30 @@ stage offered:
   log: A guide called Miki offered to show me the ropes.
   tulsa.miki says:
     always
+    ask: Who are you, then?
     Greetings, adventurer! Welcome to UniversalisRPG.
     The name's Miki, your tutorial guide, here to walk you through your first steps.
     What do you say I show you the ropes?
     -> Sounds good. Teach me.
+      say: Splendid! We start with what gives an adventurer purpose: quests.
+      if not tulsa.mirror-done:
+        say: Your first task: find the mirror in this house and decide who you are, your name and your people.
+      if tulsa.mirror-done:
+        say: Though you have stood in front of the mirror already, by the look of you, so that one is done before I set it. Come tell me who you turned out to be.
       goto name-yourself
     -> I'd rather find my own way.
       goto snubbed
 
 stage name-yourself:
-  log: Miki says a quest begins with knowing who you are, and sent me off to find a mirror.
+  log: Miki says the first thing an adventurer needs is to know who they are. I am not sure I do.
   tulsa.miki says:
     always
-    again: The mirror's still waiting. Name yourself first, then we'll talk.
-    Splendid! We start with what gives an adventurer purpose: quests.
-    Your first task: find the mirror in this house and decide who you are, your name and your people.
+    sticky
+    ask: About that mirror.
+    The mirror's still waiting. Name yourself first, then we'll talk.
   tulsa.miki says:
     when: tulsa.mirror-done
+    ask: I know who I am now.
     There you are, {player.name}. A fine name.
     give: core.jug-of-water
     give: core.pot-of-flour
@@ -55,9 +62,11 @@ stage bake-bread:
   tulsa.miki says:
     always
     sticky
+    ask: About the bread.
     Knead that dough and get it in the oven, {player.name} - water and flour won't bake themselves.
   tulsa.miki says:
     when: has core.bread
+    ask: The loaf is out of the oven.
     A warm loaf! Well done, {player.name}.
     Keep it in your pack - eat it whenever you're hungry.
     Every swing and catch builds a skill, and skills raise your stats.
@@ -72,9 +81,11 @@ stage clear-the-rats:
   tulsa.miki says:
     always
     sticky
+    ask: About the rats.
     Still those rats, {player.name}? Downstairs, in the basement.
   tulsa.miki says:
     when: tulsa.rats-killed >= 3
+    ask: The rats are dealt with.
     Ha! Barely a scratch on you. You're a natural.
     Truth be told, there's little left I can teach you.
     So here's the last of it: get off this island. East, past the sand, and keep going - there's a whole world of skills out that way.
@@ -88,6 +99,7 @@ stage sendoff:
   tulsa.miki says:
     always
     sticky
+    ask: Anything else before I go?
     Still here? East, past the sand. I've nothing else for you.
 
 stage snubbed:
@@ -95,6 +107,7 @@ stage snubbed:
   tulsa.miki says:
     always
     sticky
+    ask: About what I said.
     Hmph. Suit yourself. Don't come crying when a door won't open.
     if has core.lockpick:
       set: tulsa.miki.angered
@@ -108,6 +121,7 @@ stage snubbed:
   tulsa.miki says:
     when: tulsa.rats-killed >= 3
     sticky
+    ask: I cleared out your rats.
     Rats are dealt with, then. That was never the hard part.
     if has core.lockpick:
       set: tulsa.miki.angered
@@ -121,10 +135,12 @@ stage apologised:
   tulsa.miki says:
     always
     sticky
+    ask: About squaring it with you.
     give: core.fishing-net
     Take the net. Bring me one fish out of it and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
   tulsa.miki says:
     when: has core.fish
+    ask: I caught you your fish.
     A fish. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
     set: tulsa.front-door.unlocked
     goto sendoff
@@ -151,11 +167,13 @@ stage adrift:
   tulsa.miki says:
     when: tulsa.market-square.discovered
     sticky
+    ask: About this island of yours.
     So you found the market. That's the far side of the island, near enough. Off you go, then. I'll be here.
     goto adrift
   tulsa.miki says:
     when: tulsa.miki.angered
     sticky
+    ask: About your dresser.
     Went through my dresser, did you. Keep them - they'll get you further than I would have. I'll be here.
     goto adrift
 

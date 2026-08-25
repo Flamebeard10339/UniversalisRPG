@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { costLimit } from './actions';
 import { ActionResult, itemCost } from '../grammar/actionResult';
 import { evaluateCondition, renderSegments } from './conditions';
-import { Choice, Dialogue, DialogueNode, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
+import { Choice, Dialogue, DialogueNode, givenByQuest, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
 import { Registry } from '../content/registry';
@@ -117,20 +117,26 @@ export function openerShown(registry: Registry, state: GameState, node: Dialogue
   return first ? spokenLine(registry, state, first) : localizer.identifier(node.name);
 }
 
-// Everything this entity has open to be talked about now, out of everything anyone has given it to say. Every thread reachable at this moment is offered at once and the player picks; what an entity says when no thread of theirs is open is offered only then. The order is the order of the words a player reads, so no module takes a place in the list by having loaded earlier.
+// Where one open node stands in the list a player is offered. A quest has priority over the rest of what somebody holds open, because it is the thing the player is already in the middle of; a thread of the entity's own comes after it; and what they say when nothing else is open is a fallback and not a line in a list, so it is offered only where nothing above it is.
+const QUEST = 0;
+const THREAD = 1;
+const OTHERWISE = 2;
+
+const standing = (dialogue: Dialogue, node: DialogueNode): number => (givenByQuest(dialogue) ? QUEST : isThread(node) ? THREAD : OTHERWISE);
+
+// Everything this entity has open to be talked about now, out of everything anyone has given it to say. Every thread reachable at this moment is offered at once and the player picks; what an entity says when no thread of theirs is open is offered only then. Within one standing the order is the order of the words a player reads, so no module takes a place in the list by having loaded earlier.
 export function openersNow(registry: Registry, state: GameState, entityId: string): Opener[] {
-  const threads: Array<Opener & { shown: Localized }> = [];
-  const otherwise: Array<Opener & { shown: Localized }> = [];
+  const open: Array<Opener & { shown: Localized; standing: number }> = [];
   for (const dialogue of spokenBy(registry.dialogues, entityId)) {
     for (const node of dialogue.nodes) {
       if (!offering(node) || !speaksNow(dialogue, node, state)) continue;
       if (node.when !== undefined && !evaluateCondition(node.when, state, registry)) continue;
       if (!nodeAffordable(dialogue, node, state)) continue;
-      (isThread(node) ? threads : otherwise).push({ dialogue, node, shown: openerShown(registry, state, node) });
+      open.push({ dialogue, node, shown: openerShown(registry, state, node), standing: standing(dialogue, node) });
     }
   }
-  const open = threads.length > 0 ? threads : otherwise;
-  return open.sort((left, right) => (left.shown < right.shown ? -1 : left.shown > right.shown ? 1 : 0)).map(({ dialogue, node }) => ({ dialogue, node }));
+  const asked = open.filter((each) => each.standing < OTHERWISE);
+  return (asked.length > 0 ? asked : open).sort((left, right) => left.standing - right.standing || (left.shown < right.shown ? -1 : left.shown > right.shown ? 1 : 0)).map(({ dialogue, node }) => ({ dialogue, node }));
 }
 
 // Whether talking to this entity would reach anything, and what it opens on where that is one thing.

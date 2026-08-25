@@ -49,8 +49,13 @@ export const nodeEffects = (node: DialogueNode): ActionResult[] => node.steps.fl
 export interface Dialogue {
   id: string;
   owner?: string;
+  // The quest that handed this away, where a quest did. Nothing writes it in a `# dialogue`: it is minted where the quest mints the dialogue, and it is what tells a line a quest has for the player now from a line the entity has for anybody.
+  fromQuest?: string;
   nodes: DialogueNode[];
 }
+
+// A quest speaking through somebody is never what they say when they have nothing to say, and stands ahead of whatever else they hold open, because it is the thing the player is in the middle of.
+export const givenByQuest = (dialogue: Dialogue): boolean => dialogue.fromQuest !== undefined;
 
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
 const OWNER = new RegExp(`^owner[ \\t]*=[ \\t]*(?<id>${PATH})$`);

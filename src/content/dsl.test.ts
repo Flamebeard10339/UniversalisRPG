@@ -15,6 +15,7 @@ import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from '
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, GENERATED_FIELD, localeKey } from './locale';
 import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
+import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
@@ -656,6 +657,23 @@ describe('an entity the corpus writes examine: on', () => {
   it('offers those words as an action, so no scenery is reviewed that nobody can read', () => {
     const unreachable = written.filter((entity) => !entity.actions.some((action) => action.results.some((result) => result.kind === 'say' && result.text === entity.examine)));
     expect(unreachable.map((entity) => entity.id)).toEqual([]);
+  });
+});
+
+// A quest's line is never the fallback and always stands in whatever list the entity puts up, so
+// two of them can be side by side, and a list naming each entry by the first thing it would say
+// reads as a wall of speech nobody has chosen yet. Its subjects come from the dialogues the quests
+// themselves minted, so a quest written next month is held to it with no edit here.
+describe('a line a quest gives an entity', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const given = [...registry.dialogues.values()].filter(givenByQuest);
+
+  it('is written by enough of the corpus for what is below to mean something', () => {
+    expect(given.length).toBeGreaterThan(10);
+  });
+
+  it('says what the player picks to open it, so the list a player reads is words and not speech', () => {
+    expect(given.flatMap((dialogue) => dialogue.nodes.filter((node) => node.ask === undefined).map((node) => `${dialogue.id} node ${node.name}`))).toEqual([]);
   });
 });
 
