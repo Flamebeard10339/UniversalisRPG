@@ -194,20 +194,20 @@ eat:
 
 // No `origin-cluster:` of its own, so hex (0,0) falls back to a single point
 // carrying one east jewel slot: the on-ramp every base has when it declares
-// nothing. `max-level:` is where a base is tiered, and this one is a starter
+// nothing. `item-level:` is where a base is tiered, and this one is a starter
 // forever.
 //
 // A base is a good, and what a counter pays for is the thing on the table: the
-// steel and the days in it, never the plane it carries or how far it grows. A
-// price that read the ceiling would turn the one-shot caches these come out of
+// steel and the days in it, never the plane it carries or how far it rolled. A
+// price that read the roll would turn the one-shot caches these come out of
 // into purses, which is the same reason nothing that is spent on a plane —
-// jewel, whetstone or orb — declares a value at all.
+// jewel or orb — declares a value at all.
 # item iron-sword
 examine: A well-balanced blade, standard adventurer's kit.
 slot: mainhand
 value: 24
 weapon, +2 attack
-max-level: 10
+item-level: 3-8
 
 # item wooden-shield
 examine: A sturdy shield of banded oak.
@@ -418,20 +418,6 @@ cluster-jewel: causeway
 # item crossroads-jewel
 cluster-jewel: crossroads
 
-// --- item experience ---
-//
-// Experience is fed, never earned, and the grant is authored per item: a
-// greater whetstone is a second declaration and not a second mechanism.
-
-# item whetstone
-examine: A grey block, faintly oiled.
-item-experience: 1000
-
-# item masters-whetstone
-title: Master's Whetstone
-examine: The same grey block, cut true, and it lasts.
-item-experience: 10000
-
 // --- cluster effects ---
 //
 // An orb is used on a cluster already standing in a plane, never on a jewel
@@ -477,7 +463,7 @@ examine: The grain still moves, slowly, when you are not looking.
 slot: mainhand
 value: 30
 weapon, +4 attack
-max-level: 40
+item-level: 12-18
 origin-cluster: heartwood-core
 
 // The kingdom's coin, and the bent one above is the curio that trades for it.
@@ -567,16 +553,16 @@ eat:
 give: 1-3 rat-bone
 1 in 4: give: 1 rat-tail
 
-// The smithing on-ramp: one of each shape, the whetstones to pay for them and
-// the orbs to spend on what they carry. Every line is certain, because this
-// table is the tutorial's way of putting a plane in the player's hands rather
-// than a drop economy — the rats are a capped population and a jewel behind a
-// 1-in-150 roll would never arrive on this island at all.
+// The smithing on-ramp: two blades to spend points on, one of each jewel shape
+// to spend them on, and the orbs to scale what those carry. Every line is
+// certain, because this table is the tutorial's way of putting a plane in the
+// player's hands rather than a drop economy — the rats are a capped population
+// and a jewel behind a 1-in-150 roll would never arrive on this island at all.
+// The two blades are the only rolled lines in it: each arrives with a level
+// drawn from what it declares, so the same chest is not the same chest twice.
 # droptable smiths-cache
 give: 1 heartwood-blade
 give: 1 iron-sword
-give: 6 whetstone
-give: 4 masters-whetstone
 give: 1 keen-edge-jewel
 give: 1 stout-heart-jewel
 give: 1 tempered-will-jewel
@@ -667,30 +653,30 @@ DEBUG
 step-through:
   drain: 1000 health
 
-// Every shape a holding takes: a stack, two things standing alone, a whetstone
-// to grow a copy with, and a blade on the arm rather than in the pack.
-# save four-rows-a-whetstone-and-a-blade-worn
+// Every shape a holding takes: a stack, two things standing alone, a rolled
+// blade in a row of its own, and a second blade on the arm rather than in the
+// pack. The two are one template and neither joins the other: a level is rolled
+// per copy, and that is the whole of why a base does not stack.
+# save four-rows-and-a-blade-worn
 DEBUG
-{"version":12,"inventory":{"core.bent-coin":2,"core.rats-eye-gem":1,"core.deaths-door":1,"core.iron-sword":1,"core.whetstone":1},"equipped":{"mainhand":"core.iron-sword"}}
+{"version":13,"inventory":{"core.bent-coin":2,"core.rats-eye-gem":1,"core.deaths-door":1},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.75,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // The difference hardcore makes, stated as a difference: the same faint down the
 // same handler leaves all five holdings standing with it off and none of them
 // with it on, and the player comes back at the full thirty either way. A run
 // that asserted only the empty pack would pass in a world where fainting always
 // emptied it. `inventory.<item>` counts a stack, a grown copy and a worn one
-// alike, so the two blades are the fed copy and the one on the arm.
+// alike, so the two blades are the one in the pack and the one on the arm.
 # test hardcore-death-empties-five-holdings-a-plain-faint-leaves-standing
 DEBUG
-load: four-rows-a-whetstone-and-a-blade-worn
-feed: iron-sword with whetstone
+load: four-rows-and-a-blade-worn
 use: item.deaths-door.step-through
 assert: inventory.bent-coin = 2
 assert: inventory.rats-eye-gem = 1
 assert: inventory.iron-sword = 2
 assert: resource.health = 30
-load: four-rows-a-whetstone-and-a-blade-worn
+load: four-rows-and-a-blade-worn
 setting: hardcore on
-feed: iron-sword with whetstone
 use: item.deaths-door.step-through
 assert: inventory.bent-coin = 0
 assert: inventory.rats-eye-gem = 0
