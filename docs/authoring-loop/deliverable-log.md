@@ -180,48 +180,49 @@ Map churn is still deliberately deferred. `combat-expansion.proving-ground` sits
 `tulsa.market-square`'s own square and hangs off the beach for want of anywhere
 better. A playtest names it better than a reading does.
 
-**11. The queue that playtest filled is worked through, and what is left is four lines.**
-Ninety-odd commits on 2026-08-25 after the queue was written, fifteen lanes in worktrees
+**11. The queue that playtest filled is worked through, and the agent queue is one line.**
+A hundred-odd commits on 2026-08-25 after the queue was written, nineteen lanes in worktrees
 with the orchestrator merging and keeping these files. The suite went from 3936 tests in 163
-files to **4120 in 169**, green throughout, and the app still builds.
+files to **4133 in 169**, green throughout, and the app still builds.
 
-What closed, by area. **The engine:** every skill grants +1 to the stat it names per level;
-a foe dies below one and declares its own swing range; a fight chains onto the next foe
-still standing; an unmet `requires:` is offered and refused in words, with `hidden if:` the
-only thing that removes an action; a grown copy is on the counter at its base price and
-takes a pack row; one flag says the player has touched a thing, and the map keeps the weaker
-fact. **The words:** one `humanizeEn`, a generated action label reading through it, `#
-faction` without a `title:`, a modal named from its own id — no choice reaches a player as
-an address any more. **The app:** every overlay is one `Modal` on one layer and a strategy
-is a word; what is said arrives a line at a time; the run under way is drawn below whatever
-page you are on; a stat says what makes its number and sits on a tab that is its own
-`# group`; a turn leaves the log on its own first line; a quest's standing is a colour the
-corpus authors. **The world:** the beach is cut, the proving ground is the town's, the guide
-house opens on the market square, and the front door is what a player walks out through.
-**The tools:** autosave writes after every action; a filed run can be dropped; a run always
-carries a start save; and thirty-one test modules stand on one shared world.
+What closed, by area. **The engine:** every skill grants +1 to the stat it names per level; a
+foe dies below one and declares its own swing range; the player's swing varies because the
+arm does; a fight chains onto the next foe still standing, and one named on a foe that is not
+there is refused; an unmet `requires:` is offered and refused in words, with `hidden if:` the
+only thing that removes an action; a grown copy is on the counter at its base price and takes
+a pack row; one flag says the player has touched a thing and the map keeps the weaker fact.
+**The words:** one `humanizeEn`, a generated label reading through it, `# faction` without a
+`title:`, a modal named from its own id — no choice reaches a player as an address. **The
+app:** every overlay is one `Modal` on one layer and a strategy is a word; what is said
+arrives a line at a time; the run under way is drawn below whatever page you are on; a stat
+says what makes its number and sits on a tab that is its own `# group`; a turn leaves the log
+on its own first line; a quest's standing is a colour the corpus authors. **The world:** the
+beach is cut, the proving ground is the town's, the front door is the way out, and Miki sends
+the player to the screen he is talking about. **The tools:** autosave writes after every
+action; a filed run can be dropped; a run always carries a start save; and thirty-one test
+modules stand on one shared world.
 
-**Five lines came back different from how they were written**, which is the loop earning its
-keep. The Title Case sweep was *impossible* — an inline action label cannot carry a capital,
-and the defect was one generated name skipping `humanizeEn`. The feared wall of refusals
-could not happen: six `requires:` in the whole corpus. `finding-your-feet` always completed;
-the colour that would have said so was `text-ok`, a class naming nothing, and the proof
-written to catch that asserted the class string was truthy. Two of the item modal's three
-faults were already fixed or never real — the owner went looking for a skill tree while the
-button said *Grow*. And the *one list of what the player has touched* is two facts, not one,
-because `discovered` never meant *been here*.
+**Six lines came back different from how they were written**, which is the loop earning its
+keep rather than a tally of mistakes. The Title Case sweep was *impossible* — an inline label
+cannot carry a capital. The wall of refusals could not happen: six `requires:` in the whole
+corpus. `finding-your-feet` always completed; the colour that would have said so was
+`text-ok`, a class naming nothing, and the proof written to catch that asserted the class
+string was truthy. Two of the item modal's three faults were already fixed or never real —
+the owner went looking for a skill tree while the button said *Grow*. The *one list of what
+the player has touched* is two facts, because `discovered` never meant *been here*. And the
+last line of all closed on neither of its two expected answers: **the question was what was
+wrong**, not the rule and not the twenty-six tests that failed it.
 
-**Three lanes refused what they were asked and were right.** The `isThread` one-liner strands
+**Four lanes refused what they were asked and were right.** The `isThread` one-liner strands
 the whole apology route. A fourth modal-manner axis would double a set derived from a survey
-of six overlays, for zero shipped subjects. And an automatic end save on every recorded run
-would mint tests the corpus's own claim rule refuses.
+of six overlays, for zero shipped subjects. An automatic end save on every run would mint
+tests the corpus's own claim rule refuses. And a fixture world forced onto a module whose
+numbers *are* the arithmetic would make the test read as if it were about something else.
 
-**What is left is four lines**: the player's damage spread — the last open half of the
-combat numbers, and the only question on it is whether a body swings unevenly or a blade
-does; the apology handing out a fishing net per talk; Miki's on-ramp line, which the modal
-API turned into words plus one `open modal:`; and whether `ui/testFixtures.ts` folds into the
-shared world. **Twenty-one questions stand in `open-human.md`**, every one carrying what the
-lane measured before it handed back.
+**What is left is one agent line** — three siblings of the arming question, all measured,
+none reachable by anything shipped — and **twenty-four questions in `open-human.md`**, every
+one carrying what the lane measured before it handed back. The writing is still the long pole
+and nothing is in front of it.
 
 ## What Yonatan has to deliver
 
