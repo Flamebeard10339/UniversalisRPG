@@ -1,6 +1,7 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, ownerRef, parseOwnerRef, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { ownerRef, parseOwnerRef } from './state';
 import { findActionOwner, travelAction, travelPair } from './actionLookup';
 import {
   applyResults,

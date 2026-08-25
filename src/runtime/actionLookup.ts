@@ -6,7 +6,7 @@ import { mapOf, Registry } from '../content/registry';
 import { isActionOwnerKind, registryMapOf } from '../content/sections';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
 import { travelSeconds } from './tuning';
-import { PLAYER, type Seat, templateOf } from './state';
+import { parseOwnerRef, PLAYER, type Seat, templateOf } from './state';
 
 export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
   return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
@@ -59,9 +59,7 @@ export function travelAction(originId: string, destId: string, registry: Registr
 }
 
 export function seatedAction(seat: Seat, registry: Registry, actorId: string): Action | undefined {
-  const dot = seat.ownerRef.indexOf('.');
-  const obj = seat.ownerRef.slice(0, dot);
-  const objId = seat.ownerRef.slice(dot + 1);
+  const { obj, objId } = parseOwnerRef(seat.ownerRef);
   if (obj === 'action') {
     const own = actorEntity(registry, actorId)?.actions.find((each) => declaredId(each) === objId);
     if (own) return own;
