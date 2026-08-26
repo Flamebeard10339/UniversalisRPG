@@ -22,7 +22,7 @@ dependencies:
 # stat crafting
 title: Crafting
 base: 30
-group: core.knack
+group: core.skilling
 
 # skill crafting
 title: Crafting

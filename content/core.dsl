@@ -30,6 +30,13 @@ value: 3
 # variable default-action-duration
 value: 0
 
+// The beat a room takes to find you: what stands between arriving somewhere and the thing that
+// lives there coming at you, and the same pause between one foe falling and the next stepping over
+// it. Long enough that a second rat is a fight the player saw coming rather than one that was
+// already happening, and short enough that nowhere hostile is ever somewhere to stand and work.
+# variable engagement-seconds
+value: 2
+
 // How many things the player's pack holds. A stack counts once however deep it is, and anything
 // grown into a copy of its own counts as itself; what is worn is on the player rather than in the
 // pack. At 0 a world hands out an endless pack instead.
@@ -50,52 +57,52 @@ value: 28
 // anyone's sheet.
 # stat attack
 base: 10
-group: fighting
+group: combat
 
 // Flat damage reduction, subtracted from each incoming hit. Named `defense`
 // because that is what a player calls it; a contest points at it by name.
 # stat defense
 base: 5
-group: fighting
+group: combat
 
 // The two sides of the opposed roll. A gap of 100 is worth about a 91% chance
 // (see `contest-spread`), so the player at 100 against a rat's 40 lands ~80%.
 # stat accuracy
 base: 100
-group: fighting
+group: combat
 
 # stat evasion
-group: fighting
+group: combat
 
 // Attacks per minute, which is what `rate:` on an action reads directly:
 // 25/min is one swing every 2.4s.
 # stat attack-rate
 base: 25
-group: fighting
+group: combat
 
 // One health a minute, which is slow enough that a fight still costs something
 // and fast enough that what it cost is never permanent. Anything that wants to
 // heal at a useful pace adds to this rather than restoring a pool of its own.
 # stat regeneration
 base: 1
-group: upkeep
+group: combat
 
 // Deliberately without a base: a health pool is what makes something worth
 // swinging at, so a door or a stove has none and only what declares
 // `max-health` can be fought.
 # stat max-health
-group: fighting
+group: combat
 
 // Chestnuts per minute: 55/min is one about every 1.1 seconds.
 # stat cooking-rate
 base: 55
-group: knack
+group: skilling
 
 // The drop channel. Contested like any other roll, so a charm that reads
 // `+20 luck` moves a rare find without any table knowing the charm exists.
 # stat luck
 base: 60
-group: knack
+group: skilling
 
 // What one swing of an axe takes off a trunk. An action with nothing to
 // deplete counts down a whole of its own instead of anybody's pool, so this is
@@ -103,7 +110,7 @@ group: knack
 // number lives here and is written nowhere else, in prose least of all.
 # stat felling
 base: 0.25
-group: knack
+group: skilling
 
 // --- resources ---
 
@@ -173,28 +180,28 @@ colour: #34d399
 // What kind of measure a stat is. The character sheet keeps a tab per group and
 // shows one at a time, so these are also what a player's stats are sorted into —
 // the first tab is the group the first `# stat` above belongs to, and everything
-// the sheet knows about tabs it reads off these four and the `group:` lines.
+// the sheet knows about tabs it reads off these three and the `group:` lines.
 //
-// `measure` is the widest word there is for a stat and is what one that classifies
-// itself falls to, the way `thing` and `presence` are for items and entities. It
-// has no members today, which is the point: a stat added next month is on the
-// sheet whether or not anyone remembered to group it.
+// `combat` is what a stat naming no group falls to, so a stat added next month is
+// on the sheet whether or not anyone remembered to group it. It falls to the tab
+// the sheet opens on rather than to one a player may never turn to, which is what
+// makes having forgotten it something somebody notices.
+//
+// `other` is the only one put on by hand. It is where a pool a player may go a
+// whole life without opening goes, so that never opening it costs them no room
+// on either of the two tabs they read.
 
-# group fighting
-title: Fighting
+# group combat
+title: Combat
+standard for: stat
 colour: #f87171
 
-# group upkeep
-title: Upkeep
-colour: #60a5fa
-
-# group knack
-title: Knack
+# group skilling
+title: Skilling
 colour: #a78bfa
 
-# group measure
-title: Measure
-standard for: stat
+# group other
+title: Other
 colour: #94a3b8
 
 // --- flags ---

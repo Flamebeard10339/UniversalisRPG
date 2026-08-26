@@ -21,7 +21,7 @@ dependencies:
 # stat cooking
 title: Cooking
 base: 60
-group: core.knack
+group: core.skilling
 
 # skill cooking
 title: Cooking

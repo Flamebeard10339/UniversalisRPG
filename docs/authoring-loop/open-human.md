@@ -160,3 +160,15 @@ the foe meters staying on the home page. Either is a small edit in `App.tsx`; th
 not guess because both readings of "it should exist on lower banner" are defensible and one
 of them draws a number twice.*
 
+## Two stats were put on a tab by judgement rather than by the ruling
+
+The three tabs are Combat, Skilling and Other, and every stat names one. Two calls were
+not the ruling's to make and were made anyway: `regeneration` sits under Combat, because
+it refills the pool a fight empties, and `standard for: stat` sits on Combat, so a stat
+somebody forgot to group lands on the tab the sheet opens on rather than on one a player
+may never turn to. The other reading of that second one is that "everything related not
+fighting" is the complement and so the natural home for a stat nothing has classified.
+
+*Moves when: he opens the character sheet and either says nothing, or names the tab either
+one should sit on — one `group:` line and one `standard for:` line in `content/core.dsl`.*
+

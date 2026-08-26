@@ -197,24 +197,6 @@ channel and group on the fill. That reasoning is overruled; take the ruling.
 *Closes when:* the journal draws the title in the standing's colour and no row fill, and
 whatever pure decision sits beside the component says which colour a standing takes.
 
-### Three stat tabs
-
-Ruled, verbatim: *"Three tabs. Combat: Everything related to fighting. Skilling:
-Everything related not fighting. Other: Rage (Reason is that a player may not use rage at
-all, it should not clutter their sheet)"*
-
-A stat's tab is its own `# group`, so this is one `group:` line per stat in
-`content/core.dsl` and `content/combat-expansion.dsl`, plus renaming the three groups.
-Exactly one `# group` must stand `standard for: stat`, and that is Combat.
-
-Membership follows the ruling's own rule rather than a list: fighting stats to Combat,
-the rage triple (Max Rage, Rage Drain, and anything else reading rage) to Other,
-everything else to Skilling.
-
-*Closes when:* the three groups exist with those names, every stat names one, and the
-claim that proves it derives its subjects from the stat list rather than enumerating
-them.
-
 ### Dialogue types, and a line waits to be acknowledged
 
 Ruled: *"Typewriter is better. As in, one character at a time and a rate of 20 characters
