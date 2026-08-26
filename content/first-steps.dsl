@@ -149,7 +149,7 @@ stage apologised:
     ask: About squaring it with you.
     again: The net's yours already. One shrimp out of the pond and we're square.
     give: fishing.small-fishing-net
-    Take the net - there's a pond out the back, and shrimp in it. Bring me one and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
+    Take the net - there's a pond out the back, and shrimp in it. Bring me one and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one shrimp netted out of the pond behind the house instead, a plain item check
   first-steps.miki says:
     when: has fishing.raw-shrimp
     ask: I netted you your shrimp.
