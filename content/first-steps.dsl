@@ -564,7 +564,8 @@ assert: first-steps.rats-killed = 1
 {"version":13,"flags":{"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true}}
 
 // Standing at the oven with something to roast. Nothing in the world grants a
-// raw chestnut, so this save is the only way the continuous cadence is reached.
+// raw chestnut, so this save is the only way cooking's chestnut recipe is
+// reached at all.
 # save chestnuts-in-hand
 {"version":13,"inventory":{"core.raw-chestnut":3}}
 
@@ -674,15 +675,6 @@ look in again:
 # entity oven
 examine: A stone oven, its coals still glowing. The top of it is flat and takes a pan, which is the whole difference between an oven and a kitchen.
 stations: oven, stove
-roast chestnuts:
-  continuous
-  requires: has raw-chestnut
-  rate: cooking-rate
-  take: 1 raw-chestnut
-  give: 1 roasted-chestnut
-  xp: cooking 40-80
-  on success:
-    say: Another chestnut pops from the embers, roasted through.
 
 // A flight of stairs is a leg of the journey and is paid for like one, at the
 // same three seconds the road out of the house costs.
