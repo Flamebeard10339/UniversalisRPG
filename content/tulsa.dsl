@@ -4,13 +4,11 @@
 //
 // This module is the town STANDING: its places, the roads between them, the
 // people who live there and what they sell, and the things that are already
-// hostile. It holds no quest. Every quest named in the notes gets a module of
-// its own that gives these entities more to say — take those modules away and
-// Tulsa still loads, and everyone here still has a word for a traveller.
-//
-// Miki's guide house and the rooms under and over it are here too, and the game
-// begins in them. They are the region's, not the engine's: what core keeps is
-// the furniture every region would want.
+// hostile. It holds no quest, and the game does not begin here — a quest module
+// above it is what marks a # location starting. Every quest named in the notes
+// gets a module of its own that gives these entities more to say — take those
+// modules away and Tulsa still loads, and everyone here still has a word for a
+// traveller.
 //
 // It depends on core for that furniture: the stat bases, the health pool, the
 // death event, the factions, the player, and melee-combat.
@@ -30,9 +28,7 @@ dependencies:
 // --- flags ---
 //
 // World state no single prop owns. A flag that belongs to one door or one
-// person is declared on that door or that person instead — the last two below
-// are set by the mirror and by the rats, but the tutorial quest is what reads
-// them, so neither is that object's private business.
+// person is declared on that door or that person instead.
 
 # flag heard-of-the-back-way
 
@@ -68,12 +64,11 @@ one of:
 //
 // A dense town read as a text adventure. Every road is written from both ends
 // so that a place's own `adjacent:` reads as the whole list of its exits; the
-// engine answers a road from both ends either way. Distances are in the units
-// Miki's house already set: five seconds of walking each.
+// engine answers a road from both ends either way. Distances are uniform: five
+// seconds of walking each.
 
-// However a route leaves the guide house, it lands here — so this is the shared
-// ground every route's test converges on, as well as the square every road in
-// town runs through.
+// The square every road in town runs through, and the ground a player arrives on
+// however they got out of the house the game begins in.
 # location market-square
 x: 3, y: 0
 title: Market Square
@@ -380,12 +375,6 @@ adjacent:
   tunnels
 entities:
   2 border-guard
-
-// --- Miki's guide house, at the edge of town ---
-//
-// Where a new game begins. Three rooms and a front door, and the road from the
-// door runs into the square: however a player gets out of the house, that is
-// where they come out.
 
 // --- the cast ---
 //
@@ -762,11 +751,11 @@ examine: A knot of black spines around something that has not moved in years.
 stats: max-health 2000, defense 0, evasion 0, accuracy 0
 passives: combat-expansion.retribution
 
-// --- who and what stands in the guide house ---
+// --- what stands in no room at all ---
 
-// Not in anyone's guide house any more. It stays because the two recorded
-// growth tests below are the only route to a cluster plane, and a DEBUG
-// section is how the engine keeps one out of a player's hands.
+// It stands in no room, so nobody can reach it. It stays because the two
+// recorded growth tests below are the only route to a cluster plane, and a
+// DEBUG section is how the engine keeps one out of a player's hands.
 # entity smiths-chest
 DEBUG
 flags: emptied
@@ -923,24 +912,24 @@ node at-the-stakes:
 # save in-town
 {"version":13,"location":"tulsa.market-square"}
 
-// What the tutorial puts in a player's hands and nothing takes back off them,
+// What a new arrival walks into town holding and nothing takes back off them,
 // standing in the row that would buy either.
-# save in-town-with-mikis-sword-and-shield
+# save in-town-with-a-sword-and-a-shield
 {"version":13,"location":"tulsa.market-row","inventory":{"core.wooden-shield":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// A pocket of curios out of the tutorial's rats, which is what a new arrival
-// has to trade with and the whole of the town's on-ramp to money. The drawer
-// and the rats between them hand out about this many.
+// A pocket of curios out of a new arrival's first fights, which is what they
+// have to trade with and the whole of the town's on-ramp to money. About this
+// many is what walks in.
 # save in-town-with-bent-coins
 {"version":13,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
 // Out of a fight and back in the square with eleven of thirty left, which is
-// about what the three playtest runs walked away from the cellar rats holding.
+// about what the three playtest runs walked into town holding.
 # save hurt-in-town
 {"version":13,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
-// Down the back way with the lockpick from Miki's dresser, which is what
-// anybody who came here for the barred door would be carrying.
+// Down the back way with a lockpick, which is what anybody who came here for
+// the barred door would be carrying.
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
@@ -948,13 +937,13 @@ node at-the-stakes:
 {"version":13,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
-{"version":13,"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true}}
+{"version":13}
 
 # save growing-a-heartwood-blade-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
 
 # save growing-through-the-inventory-screen-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
 
 // --- tests ---
 
@@ -962,8 +951,7 @@ node at-the-stakes:
 // because a road is a fact about two named places and nothing derives it; what
 // it is really proving is that every place has a way in and a way out, and
 // dsl.test.ts makes that claim over the corpus without naming anybody. The road
-// on from the square to Miki's door is the guide house's own, so it is written
-// and walked there.
+// on out of the square is written and walked by the module at the far end of it.
 # test walking-the-town
 load: in-town
 travel: market-row
@@ -995,7 +983,7 @@ assert: castle-solar.discovered
 assert: hive-mouth.discovered
 
 // The economy, end to end and in the smallest amount that closes: a curio the
-// tutorial's rats drop becomes coin, coin becomes a herring, and the herring
+// a new arrival's first fights leave behind becomes coin, coin becomes a herring, and the herring
 // becomes the thing Larry's nose is pointed at.
 # test a-bent-coin-becomes-a-cooked-herring
 load: in-town-with-bent-coins
@@ -1024,7 +1012,7 @@ assert: xp.core.cooking = 3
 // store's own rate leaves of a twenty-four and a twelve, rounded its way both
 // times.
 # test a-sword-and-a-shield-are-goods-at-a-counter
-load: in-town-with-mikis-sword-and-shield
+load: in-town-with-a-sword-and-a-shield
 shop: general-store
 submit-modal: item=sell:1
 submit-modal: count=1
