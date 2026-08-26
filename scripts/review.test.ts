@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { shippedSources } from '../src/content/shipped';
-import { LEDGER, orphanLines, orphansIn, parseLedger, printLedger, sheetFor, sheetLines, through } from './review';
+import { isLeft, LEDGER, markedLines, nextUp, orphanLines, orphansIn, parseArgs, parseLedger, printLedger, sheetFor, sheetLines, STINT, stintLines, stintsLeft, through } from './review';
 
 const town = (...lines: string[]): string => ['# info town', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', ...lines].join('\n');
 
@@ -130,5 +130,82 @@ describe('the sheet a reviewer reads', () => {
     const said = written.sections.flatMap((section) => section.said);
 
     expect(sheetLines(written)[1]).toBe(`  ${said.length} line(s) left to read, of ${said.length} the game says across ${written.sections.length} section(s)`);
+  });
+});
+
+describe('review: a sitting, bounded', () => {
+  const shelf = (...items: string[]) => {
+    const text = town('', ...items.flatMap((id) => [`# item ${id}`, `examine: A ${id}.`, '']));
+    const { registry } = loadUniverseWithDiagnostics([{ name: 'town.dsl', text }]);
+    return { text, registry, sheet: (held?: Map<string, string>) => sheetFor(registry, 'town', 'content/town.dsl', text, held) };
+  };
+
+  it('takes the front of the queue and stops there, however much is behind it', () => {
+    const { sheet } = shelf('rope', 'lamp', 'pan', 'kettle');
+
+    expect(nextUp([sheet()], 2).map(({ section }) => section.id)).toEqual(['shore', 'rope']);
+    expect(stintsLeft([sheet()]).length).toBeGreaterThan(2);
+  });
+
+  it('draws one stint across modules, so a sitting is not cut short by a module running out', () => {
+    const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
+    const sheets = parsed.map((module) => sheetFor(registry, module.info.id, `content/${module.source.name}`, module.source.text));
+
+    expect(new Set(nextUp(sheets, 400).map(({ sheet }) => sheet.module)).size).toBeGreaterThan(1);
+  });
+
+  it('offers no section whose every line has been read, so a stint is always work', () => {
+    const { sheet } = shelf('rope', 'lamp');
+    const first = nextUp([sheet()], 1);
+    const held = new Map(first.flatMap(({ section }) => section.said).map((said) => [said.key, said.hash]));
+
+    expect(nextUp([sheet(held)], 1).map(({ section }) => section.id)).not.toEqual(first.map(({ section }) => section.id));
+    expect(stintsLeft([sheet(held)]).every(({ section }) => section.said.some(isLeft))).toBe(true);
+  });
+
+  // The batch a reviewer is shown and the batch a mark signs off are the same question asked twice, never a list carried between the two runs.
+  it('signs off the batch it printed, worked out again rather than typed back in', () => {
+    const { sheet } = shelf('rope', 'lamp', 'pan');
+    const shown = nextUp([sheet()], 2);
+    const held = new Map<string, string>();
+    for (const { section } of nextUp([sheet()], 2)) for (const said of section.said) held.set(said.key, said.hash);
+
+    expect(shown.map(({ section }) => section.id)).toEqual(['shore', 'rope']);
+    expect(shown.flatMap(({ section }) => section.said).every((said) => held.get(said.key) === said.hash)).toBe(true);
+    expect(nextUp([sheet(held)], 2).map(({ section }) => section.id)).toEqual(['lamp', 'pan']);
+  });
+
+  it('says how many are left behind the stint, and how to sign it off', () => {
+    const { sheet } = shelf('rope', 'lamp', 'pan');
+    const waiting = stintsLeft([sheet()]);
+    const printed = stintLines(nextUp([sheet()], 2), waiting.length, 2).join('\n');
+
+    expect(printed).toContain(`2 section(s) to read now, of ${waiting.length} still waiting`);
+    expect(printed).toContain('--read-next 2');
+    expect(stintLines(nextUp([sheet()], 2), waiting.length, STINT).join('\n')).toContain('--read-next\n');
+  });
+
+  it('names every section a mark covered, so nothing is signed off out of sight', () => {
+    const { sheet } = shelf('rope', 'lamp');
+    const taken = nextUp([sheet()], 2);
+
+    expect(markedLines(taken, 3, 1).join('\n')).toContain('# item rope');
+    expect(markedLines(taken, 3, 1).join('\n')).toContain('1 section(s) still waiting.');
+  });
+
+  it('takes the sitting as the size of a stint nobody sized, from one place', () => {
+    expect(parseArgs([])).toMatchObject({ size: STINT, readNext: false, sheet: false });
+    expect(parseArgs(['--next', '5'])).toMatchObject({ size: 5, readNext: false });
+    expect(parseArgs(['--read-next'])).toMatchObject({ size: STINT, readNext: true });
+    expect(parseArgs(['--read-next', '5'])).toMatchObject({ size: 5, readNext: true });
+    expect(parseArgs(['tulsa'])).toMatchObject({ modules: ['tulsa'], size: STINT });
+  });
+
+  it('refuses a mark that says the batch two ways, and a stint of nothing', () => {
+    expect(() => parseArgs(['--read-next', '--read', 'miki'])).toThrow(/one/);
+    expect(() => parseArgs(['--read-next', '--read-through', 'miki'])).toThrow(/one/);
+    expect(() => parseArgs(['--read-next', '--sheet'])).toThrow(/one/);
+    expect(() => parseArgs(['--next'])).toThrow(/how many/);
+    expect(() => parseArgs(['--next', '0'])).toThrow(/nothing to read/);
   });
 });
