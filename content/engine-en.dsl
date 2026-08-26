@@ -95,6 +95,8 @@ engine.said.elided: … {dropped} more lines
 engine.stat.base: Base
 engine.shop.label: Trade with {entity}
 engine.shop.counter: The counter — you are carrying {held} {coin}
+engine.shop.side.buy: Buy
+engine.shop.side.sell: Sell
 engine.shop.buy: Buy {item} — {price} each, {count} in stock
 engine.shop.sell: Sell {item} — {price} each, you carry {count}
 engine.shop.count.buy: How many {item} will you buy?
@@ -255,6 +257,7 @@ engine.repl.modal: [{modal}] {options}
 engine.repl.modal.answered: [{modal}] (answered)
 engine.repl.modal.asking: {option}:
 engine.repl.modal.free: submit-modal: {option}=<text>
+engine.repl.modal.leaving: submit-modal: {option}={leaving} to step back
 engine.repl.journal.none: You have taken nothing on yet.
 engine.repl.journal.struck: (done) {said}
 engine.repl.journal.unknown: no quest is called {quest}

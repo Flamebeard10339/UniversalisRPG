@@ -1,6 +1,7 @@
 import { type EncounterFoe } from '../../src/runtime/encounter';
 import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
+import { partsOf, type NumberedChoice } from '../../src/runtime/modalOption';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
@@ -142,9 +143,29 @@ function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
   const asking = askedOption(v.modals);
   if (!asking) return lines;
   lines.push(say(localizer.engine('engine.repl.modal.asking', { option: asking.label })));
-  if (asking.values) asking.values.forEach((choice, index) => lines.push(say(localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.shown }), 2)));
-  else lines.push(note(localizer.engine('engine.repl.modal.free', { option: localizer.identifier(asking.key) }), 2));
+  lines.push(...formatChosen(asking, localizer));
+
+  // A screen that offers no list offers no way out among one either, so the word it leaves by is
+  // written out the way anything typed at this terminal is. Asked of the option rather than of the
+  // screen's name, so any screen that grows a typed question with a way out is drawn with one.
+  const leaving = v.modals[v.modals.length - 1]?.leaving;
+  if (asking.values === null && leaving) {
+    lines.push(note(localizer.engine('engine.repl.modal.leaving', { option: localizer.identifier(asking.key), leaving: localizer.identifier(leaving) }), 2));
+  }
   return lines;
+}
+
+// The choices under the sides they stand in, where the option names sides, and one flat list where it
+// names none — the same shape the app draws as tabs. The number beside a choice is where it came out
+// of the engine, so grouping them for a reader never renumbers what a player types.
+function formatChosen(asking: PlayView['modals'][number]['options'][number], localizer: Localizer): ReplLine[] {
+  if (!asking.values) return [note(localizer.engine('engine.repl.modal.free', { option: localizer.identifier(asking.key) }), 2)];
+  const { parts, loose } = partsOf(asking);
+  const numbered = (each: NumberedChoice, indent: number): PlayerLine => say(localizer.engine('engine.repl.choice', { index: each.at + 1, choice: each.choice.shown }), indent);
+  return [
+    ...parts.flatMap((part) => [say(part.heading, 2), ...part.choices.map((each) => numbered(each, 4))]),
+    ...loose.map((each) => numbered(each, 2)),
+  ];
 }
 
 export function formatView(v: PlayView, localizer: Localizer, reread = false): ReplLine[] {

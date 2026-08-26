@@ -78,6 +78,7 @@ const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/effects.ts#Segment', why: 'why what is under way is over, carried from the result that said so to the `endAction` that writes it onto the state' },
   { type: 'src/runtime/runtime.ts#WaitedOut', why: 'why a span the engine ran unattended could not finish, said to the player in the log and answered to whoever issued the directive' },
   { type: 'src/runtime/waysOut.ts#WayOut', why: 'one published choice read as the way to a place: the words on it are that choice’s own, on their way from the list a view publishes to the map that draws them' },
+  { type: 'src/runtime/modalOption.ts#ChoicePart', why: 'the published cells of one option gathered under the side they name, on their way from the `ModalChoice` list a view publishes to the tabs and headings a surface draws it as' },
 ];
 
 const RUNTIME = 'src/runtime';
