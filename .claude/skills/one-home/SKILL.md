@@ -1,6 +1,6 @@
 ---
 name: one-home
-description: Use before implementing any change to behavior in this repo — a new feature, field, kind, panel, command, or a fix that adds a branch. Names where the fact being added lives and halts the work if it would live in two places. Also use when the user mentions duplication, inference, second authorities, or things kept manually in sync. Skip for content authoring under content/, renames, formatting, and test-only edits.
+description: Use before implementing any change to behavior in this repo — a new feature, field, kind, panel, command, or a fix that adds a branch, and before authoring a mechanic under content/ (an action, an entity that fights or is robbed, an item a quest hands over). Names where the fact being added lives and halts the work if it would live in two places. Also use when the user mentions duplication, inference, second authorities, or things kept manually in sync. Skip for renames, formatting, prose rewrites that change no mechanic, and test-only edits.
 ---
 
 # One home
@@ -74,8 +74,33 @@ re-litigating and without repeating the report:
 If the user reaffirms the original request in their own words, that is their
 decision. Treat it as "as asked" and build it.
 
+## Content is not exempt
+
+The corpus is code. A mechanic written out once per subject, a body naming the
+things it applies to, a module declaring a private copy of something the world
+already has — those are shapes 5, 2 and 3, and all three shipped in `content/`
+while this section read *"does not apply"*.
+
+They are cheap to spot and the shapes above are stated in engine vocabulary, so
+here they are in the corpus's own:
+
+- **One mechanic is one `# action`, and every subject `uses:` it**, declaring
+  only what is its own. `# action melee-combat` in `content/core.dsl` is six
+  lines and every foe in the game hangs off it. Fishing wrote four near-identical
+  casts and thieving wrote three near-identical pockets before anyone noticed.
+- **A body may not enumerate its subjects.** `on line-parted:` took one of each
+  of six pieces of tackle, by name. A seventh net breaks nothing and works
+  never.
+- **A quest names the world's thing rather than inventing its own.** `first-steps`
+  declared a second fishing net and a second fish; neither worked anywhere else,
+  and the owner found it by trying to fish with it.
+
+None of the three is caught by the suite: each loads clean, round-trips clean,
+and plays exactly as written. They are found by a human reading, which is the
+most expensive way this repo finds anything.
+
 ## Does not apply
 
-Content authoring under `content/`, renames, comment and formatting edits,
+Renames, comment and formatting edits, prose rewrites that change no mechanic,
 test-only additions, and fixes confined to one file that add no branch.
 Skip the home line entirely for those.
