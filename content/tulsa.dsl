@@ -1479,7 +1479,8 @@ node over-the-barrel:
 {"version":13,"location":"tulsa.market-square"}
 
 // What a new arrival walks into town holding and nothing takes back off them,
-// standing in the row that would buy either.
+// standing in the row that would buy either. The sword is the copy the sendoff
+// handed over, lifted whole out of miki-route-end with the roll it came out with.
 # save in-town-with-a-sword-and-a-shield
 {"version":13,"location":"tulsa.market-row","inventory":{"core.wooden-shield":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
@@ -1680,6 +1681,11 @@ assert: not has core.herring
 // makes these tradable is the `value:` each declares. Twenty-eight is what the
 // store's own rate leaves of a twenty-four and a twelve, rounded its way both
 // times.
+//
+// The two rows of the counter are the two kinds of holding there are: the sword
+// is a grown copy standing in a row of its own and is answered for by its id,
+// and the shield is a stack answered for by its item. One number covers both
+// because a copy fetches what its base is worth and not what its plane holds.
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-a-sword-and-a-shield
 shop: general-store

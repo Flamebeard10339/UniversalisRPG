@@ -18,6 +18,7 @@ import { everySaid, GENERATED_FIELD, localeKey } from './locale';
 import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
+import { isBase } from './sections/item';
 import { canSerialize, roundTripUniverse } from './serialize';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
@@ -507,6 +508,22 @@ describe('the shipped corpus', () => {
     const kept = new Set([...registry.entities.values()].flatMap((entity) => (entity.shop === undefined ? [] : [entity.shop])));
     expect(registry.shops.size).toBeGreaterThan(0);
     expect([...registry.shops.keys()].filter((id) => !kept.has(id))).toEqual([]);
+  });
+
+  // The subjects are every # save the corpus holds and every base it declares, so a save written next month, or an item given an `item-level:` next month, is held to this with no edit here.
+  it("writes no base into a save's inventory, since a base is minted as an instance and never joins a stack", () => {
+    const { registry } = loadUniverseWithDiagnostics(CORPUS);
+    const bases = [...registry.items.values()].filter(isBase);
+    expect(bases.length).toBeGreaterThan(0);
+
+    const stacked = [...registry.saves.entries()].flatMap(([id, save]) => {
+      const inventory = save.diff.inventory;
+      if (typeof inventory !== 'object' || inventory === null || Array.isArray(inventory)) return [];
+      return Object.keys(inventory)
+        .filter((itemId) => bases.some((base) => base.id === itemId))
+        .map((itemId) => `# save ${id} carries ${itemId} under "inventory", which no route through the world reaches: receiveItem mints a base as an instance, so write it under "instances" as a copy with a roll of its own.`);
+    });
+    expect(stacked).toEqual([]);
   });
 
   it('counts every counter in a coin that declares no value of its own, which is what a shop would otherwise sell itself', () => {
