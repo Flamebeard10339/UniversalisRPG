@@ -13,7 +13,7 @@ import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, typ
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
 import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
-import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, sheetOffers, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
@@ -239,11 +239,20 @@ export function renderView(v: PlayView, localizer: Localizer): string {
     if (asking.values) for (const choice of asking.values) parts.push(`  value=${choice.value} :: ${String(choice.shown)}`);
     else parts.push('  value=<free text>');
   } else if (v.choices.length > 0) {
-    parts.push('choices:');
-    // What the choice is offered by, which the terminal draws beside the label through
-    // `engine.repl.choice.owned`. Without it three things standing here that can each be looked at
-    // read as `Look`, `Look`, `Look`, told apart only by an id the model has to parse.
-    for (const choice of v.choices) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
+    // The same cut the app's sheet and the terminal's numbered list take: what is here and what is
+    // one step out. A player reads the rest off /map, and so does this one — a bot shown every
+    // discovered room is not playing the game a person plays, and a town of any size would spend
+    // most of a turn's context listing roads.
+    const sheet = sheetOffers(v);
+    if (sheet.length > 0) {
+      parts.push('choices:');
+      // What the choice is offered by, which the terminal draws beside the label through
+      // `engine.repl.choice.owned`. Without it three things standing here that can each be looked at
+      // read as `Look`, `Look`, `Look`, told apart only by an id the model has to parse.
+      for (const choice of sheet) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
+    }
+    const further = v.choices.length - sheet.length;
+    if (further > 0) parts.push(`further: ${further} place(s) a road reaches from here, under /map`);
   } else {
     parts.push('choices: (nothing offers itself here)');
   }
