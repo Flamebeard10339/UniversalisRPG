@@ -6,6 +6,7 @@ export const MIN_DAMAGE = 'min-damage';
 export const CONTEST_SPREAD = 'contest-spread';
 export const DEFAULT_ACTION_DURATION = 'default-action-duration';
 export const INVENTORY_SLOTS = 'inventory-slots';
+export const ENGAGEMENT_SECONDS = 'engagement-seconds';
 
 const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = {
   [CONTEST_SPREAD]: {
@@ -23,6 +24,10 @@ const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = 
   [INVENTORY_SLOTS]: {
     least: 0,
     why: 'a pack cannot hold fewer things than none, and zero is how a world says it holds any number',
+  },
+  [ENGAGEMENT_SECONDS]: {
+    least: 0,
+    why: 'a thing cannot find you before you got there, and zero is how a world says it pounces',
   },
 };
 

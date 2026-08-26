@@ -324,7 +324,7 @@ describe('firing order within one swing is fixed (c8)', () => {
     armFightAction('swing', 'dummy', registry, state);
 
     resolve(state, registry, secondsToMs(1));
-    expect(state.log).toEqual(['You hit the Dummy for 1.', 'charm', 'ring', 'dummy']);
+    expect(state.log).toEqual(['You are fighting the Dummy.', 'You hit the Dummy for 1.', 'charm', 'ring', 'dummy']);
   });
 
   it('composes two hooks writing one pool', () => {

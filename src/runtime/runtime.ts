@@ -1,6 +1,6 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, outcomeResults, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, leavesHere, outcomeResults, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
 import { ownerRef, parseOwnerRef } from './state';
 import { findActionOwner, travelAction, travelPair } from './actionLookup';
 import {
@@ -40,8 +40,9 @@ import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
-import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER } from './state';
-import { attemptDuration, hitChance, hitDamage, sampleStat, statValue } from './stats';
+import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, templateOf } from './state';
+import { attemptDuration, hitChance, hitDamage, sampleStat, stalledPace, statValue } from './stats';
+import { engagementDelay } from './tuning';
 import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
 import { describeCondition, evaluateCondition, itemMissingFor } from './conditions';
 import { spanStart, spanSummary, type SpanStart } from './span';
@@ -52,7 +53,7 @@ export { endAction, endJourney } from './actionEnd';
 export { RuntimeError } from './error';
 export type { ActiveAction, ActorState, BuffInstance, BuffTable, Cadence, DialogueCursor, GameState, ModalFrame } from './state';
 export { buffsOf, grantBuff, stackCount } from './buffs';
-export { contestSpread, minDamage, travelSeconds } from './tuning';
+export { contestSpread, engagementDelay, minDamage, travelSeconds } from './tuning';
 export { describeCondition, evaluateCondition, renderSegments } from './conditions';
 export { actionVisible, requiresMet } from './actions';
 export { hitChance, hitDamage, sampleStat, statRange, statValue } from './stats';
@@ -169,7 +170,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
             completionsBeforeDrain(action, state, registry, outcome),
           )
         : 1;
-      if (Number.isFinite(completions)) {
+      if (Number.isFinite(completions) && !stalledPace(attemptMs)) {
         const runway = inFlight + Math.max(0, completions - 1) * attemptsToResolve * attemptMs;
         const capInstant = state.time + Math.max(0, runway);
         if (capInstant < boundary.at) boundary = { at: capInstant, source };
@@ -196,6 +197,8 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
   const { attemptMs, milliHealthPerHit, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+
+  if (stalledPace(attemptMs)) return;
 
   if (active.repeating && attemptMs <= 0) {
     throw new RuntimeError(`repeating action ${active.ownerRef}.${active.actionSlug} resolved a non-positive duration (${attemptMs}) — give it a positive time: or a rate: that reads positive`);
@@ -295,6 +298,23 @@ function standsAgain(state: GameState, registry: Registry, action: Action, targe
   return !location || isStanding(state, registry, location, targetId);
 }
 
+// Nothing comes at the player for a beat. Arriving somewhere and felling something both say it, and
+// both an aggressive thing opening a fight and a repeating one looking for its next foe read it, so
+// the pause before a fight is one number in one place rather than one per way of starting one.
+function quietFor(state: GameState, registry: Registry): void {
+  state.engagesAt = Math.max(state.engagesAt, state.time + engagementDelay(registry));
+}
+
+// A fight the player has nobody to swing at: whoever they were fighting fell, and the action repeats,
+// so the next one has to be found before anything else can happen. Whoever else is in the fight goes
+// on fighting while that happens — a search is the player looking round, not the world holding still.
+function searchingForAFoe(state: GameState, action: Action): boolean {
+  const active = state.activeAction!;
+  if (!action.depletes || !active.repeating) return false;
+  const target = active.roster?.[PLAYER]?.target;
+  return target !== undefined && active.actors?.[target] === undefined;
+}
+
 function resolveStochasticSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
   const active = state.activeAction!;
@@ -305,14 +325,26 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       return;
     }
 
-    const roster = participants(state, registry);
+    const searching = searchingForAFoe(state, action);
+    const looking = searching ? active.roster![PLAYER]!.target : undefined;
+    if (looking !== undefined && !standsAgain(state, registry, action, looking)) {
+      grantActionFoodBuff(state, registry);
+      endAction(state, outcomeReached(state, registry, 'completion'));
+      advanceTime(state, Math.max(0, segEnd - state.time));
+      return;
+    }
+
+    const paced = participants(state, registry)
+      .filter((participant) => !(searching && participant.self === PLAYER))
+      .map((participant) => ({ participant, duration: attemptDuration(participant.action, state, registry, participant.self, participant.other) }));
+
     let next: Participant | undefined;
     let nextAt = Infinity;
-    for (const participant of roster) {
-      const duration = attemptDuration(participant.action, state, registry, participant.self, participant.other);
+    for (const { participant, duration } of paced) {
       if (duration <= 0) {
         throw new RuntimeError(`action ${active.ownerRef}.${participant.action.label} resolved a non-positive attempt duration (${duration}) — give it a positive time: or a rate: that reads positive`);
       }
+      if (stalledPace(duration)) continue;
       const at = state.time + Math.max(0, duration - participant.cadence.progress);
       if (at < nextAt) {
         next = participant;
@@ -320,21 +352,39 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
     }
 
-    if (roster.length === 0) {
+    // Whoever has been slowed to a standstill is counted no time at all: their bar holds where it
+    // stood and picks up again when whatever stopped them wears off.
+    const ticking = paced.filter((each) => !stalledPace(each.duration)).map((each) => each.participant);
+
+    if (paced.length === 0 && !searching) {
       endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
       advanceTime(state, segEnd - state.time);
       return;
     }
 
+    // Finding the next one is an event on the clock like a swing, and the first of the two to come
+    // round is what the segment steps to.
+    const foundAt = looking === undefined ? Infinity : Math.max(state.time, state.engagesAt);
+    if (foundAt <= segEnd && foundAt <= nextAt) {
+      const elapsed = foundAt - state.time;
+      for (const participant of ticking) participant.cadence.progress += elapsed;
+      advanceTime(state, elapsed);
+      clearActorDeltas(segment.deltas, looking!);
+      enterEncounter(active, looking!, state, registry, PLAYER);
+      playerCadence(active).attemptsMade = 0;
+      playerCadence(active).progress = 0;
+      continue;
+    }
+
     if (!next || nextAt > segEnd) {
       const elapsed = segEnd - state.time;
-      for (const participant of roster) participant.cadence.progress += elapsed;
+      for (const participant of ticking) participant.cadence.progress += elapsed;
       advanceTime(state, elapsed);
       return;
     }
 
     const elapsed = nextAt - state.time;
-    for (const participant of roster) participant.cadence.progress += elapsed;
+    for (const participant of ticking) participant.cadence.progress += elapsed;
     advanceTime(state, elapsed);
 
     const outcome = resolveAttempt(next, segment);
@@ -346,6 +396,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       downOne(state, registry, state.location, actorId);
       leaveFight(active, actorId);
       clearBuffs(state, [actorId]);
+      quietFor(state, registry);
     }
 
     const armedTarget = active.roster?.[PLAYER]?.target;
@@ -360,9 +411,11 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         return;
       }
       if (active.repeating && standsAgain(state, registry, action, armedTarget ?? next.other)) {
+        // A foe that fell is not replaced where it stood. The loop is searching from here on, and
+        // what stands up again does so when the room has been quiet for the beat it takes to find it.
         if (action.depletes) {
           clearActorDeltas(segment.deltas, armedTarget ?? next.other);
-          enterEncounter(active, armedTarget ?? next.other, state, registry, PLAYER);
+          if (active.actors?.[armedTarget ?? next.other] !== undefined) enterEncounter(active, armedTarget ?? next.other, state, registry, PLAYER);
         } else active.implicitTarget = IMPLICIT_TARGET_FULL;
         playerCadence(active).attemptsMade = 0;
       } else {
@@ -447,19 +500,36 @@ function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   return !isStanding(state, registry, location, target);
 }
 
-function openAggression(state: GameState, registry: Registry): void {
-  if (state.activeAction) return;
+// Who is standing here that will not let the player get on with anything else, once the room is
+// quiet no longer: something aggressive that opposes them, that can swing at them and that they can
+// swing back at. Opening the fight and knowing one is coming are the same question asked here, so a
+// loop waiting the world out and the world itself cannot come to differ about whether it is over.
+function aggressorHere(state: GameState, registry: Registry): { entity: string; id: string; action: Action } | undefined {
   const location = registry.locations.get(state.location);
-  if (!location) return;
-  for (const entry of standing(state, registry, location)) {
-    const entity = registry.entities.get(entry.entity);
-    if (!entity?.aggressive || !opposes(registry, entry.entity, PLAYER)) continue;
+  if (!location) return undefined;
+  const met = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
+  const aggressors = standing(state, registry, location).filter((entry) => registry.entities.get(entry.entity)?.aggressive && opposes(registry, entry.entity, PLAYER));
+  if (aggressors.some((entry) => met.has(entry.entity))) return undefined;
+  for (const entry of aggressors) {
     if (!retaliation(state, registry, entry.entity, PLAYER)) continue;
     const answer = retaliation(state, registry, PLAYER, entry.entity);
     if (!answer) continue;
-    armFight(state, registry, answer.id, answer.action, entry.entity);
-    return;
+    return { entity: entry.entity, ...answer };
   }
+  return undefined;
+}
+
+// An aggressive thing takes the fight to the player whatever they were doing, and goes on doing it
+// until they leave — so cancelling one buys the beat the room is quiet for and nothing more.
+function openAggression(state: GameState, registry: Registry): void {
+  if (state.time < state.engagesAt) return;
+  const coming = aggressorHere(state, registry);
+  if (!coming) return;
+  if (state.activeAction) {
+    if (leavesHere(armedAction(state, registry))) return;
+    endAction(state, localizerOf(registry, state).engine('engine.stopped.engaged', { attacker: actorTitle(coming.entity, registry, state) }));
+  }
+  armFight(state, registry, coming.id, coming.action, coming.entity);
 }
 
 function joinAllies(active: ActiveAction, state: GameState, registry: Registry, sideOwner: string, against: string): void {
@@ -521,9 +591,16 @@ const underWayUnit = (state: GameState, registry: Registry): number => {
   return actionFirstUnit(obj, objId, active.actionSlug, registry, state);
 };
 
+// One cycle of whatever is under way, or — where it is standing still and has no cycle to step —
+// as far as the next thing due, which is what could start it moving again.
 function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   const unit = underWayUnit(state, registry);
-  resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
+  if (Number.isFinite(unit)) {
+    resolve(state, registry, state.time + Math.max(1, Math.ceil(unit)));
+    return;
+  }
+  const next = nextBoundary(state, registry, state.time + UNDER_WAY_LIMIT_MS).at;
+  resolve(state, registry, Math.max(state.time + 1, Math.ceil(next)));
 }
 
 // Handing the engine a terminator is asking it to run the world in the player's absence, so the
@@ -545,6 +622,12 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
       return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(terminator)) }));
     }
     if (!state.activeAction && !state.journey) {
+      // A room that has not come at the player yet is not a room that is done with them: the beat
+      // before something engages is part of what they were waiting out.
+      if (state.time < state.engagesAt && aggressorHere(state, registry)) {
+        resolve(state, registry, state.engagesAt);
+        continue;
+      }
       const because = state.endedBecause ?? say.engine('engine.stopped.finished');
       // A terminator that was never reached did not finish, whatever ran out first: the condition is
       // what was asked for, and running out of things to do without it is the asking having failed.
@@ -565,23 +648,50 @@ function grantFoodBuff(item: Item, state: GameState): void {
   applyDeclared(state, PLAYER, item, state.time);
 }
 
+function grantFoodFor(state: GameState, registry: Registry, owner: string, action: Action, repeating: boolean): void {
+  const { obj, objId } = parseOwnerRef(owner);
+  if (obj !== 'item' || repeating) return;
+  const item = registry.items.get(objId);
+  if (!item) return;
+  if (!action.results.some((r) => r.kind === 'take' && r.item === objId)) return;
+  grantFoodBuff(item, state);
+}
+
 function grantActionFoodBuff(state: GameState, registry: Registry): void {
   const active = state.activeAction;
   if (!active) return;
-  const { obj, objId } = parseOwnerRef(active.ownerRef);
-  if (obj !== 'item') return;
-  const item = registry.items.get(objId);
-  if (!item) return;
-  if (active.repeating) return;
-  if (!armedAction(state, registry).results.some((r) => r.kind === 'take' && r.item === objId)) return;
-  grantFoodBuff(item, state);
+  grantFoodFor(state, registry, active.ownerRef, armedAction(state, registry), active.repeating);
 }
 
 export type ArmResult = { armed: true; firstUnit: number } | { armed: false };
 
+// Run the world through the span an action just armed. A span that reads as forever is an action
+// standing still before it ever swung, so no time is spent on it and it waits where it is.
+function resolveFirstUnit(state: GameState, registry: Registry, firstUnit: number): void {
+  resolve(state, registry, state.time + (Number.isFinite(firstUnit) ? Math.ceil(firstUnit) : 0));
+}
+
 function firstUnitSpan(action: Action, state: GameState, registry: Registry): number {
   const duration = attemptDuration(action, state, registry);
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
+}
+
+// A free action is one that costs the player no time — looking at something, eating what they are
+// carrying, anything the world gave no cadence. Nothing that occupies no span can displace something
+// that does, so these run where they stand and leave the fight or the gather under way alone. What is
+// free is read off the action's own pace, so an action that starts or stops declaring one moves side
+// with no list anywhere to follow it.
+const isFree = (action: Action, state: GameState, registry: Registry): boolean => attemptDuration(action, state, registry) <= 0;
+
+// Everything an action does when it completes, done at once and with nothing armed. A `stop` among
+// its results still stops what was under way: the author asked for that in so many words.
+function runFreely(state: GameState, registry: Registry, owner: string, action: Action): void {
+  const segment = newSegment(state, registry);
+  applyResults(segment, outcomeResults(action, 'completion'), PLAYER, 1);
+  fireEvents(segment, PLAYER, 'completed', undefined, 1);
+  settlePools(state, registry, [], 0, segment.deltas);
+  grantFoodFor(state, registry, owner, action, false);
+  if (segment.stopped) endAction(state, segment.stopped);
 }
 
 // Why an action a player was offered turns them away the moment they take it, in the words they
@@ -632,6 +742,11 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     throw new RuntimeError(`continuous action ${obj}.${objId}.${actionId} resolved a non-positive cadence (${duration}ms)`);
   }
 
+  if (state.activeAction && isFree(action, state, registry)) {
+    runFreely(state, registry, ownerRef(obj, objId), action);
+    return { armed: false };
+  }
+
   const active: ActiveAction = {
     ownerRef: ownerRef(obj, objId),
     actionSlug: actionId,
@@ -642,6 +757,38 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   };
   state.activeAction = active;
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
+}
+
+// How far through its cycle what is under way has got, as the fraction a bar draws.
+//
+// The clock an action keeps counts milliseconds inside the attempt in flight, while the cycle a
+// player watches is every attempt it takes to resolve. Dividing one by the other measures two
+// different spans and caps the bar at a fraction of itself the moment an action needs more than one
+// attempt, so the attempts already made are counted in the same span here. A repeat carries its
+// leftover milliseconds into the next attempt, which is why the bar comes back to nearly nothing
+// rather than to exactly nothing.
+export function actionProgress(state: GameState, registry: Registry): number {
+  const active = state.activeAction;
+  if (!active) return 0;
+  const action = armedAction(state, registry);
+  const clock = playerCadence(active);
+  const attemptMs = attemptDuration(action, state, registry);
+  if (stalledPace(attemptMs)) return 0;
+  if (!(attemptMs > 0)) return 1;
+  // A contested action resolves one swing at a time and its cycle is that swing, so the attempts
+  // behind it are a tally of the fight rather than a share of anything being drawn.
+  if (resolvesPerAttempt(action)) return Math.min(1, Math.max(0, clock.progress / attemptMs));
+  const attempts = fightPlan(action, state, registry).attemptsToResolve;
+  if (!(attempts > 0)) return 1;
+  const counted = Math.min(attempts, clock.attemptsMade) * attemptMs + clock.progress;
+  return Math.min(1, Math.max(0, counted / (attempts * attemptMs)));
+}
+
+// Whether what is under way is standing still rather than advancing: something has taken its pace to
+// nothing, and it picks up where it stood when that wears off.
+export function actionStalled(state: GameState, registry: Registry): boolean {
+  if (!state.activeAction) return false;
+  return stalledPace(attemptDuration(armedAction(state, registry), state, registry));
 }
 
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
@@ -673,7 +820,7 @@ export function useFight(actionId: string, targetId: string, registry: Registry,
   }
   const armed = armFightAction(actionId, targetId, registry, state);
   if (!armed.armed) return;
-  resolve(state, registry, state.time + armed.firstUnit);
+  resolveFirstUnit(state, registry, armed.firstUnit);
 }
 
 export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
@@ -684,7 +831,7 @@ export function useAction(obj: string, objId: string, actionId: string, registry
   }
   const armed = armAction(obj, objId, actionId, registry, state);
   if (!armed.armed) return;
-  resolve(state, registry, state.time + armed.firstUnit);
+  resolveFirstUnit(state, registry, armed.firstUnit);
 }
 
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {
@@ -795,5 +942,5 @@ export function craftFirstUnit(recipeId: string, registry: Registry, state: Game
 export function craft(recipeId: string, registry: Registry, state: GameState): void {
   const armed = armCraft(recipeId, registry, state);
   if (!armed.armed) return;
-  resolve(state, registry, state.time + armed.firstUnit);
+  resolveFirstUnit(state, registry, armed.firstUnit);
 }

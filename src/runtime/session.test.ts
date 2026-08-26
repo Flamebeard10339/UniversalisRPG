@@ -15,7 +15,7 @@ import { isMintedAction } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, startSession, submitModal, view, wait } from './session';
+import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, sheetOffers, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
 
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
@@ -1028,6 +1028,7 @@ describe('what the engine withholds', () => {
       log: 'withheld',
       endedBecause: 'withheld',
       carriedTold: 'withheld',
+      engagesAt: 'withheld',
       rng: 'withheld',
       visits: 'withheld',
       buffs: 'withheld',
@@ -1204,7 +1205,7 @@ x: 1, y: 0
     applyDirective(session, { kind: 'load', save: 'midbake' });
 
     const v = view(session);
-    expect(v.action).toEqual({ label: 'Roast', progress: 0, attempts: 0, completion: null });
+    expect(v.action).toEqual({ label: 'Roast', progress: 0, stalled: false, attempts: 0, completion: null });
   });
 });
 
@@ -2108,5 +2109,61 @@ describe('every entity the shipped world places, named by a directive from a roo
       }
     }
     expect(refused).toEqual([]);
+  });
+});
+
+// Three places in a line, walked out and back so the far end is on the map without being next door.
+const A_ROW = `
+# variable travel-seconds
+value: 1
+
+# location near-gate
+x: 0, y: 0
+starting
+title: Near Gate
+adjacent:
+  middle-yard
+
+# location middle-yard
+x: 1, y: 0
+title: Middle Yard
+adjacent:
+  near-gate
+  far-well
+
+# location far-well
+x: 2, y: 0
+title: Far Well
+adjacent:
+  middle-yard
+`;
+
+describe('what a page of offers draws, and what belongs to the map', () => {
+  const backAtTheGate = (): PlaySession => {
+    const session = startSession(loadInEnglish(A_ROW));
+    apply(session, 'travel:middle-yard');
+    apply(session, 'travel:near-gate');
+    return session;
+  };
+
+  const travels = (choices: readonly { id: string }[]): string[] => choices.map((choice) => choice.id).filter((id) => id.startsWith('travel:'));
+
+  it('keeps every place a road reaches answerable, however far off it is', () => {
+    const status = sessionStatus(backAtTheGate());
+
+    expect(travels(status.choices)).toEqual(['travel:middle-yard', 'travel:far-well']);
+    expect(status.choices.find((choice) => choice.id === 'travel:far-well')?.legs).toBe(2);
+  });
+
+  it('offers the page here and the one step out of it, and leaves the rest to the map', () => {
+    const status = sessionStatus(backAtTheGate());
+
+    expect(travels(sheetOffers(status))).toEqual(['travel:middle-yard']);
+  });
+
+  it('carries the answer a filtered offer is still taken by, since counting a shorter list would lose it', () => {
+    const status = sessionStatus(backAtTheGate());
+
+    for (const offer of sheetOffers(status)) expect(status.choices[offer.position - 1]!.id, offer.id).toBe(offer.id);
   });
 });

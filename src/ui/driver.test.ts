@@ -263,7 +263,7 @@ describe('the GUI driver', () => {
     expect(shown(driver).choices.map((choice) => choice.id)).toContain(SPINDLE);
   });
 
-  it('replaces the run under way with the next thing dispatched, keeping the time it spent', () => {
+  it('hands the run under way over to the next thing dispatched, keeping the time it spent', () => {
     const ticker = handTicker();
     const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
@@ -271,21 +271,35 @@ describe('the GUI driver', () => {
 
     driver.choose(position(driver, SPINDLE));
 
-    expect(texts(driver)).toContain('Stopped.');
+    expect(texts(driver), 'beginning something else displaces what was under way rather than calling it off').not.toContain('Stopped.');
     expect(shown(driver).time).toBe(1);
     expect(driver.snapshot().live).toMatchObject({ active: true, progress: 0 });
     expect(ticker.stops).toBe(1);
   });
 
-  it('stops the run under way before a command that is not a choice at all', () => {
+  it('leaves the run under way alone for a line that takes no turn', () => {
     const ticker = handTicker();
     const driver = createDriver(LATHE, { ticker });
     driver.choose(position(driver, SPINDLE));
+    ticker.advance(1_000);
 
     driver.send('/look');
 
-    expect(driver.snapshot().live).toBeNull();
-    expect(texts(driver)).toContain('Stopped.');
+    expect(driver.snapshot().live, 'looking at the room is free, so what was under way is still under way').toMatchObject({ active: true });
+    expect(texts(driver)).not.toContain('Stopped.');
+    expect(shown(driver).action?.label).toBe('Turn A Spindle');
+  });
+
+  it('leaves it alone for opening the pack, which is the same freedom by another door', () => {
+    const ticker = handTicker();
+    const driver = createDriver(LATHE, { ticker });
+    driver.choose(position(driver, SPINDLE));
+    ticker.advance(1_000);
+
+    driver.readStat('nothing-at-all');
+
+    expect(driver.snapshot().live).toMatchObject({ active: true });
+    expect(shown(driver).action?.label).toBe('Turn A Spindle');
   });
 
   it('reaches the state the REPL live path reaches over the same elapsed span', () => {

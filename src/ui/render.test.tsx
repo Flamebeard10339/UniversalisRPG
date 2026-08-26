@@ -7,7 +7,7 @@ import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { leaves } from '../runtime/viewLeaves';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
-import { applyDirective, readRoom, startSession, unreadHere, view, type PlayView } from '../runtime/session';
+import { applyDirective, readRoom, sheetOffers, startSession, unreadHere, view, type PlayView } from '../runtime/session';
 import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
@@ -323,14 +323,15 @@ describe('what the shell puts on the screen', () => {
     expect(driver.playtest.written().split('\n')[0]).toMatch(/^# save run-[a-z0-9-]+-start$/);
   });
 
-  it('draws every choice the engine is offering, or else the cell that is the way to it', () => {
+  it('draws every offer the page is handed, or else the cell that is the way to it', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
-    const choices = driver.snapshot().view.choices;
+    const offers = sheetOffers(driver.snapshot().view);
 
-    expect(offerCells(choices).some((cell) => cell.examine !== null), 'something is reached from the cell it sits on, so a label read off a cell is not a label nothing has').toBe(true);
-    for (const choice of choices) expect(onScreen(runs, choice.label), choice.label).toBe(true);
+    expect(offers.length, 'the page is handed something, so nothing below holds vacuously').toBeGreaterThan(0);
+    expect(offerCells(offers).some((cell) => cell.examine !== null), 'something is reached from the cell it sits on, so a label read off a cell is not a label nothing has').toBe(true);
+    for (const offer of offers) expect(onScreen(runs, offer.label), offer.label).toBe(true);
   });
 
   it('draws the discovered places where they are, with the roads between them', () => {

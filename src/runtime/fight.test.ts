@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armFightAction, createGameState, GameState, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS, WaitedOut } from './runtime';
+import { armAction, armFightAction, armTravel, createGameState, endAction, engagementDelay, GameState, initResources, PLAYER, resolve, resolveUnderWay, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS, useAction, walkTo, WaitedOut } from './runtime';
 import { condition } from '../grammar/condition';
 import { parseWhole } from '../grammar/parser';
 import { hostile, Registry } from '../content/registry';
@@ -555,6 +555,9 @@ describe('an action under way is bounded in the time of the world it runs in', (
 });
 
 const FAINTS = `
+# variable engagement-seconds
+value: 0
+
 # stat attack
 base: 4
 
@@ -651,5 +654,227 @@ describe('a condition terminator that was never reached is a failure', () => {
     const short = until('gave-up');
     expect(short.ended).toBe(false);
     expect(short.reason, 'the reason names the condition that was asked for, not only what ran out').toContain('gave-up');
+  });
+});
+
+// A room with something in it that will not let you be, a pile of stones that takes half a minute to
+// stack, and a way out. The beat is written large so a claim can stand either side of it without
+// naming it: how long it is, is the world's business and is read back off the world below.
+const WASPS = `
+# variable engagement-seconds
+value: 5
+
+# variable travel-seconds
+value: 1
+
+# stat attack
+base: 4
+
+# stat dr
+
+# stat attack-rate
+base: 60
+
+# stat max-health
+base: 200
+
+# stat regeneration
+
+# resource health
+rate: regeneration
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# faction world
+
+# faction player
+
+# action swing
+title: swing
+continuous
+rate: my attack-rate
+damage: my attack vs their dr
+depletes: their health
+
+# item pebble
+
+# entity player
+faction: player
+stats: max-health 200, attack 4, attack-rate 60
+uses: swing
+
+# entity wasp
+faction: world
+stats: max-health 4000, attack 1, attack-rate 60
+uses: swing
+aggressive
+
+# entity cairn
+title: Cairn
+examine: A pile of stones, and one of them is loose.
+stack the stones:
+  time: 30
+  give: 1 pebble
+
+# entity firepit
+title: Firepit
+bank the fire:
+  time: 20
+  give: 1 pebble
+
+# entity midge
+faction: world
+stats: max-health 4, attack 1, attack-rate 60
+uses: swing
+
+# location meadow
+x: 0, y: 0
+starting
+title: Meadow
+adjacent:
+  hollow
+  bank
+
+# location hollow
+x: 1, y: 0
+title: Hollow
+adjacent:
+  meadow
+entities: wasp, cairn, firepit
+
+# location bank
+x: 2, y: 0
+title: Bank
+adjacent:
+  meadow
+entities: 2 midge
+`;
+
+const inTheHollow = (): { registry: Registry; state: GameState } => {
+  const registry = loadInEnglish(WASPS);
+  const state = standing(registry, 'meadow');
+  walkTo('hollow', registry, state);
+  return { registry, state };
+};
+
+const quietUntil = (registry: Registry, state: GameState): number => state.time + engagementDelay(registry);
+
+const stacking = (registry: Registry, state: GameState): void => void armAction('entity', 'cairn', 'stack-the-stones', registry, state);
+
+describe('an aggressive thing holds you until you leave', () => {
+  it('leaves the room quiet for a beat before anything comes at you', () => {
+    const { registry, state } = inTheHollow();
+    const engages = quietUntil(registry, state);
+    expect(engages, 'this world declares a beat, which is what the rest of this claim is about').toBeGreaterThan(state.time);
+
+    stacking(registry, state);
+    resolve(state, registry, engages - 1);
+
+    expect(state.activeAction?.actionSlug, 'nothing engaged inside the beat').toBe('stack-the-stones');
+  });
+
+  it('comes at you once the beat is up, whatever you had started', () => {
+    const { registry, state } = inTheHollow();
+    const engages = quietUntil(registry, state);
+    stacking(registry, state);
+
+    resolve(state, registry, engages);
+
+    expect(state.activeAction?.ownerRef, 'the wasp took over what the player was doing').toBe('action.swing');
+    expect(state.activeAction?.roster?.[PLAYER]?.target).toBe('wasp');
+  });
+
+  it('comes at you again after a cancel, so cancelling buys the beat and nothing more', () => {
+    const { registry, state } = inTheHollow();
+    resolve(state, registry, quietUntil(registry, state));
+    expect(state.activeAction).not.toBeNull();
+
+    endAction(state, localizerOf(registry, state).engine('engine.stopped.called-off'));
+    resolve(state, registry, quietUntil(registry, state) + 1);
+
+    expect(state.activeAction?.roster?.[PLAYER]?.target, 'it is standing where you are and you are not').toBe('wasp');
+  });
+
+  it('does not stop you walking out, which is the one thing that ends it', () => {
+    const { registry, state } = inTheHollow();
+    resolve(state, registry, quietUntil(registry, state));
+    expect(state.activeAction?.ownerRef).toBe('action.swing');
+
+    armTravel('hollow', 'meadow', registry, state);
+    resolve(state, registry, state.time + secondsToMs(30));
+
+    expect(state.location, 'leaving is not something anything standing here can cancel').toBe('meadow');
+  });
+
+  it('is not a quiet room, so waiting the world out waits the beat out first', () => {
+    const { registry, state } = inTheHollow();
+    const engages = quietUntil(registry, state);
+
+    resolveUnderWay(state, registry);
+
+    expect(state.time, 'the sitting ran past the beat rather than calling it done inside it').toBeGreaterThan(engages);
+  });
+});
+
+describe('a free action costs what is under way nothing', () => {
+  it('reads a thing while fighting without disarming the fight', () => {
+    const { registry, state } = inTheHollow();
+    resolve(state, registry, quietUntil(registry, state));
+    const fight = state.activeAction;
+    expect(fight?.ownerRef).toBe('action.swing');
+
+    useAction('entity', 'cairn', 'examine', registry, state);
+
+    expect(state.activeAction, 'the same fight, not a replacement').toBe(fight);
+    expect(state.log.map(String)).toContain('A pile of stones, and one of them is loose.');
+  });
+
+  it('leaves a gather under way alone too, and still says its words', () => {
+    const { registry, state } = inTheHollow();
+    stacking(registry, state);
+
+    useAction('entity', 'cairn', 'examine', registry, state);
+
+    expect(state.activeAction?.actionSlug).toBe('stack-the-stones');
+    expect(state.log.map(String)).toContain('A pile of stones, and one of them is loose.');
+  });
+
+  it('takes over for something that does cost time, because that is a turn and looking is not', () => {
+    const { registry, state } = inTheHollow();
+    stacking(registry, state);
+
+    armAction('entity', 'firepit', 'bank-the-fire', registry, state);
+
+    expect(state.activeAction?.actionSlug, 'one turn at a time is still the rule for anything that takes one').toBe('bank-the-fire');
+  });
+});
+
+describe('the next one is found rather than already standing there', () => {
+  const felling = (): { registry: Registry; state: GameState } => {
+    const registry = loadInEnglish(WASPS);
+    const state = standing(registry, 'bank');
+    armFightAction('swing', 'midge', registry, state);
+    resolve(state, registry, secondsToMs(1));
+    return { registry, state };
+  };
+
+  it('fights nobody in the gap after one falls, without the run being over', () => {
+    const { registry, state } = felling();
+
+    expect(state.populations['bank']?.['midge']?.down, 'one of the two is down').toBe(1);
+    expect(state.activeAction?.actors?.['midge'], 'and nothing has stepped into its place yet').toBeUndefined();
+    expect(state.activeAction, 'while what the player is doing carries on').not.toBeNull();
+    expect(engagementDelay(registry)).toBeGreaterThan(0);
+  });
+
+  it('finds the next one once the gap is up', () => {
+    const { registry, state } = felling();
+
+    resolve(state, registry, state.time + engagementDelay(registry));
+
+    expect(state.activeAction?.actors?.['midge'], 'the second one was found and the fight went on').toBeDefined();
   });
 });

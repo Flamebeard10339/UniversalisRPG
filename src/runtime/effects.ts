@@ -21,6 +21,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { GameState, PLAYER } from './state';
 import { hitChance, statValue } from './stats';
+import { engagementDelay } from './tuning';
 import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
@@ -179,6 +180,7 @@ export function locationNamed(registry: Registry, location: string): string {
 
 export function relocateTo(state: GameState, registry: Registry, location: string): void {
   state.location = locationNamed(registry, location);
+  state.engagesAt = state.time + engagementDelay(registry);
   standWhereTheyAre(state, registry);
 }
 
