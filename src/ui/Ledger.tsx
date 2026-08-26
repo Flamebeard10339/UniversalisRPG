@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { gripFor, type Carried, type Grip } from './DragSheet';
 import { fillOf } from './lineStyle';
-import { droppedOn, type CellBox } from './packDrag';
+import { letGoOf, type CellBox } from './packDrag';
 import type { Entry } from './sheet';
 import { doll, GRID, NAME, type Layout } from './sheetLayout';
 import type { Point } from './viewport';
@@ -68,7 +68,8 @@ interface Held {
 
 // Picking a cell up off the sheet, carrying it, and putting it down on another. The grip is the one
 // the map and the plane are dragged by, at the page's own scale, so what it reports is already in
-// the pixels the cells were measured in. A press that went nowhere is a tap and opens the thing.
+// the pixels the cells were measured in. What a press turns out to have been is the drop's own
+// question, and both answers to it are answered here.
 function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: string) => void): Held | null {
   const drawn = useRef(new Map<string, HTMLElement>());
   const holding = useRef<{ id: string; from: Point } | null>(null);
@@ -89,9 +90,9 @@ function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: st
         hold: setCarried,
         rest: (report) => {
           setCarried(null);
-          if (!report) return onOpen?.(key);
-          const onto = droppedOn(boxes(), report.id, report.by);
-          if (onto !== null) onSwap(report.id, onto);
+          const asked = letGoOf(boxes(), key, report?.by ?? null);
+          if (asked.kind === 'swap') onSwap(asked.one, asked.other);
+          else onOpen?.(asked.one);
         },
       }),
   };
