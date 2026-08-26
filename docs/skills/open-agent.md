@@ -74,3 +74,20 @@ Not reachable from the shipped corpus today, for the same reason the line above 
 or the driver says plainly that it is shadowing a section other modules also write —
 `driver.ts` already warns about shadowing a shipped section and this is the same warning
 with one more thing to say.
+
+## The tackle a parted line can cost is a list again
+
+`on line-parted:` used to enumerate all six pieces of tackle by name, taking one of each;
+the owner caught it on 2026-08-26 and it is now `# droptable fishing.parted-tackle`,
+sitting under the tackle that declares it rather than in Tulsa. That is a better home and
+a much smaller list — but it is still a list, and a seventh net added next month is still
+a thing somebody has to remember.
+
+The set is derivable: what can part is exactly what grants line to lose. Every item in the
+droptable carries `+n max-line-health`, and no item carrying it is missing from the
+droptable — today.
+
+*Closes when:* a claim in `src/content/dsl.test.ts` derives its own subjects — *every item
+granting `max-line-health` is named by `fishing.parted-tackle`, and nothing else is*. That
+file's claims already pick their subjects off the shipped corpus, so this is one claim
+beside them and no new file. It closes the last hand-kept list in the skill.

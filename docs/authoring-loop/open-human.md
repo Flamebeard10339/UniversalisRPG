@@ -172,3 +172,104 @@ fighting" is the complement and so the natural home for a stat nothing has class
 *Moves when: he opens the character sheet and either says nothing, or names the tab either
 one should sit on — one `group:` line and one `standard for:` line in `content/core.dsl`.*
 
+
+## Whether a fishing spot is a thing you can use up
+
+Your reading of the corpus on 2026-08-26: *"fishing should be just like `# action
+melee-combat`, just for fishing."* The enumeration you caught is fixed — what a parted
+line costs is now a `# droptable` under the tackle that declares it, so a seventh net is
+one line in the file someone is already editing. The four duplicated casts are not, and
+the reason is a decision rather than a defect.
+
+A lane built the shape rather than asserting it could not be built. `src/grammar/action.ts:315`
+refuses a side-naming action that declares no `depletes:`, so `accuracy: my fishing vs
+their depth` is rejected at load. Adding `depletes:` to get past it **loads** — and then a
+measured minute of netting recorded the shoal *felled by the first fish and not coming
+back*, plus `combat.attack: 2` banked per landed cast. That second one is the thing
+`content/fishing.dsl`'s own header exists to refuse, and it cannot be scoped away:
+`damage-dealt` takes no `resource:` and the arity check refuses one.
+
+Both are fixable in content — `respawn after:` for the shoal, and the stray experience is
+about 7% of the benchmark — but fixing them means accepting that a fishing spot is a thing
+that gets used up and that casting trains your arm a little. That is a decision about what
+fishing *is*.
+
+There is a third path and it is the one a lane recommends: relax that grammar line so a
+side-naming action needs no `depletes:` at all, which the runtime already supports
+(`runtime.ts:264` fires target hooks without it). Then the four casts become one action and
+four waters with no shoal felled and no arm trained. It is engine work, not content.
+
+*Moves when: he says whether a water may be depleted, or whether the grammar should stop
+requiring it. The first is a content afternoon and changes what fishing means; the second is
+a small engine change and changes nothing about the game. A lane cannot pick between those.*
+
+## The thieving ladder now runs at one pace
+
+A townsman, a guardsman and a knight were tuned to 30, 20 and 15 attempts a minute so that a
+minute spent on each paid about the same. That is gone: a rate a debuff can reach has to be a
+stat, one stat is one number, and all three now run at 30. The knight is the best mark per
+minute, which is backwards.
+
+This was not a slip — it is the cost of what you asked for. *"It should work like a debuff
+that reduces your thieving rate to 0 for a few seconds"* requires the rate to be something a
+modifier can touch, and `rate: 30` written as a literal is not. The stall works; the ladder
+paid for it.
+
+*Moves when: he says whether the three payouts should be retuned to restore the ladder, or
+whether a per-mark rate is worth a language feature. Retuning is three numbers and no test
+pins them; the feature is a `rate:` that can read a number off the mark, which nothing in the
+grammar offers today.*
+
+## Whether Market Square should read as crowded or as legible
+
+It carries twelve entities and eight roads. That is what "alive" costs at the busiest room in
+the game, and it is the room every road in town runs through by design.
+
+The travel half is capped — the sheet now stops at one step out and the rest is on the map —
+but nothing caps the entity list, and nobody has decided whether it should. A square you can
+read at a glance and a square that feels like a market are not obviously the same screen.
+
+*Moves when: he stands in it and says. If it should be thinned, the lever is which entities
+stand there rather than a number in the engine; if it should not, this is deleted.*
+
+## Whether one step out is the right radius for the sheet
+
+The home page and the terminal now offer what is here plus what is one leg away, and
+everything further is reached through the map. That closed a real complaint — the list was
+being swamped by travel — but the radius itself was a lane's choice, not a ruling, and it was
+made before the grid town existed.
+
+The grid town is the case that matters: crossing Tulsa is now three or four legs through lanes
+whose neighbours are houses, so "one step out" means something different there than it did in
+a loose graph of thirty-four rooms.
+
+*Moves when: he plays the walled town and says whether the sheet feels short or right. It is
+one comparison in `sheetOffers`; a radius of two is the same edit as a radius of one.*
+
+## Whether a stalled bar should empty or hold where it stopped
+
+While a run is stalled — a rate taken to zero by a debuff, which is what being caught
+pickpocketing now does — the published fraction is `0`, so the bar empties rather than
+freezing where it had got to. The lane that built the stall published a `stalled` flag beside
+it so a renderer could draw it stopped, and did not go further.
+
+Holding the drawn number needs a span stored on `Cadence`, which is a real change to the shape
+the runtime keeps per attempt. The lane judged that out of scope rather than guessing at it.
+
+*Moves when: he sees a stall and says whether an emptied bar reads as "you are stopped" or as
+"you lost your progress". If the second, it is a field on `Cadence` and the publisher reading
+it.*
+
+## Miki's lent net can be destroyed, and his line then points at nothing
+
+`on line-parted:` takes the tackle when `line-health` empties. Miki's `again:` line — the one
+a player gets on every talk after the offer — points at the net already in their pack, so a
+player whose net has parted is told to use a thing they no longer hold.
+
+Remote rather than theoretical: the shrimp shoal drains 1 line-health per miss against the 6
+the small net grants, so it takes a run of misses. The window is still an exit, so it is not a
+softlock — it is a line of dialogue that becomes false.
+
+*Moves when: he says whether the tutorial's lent net should be exempt from parting, or whether
+Miki should have something to say to a player who broke it. The first is a condition on one
+droptable; the second is a dialogue node and is the better writing.*

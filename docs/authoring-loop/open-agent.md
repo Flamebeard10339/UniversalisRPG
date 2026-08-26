@@ -83,27 +83,25 @@ Each line below crossed from `open-human.md` carrying what had already been meas
 for it. The ruling is quoted; the measurement under it is what the lane that raised it
 found, and is not re-derived.
 
-### A test may not assert a balance number
+### Nobody has swept the suite for asserts that pin a balance number
 
-Ruled: *"balance should not be hard coded into tests. Balance is going to churn
-massively and continuously over the course of the project. Making any small change in
-balance should not redden the suite. The suite should test that the functionality
-works, not that the numbers make sense."*
+The rule itself is settled and lives in `CLAUDE.md` — a test asserts that a mechanism
+works, never that a number is the number it is today. What is open is that **nobody
+knows how many tests still break the rule**, because it has only ever been applied
+where a lane happened to trip over one.
 
-This is the largest of the rulings and it gates the two under it, because both are
-balance edits that would otherwise redden recorded figures. Two lines that used to
-stand in `open-human.md` were exactly this complaint wearing different clothes: *"every
-recorded combat figure moves again"* when the player's swing width changes, and the rage
-route closing at 19.8 of a 20 pool rather than on the cap. Under the ruling neither is a
-question any more — the assert is wrong, not the number.
+What is known, from lanes that did trip: two in `resolve.test.ts` and `driver.test.ts`
+were rewritten and renamed to say what they now assert; the engagement tests were found
+already clean, each declaring its own `# variable engagement-seconds` and reading it
+back rather than naming the world's; and `scripts/play-cli.test.ts` was found asserting
+a **flat progress bar that was a bug**, which is the shape that makes this worth
+sweeping — a pinned number does not merely churn, it can pin the defect.
 
-*Closes when:* every assertion in the suite that would break on a pure balance edit
-either stops asserting the number or asserts the *shape* instead — that rage rises when
-a blow lands, that it raises attack, that a cap bites, that two swings differ — and the
-`# test` sheets in the corpus that pin damage totals move with them. The sweep is the
-work: `grep` the suite for numeric asserts standing on `attack`, `health`, `damage`,
-`xp`, `rage`, and for `expect only:` sheets holding combat figures. **Report the count
-before editing** — if it is large, this becomes its own commit before the two below land.
+*Closes when:* the suite has been swept once and the count reported. `grep` for numeric
+asserts standing on `attack`, `health`, `damage`, `xp` and `rage`, and for `expect only:`
+sheets holding combat figures. Each one either stops asserting the number or asserts the
+shape instead — that a blow lands, that two swings differ, that a cap bites. **Report the
+count before editing**; if it is large, the sweep is its own commit.
 
 ### The rat, the player and the first fight get their numbers
 
@@ -123,103 +121,6 @@ ruling coherent. Take the numbers as written and do not re-derive them.
 *Closes when:* the declarations say those numbers, the balance sweep above has landed so
 nothing reddens on the figures, and a `npm run probe --test` of the first fight still
 passes on shape.
-
-### A sale may pay for itself when the pack is full
-
-Ruled: *"Yes, it should be possible to sell an item with a full inventory. The coins take
-up the slot that was just emptied by the sale."*
-
-`sellProblem` checks there is room for the coin **before** anything leaves the pack, so a
-player with a full pack and no coin cannot sell — including selling the very thing that
-would free the row. `pack.test.ts:182` pins the current order.
-
-*Closes when:* the coin check happens after the sold item leaves rather than before, the
-pinned test moves with it, and a test covers the exact case ruled on — full pack, no
-coin, sell one thing, coin lands in the row it vacated.
-
-### One function answers what a stat is made of, on every surface
-
-Ruled, and it is a rule about the whole architecture rather than about `/state`: *"This
-is a parity violation. The engine exposes a single function which answers the detailed
-information regarding a stat. As in, it spawns the modal showing the detailed information
-on all the pieces that compose a stat. This is true for all surfaces. The GUI simply
-renders modals differently than the harness. But the two expose the same methods to
-interact with the same information."* And again on the same subject: *"The separate
-surfaces (REPL, GUI, playbot etc) are all rendering systems. They get all information
-through the runtime. This should be enforced. If something spawns a modal, it should
-spawn it everywhere."*
-
-Measured: `amounts` and `madeOf` — the words for what makes a number — live in `src/ui`,
-so `scripts/lib/replLines.ts` draws nothing beside a stat and only the app shows the
-shares. The view-parity harness passes anyway because no driver draws `stats[].from[]`
-during its run; the app draws it only behind a press the harness never makes.
-
-Two things close this and the second is the bigger one. First, those two functions move
-down into runtime and both surfaces read them. Second, **the harness must stop passing
-when a surface is missing a screen the runtime offers** — a modal the runtime can open is
-one every surface must be able to open, and today nothing proves it.
-
-*Closes when:* the stat breakdown is a runtime function both surfaces call, and there is
-a derived claim — one that finds its own subjects, not a list — that every modal the
-runtime can raise is reachable on every surface. Cost noted by the lane that left it:
-`/state` was costed at about 620 tokens over ten playbot turns, and a per-stat breakdown
-inflates that; drawing it behind a command rather than in the status view is the obvious
-answer and is a lane decision.
-
-### An offer under its owner's name does not repeat the name
-
-Ruled: *"No. Talk to Miki should be renamed to Talk."*
-
-A terminal reads `Miki: Talk to Miki` and the app draws it in a cell already headed
-*Miki*. `engine.shop.label` has the same shape — `Sunny: Trade with Sunny` — and **one
-ruling covers both**, because the lane deliberately left them alike.
-
-The cost is known and is part of the work: the English value drops `{entity}`, and
-`unsuppliedParameters` derives the parameters a translation may use **from the English**,
-so no other language could name the entity any more. `locale.test.ts:83` uses that very
-key as its worked example and moves with it.
-
-*Closes when:* both labels read `Talk` and `Trade`, the locale test names a different
-worked example, and whatever `unsuppliedParameters` now says about those two keys is
-what the test asserts.
-
-### A quest's standing is coloured lettering, not a fill
-
-Ruled: *"The title text should be colored, not the background."*
-
-It is built as a fill today — a colour wash with a coloured edge on the row. The words
-beside it are *Not started* / *Under way* / *Done* and the colours are `#e5e7eb`,
-`#fbbf24`, `#34d399`, all in `content/core.dsl`.
-
-The lane drew the fill deliberately, reasoning that colour carries voice on the text
-channel and group on the fill. That reasoning is overruled; take the ruling.
-
-*Closes when:* the journal draws the title in the standing's colour and no row fill, and
-whatever pure decision sits beside the component says which colour a standing takes.
-
-### Dialogue types, and a line waits to be acknowledged
-
-Ruled: *"Typewriter is better. As in, one character at a time and a rate of 20 characters
-per second. That is a guess, but a relatively quick rate is what we want. But we are
-going to go further. Sequential dialogue lines require a continue acknowledgement to show
-up."*
-
-So `src/ui/reveal.ts` changes from a per-line fade to a per-character reveal at **20
-characters per second**, and a second line does not begin until the player acknowledges
-the one before it. The player preference *Paced dialogue* stays; what it switches is now
-the typewriter and the acknowledgement together.
-
-The lane that built the fade chose it over a typewriter because chopping a `Localized`
-mid-character felt wrong and nothing in the engine stops it. That concern is real and is
-part of the work rather than a reason not to: the reveal must cut the **rendered string**,
-not the `Localized`, and the pure decision beside the component is where the cut is
-computed and tested.
-
-*Closes when:* it types at 20 cps, a following line waits on an acknowledgement, the cut
-is tested on a rendered string in a `.ts` beside the component, and the three tunables
-that are no longer meaningful are gone rather than left unread.
-
----
 
 ## From the owner's third playtest, 2026-08-26
 
@@ -253,13 +154,22 @@ and one-in-five for as long as the player keeps trying — and nothing tells the
 which one they are in. The module's header comment states only the first and is
 therefore wrong about the mechanism it introduces.
 
-*Closes when:* the daze either stops re-arming the action at all (the owner asked for
-*"the progress bar should stop"*, which is a different thing from a slowed rate and is
-being built), or its penalty stops multiplying a weight that is contested against a
-fixed number. **Do not fix this by retuning the -90%** — that is a balance number and
-the ruling above forbids a test pinning it; what wants deciding is whether a penalty to
-a contested stat may swing a roll by 4x, which is a mechanism question. The evidence is
-the two arithmetic lines above and they are reproducible from the declarations alone.
+**Half of this is now built and the half that matters is not.** A rate of zero stalls a
+run outright — `attemptDuration` returns `Infinity`, the bar stops rather than crawls,
+and the run resumes on expiry — and `# item dazed` carries `-100% thieving-rate` so
+being caught genuinely stops the hand. That is what the owner asked for on the screen.
+
+But `dazed` **still carries `-90% thieving`** beside it, and `thieving` is still the
+weight contested against the mark's fixed number. So the arithmetic above is unchanged:
+the second attempt is still about one in five where the first was about seven in ten.
+The stall makes the penalty visible; it does not make it smaller.
+
+*Closes when:* the penalty stops multiplying a weight contested against a fixed number,
+or the module says out loud that it has two success rates and which one a player is in.
+**Do not fix this by retuning the -90%** — that is a balance number, and what wants
+deciding is whether a penalty to a contested stat may swing a roll fourfold, which is a
+mechanism question. The evidence is the two arithmetic lines above, reproducible from
+the declarations alone.
 
 ## A bar test passes whether or not a bar moves
 
@@ -280,23 +190,6 @@ the same constant, which is the interesting half; asserting on something only
 `LiveSheet` draws would also do it and is the cheap half. Whichever is taken, make
 the mutation first and watch it fail, because that is the step that was skipped.
 
-## `App.tsx` draws a focus by a hand-written chain
-
-`modalManner.AROUND` keys off `Focus['kind']`, and `replLines.FOCUS_LINES` now does
-too — it is `Record<Focus['kind'], …>`, so a focus grown next month does not compile
-unmentioned on the terminal. `App.tsx`'s per-focus body (`PlaneModal` / `QuestBody`
-/ `StatBody`) is still an `if` chain with no exhaustiveness guard, so a tenth focus
-draws **nothing** in the app and nothing catches it.
-
-Measured while the modal contract was rebuilt on 2026-08-26. It is the same shape
-that lane closed one file over — a screen a surface cannot draw — and the claim
-that now proves screens are *reachable* on every surface does not prove they are
-*drawn*, because App falls through silently rather than raising.
-
-*Closes when:* App's focus body is total over `Focus['kind']` the way the other two
-are, and adding a focus without drawing it fails to compile rather than rendering
-an empty modal.
-
 ## `StatShare` sits above two of its readers
 
 `madeOf` moved down into `src/runtime/statScreen.ts` so both surfaces read one
@@ -309,3 +202,51 @@ today — the type is just not named where it is used.
 *Closes when:* `StatShare` lives beneath both, say `src/runtime/statShare.ts`,
 re-exported from `session.ts` so no published surface changes, and `madeOf` names
 it.
+
+## Nothing refuses two rooms standing in one place
+
+Two `# location`s at the same `x/y/z` load clean, validate clean, and draw stacked on
+the map. `src/content/sections/location.ts:170-188` has no uniqueness check, and
+`spotOf` (`src/ui/discovery.ts:74-76`) is `at.x * PER_UNIT` with nothing behind it.
+
+Not hypothetical: **the shipped corpus had one**. `proving-ground` and `riverside` were
+both at `(5,1)`, drawing on top of each other, and it was found on 2026-08-26 only
+because a lane laying out a grid town wrote its own throwaway collision check to protect
+its own work — nothing in the repo would have said so. Relative placement (`east of X`)
+moves exactly one unit per step and resolves recursively, so a chain of them collides by
+accident easily.
+
+*Closes when:* the load path refuses a collision, naming both rooms. About ten lines over
+`registry.locations`, and it must exempt nothing — a genuine stack of floors already
+differs in `z` and passes on its own. It belongs in `src/content/`, beside the other
+things a location is refused for.
+
+## `north of X` draws X's neighbour below it
+
+`src/content/sections/location.ts:104` maps `north` to `[0, 1, 0]`, and `src/ui/discovery.ts:74-76`
+maps `y` straight to screen-y, where larger is *further down*. So a room written
+`north of market-square` is drawn south of it.
+
+The corpus already disagrees with itself about which convention it is using, which is how
+this survived unnoticed: some rooms are placed by the relative word and some by an explicit
+`y:`, and the two do not agree.
+
+*Closes when:* either the vector flips or the words are renamed, and the corpus is made
+consistent with whichever is chosen. **Check both spellings across `content/` before
+flipping anything** — the change that is one line in `location.ts` is a sweep through every
+explicit `y:` in the corpus, and the map's `CLIMB_NUDGE` for off-plane rooms reads the same
+axis.
+
+## `--record` cannot refuse to print a body from a walk that stopped short
+
+`npm run probe -- content --record <test-id>` prints the run's verdict above the body, so a
+reader can see that a route failed before pasting what it ended on. It cannot do better than
+report: `sessionOver` is unexported from `src/runtime/session.ts`, so `walkTest`'s `walked`
+is unreachable over a bare `createGameState()` — which is what the tool runs on, because
+`startSession` would change every recorded body.
+
+So the guard against pasting a truncated sheet is currently a human reading a line. That is
+thin for a tool whose whole purpose is that sheets stop being hand-maintained.
+
+*Closes when:* `sessionOver` is exported and `--record` compares `walked.length` to
+`testSteps().length`, refusing outright rather than printing a body it knows is short.
