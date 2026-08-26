@@ -311,7 +311,7 @@ examine: A stone kerb worn into scallops by two hundred years of rope, and a buc
 adjacent:
   well-lane
 entities:
-  the-well, 3 civilian
+  the-well, bench, 3 civilian
 
 # location nans-house
 x: 3, y: 3
@@ -394,7 +394,7 @@ adjacent:
   north-road
   rampart
 entities:
-  2 castle-guard, 3 civilian
+  2 castle-guard, bench, 3 civilian
 
 # location rampart
 up of kings-road
@@ -412,7 +412,7 @@ adjacent:
   well-lane
   swamp-mire
 entities:
-  dead-alder, 2 castle-guard
+  dead-alder, bench, 2 castle-guard
 
 # location riverside
 x: 7, y: 3
@@ -423,7 +423,7 @@ adjacent:
   well-lane
   deep-water
 entities:
-  fishing.shrimp-shoal, fishing.anchovy-shoal, 4 civilian
+  fishing.shrimp-shoal, fishing.anchovy-shoal, bench, 4 civilian
 
 # location bee-gate
 x: 9, y: 4
@@ -749,13 +749,15 @@ ask after her wares:
 
 // --- stations and props ---
 
-// The only way back from a bad fight, and it sits in the square every road in
-// town runs through. Sitting is worth ten regeneration for as long as you stay
-// sat, on top of the one core gives everybody, so the bench does not restore a
-// pool of its own and anything else that adds to that stat adds to this too.
+// The only way back from a bad fight, and there is one in the square and one at
+// every gate — a player who has just been beaten is never more than a room from
+// sitting down, which is the whole reason a town is somewhere you come back to.
+// Sitting is worth ten regeneration for as long as you stay sat, on top of the
+// one core gives everybody, so the bench does not restore a pool of its own and
+// anything else that adds to that stat adds to this too.
 # entity bench
 title: Bench
-examine: A bench along the wall under the awnings, worn shiny by people waiting on somebody.
+examine: A bench worn shiny down the middle by people waiting on somebody.
 sit down:
   continuous
   time: 60
@@ -1500,6 +1502,11 @@ node over-the-barrel:
 # save axe-at-the-swamp-edge
 {"version":13,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
+// A netful out of the water at the bottom of Well Lane, which is what somebody
+// walking up that lane is carrying.
+# save a-netful-on-well-lane
+{"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}
+
 # save growing-a-heartwood-blade-start
 {"version":13}
 
@@ -1712,6 +1719,35 @@ talk: kelsa
 choose: I am here about the bees.
 choose: continue
 assert: kelsa.the-third-hive.visits = 1
+
+// A kitchen on a lane is a kitchen. What makes a room somewhere a player can
+// cook is a thing standing in it that opens a station, and nothing about which
+// room that is — so the fire in a stranger's front room answers a recipe exactly
+// as the bar's stove does, and scattering the skill is a word on a location's
+// own line rather than anything the skill has to be told. Both houses are walked
+// to from the same lane, so what this separates is the two kitchens and not the
+// two walks.
+# test the-lanes-are-where-the-cooking-is
+load: a-netful-on-well-lane
+travel: hasks-house
+craft: cooking.cooked-shrimp
+assert: inventory.fishing.raw-shrimp = 3
+travel: nans-house
+craft: cooking.cooked-shrimp
+assert: inventory.fishing.raw-shrimp = 2
+assert: xp.cooking.cooking > 0
+
+// The other half of a kitchen, and the reason Well Lane is the one everybody
+// walks down: water is drawn rather than bought, so the only thing dough costs
+// is flour. Two turns of the windlass rather than one, because a claim on one
+// would also hold in a world where the well handed over its whole day at once.
+# test the-well-is-where-the-water-is
+load: a-netful-on-well-lane
+travel: town-well
+use: entity.the-well.draw-water
+assert: inventory.core.jug-of-water = 1
+use: entity.the-well.draw-water
+assert: inventory.core.jug-of-water = 2
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
 // notes say several people know about, and it puts you in among the rats
