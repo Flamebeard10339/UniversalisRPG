@@ -29,6 +29,7 @@ engine.combat.foe.hit: The {attacker} hits you for {damage}.
 engine.combat.foe.miss: The {attacker} misses you.
 engine.combat.other.hit: The {attacker} hits the {target} for {damage}.
 engine.combat.other.miss: The {attacker} misses the {target}.
+engine.combat.started: You are fighting the {target}.
 engine.combat.felled: The {target} falls.
 engine.examine.beside: {subject} — {examine}
 engine.entity.unexamined: ?
@@ -300,6 +301,7 @@ engine.stopped.unavailable: you could not carry on with it
 engine.stopped.arrived: you got where you were going
 engine.stopped.no-road: the way on was closed
 engine.stopped.called-off: you called it off
+engine.stopped.engaged: the {attacker} came at you
 engine.stopped.bound: the world had already run {hours} hours on your behalf, which is as far as it will run unattended
 engine.stopped.still: what was under way advances by nothing, so waiting it out would never end
 engine.stopped.pack-full: your pack was full and there was nowhere to put what you found
