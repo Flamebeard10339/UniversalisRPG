@@ -278,3 +278,52 @@ fixed number. **Do not fix this by retuning the -90%** — that is a balance num
 the ruling above forbids a test pinning it; what wants deciding is whether a penalty to
 a contested stat may swing a roll by 4x, which is a mechanism question. The evidence is
 the two arithmetic lines above and they are reproducible from the declarations alone.
+
+## A bar test passes whether or not a bar moves
+
+`src/ui/render.test.tsx`'s claim *"moves a bar over exactly one tick of the cadence
+both drivers read"* is vacuous, and it was measured rather than suspected: a lane
+mutated its fixture to an instant `examine`, watched two neighbouring tests go red,
+and that one stayed green.
+
+The cause is a shared constant doing two jobs. `FILL_TRANSITION`
+(`src/ui/transient.ts:27`) is read by `Meter.tsx` as well as `LiveSheet.tsx`, so
+`transition-duration:${LIVE_TICK_MS}ms` is in the markup whether or not a run is
+armed at all. The test finds it either way. This predates the lane that found it —
+nothing recent broke it, it never worked.
+
+*Closes when:* the claim fails on a tree where no run is under way. That probably
+means the bar's transition and a meter's are not the same fact and should not be
+the same constant, which is the interesting half; asserting on something only
+`LiveSheet` draws would also do it and is the cheap half. Whichever is taken, make
+the mutation first and watch it fail, because that is the step that was skipped.
+
+## `App.tsx` draws a focus by a hand-written chain
+
+`modalManner.AROUND` keys off `Focus['kind']`, and `replLines.FOCUS_LINES` now does
+too — it is `Record<Focus['kind'], …>`, so a focus grown next month does not compile
+unmentioned on the terminal. `App.tsx`'s per-focus body (`PlaneModal` / `QuestBody`
+/ `StatBody`) is still an `if` chain with no exhaustiveness guard, so a tenth focus
+draws **nothing** in the app and nothing catches it.
+
+Measured while the modal contract was rebuilt on 2026-08-26. It is the same shape
+that lane closed one file over — a screen a surface cannot draw — and the claim
+that now proves screens are *reachable* on every surface does not prove they are
+*drawn*, because App falls through silently rather than raising.
+
+*Closes when:* App's focus body is total over `Focus['kind']` the way the other two
+are, and adding a focus without drawing it fails to compile rather than rendering
+an empty modal.
+
+## `StatShare` sits above two of its readers
+
+`madeOf` moved down into `src/runtime/statScreen.ts` so both surfaces read one
+implementation, but it takes the share **structurally** rather than naming
+`StatShare`, because importing that type from `session.ts` closes a cycle:
+`session.ts -> runtime.ts` and `statScreen.ts -> session.ts`. `npm run layer-check`
+is what said so. `tsc` still binds them at every call site, so nothing is unsound
+today — the type is just not named where it is used.
+
+*Closes when:* `StatShare` lives beneath both, say `src/runtime/statShare.ts`,
+re-exported from `session.ts` so no published surface changes, and `madeOf` names
+it.
