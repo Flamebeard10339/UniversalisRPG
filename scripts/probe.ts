@@ -3,6 +3,7 @@ import path from 'node:path';
 import { formatVersion } from '../src/grammar/dependency';
 import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { mapOf } from '../src/content/registry';
+import { localId } from '../src/content/locale';
 import { contentSectionMaps } from '../src/content/sections';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
@@ -42,10 +43,12 @@ const usage = [
   '  <source>       a DSL file, a directory of them, or - to read from stdin',
   '  --show         print one registry record as JSON; repeatable',
   '  --record       run one # test and print the state it ends on as the # save section',
-  '                 an expect: sheet is written from, named as runLog names one;',
-  '                 repeatable.',
-  '                 A route whose content changed on purpose is re-recorded with this',
-  '                 and the printed section replaces the one in the file.',
+  '                 its own closing expect: names, so the printed section replaces that',
+  '                 section in the file wholesale; repeatable. This is how a route whose',
+  '                 content changed on purpose gets its sheet back. The run\'s verdict is',
+  '                 printed above the section: a stale sheet fails naming that sheet, and',
+  '                 a failure naming anything else is a route that stopped short — read it',
+  '                 before pasting.',
   '  --test         run one # test and report PASSED/FAILED; repeatable. An id',
   '                 that names no test but stands as a prefix over some — a',
   '                 module id — runs every test under it',
@@ -168,10 +171,24 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
   return { lines, ok };
 }
 
+// The sheet a test closes on, which is the one a re-recording replaces: its own last `expect:`, read
+// off the directive rather than minted again from the test id, so the printed section lands under
+// the name the file already writes. Its own directives and not `testSteps`' — a test that opens with
+// `run:` inherits the sheet that one closes on, and pasting over that would rewrite another route's.
+export function recordedSheetId(registry: Registry, testId: string): string | undefined {
+  let closing: string | undefined;
+  for (const directive of registry.tests.get(testId)?.directives ?? []) {
+    if (directive.kind === 'expect' || directive.kind === 'expect-only') closing = directive.save;
+  }
+  return closing === undefined ? undefined : localId(registry.namespace.ownerOf('save', closing) ?? null, closing);
+}
+
 // A route's end state, written the way a `# save` writes one. `runTest` leaves the state it walked
 // to, so recording a sheet is running the route and serializing what it stopped on — there is no
 // second reading of the world here, which is the whole reason a re-recorded sheet can be trusted.
-// What such a save is called is `runLog`'s, and asked of it rather than spelled again.
+// The verdict is printed beside it because a re-recording is run against a route whose sheet is
+// stale by definition: a failure naming that sheet is the expected one, and a failure naming
+// anything else is a route that stopped short of its end and a body that must not be pasted in.
 function recordTests(registry: Registry, specs: readonly string[]): { lines: string[]; ok: boolean } {
   const lines: string[] = [];
   let ok = true;
@@ -184,14 +201,19 @@ function recordTests(registry: Registry, specs: readonly string[]): { lines: str
     }
     for (const id of named) {
       const state = createGameState();
+      let verdict: string | null;
       try {
-        runTest(id, registry, state);
+        const result = runTest(id, registry, state);
+        verdict = result.passed ? null : (result.failure ?? 'no reason given');
       } catch (error) {
         lines.push(`${id}: threw before it could be recorded — ${error instanceof Error ? error.message : String(error)}`);
         ok = false;
         continue;
       }
-      lines.push(`# save ${endSaveId(id.split('.').pop()!)}`, serializeSave(state, registry), '');
+      const sheet = recordedSheetId(registry, id);
+      lines.push(verdict === null ? `${id}: PASSED, so this sheet says what the one in the file already says` : `${id}: FAILED — ${verdict}`);
+      if (sheet === undefined) lines.push(`${id}: closes on no expect:, so this replaces nothing and is named the way a recorded run names its end`);
+      lines.push(`# save ${sheet ?? endSaveId(id.split('.').pop()!)}`, serializeSave(state, registry), '');
     }
   }
   return { lines, ok };
