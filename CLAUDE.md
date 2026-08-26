@@ -131,8 +131,10 @@ sequence of actions, taken in order, reach the end it names. Nothing else. Not h
 xp it earned, not what the pools stood at, not what the clock or the rng cursor read,
 not what the loot rolled. A balance pass that makes the path *impossible* must fail here
 — that is the whole point of the test — and a balance pass that merely changes the
-numbers along the way must not. Balance is a separate problem and it has not been
-thought about yet; until it has, no `# test` gets to have an opinion about it.
+numbers along the way must not. Balance is answered by running the world —
+`npm run balance`, below — so a `# test` still gets no opinion about it. The reason
+has changed rather than the rule: balance has somewhere better to live than an
+assertion, not nowhere at all.
 
 This is why `expect:` compares only what a path is made of. The state a route ends on is
 filtered before it is compared, in one place, so a sheet **cannot** pin a balance-derived
@@ -170,6 +172,7 @@ Tools, none of which are gates:
 
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
 - `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
+- `npm run balance -- <save> [<action>]` — what an action pays an hour and whether the player lives it, measured by running it from a real save rather than reasoned about from the numbers. A save on its own measures everything reachable from where it stands. Reach for this before changing any stat, drop or rate: it is one run per save per target, so it is called when there is a balance question and deliberately never in the suite
 - `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world, then line by line what may be written where
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written
@@ -177,6 +180,11 @@ Tools, none of which are gates:
 - `npm run review` — the next twenty sections still wanting a read, and `--read-next` signs off the same twenty. `--sheet` is the whole unbounded sheet, under the section that says it, in the order its module writes them; `[-- <module>...]` narrows either. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
 - `npm run probe -- content --record <test-id>` — runs a `# test` and prints the state it ends on as the `# save` body that test closes on, to paste back over the stale one
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice. It writes the break into the working tree and puts the file back afterwards, so never run it in a checkout someone else is working in: a second writer reads the broken file as if it were the code, and an interrupted run can leave it broken on disk
+- `npm run rename-module -- <old id> <new id>` — writes a module id under a new name everywhere it is machine-meaningful: the `# info` heading, every address written whole in a body, every key and value inside a `# save`, the string literals under `src/` and `scripts/`, and the file itself. An id matches whole, so renaming `town` leaves `town-quests` alone, and nothing is written unless the corpus loads afterwards holding exactly the keys the rename should have left
+- `npm run move-sections -- <from id> <to id> <kind>:<id>...` — lifts named sections out of one module into another, carrying the comment above each and landing it among the sections already of its kind, and rewrites every id they carry the same way. Nothing is written unless the registry afterwards differs by exactly the moved ids and nothing else. Both these tools reach into `src/` and `scripts/` by string, which means they also rewrite ids inside synthetic test fixtures that only happened to share a name — read the diff outside `content/` before believing either of them
+- `npm run contribution:consolidate` — writes every section staged in the local-changes module back into the file that declared its id, and empties it. It refuses as a whole rather than in part, so a batch that would load into a different universe is not half-applied; `--dry-run` says what it would place and what it could not
+- `npm run contribution:squash` — prints one module's canonical source with the staged changes folded in, so an edit can be read as the file it would become before anything is written. `--module <id>` picks which, `--out <file>` writes it rather than printing it
+- `npm run contribution:issue` — prints the issue body a contributor's staged changes make. Only `--create` calls `gh issue create`, so nothing leaves the machine until it is asked for
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
 over in one line, stop. Put the pure decisions in a `.ts` beside the component
