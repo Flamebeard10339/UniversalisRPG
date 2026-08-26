@@ -2,12 +2,17 @@ import type { CSSProperties } from 'react';
 import type { MessageTone } from '../runtime/command';
 import type { LogKind } from './transcript';
 
-// Colour carries two meanings on two channels, and they never share one.
+// Colour reaches a player on two channels — the fill behind a thing and the ink it is lettered in —
+// and a surface says one fact on each. Which fact goes on which channel is the surface's own, and
+// what is never done is saying two facts on one channel, or one fact on both.
 //
-// Text colour is voice: whose words these are. Fill is group: what kind of thing something is,
-// which is authored and read off `# group`. Neither channel is ever read for the other's meaning,
-// which is what `lineStyle.test.ts` holds these to — a voice that named a fill or a tone that named
-// a text colour would put two facts on one channel and neither could be read again.
+// In the transcript the ink is the voice: whose words these are. Nothing there is filled, and a tone
+// decorates the voice from the margin rather than taking its colour, which is what `lineStyle.test.ts`
+// holds `VOICE_CLASS`, `TONE_CLASS` and `SHAPE_CLASS` to.
+//
+// A `# group`'s authored colour goes through `fillOf` where the fact is what kind of thing something
+// is — a grid of cells read at a glance — and through `inkOf` where the fact is a standing, on a
+// title that a filled background would turn into a control. The two never carry the same group.
 
 export const VOICE_CLASS: Record<LogKind, string> = {
   said: 'text-text',
@@ -46,3 +51,7 @@ const WASH = '2e';
 
 export const fillOf = (group: { colour: string } | undefined): CSSProperties =>
   group === undefined ? {} : { backgroundColor: `${group.colour}${WASH}`, borderColor: group.colour };
+
+// The same authored colour on the other channel: the lettering itself, at full strength, because
+// what carries it is a title and a title is read rather than glanced at.
+export const inkOf = (group: { colour: string } | undefined): CSSProperties => (group === undefined ? {} : { color: group.colour });
