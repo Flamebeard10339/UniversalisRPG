@@ -68,39 +68,55 @@ one of:
 
 // --- locations ---
 //
-// A dense town read as a text adventure. Every road is written from both ends
-// so that a place's own `adjacent:` reads as the whole list of its exits; the
-// engine answers a road from both ends either way. Distances are uniform: five
-// seconds of walking each.
+// Tulsa is a walled town on a grid. Four roads meet at the market and each of
+// them ends at a gate, which is why the square is where every road in town runs
+// through and why a stranger who wants out has to walk back to it first. Inside
+// the wall are the streets and the houses on them; outside are the fields, the
+// pines, the marsh and the road north.
+//
+// Every road is written from both ends so that a place's own `adjacent:` reads
+// as the whole list of its exits; the engine answers a road from both ends
+// either way. Walking one is a flat three seconds whatever it draws, so the town
+// is laid out to be read rather than to be paced: a lane and its houses are a
+// short walk apart on the map because that is what they look like, not because
+// the engine charges less for it.
+//
+// `x` runs east and `y` runs south, which is how the map draws them. Every place
+// writes both, because a relative `north of` moves one unit and resolves through
+// whatever it names, and two rooms landing on one square load clean and draw
+// stacked.
 
-// The square every road in town runs through, and the ground a player arrives on
-// however they got out of the house the game begins in.
+// --- inside the wall ---
+
+// Where the four gate roads cross. Everything a new arrival can reach is one
+// road from here, which is what a market square is for and why the town crier
+// stands in it.
 # location market-square
-x: 3, y: 0
+x: 7, y: 0
 title: Market Square
-examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it.
+examine: Four roads meet under the awnings, and you can see three of the town's gates from where you are standing. There is a sewer grate set into the cobbles with a boy hunched over it.
 adjacent:
   market-row
   tavern-street
   castle-gate
-  kelsa-farmhouse
-  swamp-edge
   kings-road
+  swamp-edge
   riverside
+  kelsa-farmhouse
 entities:
   mouse, town-crier, sewer-grate, bench, 8 civilian
 
 # location market-row
-east of market-square
+x: 10, y: 0
 title: Market Row
-examine: A lane of stalls end to end: groceries, fishing tackle, and a rack of axes nobody is watching closely enough.
+examine: The east road out of the square, stalls down both sides of it: groceries, fishing tackle, and a rack of axes nobody is watching closely enough.
 adjacent:
   market-square
   forge
-  oolga-house
+  kiln-lane
   market-rooftops
 entities:
-  general-store, fishing-supplies, woodcutters-stall
+  general-store, fishing-supplies, woodcutters-stall, 6 civilian
 flags: axe-taken
 lift an axe off the rack:
   hidden if: axe-taken
@@ -113,9 +129,9 @@ lift an axe off the rack:
 // The roof layer the outline asks for, and the only way onto it is a climb.
 // What it overlooks is a quest's business rather than the town's.
 # location market-rooftops
-x: 4, y: 0, z: 1
+up of market-row
 title: Market Rooftops
-examine: Tile and thatch, and the castle's upper windows across the way.
+examine: Tile and thatch over the stalls, the wall-walk one roof away, and the castle's upper windows across the town.
 adjacent:
   market-row
 watch the castle windows:
@@ -124,8 +140,9 @@ watch the castle windows:
   say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against. It means something to somebody. It does not yet mean anything to you.
 
 # location forge
-east of market-row
-examine: A low stone shop with the fire banked. An anvil stands unused in the middle of the floor.
+x: 12, y: 0
+title: The Forge
+examine: A low stone shop at the end of the row with the fire banked. An anvil stands unused in the middle of the floor.
 adjacent:
   market-row
   proving-ground
@@ -136,47 +153,47 @@ entities:
 // than any expansion's: a walled fixture off the forge that is here whatever
 // else is loaded.
 # location proving-ground
-north of forge
-examine: A walled yard behind the armoury, sand raked flat and stained.
+x: 12, y: -2
+title: Proving Ground
+examine: A walled yard behind the armoury, sand raked flat and stained, with the town wall for one of its four sides.
 adjacent:
   forge
 entities:
   armourers-chest, proving-post, spined-urchin
 
 # location tavern-street
-x: 2, y: 1
+x: 5, y: -2
 title: Tavern Street
-examine: A short street that smells of spilled beer at any hour. Sha Dynasty's is the door with the lantern over it.
+examine: The lane running north-west off the square, and it smells of spilled beer at any hour. Sha Dynasty's is the door with the lantern over it.
 adjacent:
   market-square
   sha-dynastys
   oolga-house
 entities:
-  charlie-the-tramp, 4 civilian
+  charlie-the-tramp, 5 civilian
 
 # location sha-dynastys
-x: 2, y: 2
+x: 3, y: -2
 title: Sha Dynasty's
 examine: The city's bar. Low beams, long tables, and a stove in the corner that has never been cold.
 adjacent:
   tavern-street
 entities:
-  sunny, bar-stove, drunk-patron
+  sunny, bar-stove, drunk-patron, 3 civilian
 
 # location oolga-house
-x: 3, y: 1
+x: 3, y: -4
 title: Oolga's House
-examine: A crooked house wedged between two straighter ones. Bundles of something dry hang from every beam.
+examine: A crooked house wedged between two straighter ones at the top of the lane. Bundles of something dry hang from every beam.
 adjacent:
-  market-row
   tavern-street
   oolga-basement
 entities:
   oolga, oolgas-counter, house-chest
 
 # location oolga-basement
-x: 3, y: 1, z: -1
-title: Oolga's Basement
+down of oolga-house
+title: Oolga's Cellar
 examine: A dirt-floored cellar. Something has been at the sacks in the corner, and part of the far wall has fallen in.
 adjacent:
   oolga-house
@@ -184,10 +201,12 @@ adjacent:
 entities:
   4 feral-rat, broken-wall
 
+// --- the castle, at the top of the town ---
+
 # location castle-gate
-x: 2, y: -1
+x: 7, y: -3
 title: Castle Gate
-examine: The gatehouse of Tulsa's castle. Two guards, bored, and a road running round the back.
+examine: The gatehouse of Tulsa's castle, which is a wall inside a wall. Two guards, bored, and a road running round the back.
 adjacent:
   market-square
   castle-hall
@@ -197,7 +216,7 @@ entities:
   2 castle-guard, 4 guardsman
 
 # location guard-barracks
-x: 1, y: -1
+x: 5, y: -4
 title: Guard Barracks
 examine: Bunks, a weapon rack, and a table with the town's troubles laid out on it in no particular order.
 adjacent:
@@ -206,7 +225,7 @@ entities:
   guard-captain, 4 guardsman
 
 # location castle-yard
-x: 1, y: -2
+x: 9, y: -5
 title: Castle Yard
 examine: Round the back of the castle: barrels, a midden, and a hatch into the sewers with a guard sat on it.
 adjacent:
@@ -216,7 +235,7 @@ entities:
   larry, sewer-hatch, 4 knight
 
 # location castle-hall
-x: 2, y: -2
+x: 7, y: -5
 title: Banquet Hall
 examine: The ground floor of the castle, given over to one long table that seats forty and rarely does.
 adjacent:
@@ -228,16 +247,16 @@ entities:
   4 knight
 
 # location castle-kitchen
-x: 3, y: -2
+x: 5, y: -6
 title: Castle Kitchen
 examine: Copper overhead, a range along one wall, and staff who do not look up.
 adjacent:
   castle-hall
 entities:
-  castle-range, range-drawer
+  castle-range, range-drawer, 3 civilian
 
 # location castle-quarters
-x: 2, y: -2, z: 1
+up of castle-hall
 title: Castle Quarters
 examine: The second floor: bedrooms along one side, and a sewing room at the end with the door open.
 adjacent:
@@ -247,7 +266,7 @@ entities:
   2 house-chest
 
 # location castle-solar
-x: 2, y: -2, z: 2
+up of castle-quarters
 title: The Duke's Solar
 examine: The top floor, and one room of it. The duke keeps his own counsel and most of the good chairs.
 adjacent:
@@ -256,13 +275,273 @@ entities:
   the-duke
 
 # location castle-cellar
-x: 2, y: -2, z: -1
+down of castle-hall
 title: Castle Cellar
 examine: Casks, cold air, and a drain in the floor carrying the noise of running water.
 adjacent:
   castle-hall
 entities:
   treasure-chest
+
+// --- the lanes, and the people who live on them ---
+//
+// Two lanes of ordinary houses, one either side of the town, and they are where
+// Tulsa is actually lived in. Each house is a room with somebody's kitchen in
+// it, somebody in the kitchen, and a door that is not locked, which is the whole
+// of why a thief walks these rather than the square.
+
+# location well-lane
+x: 5, y: 2
+title: Well Lane
+examine: The lane down the west side, running from the marsh gate to the water. There is a well at the turn of it and a queue at the well most of the day.
+adjacent:
+  swamp-edge
+  riverside
+  town-well
+  nans-house
+  hasks-house
+  doss-house
+entities:
+  washing-line, 6 civilian
+
+# location town-well
+x: 5, y: 1
+title: The Well
+examine: A stone kerb worn into scallops by two hundred years of rope, and a bucket somebody left on it.
+adjacent:
+  well-lane
+entities:
+  the-well, 3 civilian
+
+# location nans-house
+x: 3, y: 3
+title: Nan's House
+examine: One room and a loft over it, the fire banked low, and more chairs in it than the room can hold.
+adjacent:
+  well-lane
+entities:
+  nan, nans-hearth, house-chest, 2 civilian
+
+# location hasks-house
+x: 5, y: 4
+title: Hask's House
+examine: A cooper's, and the front room is staves. Somewhere behind the staves a family is having its dinner.
+adjacent:
+  well-lane
+entities:
+  hask, hasks-stove, house-chest, 2 civilian
+
+# location doss-house
+x: 3, y: 1
+title: The Doss House
+examine: Beds by the night, eleven of them in one room, and a fire at the end that everybody cooks on and nobody cleans.
+adjacent:
+  well-lane
+entities:
+  doss-house-fire, 7 civilian
+
+# location kiln-lane
+x: 12, y: 2
+title: Kiln Lane
+examine: The lane down the east side, behind the market row. It is warmer than the rest of the town and it smells of bread and fired clay.
+adjacent:
+  market-row
+  kelsa-farmhouse
+  motts-house
+  bels-house
+  aggies-house
+entities:
+  pie-window, 6 civilian
+
+# location motts-house
+x: 14, y: 1
+title: Mott's House
+examine: A bakehouse with the living done in the back of it. The oven is the size of the room it is in and it has never once been let go out.
+adjacent:
+  kiln-lane
+entities:
+  mott, motts-oven, 2 civilian
+
+# location bels-house
+x: 14, y: 3
+title: Bel's House
+examine: A potter's, and the yard behind it is stacked with things that did not survive the kiln.
+adjacent:
+  kiln-lane
+entities:
+  bel, bels-kiln, house-chest, 2 civilian
+
+# location aggies-house
+x: 12, y: 4
+title: Aggie's House
+examine: Nets over every surface that will take one, and a stove going under a pan that has fish in it whatever hour you arrive.
+adjacent:
+  kiln-lane
+entities:
+  aggie, aggies-stove, 2 civilian
+
+// --- the wall, and the four ways through it ---
+//
+// Each gate is a road out written from the square, so a player standing in the
+// market has all four on the map at once and can see which way the town ends.
+
+# location kings-road
+x: 9, y: -2
+title: The King's Gate
+examine: The north gate, and the biggest of the four: a barrel vault deep enough to be dark in the middle of it, with the portcullis housing overhead and the King's Road running out under the arch.
+adjacent:
+  market-square
+  north-road
+  rampart
+entities:
+  2 castle-guard, 3 civilian
+
+# location rampart
+up of kings-road
+title: The Rampart
+examine: The wall-walk over the King's Gate. From here Tulsa is small and orderly and entirely enclosed, and the country past it is not any of the three.
+adjacent:
+  kings-road
+
+# location swamp-edge
+x: 3, y: 0
+title: The Marsh Gate
+examine: The west gate, and the low one. The coast road runs out of it and the ground on the north side of that road starts drinking within fifty paces. A dead alder leans over the ditch outside the arch.
+adjacent:
+  market-square
+  well-lane
+  swamp-mire
+entities:
+  dead-alder, 2 castle-guard
+
+# location riverside
+x: 7, y: 3
+title: The Water Gate
+examine: The south gate, where the river comes under the wall through a grate too narrow for a boat and wide enough for a boy. Stone stairs go down to the shingle, and the shingle is busy with people who are not fishing.
+adjacent:
+  market-square
+  well-lane
+  deep-water
+entities:
+  fishing.shrimp-shoal, fishing.anchovy-shoal, 4 civilian
+
+# location bee-gate
+x: 9, y: 4
+title: The Bee Gate
+examine: The east gate, and hardly a gate at all: a postern in the corner of Kelsa's yard that the town gave up minding when it gave up minding the bees.
+adjacent:
+  kelsa-farmhouse
+  apiary-field
+  tunnel-mouth
+  pasture
+
+// --- Kelsa's steading, in the east corner of the wall ---
+
+# location kelsa-farmhouse
+x: 9, y: 2
+title: Kelsa's Farmhouse
+examine: A working farmhouse built against the inside of the east wall, with the door wedged open and the yard running back to a postern. Nothing here stings.
+adjacent:
+  market-square
+  kiln-lane
+  bee-gate
+entities:
+  kelsa, george
+
+// --- outside the wall ---
+
+# location apiary-field
+x: 11, y: 6
+title: The Apiary
+examine: Three hives on the far side of the property, and the air between them is not calm.
+adjacent:
+  bee-gate
+  hive-mouth
+entities:
+  5 drone-bee, first-hive, second-hive
+
+# location hive-mouth
+x: 14, y: 6
+title: The Third Hive
+examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee.
+adjacent:
+  apiary-field
+look into the comb:
+  time: 6
+  say: You put your face to the gap. The comb is chewed out to the depth of your arm and the cut edges of it are still wet. Whatever did it is not in there now, and it did not leave the way you came in.
+
+# location pasture
+x: 11, y: 8
+title: The Pasture
+examine: Kelsa's field beyond the hives, cropped short, with a gate at the top of it and cattle who have never once used the gate.
+adjacent:
+  bee-gate
+entities:
+  4 combat.cow, 6 combat.chicken
+
+# location tunnel-mouth
+x: 14, y: 8
+title: Tunnel Mouth
+examine: A hole in the turf at the edge of Kelsa's land, shored with timber by somebody who knew how.
+adjacent:
+  bee-gate
+  tunnels
+
+# location tunnels
+x: 14, y: 10, z: -1
+title: The Tunnels
+examine: A dug passage running away from town, wide enough for two abreast. It has been used.
+adjacent:
+  tunnel-mouth
+  ratkin-border
+entities:
+  6 feral-rat
+
+# location ratkin-border
+x: 17, y: 11
+title: The Ratkin Border
+examine: An outpost of stakes and banked earth, and beyond it a country nobody from Tulsa has walked in.
+adjacent:
+  tunnels
+entities:
+  2 border-guard
+
+# location swamp-mire
+x: 1, y: -3
+title: The Mire
+examine: Standing water to the knee, a quarter-mile off the coast road. Thistle on the hummocks, root under the mud, and broken things half-buried where somebody dumped them.
+adjacent:
+  swamp-edge
+entities:
+  3 swamp-mollusk, 2 bog-lurker, herb-patch, dumped-crates
+
+# location north-road
+x: 11, y: -5
+title: The North Road
+examine: Out of the King's Gate and banked either side, with rocks along the top of the bank that are a very good size for standing behind.
+adjacent:
+  kings-road
+  pinewood
+entities:
+  4 combat.highwayman
+
+# location pinewood
+x: 13, y: -7
+title: The Pinewood
+examine: Black pine and no undergrowth at all, which means you can see a long way and so can everything else.
+adjacent:
+  north-road
+entities:
+  5 combat.wolf
+
+# location deep-water
+x: 7, y: 5
+title: The Deep Water
+examine: Downstream of the wall, past the last of the houses. The bank is undercut here and the water does not look like the same river.
+adjacent:
+  riverside
+entities:
+  fishing.trout-run, fishing.salmon-pool
 
 // --- the sewers ---
 //
@@ -272,7 +551,7 @@ entities:
 // rats are.
 
 # location sewer-entrance
-x: 1, y: -2, z: -1
+x: 9, y: -5, z: -1
 title: Sewer Entrance
 examine: A brick chamber under the hatch, swept clean and lit. Whoever pays the toll gets this much for it.
 adjacent:
@@ -280,7 +559,7 @@ adjacent:
   sewer-junction
 
 # location sewer-junction
-x: 2, y: -1, z: -1
+x: 7, y: -3, z: -1
 title: Sewer Junction
 examine: Four channels meet here under a low vault. Painted signs on the brick point up at the buildings above: MARKET, CASTLE, GATE.
 adjacent:
@@ -291,7 +570,7 @@ entities:
   6 feral-rat, sewer-signs
 
 # location sewer-outfall
-x: 2, y: 0, z: -1
+x: 7, y: 0, z: -1
 title: Sewer Outfall
 examine: The channel widens and slows here, under a grate you can see daylight through. A barred door stands where the water goes.
 adjacent:
@@ -301,151 +580,13 @@ entities:
   2 feral-rat, barred-door, outfall-grate
 
 # location sewer-locked-room
-x: 3, y: 0, z: -1
+x: 10, y: 0, z: -1
 title: The Barred Room
 examine: A dry room behind the water, kept by someone. A table, a shelf, and two things standing on their hind legs.
 adjacent:
   sewer-outfall
 entities:
   2 ratman, key-table, treasure-chest
-
-// --- Kelsa's land, out past the town ---
-
-# location kelsa-farmhouse
-x: 8, y: 3
-title: Kelsa's Farmhouse
-examine: A working farmhouse with the door wedged open. Nothing here stings.
-adjacent:
-  market-square
-  apiary-field
-  tunnel-mouth
-  pasture
-entities:
-  kelsa, george
-
-# location apiary-field
-x: 9, y: 3
-title: The Apiary
-examine: Three hives on the far side of the property, and the air between them is not calm.
-adjacent:
-  kelsa-farmhouse
-  hive-mouth
-entities:
-  5 drone-bee, first-hive, second-hive
-
-# location hive-mouth
-x: 10, y: 3
-title: The Third Hive
-examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee.
-adjacent:
-  apiary-field
-look into the comb:
-  time: 6
-  say: You put your face to the gap. The comb is chewed out to the depth of your arm and the cut edges of it are still wet. Whatever did it is not in there now, and it did not leave the way you came in.
-
-# location tunnel-mouth
-x: 8, y: 4
-title: Tunnel Mouth
-examine: A hole in the turf at the edge of Kelsa's land, shored with timber by somebody who knew how.
-adjacent:
-  kelsa-farmhouse
-  tunnels
-
-# location tunnels
-x: 8, y: 5, z: -1
-title: The Tunnels
-examine: A dug passage running away from town, wide enough for two abreast. It has been used.
-adjacent:
-  tunnel-mouth
-  ratkin-border
-entities:
-  6 feral-rat
-
-// --- the border, and the swamp on the way to it ---
-
-# location swamp-edge
-x: 6, y: -4
-title: Swamp Edge
-examine: Where the road gives up and the ground starts drinking. Everything past here is aggressive.
-adjacent:
-  market-square
-  swamp-mire
-  pinewood
-entities:
-  dead-alder
-
-# location swamp-mire
-x: 7, y: -5
-title: The Mire
-examine: Standing water to the knee. Thistle on the hummocks, root under the mud, and broken things half-buried where somebody dumped them.
-adjacent:
-  swamp-edge
-entities:
-  3 swamp-mollusk, 2 bog-lurker, herb-patch, dumped-crates
-
-# location ratkin-border
-x: 12, y: 6
-title: The Ratkin Border
-examine: An outpost of stakes and banked earth, and beyond it a country nobody from Tulsa has walked in.
-adjacent:
-  tunnels
-entities:
-  2 border-guard
-
-// --- the country the skills opened up ---
-//
-// Five rooms Tulsa did not have before there was anything to train in them. Each is a hunting or a
-// working ground rather than anywhere anybody lives, and what stands in each is what decides what an
-// hour there is worth — the counts and the respawns are what tune the ladder, and they are here
-// because a room is the town's and a sheet is the skill's.
-
-# location pasture
-title: The Pasture
-x: 9, y: 4
-examine: Kelsa's field beyond the hives, cropped short, with a gate at the top of it and cattle who have never once used the gate.
-adjacent:
-  kelsa-farmhouse
-entities:
-  4 combat.cow, 6 combat.chicken
-
-# location pinewood
-title: The Pinewood
-x: 5, y: -6
-examine: Black pine and no undergrowth at all, which means you can see a long way and so can everything else.
-adjacent:
-  swamp-edge
-  kings-road
-entities:
-  5 combat.wolf
-
-# location kings-road
-title: The King's Road
-x: 4, y: -3
-examine: The north road out of Tulsa, banked either side, with rocks along the top of the bank that are a very good size for standing behind.
-adjacent:
-  market-square
-  pinewood
-entities:
-  4 combat.highwayman
-
-# location riverside
-title: Riverside
-x: 5, y: 1
-examine: Where the river runs past the bottom of the market, shallow over gravel and busy with people who are not fishing.
-adjacent:
-  market-square
-  deep-water
-entities:
-  fishing.shrimp-shoal, fishing.anchovy-shoal
-
-# location deep-water
-title: The Deep Water
-x: 6, y: 2
-examine: Upstream of the town, past the last of the houses. The bank is undercut here and the water does not look like the same river.
-adjacent:
-  riverside
-entities:
-  fishing.trout-run, fishing.salmon-pool
 
 // --- the cast ---
 //
@@ -522,6 +663,36 @@ examine: A young man at a cold forge, holding a hammer as though it were somebod
 title: Border Guard
 faction: world
 examine: A soldier of Yanodonin on the last piece of it, and not glad to be.
+
+// The five the lanes belong to. None of them wants anything and none of them is
+// anybody's quest: they are here so that a door on a lane has somebody behind
+// it, and what each says is the one thing they would actually say to a stranger
+// who walked into their kitchen.
+
+# entity mott
+title: Mott
+faction: world
+examine: The baker, forearms like a much larger man's, dusted to the elbow and going grey the same colour.
+
+# entity bel
+title: Bel
+faction: world
+examine: The potter, thumbs flat and splayed, watching the kiln rather than you.
+
+# entity aggie
+title: Aggie
+faction: world
+examine: A fishwife with a knife in one hand and a herring in the other, and she does not put either down to talk to you.
+
+# entity nan
+title: Nan
+faction: world
+examine: Very old and entirely comfortable, in the chair nearest the fire, with the rest of the chairs arranged around her.
+
+# entity hask
+title: Hask
+faction: world
+examine: The cooper, a barrel between his knees, tapping a hoop down the last quarter-inch it has left to go.
 
 // --- the stores ---
 //
@@ -673,6 +844,80 @@ title: Castle Range
 examine: A range the length of the wall, and one cook who will let you use the end of it.
 stations: stove
 
+// Every fire in Tulsa somebody will let you stand at, one to a kitchen. A recipe
+// asks the room for a station and takes the first thing standing in it that has
+// one, so what these say about themselves is the whole of what makes each of
+// them worth walking to rather than the one nearest the square.
+
+# entity motts-oven
+title: Mott's Oven
+examine: Brick, domed, and hot enough at the mouth to be felt from the door. Mott bakes at four and it is yours from noon.
+stations: oven
+
+# entity bels-kiln
+title: The Kiln
+examine: Squat and round and closed, with a stack of split wood beside it. Bel says it is not a bread oven and then does not stop anybody using it as one.
+stations: oven
+
+# entity aggies-stove
+title: Aggie's Stove
+examine: Cast iron, small, and there has been a pan on it for so long that the pan and the stove have gone the same colour.
+stations: stove
+
+# entity nans-hearth
+title: Nan's Hearth
+examine: An open fire with a bar across it and a hook on the bar. It has not been out in the lifetime of anyone in the room.
+stations: stove
+
+# entity hasks-stove
+title: Hask's Stove
+examine: Wedged between the staves, and the family eats off it standing up because there is nowhere in the room to sit.
+stations: stove
+
+# entity doss-house-fire
+title: The Doss House Fire
+examine: A grate at the end of the long room with eleven people's suppers on it and no agreement about whose is whose.
+stations: stove
+
+// The town's water, and the reason the lane it stands on is the one everybody
+// walks down. Free, slow, and it is what makes flour the only thing dough costs.
+# entity the-well
+title: The Well
+examine: Deep enough that the bucket is out of sight before you hear it land.
+draw water:
+  continuous
+  time: 8
+  give: 1 core.jug-of-water
+  on success:
+    say: You wind the bucket up and fill a jug off it.
+
+// Two things a light hand takes off a lane rather than off a person, and each is
+// a one-off: the flag is what its own `hidden if:` reads, so neither is a second
+// helping.
+# entity washing-line
+title: Washing Line
+examine: Somebody's whole week strung across the lane at head height, and it has been there since before it rained.
+flags: taken
+lift a shirt off the line:
+  hidden if: taken
+  time: 5
+  xp: thieving.thieving 8
+  set: taken
+  give: 1 core.bent-coin
+  say: You take a shirt off the line without breaking stride and find a bent coin knotted into the tail of it, which somebody put there on purpose and is going to miss.
+
+# entity pie-window
+title: The Cooling Window
+examine: Mott's back window, propped open on a spoon, with the afternoon's work cooling on the sill in a row.
+flags: taken
+take one off the sill:
+  hidden if: taken
+  time: 4
+  xp: thieving.thieving 10
+  set: taken
+  give: 1 core.bread
+  say: You take the end one and put the gap in the middle of the row, which buys you about a minute.
+
 // The one thing in the castle worth more than what is on the range. Whoever it belonged to is not
 // here and the cook does not say where they went.
 # entity range-drawer
@@ -766,7 +1011,7 @@ on death:
     roll: combat.purse
 pick their pocket:
   continuous
-  rate: 30
+  rate: thieving.thieving-rate
   one of:
     thieving:
       give: 3 coin
@@ -789,7 +1034,7 @@ on death:
     1 in 8: give: 1 combat.bronze-helmet
 pick their pocket:
   continuous
-  rate: 20
+  rate: thieving.thieving-rate
   one of:
     thieving:
       give: 7 coin
@@ -812,7 +1057,7 @@ on death:
     1 in 10: give: 1 combat.iron-helmet
 pick their pocket:
   continuous
-  rate: 15
+  rate: thieving.thieving-rate
   one of:
     thieving:
       give: 12 coin
@@ -987,14 +1232,22 @@ stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evas
 skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, thieving.thieving, smithing.smithing, crafting.crafting
 equipment-slots: mainhand, offhand, head, body, legs, gloves
 uses: core.melee-combat
+// Waking up is the market square once the market square has been stood in, and
+// the house the game begins in before that. `starting` may only be on one
+// location and it stays on the tutorial's, so this branch is the whole of what
+// content can say about where a faint puts you — and a player who has left that
+// island should not be walked back onto it.
 on death:
-  say: You slump to the floor, spent, and come to a long while later back where you started out. (You should have eaten something.)
+  say: You slump to the floor, spent, and come to a long while later somewhere you did not lie down. (You should have eaten something.)
   set: core.fainted
   restore: core.health
   if setting.hardcore:
     say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
     take: everything
-  relocate: starting-location
+  if market-square.touched:
+    relocate: market-square
+  if not market-square.touched:
+    relocate: starting-location
   stop
 // A pool going empty is the player's, so the handler for it is the player's; what an emptied line
 // costs is fishing's, and `fishing.parted-tackle` is where fishing says it. A seventh net is added
@@ -1174,6 +1427,50 @@ node at-the-stakes:
   again: Same as before. We watch. We do not go in.
   Past the stakes is theirs. We watch it. We do not go in.
 
+// The lanes. Each of the five says one thing, and the thing each says is about
+// the town rather than about the player, because a stranger in your kitchen is
+// not news and the price of flour is.
+
+# dialogue mott
+owner = mott
+
+node at-the-oven:
+  always
+  again: Still four in the morning. Still the flour.
+  I am up at four and the oven is up before me. Use it after noon and mind the door, it swings.
+
+# dialogue bel
+owner = bel
+
+node at-the-kiln:
+  always
+  again: Still not a bread oven. Still nobody listening.
+  It is not a bread oven. It gets hotter than a bread oven and it goes cold slower, and no, I am not going to stop you.
+
+# dialogue aggie
+owner = aggie
+
+node over-the-pan:
+  always
+  again: Still off the shingle. Still cheap.
+  Everything in this house came out of the water at the bottom of the lane. It is not good fish. It is very cheap fish.
+
+# dialogue nan
+owner = nan
+
+node by-the-fire:
+  always
+  again: Still the wall. She still would not.
+  I have watched them build that wall twice. The second time they built it in the wrong place and nobody has ever said so out loud.
+
+# dialogue hask
+owner = hask
+
+node over-the-barrel:
+  always
+  again: Still hoops. Still the whole of it.
+  Staves, hoops, and a bottom. That is the whole of it, and it has fed four of us for thirty years.
+
 // --- saves ---
 
 # save in-town
@@ -1265,40 +1562,60 @@ assert: resource.core.health = 31.31
 
 // --- tests ---
 
-// The town is walkable, and every road it holds is walked. The list is long
-// because a road is a fact about two named places and nothing derives it; what
-// it is really proving is that every place has a way in and a way out, and
-// dsl.test.ts makes that claim over the corpus without naming anybody. The road
-// on out of the square is written and walked by the module at the far end of it.
+// The town is walkable end to end, and the shape it is walked in is the claim:
+// out of the square by each of the four gates in turn and back, so a wall with a
+// way through it in every direction is what this fails on if a gate stops being
+// reachable. The corners are what the route ends on — the wall-walk, the top of
+// the castle and the far side of Kelsa's land — because a place three roads deep
+// is the kind that quietly loses its way in. That every place has a way in at all
+// is dsl.test.ts's claim over the corpus, made without naming anybody.
 # test walking-the-town
 load: in-town
 travel: market-row
 travel: forge
 travel: proving-ground
-travel: market-row
 travel: market-rooftops
-travel: market-row
-travel: oolga-house
+travel: kiln-lane
+travel: motts-house
+travel: bels-house
+travel: aggies-house
+travel: kelsa-farmhouse
+travel: bee-gate
+travel: hive-mouth
+travel: pasture
+travel: tunnel-mouth
+travel: market-square
 travel: tavern-street
 travel: sha-dynastys
-travel: tavern-street
+travel: oolga-house
+travel: oolga-basement
 travel: market-square
 travel: castle-gate
 travel: guard-barracks
-travel: castle-gate
 travel: castle-kitchen
 travel: castle-solar
 travel: castle-cellar
 travel: castle-yard
 travel: market-square
-travel: kelsa-farmhouse
-travel: hive-mouth
-travel: tunnel-mouth
+travel: kings-road
+travel: rampart
+travel: north-road
+travel: pinewood
 travel: market-square
 travel: swamp-edge
-assert: market-rooftops.discovered
+travel: swamp-mire
+travel: well-lane
+travel: town-well
+travel: nans-house
+travel: hasks-house
+travel: doss-house
+travel: riverside
+travel: deep-water
+assert: rampart.discovered
 assert: castle-solar.discovered
 assert: hive-mouth.discovered
+assert: doss-house.discovered
+assert: pinewood.discovered
 
 // The economy, end to end and in the smallest amount that closes: a curio the
 // a new arrival's first fights leave behind becomes coin, coin becomes a herring, and the herring
