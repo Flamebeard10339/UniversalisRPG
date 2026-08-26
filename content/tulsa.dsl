@@ -394,7 +394,7 @@ adjacent:
   north-road
   rampart
 entities:
-  2 castle-guard, bench, 3 civilian
+  2 guardsman, bench, 3 civilian
 
 # location rampart
 up of kings-road
@@ -412,7 +412,7 @@ adjacent:
   well-lane
   swamp-mire
 entities:
-  dead-alder, bench, 2 castle-guard
+  dead-alder, bench, 2 guardsman
 
 # location riverside
 x: 7, y: 3
@@ -1291,8 +1291,8 @@ owner = knight
 
 node armoured:
   always
-  again: The helm turns a few degrees and stops.
-  The helm turns. Whatever is inside it looks at you for a while and then looks at the road again.
+  again: Still the wrong end of it. He has not moved.
+  You are stood at the wrong end of me. Everything worth hearing goes past the front of this helm and I am not turning it round for you.
 
 # dialogue mouse
 owner = mouse
