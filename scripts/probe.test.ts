@@ -7,7 +7,7 @@ import { CORPUS_DIR, moduleSource, shippedFiles, shippedSources } from '../src/c
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { parseProbeArgs, probe, sourceFiles, splitDocuments, type ProbeOptions } from './probe';
+import { parseProbeArgs, probe, recordedSheetId, sourceFiles, splitDocuments, type ProbeOptions } from './probe';
 
 const BASE: ModuleSource = {
   name: 'base',
@@ -371,5 +371,52 @@ describe('probe: the command seam', () => {
     const result = run([CORPUS_DIR, '--test', id]);
     expect(result.status).toBe(0);
     expect(result.out).toContain(`${id}: PASSED`);
+  });
+});
+
+describe('probe: --record, the sheet a route is re-recorded into', () => {
+  const REGISTRY = loadUniverseWithDiagnostics(shippedSources()).registry;
+  const closing = [...REGISTRY.tests.keys()].flatMap((id) => {
+    const sheet = recordedSheetId(REGISTRY, id);
+    return sheet === undefined ? [] : [{ id, sheet }];
+  });
+
+  // The subjects are every shipped test that closes on a sheet, so a route written next month is
+  // covered here with no edit. A name minted from the test id passes this only where the two happen
+  // to agree, and in the corpus they do not: `miki-route-full` closes on `miki-route-end`.
+  it('names a section the file already writes, for every route that closes on one', () => {
+    expect(closing.length).toBeGreaterThan(0);
+    const missing = closing.filter(({ id, sheet }) => !REGISTRY.saves.has(`${id.slice(0, id.lastIndexOf('.'))}.${sheet}`));
+    expect(missing).toEqual([]);
+  });
+
+  it('reads the sheet off the route being recorded, not off one it opened by running', () => {
+    const source: ModuleSource = {
+      name: 'm',
+      text: ['# info m', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# save inner-end', '{"version":13}', '', '# save outer-end', '{"version":13}', '', '# test inner', 'expect only: inner-end', '', '# test outer', 'run: inner', 'expect only: outer-end'].join('\n'),
+    };
+    const registry = loadUniverseWithDiagnostics([source]).registry;
+    expect(recordedSheetId(registry, 'm.outer')).toBe('outer-end');
+  });
+
+  it('prints a body that loads back as that sheet and makes the route pass', () => {
+    const body = (save: string): string =>
+      ['# info m', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# location cave', 'x: 1, y: 0', '', `# save walked-end`, save, '', '# test walked', 'travel: cave', 'expect only: walked-end'].join('\n');
+    const stale = report([{ name: 'm', text: body('{"version":13}') }], { show: [], roundTrip: false, record: ['m.walked'] });
+    const printed = stale.lines[stale.lines.indexOf('# save walked-end') + 1];
+
+    const rerun = report([{ name: 'm', text: body(printed) }], { show: [], roundTrip: false, test: ['m.walked'] });
+    expect(rerun.lines.join('\n')).toContain('m.walked: PASSED');
+    expect(rerun.ok).toBe(true);
+  });
+
+  it('says which route failed and why, so a body recorded off a route that stopped short is not pasted in blind', () => {
+    const source: ModuleSource = {
+      name: 'm',
+      text: ['# info m', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# save end', '{"version":13}', '', '# test short', 'assert: has m.rope', 'expect only: end'].join('\n'),
+    };
+    const result = report([source], { show: [], roundTrip: false, record: ['m.short'] });
+    expect(result.lines.join('\n')).toContain('m.short: FAILED');
+    expect(result.lines.join('\n')).not.toContain('save mismatch');
   });
 });

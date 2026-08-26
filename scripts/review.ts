@@ -26,6 +26,9 @@ export type Standing = 'reviewed' | 'changed';
 
 export const LEDGER = 'content/reviewed.tsv';
 
+// What one sitting covers. The default of the sheet and of the mark alike, so a stint printed and a stint signed off cannot come to mean different amounts.
+export const STINT = 20;
+
 export const stamp = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 12);
 
 export const parseLedger = (text: string): Map<string, string> => new Map(text.split(/\r?\n/).flatMap((line) => (line.trim() === '' || line.startsWith('#') ? [] : [line.split('\t') as [string, string]])));
@@ -42,13 +45,23 @@ function standingOf(held: ReadonlyMap<string, string>, key: string, text: string
 }
 
 const usage = [
-  'Usage: npm run review [-- <module>...] [--all] [--read-through <section>] [--read <section>...]',
+  'Usage: npm run review [-- <module>...] [--next <n>] [--read-next [<n>]] [--sheet]',
+  '                      [--all] [--read-through <section>] [--read <section>...]',
   '',
   '  <module>              a module id; with none, every module the corpus holds',
+  `  --next <n>            take <n> sections rather than the ${STINT} a sitting takes by default`,
+  '  --read-next [<n>]     mark the sections that stint covers as read, without',
+  '                        naming one of them: the batch is worked out again rather',
+  '                        than typed back in',
+  '  --sheet               every section at once, module by module, rather than a stint',
   '  --all                 show the lines already read as well as the ones left',
   '  --read-through <id>   mark every line from the top of the module down to and',
   '                        including this section as read',
   '  --read <id>...        mark just these sections as read',
+  '',
+  `A sitting is the ${STINT} sections nearest the front that still hold a line nobody has`,
+  'read, in the order the corpus writes them, and that is what a bare run prints.',
+  'Reading it and then `--read-next` signs off exactly that batch.',
   '',
   'Every line the game can say, in the order its module writes them, under the',
   'section that says it. The set derives itself from the locale tables the engine',
@@ -222,6 +235,36 @@ export function sheetLines(sheet: Sheet, all = false): string[] {
   ];
 }
 
+export interface Stint {
+  sheet: Sheet;
+  section: Spoken;
+}
+
+// Every section still holding a line nobody has read, in the order the corpus writes them: modules in the order they load, sections in the order their file writes them. A stint is the front of this queue and nothing else, which is why printing one and marking one can ask the same question and get the same batch without either of them writing the answer down.
+export const stintsLeft = (sheets: readonly Sheet[]): Stint[] => sheets.flatMap((sheet) => sheet.sections.filter((section) => section.said.some(isLeft)).map((section) => ({ sheet, section })));
+
+export const nextUp = (sheets: readonly Sheet[], size: number = STINT): Stint[] => stintsLeft(sheets).slice(0, size);
+
+export function stintLines(taken: readonly Stint[], waiting: number, size: number, all = false): string[] {
+  if (taken.length === 0) return ['every line the corpus says has been read.', ''];
+  const lines = [`${taken.length} section(s) to read now, of ${waiting} still waiting`, ''];
+  let source: string | null = null;
+  for (const { sheet, section } of taken) {
+    if (sheet.source !== source) lines.push(`${sheet.source} — ${sheet.module}`, '');
+    source = sheet.source;
+    const said = all ? section.said : section.said.filter(isLeft);
+    lines.push(`# ${section.kind} ${section.id}`.padEnd(52) + `${sheet.source}:${section.line}`, ...said.flatMap(saidLines), '');
+  }
+  return [...lines, `Read these, then sign the batch off with: npm run review -- --read-next${size === STINT ? '' : ` ${size}`}`, ''];
+}
+
+export const markedLines = (taken: readonly Stint[], marked: number, waiting: number): string[] => [
+  `${marked} line(s) across ${taken.length} section(s) marked read, in ${LEDGER}:`,
+  ...taken.map(({ sheet, section }) => `  ${sheet.module.padEnd(24)}# ${section.kind} ${section.id}`),
+  `${waiting} section(s) still waiting.`,
+  '',
+];
+
 // The sections a `--read-through` covers: everything the module writes down to and including the one named. What "down to" means is the order the sheet is read in, which is the order the file is written in.
 export function through(sheet: Sheet, id: string): Spoken[] {
   const at = sheet.sections.findIndex((section) => section.id === id);
@@ -231,22 +274,37 @@ export function through(sheet: Sheet, id: string): Spoken[] {
 
 const shipped = (): ModuleSource[] => [...shippedSources()];
 
-interface Asked {
+export interface Asked {
   modules: string[];
   all: boolean;
+  sheet: boolean;
+  size: number;
+  readNext: boolean;
   through?: string;
   read: string[];
 }
 
-function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { modules: [], all: false, read: [] };
+export function parseArgs(argv: readonly string[]): Asked {
+  const asked: Asked = { modules: [], all: false, sheet: false, size: STINT, readNext: false, read: [] };
+  const sizeAfter = (at: number): number | undefined => (/^\d+$/.test(argv[at + 1] ?? '') ? Number(argv[at + 1]) : undefined);
   for (let at = 0; at < argv.length; at++) {
     if (argv[at] === '--all') asked.all = true;
-    else if (argv[at] === '--read-through') asked.through = argv[++at];
+    else if (argv[at] === '--sheet') asked.sheet = true;
+    else if (argv[at] === '--next' || argv[at] === '--read-next') {
+      asked.readNext ||= argv[at] === '--read-next';
+      const size = sizeAfter(at);
+      if (size !== undefined) {
+        asked.size = size;
+        at++;
+      } else if (argv[at] === '--next') throw new Error('--next wants how many sections after it');
+    } else if (argv[at] === '--read-through') asked.through = argv[++at];
     else if (argv[at] === '--read') while (at + 1 < argv.length && !argv[at + 1].startsWith('--')) asked.read.push(argv[++at]);
     else asked.modules.push(argv[at]);
   }
   if (asked.through !== undefined && asked.read.length > 0) throw new Error('--read-through and --read say the same thing two ways; use one');
+  if (asked.readNext && (asked.through !== undefined || asked.read.length > 0)) throw new Error('--read-next signs off the stint it works out for itself; --read-through and --read name sections instead. Use one');
+  if (asked.readNext && asked.sheet) throw new Error('--sheet prints every section and --read-next signs off one stint; use one');
+  if (asked.size < 1) throw new Error('a stint of no sections is nothing to read');
   return asked;
 }
 
@@ -267,8 +325,8 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
-  const marking = asked.through !== undefined || asked.read.length > 0;
-  if (marking && wanted.length > 1) {
+  const named = asked.through !== undefined || asked.read.length > 0;
+  if (named && wanted.length > 1) {
     console.error('name the one module being marked, so a section id can only mean one thing');
     process.exitCode = 1;
     return;
@@ -279,7 +337,22 @@ function main(): void {
   const sheets = wanted.map((id) => everySheet.find((sheet) => sheet.module === id)!);
   const orphans = orphanLines(orphansIn(everySheet, held));
 
-  if (marking) {
+  if (!named && !asked.sheet) {
+    const waiting = stintsLeft(sheets);
+    const taken = waiting.slice(0, asked.size);
+    if (asked.readNext) {
+      const marked = taken.flatMap(({ section }) => section.said).filter(isLeft).length;
+      for (const { section } of taken) for (const said of section.said) held.set(said.key, said.hash);
+      writeFileSync(LEDGER, printLedger(held));
+      console.log(markedLines(taken, marked, waiting.length - taken.length).join('\n'));
+    } else {
+      console.log(stintLines(taken, waiting.length, asked.size, asked.all).join('\n'));
+    }
+    if (orphans.length > 0) console.log(orphans.join('\n'));
+    return;
+  }
+
+  if (named) {
     const sheet = sheets[0];
     const covered = asked.through === undefined ? sheet.sections.filter((section) => asked.read.includes(section.id)) : through(sheet, asked.through);
     const missing = asked.read.filter((id) => !covered.some((section) => section.id === id));
