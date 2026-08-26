@@ -96,3 +96,6 @@ Nothing in the repo can dump one either. `/state` prints a status view, not a sa
 and the four comments name the thing that actually does it. The pieces are already
 there — `runTest` in `src/runtime/session.ts` leaves the state, and `src/runtime/save.ts`
 serializes one — so this is a script and its test, not a design.
+
+## npm run review needs to work in chunks
+the command should give the first 20 sections that need review. Optional way to indicate that all of those 20 have been reviewed. 
