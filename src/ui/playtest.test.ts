@@ -96,6 +96,37 @@ describe('the recorder', () => {
     expect(describeEntry(turnRecord(1, '/cancel', 'applied', ['cancel'], []))).toContain('result: nothing happened');
   });
 
+  // A player who begins something and stands there has taken one turn, and what that turn was made
+  // of is the beginning and the standing. Recorded as the beginning alone, a run replays as somebody
+  // who armed a loop and walked away from it.
+  it('settles a run that came off the clock onto the turn that began it', () => {
+    const { record } = recorder();
+    record.start(NEW_GAME);
+    record.opened('use:entity.oven.roast', took, ['begin: use entity.oven.roast']);
+    record.settled(['wait: 2 times', 'cancel']);
+
+    expect(record.written()).toContain(['begin: use entity.oven.roast', 'wait: 2 times', 'cancel'].join('\n'));
+    expect(turnsPlayed(record.run()?.log ?? [])).toBe(1);
+  });
+
+  it('settles onto the last turn anybody played, over a page move that took no turn of its own', () => {
+    const { record } = recorder();
+    record.start(NEW_GAME);
+    record.opened('use:entity.oven.roast', took, ['begin: use entity.oven.roast']);
+    record.moved('character/inventory');
+    record.settled(['wait: done']);
+
+    expect(record.written()).toContain(['begin: use entity.oven.roast', 'wait: done'].join('\n'));
+  });
+
+  it('has nothing to settle onto where a run was left standing before anything was played', () => {
+    const { record } = recorder();
+    record.start(NEW_GAME);
+    record.settled(['wait: done']);
+
+    expect(turnsPlayed(record.run()?.log ?? [])).toBe(0);
+  });
+
   it('picks a run back up where a reload left it, since a kept run is what recording is', () => {
     const kept = store();
     const first = createRecorder(kept, () => {}, () => PLAYED);

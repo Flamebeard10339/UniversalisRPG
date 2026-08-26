@@ -953,16 +953,38 @@ ring:
     expect(messages(ended).map((out) => out.text)).toEqual(['Stopped.']);
   });
 
-  it('records a completed run without a cancel, and nothing at all for an instant choice', () => {
+  it('records a run that finished as having finished, which is what a replay of it has to do', () => {
     const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.anvil.strike');
     started.live!.tick(4000);
     started.live!.end(false);
-    expect(recorder.history).toEqual(['begin: use entity.anvil.strike', 'wait: 4']);
+    expect(recorder.history).toEqual(['begin: use entity.anvil.strike', 'wait: done']);
 
     const instant = liveFixture(LIVE_MODULE, 'use:entity.bench.sit');
     expect(instant.started.live).toBeUndefined();
     expect(instant.recorder.history).toEqual(['use: entity.bench.sit']);
     expect(instant.ctx.view.said).toContain('You rest a moment.');
+  });
+
+  it('records how many times a loop came round rather than the seconds it took', () => {
+    const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    started.live!.tick(10_000);
+    started.live!.end(true);
+    expect(recorder.history).toEqual(['begin: use entity.oven.roast', 'wait: 2 times', 'cancel']);
+  });
+
+  // What the count is for. The same recording, replayed against a world where a roast takes half as
+  // long, walks the same path; written as the ten seconds it actually took it would come back with
+  // five chestnuts and a run nobody could read as the one that was played.
+  it('replays as the same path in a world that has been rebalanced under it', () => {
+    const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
+    started.live!.tick(10_000);
+    started.live!.end(true);
+
+    const faster = startSession(loadInEnglish(LIVE_MODULE.replace('time: 4', 'time: 2')));
+    const replay = newContext(faster, view(faster), {});
+    for (const line of recorder.history) runLine(replay, line);
+
+    expect(replay.view.inventory['roasted-chestnut']).toBe(2);
   });
 
   it('refuses a choice number no view offers, whether it arrives as a line or as an argument', () => {

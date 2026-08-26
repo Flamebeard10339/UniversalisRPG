@@ -49,6 +49,7 @@ import {
   beginAction,
   carriedListing,
   choiceToDirective,
+  cyclesDone,
   loadSaved,
   runSessionTest,
   serializeSession,
@@ -831,7 +832,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/wait',
     arg: 'directive',
     argHint: '<s>',
-    summary: 'advance simulated time by <s> seconds, letting whatever moves with the clock move: buffs tick down toward expiry, and a pool refills at whatever regeneration is in effect — none, unless something has granted some; or /wait done until what is under way has finished',
+    summary: 'advance simulated time by <s> seconds, letting whatever moves with the clock move: buffs tick down toward expiry, and a pool refills at whatever regeneration is in effect — none, unless something has granted some; or /wait done until what is under way has finished, or /wait <n> times to stand while it comes round that many more times',
     parse: directiveFrom('/wait', (rest) => `wait: ${rest}`),
     run: runDirective,
   }),
@@ -1334,8 +1335,22 @@ export function liveAgain(ctx: CommandContext): LiveRun | null {
   return standing.action === null ? null : liveOver(ctx, standing);
 }
 
+// What the player stood there for, written as a `# test` replays it. A loop that came round is
+// written in how many times it did and not in how long that took: a run is a record of a path
+// walked, and how many seconds a cycle costs is balance that moves under it. Nothing came round and
+// nothing finished leaves only the clock, which is the one case where the seconds are the whole of
+// what happened.
+function stood(ctx: CommandContext, final: PlayView, started: number, startedCycles: number, cancelled: boolean): string[] {
+  const cycles = cyclesDone(ctx.session) - startedCycles;
+  if (final.action === null && !cancelled) return ['wait: done'];
+  if (cycles > 0) return [`wait: ${cycles} times`];
+  const elapsed = final.time - started;
+  return elapsed > 0 ? [`wait: ${formatElapsed(elapsed)}`] : [];
+}
+
 function liveOver(ctx: CommandContext, opening: PlayStatus): LiveRun {
   const started = opening.time;
+  const startedCycles = cyclesDone(ctx.session);
   const armed = opening.action!.label;
   let latest: PlayStatus = opening;
   let over: LiveProgress | null = null;
@@ -1361,8 +1376,7 @@ function liveOver(ctx: CommandContext, opening: PlayStatus): LiveRun {
       const final = view(ctx.session);
       latest = final;
       over = finished(label, final);
-      const elapsed = final.time - started;
-      const recorded = [...(elapsed > 0 ? [`wait: ${formatElapsed(elapsed)}`] : []), ...(cancelled ? ['cancel'] : [])];
+      const recorded = [...stood(ctx, final, started, startedCycles, cancelled), ...(cancelled ? ['cancel'] : [])];
       output.push({ kind: 'view', view: final, reread: false });
       closed = settle(ctx, { view: final, output, quit: false, recorded });
       return closed;

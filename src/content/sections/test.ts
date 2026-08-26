@@ -58,7 +58,7 @@ export type Directive =
   | { kind: 'load'; save: string }
   | { kind: 'cancel' }
   | { kind: 'wait'; seconds: number }
-  | { kind: 'wait-out' }
+  | { kind: 'wait-out'; until: WaitFor }
   | { kind: 'equip'; item: string }
   | { kind: 'unequip'; slot: string }
   | { kind: 'swap'; one: string; other: string }
@@ -83,8 +83,21 @@ export type Directive =
 
 export type GrowthDirective = Extract<Directive, { kind: 'slot' | 'allocate' | 'unallocate' | 'apply' }>;
 
+// How many times what is under way comes round before the player is back. A run recorded off a live
+// session is written in these rather than in the seconds it took, because how long a cycle takes is
+// balance and how many of them a player sat through is the path they walked.
+export interface Cycles {
+  readonly times: number;
+}
+
 // `done` is a fact about the action system — nothing is under way — not a fact about game state, so no engine root could ever spell it and it stays a word rather than a condition.
-export type Terminator = 'done' | Condition;
+export type Terminator = 'done' | Cycles | Condition;
+
+// What may stand after `wait:`, which is the half of a terminator that needs nothing under way to
+// have been started by the same line.
+export type WaitFor = 'done' | Cycles;
+
+export const isCycles = (value: Terminator): value is Cycles => typeof value === 'object' && 'times' in value;
 
 export interface Test {
   id: string;
@@ -125,10 +138,14 @@ const REFUSED = /^refused$/;
 const PAGE = new RegExp(`^page:[ \\t]*(?<layer>${SLUG})/(?<subpage>${SLUG})$`);
 const WAIT = /^wait:[ \t]*(?<seconds>\d+(?:\.\d+)?)$/;
 const WAIT_OUT = /^wait:[ \t]*done$/;
+const WAIT_TIMES = /^wait:[ \t]*(?<times>\d+)[ \t]+times$/;
+const CYCLES = /^(?<times>\d+)[ \t]+times$/;
 const UNTIL = /^(?<rest>.+)[ \t]+until[ \t]+(?<terminator>.+)$/;
 
 function parseTerminator(text: string): Terminator | null {
   if (text.trim() === 'done') return 'done';
+  const cycles = CYCLES.exec(text.trim())?.groups;
+  if (cycles) return { times: Number(cycles.times) };
   try {
     return parseWhole(condition, text, 0, 'an until condition');
   } catch {
@@ -328,7 +345,10 @@ export function parseDirectiveLine(text: string): Directive | null {
   const wait = WAIT.exec(text)?.groups;
   if (wait) return { kind: 'wait', seconds: Number(wait.seconds) };
 
-  if (WAIT_OUT.test(text)) return { kind: 'wait-out' };
+  if (WAIT_OUT.test(text)) return { kind: 'wait-out', until: 'done' };
+
+  const times = WAIT_TIMES.exec(text)?.groups;
+  if (times) return { kind: 'wait-out', until: { times: Number(times.times) } };
 
   const equip = EQUIP.exec(text)?.groups;
   if (equip) return { kind: 'equip', item: equip.item };
@@ -366,6 +386,11 @@ export function parseDirectiveLine(text: string): Directive | null {
   return null;
 }
 
+export function printTerminator(value: Terminator): string {
+  if (value === 'done') return 'done';
+  return isCycles(value) ? `${value.times} times` : condition.print(value);
+}
+
 function inlined(inner: Directive, verb = inner.kind): string {
   return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
 }
@@ -395,7 +420,7 @@ export function printDirective(value: Directive): string {
     case 'refuse':
       return `refuse: ${inlined(value.inner)}`;
     case 'until':
-      return `${printDirective(value.inner)} until ${value.until === 'done' ? 'done' : condition.print(value.until)}`;
+      return `${printDirective(value.inner)} until ${printTerminator(value.until)}`;
     case 'assert':
       return `assert: ${condition.print(value.condition)}`;
     case 'journal':
@@ -413,7 +438,7 @@ export function printDirective(value: Directive): string {
     case 'wait':
       return `wait: ${value.seconds}`;
     case 'wait-out':
-      return 'wait: done';
+      return `wait: ${printTerminator(value.until)}`;
     case 'equip':
       return `equip: ${value.item}`;
     case 'unequip':
@@ -507,9 +532,19 @@ export const test = section<Test>()({
     { form: 'wait: <seconds>', example: 'wait: 1' },
     { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
     {
+      form: 'wait: <n> times',
+      example: 'wait: 4 times',
+      note: 'stands while what is under way comes round n more times, and fails where it stops short of them — how many times a player sat through a loop is the path they walked, and how long that took is balance',
+    },
+    {
       form: '<a directive that starts an action> until done',
       example: 'use: melee-combat on giant-rat until done',
       note: 'performs the directive, then stands until whatever it started has finished, exactly as wait: done does',
+    },
+    {
+      form: '<a directive that starts an action> until <n> times',
+      example: 'use: melee-combat on giant-rat until 4 times',
+      note: 'performs the directive, then stands while what it started comes round n times, exactly as wait: <n> times does',
     },
     {
       form: '<a directive that starts an action> until <condition>',
@@ -638,7 +673,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
       return;
     case 'until':
       visitDirective(value.inner, `${where} until:`, visit);
-      if (value.until !== 'done') visitCondition(value.until, `${where} until:`, visit);
+      if (value.until !== 'done' && !isCycles(value.until)) visitCondition(value.until, `${where} until:`, visit);
       return;
     case 'note':
     case 'refused':

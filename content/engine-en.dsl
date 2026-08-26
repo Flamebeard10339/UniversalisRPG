@@ -300,6 +300,7 @@ engine.span.levelled: {skill}: {gained} experience, and level {level}
 engine.span.moved: You are standing in {location}.
 engine.stopped.itself: what you were doing called a halt
 engine.stopped.condition: {condition} came true
+engine.stopped.counted: it had come round {times} times
 engine.stopped.event: {event} happened
 engine.stopped.finished: it was finished
 engine.stopped.unfinished: it ran out of attempts
@@ -313,6 +314,7 @@ engine.stopped.still: what was under way advances by nothing, so waiting it out 
 engine.stopped.pack-full: your pack was full and there was nowhere to put what you found
 engine.stopped.unloadable: what was under way could not be picked up again
 engine.stopped.short: {because}, and {condition} never came true
+engine.stopped.short-count: {because}, and it came round {times} of the {wanted} times asked for
 engine.setting.stands: {setting}: {value}
 engine.setting.takes: takes {choices}
 engine.setting.on: On

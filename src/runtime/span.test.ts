@@ -161,7 +161,7 @@ describe('a span the engine runs unattended is summarised, and one the player st
   });
 
   it('says nothing where nothing was under way to be away from', () => {
-    expect(said({ kind: 'wait-out' })).toEqual([]);
+    expect(said({ kind: 'wait-out', until: 'done' })).toEqual([]);
   });
 });
 

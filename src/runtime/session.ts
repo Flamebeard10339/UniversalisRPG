@@ -36,7 +36,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
 import { compareSave, compareSaveOnly, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import type { PruneWarning } from './pruning';
-import { Directive, parseUseChoiceId, printDirective, Terminator, useChoiceId } from '../content/sections/test';
+import { Directive, parseUseChoiceId, printDirective, printTerminator, Terminator, useChoiceId } from '../content/sections/test';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -207,6 +207,11 @@ function own(session: PlaySession): SessionInternals {
 export const sessionLocalizer = (session: PlaySession): Localizer => localizerOf(session.registry, stateOf(session));
 
 export const sessionJournal = (session: PlaySession): JournalEntry[] => journal(session.registry, stateOf(session));
+
+// How many times something under way has come round since this world was opened. Read as the
+// difference across a span, which is what a run recorded off a live session writes down in place of
+// the seconds that span happened to take.
+export const cyclesDone = (session: PlaySession): number => stateOf(session).cyclesDone;
 
 function stateOf(session: PlaySession): GameState {
   return own(session).state;
@@ -879,7 +884,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
       return {};
     case 'wait-out':
-      return waitedOut(state, registry);
+      return waitedOut(state, registry, directive.until);
     case 'until': {
       // One directive, one span: what the inner directive does on the way to being under way is
       // part of what the player was away for, and it happens before the loop is ever entered.
@@ -923,7 +928,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
 function waitedOut(state: GameState, registry: Registry, terminator: Terminator = 'done', start?: SpanStart): { failure?: string } {
   const waited = resolveUnderWay(state, registry, terminator, start);
   if (waited.ended) return {};
-  const label = terminator === 'done' ? 'wait: done' : `until ${describeCondition(terminator)}`;
+  const label = terminator === 'done' ? 'wait: done' : `until ${printTerminator(terminator)}`;
   return { failure: `${label} — ${waited.reason}` };
 }
 

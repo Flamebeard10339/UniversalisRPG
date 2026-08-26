@@ -252,6 +252,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const settleRun = (run: LiveRun, cancelled: boolean): void => {
     const result = run.end(cancelled);
+    record.settled(result.recorded);
     current = settled({ ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) });
     publish();
   };

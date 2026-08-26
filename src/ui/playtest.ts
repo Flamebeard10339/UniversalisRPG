@@ -43,6 +43,11 @@ export interface Recorder {
   // What the player picked, and whether the engine took it. What it answered with is not recorded:
   // the author read it on the screen it was said on.
   opened(line: string, outcome: TurnOutcome, directives: readonly string[]): void;
+  // What a run that was left on the clock settled into when it came off it — how many times the
+  // loop came round, and whether it was called off. Nobody typed it, so it belongs to the turn that
+  // started the run rather than to a turn of its own, and without it a recorded run says a player
+  // began something and never says how much of it they sat through.
+  settled(directives: readonly string[]): void;
   // Where in the app the player went, which the engine never hears about and which they may still
   // have something to say about.
   moved(where: string): void;
@@ -87,6 +92,14 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
       keep();
     },
     opened: (line, outcome, directives) => turning((log) => [...log, turnRecord(log.length + 1, line, outcome, directives, null)]),
+    settled: (directives) => {
+      if (directives.length === 0) return;
+      turning((log) => {
+        const started = [...log].reverse().find(isPlayed);
+        if (started === undefined) return log;
+        return log.map((entry) => (entry === started ? { ...started, directives: [...started.directives, ...directives] } : entry));
+      });
+    },
     moved: (where) =>
       turning((log) => {
         const open = log[log.length - 1];
