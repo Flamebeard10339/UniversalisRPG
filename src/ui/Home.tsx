@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlayView } from '../runtime/session';
+import { sheetOffers, type PlayView } from '../runtime/session';
 import { drawsNothing, offerCells } from './choices';
 import { Console } from './Console';
 import type { DriverSnapshot } from './driver';
@@ -25,12 +25,13 @@ function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElem
   );
 }
 
-function Sheet({ choices, words, onChoose }: { choices: PlayView['choices']; words: Words; onChoose: (position: number) => void }): JSX.Element {
-  if (drawsNothing(choices)) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;
+function Sheet({ view, words, onChoose }: { view: PlayView; words: Words; onChoose: (position: number) => void }): JSX.Element {
+  const offers = sheetOffers(view);
+  if (drawsNothing(offers)) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;
   return (
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
-        {offerCells(choices).map((cell) => (
+        {offerCells(offers).map((cell) => (
           <div key={String(cell.of ?? cell.offers[0]?.id)} style={fillOf(cell.group)} className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-panel active:border-accent">
             {cell.examine ? (
               <button
@@ -111,9 +112,9 @@ export function Home({
           </div>
         </div>
 
-        {drawsNothing(view.choices) ? (
+        {drawsNothing(sheetOffers(view)) ? (
           <div className="shrink-0 border-t border-border bg-surface-raised pb-[calc(env(safe-area-inset-bottom))]">
-            <Sheet choices={view.choices} words={words} onChoose={onChoose} />
+            <Sheet view={view} words={words} onChoose={onChoose} />
           </div>
         ) : (
           <>
@@ -122,7 +123,7 @@ export function Home({
               onDrag={(dy) => setSplit(splitFrom(held.current, dy, surface.current?.clientHeight ?? 0))}
             />
             <div className="unbarred min-h-0 overflow-y-auto border-t border-border bg-surface-raised" style={{ flexGrow: 1 - split, flexBasis: 0 }}>
-              <Sheet choices={view.choices} words={words} onChoose={onChoose} />
+              <Sheet view={view} words={words} onChoose={onChoose} />
             </div>
           </>
         )}

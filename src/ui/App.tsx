@@ -23,7 +23,7 @@ import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { Notices } from './Notices';
 import { noticesBetween } from './notice';
-import { declaredFor } from './modalManner';
+import { declaredFor, type Declared } from './modalManner';
 import { ModalSheet } from './ModalSheet';
 import type { LabelId } from './labels';
 import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
@@ -113,6 +113,48 @@ function tryAgain(driver: Driver): void {
 
 const standingIn = (view: PlayView): Standing => ({ location: view.location.id, entities: view.entities.map((entity) => entity.id) });
 
+type Reading = NonNullable<PlayView['focus']>;
+
+// What a screen that is about something has to draw it with — the view it reads the subject out of,
+// and everything a screen of its own would need to stand on the app by itself.
+interface Drawing {
+  readonly view: PlayView;
+  readonly words: Words;
+  readonly option: PlayView['modals'][number]['options'][number];
+  readonly manner: Declared;
+  readonly onAnswer: (key: string, value: string) => void;
+}
+
+// A subject is read either on a surface of its own, standing in place of the ordinary sheet, or as a
+// body inside it above the question. Neither, where the view no longer carries what the focus names.
+interface FocusScreen {
+  readonly instead?: JSX.Element;
+  readonly beside?: JSX.Element;
+}
+
+// Keyed by the kind the view publishes rather than tested for one kind at a time, so a focus the
+// engine grows next month does not compile until the app has something to draw for it — the same
+// answer the manner table and the terminal's own lines already have to give.
+type Draws<K extends Reading['kind']> = (focus: Extract<Reading, { kind: K }>, drawing: Drawing) => FocusScreen;
+
+const FOCUS_SCREEN: { [K in Reading['kind']]: Draws<K> } = {
+  plane: (focus, { view, words, option, manner, onAnswer }) => {
+    const plane = view.planes.find((each) => each.instance === focus.instance);
+    return plane === undefined ? {} : { instead: <PlaneModal plane={plane} option={option} manner={manner} words={words} onAnswer={onAnswer} /> };
+  },
+  quest: (focus, { view, words }) => {
+    const entry = view.journal.find((each) => each.quest === focus.quest);
+    return entry === undefined ? {} : { beside: <QuestBody entry={entry} words={words} /> };
+  },
+  stat: (focus, { view }) => {
+    const row = view.stats.find((each) => each.id === focus.stat);
+    return row === undefined ? {} : { beside: <StatBody row={row} /> };
+  },
+};
+
+const focusScreen = (focus: PlayView['focus'], drawing: Drawing | null): FocusScreen =>
+  focus === null || drawing === null ? {} : (FOCUS_SCREEN[focus.kind] as Draws<Reading['kind']>)(focus, drawing);
+
 export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
   const [where, setWhere] = useState(opening);
@@ -122,10 +164,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
   const asking = askedOption(view.modals);
-  const reading = view.focus;
-  const plane = reading?.kind === 'plane' ? (view.planes.find((each) => each.instance === reading.instance) ?? null) : null;
-  const questRead = reading?.kind === 'quest' ? (view.journal.find((entry) => entry.quest === reading.quest) ?? null) : null;
-  const statRead = reading?.kind === 'stat' ? (view.stats.find((row) => row.id === reading.stat) ?? null) : null;
+  const screen = focusScreen(view.focus, asking ? { view, words, option: asking, manner: declaredFor(view.focus), onAnswer: driver.answer } : null);
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
   useNotices(view, words, driver.transient);
@@ -319,13 +358,12 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           columns={here.columns}
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
-        {asking && plane ? <PlaneModal plane={plane} option={asking} manner={declaredFor(view.focus)} words={words} onAnswer={driver.answer} /> : null}
-        {asking && !plane ? (
-          <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
-            {questRead ? <QuestBody entry={questRead} words={words} /> : null}
-            {statRead ? <StatBody row={statRead} /> : null}
-          </ModalSheet>
-        ) : null}
+        {screen.instead ??
+          (asking ? (
+            <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
+              {screen.beside}
+            </ModalSheet>
+          ) : null)}
       </div>
     </TransientProvider>
   );

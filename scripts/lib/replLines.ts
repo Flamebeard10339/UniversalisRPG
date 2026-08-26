@@ -5,7 +5,7 @@ import { partsOf, type NumberedChoice } from '../../src/runtime/modalOption';
 import { tidy } from '../../src/runtime/figures';
 import { madeOf } from '../../src/runtime/statScreen';
 import type { Focus } from '../../src/runtime/modals';
-import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
+import { sheetOffers, type OfferedChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
 
@@ -44,13 +44,14 @@ const shownLocations = new Set<string>();
 
 // A choice is answered by where it sits in the view's own list, so what is skipped here still
 // counts: the numbers a reader sees are the numbers the engine takes, with the ways out missing
-// from among them rather than renumbered away.
-function formatChoices(choices: PlayChoice[], localizer: Localizer): PlayerLine[] {
-  return choices.flatMap((choice, index) => {
+// from among them rather than renumbered away. The offer carries its own position for that reason,
+// and nothing here counts a list of its own — a shorter list counted again answers a different choice.
+function formatChoices(choices: readonly OfferedChoice[], localizer: Localizer): PlayerLine[] {
+  return choices.map((choice) => {
     const numbered = choice.detail
-      ? localizer.engine('engine.repl.choice.owned', { index: index + 1, owner: grouped(localizer, choice.group, choice.detail), choice: choice.label })
-      : localizer.engine('engine.repl.choice', { index: index + 1, choice: choice.label });
-    return [say(numbered, 2)];
+      ? localizer.engine('engine.repl.choice.owned', { index: choice.position, owner: grouped(localizer, choice.group, choice.detail), choice: choice.label })
+      : localizer.engine('engine.repl.choice', { index: choice.position, choice: choice.label });
+    return say(numbered, 2);
   });
 }
 
@@ -200,7 +201,7 @@ export function formatView(v: PlayView, localizer: Localizer, reread = false): R
   lines.push(...formatResources(v.resources, localizer));
   lines.push(...formatEncounter(v.encounter, localizer));
   lines.push(...formatModals(v, localizer));
-  lines.push(...formatChoices(v.choices, localizer));
+  lines.push(...formatChoices(sheetOffers(v), localizer));
   lines.push(say(localizer.engine('engine.repl.clock', { time: v.time })));
   return lines;
 }
@@ -302,7 +303,7 @@ export function formatOutput(output: CommandOutput, localizer: Localizer): ReplL
     case 'status':
       return formatState(output.status, localizer);
     case 'choices':
-      return formatChoices(output.choices, localizer);
+      return formatChoices(sheetOffers(output), localizer);
     case 'help':
       return [note('Commands:'), ...output.entries.map(formatHelp)];
     case 'source':

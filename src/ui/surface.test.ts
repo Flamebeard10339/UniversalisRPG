@@ -54,6 +54,7 @@ const DISPATCHES = [
   'madeOf',
   'partsOf',
   'partStanding',
+  'sheetOffers',
   'waysOut',
   'BASE_LANGUAGE',
   'createTicker',
