@@ -190,6 +190,25 @@ describe('something arriving at a pack with no room', () => {
     expect(state.inventory.stone).toBe(4);
   });
 
+  // A full pack with no coin in it is exactly where selling matters most, and the row the goods
+  // leave is the row the coin lands in. The sale that pays for itself is the one that takes the
+  // whole of a row.
+  it('takes the last of a row from a full pack holding no coin, and pays into the row it just emptied', () => {
+    const registry = twoSlots();
+    const state = standing(registry);
+    receiveItem(state, registry, 'stone', 4);
+    receiveItem(state, registry, 'twig', 1);
+    const quarry = shopOf(registry, 'quarry');
+
+    expect(packRows(state).map((row) => row.template)).toEqual(['stone', 'twig']);
+    expect(sellProblem(quarry, state, registry, 'stone', 4)).toBeUndefined();
+    expect(sell(quarry, state, registry, 'stone', 4)).toBeUndefined();
+
+    expect(state.inventory.stone ?? 0).toBe(0);
+    expect(state.inventory.coin).toBeGreaterThan(0);
+    expect(packRows(state).map((row) => row.template).sort()).toEqual(['coin', 'twig']);
+  });
+
   it('takes as many blades as there are rows for and turns the rest away, because no two of them share one', () => {
     const registry = twoSlots();
     const state = standing(registry);

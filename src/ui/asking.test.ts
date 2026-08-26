@@ -110,4 +110,13 @@ describe('what a click away from a screen answers', () => {
 
     expect(dismissal(asked)).toBeNull();
   });
+
+  // A typed question has no list for the way out to be missing from, so publishing one is the whole
+  // of offering it. Without this a screen asking for a number could only be answered with one.
+  it('is the way out of a question that takes free text, which lists nothing to find it among', () => {
+    const typed: PlayView['modals'] = [{ name: 'held', leaving: 'back', options: [{ key: 'count', label: asLocalized('How many?'), values: null }] }];
+
+    expect(dismissal(typed)).toEqual({ key: 'count', value: 'back' });
+    expect(dismissal([{ ...typed[0], leaving: null }])).toBeNull();
+  });
 });

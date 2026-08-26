@@ -4,9 +4,13 @@ import { heldName } from './carried';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import type { ModalChoice, ModalOption } from './modalOption';
 import { GameState, type ModalFrame } from './state';
-import { buy, coinHeld, countProblem, forSale, sell, Trade, wanted, type Refusal } from './trade';
+import { buy, coinHeld, countAsked, forSale, sell, Trade, wanted, type Refusal } from './trade';
 
 export const LEAVE: Answer = 'close';
+
+// The word the count question leaves by. It is no number, so nothing a player could mean as a count
+// can be mistaken for it, and it is what clicking away from the question answers with.
+export const BACK: Answer = 'back';
 
 export type Side = 'buy' | 'sell';
 
@@ -36,11 +40,24 @@ export function rowOf(answer: Answer | undefined): { side: Side; item: string } 
   return { side, item: answer.slice(at + 1) };
 }
 
+// One row of the counter, as words for a surface that reads it as a line and as figures for one that
+// draws it as a cell. Both are made here from the one trade, so no surface has to take a price back
+// apart and none of them can differ about what a thing costs or how many there are.
 const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer: Localizer): ModalChoice[] =>
-  trades.map((trade) => ({
-    value: rowAnswer(side, trade.item),
-    shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item: heldName(state, localizer, trade.item), price: trade.coin, count: trade.count }),
-  }));
+  trades.map((trade) => {
+    const item = heldName(state, localizer, trade.item);
+    return {
+      value: rowAnswer(side, trade.item),
+      shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item, price: trade.coin, count: trade.count }),
+      cell: {
+        under: side,
+        heading: localizer.engine(side === 'buy' ? 'engine.shop.side.buy' : 'engine.shop.side.sell'),
+        title: item,
+        price: trade.coin,
+        count: trade.count,
+      },
+    };
+  });
 
 export function shopOptions(frame: ShopFrame, state: GameState, registry: Registry): ModalOption[] {
   const shop = registry.shops.get(frame.shop);
@@ -68,7 +85,7 @@ export function countOptions(frame: ShopCountFrame, state: GameState, registry: 
   return [{ key: 'count', label: localizer.engine(frame.side === 'buy' ? 'engine.shop.count.buy' : 'engine.shop.count.sell', { item: heldName(state, localizer, frame.item) }), values: null }];
 }
 
-// A shop stays open across a trade: what comes back is a fresh counter, so it is re-read against what the player now carries and the shop now holds. Anything that is not a number to trade is how a player backs out of the question.
+// A shop stays open across a trade: what comes back is a fresh counter, so it is re-read against what the player now carries and the shop now holds.
 export function countSubmit(frame: ShopCountFrame, state: GameState, registry: Registry): ModalFrame | null {
   const shop = registry.shops.get(frame.shop);
   if (!shop) return null;
@@ -77,10 +94,15 @@ export function countSubmit(frame: ShopCountFrame, state: GameState, registry: R
   return shopFrame(frame.shop);
 }
 
+// Naming none of something is how a player backs out, and backing out is not a mistake to be told
+// about: the word the screen leaves by, an empty line and the number zero all put the player back at
+// the counter with nothing said. Writing that names no number at all is the one thing answered,
+// because it is the one case where what was meant cannot be read off what was written.
 function tradeRefusal(shop: Shop, state: GameState, registry: Registry, side: Side, item: string, written: string): Refusal | undefined {
-  const badCount = countProblem(written);
-  if (badCount) return badCount;
-  const count = Number(written.trim());
+  if (written.trim() === BACK || written.trim() === '') return undefined;
+  const count = countAsked(written);
+  if (count === undefined) return 'not-a-count';
+  if (count === 0) return undefined;
   return side === 'buy' ? buy(shop, state, registry, item, count) : sell(shop, state, registry, item, count);
 }
 

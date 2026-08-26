@@ -73,8 +73,13 @@ export const coinHeld = (shop: Shop, state: GameState): number => spendableCount
 
 export type Refusal = 'unknown-item' | 'untradable' | 'out-of-stock' | 'not-carried' | 'not-afforded' | 'not-a-count' | 'pack-full';
 
-export function countProblem(written: string): Refusal | undefined {
-  return /^\d+$/.test(written.trim()) && Number(written.trim()) > 0 ? undefined : 'not-a-count';
+// How many a written answer names, or nothing at all where it names no number. A count is whole and
+// never negative, because a shop takes no half of a thing and no debt of one. Zero is a number like
+// any other and this says so: naming none of something is a thing a player means, not a mistake, and
+// what a counter does about it is the counter's to decide.
+export function countAsked(written: string): number | undefined {
+  const trimmed = written.trim();
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : undefined;
 }
 
 // Buying takes coin and hands over stock; a shop has none of an item to sell once its count reaches zero, which is the floor everything here is written against.
@@ -108,14 +113,25 @@ function partWith(state: GameState, itemId: string, count: number): string | und
   return given.item;
 }
 
+// Whether parting with this many empties the row they stand in, read off the same rows the counter
+// offers: a grown copy is one thing in a row of its own, and a stack's row is gone once nothing is
+// left in it. What is worn stands in no row and so empties none.
+function vacatesItsRow(state: GameState, itemId: string, count: number): boolean {
+  const rows = packRows(state);
+  if (isGrownCopy(state, itemId)) return rows.some((row) => row.kind === 'grown' && row.id === itemId);
+  const stacked = rows.find((row) => row.kind === 'stack' && row.template === itemId);
+  return stacked !== undefined && stacked.kind === 'stack' && stacked.count <= count;
+}
+
 export function sellProblem(shop: Shop, state: GameState, registry: Registry, itemId: string, count: number): Refusal | undefined {
   const item = itemOf(registry, itemTemplate(state, itemId));
   if (!item) return 'unknown-item';
   if (!takesItem(shop, item)) return 'untradable';
   if (!onOffer(state, itemId, count)) return 'not-carried';
   // What is paid for the goods has to have somewhere to land too, or the sale would take the item
-  // and hand back nothing.
-  if (!roomToPack(state, registry, shop.coin)) return 'pack-full';
+  // and hand back nothing. It lands after the goods have gone, so the row the sale empties is a row
+  // the coin may take — which is how a full pack is traded out of at all.
+  if (!roomToPack(state, registry, shop.coin) && !vacatesItsRow(state, itemId, count)) return 'pack-full';
   return undefined;
 }
 

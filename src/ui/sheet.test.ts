@@ -3,7 +3,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { localizerFor } from '../runtime/localized';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayStatus, StatRow, StatShare } from '../runtime/session';
-import { carried, contributionText, counted, identity, madeOf, worn } from './sheet';
+import { carried, contributionText, counted, identity, worn } from './sheet';
 
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
@@ -38,33 +38,6 @@ const STAT = { statId: 'mod.attack', statTitle: asLocalized('Attack') };
 const flat = (amount: number): Contribution => ({ ...STAT, added: { min: amount, max: amount }, increased: 0 });
 
 const share = (title: string, amount: number, increased = 0): StatShare => ({ title: asLocalized(title), added: { min: amount, max: amount }, increased });
-
-describe('what a stat is made of, read out', () => {
-  it('names every share and signs what it is worth, in the order the engine folded them', () => {
-    expect(madeOf([share('Base', 10), share('Melee', 1), share('Iron Sword', 4)])).toEqual([
-      { title: 'Base', worth: '+10' },
-      { title: 'Melee', worth: '+1' },
-      { title: 'Iron Sword', worth: '+4' },
-    ]);
-  });
-
-  it('says a percentage as one, and a share on both channels as both', () => {
-    expect(madeOf([share('Blade', 2, 18)])[0].worth).toBe('+2 +18%');
-    expect(madeOf([share('Ring', 0, 25)])[0].worth).toBe('+25%');
-  });
-
-  it('reads a ranged share as the range it is', () => {
-    expect(madeOf([{ title: asLocalized('Base'), added: { min: 3, max: 8 }, increased: 0 }])[0].worth).toBe('+3-8');
-  });
-
-  it('still says a share worth nothing, because a base nothing touches is the whole answer', () => {
-    expect(madeOf([share('Base', 0)])).toEqual([{ title: 'Base', worth: '+0' }]);
-  });
-
-  it('draws nothing for a stat that published no shares at all', () => {
-    expect(madeOf([])).toEqual([]);
-  });
-});
 
 describe('the counted rows the engine publishes, as a sheet draws them', () => {
   const number = (id: string, title: string, value: number, from: StatShare[] = []): StatRow => ({ id, title: asLocalized(title), value, from });

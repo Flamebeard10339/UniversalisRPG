@@ -6,7 +6,7 @@ import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
 import { holdsStat, statFocus, statOptions, statStale, statSubmit, LEAVE as STAT_LEAVE } from './statScreen';
-import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, LEAVE as SHOP_LEAVE } from './shopScreen';
+import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, BACK as SHOP_BACK, LEAVE as SHOP_LEAVE } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
@@ -109,6 +109,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     submit: countSubmit,
     holds: holdsCount,
     stale: shopStale,
+    leaves: SHOP_BACK,
   },
   dialogue: {
     options: (frame, state, registry) => [

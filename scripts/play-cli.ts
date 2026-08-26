@@ -35,11 +35,12 @@ import {
   oneLine,
   printed,
   say,
-  tidy,
   withCount,
   type PlayerLine,
   type ReplLine,
 } from './lib/replLines';
+
+import { tidy } from '../src/runtime/figures';
 
 export { formatView, printed, type PlayerLine, type ReplLine, type ToolLine } from './lib/replLines';
 

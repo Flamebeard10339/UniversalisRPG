@@ -1,7 +1,7 @@
 import type { StatRow } from '../runtime/session';
+import { madeOf } from '../runtime/statScreen';
 import { tidy } from './format';
 import { fillOf } from './lineStyle';
-import { madeOf } from './sheet';
 import { NAME } from './sheetLayout';
 import { useTestSurface } from './useTestSurface';
 
