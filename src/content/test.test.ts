@@ -400,6 +400,18 @@ describe('a terminator follows a payload, not free text', () => {
     expect(roundTrip('choose: I will wait until morning')).toBe('choose: I will wait until morning');
   });
 
+  it('reads a count of cycles as a terminator, after a payload or after wait:', () => {
+    expect(parseDirectiveLine('use: entity.kiln.bake-forever until 4 times')).toEqual({
+      kind: 'until',
+      inner: { kind: 'use', obj: 'entity', objId: 'kiln', actionId: 'bake-forever' },
+      until: { times: 4 },
+    });
+    expect(parseDirectiveLine('wait: 4 times')).toEqual({ kind: 'wait-out', until: { times: 4 } });
+    expect(parseDirectiveLine('wait: done')).toEqual({ kind: 'wait-out', until: 'done' });
+    expect(roundTrip('wait: 4 times')).toBe('wait: 4 times');
+    expect(roundTrip('use: entity.kiln.bake-forever until 4 times')).toBe('use: entity.kiln.bake-forever until 4 times');
+  });
+
   it('still reads a terminator after a payload that spells itself out', () => {
     expect(parseDirectiveLine('use: melee-combat on giant-rat until done')).toEqual({ kind: 'until', inner: { kind: 'use-on', action: 'melee-combat', target: 'giant-rat' }, until: 'done' });
     expect(roundTrip('travel: beach until has rope')).toBe('travel: beach until has rope');

@@ -22,7 +22,7 @@ describe('what a step reads as', () => {
   });
 
   it('reads a kind it has never met as a line the game took, rather than as nothing', () => {
-    expect(stepKind({ kind: 'wait-out' })).toBe('played');
+    expect(stepKind({ kind: 'wait-out', until: 'done' })).toBe('played');
   });
 });
 

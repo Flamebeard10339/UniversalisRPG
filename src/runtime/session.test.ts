@@ -1014,6 +1014,7 @@ describe('what the engine withholds', () => {
       language: 'withheld',
       location: 'published',
       time: 'published',
+      cyclesDone: 'withheld',
       flags: 'published',
       inventory: 'published',
       packOrder: 'published',
@@ -1963,7 +1964,7 @@ describe('a fight named on a foe that is not standing here', () => {
   const cleared = (): PlaySession => {
     const session = yard();
     applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
-    applyDirective(session, { kind: 'wait-out' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
     return session;
   };
 
@@ -1974,7 +1975,7 @@ describe('a fight named on a foe that is not standing here', () => {
     expect(fightsOffered(session)).toEqual(['fight:swing:scarecrow']);
 
     applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
-    applyDirective(session, { kind: 'wait-out' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
     expect(fightsOffered(session)).toEqual([]);
   });
 
@@ -2025,14 +2026,14 @@ describe('an entity action named on an entity that is not standing here', () => 
     expect(offered(session)).toContain('use:entity.scarecrow.straighten');
 
     applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
-    applyDirective(session, { kind: 'wait-out' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
     expect(offered(session)).toEqual([]);
   });
 
   it('refuses a directive that names the felled entity, in the words a player reads', () => {
     const session = yard();
     applyDirective(session, { kind: 'use-on', action: 'swing', target: 'scarecrow' });
-    applyDirective(session, { kind: 'wait-out' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
 
     expect(use(session, 'scarecrow', 'straighten').said.map(String)).toEqual(['There is no Scarecrow here.']);
   });

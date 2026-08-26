@@ -293,6 +293,8 @@ export const ENGINE_KEYS = [
   'engine.span.moved',
   'engine.stopped.itself',
   'engine.stopped.condition',
+  'engine.stopped.counted',
+  'engine.stopped.short-count',
   'engine.stopped.event',
   'engine.stopped.finished',
   'engine.stopped.unfinished',

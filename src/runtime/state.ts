@@ -124,6 +124,11 @@ export interface GameState extends RngCursor {
   // change news exactly once, and coming back to a save is not news.
   carriedTold: string | null;
   time: number;
+  // How many times something under way has come round since this world was opened — a swing that
+  // felled what it was aimed at, an ore prised loose, a loaf out of the oven. Counted rather than
+  // saved: it is read as the difference across a span, and what a span was made of is a question
+  // about the sitting rather than about the world.
+  cyclesDone: number;
   // The earliest instant anything standing here may come at the player. Arriving somewhere and
   // felling something both push it forward, so a room is quiet for a beat before the next thing
   // finds you. Not saved: a world picked up again is one you have just walked back into.
@@ -166,7 +171,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, engagesAt: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

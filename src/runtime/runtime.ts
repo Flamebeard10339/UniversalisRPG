@@ -46,7 +46,7 @@ import { engagementDelay } from './tuning';
 import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
 import { describeCondition, evaluateCondition, itemMissingFor } from './conditions';
 import { spanStart, spanSummary, type SpanStart } from './span';
-import type { Terminator } from '../content/sections/test';
+import { isCycles, type Terminator } from '../content/sections/test';
 
 export { advanceTime, createGameState, PLAYER } from './state';
 export { endAction, endJourney } from './actionEnd';
@@ -285,9 +285,12 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   return { felled: felledBy(segment, action, self, other, reached), finished: false };
 }
 
+// Every cycle of an action that resolves, resolves here — one swing that felled what it was aimed
+// at, or a batch of them settled at once — so this is where the world's tally of them is kept.
 function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, times: number): void {
   const batch = fightBatch(action, times, outcome);
   if (batch.count <= 0) return;
+  segment.state.cyclesDone += batch.count;
   applyResults(segment, batch.results, PLAYER, batch.count);
   fireEvents(segment, PLAYER, outcome === 'completion' ? 'completed' : 'unfinished', undefined, batch.count);
 }
@@ -611,6 +614,10 @@ function advanceUnderWayCycle(state: GameState, registry: Registry): void {
 export function resolveUnderWay(state: GameState, registry: Registry, terminator: Terminator = 'done', start: SpanStart = spanStart(state)): WaitedOut {
   const startedAt = start.at;
   const say = localizerOf(registry, state);
+  // A count is read off the world's own tally rather than off the steps this loop takes, so what a
+  // recorded run says it sat through and what a replay of it sits through are the same fact.
+  const counted = isCycles(terminator) ? { wanted: terminator.times, cycled: (): number => state.cyclesDone - start.state.cyclesDone } : null;
+  const met = terminator === 'done' || isCycles(terminator) ? null : terminator;
 
   const over = (ended: boolean, because: Localized): WaitedOut => {
     state.log.push(...spanSummary(start, state, registry, because));
@@ -618,8 +625,10 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
   };
 
   for (;;) {
-    if (terminator !== 'done' && evaluateCondition(terminator, state, registry)) {
-      return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(terminator)) }));
+    if (counted) {
+      if (counted.cycled() >= counted.wanted) return over(true, say.engine('engine.stopped.counted', { times: counted.wanted }));
+    } else if (met && evaluateCondition(met, state, registry)) {
+      return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(met)) }));
     }
     if (!state.activeAction && !state.journey) {
       // A room that has not come at the player yet is not a room that is done with them: the beat
@@ -632,7 +641,8 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
       // A terminator that was never reached did not finish, whatever ran out first: the condition is
       // what was asked for, and running out of things to do without it is the asking having failed.
       if (terminator === 'done') return over(true, because);
-      return over(false, say.engine('engine.stopped.short', { because, condition: say.identifier(describeCondition(terminator)) }));
+      if (counted) return over(false, say.engine('engine.stopped.short-count', { because, times: counted.cycled(), wanted: counted.wanted }));
+      return over(false, say.engine('engine.stopped.short', { because, condition: say.identifier(describeCondition(met!)) }));
     }
     if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return over(false, say.engine('engine.stopped.bound', { hours: UNDER_WAY_LIMIT_HOURS }));
     const unit = underWayUnit(state, registry);

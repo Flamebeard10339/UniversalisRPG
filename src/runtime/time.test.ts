@@ -237,6 +237,22 @@ assert: time > 0
 goto: camp
 begin: use entity.kiln.bake-forever
 wait: done
+
+# test four-bakings
+goto: camp
+begin: use entity.kiln.bake-forever
+wait: 4 times
+assert: inventory.brick = 4
+
+# test four-bakings-on-one-line
+goto: camp
+use: entity.kiln.bake-forever until 4 times
+assert: inventory.brick = 4
+
+# test a-kiln-with-four-firings-in-it
+goto: camp
+begin: use entity.kiln.fire
+wait: 4 times
 `;
 
   const registry = () => loadInEnglish(MODULE);
@@ -252,6 +268,22 @@ wait: done
   // nextBoundary predicts the runway of an action that drains a pool it can read, and a fight drains the pool of whoever is being swung at, which is not one of them. Stepping by the action's own cycle needs no such prediction.
   it('runs a fight out to the end of it, which no boundary the engine computes predicts', () => {
     expect(runTest('one-straw-man', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  it('stands while a loop comes round the number of times asked for, however long each one takes', () => {
+    expect(runTest('four-bakings', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  // The same span either way: what the line does on the way to being under way is inside the count,
+  // as it is inside the seconds.
+  it('counts the same whether the loop was armed by the line before or by the line itself', () => {
+    expect(runTest('four-bakings-on-one-line', registry(), createGameState())).toEqual({ passed: true });
+  });
+
+  it('refuses where what is under way stops short of the times asked for, saying how far it got', () => {
+    const result = runTest('a-kiln-with-four-firings-in-it', registry(), createGameState());
+    expect(result.passed).toBe(false);
+    expect(result.failure).toMatch(/until 4 times — .*came round 1 of the 4 times asked for/);
   });
 
   it('refuses, rather than running forever, when what is under way never finishes', () => {
