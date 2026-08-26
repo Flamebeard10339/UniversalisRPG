@@ -80,9 +80,12 @@ export function parseManifest(text: string): Mutation[] {
   }
   if (!Array.isArray(parsed)) throw new Error('the manifest must be a list of mutations');
   if (parsed.length === 0) throw new Error('the manifest is an empty list, so there is nothing to measure');
+  return mutationsFrom(parsed);
+}
 
+export function mutationsFrom(entries: readonly unknown[]): Mutation[] {
   const names = new Set<string>();
-  return parsed.map((raw, index) => {
+  return entries.map((raw, index) => {
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`entry ${index + 1} is not an object`);
     const entry = raw as Record<string, unknown>;
     const at = typeof entry.name === 'string' && entry.name !== '' ? entry.name : `entry ${index + 1}`;
@@ -104,6 +107,40 @@ export function parseManifest(text: string): Mutation[] {
     return { ...(entry as unknown as Mutation) };
   });
 }
+
+// A mutation asked for on the command line is the same object a manifest holds one of: every
+// field is --<its own name>, and mutationsFrom refuses both by the same rules. There is no
+// second list of what may be given, and a field added to FIELDS is a flag with no edit here.
+const BY_BEING_THERE = 'all';
+const MAY_BE_GIVEN_TWICE = 'tests';
+
+export function oneMutationFrom(args: readonly string[]): Mutation[] {
+  const given = new Map<string, string[]>();
+  for (let index = 0; index < args.length; index++) {
+    const flag = args[index];
+    if (!flag.startsWith('--')) throw new Error(`${flag} is not a flag — every part of a mutation is given as --<field>. Takes: ${flagList()}`);
+    const field = flag.slice(2);
+    if (!FIELDS.has(field)) throw new Error(`--${field} is not something a mutation has. Takes: ${flagList()}`);
+    const values = given.get(field) ?? [];
+    if (field === BY_BEING_THERE) {
+      given.set(field, values);
+      continue;
+    }
+    const value = args[index + 1];
+    given.set(field, value === undefined ? values : [...values, value]);
+    index++;
+  }
+
+  const entry: Record<string, unknown> = {};
+  for (const [field, values] of given) {
+    entry[field] = field === BY_BEING_THERE ? true : field === MAY_BE_GIVEN_TWICE ? values : values[0];
+  }
+  // A verdict is reported under a name, and the file it broke is the one worth reading here.
+  entry.name ??= entry.file ?? 'the mutation asked for';
+  return mutationsFrom([entry]);
+}
+
+const flagList = (): string => [...FIELDS].map((field) => `--${field}`).join(', ');
 
 export function outputTail(raw: string, lines = 12): string {
   return raw.split('\n').filter((line) => line.trim() !== '').slice(-lines).join('\n');
@@ -374,6 +411,7 @@ const repoRoot = path.join(import.meta.dirname, '..');
 
 const usage = [
   'Usage: npm run mutate -- <manifest.json>',
+  '       npm run mutate -- --file <path> --find <text> --replace <text> [--tests <path>]',
   '',
   'Applies each mutation in turn, runs the tests it names, restores the file, and',
   'reports which mutations the suite failed to notice. Exits non-zero when any',
@@ -383,6 +421,17 @@ const usage = [
   '  { "name": "c6", "file": "src/x.ts", "find": "<exact text>", "replace": "<text>",',
   '    "tests": ["src/x.test.ts"], "test": "<one test\'s name>", "all": false,',
   '    "note": "what this breaks" }',
+  '',
+  'One mutation can be given on the command line instead, where every field above',
+  'is a flag of its own name and is refused by the same rules. --tests may be',
+  'given more than once, --all is asked for by being there, and --name defaults',
+  'to the file. Text carrying newlines belongs in a manifest, where it escapes.',
+  '',
+  '  npm run mutate -- --file src/x.ts --find "!== undefined" --replace "=== undefined"',
+  '',
+  'With no --tests that asks the whole suite whether anything at all catches the',
+  'break — the question to ask before writing a test that may already be covered,',
+  'and it costs what the suite costs.',
   '',
   'tests is optional, and test narrows further to one named test inside it. Name',
   'the narrowest scope you can: a mutation that dies there is settled, and one',
@@ -578,15 +627,16 @@ export async function warmVitest(root: string): Promise<WarmVitest> {
 }
 
 async function main(): Promise<void> {
-  const manifestPath = process.argv[2];
-  if (manifestPath === undefined || manifestPath === '--help' || manifestPath === '-h') {
+  const args = process.argv.slice(2);
+  const asked = args[0];
+  if (asked === undefined || asked === '--help' || asked === '-h') {
     console.error(usage);
     process.exit(2);
   }
 
   let mutations: Mutation[];
   try {
-    mutations = parseManifest(readFileSync(manifestPath, 'utf8'));
+    mutations = asked.startsWith('--') ? oneMutationFrom(args) : parseManifest(readFileSync(asked, 'utf8'));
   } catch (error) {
     console.error((error as Error).message);
     process.exit(2);

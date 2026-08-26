@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { RunnerTestFile } from 'vitest/node';
-import { applyTo, asLiteralPattern, watchedBy, escapesRoot, filesOf, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, journalPathFor, pidIsAlive, putBackAll, readJournal, recoveryStanding, scopeOf, tallyRun, type Baseline, type BaselineFor, type RunTests, recoverFrom, refusalsFor, runMutations, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
+import { applyTo, asLiteralPattern, oneMutationFrom, watchedBy, escapesRoot, filesOf, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, journalPathFor, pidIsAlive, putBackAll, readJournal, recoveryStanding, scopeOf, tallyRun, type Baseline, type BaselineFor, type RunTests, recoverFrom, refusalsFor, runMutations, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -920,6 +920,53 @@ describe('mutate: a find that missed', () => {
     const refusals = refusalsFor([mutation({ name: 'bad', find: 'const iindented = value;' })], store({ 'a.ts': file }));
     expect(refusals).toHaveLength(1);
     expect(refusals[0]).toContain('file has:  const indented = value;');
+  });
+});
+
+describe('mutate: one mutation asked for on the command line', () => {
+  const asked = (...args: string[]) => oneMutationFrom(args)[0];
+
+  it('takes every field a manifest entry has, under a flag of its own name', () => {
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', 'b', '--test', 'one test', '--tests', 'src/x.test.ts', '--note', 'why')).toEqual({
+      name: 'src/x.ts',
+      file: 'src/x.ts',
+      find: 'a',
+      replace: 'b',
+      test: 'one test',
+      tests: ['src/x.test.ts'],
+      note: 'why',
+    });
+  });
+
+  it('names the verdict after the file it breaks, unless a name was asked for', () => {
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', 'b').name).toBe('src/x.ts');
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', 'b', '--name', 'c6').name).toBe('c6');
+  });
+
+  it('collects a scope given a file at a time', () => {
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', 'b', '--tests', 'one.test.ts', '--tests', 'two.test.ts').tests).toEqual(['one.test.ts', 'two.test.ts']);
+  });
+
+  it('takes all by its being there, since it is the one field that is not a value', () => {
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', 'b', '--all').all).toBe(true);
+  });
+
+  it('takes an empty replace, which is how a find is deleted rather than changed', () => {
+    expect(asked('--file', 'src/x.ts', '--find', 'a', '--replace', '').replace).toBe('');
+  });
+
+  it('offers every field a mutation has when it is handed one that is not', () => {
+    expect(() => oneMutationFrom(['--scope', 'src/x.test.ts'])).toThrow(/--scope is not something a mutation has.*--file.*--find.*--replace/s);
+  });
+
+  it('refuses a bare word, since there is nowhere for it to belong', () => {
+    expect(() => oneMutationFrom(['src/x.ts', '--find', 'a'])).toThrow(/src\/x\.ts is not a flag/);
+  });
+
+  it('is refused by the rules a manifest is refused by, and in the same words', () => {
+    expect(() => oneMutationFrom(['--find', 'a', '--replace', 'b'])).toThrow(/file is required and must be a non-empty string/);
+    expect(() => oneMutationFrom(['--file', 'src/x.ts', '--find', 'a'])).toThrow(/replace is required/);
+    expect(() => oneMutationFrom(['--file', 'src/x.ts', '--find', 'a', '--replace', 'b', '--test', 'one'])).toThrow(/tests must name the file it lives in/);
   });
 });
 
