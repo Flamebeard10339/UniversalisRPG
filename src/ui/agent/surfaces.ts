@@ -78,6 +78,11 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
         else controls.stop();
       },
       drop: (value) => controls.drop(String(value)),
+      rename: (value) => {
+        const { run, to } = (value ?? {}) as { run?: unknown; to?: unknown };
+        if (typeof run !== 'string' || typeof to !== 'string') throw new Error('a rename is a { run, to } of two names');
+        controls.rename(run, to);
+      },
       attach: (value) => {
         if (log === null) throw new Error('no run is being recorded');
         const about = feedbackOn(log);

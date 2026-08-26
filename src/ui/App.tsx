@@ -247,6 +247,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           playtest={snapshot.playtest !== null}
           onPlaytest={(on) => (on ? driver.playtest.start() : driver.playtest.stop())}
           runs={driver.playtest.filed()}
+          onReplayRun={driver.replay.watching}
+          onRenameRun={driver.playtest.rename}
           onDropRun={driver.playtest.drop}
         />
       ) : null;

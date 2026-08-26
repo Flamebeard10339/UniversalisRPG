@@ -1,6 +1,6 @@
 import type { LocalSection } from '../content/localChanges';
 import type { Answer } from './localized';
-import { dropLocalSections, noted, stagedSections, stageLocalSections, type CommandContext, type CommandResult } from './command';
+import { dropLocalSections, noted, refusedLine, stagedSections, stageLocalSections, type CommandContext, type CommandResult } from './command';
 import { runAsSections, runSections, RUN_SECTION, startsAtSave, type KeptRun, type RunHeader, type SectionAddress } from './runLog';
 import { createGameState } from './runtime';
 import { loadSave, savedGameFromSerialized } from './save';
@@ -63,4 +63,51 @@ export function dropRun(ctx: CommandContext, id: string): CommandResult {
   const run = stagedRuns(ctx).find((each) => each.id === id);
   if (!run) return noted('error', `no run called ${id} is filed here.`);
   return dropLocalSections(ctx, run.sections);
+}
+
+const escaped = (id: string): string => id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// The names a rename swaps, derived from what a run of each name is filed as rather than by
+// spelling the suffixes a second time: whatever runSections says a run's addresses are, those are
+// the words that move.
+function swappedIds(from: string, to: string): (line: string) => string {
+  const named = runSections(to);
+  const swaps = new Map(runSections(from).map((at, index) => [at.id, named[index].id]));
+  // Longest first, so the id of a run is not read out of the id of its start.
+  const ids = [...swaps.keys()].sort((one, other) => other.length - one.length).map(escaped);
+  const naming = new RegExp(`(?<![\\w-])(${ids.join('|')})(?![\\w-])`, 'g');
+  return (line) => line.replace(naming, (id) => swaps.get(id) ?? id);
+}
+
+// A section under its new name. Every heading names the run; only the `# test` says the names again
+// in its body, where it loads the save it walks forward from and expects the one it ends on. A
+// saved game's bytes are the world's and are left exactly as they were recorded.
+function renamedSection(section: LocalSection, swap: (line: string) => string): string {
+  const [heading, ...body] = section.text.split('\n');
+  return [swap(heading), ...(section.kind === RUN_SECTION ? body.map(swap) : body)].join('\n');
+}
+
+// Renaming a run moves every section it is filed as, because a run minted its name from the instant
+// it started and an author reading a list of them wants to know which was which. The renamed
+// sections are staged before the old ones are dropped, so a name the language refuses leaves the
+// run standing where it was.
+export function renameRun(ctx: CommandContext, id: string, to: string): CommandResult {
+  const staged = stagedSections(ctx);
+  const filed = filedRuns(staged);
+  const run = filed.find((each) => each.id === id);
+  if (!run) return noted('error', `no run called ${id} is filed here.`);
+  if (to === id) return noted('error', `${id} is what it is already called.`);
+  if (filed.some((each) => each.id === to)) return noted('error', `a run called ${to} is filed here already.`);
+
+  const swap = swappedIds(id, to);
+  const held = new Map(staged.map((section) => [`${section.kind} ${section.id}`, section]));
+  const renamed = run.sections.flatMap((at) => {
+    const section = held.get(`${at.kind} ${at.id}`);
+    return section === undefined ? [] : [renamedSection(section, swap)];
+  });
+
+  const written = stageLocalSections(ctx, renamed);
+  if (refusedLine(written)) return written;
+  const dropped = dropLocalSections(ctx, run.sections);
+  return { ...dropped, output: [...written.output, ...dropped.output] };
 }

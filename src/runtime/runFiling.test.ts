@@ -4,7 +4,7 @@ import { initialLocalChangesModule, listLocalSections, localSectionHeadings } fr
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import type { ModuleSource } from '../content/universe';
 import { newContext, stagedSections, type AuthoringContext, type CommandContext, type CommandResult } from './command';
-import { dropRun, fileRun, filedRuns, stagedRuns } from './runFiling';
+import { dropRun, fileRun, filedRuns, renameRun, stagedRuns } from './runFiling';
 import { runAsSections, type KeptRun } from './runLog';
 import { serializeSession, startSession, view } from './session';
 
@@ -127,5 +127,62 @@ describe('a filed run is the sections filing wrote, and dropping one takes those
     file(ctx, 'run-one');
 
     expect(stagedSections(ctx)).toEqual(listLocalSections(onDisk()));
+  });
+});
+
+describe('renaming a filed run moves every section it is filed as', () => {
+  it('carries the run and its saves across, and leaves the world holding the run under the new name alone', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+
+    expect(errors(renameRun(ctx, 'run-one', 'run-fishing'))).toEqual([]);
+
+    expect(localSectionHeadings(onDisk())).toEqual(['# save run-fishing-start', '# test run-fishing']);
+    expect(stagedRuns(ctx).map((run) => run.id)).toEqual(['run-fishing']);
+    expect([...ctx.session.registry.tests.keys()]).toEqual(['local-changes.run-fishing']);
+    expect([...ctx.session.registry.saves.keys()]).toEqual(['local-changes.run-fishing-start']);
+  });
+
+  it('renames the saves the run names inside itself, so the renamed run still loads where it began', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+
+    renameRun(ctx, 'run-one', 'run-fishing');
+
+    const walked = listLocalSections(onDisk()).find((section) => section.kind === 'test')!;
+    expect(walked.text).not.toContain('run-one');
+    expect(walked.text).toContain('load: run-fishing-start');
+  });
+
+  it('leaves every other run standing', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+    file(ctx, 'run-two');
+
+    renameRun(ctx, 'run-one', 'run-fishing');
+
+    expect(stagedRuns(ctx).map((run) => run.id).sort()).toEqual(['run-fishing', 'run-two']);
+    expect(localSectionHeadings(onDisk())).toContain('# save run-two-start');
+  });
+
+  it('says so and writes nothing when the run named is not filed here, when the name is its own, or when it is another run’s', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+    file(ctx, 'run-two');
+    const before = onDisk();
+
+    expect(errors(renameRun(ctx, 'run-three', 'run-fishing'))).toEqual(['no run called run-three is filed here.']);
+    expect(errors(renameRun(ctx, 'run-one', 'run-one'))).toEqual(['run-one is what it is already called.']);
+    expect(errors(renameRun(ctx, 'run-one', 'run-two'))).toEqual(['a run called run-two is filed here already.']);
+    expect(onDisk()).toBe(before);
+  });
+
+  it('leaves the run standing under its old name when the language refuses the new one', () => {
+    const { ctx, onDisk } = standing();
+    file(ctx, 'run-one');
+    const before = onDisk();
+
+    expect(errors(renameRun(ctx, 'run-one', 'a name with spaces'))).not.toEqual([]);
+    expect(onDisk()).toBe(before);
   });
 });

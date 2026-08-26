@@ -5,10 +5,10 @@ import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
-import { type AuthoringContext, createTicker, liveAgain, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, liveAgain, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type CommandResult, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
-import { dropRun, fileRun, stagedRuns, type FiledRun } from '../runtime/runFiling';
+import { dropRun, fileRun, renameRun, stagedRuns, type FiledRun } from '../runtime/runFiling';
 import type { Answer } from '../runtime/localized';
 import type { Directive } from '../content/sections/test';
 import { advances, clamped, REPLAY_SPEED } from './replay';
@@ -91,6 +91,8 @@ export interface PlaytestControls {
   filed(): readonly FiledRun[];
   // Dropping one, both its sections in the one edit that files them.
   drop(run: string): void;
+  // Renaming one, every section it is filed as moving together.
+  rename(run: string, to: string): void;
 }
 
 export interface Driver {
@@ -222,6 +224,13 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   const changing = (act: () => void): void => {
     act();
     current = { ...current, playtest: record.run() };
+    publish();
+  };
+
+  // An edit to the runs filed in the game: the world it leaves behind, and whatever the edit said
+  // about itself, said where every other command's words are said.
+  const filing = (result: CommandResult): void => {
+    current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     publish();
   };
 
@@ -450,11 +459,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       moved: (where) => changing(() => record.moved(where)),
       written: () => record.written(),
       filed: () => stagedRuns(context),
-      drop: (run) => {
-        const result = dropRun(context, run);
-        current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
-        publish();
-      },
+      drop: (run) => filing(dropRun(context, run)),
+      rename: (run, to) => filing(renameRun(context, run, to)),
     },
     reopen,
     clearLocalChanges: () => {

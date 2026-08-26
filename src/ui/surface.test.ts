@@ -67,6 +67,7 @@ const DISPATCHES = [
   'fileRun',
   'stagedRuns',
   'dropRun',
+  'renameRun',
   'runLine',
   'serializeSession',
   'sessionLocalizer',

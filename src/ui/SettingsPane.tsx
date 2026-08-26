@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DevOnly } from './DevOnly';
 import { devLine, RATES, speedLine } from './devMode';
 import type { Localizer } from '../runtime/localized';
@@ -59,27 +60,74 @@ function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: 
   );
 }
 
-// The runs already filed into the game, and the one thing that can be done to one here. They pile
-// up two sections at a time and nothing prunes them on a clock — a run the author has not exported
-// yet is theirs to keep — so this is where they go.
-function Runs({ runs, words, localizer, onDrop }: { runs: readonly FiledRun[]; words: Words; localizer: Localizer; onDrop: (run: string) => void }): JSX.Element {
+const RUN_CONTROL = 'shrink-0 rounded-xl border border-border bg-surface px-3 text-sm text-text-subtle transition-transform duration-75 active:scale-[0.97]';
+
+// One filed run and the three things that can be done to it: watched back, renamed, or dropped.
+// Renaming asks here rather than through a screen — the name is one word about a row that is
+// already on the page, and the row is where it is read.
+function Run({ run, renaming, words, localizer, onRenaming, onReplay, onRename, onDrop }: { run: FiledRun; renaming: string | null; words: Words; localizer: Localizer; onRenaming: (name: string | null) => void; onReplay: () => void; onRename: (to: string) => void; onDrop: () => void }): JSX.Element {
+  if (renaming !== null) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          data-drive="none: the name is answered with the run in one act, which playtest.rename takes whole"
+          type="text"
+          value={renaming}
+          aria-label={words('playtest-renaming', { run: localizer.identifier(run.id) })}
+          onChange={(event) => onRenaming(event.target.value)}
+          className="mr-auto min-w-0 flex-1 select-text rounded-xl border border-border bg-surface px-3 text-sm text-text outline-none focus:border-accent"
+        />
+        <button data-drive="playtest.rename" type="button" onClick={() => onRename(renaming)} className={RUN_CONTROL}>
+          {words('playtest-rename')}
+        </button>
+        <button data-drive="none: leaving the name unanswered leaves the run exactly as it was filed" type="button" onClick={() => onRenaming(null)} className={RUN_CONTROL}>
+          {words('playtest-discard')}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="mr-auto truncate text-xs">{localizer.identifier(run.id)}</span>
+      <button data-drive="replay.watching" data-run={run.id} type="button" onClick={onReplay} className={RUN_CONTROL}>
+        {words('playtest-replay')}
+      </button>
+      <button data-drive="none: the name is answered with the run in one act, which playtest.rename takes whole" data-run={run.id} type="button" onClick={() => onRenaming(run.id)} className={RUN_CONTROL}>
+        {words('playtest-rename')}
+      </button>
+      <button data-drive="playtest.drop" data-run={run.id} type="button" onClick={onDrop} className={RUN_CONTROL}>
+        {words('playtest-drop')}
+      </button>
+    </div>
+  );
+}
+
+// The runs already filed into the game, and what can be done to one here. They pile up two sections
+// at a time and nothing prunes them on a clock — a run the author has not exported yet is theirs to
+// keep — so this is where they go.
+function Runs({ runs, words, localizer, onReplay, onRename, onDrop }: { runs: readonly FiledRun[]; words: Words; localizer: Localizer; onReplay: (run: string) => void; onRename: (run: string, to: string) => void; onDrop: (run: string) => void }): JSX.Element {
+  const [renaming, setRenaming] = useState<{ run: string; to: string } | null>(null);
+
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
       <span className="text-xs uppercase tracking-wide text-text-subtle">{words('playtest-runs')}</span>
       {runs.length === 0 ? <span className="text-xs text-text-subtle">{words('playtest-none')}</span> : null}
       {runs.map((run) => (
-        <div key={run.id} className="flex items-center gap-2">
-          <span className="mr-auto truncate text-xs">{localizer.identifier(run.id)}</span>
-          <button
-            data-drive="playtest.drop"
-            data-run={run.id}
-            type="button"
-            onClick={() => onDrop(run.id)}
-            className="shrink-0 rounded-xl border border-border bg-surface px-3 text-sm text-text-subtle transition-transform duration-75 active:scale-[0.97]"
-          >
-            {words('playtest-drop')}
-          </button>
-        </div>
+        <Run
+          key={run.id}
+          run={run}
+          renaming={renaming?.run === run.id ? renaming.to : null}
+          words={words}
+          localizer={localizer}
+          onRenaming={(name) => setRenaming(name === null ? null : { run: run.id, to: name })}
+          onReplay={() => onReplay(run.id)}
+          onRename={(to) => {
+            setRenaming(null);
+            onRename(run.id, to);
+          }}
+          onDrop={() => onDrop(run.id)}
+        />
       ))}
     </div>
   );
@@ -97,6 +145,8 @@ export function SettingsPane({
   playtest,
   onPlaytest,
   runs,
+  onReplayRun,
+  onRenameRun,
   onDropRun,
 }: {
   dev: boolean;
@@ -110,6 +160,8 @@ export function SettingsPane({
   playtest: boolean;
   onPlaytest: (recording: boolean) => void;
   runs: readonly FiledRun[];
+  onReplayRun: (run: string) => void;
+  onRenameRun: (run: string, to: string) => void;
   onDropRun: (run: string) => void;
 }): JSX.Element {
   return (
@@ -145,7 +197,7 @@ export function SettingsPane({
         />
       </label>
 
-      <Runs runs={runs} words={words} localizer={localizer} onDrop={onDropRun} />
+      <Runs runs={runs} words={words} localizer={localizer} onReplay={onReplayRun} onRename={onRenameRun} onDrop={onDropRun} />
 
       <DevOnly dev={dev}>
         <Rates speed={speed} words={words} onSend={onSend} />

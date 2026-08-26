@@ -230,6 +230,9 @@ engine.playtest.stop: Stop recording
 engine.playtest.runs: Runs in the game
 engine.playtest.none: No runs are in the game.
 engine.playtest.drop: Drop
+engine.playtest.rename: Rename
+engine.playtest.renaming: A new name for {run}
+engine.playtest.replay: Watch
 engine.playtest.about: About {line}
 engine.playtest.note: What you were doing, and why
 engine.playtest.expected: Something you reached for and could not do
