@@ -4,6 +4,7 @@ dependencies:
   core
   tulsa
   cooking
+  fishing
   thieving
 
 // The whole of the tutorial quest: what the journal reads at each stage, what
@@ -138,7 +139,7 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: I went back and apologised. Miki took it, and put a price on it: one fish, out of his own net.
+  log: I went back and apologised. Miki took it, and put a price on it: one catch out of the pond behind his house, in a net he lent me.
   // Not sticky: the node hands over a net, and sticky replays a node whole, so
   // a player who talked this through four times walked away with four nets.
   // `again:` is the other half of that pair — the offer is made once, and what
@@ -146,13 +147,13 @@ stage apologised:
   first-steps.miki says:
     always
     ask: About squaring it with you.
-    again: The net's yours already. One fish out of it and we're square.
-    give: core.fishing-net
-    Take the net. Bring me one fish out of it and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one fish caught with the net instead, a plain item check
+    again: The net's yours already. One shrimp out of the pond and we're square.
+    give: fishing.small-fishing-net
+    Take the net - there's a pond out the back, and shrimp in it. Bring me one and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one shrimp netted out of the pond behind the house instead, a plain item check
   first-steps.miki says:
-    when: has core.fish
-    ask: I caught you your fish.
-    A fish. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
+    when: has fishing.raw-shrimp
+    ask: I netted you your shrimp.
+    Shrimp. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
     set: first-steps.front-door.unlocked
     goto sendoff
 
@@ -250,7 +251,8 @@ expect only: left-mikis-house
 // drops, the visits, the xp, the pools, the clock and the rng cursor. A scalar
 // field a save names is compared whole either way, so the clock and the cursor
 // are pinned here as firmly as `expect:` pinned them; what `expect only:` lets
-// go is the keys this sheet never named. Regenerate with /create-valid-test
+// go is the keys this sheet never named.
+// Regenerate with npm run probe -- content --record first-steps.miki-route-full
 // when the route's content changes on purpose.
 expect only: miki-route-end
 
@@ -288,13 +290,19 @@ assert: not first-steps.front-door.unlocked
 // because a band here would also hold in a world where the window cost twenty.
 assert: resource.core.health = 26.31
 expect only: left-mikis-house
-// Regenerate with /create-valid-test when this route's content changes on
-// purpose. See thieving-route-full-end for why this isn't miki-route-end.
+// Regenerate with npm run probe -- content --record first-steps.thieving-route-full
+// when this route's content changes on purpose. See thieving-route-full-end for
+// why this isn't miki-route-end.
 expect only: thieving-route-full-end
 
-// --- apology route: snub Miki, apologise, take the net, catch a fish, and
-// the door opens the ordinary way. Converges on Miki's usual sendoff, since
-// that line no longer says which route earned it.
+// --- apology route: snub Miki, apologise, take the net, net a shrimp out of the
+// pond behind the house, and the door opens the ordinary way. Converges on Miki's
+// usual sendoff, since that line no longer says which route earned it.
+//
+// The net and the water are both the world's own, so this route is also the claim
+// that the tackle Miki lends works on the shoals the rest of the game is built
+// out of: `net the shrimp` refuses anyone without one of the two nets, and it is
+// Miki's that answers for it here.
 
 # test apology-route-full
 talk: first-steps.miki
@@ -303,19 +311,19 @@ talk: first-steps.miki
 choose: Actually - sorry. Show me the ropes after all.
 talk: first-steps.miki
 choose: continue
-assert: has core.fishing-net
+assert: has fishing.small-fishing-net
 // Talked through twice more before going fishing. The offer stands as long as
-// the fish is owed, so the line keeps being reachable; what it must not do is
+// the catch is owed, so the line keeps being reachable; what it must not do is
 // keep paying out, which is what the count below is here for.
 talk: first-steps.miki
 choose: continue
 talk: first-steps.miki
 choose: continue
-assert: inventory.core.fishing-net = 1
-use: entity.stairs.ascend
-use: entity.window.fish
-assert: has core.fish
-use: entity.stairs-down.descend
+assert: inventory.fishing.small-fishing-net = 1
+use: entity.back-door.step-out-back
+use: entity.fishing.shrimp-shoal.net-the-shrimp until has fishing.raw-shrimp
+assert: has fishing.raw-shrimp
+use: entity.back-door-in.step-inside
 talk: first-steps.miki
 choose: continue
 assert: finding-your-feet.sendoff
@@ -330,8 +338,9 @@ choose: continue
 assert: leave-tutorial-island.adrift
 travel: market-square
 expect only: left-mikis-house
-// Regenerate with /create-valid-test when this route's content changes on
-// purpose. See apology-route-full-end for why this isn't miki-route-end.
+// Regenerate with npm run probe -- content --record first-steps.apology-route-full
+// when this route's content changes on purpose. See apology-route-full-end for
+// why this isn't miki-route-end.
 expect only: apology-route-full-end
 
 // bake-bread is left by a line Miki says and not by a `done when:`, so one
@@ -379,11 +388,11 @@ assert: finding-your-feet.apologised
 talk: first-steps.miki
 choose: finding-your-feet.apologised.miki.0.said
 choose: continue
-assert: has core.fishing-net
-use: entity.stairs.ascend
-use: entity.window.fish
-assert: has core.fish
-use: entity.stairs-down.descend
+assert: has fishing.small-fishing-net
+use: entity.back-door.step-out-back
+use: entity.fishing.shrimp-shoal.net-the-shrimp until has fishing.raw-shrimp
+assert: has fishing.raw-shrimp
+use: entity.back-door-in.step-inside
 talk: first-steps.miki
 choose: finding-your-feet.apologised.miki.1.said
 choose: continue
@@ -434,9 +443,13 @@ assert: player.name and player.race
 // is the shape of test this branch's audit caught. The whole sheet is what tells
 // the two apart: `luck vs 60` and the table behind it move the rng cursor
 // whether or not they yield anything, and `expect:` is what pins that.
-// Regenerate with /create-valid-test when the drawer's odds change on purpose.
+// Regenerate with npm run probe -- content --record first-steps.dresser-trinket
+// when the drawer's odds change on purpose.
+// The landing is not on the map until it has been stood in, so the stairs are
+// how a fresh game first gets to it — which is the same first climb a player
+// makes, and the reason this line is not a `travel:`.
 # test dresser-trinket
-travel: guide-house-upstairs
+use: entity.stairs.ascend
 use: entity.dresser.search-drawer
 assert: has lockpick
 assert: searched
@@ -455,6 +468,28 @@ assert: not market-square.touched
 assert: guide-house.touched
 assert: xp.thieving = 4
 assert: time >= 4
+
+// The house is walked into and not read off the map: a room of it reaches the
+// map by being stood in and not before, which is why every road out of the front
+// room carries a clause. The landing stands for all of them — the clause is the
+// mechanism and it is the same one on the cellar and the yard, so a room this
+// house grows next is covered by copying the line rather than by editing this.
+// A fresh game therefore opens with the front room on the map and nothing else.
+# test a-room-of-this-house-reaches-the-map-by-being-stood-in
+load: miki-route-start
+assert: guide-house.discovered and not guide-house-upstairs.discovered
+use: entity.stairs.ascend
+assert: guide-house-upstairs.discovered
+
+// Miki's oven is a stove as well as an oven, so the shrimp that comes out of the
+// pond behind his house is cooked on it by the world's own recipe, at the same
+// station the tavern's bar stove opens. What the contest then makes of it is
+// cooking's business; that the raw shrimp is spent at all is what says the
+// station answered.
+# test the-tutorial-oven-cooks-what-the-tutorial-catches
+load: shrimp-at-mikis-oven
+craft: cooked-shrimp
+assert: not has fishing.raw-shrimp
 
 # test save-restores-object-owned-flags
 load: explored-and-unlocked
@@ -494,19 +529,21 @@ assert: first-steps.rats-killed = 1
 // --- saves ---
 
 // What all three routes out of the house genuinely land on, named once
-// instead of asserted three times: the same square, the same house explored,
-// the same quest picked up. `finding-your-feet.sendoff` and
-// `front-door.unlocked` are each true for two of the three routes and false
-// for the third — the thief never gets the ordinary sendoff — so those two
-// stay proven by each route's own `assert:` instead.
+// instead of asserted three times: the same square, the same front room, the
+// same quest picked up. No other room of the house is in it — a room reaches
+// the map by being stood in, and the three routes stand in three different
+// ones. `finding-your-feet.sendoff` and `front-door.unlocked` are each true
+// for two of the three routes and false for the third — the thief never gets
+// the ordinary sendoff — so those two stay proven by each route's own
+// `assert:` instead.
 # save left-mikis-house
-{"version":13,"location":"tulsa.market-square","flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"first-steps.finding-your-feet.offered":true,"tulsa.market-square.discovered":true,"tulsa.market-square.touched":true,"first-steps.leave-tutorial-island.adrift":true}}
+{"version":13,"location":"tulsa.market-square","flags":{"first-steps.guide-house.discovered":true,"first-steps.finding-your-feet.offered":true,"tulsa.market-square.discovered":true,"tulsa.market-square.touched":true,"first-steps.leave-tutorial-island.adrift":true}}
 
 # save miki-route-start
 {"version":13}
 
 # save miki-route-end
-{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":8,"core.rat-tail":1},"flags":{"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.name-yourself":true,"first-steps.mirror-done":true,"first-steps.finding-your-feet.bake-bread":true,"first-steps.finding-your-feet.clear-the-rats":true,"first-steps.basement.touched":true,"first-steps.rats-killed":3,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.name-yourself.miki.1.said":1,"first-steps.finding-your-feet.bake-bread.miki.1.said":1,"first-steps.finding-your-feet.clear-the-rats.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"cooking.cooking":6,"combat.attack":127,"combat.health":97},"resources":{"core.health":25185},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"first-steps.basement":{"first-steps.giant-rat":{"down":3,"due":[]}}},"time":28400,"rng":1498481104,"player":{"name":"Rowan","race":"core.elf"}}
+{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":8,"core.rat-tail":1},"flags":{"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.name-yourself":true,"first-steps.mirror-done":true,"first-steps.finding-your-feet.bake-bread":true,"first-steps.finding-your-feet.clear-the-rats":true,"first-steps.basement.touched":true,"first-steps.basement.discovered":true,"first-steps.rats-killed":3,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.name-yourself.miki.1.said":1,"first-steps.finding-your-feet.bake-bread.miki.1.said":1,"first-steps.finding-your-feet.clear-the-rats.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"cooking.cooking":6,"combat.attack":127,"combat.health":97},"resources":{"core.health":25235},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"first-steps.basement":{"first-steps.giant-rat":{"down":3,"due":[]}}},"time":34400,"rng":1498481104,"player":{"name":"Rowan","race":"core.elf"}}
 
 // The thief's own closing sheet — not the door route's. A route that never
 // bakes or fights lands on different holdings, a different clock and a
@@ -514,14 +551,14 @@ assert: first-steps.rats-killed = 1
 // sheets; what genuinely converges across all of them is left-mikis-house,
 // which each of them also closes on.
 # save thieving-route-full-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.miki.angered":true,"first-steps.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":26310},"location":"tulsa.market-square","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true,"first-steps.guide-house.touched":true,"first-steps.miki.angered":true,"first-steps.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":26310},"location":"tulsa.market-square","time":9000,"rng":2617077404}
 
 // The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
-{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}
+{"version":13,"inventory":{"fishing.small-fishing-net":1,"fishing.raw-shrimp":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.backyard.touched":true,"first-steps.backyard.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"fishing.fishing":18},"location":"tulsa.market-square","time":17000,"rng":582581775}
 
 # save dresser-trinket-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true},"location":"first-steps.guide-house-upstairs","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true},"location":"first-steps.guide-house-upstairs","time":3000,"rng":2617077404}
 
 # save explored-and-unlocked
 {"version":13,"flags":{"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true}}
@@ -530,6 +567,11 @@ assert: first-steps.rats-killed = 1
 // raw chestnut, so this save is the only way the continuous cadence is reached.
 # save chestnuts-in-hand
 {"version":13,"inventory":{"core.raw-chestnut":3}}
+
+// Standing at the oven with the pond's own catch in hand, which is what says the
+// oven is a stove: the shrimp came out of the water behind the house.
+# save shrimp-at-mikis-oven
+{"version":13,"location":"first-steps.guide-house","inventory":{"fishing.raw-shrimp":1}}
 
 // A purse with the price of a second look in it, and a purse a coin short of
 // one, standing in the room the mirror is in.
@@ -630,8 +672,8 @@ look in again:
     say: You need 1000 coin to perform this action.
 
 # entity oven
-examine: A stone oven, its coals still glowing.
-stations: oven
+examine: A stone oven, its coals still glowing. The top of it is flat and takes a pan, which is the whole difference between an oven and a kitchen.
+stations: oven, stove
 roast chestnuts:
   continuous
   requires: has raw-chestnut
@@ -642,30 +684,47 @@ roast chestnuts:
   on success:
     say: Another chestnut pops from the embers, roasted through.
 
+// A flight of stairs is a leg of the journey and is paid for like one, at the
+// same three seconds the road out of the house costs.
 # entity stairs
 title: Stairs
 ascend:
-  instant
+  time: 3
   relocate: guide-house-upstairs
   say: You climb to the second floor.
 descend:
-  instant
+  time: 3
   relocate: basement
   say: You head down into the basement.
 
 # entity stairs-down
 title: Stairs
 descend:
-  instant
+  time: 3
   relocate: guide-house
   say: You head back down to the ground floor.
 
 # entity stairs-up
 title: Stairs
 ascend:
-  instant
+  time: 3
   relocate: guide-house
   say: You climb back up to the ground floor.
+
+# entity back-door
+title: Back Door
+examine: A plank door at the back of the room, swollen in its frame, with green light coming round the edge of it.
+step out back:
+  time: 3
+  relocate: backyard
+  say: You lean on the door until it gives, and step out into the yard.
+
+# entity back-door-in
+title: Back Door
+step inside:
+  time: 3
+  relocate: guide-house
+  say: You duck back in out of the wet.
 
 # entity dresser
 examine: A dusty dresser, one drawer left slightly ajar.
@@ -687,12 +746,6 @@ climb out:
   relocate: market-square
   drain: 5 health
   say: You get a leg over the sill, hang off it as long as your arms will have it, and let go. The sand takes most of the drop and your ankles take the rest, and the road into town is right there.
-fish:
-  instant
-  requires: has fishing-net
-  hidden if: has fish
-  give: 1 fish
-  say: You drop the net off the sill and haul it up hand over hand. One fish in it, and it is not pleased about any part of this.
 
 // 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
 // rat falls in about six seconds and lands a bite or two on the way out. It
@@ -716,14 +769,19 @@ x: 0, y: 0
 starting
 examine: A cluttered but cozy cottage. Miki's guide house.
 adjacent:
-  guide-house-upstairs
-  basement
+  // This house is walked into rather than read off the map. Without these three
+  // clauses a player who has not moved yet has the landing, the cellar and the
+  // yard on the map already; the stairs and the back door are how each is first
+  // reached, and the map is what has them from then on.
+  guide-house-upstairs while guide-house-upstairs.touched
+  basement while basement.touched
+  backyard while backyard.touched
   // The road back in is this same edge read from the far end, so it carries this
   // same condition: without the second clause, dropping out of the window with the
   // door still shut would leave the house unreachable from the square.
   market-square while front-door.unlocked or market-square.touched
 entities:
-  miki, front-door, stairs, mirror, oven
+  miki, front-door, stairs, mirror, oven, back-door
 
 # location guide-house-upstairs
 x: 0, y: 0, z: 1
@@ -740,3 +798,14 @@ adjacent:
   guide-house
 entities:
   3 giant-rat, stairs-up
+
+// The water the tutorial teaches on is the same water the rest of the world has:
+// the shoal standing here is the one the riverside stands on, so a net that works
+// in this yard works in the river and a net that does not works in neither.
+# location backyard
+x: -1, y: 0
+examine: A strip of grass behind the house, walled on three sides, with a pond at the end of it deeper than it has any business being.
+adjacent:
+  guide-house
+entities:
+  fishing.shrimp-shoal, back-door-in
