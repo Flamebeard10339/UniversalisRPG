@@ -7,6 +7,9 @@ import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
+# variable engagement-seconds
+value: 0
+
 # stat attack
 base: 10
 

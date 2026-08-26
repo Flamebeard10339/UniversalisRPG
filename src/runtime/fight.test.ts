@@ -555,6 +555,9 @@ describe('an action under way is bounded in the time of the world it runs in', (
 });
 
 const FAINTS = `
+# variable engagement-seconds
+value: 0
+
 # stat attack
 base: 4
 

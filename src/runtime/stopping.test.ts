@@ -7,6 +7,9 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE = `
+# variable engagement-seconds
+value: 0
+
 # stat attack
 base: 10
 

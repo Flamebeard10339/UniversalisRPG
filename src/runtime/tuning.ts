@@ -1,5 +1,6 @@
 import type { Registry } from '../content/registry';
-import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, INVENTORY_SLOTS, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
+import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, ENGAGEMENT_SECONDS, INVENTORY_SLOTS, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
+import { secondsToMs } from './units';
 
 const DEFAULT_TRAVEL_SECONDS = 3;
 
@@ -33,4 +34,11 @@ export function defaultActionDuration(registry: Registry): number {
 // plays at is `content/core.dsl`'s to say and nobody else's.
 export function inventorySlots(registry: Registry): number {
   return Math.max(0, registry.variables.get(INVENTORY_SLOTS)?.value ?? 0);
+}
+
+// The beat between a room noticing you and something in it coming at you, and the same beat between
+// one foe falling and the next being found. A world that names no beat has none — whatever comes at
+// you there arrives the instant you do, which is what every world played before this did.
+export function engagementDelay(registry: Registry): number {
+  return Math.max(0, secondsToMs(registry.variables.get(ENGAGEMENT_SECONDS)?.value ?? 0));
 }
