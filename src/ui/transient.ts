@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect } from 'react';
 import { LIVE_TICK_MS } from '../runtime/command';
 import { merged, NOTICE_LIFETIME_MS, sayingOf, type Notice, type Shown } from './notice';
+import { useMedia } from './wide';
 
 export const SETTLE_MS = 220;
 
-export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway' | 'speak';
+export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway';
 
 const DRAWN_AS: Record<MomentKind, string> = {
   arrival: 'arrived',
@@ -12,17 +13,28 @@ const DRAWN_AS: Record<MomentKind, string> = {
   darken: 'darkened',
   settle: `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)`,
   sprout: 'sprouted',
-  speak: 'spoken',
   linger: 'lingered',
   deny: 'denied',
   underway: 'underway',
 };
+
+const LESS_MOTION = '(prefers-reduced-motion: reduce)';
+
+// The same preference the stylesheet answers, put to a caller that has to pace something in
+// JavaScript because no stylesheet can pace it. Neither side holds a copy: both ask the browser.
+export const useMotionless = (): boolean => useMedia(LESS_MOTION);
 
 export const FILL_TRANSITION = { transitionProperty: 'width', transitionTimingFunction: 'linear', transitionDuration: `${LIVE_TICK_MS}ms` };
 
 export const playedAfter = (ms: number): { animationDelay: string; animationFillMode: 'backwards' } => ({ animationDelay: `${ms}ms`, animationFillMode: 'backwards' });
 
 export const STIRRING = 'stirring';
+
+// A road being walked, and the same road drawn from the other end than the one it is walked from, so
+// that what marches along it marches the way the player is going either way round.
+export const MARCHING = 'marching';
+
+export const MARCHING_BACK = 'marching marching-back';
 
 export interface Moment {
   id: number;

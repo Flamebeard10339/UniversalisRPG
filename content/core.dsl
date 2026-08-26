@@ -319,14 +319,6 @@ shield, +2 defense
 examine: A bent sliver of metal, worn smooth from use.
 thieving-tool
 
-# item fishing-net
-examine: A weighted throw net, the mesh mended in three places with line that does not match.
-value: 20
-
-# item fish
-examine: Whatever came up in the net. Bright, cold, and still working its gills.
-value: 3
-
 # item jug-of-water
 examine: A clay jug of clean water.
 value: 1

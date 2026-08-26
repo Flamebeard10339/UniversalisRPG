@@ -91,7 +91,7 @@ describe('play-cli renders what a command result says happened', () => {
 
     expect(lines[0]).toBe('Guide House (first-steps.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
-    expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
+    expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
     expect(lines[3]).toBe('Health: ██████████ 31.3/31.3');
     expect(lines).toContain('  1) [Presence] Miki: Talk to Miki');
     expect(lines).toContain('  2) [Presence] Miki: Examine');
@@ -107,7 +107,7 @@ describe('play-cli renders what a command result says happened', () => {
     expect(unread).toContain('?');
     expect(unread).not.toContain('Miki');
 
-    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
+    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {
@@ -167,14 +167,14 @@ describe('play-cli renders what a command result says happened', () => {
     runLine(ctx, '/wait 7');
     const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [`${row.title} (${row.id})`, row.value])));
     const state = shown(runLine(ctx, '/state'));
-    // Every line the readout is made of, and no other. What the town holds beyond the three rooms
-    // walked to here is the world's size rather than this readout's shape, so the two lines that
-    // count it are read for their form.
-    expect(state).toHaveLength(13);
+    // Every line the readout is made of, and no other. What the world holds beyond the one room
+    // stood in here is its size rather than this readout's shape, so the two lines that count it
+    // are read for their form.
+    expect(state).toHaveLength(11);
     expect(state.slice(0, 4)).toEqual([
       'Location: first-steps.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true}',
+      'Flags: {"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true}',
       'Inventory: {}',
     ]);
     // Under the name the world gives a thing as well as the id it is addressed by: an id-only
@@ -183,17 +183,15 @@ describe('play-cli renders what a command result says happened', () => {
     // the same way with nothing edited here — and every skill they hold has to be on the line.
     expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
     for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
-    expect(state.slice(5, 12)).toEqual([
+    expect(state.slice(5, 10)).toEqual([
       'Equipped: {"Head (head)":null,"Main Hand (mainhand)":null,"Body (body)":null,"Off Hand (offhand)":null,"Gloves (gloves)":null,"Legs (legs)":null}',
       `stats: ${sheet}`,
       'Health: ██████████ 31.3/31.3',
-      'discovered: 3',
-      '  Guide House (first-steps.guide-house) at 0,0,0 -> first-steps.guide-house-upstairs, first-steps.basement',
-      '  Guide House Upstairs (first-steps.guide-house-upstairs) at 0,0,1 -> first-steps.guide-house',
-      '  Basement (first-steps.basement) at 0,0,-1 -> first-steps.guide-house',
+      'discovered: 1',
+      '  Guide House (first-steps.guide-house) at 0,0,0',
     ]);
-    expect(state[12]).toMatch(/^locations: 3 of \d+ found; not yet found: tulsa\./);
-    expect(state[12]).toContain('tulsa.market-square');
+    expect(state[10]).toMatch(/^locations: 1 of \d+ found; not yet found: tulsa\./);
+    expect(state[10]).toContain('tulsa.market-square');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
   });
 

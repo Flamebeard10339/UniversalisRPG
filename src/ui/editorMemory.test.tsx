@@ -72,12 +72,18 @@ describe('where the author was survives the tab (c10)', () => {
   });
 });
 
-function reopened(where: Editing | null): string {
+// A floor reaches the map once somewhere on it has been stood in, and a new game has stood
+// nowhere but the ground floor, so a claim about the floor a page opens on walks down to one
+// first — on both sides of the comparison, so that what differs is the remembered map.
+const DOWNSTAIRS = '/goto first-steps.basement';
+
+function reopened(where: Editing | null, walk?: string): string {
   const storage = pageStorage();
   const slots = browserSlots(() => storage);
   if (where) slotStore(slots, () => 0).write(EDITOR_SLOT, recorded(where));
   const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
   driver.send('/dev on');
+  if (walk) driver.send(walk);
   return renderToStaticMarkup(<App driver={driver} />);
 }
 
@@ -112,12 +118,12 @@ describe('where the author was is on the screen when the page opens (c10)', () =
   });
 
   it('opens where the map was looking, at the zoom and on the floor it was left at', () => {
-    const html = reopened({ ...FORGOTTEN, map: { pan: { x: -77, y: 33 }, zoom: 2.5, plane: -1 } });
+    const html = reopened({ ...FORGOTTEN, map: { pan: { x: -77, y: 33 }, zoom: 2.5, plane: -1 } }, DOWNSTAIRS);
 
     expect(html).toContain('scale(2.5)');
     expect(html).toContain('data-floor="-1" data-drawn="yes"');
     expect(attribute(html, 'style').filter((style) => style.includes('translate'))).not.toEqual(
-      attribute(reopened(null), 'style').filter((style) => style.includes('translate')),
+      attribute(reopened(null, DOWNSTAIRS), 'style').filter((style) => style.includes('translate')),
     );
   });
 

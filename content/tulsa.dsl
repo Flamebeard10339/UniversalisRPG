@@ -543,7 +543,6 @@ keeps shop: general-store
 # shop fishing-supplies
 coin: coin
 stocks:
-  3 core.fishing-net
   20 herring
   3 fishing.small-fishing-net
   2 fishing.large-fishing-net
