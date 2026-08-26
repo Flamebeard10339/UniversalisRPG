@@ -4,6 +4,7 @@ import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, 
 import { partsOf, type NumberedChoice } from '../../src/runtime/modalOption';
 import { tidy } from '../../src/runtime/figures';
 import { madeOf } from '../../src/runtime/statScreen';
+import type { Focus } from '../../src/runtime/modals';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
@@ -102,32 +103,45 @@ function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer)
 // What the open screen is reading, where the view publishes it beside the question rather than in
 // it. Every focus the engine can publish is drawn here, so a screen that is about something is not
 // reached and then found to say nothing.
-export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
-  const focus = v.focus;
-  if (focus === null) return [];
-  const blank = localizer.identifier('');
-  if (focus.kind === 'quest') {
+// Keyed by the kind itself rather than walked through as a chain of tests, so a focus the engine
+// grows next month does not compile until this file has words for it — the same answer the app's
+// manner table has to give.
+type Drawn<K extends Focus['kind']> = (focus: Extract<Focus, { kind: K }>, v: PlayView, localizer: Localizer) => ReplLine[];
+
+const FOCUS_LINES: { [K in Focus['kind']]: Drawn<K> } = {
+  quest: (focus, v, localizer) => {
     const entry = v.journal.find((each) => each.quest === focus.quest);
     if (!entry) return [];
     const lines = entry.lines.map((line) => say(line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said, 2));
     return [say(entry.title), ...(lines.length > 0 ? lines : [say(localizer.engine('engine.shell.journal.untouched'), 2)])];
-  }
-  // What the stat screen is showing, in the words the app's own screen shows: the stat and where it
-  // stands, then one line per share the engine folded to reach it. Read through the same `madeOf` the
-  // app draws, so neither surface can come to say a different thing is adding to a stat.
-  if (focus.kind === 'stat') {
+  },
+  // The stat and where it stands, then one line per share the engine folded to reach it, through the
+  // same `madeOf` the app's screen draws — so the two surfaces cannot come to name different things
+  // as adding to a stat.
+  stat: (focus, v, localizer) => {
     const row = v.stats.find((each) => each.id === focus.stat);
     if (!row) return [];
     return [
       say(localizer.engine('engine.repl.stat', { stat: row.title, value: localizer.identifier(tidy(row.value)) })),
       ...madeOf(row.from).map((share) => say(localizer.engine('engine.repl.stat', { stat: share.title, value: localizer.identifier(share.worth) }), 2)),
     ];
-  }
-  const plane = v.planes.find((each) => each.instance === focus.instance);
-  if (!plane) return [];
-  // What is being grown, named before the diagram of it: a plane drawn with nothing above it left
-  // a reader with a lattice and no word for the thing it belongs to.
-  return [blank, plane.title, ...formatPlane(plane, v.equipment.some((row) => row.item === plane.instance), focus.hex, localizer), blank].map((line) => say(line));
+  },
+  plane: (focus, v, localizer) => {
+    const plane = v.planes.find((each) => each.instance === focus.instance);
+    if (!plane) return [];
+    const blank = localizer.identifier('');
+    // What is being grown, named before the diagram of it: a plane drawn with nothing above it left
+    // a reader with a lattice and no word for the thing it belongs to.
+    return [blank, plane.title, ...formatPlane(plane, v.equipment.some((row) => row.item === plane.instance), focus.hex, localizer), blank].map((line) => say(line));
+  },
+};
+
+// Every kind of subject a screen may have, read off the table that has to answer for all of them.
+export const FOCUS_KINDS: readonly Focus['kind'][] = Object.keys(FOCUS_LINES) as Focus['kind'][];
+
+export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
+  const focus = v.focus;
+  return focus === null ? [] : (FOCUS_LINES[focus.kind] as Drawn<Focus['kind']>)(focus, v, localizer);
 }
 
 function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {

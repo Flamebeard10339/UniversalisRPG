@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { saidWords } from '../src/content/locale';
 import { LIVE_TICK_MS, newContext, runLine, type CommandContext, type LiveRun } from '../src/runtime/command';
-import type { Localizer } from '../src/runtime/localized';
+import { BASE_LANGUAGE, localizerFor, type Localizer } from '../src/runtime/localized';
+import { MODAL_NAMES } from '../src/runtime/modals';
 import { sessionLocalizer, startSession, view } from '../src/runtime/session';
 import { pageStorage } from '../src/ui/agent/pageStorage';
 import { asksNothing } from '../src/ui/asking';
@@ -24,7 +25,7 @@ import {
   type SurfaceRun,
   type SurfaceStep,
 } from './lib/viewCoverage';
-import { printed, say } from './lib/replLines';
+import { formatFocus, FOCUS_KINDS, printed, say } from './lib/replLines';
 import { driveRun, formatResult, openRepl } from './play-cli';
 import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 
@@ -95,6 +96,15 @@ const SCRIPT: readonly string[] = [
   '/quests first-steps.finding-your-feet',
   'submit-modal: close=close',
   '/stat',
+  // Character creation and the breakdown of one stat. Neither stands in anybody's way through the
+  // world, so neither is reached by walking one — and a screen no walk reaches is a screen no driver
+  // was ever asked to draw.
+  'open-modal: name-yourself',
+  'submit-modal: name=Rowan',
+  'open-modal: choose-race',
+  'submit-modal: race=core.elf',
+  '/stat core.attack',
+  'submit-modal: close=close',
   '/load tulsa.growing-through-the-inventory-screen-end',
   '/look',
   '/state',
@@ -104,7 +114,20 @@ const SCRIPT: readonly string[] = [
   'submit-modal: plane=back',
   'submit-modal: verb=close',
   '/settings',
+  // A counter and the question it asks about how many, reached the way a player reaches one: the
+  // shopkeeper is looked at before anything they keep is on offer.
+  '/load tulsa.in-town',
+  'travel:tulsa.market-row',
+  'use:entity.tulsa.general-store.examine',
+  'shop:tulsa.general-store',
+  'submit-modal: item=buy:core.pot-of-flour',
+  'submit-modal: count=back',
+  'submit-modal: item=close',
   '/load first-steps.miki-route-start',
+  'use:entity.first-steps.miki.examine',
+  'talk:first-steps.miki',
+  'submit-modal: choice=0',
+  'submit-modal: choice=0',
   '/goto first-steps.basement',
   '/state',
   // Nothing offers a fight against something nobody has looked at, so the rat is read first — which
@@ -224,15 +247,51 @@ function guiRun(): SurfaceStep[] {
   });
 }
 
+// Each driver walks the script once, however many claims ask about it. The walk is deterministic —
+// one engine, one script, one starting save — so a second one would be the same steps again at the
+// price of drawing every page of the app all over.
+const once = <T,>(walk: () => T): (() => T) => {
+  let held: { value: T } | null = null;
+  return () => (held ??= { value: walk() }).value;
+};
+
+const bot = once(botRun);
+const cli = once(cliRun);
+const gui = once(guiRun);
+
 describe('no driver draws less of a live view than the others', () => {
   const runs = (): SurfaceRun[] => [
-    { name: 'the playbot', steps: botRun() },
-    { name: 'play-cli', steps: cliRun().steps },
-    { name: 'the GUI', steps: guiRun() },
+    { name: 'the playbot', steps: bot() },
+    { name: 'play-cli', steps: cli().steps },
+    { name: 'the GUI', steps: gui() },
   ];
 
   it('the walk arms an action, so the sheet a terminal draws while one runs is drawn here at all', () => {
-    expect(cliRun().armedBy).not.toEqual([]);
+    expect(cli().armedBy).not.toEqual([]);
+  });
+
+  // The subjects are every screen the engine declares, read off the engine and never listed here. A
+  // screen this walk never opens is one no driver is asked to draw, so a surface that has quietly
+  // stopped drawing it goes on passing — which is how the app came to be the only place a stat's
+  // shares were ever shown. A tenth screen declared next month fails here with nothing edited.
+  it('opens every screen the engine can raise, so each is put in front of all three drivers', () => {
+    const opened = new Set(bot().flatMap((step) => step.view.modals.map((modal) => modal.name)));
+
+    expect([...opened].sort()).toEqual([...MODAL_NAMES].sort());
+  });
+
+  // A screen that is about something publishes what it is about, and every surface has to draw it.
+  // The claim above makes the subjects here every screen the engine declares; a screen grown next
+  // month that says nothing beside its own question fails with nothing edited. The parity claim
+  // cannot reach this: a stat share's words are an item's or a stat's own, so no word on the surface
+  // proves that path drew rather than one of the paths it shares its words with.
+  it('draws what a screen is about beside it, wherever a screen is about something', () => {
+    const localizer = localizerFor(registry(), BASE_LANGUAGE);
+    const about = bot().flatMap((step) => (step.view.focus === null ? [] : [step.view.focus.kind]));
+    const silent = bot().flatMap((step) => (step.view.focus !== null && formatFocus(step.view, localizer).length === 0 ? [step.view.focus.kind] : []));
+
+    expect([...new Set(about)].sort()).toEqual([...FOCUS_KINDS].sort());
+    expect([...new Set(silent)], 'these screens publish what they are about and the terminal draws none of it').toEqual([]);
   });
 
   it('every leaf the same short run publishes reaches all three drivers, or none of them', () => {
