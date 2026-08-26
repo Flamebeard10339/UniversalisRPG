@@ -24,7 +24,7 @@ export interface RenameReport {
   moved: { from: string; to: string } | null;
 }
 
-// A module id is a token: it stands as the `# info` id, as the first segment of any address written whole, and as the stem of the file it lives in. Nothing that keys off it is spelled any other way, so one boundary rule reaches all three — and leaves `leave-tutorial-island` and `tutorial-quests` alone.
+// A module id is a token: it stands as the `# info` id, as the first segment of any address written whole, and as the stem of the file it lives in. Nothing that keys off it is spelled any other way, so one boundary rule reaches all three — and leaves `town-quests` and `old-town` alone.
 const EDGE = '[A-Za-z0-9_-]';
 
 export const occurrencesOf = (id: string): RegExp => new RegExp(`(?<!${EDGE})${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!${EDGE})`, 'g');
@@ -123,8 +123,8 @@ const usage = [
   'Writes a module id under a new name everywhere it is machine-meaningful: the',
   '`# info` heading, every address written whole in a DSL body, every key and value',
   'inside a `# save`, the string literals under src/ and scripts/ that name it, and',
-  "the module's own file. An id is matched whole, so leave-tutorial-island and",
-  'tutorial-quests are left alone.',
+  "the module's own file. An id is matched whole, so renaming town leaves",
+  'town-quests and old-town alone.',
   '',
   `Only ${SCOPE.join(', ')} are touched. Nothing is written unless the corpus loads`,
   'afterwards and its namespace holds exactly the keys the rename should have left —',

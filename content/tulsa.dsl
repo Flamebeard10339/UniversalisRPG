@@ -102,7 +102,6 @@ x: 3, y: 0
 title: Market Square
 examine: Awnings, shouting, and a sewer grate set into the cobbles with a boy hunched over it.
 adjacent:
-  guide-house
   market-row
   tavern-street
   castle-gate
@@ -418,7 +417,10 @@ examine: A cluttered but cozy cottage. Miki's guide house.
 adjacent:
   guide-house-upstairs
   basement
-  market-square while front-door.unlocked
+  // The road back in is this same edge read from the far end, so it carries this
+  // same condition: without the second clause, dropping out of the window with the
+  // door still shut would leave the house unreachable from the square.
+  market-square while front-door.unlocked or market-square.touched
 entities:
   miki, front-door, stairs, mirror, oven
 

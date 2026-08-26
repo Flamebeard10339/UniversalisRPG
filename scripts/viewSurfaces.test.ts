@@ -87,12 +87,12 @@ const DISTINCTIVE_SECONDS = 54321;
 // them. Walking a short run instead is what puts those paths in front of every driver. Each line
 // is one the engine takes from any of the three.
 const SCRIPT: readonly string[] = [
-  '/load tutorial-quests.miki-route-end',
+  '/load first-steps.miki-route-end',
   `/wait ${DISTINCTIVE_SECONDS}`,
   '/look',
   '/state',
   '/quests',
-  '/quests tutorial-quests.finding-your-feet',
+  '/quests first-steps.finding-your-feet',
   'submit-modal: close=close',
   '/stat',
   '/load tulsa.growing-through-the-inventory-screen-end',
@@ -104,7 +104,7 @@ const SCRIPT: readonly string[] = [
   'submit-modal: plane=back',
   'submit-modal: verb=close',
   '/settings',
-  '/load tutorial-quests.miki-route-start',
+  '/load first-steps.miki-route-start',
   '/goto tulsa.basement',
   '/state',
   // Nothing offers a fight against something nobody has looked at, so the rat is read first — which

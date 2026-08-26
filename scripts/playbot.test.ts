@@ -33,7 +33,7 @@ import {
 // The island and quest actually played: standing Tulsa, plus the tutorial quest module —
 // deliberately not the whole shipped corpus, so the archetype pack Tulsa names optionally is
 // absent and a run here never meets a jewel.
-const PLAYED_MODULES = ['core', 'tulsa', 'tutorial-quests'];
+const PLAYED_MODULES = ['core', 'tulsa', 'first-steps'];
 
 // The island and quest actually played, same corpus session.test.ts drives.
 const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), ...PLAYED_MODULES.map(moduleSource)];
