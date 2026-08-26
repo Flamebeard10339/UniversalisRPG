@@ -261,3 +261,45 @@ computed and tested.
 *Closes when:* it types at 20 cps, a following line waits on an acknowledgement, the cut
 is tested on a rendered string in a `.ts` beside the component, and the three tunables
 that are no longer meaningful are gone rather than left unread.
+
+---
+
+## From the owner's third playtest, 2026-08-26
+
+`.planning/yonatan-playtests/run-2026-08-26t14-27-54-074z.md`, recorded against
+`8c853ce5`. Most of what it raised was taken straight into lanes on the day and is
+closed; what stands below is what nobody was briefed on, because it was measured
+while the run was being read rather than while it was being played.
+
+### A failed lift makes the next one fail, and that is what "every single time" was
+
+He wrote, at the third attempt on a townsman: *"I am taking damage every single time?
+You should only take damage when you fail."*
+
+The literal reading is wrong and the experience is real. `drain: 1 health` sits only in
+the losing row of `pick their pocket:` (`content/tulsa.dsl`, civilian ~:772) — a
+successful lift costs nothing. What actually happened is a cascade:
+
+- `# stat thieving` is base **60**; the civilian's losing row is weighted **25x**. So a
+  first attempt wins 60/85 — about seven in ten, which is exactly what the module's own
+  header comment claims.
+- The losing row also does `inflict: thieving.dazed`, and `# item dazed` is
+  `3s, -90% core.attack-rate, -90% thieving` (`content/thieving.dsl:36`). Inside those
+  three seconds `thieving` is **6** against the same 25, so the next attempt wins 6/31 —
+  about **one in five**.
+- `rate: 30` is one attempt every two seconds, so the daze always covers the next
+  attempt and often the one after. One unlucky lift drops the player into a stretch
+  where four in five fail, each failure re-inflicting the daze.
+
+So the skill has two success rates — the advertised seven-in-ten on the first attempt,
+and one-in-five for as long as the player keeps trying — and nothing tells the player
+which one they are in. The module's header comment states only the first and is
+therefore wrong about the mechanism it introduces.
+
+*Closes when:* the daze either stops re-arming the action at all (the owner asked for
+*"the progress bar should stop"*, which is a different thing from a slowed rate and is
+being built), or its penalty stops multiplying a weight that is contested against a
+fixed number. **Do not fix this by retuning the -90%** — that is a balance number and
+the ruling above forbids a test pinning it; what wants deciding is whether a penalty to
+a contested stat may swing a roll by 4x, which is a mechanism question. The evidence is
+the two arithmetic lines above and they are reproducible from the declarations alone.
