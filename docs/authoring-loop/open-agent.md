@@ -103,25 +103,6 @@ sheets holding combat figures. Each one either stops asserting the number or ass
 shape instead — that a blow lands, that two swings differ, that a cap bites. **Report the
 count before editing**; if it is large, the sweep is its own commit.
 
-### The rat, the player and the first fight get their numbers
-
-Ruled, verbatim: *"The rat needs to have 1-3 attack. Don't do anything fancy like
-calculating its dps. The player at this point in the game should have 1 defense from
-their defense skill. We also nerf the rat's health to 3, and the player's attack to 1-2
-from their attack skill."* And, on the player's swing: *"the player's attack should be
-low, maybe 1-3 damage per hit."*
-
-So: `giant-rat` declares `attack 1-3` and `health 3`; the shipped player's defence comes
-to **1** off the defence skill and the attack to **1-2** off the attack skill. The lane
-that wrote `attack 6-8` did so because `damage: my attack vs their defense` subtracts
-and `hitDamage` floors at `max(1, min(minDamage, attack))` — with defence at 1 rather
-than 5, an authored `1-3` no longer collapses to a constant, which is what makes the
-ruling coherent. Take the numbers as written and do not re-derive them.
-
-*Closes when:* the declarations say those numbers, the balance sweep above has landed so
-nothing reddens on the figures, and a `npm run probe --test` of the first fight still
-passes on shape.
-
 ## From the owner's third playtest, 2026-08-26
 
 `.planning/yonatan-playtests/run-2026-08-26t14-27-54-074z.md`, recorded against

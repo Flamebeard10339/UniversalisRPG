@@ -273,3 +273,44 @@ softlock — it is a line of dialogue that becomes false.
 *Moves when: he says whether the tutorial's lent net should be exempt from parting, or whether
 Miki should have something to say to a player who broke it. The first is a condition on one
 droptable; the second is a dialogue node and is the better writing.*
+
+## The ruled combat numbers make the sewer unreachable
+
+Ruled, and **applied**: *"The rat needs to have 1-3 attack... The player at this point in
+the game should have 1 defense from their defense skill. We also nerf the rat's health to
+3, and the player's attack to 1-2 from their attack skill."* This came here from
+`open-agent.md` rather than closing, because taking it to the end turned up something a
+lane cannot decide.
+
+The edit is written and sitting on branch `worktree-agent-a44bebbff7348643a`, commit
+`08eb6511`, so nothing has to be re-done. It is **not merged**, because it reddens
+twenty-odd routes and one of them is not a stale sheet.
+
+**What it does to the tutorial is exactly what was asked for.** `giant-rat` at `attack 1-3`
+and `max-health 3` against a player at `attack 1-2` and `defense 1`: a rat falls in two or
+three swings and bites for one or two. That reads right.
+
+**What it does to everything past the tutorial is the problem.** The numbers are written on
+the base player line, and every enemy in Tulsa was tuned against the player they replace
+(`attack 8-12`, `defense 5`). `feral-rat` in the sewer outfall declares `attack 9`,
+`defense 1`, `max-health 24`. Derived from those declarations: the player now needs about
+**24 landed hits** to put one down and dies to about **four bites**, and the outfall stands
+two of them.
+
+So `tulsa.the-key-opens-the-barred-door` fails at `tulsa.barred-door.unlocked` — and it
+fails for a reason worth reading. `feral-rat` is `aggressive`, `pick lock:` is `time: 6`,
+and an aggressive foe now cancels what you are doing. A player who cannot clear the room
+can never pick the lock, so the puzzle is not merely hard, it is **unreachable**. That is
+the collision between this ruling and the aggression rule from the same playtest, and it is
+the sharper form of a question already standing in `docs/skills/open-human.md` — *whether
+the sewer should be able to kill a beginner*.
+
+*Moves when: he says whether the nerf is the tutorial's or the game's. If it is the
+tutorial's, the base line is the wrong home and a beginner wants a weaker start that grows
+back — a different mechanism, not a different number. If it is the game's, every enemy in
+Tulsa needs re-tiering against the new player and that is a content pass a lane can take
+once he says so. Either way the branch above holds the numbers.*
+
+*Beside it, and answerable in the same breath: `first-steps.two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down` is a test whose **name** is a balance number. Under the
+ruling that a test may not pin one, it is wrong whatever is decided here — but what it
+should assert instead depends on what a first fight is supposed to feel like.*
