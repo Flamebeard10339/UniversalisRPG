@@ -2,6 +2,8 @@ import { type EncounterFoe } from '../../src/runtime/encounter';
 import { type Localized, type Localizer } from '../../src/runtime/localized';
 import { askedOption, type CommandHelp, type CommandOutput, type CommandResult, type MessageTone } from '../../src/runtime/command';
 import { partsOf, type NumberedChoice } from '../../src/runtime/modalOption';
+import { tidy } from '../../src/runtime/figures';
+import { madeOf } from '../../src/runtime/statScreen';
 import { type PlayChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
@@ -58,10 +60,6 @@ function fillRatio(current: number, max: number): number {
   return max > 0 ? Math.min(1, Math.max(0, current / max)) : 0;
 }
 
-export function tidy(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-}
-
 function fullBar(current: number, max: number): string {
   const filled = Math.round(fillRatio(current, max) * BAR_WIDTH);
   return `${'█'.repeat(filled)}${'░'.repeat(BAR_WIDTH - filled)} ${tidy(current)}/${tidy(max)}`;
@@ -114,10 +112,17 @@ export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
     const lines = entry.lines.map((line) => say(line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said, 2));
     return [say(entry.title), ...(lines.length > 0 ? lines : [say(localizer.engine('engine.shell.journal.untouched'), 2)])];
   }
-  // A stat's shares are drawn as a column of signed figures, which is a shape a scrollback cannot
-  // hold; the terminal has `/stat` for the numbers themselves and says nothing more beside the
-  // screen than it said before the screen existed.
-  if (focus.kind === 'stat') return [];
+  // What the stat screen is showing, in the words the app's own screen shows: the stat and where it
+  // stands, then one line per share the engine folded to reach it. Read through the same `madeOf` the
+  // app draws, so neither surface can come to say a different thing is adding to a stat.
+  if (focus.kind === 'stat') {
+    const row = v.stats.find((each) => each.id === focus.stat);
+    if (!row) return [];
+    return [
+      say(localizer.engine('engine.repl.stat', { stat: row.title, value: localizer.identifier(tidy(row.value)) })),
+      ...madeOf(row.from).map((share) => say(localizer.engine('engine.repl.stat', { stat: share.title, value: localizer.identifier(share.worth) }), 2)),
+    ];
+  }
   const plane = v.planes.find((each) => each.instance === focus.instance);
   if (!plane) return [];
   // What is being grown, named before the diagram of it: a plane drawn with nothing above it left

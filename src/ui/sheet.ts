@@ -1,8 +1,8 @@
 import type { Place } from '../content/sections/slot';
-import type { Range } from '../grammar/range';
+import { amounts } from '../runtime/figures';
 import type { Answer, Localized, Localizer } from '../runtime/localized';
-import type { GroupRow, PlayStatus, StatRow, StatShare } from '../runtime/session';
-import { signed, tidy } from './format';
+import type { GroupRow, PlayStatus, StatRow } from '../runtime/session';
+import { tidy } from './format';
 
 export interface Entry {
   name: Localized;
@@ -27,27 +27,6 @@ const byName = (left: Entry, right: Entry): number =>
 // asked; a field nobody has answered draws nothing.
 export function identity(rows: PlayStatus['player']): Entry[] {
   return Object.values(rows).flatMap((row) => (row === null ? [] : [{ id: row.id, name: row.label, value: row.title }]));
-}
-
-// How much a bonus is worth, in the two channels a bonus lands on and in the words every sheet
-// reads them in. A channel that moves nothing says nothing, so a bonus on one channel reads as one
-// figure rather than as a figure and a zero.
-function amounts(added: Range, increased: number): string[] {
-  const said: string[] = [];
-  if (added.min !== 0 || added.max !== 0) said.push(added.min === added.max ? signed(added.min) : `${signed(added.min)}-${tidy(added.max)}`);
-  if (increased !== 0) said.push(`${signed(increased)}%`);
-  return said;
-}
-
-// What a stat is made of, share by share: every share the engine folded, named and signed, in the
-// order the engine folded them. A share that moves nothing still stands — the base of a stat nothing
-// touches is the whole answer to where its number came from. One row each rather than one line for
-// all of them, because the screen that draws them is a screen and not a line under a row.
-export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; worth: string }> {
-  return shares.map((share) => {
-    const said = amounts(share.added, share.increased);
-    return { title: share.title, worth: (said.length > 0 ? said : [signed(0)]).join(' ') };
-  });
 }
 
 export function counted(rows: readonly StatRow[], localizer: Localizer): Entry[] {
