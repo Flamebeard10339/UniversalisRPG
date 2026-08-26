@@ -1491,10 +1491,11 @@ assert: has sewer-key
 // Core's cluster planes, walked from the DEBUG smith's chest, which is the only
 // thing left that puts a jewel in anyone's hands and stands in no location.
 //
-// Recorded from a live session with /create-valid-test, so what follows is what
-// a player types and the closing sheet is where that session ended: both grown
-// copies, their planes, every allocation, and the effects each cluster carries.
-// Regenerate with /create-valid-test when this content changes on purpose.
+// Recorded from a live session, so what follows is what a player types and the
+// closing sheet is where that session ended: both grown copies, their planes,
+// every allocation, and the effects each cluster carries. Regenerate the sheet
+// with `npm run probe -- content --record tulsa.growing-a-heartwood-blade` when
+// this content changes on purpose.
 //
 // What this route claims is written as its refusals — each one names a growth
 // the plane must not take, and there are six of them. The plane itself is what
@@ -1564,8 +1565,9 @@ expect only: growing-a-heartwood-blade-end
 //
 // The same growth the test above spells as directives, walked the way a player
 // reaches it: every line below is a screen being answered. Recorded from a live
-// session with /create-valid-test and regenerated the same way when this content
-// changes on purpose.
+// session; regenerate the sheet with `npm run probe -- content --record
+// tulsa.growing-through-the-inventory-screen` when this content changes on
+// purpose.
 //
 // It opens the inventory, opens the Iron Sword's plane, slots a jewel into the
 // bare east slot every base has, walks out to the hexagon that jewel put there
@@ -1614,9 +1616,10 @@ expect only: growing-through-the-inventory-screen-end
 # save at-the-proving-ground
 {"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true}}
 
-// Recorded from live sessions with /create-valid-test, so what each route
-// spells is what a player typed and the closing sheet is where that session
-// ended. Regenerate the same way when this content changes on purpose.
+// Recorded from live sessions, so what each route spells is what a player typed
+// and the closing sheet is where that session ended. Regenerate a sheet with
+// `npm run probe -- content --record tulsa.<the route below it>` when this
+// content changes on purpose.
 //
 // The sheets close on `expect only:`, which compares just the keys the save
 // names, and what each route actually claims is written above it as `assert:`.
