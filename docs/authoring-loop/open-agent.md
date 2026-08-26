@@ -28,6 +28,43 @@ and is the one place that rule is written.
 
 ---
 
+## A test maintenance pass over the whole suite
+
+**The suite carries duplicate proofs, and three known tests still pin a balance number.**
+The evidence is `npm run mutate` plus the sweep done on 2026-08-26: bumping every
+`stats:` line in `tulsa` and `first-steps` by three and every `base:` in `core` by two
+reddened sixteen tests before that session's work and four after it. What is left is:
+
+- `scripts/play-cli.test.ts` — *"prints a view as narration, location, occupants, pools,
+  modals, choices and the clock"* and *"prints the status readout /state and /quit both
+  produce"*. Both draw pools and the clock into a snapshot, so a balance pass rewrites the
+  expected text. Closing it means the snapshot naming the shape it renders rather than the
+  numbers that happened to be in it.
+- `first-steps.thieving-route-full` — closes on `assert: resource.core.health = 26.31`.
+  Same disease as tulsa's nine and the same fix: what the route is for is the walk out
+  through the window, not what the drop cost. It was left alone because that session was
+  scoped to tulsa.
+- `tulsa.a-log-costs-four-swings-of-an-axe` — asserts `time > 3`, which a large enough
+  bump to `felling` still trips, because the alder then falls in one swing. That is
+  arguably the test doing its job: *chopping takes more than one swing* is design intent,
+  and a pass that breaks it should be seen. Left as-is deliberately; a lane that disagrees
+  should raise it rather than quietly loosen the threshold.
+
+The wider pass is the real line: **walk the suite for proofs that already exist elsewhere.**
+`npm run mutate` is the instrument and it is cheap — break the mechanism, read who catches
+it, and delete the copies. Do not build test telemetry to decide this. `.planning/.scratch.md`
+sketches a per-test store of runs, failures and mutation scores held as structural metadata;
+its own candidate-for-review rule needs `runs > 10,000`, which nothing here collects, and a
+store like that is a second home for a fact the mutation run already derives on demand.
+
+**Grep `src/` and `scripts/` for a test's id before deleting it** — a corpus route is often
+somebody's fixture, and that dependency is invisible to the mutation measurement.
+
+*Closes when:* a mutation sweep has been walked over the suite, the proofs it shows to be
+duplicated are deleted, and the three above are each either de-balanced or argued for in
+the commit that leaves them standing. The same bump that measured this — `stats:` +3 in
+`tulsa` and `first-steps`, `base:` +2 in `core` — reddens nothing when it is done.
+
 ## From the owner's second playtest, 2026-08-25
 
 `.planning/yonatan-playtests/run-2026-08-25t14-51-24-926z-reviewed.md`, sixty turns

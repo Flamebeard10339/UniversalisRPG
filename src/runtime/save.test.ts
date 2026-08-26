@@ -40,9 +40,12 @@ item-level: 2
 # resource health
 max: max-health
 
+# flag opened
+
 # entity chest
 open:
   give: 1 gold
+  set: opened
 
 # race human
 
@@ -372,9 +375,23 @@ describe('compareSave', () => {
   it('reports a human-readable mismatch', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
+    state.flags['side-quest'] = true;
+    const saved = { version: SAVE_VERSION, diff: { flags: { 'side-quest': false } } };
+    expect(compareSave(state, saved, registry)).toEqual(['flags.side-quest: true vs false']);
+  });
+
+  // A path is what the player did, so what the numbers came to is not compared however a sheet
+  // names it. This is the whole of what keeps a balance pass out of the suite, so it is proved on
+  // a field that is not walked rather than left to the corpus to notice.
+  it('is blind to a field a walked path is not made of, however loudly the save names it', () => {
+    const registry = loadInEnglish(MODULE);
+    const state = initialState(registry);
     state.inventory.bread = 2;
-    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
-    expect(compareSave(state, saved, registry)).toEqual(['inventory.bread: 2 vs 1']);
+    state.xp['tutorial.baking'] = 900;
+    state.time = 12345;
+    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 }, xp: { 'tutorial.baking': 3 }, time: 7 } };
+    expect(compareSave(state, saved, registry)).toEqual([]);
+    expect(compareSaveOnly(state, saved)).toEqual([]);
   });
 
   it('reports a flag present in the save but absent from the state', () => {
@@ -395,18 +412,18 @@ describe('compareSaveOnly', () => {
   it('ignores a live key the save is silent on', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
-    state.inventory.bread = 1;
+    state.flags['named'] = true;
     state.flags['side-quest'] = true;
-    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
+    const saved = { version: SAVE_VERSION, diff: { flags: { named: true } } };
     expect(compareSaveOnly(state, saved)).toEqual([]);
   });
 
   it('reports a human-readable mismatch on a key the save does name', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
-    state.inventory.bread = 2;
-    const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 } } };
-    expect(compareSaveOnly(state, saved)).toEqual(['inventory.bread: 2 vs 1']);
+    state.flags['side-quest'] = true;
+    const saved = { version: SAVE_VERSION, diff: { flags: { 'side-quest': false } } };
+    expect(compareSaveOnly(state, saved)).toEqual(['flags.side-quest: true vs false']);
   });
 
   it('reads through to the field default for a key the live state never touched', () => {
@@ -445,9 +462,12 @@ base: 3
 slot: neck
 +2 might
 
+# flag opened
+
 # entity chest
 open:
   give: 1 gold
+  set: opened
 
 # save empty
 {"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"camp.touched":true}}
@@ -513,10 +533,10 @@ describe('# save section wired through load: / expect: test directives', () => {
     const result = runTest('load-then-diverge', registry, state);
     expect(result.passed).toBe(false);
     expect(result.failure).toMatch(/^save mismatch empty:/);
-    expect(result.failure).toMatch(/inventory\.gold/);
+    expect(result.failure).toMatch(/flags\.opened/);
   });
 
-  it('expect only: passes on the same divergence, since the save never names inventory', () => {
+  it('expect only: passes on the same divergence, since the save never names that flag', () => {
     const registry = loadInEnglish(SAVE_TEST_MODULE);
     const state = createGameState();
     expect(runTest('load-then-diverge-only', registry, state)).toEqual({ passed: true });

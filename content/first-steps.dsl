@@ -497,34 +497,31 @@ assert: front-door.unlocked
 assert: market-square.discovered
 
 // Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
-// which is what `rats-killed` counts; one swing does it because the hammer says
-// it does, and nothing about the rat's twenty health is being relied on.
-# test one-swing-of-a-million-attack-hammer-fells-a-rat
+// which is what `dummies-felled` counts; one swing does it because the hammer
+// says it does, and a million is more than any pool this file could be given.
+# test one-swing-of-a-million-attack-hammer-fells-a-dummy
 DEBUG
 load: armed-with-a-million-attack-hammer
 equip: million-attack-hammer
-use: entity.stairs.descend
-use: melee-combat on giant-rat
-assert: first-steps.rats-killed = 1
+use: melee-combat on practice-dummy
+assert: first-steps.dummies-felled = 1
 
 // The stages of a fight. A `use:` that finds its own action already under way
 // against the same target advances a cycle of the fight in progress; one that
-// re-armed would snapshot the rat at full health every time, so at eight a
+// re-armed would snapshot the dummy at full health every time, so at eight a
 // swing against twenty no run of them, however long, would ever empty the pool.
-// Two swings are sixteen and three are twenty-four, so the third is the one
-// that lands the kill and the second must not — and it is the second assertion
-// that makes a rebalance of the rat fail this loudly, rather than quietly
-// leaving behind a claim about one swing that a re-arming `use:` would pass too.
-# test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
+// Two swings are sixteen and three are twenty-four, so the third is the one that
+// lands the kill and the second must not. Both numbers are the dummy's own, so
+// what fails here is a change to how `use:` advances and never a balance pass.
+# test two-eight-health-swings-leave-a-dummy-up-and-the-third-puts-it-down
 DEBUG
 load: armed-with-an-eight-a-swing-hammer
 equip: eight-a-swing-hammer
-use: entity.stairs.descend
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-assert: first-steps.rats-killed = 0
-use: melee-combat on giant-rat
-assert: first-steps.rats-killed = 1
+use: melee-combat on practice-dummy
+use: melee-combat on practice-dummy
+assert: first-steps.dummies-felled = 0
+use: melee-combat on practice-dummy
+assert: first-steps.dummies-felled = 1
 
 // --- saves ---
 
@@ -590,11 +587,11 @@ assert: first-steps.rats-killed = 1
 
 # save armed-with-a-million-attack-hammer
 DEBUG
-{"version":13,"inventory":{"first-steps.million-attack-hammer":1}}
+{"version":13,"location":"first-steps.practice-yard","inventory":{"first-steps.million-attack-hammer":1}}
 
 # save armed-with-an-eight-a-swing-hammer
 DEBUG
-{"version":13,"inventory":{"first-steps.eight-a-swing-hammer":1}}
+{"version":13,"location":"first-steps.practice-yard","inventory":{"first-steps.eight-a-swing-hammer":1}}
 
 // Two hammers whose numbers this file declares, so that what the tests swinging
 // them prove is proved about the engine rather than about what the last balance
@@ -614,6 +611,31 @@ slot: mainhand
 weapon, -100% attack, +1000000 accuracy
 on hit:
   drain: 8 health from them
+
+// And the thing they are swung at. A hammer that is worth eight a swing says
+// nothing on its own: what it is worth is only legible against a pool, so the
+// pool is written here beside it rather than taken from whatever the tutorial's
+// rat is worth this month. Twenty is two swings up and three swings down, and
+// it is owned by the two tests below. The dummy carries no attack and no
+// evasion, so neither what it does back nor whether a swing lands is in play.
+# entity practice-dummy
+DEBUG
+stats: attack 0, defense 0, max-health 20, attack-rate 16, accuracy 0, evasion 0
+uses: melee-combat
+faction: world
+on death:
+  add: dummies-felled 1
+
+# flag dummies-felled
+
+// Three of them, so a Fight that re-arms on the next one standing has somewhere
+// to prove it. Nothing a player reaches names this yard; the saves above stand
+// in it directly.
+# location practice-yard
+DEBUG
+x: 0, y: 0, z: -9
+entities:
+  3 practice-dummy
 
 // Miki has a word for a traveller whatever else is loaded. A quest that wants
 // more of him gives him more to say; this is what is left when none is.

@@ -60,9 +60,12 @@ entities:
 # item gold
 title: Gold
 
+# flag opened
+
 # entity chest
 open:
   give: 1 gold
+  set: opened
 
 # save empty
 {"version":${SAVE_VERSION},"flags":{"camp.discovered":true,"camp.touched":true}}

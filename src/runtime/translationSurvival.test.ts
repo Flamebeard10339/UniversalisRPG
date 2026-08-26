@@ -70,11 +70,15 @@ describe('a universe with every word replaced', () => {
   });
 });
 
+// What this asks is whether replacing every word changes the answer — not whether the route passes,
+// which is `integration.test.ts`'s question and is answered there once. A route broken by a balance
+// pass reddens that file alone; if it reddened here too, a content bug would read as a translation
+// bug in three files at once and send its reader into the engine.
 describe('a recording survives translation', () => {
   for (const id of registry.tests.keys()) {
     for (const language of PLAYED) {
-      it(`test "${id}" passes in ${language}`, () => {
-        expect(replay(id, language)).toEqual({ passed: true });
+      it(`test "${id}" reaches the same verdict in ${language}`, () => {
+        expect(replay(id, language)).toEqual(replay(id, BASE_LANGUAGE));
       });
     }
   }

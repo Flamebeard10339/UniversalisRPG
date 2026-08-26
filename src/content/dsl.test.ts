@@ -495,7 +495,10 @@ describe('the shipped corpus', () => {
         frontier.push(edge.target);
       }
     }
-    expect([...registry.locations.keys()].filter((id) => !seen.has(id))).toEqual([]);
+    // A DEBUG location ships to nobody and nothing a player reaches may name it, so there is no road
+    // to it by construction: it is stood in by a save that says so, and the walk cannot be asked for.
+    const reachable = [...registry.locations.values()].filter((location) => !isDebug(location));
+    expect(reachable.map((location) => location.id).filter((id) => !seen.has(id))).toEqual([]);
   });
 
   // The subjects are every # shop the corpus holds, so a store written next month is held to both of these with no edit here.

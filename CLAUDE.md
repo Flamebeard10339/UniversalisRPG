@@ -126,6 +126,41 @@ to it must not redden the suite. Test that the mechanism works — that rage ris
 a blow lands, that a cap bites, that two swings differ — never that a number is the
 number it is today.
 
+**A `# test` in the corpus asks one question: is this path still walkable?** Does this
+sequence of actions, taken in order, reach the end it names. Nothing else. Not how much
+xp it earned, not what the pools stood at, not what the clock or the rng cursor read,
+not what the loot rolled. A balance pass that makes the path *impossible* must fail here
+— that is the whole point of the test — and a balance pass that merely changes the
+numbers along the way must not. Balance is a separate problem and it has not been
+thought about yet; until it has, no `# test` gets to have an opinion about it.
+
+This is why `expect:` compares only what a path is made of. The state a route ends on is
+filtered before it is compared, in one place, so a sheet **cannot** pin a balance-derived
+field however it was recorded — see `WALKED` in `src/runtime/session.ts`. The filter is
+the rule's proof: there is nothing to keep in sync, and a sheet written next month is
+covered by having been written at all.
+
+**A test is not added until it has been shown not to be redundant.** Run
+`npm run mutate` first: break the thing the new test would guard, and read which tests
+already catch it. If something does, the test is not written — the suite is already
+paying to run that proof, and a second copy of it is one more thing to keep in sync. This
+holds for a `.ts` unit test and a corpus `# test` alike. Nine of tulsa's `# test` sections
+were written past this rule before it existed; breaking buff stacking turned out to be
+caught eight ways over by `buffs.test.ts`, and breaking the own-sheet-beats-the-global-table
+rule by `encounter.test.ts` and about twenty-five others.
+
+The measurement has one blind spot worth knowing: it reads which tests *assert* against a
+break, not which tests *depend on the route as a fixture*. Grep `src/` and `scripts/` for
+the id before deleting anything — three of those nine were replayed by runtime tests as
+scenario builders, and cutting them took good tests down with them.
+
+**A route's verdict is reported once.** Three harnesses replay every corpus `# test` —
+the shipped corpus, the corpus with every word replaced, and the consolidated tree. Only
+the first asserts that a route passes. The other two assert that their transformation did
+not *change* the verdict, so a genuinely broken route reddens one line and not eight. A
+failure repeated by three files with unrelated names is what sends a reader into the
+engine after a content bug.
+
 `src/content/dsl.test.ts` is the general-purpose test and the one to extend
 first. Every claim in it picks its own subjects — from the shipped corpus in
 `content/`, from the section list, or from what a field's own parser says it

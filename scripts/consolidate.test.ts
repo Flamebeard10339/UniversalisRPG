@@ -189,9 +189,12 @@ describe('the round trip is closed, on the content that ships', () => {
     for (const name of shippedNames().filter((each) => each !== 'core.dsl')) expect(written[name], name).toBe(tree.before[name]);
   });
 
-  it('passes every # test the consolidated tree declares', () => {
+  // Consolidating is asked whether it changed any route's answer, not whether the routes pass:
+  // whether they pass is `integration.test.ts`'s question, answered there once. A route a balance
+  // pass broke is not a consolidation bug and must not be reported here as one.
+  it('changes no # test verdict the tree declares', () => {
     expect(after.tests.size).toBeGreaterThan(0);
-    for (const id of after.tests.keys()) expect(runTest(id, after, createGameState()), id).toEqual({ passed: true });
+    for (const id of after.tests.keys()) expect(runTest(id, after, createGameState()), id).toEqual(runTest(id, staged, createGameState()));
   });
 });
 

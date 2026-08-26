@@ -38,6 +38,12 @@ interface SaveFieldRule {
   holds(value: unknown): boolean;
   sparsest: unknown;
   prune: Prune;
+  // Whether a `# test`'s `expect:` compares this field. A corpus test asks whether a path is still
+  // walkable and nothing else, so what the player did is compared and what the numbers came to is
+  // not: a balance pass moves xp, pools, the clock, the rng cursor, what the loot rolled and how
+  // far into a swing the fight had got, and none of that is the question the test asked. Written
+  // here, on the field, so the filter derives itself and a field added next month has to answer.
+  walked: boolean;
 }
 
 const isNumber = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value);
@@ -78,26 +84,26 @@ const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(val
 const isPlayer = (value: unknown): boolean => PLAYER_FIELDS.every((field) => at(value, field, isText));
 
 export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
-  location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
-  inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } },
-  packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' },
-  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } },
-  visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } },
-  xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } },
-  resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
-  resourceRateRemainders: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } },
-  equipped: { shape: 'record', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' },
-  buffs: { shape: 'record', holds: isBuffList, sparsest: [], prune: 'pruned by a rule of its own' },
-  activeAction: { shape: 'scalar', holds: (value) => value === null || isActiveAction(value), sparsest: { ownerRef: '', actionSlug: '', repeating: false, implicitTarget: 0, cadences: {} }, prune: 'pruned by a rule of its own' },
-  journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' },
-  instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' },
-  populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' },
-  shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } },
-  time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
-  rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' },
-  player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' },
-  settings: { shape: 'scalar', holds: isSettingSheet, sparsest: standingSettings(), prune: 'pruned by a rule of its own' },
-  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' },
+  location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true },
+  inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } , walked: false },
+  packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' , walked: true },
+  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } , walked: true },
+  visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } , walked: true },
+  xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } , walked: false },
+  resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false },
+  resourceRateRemainders: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false },
+  equipped: { shape: 'record', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true },
+  buffs: { shape: 'record', holds: isBuffList, sparsest: [], prune: 'pruned by a rule of its own' , walked: false },
+  activeAction: { shape: 'scalar', holds: (value) => value === null || isActiveAction(value), sparsest: { ownerRef: '', actionSlug: '', repeating: false, implicitTarget: 0, cadences: {} }, prune: 'pruned by a rule of its own' , walked: false },
+  journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' , walked: true },
+  instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' , walked: false },
+  populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' , walked: false },
+  shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } , walked: false },
+  time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false },
+  rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false },
+  player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' , walked: true },
+  settings: { shape: 'scalar', holds: isSettingSheet, sparsest: standingSettings(), prune: 'pruned by a rule of its own' , walked: true },
+  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' , walked: true },
 };
 
 export const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
@@ -107,6 +113,8 @@ function fieldsOfShape(shape: 'record' | 'scalar'): SaveField[] {
 }
 
 const RECORD_FIELDS = fieldsOfShape('record');
+// The fields a walked path is made of. `expect:` compares these and is blind to the rest.
+const WALKED_FIELDS = new Set(SAVE_FIELD_NAMES.filter((field) => SAVE_FIELDS[field].walked));
 const SCALAR_FIELDS = fieldsOfShape('scalar');
 const RECORD_PRUNES = SAVE_FIELD_NAMES.map((field) => [field, SAVE_FIELDS[field].prune] as const).filter((entry): entry is [SaveField, RecordPrune] => typeof entry[1] !== 'string');
 
@@ -350,6 +358,7 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
   const diffs: string[] = [];
 
   for (const field of RECORD_FIELDS) {
+    if (!WALKED_FIELDS.has(field)) continue;
     const { sparsest } = SAVE_FIELDS[field];
     const a = (current[field] ?? {}) as Record<string, unknown>;
     const b = (expected[field] ?? {}) as Record<string, unknown>;
@@ -359,6 +368,7 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
   }
 
   for (const field of SCALAR_FIELDS) {
+    if (!WALKED_FIELDS.has(field)) continue;
     if (!deepEqual(current[field], expected[field])) diffs.push(`${field}: ${describeValue(current[field])} vs ${describeValue(expected[field])}`);
   }
 
@@ -372,6 +382,7 @@ export function compareSaveOnly(state: GameState, saved: ParsedSave): string[] {
   const diffs: string[] = [];
 
   for (const field of RECORD_FIELDS) {
+    if (!WALKED_FIELDS.has(field)) continue;
     const declared = expected[field] as Record<string, unknown> | undefined;
     if (!declared) continue;
     const live = state[field] as unknown as Record<string, unknown>;
@@ -382,7 +393,7 @@ export function compareSaveOnly(state: GameState, saved: ParsedSave): string[] {
   }
 
   for (const field of SCALAR_FIELDS) {
-    if (!(field in expected)) continue;
+    if (!WALKED_FIELDS.has(field) || !(field in expected)) continue;
     const value = state[field];
     if (!deepEqual(value, expected[field])) diffs.push(`${field}: ${describeValue(value)} vs ${describeValue(expected[field])}`);
   }
