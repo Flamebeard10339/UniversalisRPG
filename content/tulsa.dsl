@@ -1014,6 +1014,34 @@ on line-parted:
 // One node each, reached whenever nothing further along is. A quest that wants
 // more of somebody gives them more; this is what is left when none does.
 
+// The three the town is made of. None of them is anybody in particular, so none of them has a name
+// or a second thing to say — what they are for is that a player can talk to a townsman, rob a
+// townsman and fight a townsman, and find out which of the three the town minds.
+
+# dialogue civilian
+owner = civilian
+
+node passing:
+  always
+  again: They have already told you about the weather.
+  Fine morning. Or it was. Have you been down by the water? They say there is something in it.
+
+# dialogue guardsman
+owner = guardsman
+
+node on-duty:
+  always
+  again: He has gone back to watching the road.
+  Move along. Nothing down there for you and nothing up here either.
+
+# dialogue knight
+owner = knight
+
+node armoured:
+  always
+  again: The helm turns a few degrees and stops.
+  The helm turns. Whatever is inside it looks at you for a while and then looks at the road again.
+
 # dialogue mouse
 owner = mouse
 
