@@ -2,9 +2,9 @@
 
 The queue an autonomous lane picks from. Everything here is open; nothing here is
 done. **A line is deleted the day it closes** — not struck through, not annotated,
-deleted — and if what it settled is something a later agent could get wrong, one
-sentence about it goes in `settled.md` instead. Git holds the reasoning, and the
-commit that closes a line is where the reasoning belongs.
+deleted. Git holds the reasoning, and the commit that closes a line is where the
+reasoning belongs. Nothing here records what has been decided: a ruling a later
+agent could get wrong is a test, and a test is where they will meet it.
 
 Each line says what is wrong, how it is known, and what would close it. A line
 without evidence is a hunch and does not belong here yet.
@@ -23,7 +23,7 @@ loop. Half of what is below is GUI, because it came out of a playtest.
 **A line here that turns out to need his judgement does not stay here flagged — it
 moves, carrying what you measured.** Guessing the ruling and abandoning the lane
 are the two bad answers, and the second is worse, because the measurement dies with
-the session. `deliverable-log.md` states how a line crosses, in both directions,
+the session. The `hand-over` skill states how a line crosses, in both directions,
 and is the one place that rule is written.
 
 ---

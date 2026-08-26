@@ -1,24 +1,30 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 
 const usage = [
   'Usage: npm run handoff',
   '',
   'Asks whether the folders a session hands over through are still telling the',
-  'truth. A feature that runs longer than one session keeps a deliverable-log.md',
-  'under docs/<feature>/ saying what the work is for, and beside it the files that',
-  'log names — what is still wrong, and what a cold agent has to know. The log is',
-  'the folder index, so this reads the naming both ways: a file the log never',
-  'names strands a reader, and a name the log holds with no file behind it is the',
-  'log gone stale. Nothing is struck through in any of them: done means deleted.',
+  'truth. A feature that runs longer than one session keeps two files under',
+  'docs/<feature>/ and nothing else: what is still wrong that a lane can close on',
+  'its own, and what is still wrong that waits on the author. Nothing is struck',
+  'through in either: done means deleted. What is already true is not written down',
+  'here at all — it is in the code, in a test, in CLAUDE.md, in a memory, or in git.',
+  '',
+  'So this reads a folder off the tree rather than off an index, reports any third',
+  'file as the format growing back, and asks of every open item whether it names',
+  'the thing that would close it — an item that names none is how invented work',
+  'gets started.',
   '',
   'It reports rather than gates. The one thing it can measure that a reader',
   'cannot is how much work has landed since the docs were last written, which is',
   'the number that says whether they have drifted.',
 ].join('\n');
 
-const LOG = 'deliverable-log.md';
+const OPEN = ['open-agent.md', 'open-human.md'];
+
+const isOpen = (name: string): boolean => /^open-.+\.md$/.test(name);
 
 const WORK = ['src', 'content', 'scripts'];
 
@@ -29,6 +35,24 @@ export interface Complaint {
   says: string;
 }
 
+export interface Item {
+  at: number;
+  heading: string;
+  body: string[];
+}
+
+// An item's own clause naming what would close or move it is the whole format: without it a reader cannot tell an open question from a decision already taken, and a lane invents the answer.
+const namesItsClose = (line: string): boolean => /^\*[^*\s]/.test(line.trimStart());
+
+export function itemsIn(lines: readonly string[]): Item[] {
+  const items: Item[] = [];
+  lines.forEach((line, index) => {
+    if (/^##\s+\S/.test(line)) items.push({ at: index + 1, heading: line.trim(), body: [] });
+    else items[items.length - 1]?.body.push(line);
+  });
+  return items;
+}
+
 // A line that is struck through, or a heading that calls itself finished, is the shape this format exists to remove: it leaves a reader working out which half of the file still applies.
 export function complaintsIn(file: string, text: string): Complaint[] {
   const complaints: Complaint[] = [];
@@ -37,67 +61,68 @@ export function complaintsIn(file: string, text: string): Complaint[] {
     if (line.includes('~~')) complaints.push({ file, says: `line ${index + 1} is struck through, and done means deleted` });
     if (/^#{1,6}\s/.test(line) && /\b(closed|fixed|done|resolved|complete)\b/i.test(line)) complaints.push({ file, says: `line ${index + 1} is a heading that calls itself finished: ${line.trim()}` });
   });
+  for (const item of itemsIn(lines)) {
+    if (!item.body.some(namesItsClose)) complaints.push({ file, says: `line ${item.at} names nothing that would close it: ${item.heading}` });
+  }
   return complaints;
-}
-
-export function namesInLog(text: string): string[] {
-  const written = [...text.matchAll(/(?:^|[^\w./\\-])([\w-]+\.md)/g)].map((found) => found[1]);
-  return [...new Set(written)];
 }
 
 export interface Folder {
   name: string;
-  companions: string[];
+  open: string[];
+  missing: string[];
+  strays: string[];
+  items: number;
   complaints: Complaint[];
-  unlinked: string[];
-  gone: string[];
   since: number;
   lastWrote: string;
 }
 
 function reviewFolder(dir: string): Folder {
-  const log = readFileSync(path.join(dir, LOG), 'utf8');
-  const companions = readdirSync(dir).filter((name) => name !== LOG && name.endsWith('.md'));
-  const complaints = companions.flatMap((name) => complaintsIn(name, readFileSync(path.join(dir, name), 'utf8')));
+  const held = readdirSync(dir).filter((name) => name.endsWith('.md'));
+  const open = held.filter(isOpen);
+  const texts = open.map((name) => [name, readFileSync(path.join(dir, name), 'utf8')] as const);
 
-  const named = namesInLog(log);
-  const unlinked = companions.filter((name) => !named.includes(name));
-  const gone = named.filter((name) => name !== LOG && !companions.includes(name) && !existsSync(name));
-
-  const held = [LOG, ...companions];
-  const written = held.map((name) => git('log', '-1', '--format=%H %h %s', '--', path.join(dir, name))).filter((line) => line !== '');
-  const newest = written[0] ?? '';
+  const written = open.map((name) => git('log', '-1', '--format=%H %h %s', '--', path.join(dir, name))).filter((line) => line !== '');
   let since = 0;
   let lastWrote = '(never committed)';
-  if (newest !== '') {
-    // The docs are as old as their youngest line, so the commit to count from is the last one that touched any of them.
+  if (written.length > 0) {
+    // The docs are as old as their youngest line, so the commit to count from is the last one that touched either of them.
     const commits = written.map((line) => line.split(' ')[0]);
     const times = commits.map((hash) => Number(git('show', '-s', '--format=%ct', hash)));
     const at = times.indexOf(Math.max(...times));
     lastWrote = written[at].split(' ').slice(1).join(' ');
     since = Number(git('rev-list', '--count', `${commits[at]}..HEAD`, '--', ...WORK));
   }
-  return { name: path.basename(dir), companions, complaints, unlinked, gone, since, lastWrote };
+
+  return {
+    name: path.basename(dir),
+    open,
+    missing: OPEN.filter((name) => !open.includes(name)),
+    strays: held.filter((name) => !isOpen(name)),
+    items: texts.reduce((count, [, text]) => count + itemsIn(text.split(/\r?\n/)).length, 0),
+    complaints: texts.flatMap(([name, text]) => complaintsIn(name, text)),
+    since,
+    lastWrote,
+  };
 }
 
-export const wrongIn = (folder: Folder): number =>
-  folder.complaints.length + folder.unlinked.length + folder.gone.length + (folder.companions.length === 0 ? 1 : 0);
+export const wrongIn = (folder: Folder): number => folder.complaints.length + folder.missing.length + folder.strays.length;
 
 export function folderLines(folder: Folder): string[] {
   const lines = [`docs/${folder.name}/`];
   const say = (mark: string, text: string): void => void lines.push(`  ${mark} ${text}`);
-  if (folder.companions.length === 0) say('--', `${LOG} stands alone — a folder that hands over keeps what is still wrong and what is settled in files beside it`);
-  else say('ok', `${LOG} and the ${folder.companions.length} file(s) it names: ${folder.companions.join(', ')}`);
+  say('ok', `${folder.open.join(' and ')}, ${folder.items} open item(s) between them`);
+  for (const name of folder.missing) say('--', `no ${name} — the queue is split by who is blocked, and a half that is empty says so in a line rather than by being absent`);
+  for (const name of folder.strays) say('--', `${name} stands beside them, and this format is the open files and nothing else — what is already true belongs in the code, in CLAUDE.md, in a memory, or in git`);
   for (const complaint of folder.complaints) say('--', `${complaint.file}: ${complaint.says}`);
-  for (const name of folder.unlinked) say('--', `${LOG} never names ${name}, so a reader starting there will not find it`);
-  for (const name of folder.gone) say('--', `${LOG} names ${name}, and no such file stands beside it`);
   if (folder.since === 0) say('ok', 'nothing has landed since these were last written');
   else say(folder.since > 8 ? '--' : 'ok', `${folder.since} commit(s) under ${WORK.join('/')} since these were last written — the last was ${folder.lastWrote}`);
   return lines;
 }
 
 export function handoffLines(dirs: readonly string[]): string[] {
-  if (dirs.length === 0) return ['no docs/<feature>/ folder keeps a deliverable-log, so nothing here is handed over between sessions'];
+  if (dirs.length === 0) return ['no docs/<feature>/ folder keeps an open-*.md, so nothing here is handed over between sessions'];
   const folders = dirs.map(reviewFolder);
   const wrong = folders.reduce((count, folder) => count + wrongIn(folder), 0);
   const stale = folders.filter((folder) => folder.since > 8).length;
@@ -111,7 +136,7 @@ export const featureFolders = (root = 'docs'): string[] =>
   readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(root, entry.name))
-    .filter((dir) => existsSync(path.join(dir, LOG)));
+    .filter((dir) => readdirSync(dir).some(isOpen));
 
 function main(): void {
   if (process.argv.includes('--help')) {

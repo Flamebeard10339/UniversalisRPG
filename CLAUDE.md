@@ -62,19 +62,32 @@ module; replace one only having read what you are replacing.
 
 # Work that outlives a session
 
-A feature that runs longer than one sitting hands over through four files in
-`docs/<feature>/`: `deliverable-log.md` says what it is for and what phase it is
-in, `open-agent.md` is what is still wrong that a lane can close on its own,
-`open-human.md` is what is still wrong that waits on the author, and `settled.md`
-is what someone starting cold has to know. **Read all four before touching that
-work, and keep them current as you go.** A finding left only in a session
-transcript is lost.
+A feature that runs longer than one sitting hands over through **two** files in
+`docs/<feature>/` and nothing else: `open-agent.md` is what is still wrong that a
+lane can close on its own, and `open-human.md` is what is still wrong that waits on
+the author. **Read both before touching that work, and keep them current as you
+go.** A finding left only in a session transcript is lost.
 
-Nothing is struck through in any of them — **done means deleted**, and the commit
-that closed a line is where its reasoning lives. An open line that changes hands
-**crosses between the two open files rather than being marked in place**, in
-either direction. A folder where a finished heading and an open one look alike
-has stopped answering the one question it is for.
+Nothing is struck through in either — **done means deleted**, and the commit that
+closed a line is where its reasoning lives. An open line that changes hands
+**crosses between the two rather than being marked in place**, in either direction.
+Every line names the thing that would close it, and `npm run handoff` reports one
+that names none: a reader who cannot tell an open question from a decision already
+taken invents work rather than doing it.
+
+**What is already settled is not written down here.** A third file was tried — a
+`settled.md` that reached 1463 lines — and every fact in it was already in the code.
+A decision about the game is a **test**. A rule about the work is a line in this
+file. A workflow discovery is a memory, kept short and actionable. Why any of them
+was decided is the commit message. **Never write a settled decision into a code
+comment**: the *Comments* section already refuses it, and a folder of them is what
+this paragraph replaced.
+
+So a test that blocks the task in hand is one of two things, and both have the same
+answer. Either the author decided that behaviour, in which case it stands and the
+task is wrong; or an agent wrote the test, in which case **the task overrules it**,
+because the task came from the author. Change it, say plainly that you did, and do
+not stall hunting for a past ruling that would license the change.
 
 `npm run handoff` says which of those folders have drifted from the work. The
 `hand-over` skill is the procedure for writing them and for closing a session out.
