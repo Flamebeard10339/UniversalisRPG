@@ -234,7 +234,7 @@ examine: Copper overhead, a range along one wall, and staff who do not look up.
 adjacent:
   castle-hall
 entities:
-  castle-range
+  castle-range, range-drawer
 
 # location castle-quarters
 x: 2, y: -2, z: 1
@@ -673,6 +673,19 @@ stations: stove
 title: Castle Range
 examine: A range the length of the wall, and one cook who will let you use the end of it.
 stations: stove
+
+// The one thing in the castle worth more than what is on the range. Whoever it belonged to is not
+// here and the cook does not say where they went.
+# entity range-drawer
+title: The End Drawer
+examine: The drawer at the cold end of the range, which sticks, and which nobody has opened in a while.
+flags: emptied
+work it open:
+  time: 8
+  hidden if: emptied
+  set: emptied
+  give: 1 cooking.a-cooks-hands-jewel
+  say: The drawer comes out crooked and almost entirely empty. What is in it is a ring of blackened iron, and it is warm.
 
 # entity first-hive
 title: The First Hive
@@ -1265,6 +1278,31 @@ assert: hive-mouth.discovered
 // The economy, end to end and in the smallest amount that closes: a curio the
 // a new arrival's first fights leave behind becomes coin, coin becomes a herring, and the herring
 // becomes the thing Larry's nose is pointed at.
+// --- what a minute is worth, which is what every room in the world is sized against ---
+
+// Attack is paid two experience for every point of damage dealt, so what an hour of this game comes
+// to is the player's damage and nothing else. The post takes every swing without moving and without
+// hitting back, so a minute here is that number with the room taken out of it — and it is the number
+// `combat.dsl` sizes each room's count and respawn against. A band rather than an exact figure,
+// because a swing is spent out of a range and the whole point of the range is that it varies.
+# test a-minute-at-the-post-is-what-the-ladder-is-cut-from
+load: at-the-proving-ground
+use: core.melee-combat on proving-post
+wait: 60
+assert: xp.combat.attack > 350
+assert: xp.combat.attack < 750
+
+// The other half of the same minute, and the reason there are two skills rather than one: standing
+// somewhere that hits back pays for both, and what a room can pay in Health is capped by the pool
+// the player has to spend rather than by the room. Nothing here is a number — that a rat trains both
+// at all is the claim, and how fast is what a playtest is for.
+# test the-sewer-pays-a-beginner-in-both-halves-of-a-fight
+load: at-the-sewer-junction
+wait: 20
+assert: xp.combat.attack > 0
+assert: xp.combat.health > 0
+assert: not core.fainted
+
 // The two things in the market a light hand gets, and fifteen is the whole of what they are worth:
 // three at the grate and twelve off the rack. Each sets its own flag, which is what its own
 // `hidden if:` reads, so neither is a second helping — and the axe is the tool the dead alder wants,

@@ -111,6 +111,7 @@ examine: Drawn from one tail, by somebody with a great deal of patience and one 
 slot: gloves
 requires: level.fishing >= 15
 value: 120
+item-level: 8-14
 tackle, +12 max-line-health
 
 // The one piece of tackle that is a trade rather than an upgrade: twice the line to lose and six
@@ -217,6 +218,38 @@ cast for salmon:
     fishing:
       give: 1 raw-salmon
       xp: fishing 55
+      1 in 200:
+        give: 1 anglers-knot-jewel
+        say: There is something wound into the gill plate that was not put there by a fish.
     150x:
       drain: 3 line-health
       say: Something enormous takes it and simply keeps going.
+
+// --- what a line can be grown into ---
+//
+// The one piece of tackle with a plane in it, and the jewel that is worth socketing there. A line is
+// the only thing a fisherman wears for long enough to be worth spending points on, which is why the
+// horsehair one is the base and the gut one is not.
+
+# passive keen-line
+tackle, +3 fishing
+
+# passive sure-hand
+tackle, +6 fishing
+
+# passive drawn-out
+tackle, +4 max-line-health
+
+# passive unbreaking
+tackle, +20% max-line-health
+
+# cluster-jewel anglers-knot
+examine: A knot nobody can teach you and everybody claims to have invented.
+shape: ring
+open-connections: e
+passives: 1 keen-line, 2 drawn-out, 3 sure-hand, 4 unbreaking, 5 keen-line, 6 drawn-out
+
+# item anglers-knot-jewel
+title: Angler's Knot
+examine: Six turns of something that is not quite line, and it does not come undone. @@@ It should also carry a chance not to spend the bait, which nothing in the language can say: what a cast consumes is written in the cast rather than read off a stat.
+cluster-jewel: anglers-knot

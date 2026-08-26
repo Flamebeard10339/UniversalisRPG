@@ -32,17 +32,18 @@ trigger: damage-dealt
 # event damage-taken
 trigger: damage-taken
 
-// A point of damage is two experience. Against the first thing in the game worth hitting that is
-// about four hundred a minute of standing still and swinging, which is the pace the whole ladder
-// below is cut to; `the-sewer-pays-a-beginner-about-what-the-ladder-is-cut-to` is where that number
-// is held to.
+// A point of damage is two experience. A minute of standing still and swinging comes to about five
+// hundred, which is the pace every room in the world is sized against, and it is held to that in
+// `tulsa.a-minute-at-the-post-is-what-the-ladder-is-cut-from` — at the one thing in the world that
+// takes a swing without moving, so the number is the player's arm with the room taken out of it.
 # skill attack
 title: Attack
 stat: core.attack
 gain 2 * amount experience on damage-dealt
 
 // Taken damage is worth fifteen times what dealt damage is, because a fight the player wins is one
-// where they took a small fraction of what they gave. What caps this is not the enemy but the
+// where they took a small fraction of what they gave. That both halves are paid at once is
+// `tulsa.the-sewer-pays-a-beginner-in-both-halves-of-a-fight`. What caps this is not the enemy but the
 // player's own pool and what they can put back into it, so armour that stops a tier hurting you is
 // armour that stops it training you — which is the whole reason to walk further out.
 # skill health

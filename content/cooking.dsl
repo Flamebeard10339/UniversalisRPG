@@ -60,6 +60,7 @@ examine: Heavy enough to be a weapon and seasoned black by somebody who never on
 slot: mainhand
 requires: level.cooking >= 5
 value: 60
+item-level: 6-12
 kitchen, +6 cooking
 
 // --- what a kitchen turns out ---
@@ -215,3 +216,27 @@ accuracy: cooking
 skill: cooking 3
 rate: core.cooking-rate
 say: The shell splits along the score and the inside comes out soft.
+
+// --- what a pan can be grown into ---
+//
+// The pan is the one thing in a kitchen a cook keeps, so it is the one thing with a plane in it.
+
+# passive seasoned
+kitchen, +4 cooking
+
+# passive practised
+kitchen, +7 cooking
+
+# passive second-nature
+kitchen, +10% cooking
+
+# cluster-jewel a-cooks-hands
+examine: Whatever it is that lets somebody take a pan off the heat without looking at it.
+shape: ring
+open-connections: e
+passives: 1 seasoned, 2 practised, 3 second-nature, 4 seasoned, 5 practised, 6 second-nature
+
+# item a-cooks-hands-jewel
+title: A Cook's Hands
+examine: A ring of blackened iron, worn smooth on the inside by somebody who never took it off.
+cluster-jewel: a-cooks-hands

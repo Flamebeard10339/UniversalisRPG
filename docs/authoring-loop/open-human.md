@@ -127,29 +127,6 @@ of `page:` moves is played back. There are two recorded runs standing in
 *Moves when: he watches one and names the cadence. Nothing else answers it — and he
 has said explicitly that he will do it later.*
 
-## Which stat each skill raises, where a skill raises one at all
-
-Ruled and landed: every `# skill` naming a stat grants +1 to it per level, derived from
-that one word rather than written beside each skill, and a skill naming no stat grants
-nothing. `melee` and `thieving` took back the `stat: attack` the ruling names. What the
-lane could not answer is the rest of the list, and it measured the candidates rather
-than guessing:
-
-- **`cooking` → `cooking-rate`** (base 55). Natural fit by name, and +1 a level is a
-  modest nudge against that base.
-- **`woodcutting` → `felling`** (base **0.25**). Natural fit by name, but +1 a level is
-  a scale change rather than a balance nit: at level 2 a trunk falls in one swing where
-  it now takes four.
-- **`fishing` → nothing exists.** A stat would have to be invented before the question
-  can be answered at all.
-- **`thieving` → `attack`** is what is in the corpus now, restored because the ruling's
-  own wording names it — but it reads like a placeholder somebody pasted, a non-combat
-  skill quietly adding to the player's damage.
-
-*Moves when: he names a stat, or `none`, for each of the four. Each answer is a one-word
-content edit and the derived proof follows it with nothing else edited — so this is four
-words, not four tasks.*
-
 ## Whether a sale may pay for itself when the pack is full
 
 `sellProblem` checks there is room for the coin before anything leaves the pack, so a
