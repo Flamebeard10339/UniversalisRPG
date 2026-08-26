@@ -1,5 +1,5 @@
 import type { JournalEntry } from '../runtime/session';
-import { fillOf } from './lineStyle';
+import { inkOf } from './lineStyle';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
@@ -9,8 +9,10 @@ export function QuestBody({ entry, words }: { entry: JournalEntry; words: Words 
   useTestSurface('quest', { entry });
 
   return (
-    <div style={fillOf(entry.group)} className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
-      <h3 className="text-base font-semibold">{entry.title}</h3>
+    <div data-standing={entry.standing} className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
+      <h3 style={inkOf(entry.group)} className="text-base font-semibold">
+        {entry.title}
+      </h3>
       {entry.lines.length === 0 ? <p className="mt-2 text-sm text-text-muted">{words('journal-untouched')}</p> : null}
       <ol className="unbarred mt-2 flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
         {entry.lines.map((line, at) => (

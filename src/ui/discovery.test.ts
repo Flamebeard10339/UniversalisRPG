@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { waysOut } from '../runtime/waysOut';
-import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkLine, type Place } from './discovery';
+import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkingAt, walkLine, type Node, type Place } from './discovery';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -169,17 +169,60 @@ describe('the walk under way', () => {
   it('takes the road between two places it crosses in a row, either way round', () => {
     const line = walkLine('a', journey);
 
-    expect(onWalk(line, 'a', 'b')).toBe(true);
-    expect(onWalk(line, 'c', 'b')).toBe(true);
-    expect(onWalk(line, 'c', 'd')).toBe(true);
+    expect(onWalk(line, 'a', 'b')?.stretch).toBe('now');
+    expect(onWalk(line, 'c', 'b')?.stretch).toBe('ahead');
+    expect(onWalk(line, 'c', 'd')?.stretch).toBe('ahead');
+  });
+
+  it('tells the road under the player from the rest of the route, whichever end it was drawn from', () => {
+    const line = walkLine('a', journey);
+
+    expect(onWalk(line, 'a', 'b')).toEqual({ stretch: 'now', along: true });
+    expect(onWalk(line, 'b', 'a')).toEqual({ stretch: 'now', along: false });
+  });
+
+  it('says which way a road is drawn against the way it is walked, so a march along it goes forwards', () => {
+    const line = walkLine('a', journey);
+
+    expect(onWalk(line, 'b', 'c')?.along).toBe(true);
+    expect(onWalk(line, 'c', 'b')?.along).toBe(false);
   });
 
   it('leaves the roads it does not take, including a short cut between two places on it', () => {
     const line = walkLine('a', journey);
 
-    expect(onWalk(line, 'a', 'c')).toBe(false);
-    expect(onWalk(line, 'b', 'elsewhere')).toBe(false);
-    expect(onWalk([], 'a', 'b')).toBe(false);
+    expect(onWalk(line, 'a', 'c')).toBeNull();
+    expect(onWalk(line, 'b', 'elsewhere')).toBeNull();
+    expect(onWalk([], 'a', 'b')).toBeNull();
+  });
+});
+
+const at = (id: string, here = false): Node => ({ place: place(id, 0, 0, 0), here, climb: 0, at: { x: 0, y: 0 } });
+
+describe('what a place is while a journey is on', () => {
+  const line = walkLine('a', { to: 'd', legs: ['b', 'c', 'd'] });
+
+  it('tells the four apart: where the player stands, the next stop, one further on, and the far end', () => {
+    expect(line.map((id) => walkingAt(line, at(id, id === 'a')))).toEqual(['here', 'next', 'ahead', 'target']);
+  });
+
+  it('says nothing of a place the journey does not pass through', () => {
+    expect(walkingAt(line, at('elsewhere'))).toBeUndefined();
+  });
+
+  it('says where the player stands even when no journey is under way, and nothing of anywhere else', () => {
+    expect(walkingAt([], at('a', true))).toBe('here');
+    expect(walkingAt([], at('b'))).toBeUndefined();
+  });
+
+  it('says target rather than next for a journey of one leg, which is the fact the player chose', () => {
+    const short = walkLine('a', { to: 'b', legs: ['b'] });
+
+    expect(walkingAt(short, at('b'))).toBe('target');
+  });
+
+  it('gives every place on the line one of the four and never nothing, so no leg goes undrawn', () => {
+    expect(line.map((id) => walkingAt(line, at(id, id === 'a'))).filter((each) => each === undefined)).toEqual([]);
   });
 });
 

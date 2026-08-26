@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
 import { names, type Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
-import { drawnFor, onWalk, spotOf, walkLine, type Node } from './discovery';
+import { drawnFor, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
 import { answering, centredOn, created, droppedAt, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
-import { useMoment } from './transient';
+import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
 import { bounds, panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
@@ -15,6 +15,17 @@ import type { Words } from './words';
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
 
 const NOT_CARRIED: Point = { x: 0, y: 0 };
+
+// Each of the four things a place can be while a journey is on, said in a colour of its own. Written
+// as a record over the states themselves, so a state added to the walk has to be drawn before this
+// compiles. Where the player stands is the one that is filled; the rest are edges and lettering,
+// because a filled bubble reads as somewhere you already are.
+const WALKING_CLASS: Record<Walking, string> = {
+  here: 'border-accent bg-accent-strong font-semibold text-accent-text',
+  next: 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong',
+  ahead: 'border-accent text-accent',
+  target: 'border-warning font-semibold text-warning ring-2 ring-warning',
+};
 
 function Bubble({
   node,
@@ -30,7 +41,7 @@ function Bubble({
 }: {
   node: Node;
   arrived: boolean;
-  walking: 'going' | 'crossing' | undefined;
+  walking: Walking | undefined;
   scale: number;
   held: (element: HTMLButtonElement | null) => void;
   go: (() => void) | null;
@@ -48,10 +59,8 @@ function Bubble({
     'data-walk': walking,
     style: { left: spot.x + carried.x, top: spot.y + carried.y },
     className: `absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
-      node.here ? 'border-accent bg-accent-strong font-semibold text-accent-text' : 'border-border bg-panel'
-    } ${walking === 'going' ? 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong' : ''} ${
-      walking === 'crossing' ? 'border-accent text-accent' : ''
-    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-warning' : ''}`,
+      walking === undefined ? 'border-border bg-panel' : WALKING_CLASS[walking]
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-danger' : ''}`,
   };
 
   const inside = (
@@ -86,16 +95,27 @@ function Bubble({
 }
 
 // Whether a road is walked both ways is what the line is: solid for a road walked both, dashed and pointed for one walked only towards where it points. Whether it is open is the weight and the colour, so the two facts do not share a channel.
-function Road({ from, to, open, mutual, walking }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: boolean }): JSX.Element {
+function Road({ from, to, open, mutual, walking }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: Walked | null }): JSX.Element {
   const a = spotOf(from);
   const b = spotOf(to);
+  const now = walking?.stretch === 'now';
   const look = {
     className: walking ? 'stroke-accent-strong' : open ? 'stroke-accent' : 'stroke-text-subtle',
     strokeWidth: walking ? 7 : open ? 3 : 2,
   };
   return (
     <g data-road={mutual ? 'both ways' : 'one way'}>
-      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} data-walk={walking ? 'road' : undefined} {...look} strokeDasharray={mutual ? undefined : '5 4'} strokeLinecap="round" />
+      <line
+        x1={a.x}
+        y1={a.y}
+        x2={b.x}
+        y2={b.y}
+        data-walk={walking?.stretch}
+        {...look}
+        className={`${look.className} ${now ? (walking!.along ? MARCHING : MARCHING_BACK) : ''}`}
+        strokeDasharray={mutual || now ? undefined : '5 4'}
+        strokeLinecap="round"
+      />
       {mutual ? null : <polyline points={arrowAt(a, b)} {...look} fill="none" strokeLinecap="round" strokeLinejoin="round" />}
     </g>
   );
@@ -148,7 +168,6 @@ export function MapPane({
   const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
 
   const walk = walkLine(here, view.journey);
-  const going = walk[walk.length - 1];
 
   const recentre = (): void => {
     const floor = view.discovered.find((place) => place.id === here)?.z ?? null;
@@ -298,7 +317,7 @@ export function MapPane({
           key={`${node.place.id}-${arrivals.includes(node.place.id) ? generation : 0}`}
           node={node}
           arrived={arrivals.includes(node.place.id)}
-          walking={node.place.id === going ? 'going' : walk.includes(node.place.id) && !node.here ? 'crossing' : undefined}
+          walking={walkingAt(walk, node)}
           go={mode === 'link' ? () => link(node.place.id) : lineFor(node.place.id) === null ? null : () => go(node.place.id)}
           chosen={node.place.id === from}
           scale={map.zoom}

@@ -2,17 +2,21 @@ import { useEffect, useState } from 'react';
 
 export const SIDE_BY_SIDE = '(min-aspect-ratio: 1/1)';
 
-export function useWide(): boolean {
-  const [wide, setWide] = useState(false);
+// A question put to the browser and kept up to date, for the things a stylesheet cannot answer on
+// its own. Asked once here so that a caller names the query and nothing else.
+export function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(false);
 
   useEffect(() => {
-    const asked = typeof window === 'undefined' ? undefined : window.matchMedia?.(SIDE_BY_SIDE);
+    const asked = typeof window === 'undefined' ? undefined : window.matchMedia?.(query);
     if (!asked) return;
-    const read = (): void => setWide(asked.matches);
+    const read = (): void => setMatches(asked.matches);
     read();
     asked.addEventListener('change', read);
     return () => asked.removeEventListener('change', read);
-  }, []);
+  }, [query]);
 
-  return wide;
+  return matches;
 }
+
+export const useWide = (): boolean => useMedia(SIDE_BY_SIDE);

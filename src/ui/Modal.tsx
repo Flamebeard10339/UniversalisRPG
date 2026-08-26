@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { VOICE_CLASS } from './lineStyle';
 import { clickingOffLeaves, layerOf, mannerOf, showsTheBeat, type Declared } from './modalManner';
 import type { Localized } from '../runtime/localized';
-import { revealDelays } from './reveal';
-import { playedAfter, useMoment } from './transient';
+import { arriving, A_CHARACTER, landed, OPENS, pressed, typedOn } from './reveal';
+import { useMoment, useMotionless } from './transient';
+import { useTestSurface } from './useTestSurface';
 
 const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
 
@@ -21,34 +22,52 @@ export function ModalCard({ subject, title, children }: { subject?: string; titl
   );
 }
 
-// One line of the beat, waiting out the lines before it. Keyed on its own words, because the same
-// slot holding something else is a new line and a line that never remounts never arrives again.
-function Said({ line, waits, paced }: { line: Localized; waits: number; paced: boolean }): JSX.Element {
-  const spoken = useMoment('speak', paced, line);
-
-  return (
-    <p style={paced ? playedAfter(waits) : undefined} className={`${spoken} whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`}>
-      {line}
-    </p>
-  );
-}
+const SAID = `whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`;
 
 // The words the screen is answering, which the scrim behind it has taken away. Drawn in the voice
 // they were said in, so a line reads the same whether it is in the history or in front of it. This
 // is the one place the words are paced: the history behind the scrim is a record and comes to rest
 // at the line the turn began on, which is a line nobody has read yet if it is still arriving.
+//
+// The reading is state and not a delay handed to the stylesheet, because a reader who asked for less
+// motion is handed no animation at all and would have been handed the whole beat at once.
 function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean }): JSX.Element | null {
-  if (lines.length === 0) return null;
+  const [reading, setReading] = useState(OPENS);
+  const motionless = useMotionless();
+  const beat = arriving(lines, reading, paced);
+  const typing = beat.typing;
+  const press = (): void => setReading((was) => pressed(lines, was));
 
-  const waits = revealDelays(lines, paced);
+  useTestSurface('beat', { arriving: beat, controls: { press } });
+
+  useEffect(() => {
+    if (!typing) return;
+    if (motionless) return void setReading((was) => landed(lines, was));
+    const timer = setTimeout(() => setReading((was) => typedOn(lines, was)), A_CHARACTER);
+    return () => clearTimeout(timer);
+  }, [typing, motionless, reading.at, reading.typed]);
+
+  if (lines.length === 0) return null;
 
   return (
     <ModalCard>
       <div className="unbarred flex max-h-[40vh] flex-col gap-1 overflow-y-auto">
-        {lines.map((line, at) => (
-          <Said key={`${at}:${line}`} line={line} waits={waits[at]} paced={paced} />
+        {beat.shown.map((line, at) => (
+          <p key={at} className={SAID}>
+            {line}
+          </p>
         ))}
       </div>
+      {beat.typing || beat.awaits ? (
+        <button
+          data-drive="beat.press"
+          type="button"
+          onClick={press}
+          className="mt-1 w-full rounded-xl border border-border text-sm text-text-subtle transition-transform duration-75 active:scale-[0.99] active:text-accent"
+        >
+          ▾
+        </button>
+      ) : null}
     </ModalCard>
   );
 }
@@ -88,7 +107,9 @@ export function Modal({
       className={`${darkened} ${layerOf(held)}`}
     >
       {about}
-      {showsTheBeat(held) ? <Beat lines={spoken} paced={paced} /> : null}
+      {/* Keyed on the words, because a beat is read once: the same slot holding something else is a
+          new beat and one that never remounts would open where the last one was left. */}
+      {showsTheBeat(held) ? <Beat key={spoken.join('\n')} lines={spoken} paced={paced} /> : null}
       {children}
     </div>
   );

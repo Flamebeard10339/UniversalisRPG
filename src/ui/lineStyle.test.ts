@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
+import { fillOf, inkOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
 
 // The subjects are whatever the two records hold, so a line kind or a tone added next month is held
 // to the same separation with nothing edited here.
@@ -53,5 +53,30 @@ describe('what a cell is filled with', () => {
 
   it('is nothing at all where nothing says what the thing is', () => {
     expect(fillOf(undefined)).toEqual({});
+  });
+});
+
+describe('what a title is lettered in', () => {
+  it('is the group at full strength, since a title is read rather than glanced at', () => {
+    expect(inkOf({ colour: '#34d399' })).toEqual({ color: '#34d399' });
+  });
+
+  it('is nothing at all where nothing says where the thing stands', () => {
+    expect(inkOf(undefined)).toEqual({});
+  });
+});
+
+// The whole point of there being two of them: an element handed both would be saying one fact twice,
+// and an element handed each of two groups would be saying two facts that could not be told apart.
+// So the two never write the same property, whatever colour either is handed.
+describe('the two channels a group\'s colour reaches a player on', () => {
+  it('never write the same thing, so neither can quietly take the other\'s meaning', () => {
+    const group = { colour: '#fbbf24' };
+    const fill = Object.keys(fillOf(group));
+    const ink = Object.keys(inkOf(group));
+
+    expect(fill.length, 'a fill that writes nothing makes this vacuous').toBeGreaterThan(0);
+    expect(ink.length, 'an ink that writes nothing makes this vacuous').toBeGreaterThan(0);
+    expect(fill.filter((property) => ink.includes(property))).toEqual([]);
   });
 });
