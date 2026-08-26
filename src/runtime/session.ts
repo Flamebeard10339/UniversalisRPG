@@ -3,7 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
-import { actionFirstUnit, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionProgress, actionStalled, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems, packRows } from './itemInstance';
 import { swappedOrder } from './packOrder';
@@ -62,6 +62,20 @@ export interface PlayChoice {
   legs?: number;
 }
 
+export interface OfferedChoice extends PlayChoice {
+  // Where the choice sits in the view's own list, which is how a player answers it. A surface that
+  // draws some of the list rather than all of it would lose that by counting again, so it is carried.
+  position: number;
+}
+
+// What a page of offers draws: everything on offer where the player stands, and the one step out of
+// it. Anywhere further is the map's — `waysOut` is what answers that — because a room's offers are
+// what can be done from it, and every place the player has ever found is not that. The cut is read
+// off the choice's own `legs`, so a world that grows a district does not grow this list with it.
+export function sheetOffers(status: Pick<PlayStatus, 'choices'>): OfferedChoice[] {
+  return status.choices.map((choice, at) => ({ ...choice, position: at + 1 })).filter((choice) => (choice.legs ?? 0) <= 1);
+}
+
 export interface PlayAction {
   label: Localized;
   // Who the action under way is aimed at, said the way a choice says what offers it. The seat is
@@ -70,6 +84,9 @@ export interface PlayAction {
   of?: Answer;
   detail?: Localized;
   progress: number;
+  // Whether it is standing still rather than advancing — something took its pace to nothing. The bar
+  // holds where it stood; it has not been lost, and it moves again when whatever did it wears off.
+  stalled: boolean;
   attempts: number;
   // How much of this cycle is still to be counted, or null when there is no such figure to give.
   // A renderer draws it when it is there and says nothing when it is not; deciding for itself what
@@ -249,8 +266,7 @@ function entityAliasesTravelTo(location: Location, target: string, registry: Reg
 //
 // Two things are deliberately never masked. One with no `examine:` mints no offer that could lift
 // the mask, so masking it would leave it standing with nothing a player could ever do; and a foe in
-// the fight under way is already met, while running its examine would disarm that fight, which is
-// the one way this could take a player's answer away from them.
+// the fight under way has been met, whatever anybody has read.
 function maskedHere(registry: Registry, state: GameState, location: Location): ReadonlySet<string> {
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const masked = new Set<string>();
@@ -640,7 +656,6 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   const active = state.activeAction;
   if (!active) return null;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  const cycle = actionFirstUnit(obj, objId, active.actionSlug, registry, state);
   const clock = playerCadence(active);
   const localizer = localizerOf(registry, state);
   const action = armedAction(state, registry);
@@ -649,7 +664,8 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
   return {
     label: actionUnderWay(localizer, obj, objId, action),
     ...(aimed === undefined ? {} : { of: aimed.of, detail: aimed.detail }),
-    progress: cycle > 0 ? Math.min(1, Math.max(0, clock.progress / cycle)) : 1,
+    progress: actionProgress(state, registry),
+    stalled: actionStalled(state, registry),
     attempts: clock.attemptsMade,
     completion: stillToCount(action, active),
   };

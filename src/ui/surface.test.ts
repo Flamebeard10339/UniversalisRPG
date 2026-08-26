@@ -53,6 +53,7 @@ const DISPATCHES = [
   'waysOut',
   'BASE_LANGUAGE',
   'createTicker',
+  'liveAgain',
   'LIVE_TICK_MS',
   'localizerFor',
   'newContext',
