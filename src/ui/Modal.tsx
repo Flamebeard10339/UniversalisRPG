@@ -61,7 +61,6 @@ function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean })
       {beat.typing || beat.awaits ? (
         <button
           data-drive="beat.press"
-          data-awaits={beat.awaits ? 'yes' : undefined}
           type="button"
           onClick={press}
           className="mt-1 w-full rounded-xl border border-border text-sm text-text-subtle transition-transform duration-75 active:scale-[0.99] active:text-accent"
