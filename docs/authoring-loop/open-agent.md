@@ -75,31 +75,6 @@ as differing with its reason. **The third is the one to think about first** — 
 `hidden if:` rule and the refusal rule meeting, and which of them owns that moment is a
 design answer rather than a patch.
 
-## The command four test comments tell you to regenerate a sheet with does not exist
-
-`content/first-steps.dsl` and `content/tulsa.dsl` carry four comments reading
-*"Regenerate with /create-valid-test when this route's content changes on purpose"*,
-over the `expect only:` sheets on `miki-route-full`, `thieving-route-full`,
-`apology-route-full` and `dresser-trinket`. There is no such command: nothing under
-`.claude/skills/`, nothing under `~/.claude/commands/`, nothing in `package.json`.
-
-So a recorded sheet is unmaintainable by anything but hand-editing, and those sheets
-pin the clock, the rng cursor, the visit counts and every holding. This was hit on
-2026-08-25 while pricing a split of `leave-tutorial-island` out of `first-steps`: the
-split needed three sheets re-recorded, no tool could do it, and the split was dropped
-for that reason among others.
-
-Nothing in the repo can dump one either. `/state` prints a status view, not a save;
-`npm run probe --test <id>` reports PASSED/FAILED and nothing else.
-
-*Closes when:* running a `# test` can print the state it ends on as a `# save` body,
-and the four comments name the thing that actually does it. The pieces are already
-there — `runTest` in `src/runtime/session.ts` leaves the state, and `src/runtime/save.ts`
-serializes one — so this is a script and its test, not a design.
-
-## npm run review needs to work in chunks
-the command should give the first 20 sections that need review. Optional way to indicate that all of those 20 have been reviewed. 
-
 ---
 
 ## From the owner's rulings on `open-human.md`, 2026-08-26
