@@ -10,7 +10,7 @@ const entry = (quest: string, standing: Entry['standing'], lines: Array<[string,
   title: quest as Localized,
   stage: 'a-stage' as Answer,
   standing,
-  lines: lines.map(([said, struck]) => ({ stage: 'a-stage' as Answer, said: said as Localized, struck })),
+  lines: lines.map(([said, struck]) => ({ stage: 'a-stage' as Answer, said: said as Localized, authored: said, struck })),
 });
 
 describe('the journal as a page reads it', () => {
@@ -31,8 +31,8 @@ describe('the journal as a page reads it', () => {
     const [row] = journalRows([entry('going', 'started', [['done that', true], ['doing this', false]])]);
 
     expect(row!.lines).toEqual([
-      { stage: 'a-stage', said: 'done that', struck: true },
-      { stage: 'a-stage', said: 'doing this', struck: false },
+      { stage: 'a-stage', said: 'done that', authored: 'done that', struck: true },
+      { stage: 'a-stage', said: 'doing this', authored: 'doing this', struck: false },
     ]);
   });
 

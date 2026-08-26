@@ -68,6 +68,7 @@ function speaksForTheTool(members: ts.NodeArray<ts.TypeElement>): boolean {
 const BELOW_THE_BRAND: ReadonlyArray<{ field: string; why: string }> = [
   { field: 'ClusterEffect.statId', why: 'a stat id, declared by `ClusterEffect` in src/content/item.ts, which sits under the layer that declares the brand' },
   { field: 'GroupRow.colour', why: 'a colour, which is neither words a player reads nor a name anything is addressed by: it is drawn, and a terminal that cannot draw one prints the group\'s `title` beside it instead' },
+  { field: 'JournalLine.authored', why: 'the line as it was written rather than as a player reads it, which is the same in every language: what a `# test` names the standing line by, the way `MenuEntry.name` names a dialogue choice rather than the words drawn on it. Nothing draws it' },
 ];
 
 const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [

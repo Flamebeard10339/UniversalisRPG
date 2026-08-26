@@ -114,7 +114,7 @@ describe('the two drivers cannot drift', () => {
       '/bogus',
       '/assert time >= 3',
       '/expect empty',
-      '/dsl location tulsa.guide-house x: 9, y: 9',
+      '/dsl location first-steps.guide-house x: 9, y: 9',
       '/local list',
       '/local show',
       '/reload',
@@ -157,8 +157,8 @@ describe('the two drivers cannot drift', () => {
     const at = (found: (choice: PlayChoice) => boolean): string => String(gui.snapshot().view.choices.findIndex(found) + 1);
 
     // Nobody has read this room, so the only thing Miki offers either driver is the look that reads her.
-    inStep(repl, gui, at((choice) => choice.of === 'entity.tulsa.miki'));
-    inStep(repl, gui, at((choice) => choice.id === 'talk:tulsa.miki'));
+    inStep(repl, gui, at((choice) => choice.of === 'entity.first-steps.miki'));
+    inStep(repl, gui, at((choice) => choice.id === 'talk:first-steps.miki'));
 
     // Two answers, and both go through the same table: the line taken out of Miki's menu, and then
     // the beat it leaves him saying, which asks nothing but is still a screen somebody dismisses.

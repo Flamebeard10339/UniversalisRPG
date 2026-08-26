@@ -86,7 +86,7 @@ stats: attack 0, max-health 10, swings-per-minute 60
   it('throws a clear error on an unavailable or unknown choice id', () => {
     const registry = tutorial();
     const session = startSession(registry);
-    expect(() => apply(session, 'use:entity.tulsa.front-door.pick-lock')).toThrow();
+    expect(() => apply(session, 'use:entity.first-steps.front-door.pick-lock')).toThrow();
     expect(() => apply(session, 'travel:tulsa.market-square')).toThrow();
     expect(() => apply(session, 'nonsense')).toThrow();
   });
@@ -361,10 +361,10 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     const session = startSession(registry);
 
     const choiceIds = ids(view(session));
-    expect(choiceIds).toContain('use:entity.tulsa.stairs.ascend');
-    expect(choiceIds).toContain('use:entity.tulsa.stairs.descend');
-    expect(choiceIds).not.toContain('travel:tulsa.basement');
-    expect(choiceIds).not.toContain('travel:tulsa.guide-house-upstairs');
+    expect(choiceIds).toContain('use:entity.first-steps.stairs.ascend');
+    expect(choiceIds).toContain('use:entity.first-steps.stairs.descend');
+    expect(choiceIds).not.toContain('travel:first-steps.basement');
+    expect(choiceIds).not.toContain('travel:first-steps.guide-house-upstairs');
   });
 
   // The road out of the guide house is `market-square while front-door.unlocked`, so the door
@@ -375,16 +375,16 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     const locked = ids(view(startSession(registry)));
 
     expect(locked).not.toContain('travel:tulsa.market-square');
-    expect(locked).not.toContain('use:entity.tulsa.front-door.step-outside');
+    expect(locked).not.toContain('use:entity.first-steps.front-door.step-outside');
 
     // A masked thing offers nothing but the look that reads it, so the road stands until the
     // player has met the door — which is the fallback that keeps a room from stranding anyone.
-    const session = primed(registry, { flags: { 'tulsa.front-door.unlocked': true } });
+    const session = primed(registry, { flags: { 'first-steps.front-door.unlocked': true } });
     expect(ids(view(session))).toContain('travel:tulsa.market-square');
     readRoom(session);
     const opened = ids(view(session));
 
-    expect(opened).toContain('use:entity.tulsa.front-door.step-outside');
+    expect(opened).toContain('use:entity.first-steps.front-door.step-outside');
     expect(opened).not.toContain('travel:tulsa.market-square');
   });
 

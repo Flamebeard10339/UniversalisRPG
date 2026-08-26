@@ -14,7 +14,7 @@ import { ownerRef, parseOwnerRef } from './state';
 import { TRAVEL_PAIR } from './actionLookup';
 import { locationNamed, relocateTo, standWhereTheyAre } from './effects';
 import { effectiveAdjacent, reachable } from './journey';
-import { journal, standingLine, type JournalEntry } from './journal';
+import { journal, standingAuthored, type JournalEntry } from './journal';
 export { standingLine } from './journal';
 export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
@@ -839,7 +839,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'journal': {
       const entry = journal(registry, state).find((each) => each.quest === directive.quest);
       if (!entry) throw new RuntimeError(`unknown quest: ${directive.quest}`);
-      const standing = standingLine(entry);
+      const standing = standingAuthored(entry);
       if (standing !== directive.text) return { failure: `journal ${directive.quest}: expected ${JSON.stringify(directive.text)}, the journal is standing on ${standing === null ? 'nothing' : JSON.stringify(standing)}` };
       return {};
     }

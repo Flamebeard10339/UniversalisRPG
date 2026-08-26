@@ -38,10 +38,6 @@ dependencies:
 
 # flag sewer-toll-paid
 
-# flag mirror-done
-
-# flag rats-killed
-
 // --- items ---
 
 # item bottle-of-vodka
@@ -51,25 +47,6 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 # item sewer-key
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
-
-// Two hammers whose numbers this file declares, so that what the tests swinging
-// them prove is proved about the engine rather than about what the last balance
-// pass did to base attack or to the rat's sheet: a million is more than any of
-// that will ever move, and `-100% attack` scales the whole stat — base, bonuses
-// and all — to nothing, so the second hammer's own swing is worth the least the
-// engine lets a landed hit be worth and the eight it drains is the whole of what
-// it does.
-# item million-attack-hammer
-DEBUG
-slot: mainhand
-weapon, +1000000 attack, +1000000 accuracy
-
-# item eight-a-swing-hammer
-DEBUG
-slot: mainhand
-weapon, -100% attack, +1000000 accuracy
-on hit:
-  drain: 8 health from them
 
 // --- drop tables ---
 
@@ -409,36 +386,6 @@ entities:
 // Where a new game begins. Three rooms and a front door, and the road from the
 // door runs into the square: however a player gets out of the house, that is
 // where they come out.
-
-# location guide-house
-x: 0, y: 0
-starting
-examine: A cluttered but cozy cottage. Miki's guide house.
-adjacent:
-  guide-house-upstairs
-  basement
-  // The road back in is this same edge read from the far end, so it carries this
-  // same condition: without the second clause, dropping out of the window with the
-  // door still shut would leave the house unreachable from the square.
-  market-square while front-door.unlocked or market-square.touched
-entities:
-  miki, front-door, stairs, mirror, oven
-
-# location guide-house-upstairs
-x: 0, y: 0, z: 1
-examine: A narrow landing with a dresser and a view of the coast.
-adjacent:
-  guide-house
-entities:
-  dresser, stairs-down, window
-
-# location basement
-x: 0, y: 0, z: -1
-examine: A damp cellar, crates stacked against the walls.
-adjacent:
-  guide-house
-entities:
-  3 giant-rat, stairs-up
 
 // --- the cast ---
 //
@@ -817,87 +764,6 @@ passives: combat-expansion.retribution
 
 // --- who and what stands in the guide house ---
 
-# entity miki
-faction: player
-examine: A weathered man in patched leather, quick to smile.
-flags: angered
-
-# entity front-door
-examine: A heavy wooden door, bound in iron. The latch lifts from this side once whatever is holding it has stopped.
-flags: unlocked
-step outside:
-  instant
-  hidden if: not unlocked
-  relocate: market-square
-  say: You lift the latch and step out into the light coming off the water, and the road carries you the short way into the market.
-pick lock:
-  requires: has lockpick
-  hidden if: unlocked
-  time: 4
-  xp: thieving 4
-  on success:
-    set: unlocked
-    say: The lock clicks open.
-
-# entity mirror
-examine: A tall mirror in a gilt frame. Whoever stands in front of it comes away with a name and a people, and may stand in front of it again as often as they like. The first look is free. Every look after it wants a thousand coin, and the glass is not sentimental about it.
-look in:
-  instant
-  hidden if: mirror-done
-  open modal: choose-race
-  open modal: name-yourself
-  set: mirror-done
-  on success:
-    say: The glass gives you back a name and a people. Come and change your mind whenever you like - it will want paying next time, but it will not turn you away.
-look in again:
-  instant
-  hidden if: not mirror-done
-  take: 1000 coin
-  open modal: choose-race
-  open modal: name-yourself
-  on success:
-    say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
-  on failure:
-    say: You need 1000 coin to perform this action.
-
-# entity oven
-examine: A stone oven, its coals still glowing.
-stations: oven
-roast chestnuts:
-  continuous
-  requires: has raw-chestnut
-  rate: cooking-rate
-  take: 1 raw-chestnut
-  give: 1 roasted-chestnut
-  xp: cooking 40-80
-  on success:
-    say: Another chestnut pops from the embers, roasted through.
-
-# entity stairs
-title: Stairs
-ascend:
-  instant
-  relocate: guide-house-upstairs
-  say: You climb to the second floor.
-descend:
-  instant
-  relocate: basement
-  say: You head down into the basement.
-
-# entity stairs-down
-title: Stairs
-descend:
-  instant
-  relocate: guide-house
-  say: You head back down to the ground floor.
-
-# entity stairs-up
-title: Stairs
-ascend:
-  instant
-  relocate: guide-house
-  say: You climb back up to the ground floor.
-
 // Not in anyone's guide house any more. It stays because the two recorded
 // growth tests below are the only route to a cluster plane, and a DEBUG
 // section is how the engine keeps one out of a player's hands.
@@ -909,51 +775,6 @@ open:
   hidden if: emptied
   roll: smiths-cache
   set: emptied
-
-# entity dresser
-examine: A dusty dresser, one drawer left slightly ajar.
-flags: searched
-search drawer:
-  hidden if: searched
-  give: lockpick
-  say: Tucked beneath old linens, a set of worn lockpicks.
-  set: searched
-  luck vs 60:
-    roll: trinket
-
-// The only way out that never runs through Miki. A player who has burned the
-// front door still has this — a straight drop with a cost, not a puzzle.
-# entity window
-examine: A casement over the water, its latch worn bright by somebody's thumb. It is a long drop to the sand and nothing on the way down to slow it.
-climb out:
-  instant
-  relocate: market-square
-  drain: 5 health
-  say: You get a leg over the sill, hang off it as long as your arms will have it, and let go. The sand takes most of the drop and your ankles take the rest, and the road into town is right there.
-fish:
-  instant
-  requires: has fishing-net
-  hidden if: has fish
-  give: 1 fish
-  say: You drop the net off the sill and haul it up hand over hand. One fish in it, and it is not pleased about any part of this.
-
-// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
-// rat falls in about six seconds and lands a bite or two on the way out. It
-// swings back because it `uses:` an action, not because a tag says so.
-# entity giant-rat
-title: Giant Rat
-examine: A hunched rat claws at an overturned crate, eyes red in the dark.
-stats: attack 6-8, defense 0, max-health 20, attack-rate 16, accuracy 60, evasion 40
-uses: melee-combat
-hidden if: rats-killed >= 3
-on death:
-  add: rats-killed 1
-  say: You put down another rat.
-  credit:
-    xp: melee 4-6
-    roll: rat-remains
-    1 in 3:
-      roll: trinket
 
 // --- recipes ---
 
@@ -1097,16 +918,6 @@ node at-the-stakes:
   again: Same as before. We watch. We do not go in.
   Past the stakes is theirs. We watch it. We do not go in.
 
-// Miki has a word for a traveller whatever else is loaded. A quest that wants
-// more of him gives him more to say; this is what is left when none is.
-# dialogue miki
-owner = miki
-
-node greeting:
-  always
-  Well met. Miki, they call me - I keep an eye on this stretch of coast.
-  There's a mirror over there if you've a mind to know your own face, and rats in the basement if you haven't.
-
 // --- saves ---
 
 # save in-town
@@ -1133,98 +944,26 @@ node greeting:
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
-# save dresser-trinket-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"tulsa.guide-house-upstairs.touched":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.guide-house.discovered":true,"tulsa.dresser.searched":true},"location":"tulsa.guide-house-upstairs","rng":2617077404}
-
-# save explored-and-unlocked
-{"version":13,"flags":{"tulsa.front-door.unlocked":true,"tulsa.market-square.discovered":true}}
-
-// Standing at the oven with something to roast. Nothing in the world grants a
-// raw chestnut, so this save is the only way the continuous cadence is reached.
-# save chestnuts-in-hand
-{"version":13,"inventory":{"core.raw-chestnut":3}}
-
 # save axe-at-the-swamp-edge
 {"version":13,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
 
 # save growing-a-heartwood-blade-start
-{"version":13,"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}}
+{"version":13,"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true}}
 
 # save growing-a-heartwood-blade-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
 
 # save growing-through-the-inventory-screen-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
-
-// A purse with the price of a second look in it, and a purse a coin short of
-// one, standing in the room the mirror is in.
-# save at-the-mirror-with-a-thousand-coin
-{"version":13,"location":"tulsa.guide-house","inventory":{"core.coin":1000}}
-
-# save at-the-mirror-one-coin-short
-{"version":13,"location":"tulsa.guide-house","inventory":{"core.coin":999}}
-
-# save renamed-at-the-mirror
-{"version":13,"player":{"name":"Wren","race":"core.orc"},"inventory":{"core.coin":0}}
-
-# save named-once-with-nine-hundred-and-ninety-nine-coin
-{"version":13,"player":{"name":"Rowan","race":"core.elf"},"inventory":{"core.coin":999}}
-
-# save armed-with-a-million-attack-hammer
-DEBUG
-{"version":13,"inventory":{"tulsa.million-attack-hammer":1}}
-
-# save armed-with-an-eight-a-swing-hammer
-DEBUG
-{"version":13,"inventory":{"tulsa.eight-a-swing-hammer":1}}
+{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
 
 // --- tests ---
-
-// The first look at the mirror is free and every look after it is a thousand
-// coin. The claim is the difference across the second look — a purse of a
-// thousand is untouched by the first and empty after the second — so a price
-// that moved would fail here rather than pass inside a band.
-# test the-mirror-charges-nothing-once-and-a-thousand-coin-after
-load: at-the-mirror-with-a-thousand-coin
-use: entity.mirror.look-in
-submit-modal: name=Rowan
-submit-modal: race=core.elf
-assert: mirror-done and inventory.coin = 1000
-use: entity.mirror.look-in-again
-submit-modal: name=Wren
-submit-modal: race=core.orc
-assert: inventory.coin = 0
-expect only: renamed-at-the-mirror
-
-// What a player who cannot pay sees. The action stays on the mirror rather
-// than hiding itself, because a mirror that vanishes is what a playtester
-// reads as a broken save; it takes the look, says what is missing, and leaves
-// the purse and the character exactly as they were.
-# test a-purse-a-coin-short-is-turned-away-and-charged-nothing
-load: at-the-mirror-one-coin-short
-use: entity.mirror.look-in
-submit-modal: name=Rowan
-submit-modal: race=core.elf
-use: entity.mirror.look-in-again
-assert: inventory.coin = 999 and player.name and player.race
-expect only: named-once-with-nine-hundred-and-ninety-nine-coin
-
-// The name is asked first and the race second, which this proves by answering
-// them in that order: the race screen has no `name` to answer, so a run that
-// asked in the other order refuses the first line here rather than passing.
-# test the-name-screen-is-answered-before-the-race-screen
-load: at-the-mirror-with-a-thousand-coin
-use: entity.mirror.look-in
-submit-modal: name=Rowan
-submit-modal: race=core.orc
-assert: player.name and player.race
 
 // The town is walkable, and every road it holds is walked. The list is long
 // because a road is a fact about two named places and nothing derives it; what
 // it is really proving is that every place has a way in and a way out, and
-// dsl.test.ts makes that claim over the corpus without naming anybody. It ends
-// at Miki's door, because the road from the square to the guide house is the
-// one every route out of that house arrives by.
+// dsl.test.ts makes that claim over the corpus without naming anybody. The road
+// on from the square to Miki's door is the guide house's own, so it is written
+// and walked there.
 # test walking-the-town
 load: in-town
 travel: market-row
@@ -1251,11 +990,9 @@ travel: hive-mouth
 travel: tunnel-mouth
 travel: market-square
 travel: swamp-edge
-travel: guide-house
 assert: market-rooftops.discovered
 assert: castle-solar.discovered
 assert: hive-mouth.discovered
-assert: guide-house.discovered
 
 // The economy, end to end and in the smallest amount that closes: a curio the
 // tutorial's rats drop becomes coin, coin becomes a herring, and the herring
@@ -1415,39 +1152,6 @@ travel: sewer-locked-room
 use: entity.key-table.take-the-key
 assert: has sewer-key
 
-// The drawer's contested roll over shipped content. On the default seed this
-// search comes up empty behind the lockpick, so an assertion over inventory
-// alone would also hold in a world where the drawer never rolls at all — which
-// is the shape of test this branch's audit caught. The whole sheet is what tells
-// the two apart: `luck vs 60` and the table behind it move the rng cursor
-// whether or not they yield anything, and `expect:` is what pins that.
-// Regenerate with /create-valid-test when the drawer's odds change on purpose.
-# test dresser-trinket
-travel: guide-house-upstairs
-use: entity.dresser.search-drawer
-assert: has lockpick
-assert: searched
-expect: dresser-trinket-end
-
-// The two words for a place, told apart on the one line where the engine
-// makes the difference: picking the lock opens the road into town, which puts
-// the market on the map without anyone walking into it.
-# test a-lockpick-opens-the-front-door
-run: dresser-trinket
-travel: guide-house
-use: entity.front-door.pick-lock
-assert: front-door.unlocked
-assert: market-square.discovered
-assert: not market-square.touched
-assert: guide-house.touched
-assert: xp.thieving = 4
-assert: time >= 4
-
-# test save-restores-object-owned-flags
-load: explored-and-unlocked
-assert: front-door.unlocked
-assert: market-square.discovered
-
 // --- growing an item ---
 //
 // Core's cluster planes, walked from the DEBUG smith's chest, which is the only
@@ -1563,36 +1267,6 @@ submit-modal: item=close
 // out. Nothing else on this route touches attack.
 assert: stat.attack = 16
 expect only: growing-through-the-inventory-screen-end
-
-// Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
-// which is what `rats-killed` counts; one swing does it because the hammer says
-// it does, and nothing about the rat's twenty health is being relied on.
-# test one-swing-of-a-million-attack-hammer-fells-a-rat
-DEBUG
-load: armed-with-a-million-attack-hammer
-equip: million-attack-hammer
-use: entity.stairs.descend
-use: melee-combat on giant-rat
-assert: tulsa.rats-killed = 1
-
-// The stages of a fight. A `use:` that finds its own action already under way
-// against the same target advances a cycle of the fight in progress; one that
-// re-armed would snapshot the rat at full health every time, so at eight a
-// swing against twenty no run of them, however long, would ever empty the pool.
-// Two swings are sixteen and three are twenty-four, so the third is the one
-// that lands the kill and the second must not — and it is the second assertion
-// that makes a rebalance of the rat fail this loudly, rather than quietly
-// leaving behind a claim about one swing that a re-arming `use:` would pass too.
-# test two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down
-DEBUG
-load: armed-with-an-eight-a-swing-hammer
-equip: eight-a-swing-hammer
-use: entity.stairs.descend
-use: melee-combat on giant-rat
-use: melee-combat on giant-rat
-assert: tulsa.rats-killed = 0
-use: melee-combat on giant-rat
-assert: tulsa.rats-killed = 1
 
 // --- the archetype routes, walked in the proving ground ---
 //

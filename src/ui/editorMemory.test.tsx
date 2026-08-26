@@ -61,7 +61,7 @@ describe('where the author was survives the tab (c10)', () => {
     expect(remembered('not json at all')).toEqual(FORGOTTEN);
     expect(remembered('[1, 2, 3]')).toEqual(FORGOTTEN);
     expect(remembered('{"surface":"nowhere","cursor":"seventeen"}')).toEqual(FORGOTTEN);
-    expect(remembered('{"open":"entity tulsa.miki"}')).toEqual({ ...FORGOTTEN, open: 'entity tulsa.miki' });
+    expect(remembered('{"open":"entity first-steps.miki"}')).toEqual({ ...FORGOTTEN, open: 'entity first-steps.miki' });
     expect(remembered('{"map":{"zoom":3}}')).toEqual({ ...FORGOTTEN, map: { ...FORGOTTEN.map, zoom: 3 } });
     expect(remembered('{"map":{"pan":{"x":5},"plane":null}}')).toEqual({ ...FORGOTTEN, map: { ...FORGOTTEN.map, pan: { x: 5, y: 0 } } });
   });

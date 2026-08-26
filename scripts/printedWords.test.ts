@@ -198,10 +198,10 @@ describe('what the REPL puts on the terminal (c10)', () => {
   });
 
   it('grants that permission to a place drawn beside its own name', () => {
-    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('tulsa.guide-house')));
+    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('first-steps.guide-house')));
     const words = vocabulary(base[at].view, other[at].view);
 
     expect(at).toBeGreaterThan(-1);
-    expect([...(words.beside.get('tulsa.guide-house') ?? [])]).toContain(base[at].view.location.title);
+    expect([...(words.beside.get('first-steps.guide-house') ?? [])]).toContain(base[at].view.location.title);
   });
 });

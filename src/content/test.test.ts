@@ -133,14 +133,14 @@ describe('test: composable in-game scripts', () => {
     const source = [
       '# test replay',
       'run: core.intro',
-      'talk: tulsa.miki',
-      'use: entity.tulsa.front-door.pick-lock',
+      'talk: first-steps.miki',
+      'use: entity.first-steps.front-door.pick-lock',
       'travel: tulsa.beach',
       'craft: core.bread',
       'load: core.start',
       'expect: core.end',
-      'begin: use entity.tulsa.oven.roast-chestnuts',
-      'begin: travel tulsa.basement',
+      'begin: use entity.first-steps.oven.roast-chestnuts',
+      'begin: travel first-steps.basement',
       'begin: craft core.dough',
     ].join('\n');
 
@@ -149,11 +149,11 @@ describe('test: composable in-game scripts', () => {
     }[];
     expect(section.value.directives).toEqual([
       { kind: 'run', test: 'core.intro' },
-      { kind: 'talk', entity: 'tulsa.miki' },
+      { kind: 'talk', entity: 'first-steps.miki' },
       {
         kind: 'use',
         obj: 'entity',
-        objId: 'tulsa.front-door',
+        objId: 'first-steps.front-door',
         actionId: 'pick-lock',
       },
       { kind: 'travel', location: 'tulsa.beach' },
@@ -165,13 +165,13 @@ describe('test: composable in-game scripts', () => {
         inner: {
           kind: 'use',
           obj: 'entity',
-          objId: 'tulsa.oven',
+          objId: 'first-steps.oven',
           actionId: 'roast-chestnuts',
         },
       },
       {
         kind: 'begin',
-        inner: { kind: 'travel', location: 'tulsa.basement' },
+        inner: { kind: 'travel', location: 'first-steps.basement' },
       },
       {
         kind: 'begin',

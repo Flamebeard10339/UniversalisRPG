@@ -4,7 +4,7 @@ import { advances, clamped, pageAt, REPLAY_SPEED, REPLAY_SPEEDS, replayLines, st
 
 const steps = (...lines: string[]): Directive[] => lines.map((line) => parseDirectiveLine(line)!);
 
-const RUN = steps('load: run-start', 'page: home/home', 'use: entity.tulsa.mirror.look-in', 'confusion: the refusal is fancy about failing', 'page: character/inventory', 'travel: tulsa.nowhere', 'refused');
+const RUN = steps('load: run-start', 'page: home/home', 'use: entity.first-steps.mirror.look-in', 'confusion: the refusal is fancy about failing', 'page: character/inventory', 'travel: tulsa.nowhere', 'refused');
 
 describe('what a step reads as', () => {
   // Every kind a directive can be gets a reading, taken off the union rather than off a list here —

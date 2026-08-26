@@ -89,7 +89,7 @@ describe('play-cli renders what a command result says happened', () => {
   it('prints a view as narration, location, occupants, pools, modals, choices and the clock', () => {
     const lines = shown(runLine(read(driver(TUTORIAL)), '/look'));
 
-    expect(lines[0]).toBe('Guide House (tulsa.guide-house)');
+    expect(lines[0]).toBe('Guide House (first-steps.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
     expect(lines[3]).toBe('Health: ██████████ 30/30');
@@ -172,9 +172,9 @@ describe('play-cli renders what a command result says happened', () => {
     // count it are read for their form.
     expect(state).toHaveLength(13);
     expect(state.slice(0, 4)).toEqual([
-      'Location: tulsa.guide-house',
+      'Location: first-steps.guide-house',
       'Elapsed simulated time: 7s',
-      'Flags: {"tulsa.guide-house.touched":true,"tulsa.guide-house.discovered":true,"tulsa.guide-house-upstairs.discovered":true,"tulsa.basement.discovered":true}',
+      'Flags: {"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true}',
       'Inventory: {}',
     ]);
     // Under the name the world gives a thing as well as the id it is addressed by: an id-only
@@ -185,13 +185,13 @@ describe('play-cli renders what a command result says happened', () => {
       `stats: ${sheet}`,
       'Health: ██████████ 30/30',
       'discovered: 3',
-      '  Guide House (tulsa.guide-house) at 0,0,0 -> tulsa.guide-house-upstairs, tulsa.basement',
-      '  Guide House Upstairs (tulsa.guide-house-upstairs) at 0,0,1 -> tulsa.guide-house',
-      '  Basement (tulsa.basement) at 0,0,-1 -> tulsa.guide-house',
+      '  Guide House (first-steps.guide-house) at 0,0,0 -> first-steps.guide-house-upstairs, first-steps.basement',
+      '  Guide House Upstairs (first-steps.guide-house-upstairs) at 0,0,1 -> first-steps.guide-house',
+      '  Basement (first-steps.basement) at 0,0,-1 -> first-steps.guide-house',
     ]);
     expect(state[12]).toMatch(/^locations: 3 of \d+ found; not yet found: tulsa\./);
     expect(state[12]).toContain('tulsa.market-square');
-    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: tulsa.guide-house');
+    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
   });
 
   // A road whose condition does not hold is still a road, and a map that drew it the same as an

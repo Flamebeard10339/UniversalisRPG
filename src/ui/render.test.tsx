@@ -34,12 +34,12 @@ const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, 
 
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'use:entity.tulsa.oven.roast-chestnuts';
-const TALK = 'talk:tulsa.miki';
+const ROAST = 'use:entity.first-steps.oven.roast-chestnuts';
+const TALK = 'talk:first-steps.miki';
 
 // The corpus grants no raw chestnut, so the only continuous action it ships is
 // offered to nobody until this save puts the ingredient in hand.
-const STOCKED = { kind: 'load', save: 'tulsa.chestnuts-in-hand' } as const;
+const STOCKED = { kind: 'load', save: 'first-steps.chestnuts-in-hand' } as const;
 
 const readable = (html: string): string[] => htmlRuns(html).filter((run) => /[A-Za-z]/.test(run));
 
@@ -290,7 +290,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, ROAST));
     step();
     driver.cancel();
-    driver.choose(position(driver, 'use:entity.tulsa.mirror.look-in'));
+    driver.choose(position(driver, 'use:entity.first-steps.mirror.look-in'));
     step();
 
     expect(seen).toBeGreaterThan(20);
@@ -565,7 +565,7 @@ describe('what the shell puts on the screen', () => {
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
     const driver = read(createDriver(SHIPPED_SOURCES));
-    driver.choose(position(driver, 'talk:tulsa.miki'));
+    driver.choose(position(driver, 'talk:first-steps.miki'));
     const menu = driver.snapshot().view.modals[0].options[0];
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
@@ -704,10 +704,10 @@ describe('what the editing page says about a section', () => {
   it('tells a staged section from a shipped one by its colour rather than by a slant', () => {
     const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
     driver.send(devLine(true));
-    driver.send('/dsl entity tulsa.miki title: Miki');
+    driver.send('/dsl entity first-steps.miki title: Miki');
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
-    const staged = rowClass(html, 'entity tulsa.miki');
-    const shipped = rowClass(html, 'entity tulsa.oven');
+    const staged = rowClass(html, 'entity first-steps.miki');
+    const shipped = rowClass(html, 'entity first-steps.oven');
 
     expect(staged, 'the editing page drew no row for the staged section').not.toBe('');
     expect(staged).not.toBe(shipped);

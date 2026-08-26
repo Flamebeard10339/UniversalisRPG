@@ -292,7 +292,7 @@ describe('playbot', () => {
   // have honoured it.
   it("[c9] a line naming a command outside this player's audience is refused before runLine runs it", async () => {
     const session = startSession(played());
-    const client: ModelClient = { send: async () => ({ line: '/dsl location tulsa.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
+    const client: ModelClient = { send: async () => ({ line: '/dsl location first-steps.guide-house x: 9, y: 9', note: 'n', expected: '', confusion: '' }) };
     const { run: recorded } = await runPlaybot({ session, read: tutorialReader, client, mode: 'author', turns: 1, at: PLAYED_AT, write: () => {} });
     expect(recorded.log[0].outcome).toBe('invalid-reply');
     expect(recorded.log[0].detail).toMatch(/\/dsl is not a command this player may run/);
@@ -436,9 +436,9 @@ adjacent:
   // the # test 'load' directive already uses (session.ts), read here instead of re-derived.
   it('[--save] a run opens in the state a named save describes', () => {
     const registry = played();
-    const { session, warnings } = openSession(registry, 'tulsa.dresser-trinket-end');
+    const { session, warnings } = openSession(registry, 'first-steps.dresser-trinket-end');
     expect(warnings).toEqual([]);
-    expect(view(session).location.id).toBe('tulsa.guide-house-upstairs');
+    expect(view(session).location.id).toBe('first-steps.guide-house-upstairs');
   });
 
   // --save implies its own sources: with nothing named positionally, the default reader stands for

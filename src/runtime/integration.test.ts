@@ -10,14 +10,15 @@ import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
 import { MEMBER_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/load';
-import { moduleSource, shippedSources } from '../content/shipped';
+import { moduleSource, shippedSources, standingSources } from '../content/shipped';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const source = moduleSource('core').text;
-const town = moduleSource('tulsa');
-const island = (text: string) => loadUniverse([engineLocale(), { name: 'core', text }, town]);
+// The smallest shipped world with somewhere to stand, derived rather than listed, with core's own
+// text swapped for whatever a caller is perturbing: a module split moves with no edit here.
+const island = (text: string) => loadUniverse([engineLocale(), ...standingSources().map((each) => (each.name === 'core' ? { name: 'core', text } : each))]);
 const registry = island(source);
 
 const shipped = loadUniverse(withEngineLocale(shippedSources()));
@@ -272,21 +273,21 @@ describe('no shipped identifier is named after this content', () => {
 });
 
 describe('core health resource (Pass 2 end-to-end)', () => {
-  const cellarRats = registry.locations.get('tulsa.basement')!.entities.find((each) => each.entity === 'tulsa.giant-rat')!;
+  const cellarRats = registry.locations.get('first-steps.basement')!.entities.find((each) => each.entity === 'first-steps.giant-rat')!;
 
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
     const full = state.resources['core.health'];
     expect(full).toBe(toMilliUnits(30));
 
-    state.location = 'tulsa.basement';
-    useFight('core.melee-combat', 'tulsa.giant-rat', registry, state);
+    state.location = 'first-steps.basement';
+    useFight('core.melee-combat', 'first-steps.giant-rat', registry, state);
     expect(state.time).toBe(secondsToMs(2.4));
 
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health'];
     // One Fight clears the cellar, so the tally is the population the room declares.
-    expect(state.flags['tulsa.rats-killed']).toBe(populationCount(cellarRats));
+    expect(state.flags['first-steps.rats-killed']).toBe(populationCount(cellarRats));
     expect(afterFighting).toBeLessThan(full);
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);

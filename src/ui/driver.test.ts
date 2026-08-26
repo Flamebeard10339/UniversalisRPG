@@ -114,7 +114,7 @@ describe('the GUI driver', () => {
 
     expect(driver.snapshot().problems).toEqual([]);
     const view = shown(driver);
-    expect(view.location.id).toBe('tulsa.guide-house');
+    expect(view.location.id).toBe('first-steps.guide-house');
     expect(texts(driver)).toEqual([view.location.title, view.location.description]);
     expect(view.choices.length).toBeGreaterThan(0);
   });

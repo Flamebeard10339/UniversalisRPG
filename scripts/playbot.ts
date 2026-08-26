@@ -94,16 +94,16 @@ const SHARED_EXAMPLE = `## A worked example
 
 Suppose the view shows:
 
-  location: The Guide House (tulsa.guide-house)
+  location: The Guide House (first-steps.guide-house)
   here: Miki, the front door, a mirror
   choices:
-    id=talk:tulsa.miki :: Talk to Miki
-    id=use:entity.tulsa.mirror.look-in :: Look in the mirror
+    id=talk:first-steps.miki :: Talk to Miki
+    id=use:entity.first-steps.mirror.look-in :: Look in the mirror
     id=travel:tulsa.market-square :: Travel to the market square
 
 A reasonable reply is:
 
-  {"line":"use:entity.tulsa.mirror.look-in","note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
+  {"line":"use:entity.first-steps.mirror.look-in","note":"Trying the mirror before talking to anyone, since it is the first thing described in the room.","expected":"","confusion":""}
 
 If that opens a screen asking for a name, the next turn's view shows a modal instead of choices, something like:
 

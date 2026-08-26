@@ -25,7 +25,7 @@ const quest = (id: string, stage: string, standing: PlayView['journal'][number][
   title: asLocalized(named(id)),
   stage,
   standing,
-  lines: said === '' ? [] : [{ stage, said: asLocalized(said), struck: false }],
+  lines: said === '' ? [] : [{ stage, said: asLocalized(said), authored: said, struck: false }],
 });
 
 const viewOf = (parts: Partial<PlayView>): PlayView => ({ xp: [], carried: [], journal: [], ...parts }) as PlayView;

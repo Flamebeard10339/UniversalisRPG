@@ -26,6 +26,6 @@ describe('the content the build carries', () => {
     const driver = createDriver(SHIPPED_SOURCES);
 
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view.location.id).toBe('tulsa.guide-house');
+    expect(driver.snapshot().view.location.id).toBe('first-steps.guide-house');
   });
 });
