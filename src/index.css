@@ -85,8 +85,12 @@ textarea {
   display: none;
 }
 
+/* Held long enough to be found by a reader who looked away and came back, then
+   let go of slowly enough that nothing blinks. Three quarters of the run is the
+   hold, so the two move together from the one duration below. */
 @keyframes arrived {
-  from {
+  0%,
+  75% {
     background-color: var(--color-flash);
   }
   to {
@@ -111,15 +115,6 @@ textarea {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes spoken {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
   }
 }
 
@@ -162,7 +157,7 @@ textarea {
 }
 
 .arrived {
-  animation: arrived 260ms ease-out;
+  animation: arrived 4000ms ease-out;
 }
 
 .risen {
@@ -173,12 +168,6 @@ textarea {
   animation: darkened 180ms ease-out;
 }
 
-/* A line of a beat coming in. Short, because what is being waited for is the
-   line before it and not this: the pace is in the delay the beat hands each
-   line, and this only keeps a line from being read before its turn. */
-.spoken {
-  animation: spoken 200ms ease-out;
-}
 
 /* Twice over, so a second refusal on a count that has not moved still reads as
    an answer rather than as nothing happening. */
@@ -224,15 +213,19 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .arrived,
   .risen,
   .darkened,
   .sprouted,
-  .spoken,
   .lingered,
   .denied,
   .stirring,
   .underway {
     animation: none;
+  }
+
+  /* Kept, because what it is made of is a colour and not a movement: the same
+     hold, then taken away in one step rather than faded out of. */
+  .arrived {
+    animation-timing-function: steps(1, end);
   }
 }
