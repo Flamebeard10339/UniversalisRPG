@@ -367,12 +367,12 @@ describe('play-cli renders the live clock', () => {
     ]);
   });
 
-  it('counts an untargeted action’s swings down to its completion instead of a foe’s pool', () => {
+  it('counts an untargeted action’s swings down to its completion instead of a foe’s pool, and fills the bar as it goes', () => {
     expect(liveLines('use:entity.bell.ring', 4, 1000)).toEqual([
-      'Ring... [--------------------] hits:1 completion:0.8  [time: 1.0s]',
-      'Ring... [--------------------] hits:2 completion:0.6  [time: 2.0s]',
-      'Ring... [--------------------] hits:3 completion:0.4  [time: 3.0s]',
-      'Ring... [--------------------] hits:4 completion:0.2  [time: 4.0s]',
+      'Ring... [####----------------] hits:1 completion:0.8  [time: 1.0s]',
+      'Ring... [########------------] hits:2 completion:0.6  [time: 2.0s]',
+      'Ring... [############--------] hits:3 completion:0.4  [time: 3.0s]',
+      'Ring... [################----] hits:4 completion:0.2  [time: 4.0s]',
     ]);
   });
 

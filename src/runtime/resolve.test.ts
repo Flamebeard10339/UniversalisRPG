@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statValue, useAction } from './runtime';
+import { ActiveAction, actionProgress, actionStalled, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statValue, useAction } from './runtime';
 import { actionAddress } from '../content/sections/action';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
@@ -466,13 +466,20 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
     expect(() => loadModule(module)).toThrow(/continuous action needs a time: or rate:/);
   });
 
-  it('an action whose rate stat reads 0 refuses to start rather than resolving an infinite attempt duration', () => {
+  it('an action whose rate stat reads 0 stands still rather than resolving an infinite attempt duration', () => {
     const registry = loaded();
     const state = createGameState('nowhere');
 
-    expect(() => useAction('entity', 'shrine', 'chant', registry, state)).toThrow(/impossible attempt duration/);
-    expect(state.time).toBe(0);
-    expect(state.activeAction).toBeNull();
+    useAction('entity', 'shrine', 'chant', registry, state);
+
+    expect(actionStalled(state, registry)).toBe(true);
+    expect(state.activeAction).not.toBeNull();
+
+    resolve(state, registry, secondsToMs(30));
+
+    expect(state.inventory['blessing']).toBeUndefined();
+    expect(actionProgress(state, registry)).toBe(0);
+    expect(state.activeAction, 'standing still is not the same as being over').not.toBeNull();
   });
 });
 

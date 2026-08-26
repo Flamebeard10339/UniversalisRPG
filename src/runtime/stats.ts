@@ -204,14 +204,23 @@ export function hitDamage(attack: number, dr: number, registry: Registry): numbe
   return Math.max(floor, toMilliUnits(attack - dr));
 }
 
+// How long one attempt takes, or Infinity where whoever is making it has been slowed to a standstill.
+// No attempts a minute is a rate like any other and the arithmetic already says what it costs, so a
+// modifier that takes the pace to nothing stalls the action rather than being refused as impossible.
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER, other: string = actorId): number {
   if (actionKind(action) === 'instant') return 0;
   if (action.rate === undefined) return secondsToMs(action.time ?? defaultActionDuration(registry));
 
   const perMinute = typeof action.rate === 'number' ? action.rate : statValue(action.rate.id, state, registry, sideOf(action.rate, actorId, other));
+  if (perMinute <= 0) return Infinity;
   const duration = Math.floor(MS_PER_MINUTE / perMinute);
   if (!Number.isFinite(duration) || duration < 0) {
     throw new RuntimeError(`action ${action.label} resolved an impossible attempt duration (${duration}) from rate: ${perMinute} per minute`);
   }
   return duration;
 }
+
+// Whether what is under way is standing still: its pace has been taken to nothing and no amount of
+// time will advance it. The bar it draws is stopped rather than crawling, and what has already been
+// counted is waiting rather than lost.
+export const stalledPace = (duration: number): boolean => !Number.isFinite(duration);

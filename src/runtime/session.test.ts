@@ -1028,6 +1028,7 @@ describe('what the engine withholds', () => {
       log: 'withheld',
       endedBecause: 'withheld',
       carriedTold: 'withheld',
+      engagesAt: 'withheld',
       rng: 'withheld',
       visits: 'withheld',
       buffs: 'withheld',
@@ -1204,7 +1205,7 @@ x: 1, y: 0
     applyDirective(session, { kind: 'load', save: 'midbake' });
 
     const v = view(session);
-    expect(v.action).toEqual({ label: 'Roast', progress: 0, attempts: 0, completion: null });
+    expect(v.action).toEqual({ label: 'Roast', progress: 0, stalled: false, attempts: 0, completion: null });
   });
 });
 
