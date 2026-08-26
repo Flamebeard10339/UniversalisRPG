@@ -17,6 +17,7 @@
     "playbot": "tsx scripts/playbot.ts",
     "probe": "tsx scripts/probe.ts",
     "oracle": "tsx scripts/oracle.ts",
+    "balance": "tsx scripts/balance.ts",
     "handoff": "tsx scripts/handoff.ts",
     "notes": "tsx scripts/notes.ts",
     "review": "tsx scripts/review.ts",
