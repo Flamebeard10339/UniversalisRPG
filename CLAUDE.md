@@ -117,6 +117,15 @@ drifting toward heavy commenting is a design signal: it needs a seam.
 
 `npm test` runs the whole suite in about twenty seconds. Keep it there.
 
+**Run the one file you are editing; that costs about a second.** `npm test` is the
+gate, not the loop — the twenty seconds are import and transform, a function of how
+many test files there are, so nothing you cache moves them.
+
+**A test may not assert a balance number.** Balance churns continuously, and a change
+to it must not redden the suite. Test that the mechanism works — that rage rises when
+a blow lands, that a cap bites, that two swings differ — never that a number is the
+number it is today.
+
 `src/content/dsl.test.ts` is the general-purpose test and the one to extend
 first. Every claim in it picks its own subjects — from the shipped corpus in
 `content/`, from the section list, or from what a field's own parser says it
