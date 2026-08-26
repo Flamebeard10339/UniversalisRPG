@@ -638,7 +638,7 @@ flags: angered
 examine: A heavy wooden door, bound in iron. The latch lifts from this side once whatever is holding it has stopped.
 flags: unlocked
 step outside:
-  instant
+  time: 3
   hidden if: not unlocked
   relocate: market-square
   say: You lift the latch and step out into the light coming off the water, and the road carries you the short way into the market.
