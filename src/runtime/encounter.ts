@@ -33,7 +33,11 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   return undefined;
 }
 
+// Somebody joins the fight. Said only for those coming at the player, which is what naming who they
+// entered against already tells us: a foe's friends arrive against the player and the player's
+// against the foe, so nobody has to keep a second list of which side anyone is on.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
+  if (attackerId === PLAYER) state.log.push(localizerOf(registry, state).engine('engine.combat.started', { target: actorTitle(actorId, registry, state) }));
   const resources: Record<string, number> = {};
   for (const resource of registry.resources.values()) {
     resources[resource.id] = toMilliUnits(statValue(resource.max, state, registry, actorId));

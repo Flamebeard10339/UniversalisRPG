@@ -5,7 +5,7 @@ import { declaredBy } from '../content/references';
 import type { ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
-import { type AuthoringContext, createTicker, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
+import { type AuthoringContext, createTicker, liveAgain, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
 import { openUniverse, openWithLocalCleared, type OpenedUniverse, type UniverseProblem } from '../runtime/openUniverse';
 import { dropRun, fileRun, stagedRuns, type FiledRun } from '../runtime/runFiling';
@@ -230,15 +230,26 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  const close = (cancelled: boolean): void => {
+  // Stop the app's clock without saying anything to the engine about it. A line the player types is
+  // not by itself a reason to drop what they were doing, so what the world does with it is the
+  // world's to decide.
+  const unhook = (): LiveRun | null => {
     const run = running;
-    if (!run) return;
     running = null;
     stopTicking?.();
     stopTicking = null;
+    return run;
+  };
+
+  const settleRun = (run: LiveRun, cancelled: boolean): void => {
     const result = run.end(cancelled);
     current = settled({ ...current, view: context.view, live: null, transcript: appendOutputs(current.transcript, result.output) });
     publish();
+  };
+
+  const close = (cancelled: boolean): void => {
+    const run = unhook();
+    if (run) settleRun(run, cancelled);
   };
 
   const advance = (elapsedMs: number): void => {
@@ -275,12 +286,20 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       complain(refusal);
       return;
     }
-    if (running) close(true);
+    // A line no longer calls off what was under way. The run comes off the clock, the line runs
+    // beside it, and whatever the engine is still holding afterwards is what gets picked back up —
+    // so examining something or opening a screen costs the fight nothing, and beginning something
+    // else displaces it because the engine says so and not because a line was typed.
+    const held = unhook();
+    if (held) settleRun(held, false);
+
     const result = runLine(context, line);
     record.opened(chose, outcomeOf(result), result.recorded);
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
-    if (result.live) {
-      running = result.live;
+
+    const live = result.live ?? (held ? liveAgain(context) : null);
+    if (live) {
+      running = live;
       current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'view', view: context.view, reread: false }]) });
       stopTicking = ticker(advance);
       advance(0);

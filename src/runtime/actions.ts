@@ -1,5 +1,6 @@
 import { RuntimeError } from './error';
 import { ActionResult, itemCost } from '../grammar/actionResult';
+import { actionResultLists } from '../grammar/action';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
@@ -23,6 +24,15 @@ export type FightOutcome = 'completion' | 'unfinished';
 
 export function resolvesPerAttempt(action: Action): boolean {
   return action.accuracy !== undefined || action.depletes !== undefined;
+}
+
+// Whether taking this action puts the player somewhere else — walking a road, or a door somebody
+// wrote as an action of its own. Nothing standing here can stop one: leaving is what an aggressive
+// thing holds you until you do, so an implementation that cancelled this held you forever. A
+// relocate buried inside a `one of:` is a risk the action carries rather than a way out, and is not
+// read here.
+export function leavesHere(action: Action): boolean {
+  return actionResultLists(action).some((list) => list.some((result) => result.kind === 'relocate'));
 }
 
 export function actionStillValid(action: Action, active: ActiveAction, state: GameState, registry: Registry): boolean {

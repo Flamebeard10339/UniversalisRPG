@@ -1281,7 +1281,7 @@ function livePools(status: PlayStatus): LivePool[] {
   ];
 }
 
-function tickOnce(ctx: CommandContext, previous: PlayView, elapsedMs: number, armed: Localized): LiveProgress {
+function tickOnce(ctx: CommandContext, previous: PlayStatus, elapsedMs: number, armed: Localized): LiveProgress {
   const label = previous.action?.label ?? armed;
   const next = wait(ctx.session, (elapsedMs / 1000) * ctx.live.speed);
   ctx.view = next;
@@ -1323,9 +1323,21 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   }
   if (!opening.action) return { ...shown(opening), recorded: [recordedForChoice(choice)] };
 
+  return { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`], live: liveOver(ctx, opening) };
+}
+
+// Whatever is under way, picked up on the clock again. A driver that stopped ticking to run a line
+// asks for this afterwards: nothing comes back where the line ended what was going on, and the world
+// is what says which of those happened rather than the driver reading the line and guessing.
+export function liveAgain(ctx: CommandContext): LiveRun | null {
+  const standing = sessionStatus(ctx.session);
+  return standing.action === null ? null : liveOver(ctx, standing);
+}
+
+function liveOver(ctx: CommandContext, opening: PlayStatus): LiveRun {
   const started = opening.time;
-  const armed = opening.action.label;
-  let latest = opening;
+  const armed = opening.action!.label;
+  let latest: PlayStatus = opening;
   let over: LiveProgress | null = null;
   let closed: CommandResult | null = null;
 
@@ -1356,5 +1368,5 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
       return closed;
     },
   };
-  return { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`], live };
+  return live;
 }
