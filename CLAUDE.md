@@ -147,7 +147,8 @@ Tools, none of which are gates:
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
-- `npm run review [-- <module>...]` — every line the game can say, under the section that says it, in the order its module writes them; `--read-through <section>` marks a sitting as read. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
+- `npm run review` — the next twenty sections still wanting a read, and `--read-next` signs off the same twenty. `--sheet` is the whole unbounded sheet, under the section that says it, in the order its module writes them; `[-- <module>...]` narrows either. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
+- `npm run probe -- content --record <test-id>` — runs a `# test` and prints the state it ends on as the `# save` body that test closes on, to paste back over the stale one
 - `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
