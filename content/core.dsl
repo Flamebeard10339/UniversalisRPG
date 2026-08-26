@@ -30,6 +30,13 @@ value: 3
 # variable default-action-duration
 value: 0
 
+// The beat a room takes to find you: what stands between arriving somewhere and the thing that
+// lives there coming at you, and the same pause between one foe falling and the next stepping over
+// it. Long enough that a second rat is a fight the player saw coming rather than one that was
+// already happening, and short enough that nowhere hostile is ever somewhere to stand and work.
+# variable engagement-seconds
+value: 2
+
 // How many things the player's pack holds. A stack counts once however deep it is, and anything
 // grown into a copy of its own counts as itself; what is worn is on the player rather than in the
 // pack. At 0 a world hands out an endless pack instead.
