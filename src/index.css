@@ -118,6 +118,12 @@ textarea {
   }
 }
 
+@keyframes marching {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
 @keyframes denied {
   0%,
   100% {
@@ -169,6 +175,21 @@ textarea {
 }
 
 
+/* The road under the player's feet, marching the way they are going. The dashes
+   are the legibility and the march is the motion, so a reader who asked for less
+   of the second still keeps the first: a dashed road among solid ones is the one
+   being walked whether or not anything moves along it. The pattern is 24 long,
+   which is what the keyframe travels, so the dashes arrive where the ones before
+   them started and the march never jumps. */
+.marching {
+  stroke-dasharray: 10 14;
+  animation: marching 900ms linear infinite;
+}
+
+.marching-back {
+  animation-direction: reverse;
+}
+
 /* Twice over, so a second refusal on a count that has not moved still reads as
    an answer rather than as nothing happening. */
 .denied {
@@ -219,7 +240,8 @@ textarea {
   .lingered,
   .denied,
   .stirring,
-  .underway {
+  .underway,
+  .marching {
     animation: none;
   }
 

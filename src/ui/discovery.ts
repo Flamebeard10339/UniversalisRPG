@@ -82,9 +82,32 @@ export function walkLine(here: string, journey: PlayView['journey']): string[] {
   return [here, ...journey.legs];
 }
 
-export function onWalk(line: readonly string[], from: string, to: string): boolean {
+// Which part of the journey a place is. A journey of one leg has the stop it is walking to and the
+// far end it set out for in the same place and says `target`: the far end is the fact the player
+// chose, and the road under their feet already says which way they are going.
+export type Walking = 'here' | 'next' | 'ahead' | 'target';
+
+export function walkingAt(line: readonly string[], node: Node): Walking | undefined {
+  if (node.here) return 'here';
+  const at = line.indexOf(node.place.id);
+  if (at < 1) return undefined;
+  return at === line.length - 1 ? 'target' : at === 1 ? 'next' : 'ahead';
+}
+
+export interface Walked {
+  // Under the player's feet, or a stretch of the route still to come.
+  stretch: 'now' | 'ahead';
+  // Whether the road is drawn the way it is walked. A road is drawn from whichever of its two ends
+  // sorts first, which has nothing to do with which end the player is at.
+  along: boolean;
+}
+
+export function onWalk(line: readonly string[], from: string, to: string): Walked | null {
   const at = line.indexOf(from);
-  return at >= 0 && (line[at + 1] === to || line[at - 1] === to);
+  if (at < 0) return null;
+  if (line[at + 1] === to) return { stretch: at === 0 ? 'now' : 'ahead', along: true };
+  if (at > 0 && line[at - 1] === to) return { stretch: at === 1 ? 'now' : 'ahead', along: false };
+  return null;
 }
 
 export function newlyFound(before: readonly Place[], after: readonly Place[]): string[] {

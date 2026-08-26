@@ -30,6 +30,12 @@ export const playedAfter = (ms: number): { animationDelay: string; animationFill
 
 export const STIRRING = 'stirring';
 
+// A road being walked, and the same road drawn from the other end than the one it is walked from, so
+// that what marches along it marches the way the player is going either way round.
+export const MARCHING = 'marching';
+
+export const MARCHING_BACK = 'marching marching-back';
+
 export interface Moment {
   id: number;
   kind: MomentKind | 'note';
