@@ -376,7 +376,7 @@ describe('what the shell puts on the screen', () => {
     expect(drawn.find((entry) => entry.id === 'surveyed.workshop')!.flashing).toBe(false);
   });
 
-  it('lights the walk up: where it ends, what it still has to cross, and the roads between', () => {
+  it('lights the walk up: where it starts, the next stop, where it ends, and the roads between', () => {
     const driver = createDriver([SURVEYED], { ticker: noTicks });
     driver.choose(position(driver, LOOK_OUT));
     driver.choose(position(driver, 'travel:surveyed.cove'));
@@ -386,24 +386,26 @@ describe('what the shell puts on the screen', () => {
 
     expect(view.journey).toEqual({ to: 'surveyed.cove', legs: ['surveyed.overlook', 'surveyed.cove'] });
     expect(places(html).map((node) => [node.id, node.walk])).toEqual([
-      ['surveyed.workshop', undefined],
-      ['surveyed.overlook', 'crossing'],
-      ['surveyed.cove', 'going'],
+      ['surveyed.workshop', 'here'],
+      ['surveyed.overlook', 'next'],
+      ['surveyed.cove', 'target'],
       ['surveyed.shed', undefined],
     ]);
     expect(html.match(/<line/g) ?? []).toHaveLength(3);
-    expect(html.match(/data-walk="road"/g) ?? []).toHaveLength(2);
+    expect(html.match(/data-walk="now"/g) ?? []).toHaveLength(1);
+    expect(html.match(/data-walk="ahead"/g) ?? []).toHaveLength(1);
   });
 
-  it('lights nothing up when nobody is walking', () => {
+  it('lights no journey up when nobody is walking, leaving only where the player stands', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
 
     const html = renderToStaticMarkup(<MapPane words={shellWord} view={driver.snapshot().view} arrivals={[]} generation={0} {...MAPPING} />);
 
     expect(driver.snapshot().view.journey).toBeNull();
-    expect(places(html).every((node) => node.walk === undefined)).toBe(true);
-    expect(html).not.toContain('data-walk="road"');
+    expect(places(html).filter((node) => node.walk !== undefined).map((node) => node.walk)).toEqual(['here']);
+    expect(html).not.toContain('data-walk="now"');
+    expect(html).not.toContain('data-walk="ahead"');
   });
 
   it('sets off for a place when it is tapped, through the choice the engine published', () => {

@@ -9,6 +9,7 @@ import type { LabelId } from '../labels';
 import { LAYERS, shellState, shownIn, toLayer, toSubpage, type ShellState, type Where } from '../nav';
 import type { PlaneGraph, Plane } from '../planeGraph';
 import type { JournalRow } from '../journalPanel';
+import type { Arriving } from '../reveal';
 import type { JournalEntry, StatRow } from '../../runtime/session';
 import type { StatTab } from '../statTabs';
 import { filled, type SkillPanel } from '../skillPanels';
@@ -375,6 +376,16 @@ export function tabNamed(tabs: readonly StatTab[], value: unknown): Answer | nul
   return tab.group?.id ?? null;
 }
 
+// The words a screen is saying, as much of them as have arrived, and the one press that carries the
+// beat on. An agent reads what is on the screen rather than what the engine has said, because those
+// are not the same thing while a line is still arriving.
+export function beatSurface(held: AgentSurfaces['beat']): TestSurface {
+  return {
+    state: () => ({ shown: [...held.arriving.shown], typing: held.arriving.typing, awaits: held.arriving.awaits }),
+    actions: { press: () => held.controls.press() },
+  };
+}
+
 // What the breakdown screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
 export function statSurface(held: AgentSurfaces['stat']): TestSurface {
   return {
@@ -403,6 +414,7 @@ export interface AgentSurfaces {
   skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
+  beat: { arriving: Arriving; controls: { press(): void } };
   quest: { entry: JournalEntry };
   stats: { tabs: readonly StatTab[]; chosen: Answer | null; controls: { tab(id: Answer | null): void } };
   stat: { row: StatRow };
@@ -417,6 +429,7 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   plane: (held) => planeSurface(held),
   skills: (held) => skillsSurface(held),
   journal: (held) => journalSurface(held),
+  beat: (held) => beatSurface(held),
   quest: (held) => questSurface(held),
   stats: (held) => statsSurface(held),
   stat: (held) => statSurface(held),

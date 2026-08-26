@@ -4,6 +4,7 @@ import { clickingOffLeaves, layerOf, mannerOf, showsTheBeat, type Declared } fro
 import type { Localized } from '../runtime/localized';
 import { arriving, A_CHARACTER, landed, OPENS, pressed, typedOn } from './reveal';
 import { useMoment, useMotionless } from './transient';
+import { useTestSurface } from './useTestSurface';
 
 const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
 
@@ -35,6 +36,9 @@ function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean })
   const motionless = useMotionless();
   const beat = arriving(lines, reading, paced);
   const typing = beat.typing;
+  const press = (): void => setReading((was) => pressed(lines, was));
+
+  useTestSurface('beat', { arriving: beat, controls: { press } });
 
   useEffect(() => {
     if (!typing) return;
@@ -56,10 +60,10 @@ function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean })
       </div>
       {beat.typing || beat.awaits ? (
         <button
-          data-drive="reveal"
+          data-drive="beat.press"
           data-awaits={beat.awaits ? 'yes' : undefined}
           type="button"
-          onClick={() => setReading((was) => pressed(lines, was))}
+          onClick={press}
           className="mt-1 w-full rounded-xl border border-border text-sm text-text-subtle transition-transform duration-75 active:scale-[0.99] active:text-accent"
         >
           ▾
