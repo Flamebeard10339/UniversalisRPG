@@ -140,19 +140,11 @@ field however it was recorded — see `WALKED` in `src/runtime/session.ts`. The 
 the rule's proof: there is nothing to keep in sync, and a sheet written next month is
 covered by having been written at all.
 
-**A test is not added until it has been shown not to be redundant.** Run
-`npm run mutate` first: break the thing the new test would guard, and read which tests
-already catch it. If something does, the test is not written — the suite is already
-paying to run that proof, and a second copy of it is one more thing to keep in sync. This
-holds for a `.ts` unit test and a corpus `# test` alike. Nine of tulsa's `# test` sections
-were written past this rule before it existed; breaking buff stacking turned out to be
-caught eight ways over by `buffs.test.ts`, and breaking the own-sheet-beats-the-global-table
-rule by `encounter.test.ts` and about twenty-five others.
-
-The measurement has one blind spot worth knowing: it reads which tests *assert* against a
-break, not which tests *depend on the route as a fixture*. Grep `src/` and `scripts/` for
-the id before deleting anything — three of those nine were replayed by runtime tests as
-scenario builders, and cutting them took good tests down with them.
+**A test is not added until it has been shown not to be redundant, and a duplicate
+found is deleted rather than glossed over.** A proof has one home like anything else:
+nine of tulsa's `# test` sections were written past this, one of them already caught
+eight ways over. The procedure, and how to measure it, live in the `one-home` skill.
+That skill is the authority; this paragraph is why.
 
 **A route's verdict is reported once.** Three harnesses replay every corpus `# test` —
 the shipped corpus, the corpus with every word replaced, and the consolidated tree. Only
@@ -184,7 +176,7 @@ Tools, none of which are gates:
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
 - `npm run review` — the next twenty sections still wanting a read, and `--read-next` signs off the same twenty. `--sheet` is the whole unbounded sheet, under the section that says it, in the order its module writes them; `[-- <module>...]` narrows either. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
 - `npm run probe -- content --record <test-id>` — runs a `# test` and prints the state it ends on as the `# save` body that test closes on, to paste back over the stale one
-- `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice
+- `npm run mutate -- <manifest.json>` — break a named line, run the tests it names, report what the suite failed to notice. It writes the break into the working tree and puts the file back afterwards, so never run it in a checkout someone else is working in: a second writer reads the broken file as if it were the code, and an interrupted run can leave it broken on disk
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
 over in one line, stop. Put the pure decisions in a `.ts` beside the component

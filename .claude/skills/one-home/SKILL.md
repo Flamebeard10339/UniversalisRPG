@@ -1,6 +1,6 @@
 ---
 name: one-home
-description: Use before implementing any change to behavior in this repo — a new feature, field, kind, panel, command, or a fix that adds a branch, and before authoring a mechanic under content/ (an action, an entity that fights or is robbed, an item a quest hands over). Names where the fact being added lives and halts the work if it would live in two places. Also use when the user mentions duplication, inference, second authorities, or things kept manually in sync. Skip for renames, formatting, prose rewrites that change no mechanic, and test-only edits.
+description: Use before implementing any change to behavior in this repo — a new feature, field, kind, panel, command, or a fix that adds a branch, and before authoring a mechanic under content/ (an action, an entity that fights or is robbed, an item a quest hands over), and before adding a test of any kind, `.ts` or corpus `# test`. Names where the fact being added lives and halts the work if it would live in two places. Also use when the user mentions duplication, inference, second authorities, or things kept manually in sync. Skip only when the edit adds no fact.
 ---
 
 # One home
@@ -99,8 +99,52 @@ None of the three is caught by the suite: each loads clean, round-trips clean,
 and plays exactly as written. They are found by a human reading, which is the
 most expensive way this repo finds anything.
 
+## Tests are not exempt
+
+A test is a fact too: *this behaviour is proved here*. Two tests proving one
+behaviour is shape 3, and a test naming its subjects rather than deriving them is
+shape 7 — and both shipped while this skill listed test-only edits as out of
+scope. Nine of tulsa's `# test` sections were written past the rule; breaking buff
+stacking turned out to be caught eight ways over by `buffs.test.ts`, and breaking
+the own-sheet-beats-the-global-table rule by `encounter.test.ts` and about
+twenty-five others.
+
+The home line takes the same one line, in the proof's vocabulary:
+
+> **Home:** the proof that *<behaviour>* holds lives in `<test>`.
+
+It is **measured, not guessed.** Run `npm run mutate` first: break the thing the
+new test would guard and read which tests already catch it. Nothing catches it —
+the home is free, write the test. Something catches it — the home is taken, and
+the suite is already paying to run that proof.
+
+**A taken home ends differently here: do not report, and do not wait.** A
+redundant test is not a design question for the author. Don't write it; or, if
+the duplicate is already on disk, delete it and say in one line what went. Then
+carry on with the work that was asked for.
+
+Two things the measurement will not tell you. It reads which tests *assert*
+against a break, not which *depend on a route as a fixture* — grep `src/` and
+`scripts/` for a `# test` id before deleting it, because three of those nine were
+replayed by runtime tests as scenario builders and cutting them took good tests
+down with them. And it has no word on *what* a test may assert: that is the
+balance rule, and `CLAUDE.md` owns it.
+
 ## Does not apply
 
-Renames, comment and formatting edits, prose rewrites that change no mechanic,
-test-only additions, and fixes confined to one file that add no branch.
-Skip the home line entirely for those.
+**Skip only when the edit adds no fact.** If you cannot name the fact, there is
+nothing to home: whitespace, reflow, a typo. That is the whole exemption, and it
+is derived rather than listed on purpose — a list here would be shape 2, and the
+copy of it that has to live in the description would be shape 3.
+
+Four edits look exempt and are not. A **rename** is where a second home
+announces itself, which is why the move tools reach into fixtures. A
+**comment** is already governed by the home rule under another name —
+`CLAUDE.md` keeps one only when the fact is owned by this file and derivable
+from nowhere else. A **prose rewrite that changes no mechanic** can still
+restate one the world already declares. And a **fix confined to one file**
+asserts the home line's answer as its precondition: that it is confined is the
+thing the line was going to tell you.
+
+None of this costs anything when the home is obvious. Same file both sides,
+proceed — that is one line, and it is the common case.
