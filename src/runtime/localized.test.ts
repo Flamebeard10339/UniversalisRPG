@@ -6,7 +6,7 @@ import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
-import { moduleSource } from '../content/shipped';
+import { moduleSource, standingSources } from '../content/shipped';
 import { NOTE_MARK } from '../grammar/note';
 import { everyKey, englishOf } from '../content/translation';
 import { hasNote, withoutNote } from '../grammar/note';
@@ -159,14 +159,24 @@ describe('an action is displayed under the address it is identified by', () => {
   });
 });
 
+// Over the standing world rather than over core alone: a `# action` is a verb shared by whoever
+// brings it, and the two ends of that sharing — the player who swings and the thing swung at — are
+// not both declared in one module, so a world small enough to hold only one of them cannot say
+// anything about the other.
 describe('one line translates an action for every owner that performs it (c7)', () => {
-  const source = moduleSource('core').text;
-  const english = loadUniverse([engineLocale(), { name: 'core', text: source }]);
+  const world = standingSources();
+  const english = loadUniverse([engineLocale(), ...world]);
   const declarations = [...english.actions.keys()];
-  const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', '  core', '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
-  const registry = loadUniverse([engineLocale(), { name: 'core', text: source }, { name: 'isla-es', text: locale.join('\n') }]);
+  const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', ...world.map((each) => `  ${each.name}`), '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
+  const registry = loadUniverse([engineLocale(), ...world, { name: 'isla-es', text: locale.join('\n') }]);
   const say = localizerFor(registry, 'es');
-  const performed = everyActionTable(registry).flatMap(([kind, ownerId, actions]) => actions.filter((action) => declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
+  // Only the ones a `# action` declares: an action minted onto an owner — the examine every thing
+  // carries — is keyed under that owner rather than under a declaration, so it is not what a line
+  // shared between performers is about.
+  const shared = new Set(declarations);
+  const performed = everyActionTable(registry).flatMap(([kind, ownerId, actions]) =>
+    actions.filter((action) => declaredId(action) !== undefined && shared.has(declaredId(action)!)).map((action) => ({ kind, ownerId, action })),
+  );
 
   it('has shipped declarations, performed under owners of more than one kind', () => {
     expect(declarations.length).toBeGreaterThan(0);

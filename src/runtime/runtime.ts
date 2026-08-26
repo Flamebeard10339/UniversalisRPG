@@ -602,7 +602,7 @@ function whyRefused(action: Action, registry: Registry, state: GameState, target
   }
   const { short, unspendable } = inputLimit(action, state);
   if (short !== undefined) return localizer.engine('engine.inputs.short', { item: item(short) });
-  if (unspendable !== undefined) return localizer.engine(unspendable.kind === 'grown' ? 'engine.inputs.grown' : 'engine.inputs.worn', { item: item(unspendable.item) });
+  if (unspendable !== undefined) return localizer.engine('engine.inputs.grown', { item: item(unspendable) });
   return undefined;
 }
 

@@ -3,6 +3,8 @@ version: 1.0.0
 dependencies:
   core
   tulsa
+  cooking
+  thieving
 
 // The whole of the tutorial quest: what the journal reads at each stage, what
 // Miki says while the quest stands there, and what moving on does. Nothing else
@@ -278,12 +280,13 @@ assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not first-steps.front-door.unlocked
-// The drop is what the route pays instead of the door: five off the thirty the
-// player starts with, and nothing on this route gives any of it back. The
-// condition roots read a pool and not what is missing from one, so this is the
-// total the drop leaves — exact, because a band here would also hold in a world
-// where the window cost twenty.
-assert: resource.core.health = 25
+// The drop is what the route pays instead of the door: five off the pool the
+// player starts with, and nothing on this route gives any of it back. That pool
+// is the thirty on their own sheet and the level of Health they stand at, which
+// is where the odd fraction comes from. The condition roots read a pool and not
+// what is missing from one, so this is the total the drop leaves — exact,
+// because a band here would also hold in a world where the window cost twenty.
+assert: resource.core.health = 26.31
 expect only: left-mikis-house
 // Regenerate with /create-valid-test when this route's content changes on
 // purpose. See thieving-route-full-end for why this isn't miki-route-end.
@@ -503,7 +506,7 @@ assert: first-steps.rats-killed = 1
 {"version":13}
 
 # save miki-route-end
-{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":5},"flags":{"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.name-yourself":true,"first-steps.mirror-done":true,"first-steps.finding-your-feet.bake-bread":true,"first-steps.finding-your-feet.clear-the-rats":true,"first-steps.basement.touched":true,"first-steps.rats-killed":3,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.name-yourself.miki.1.said":1,"first-steps.finding-your-feet.bake-bread.miki.1.said":1,"first-steps.finding-your-feet.clear-the-rats.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"core.cooking":6,"core.melee":14},"resources":{"core.health":24702},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"first-steps.basement":{"first-steps.giant-rat":{"down":3,"due":[]}}},"time":28400,"rng":4140627150,"player":{"name":"Rowan","race":"core.elf"}}
+{"version":13,"inventory":{"core.bread":1,"core.wooden-shield":1,"core.rat-bone":8,"core.rat-tail":1},"flags":{"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.basement.discovered":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.name-yourself":true,"first-steps.mirror-done":true,"first-steps.finding-your-feet.bake-bread":true,"first-steps.finding-your-feet.clear-the-rats":true,"first-steps.basement.touched":true,"first-steps.rats-killed":3,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.name-yourself.miki.1.said":1,"first-steps.finding-your-feet.bake-bread.miki.1.said":1,"first-steps.finding-your-feet.clear-the-rats.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"cooking.cooking":6,"combat.attack":127,"combat.health":97},"resources":{"core.health":25185},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"first-steps.basement":{"first-steps.giant-rat":{"down":3,"due":[]}}},"time":28400,"rng":1498481104,"player":{"name":"Rowan","race":"core.elf"}}
 
 // The thief's own closing sheet — not the door route's. A route that never
 // bakes or fights lands on different holdings, a different clock and a
@@ -511,11 +514,11 @@ assert: first-steps.rats-killed = 1
 // sheets; what genuinely converges across all of them is left-mikis-house,
 // which each of them also closes on.
 # save thieving-route-full-end
-{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.miki.angered":true,"first-steps.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":25000},"location":"tulsa.market-square","rng":2617077404}
+{"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.miki.angered":true,"first-steps.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":26310},"location":"tulsa.market-square","rng":2617077404}
 
 // The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
-{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}
+{"version":13,"inventory":{"core.fishing-net":1,"core.fish":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.basement.discovered":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"location":"tulsa.market-square","time":9000}
 
 # save dresser-trinket-end
 {"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true},"location":"first-steps.guide-house-upstairs","rng":2617077404}
@@ -704,7 +707,6 @@ on death:
   add: rats-killed 1
   say: You put down another rat.
   credit:
-    xp: melee 4-6
     roll: rat-remains
     1 in 3:
       roll: trinket

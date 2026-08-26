@@ -10,7 +10,7 @@ import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
-import { memberKey, Namespace } from './namespace';
+import { keyedUnderOwnerKind, memberKey, Namespace } from './namespace';
 import { TOUCHED } from './sections/define';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
@@ -580,7 +580,13 @@ const declaredKeys = (held: Namespace): { kind: string; key: string }[] =>
     .sort()
     .flatMap((kind) => held.declaredKeys(kind).sort().map((key) => ({ kind, key })));
 
-const names = (key: string, id: string): boolean => key.split('.').includes(id);
+// Whether a declared key is namespaced under a module, which is a question about its prefix and not
+// about any word in it: a skill a module named after itself puts that module's own word at the tail
+// as well, and reading the tail would say a rename had failed when it had not.
+const names = (entry: { kind: string; key: string }, id: string): boolean => {
+  const key = keyedUnderOwnerKind(entry.kind) ? entry.key.slice(entry.key.indexOf('.') + 1) : entry.key;
+  return key === id || key.startsWith(`${id}.`);
+};
 
 // Every shape the page offers anywhere under an action, however deep the blocks go. A block reached twice holds the same lines, so it is walked once.
 const ACTION_SHAPES: readonly string[] = (() => {
@@ -714,9 +720,9 @@ describe('renaming a module', () => {
     const to = `${module}-somewhere-else`;
     const before = declaredKeys(namespace);
     const after = declaredKeys(namespace.renamed(module, to));
-    expect(before.filter((each) => names(each.key, module)).length).toBeGreaterThan(0);
-    expect(after.filter((each) => names(each.key, module))).toEqual([]);
-    expect(after.filter((each) => !names(each.key, to))).toEqual(before.filter((each) => !names(each.key, module)));
+    expect(before.filter((each) => names(each, module)).length).toBeGreaterThan(0);
+    expect(after.filter((each) => names(each, module))).toEqual([]);
+    expect(after.filter((each) => !names(each, to))).toEqual(before.filter((each) => !names(each, module)));
     expect(after).toHaveLength(before.length);
   });
 });

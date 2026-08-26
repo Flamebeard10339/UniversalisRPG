@@ -18,6 +18,7 @@ import { loadModule, loadUniverse } from '../content/load';
 import { loadSave } from './save';
 import { statBreakdown, type StatBreakdown } from './stats';
 import { shippedSources } from '../content/shipped';
+import type { Skill } from '../content/sections/skill';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
 
@@ -405,12 +406,41 @@ describe('a skill of the shipped player', () => {
     expect(SHIPPED.stats.size).toBeGreaterThan(5);
   });
 
-  it.each(HELD)('$id raises the stat it names by one for each level it gains, and no other stat at all', (skill) => {
-    expect(movedByLevels(SHIPPED, skill.id, LEVEL)).toEqual(skill.stat === undefined ? {} : { [skill.stat]: LEVEL - 1 });
+  it.each(HELD)('$id raises the stat it names and no other stat at all', (skill) => {
+    expect(Object.keys(movedByLevels(SHIPPED, skill.id, LEVEL))).toEqual(skill.stat === undefined ? [] : [skill.stat]);
   });
 
-  // The claim above reads midpoints, which cannot see a spread at all. Where the stat the skill
-  // raises is one the player declares as a range, the grant has to move both ends together or the
+  // A level lands on both channels a bonus in this language has, and neither reading below needs the
+  // stat's base to see it: `(base + flat) x (1 + percent/100)` has one unknown, so the base a reading
+  // implies is the same at every level only when both channels are there and are the sizes the rule
+  // says. What the other skills naming the same stat put in is counted the same way, off the world,
+  // because they stand at level one throughout.
+  const NAMED = HELD.filter((skill) => skill.stat !== undefined);
+
+  const impliedBase = (skill: Skill, level: number): number => {
+    const state = createGameState('');
+    state.xp[skill.id] = xpForLevel(level);
+    const alongside = NAMED.filter((other) => other.id !== skill.id && other.stat === skill.stat).length;
+    const levels = level + alongside;
+    return statValue(skill.stat!, state, SHIPPED) / (1 + levels / 100) - levels;
+  };
+
+  it.each(NAMED)('$id raises it by one and by one percent for every level it gains', (skill) => {
+    const base = impliedBase(skill, 1);
+    for (const level of [2, 9, 20, 45]) expect(impliedBase(skill, level)).toBeCloseTo(base, 6);
+  });
+
+  it.each(NAMED)('$id leaves it standing higher at nine than at one, so neither reading above is vacuous', (skill) => {
+    const at = (level: number): number => {
+      const state = createGameState('');
+      state.xp[skill.id] = xpForLevel(level);
+      return statValue(skill.stat!, state, SHIPPED);
+    };
+    expect(at(LEVEL)).toBeGreaterThan(at(1));
+  });
+
+  // The claims above read midpoints, which cannot see a spread at all. Where the stat the skill
+  // raises is one the player declares as a range, the grant has to carry both ends up or the
   // player's swing would tighten as they trained — so the same subjects are asked again about the
   // ends, and a stat the player writes flat drops out rather than being named here as an exception.
   it('shifts both ends of a stat the player swings unevenly, and widens it by nothing', () => {
@@ -426,9 +456,9 @@ describe('a skill of the shipped player', () => {
       const first = at(skill.id, skill.stat!, 1);
       const raised = at(skill.id, skill.stat!, LEVEL);
 
-      expect(raised.min - first.min).toBe(LEVEL - 1);
-      expect(raised.max - first.max).toBe(LEVEL - 1);
-      expect(raised.max - raised.min).toBe(first.max - first.min);
+      expect(raised.min).toBeGreaterThan(first.min);
+      expect(raised.max).toBeGreaterThan(first.max);
+      expect(raised.max - raised.min).toBeGreaterThanOrEqual(first.max - first.min);
     }
   });
 });
@@ -438,9 +468,10 @@ describe('a skill of the shipped player', () => {
 describe('a skill weighed against one that names no stat', () => {
   const REGISTRY = loadModule(['# stat guile', 'base: 2', '', '# skill lockpicking', 'stat: guile', '', '# skill whistling', '', '# entity player', 'skills: lockpicking, whistling'].join('\n'));
 
-  it('raises the stat it names, from the first level and by one for each after it', () => {
-    expect(statValue('guile', createGameState(''), REGISTRY)).toBe(3);
-    expect(movedByLevels(REGISTRY, 'lockpicking', 4)).toEqual({ guile: 3 });
+  it('raises the stat it names on both channels, from the first level and once more for each after it', () => {
+    const at = (level: number): number => (2 + level) * (1 + level / 100);
+    expect(statValue('guile', createGameState(''), REGISTRY)).toBeCloseTo(at(1), 6);
+    expect(movedByLevels(REGISTRY, 'lockpicking', 4).guile).toBeCloseTo(at(4) - at(1), 6);
   });
 
   it('raises nothing at any level where it names no stat', () => {

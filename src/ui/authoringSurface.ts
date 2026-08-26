@@ -1,6 +1,5 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import { qualify } from '../content/namespace';
-import { isOwnedKind } from '../content/sections';
+import { declaredKey } from '../content/resolve';
 import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
@@ -24,8 +23,10 @@ const HEADER_KIND = 'info';
 
 const normalized = (text: string): string => text.replace(/\r\n?/g, '\n');
 
-const addressOf = (module: string, kind: string, id: string): string =>
-  module === LOCAL_CHANGES_MODULE_ID || !isOwnedKind(kind) ? id : qualify(module, id);
+// What the loader would file this section under, asked of the loader rather than worked out again
+// here: an owned id that already names a module is a section of that module's being edited from this
+// one, and re-qualifying it would address a section nothing declares.
+const addressOf = (module: string, kind: string, id: string): string => (module === LOCAL_CHANGES_MODULE_ID ? id : (declaredKey(module, kind, id) ?? id));
 
 export function sectionsIn(source: ModuleSource): Section[] {
   const text = normalized(source.text);
@@ -55,9 +56,21 @@ export function sectionsIn(source: ModuleSource): Section[] {
 
 const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
 
+// One address is one thing to edit, and more than one module may write at it: the module that owns
+// the id declares it, and any other module writing there is adding to what it declared. The
+// declaring body is the one an author drags, types over and reads, so it is the one kept — asked of
+// the loader's own rule about which module an id belongs to rather than of the order the sources
+// happen to arrive in.
+const declares = (section: Section): boolean => addressOf(section.module, section.kind, section.address) === section.address;
+
 export function addressable(sources: readonly ModuleSource[]): Section[] {
   const held = new Map<string, Section>();
-  for (const source of sources) for (const section of sectionsIn(source)) held.set(keyOf(section), section);
+  for (const source of sources) {
+    for (const section of sectionsIn(source)) {
+      const standing = held.get(keyOf(section));
+      if (standing === undefined || declares(section)) held.set(keyOf(section), section);
+    }
+  }
   return [...held.values()];
 }
 

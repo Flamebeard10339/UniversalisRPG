@@ -41,38 +41,37 @@ function hasSomewhereToStand(subset: readonly string[]): boolean {
   return diagnostics.length === 0 && [...registry.locations.values()].some((location) => location.starting);
 }
 
-// Every subset of a set, in order of size, so the first one a search finds is provably the smallest.
-function* subsetsBySize(all: readonly string[]): Generator<string[]> {
-  for (let size = 1; size <= all.length; size++) {
-    const combo: number[] = Array.from({ length: size }, (_, i) => i);
-    for (;;) {
-      yield combo.map((index) => all[index]);
-      let cursor = size - 1;
-      while (cursor >= 0 && combo[cursor] === all.length - size + cursor) cursor--;
-      if (cursor < 0) break;
-      combo[cursor]++;
-      for (let after = cursor + 1; after < size; after++) combo[after] = combo[after - 1] + 1;
-    }
-  }
-}
-
 // The claim `open.md` names: one thing at or below the content layer says what the standing
 // (somewhere-to-stand) shipped world is, proved here by a reading of the corpus that owes
-// `shipped.ts` nothing — it tries every subset, smallest first, and stops at the first that loads
-// clean and has a starting location. Adding, splitting or renaming a shipped module changes what
-// this search finds with no edit here.
+// `shipped.ts` nothing — the set it offers has to stand, and has to stop standing when any one
+// module is taken out of it. Only one shipped module declares a starting # location, so every set
+// that stands at all holds that module and everything it leans on; a set that is minimal in that
+// sense is therefore that closure and no other. Adding, splitting or renaming a shipped module
+// moves what this finds with no edit here.
+//
+// It reads one universe per module rather than one per subset. The exhaustive smallest-first search
+// this replaced was the same claim and cost 2^n loads of the corpus, which reached five minutes of
+// the suite's twenty seconds at seventeen modules.
 describe('the standing world is derived, not listed', () => {
-  it('standingSources is the smallest shipped subset whose registry has somewhere to stand', () => {
-    let smallest: string[] | undefined;
-    for (const subset of subsetsBySize(ids())) {
-      if (hasSomewhereToStand(subset)) {
-        smallest = subset;
-        break;
-      }
-    }
+  const standing = (): string[] => standingSources().map((source) => source.name);
 
-    expect(smallest).toBeDefined();
-    expect(new Set(standingSources().map((source) => source.name))).toEqual(new Set(smallest));
+  it('is a subset of what ships, and every shipped module outside it is one the world can begin without', () => {
+    expect(standing().length).toBeGreaterThan(0);
+    expect(ids()).toEqual(expect.arrayContaining(standing()));
+  });
+
+  it('stands, and stops standing when any one of its modules is taken out', () => {
+    const held = standing();
+    expect(hasSomewhereToStand(held)).toBe(true);
+    for (const dropped of held) {
+      expect(hasSomewhereToStand(held.filter((id) => id !== dropped)), `without ${dropped}`).toBe(false);
+    }
+  });
+
+  it('is the only place a starting # location is declared, which is what makes the reading above exhaustive', () => {
+    const starters = ids().filter((id) => parseModuleSource(moduleSource(id)).sections.some((section) => section.kind === 'location' && (section.value as { starting?: boolean }).starting === true));
+    expect(starters).toHaveLength(1);
+    expect(standing()).toContain(starters[0]);
   });
 });
 

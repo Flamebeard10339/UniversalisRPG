@@ -152,13 +152,16 @@ describe('equipment', () => {
     expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
     expect(statValue('core.defense', state, tutorial)).toBe(bareDefense);
 
+    // A flat bonus lands on the added channel and the whole is then multiplied by the percent channel,
+    // so what a +2 sword is worth on the arm is 2 times whatever percentage the wearer already
+    // carries — here the one percent a level of Attack grants. Defense carries none, so it moves by 2.
     equip(state, tutorial, sword);
     equip(state, tutorial, shield);
-    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack + 2);
+    expect(statValue('core.attack', state, tutorial)).toBeCloseTo(bareAttack + 2 * 1.01, 6);
     expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
 
     unequip(state, tutorial, 'mainhand');
-    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
+    expect(statValue('core.attack', state, tutorial)).toBeCloseTo(bareAttack, 6);
     expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
   });
 

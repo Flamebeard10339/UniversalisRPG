@@ -8,11 +8,16 @@ const moduleId = (fileName: string): string => fileName.replace(/\.dsl$/, '');
 
 // Every shipped module's file, excluding an author's own local-changes file — which does not
 // exist in the repository and is not itself shipped, but is legal to run `npm run play` against.
+// Ordered by the module id rather than by the file name, because the extension is not part of the
+// id and sorting with it on puts `combat-expansion` before `combat` while every reader downstream
+// puts `combat` first. Two ids where one is a prefix of the other is the only case the two orders
+// disagree on, and the page and the filesystem have to answer in one order or a claim that they
+// carry the same corpus reads as a claim that they do not.
 export function shippedFiles(): readonly string[] {
   return readdirSync(CORPUS_DIR)
     .filter((name) => name.endsWith('.dsl'))
     .filter((name) => moduleId(name) !== LOCAL_CHANGES_MODULE_ID)
-    .sort();
+    .sort((a, b) => moduleId(a).localeCompare(moduleId(b)));
 }
 
 export function moduleSource(id: string): ModuleSource {

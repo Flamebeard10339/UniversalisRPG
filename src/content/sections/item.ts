@@ -1,12 +1,13 @@
 import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
+import { Condition, condition as conditionValue } from '../../grammar/condition';
 import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { range, Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { actions, condition as visitCondition, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
 import { section } from './define';
 import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
@@ -21,6 +22,7 @@ export interface Item extends HookCarrier {
   title: string;
   examine?: string;
   slot?: string;
+  requires?: Condition;
   tags: TagClause[];
   actions: Action[];
   clusterJewel?: string;
@@ -52,6 +54,9 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
 export const isBase = (item: Item): boolean => item.itemLevel !== undefined;
 
 function roleProblem(item: Item): string | undefined {
+  if (item.requires !== undefined && item.slot === undefined) {
+    return `requires: is what has to hold of whoever puts ${item.id} on, and nothing without a slot: is ever put on: give it a slot: or drop the field`;
+  }
   if (item.value !== undefined && item.value <= 0) {
     return `value: is what a shop prices one of these at, and ${item.value} prices it at nothing: leave the line out and ${item.id} is untradable`;
   }
@@ -86,6 +91,7 @@ export const item = section<Item, never, 'actions'>()({
     group: GROUP_FIELD,
     examine: { parser: text },
     slot: { parser: id, note: 'the slots are every id any equipment-slots: names, so this declares one as much as it uses one; a # slot only supplies display words for it' },
+    requires: { parser: conditionValue, note: 'what has to hold of whoever puts this on; while it does not, the thing is carried and not worn' },
     itemLevel: {
       parser: range,
       keyword: 'item-level',
@@ -104,11 +110,16 @@ export const item = section<Item, never, 'actions'>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     visitTags(held.tags, where, visit);
+    visitCondition(value.requires, `${where} requires:`, visit);
     actions(held.actions, where, visit);
     hooks(held, where, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
   },
   prune: (value, at, where) => {
+    // A wear requirement is a gate, and a gate nobody can read is not a gate: an item asking for a
+    // skill the world has stopped declaring goes the way an entity whose `hidden if:` lost its
+    // subject goes, rather than quietly becoming a thing anyone may put on.
+    if (!at.intact(() => visitCondition(value.requires, `${where} requires:`, at.visit))) return null;
     const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);

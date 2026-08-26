@@ -260,7 +260,13 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
       }
     }
 
-    cursor.take(/[ \t]*,[ \t]*/);
+    // What follows on the same line is another thing this body holds, and a comma is what says so.
+    // Without one, whatever is left over is the tail of the value just read rather than a second
+    // value, and reading it as a clause is how `slot: head typo` became a keyword called typo.
+    if (cursor.take(/[ \t]*,[ \t]*/) === null) {
+      cursor.take(/[ \t]*/);
+      if (!cursor.done) throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
+    }
   }
 }
 

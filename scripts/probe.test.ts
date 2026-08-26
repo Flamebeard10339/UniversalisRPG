@@ -360,8 +360,10 @@ describe('probe: the command seam', () => {
   // sourceFiles is a generic any-directory reader, one layer above content and unaware of the
   // shipped corpus; shippedFiles is content's own answer, which also excludes an author's local
   // changes. This is the guard that the two agree on what content/ itself holds.
+  // What they agree on is which files, not what order: the generic reader sorts by file name and
+  // content's own answer sorts by module id, which differ wherever one id is a prefix of another.
   it('reads a directory as the .dsl files in it, so the corpus is nameable where no glob expands', () => {
-    expect(sourceFiles(CORPUS_DIR)).toEqual(shippedFiles().map((file) => path.join(CORPUS_DIR, file)));
+    expect([...sourceFiles(CORPUS_DIR)].sort()).toEqual(shippedFiles().map((file) => path.join(CORPUS_DIR, file)).sort());
   });
 
   it('runs one shipped # test by name and exits 0', () => {

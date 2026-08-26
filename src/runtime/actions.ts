@@ -41,7 +41,7 @@ export function actionVisible(action: Action, state: GameState, registry: Regist
 export interface InputLimit {
   completions: number;
   short?: string;
-  unspendable?: { item: string; kind: 'grown' | 'worn' };
+  unspendable?: string;
 }
 
 export function inputLimit(action: Action, state: GameState): InputLimit {
@@ -54,12 +54,12 @@ export function inputLimit(action: Action, state: GameState): InputLimit {
 export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): InputLimit {
   let completions = Infinity;
   let short: string | undefined;
-  let unspendable: InputLimit['unspendable'];
+  let unspendable: string | undefined;
   for (const [item, need] of cost) {
     if (need <= 0) continue;
     const copies = copiesOf(state, item);
     if (copies.stack + copies.grown + copies.worn < need) short ??= item;
-    else if (spendable(copies) < need) unspendable ??= { item, kind: copies.grown > 0 ? 'grown' : 'worn' };
+    else if (spendable(copies) < need) unspendable ??= item;
     completions = Math.min(completions, Math.floor(spendable(copies) / need));
   }
   return { completions, short, unspendable };

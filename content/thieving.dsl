@@ -1,0 +1,88 @@
+// Thieving — taking things off people who are still using them, and out of boxes that are still
+// locked.
+//
+// Every theft is one roll weighed between two things: the player's `thieving` on one side and how
+// hard the mark is on the other, written as a plain number on the mark's own line. A pickpocket that
+// wins pays coin and experience; one that loses costs health and leaves the player dazed for three
+// seconds, which is long enough that a failed lift is felt rather than merely reported. A lock that
+// loses puts the player outside, which is the same idea with a longer walk.
+//
+// What is here is the skill itself: what it is measured in, what a caught hand costs, and what
+// comes out of a box. Who is worth stealing from is the town's, because a townsman is somebody two
+// skills both have a use for and only the region can see both of them.
+
+# info thieving
+version: 1.0.0
+dependencies:
+  core
+  combat
+
+// The one side of every theft the player brings. Sixty is about seven lifts in ten off a townsman
+// with nothing on and no levels; a knight at fifty-five is not worth attempting until it is.
+# stat thieving
+title: Thieving
+base: 60
+group: core.knack
+
+# skill thieving
+title: Thieving
+stat: thieving
+
+
+// Three seconds of being no use to anybody, which is what a hand caught in somebody's pocket costs.
+// A buff is an item the world inflicts rather than one anybody carries, so it is not for sale and
+// has no value.
+# item dazed
+title: Dazed
+examine: You are standing very still and hoping the moment passes.
+3s, -90% core.attack-rate, -90% thieving
+
+// --- what is worth taking ---
+
+# item polished-buttons
+title: Polished Buttons
+examine: A dozen of them cut from bone and polished, off a coat that is going to be missing a dozen buttons.
+value: 1
+
+# item gold-ring
+title: Gold Ring
+examine: Thin, plain, and warm from somebody's hand.
+value: 5
+
+# item gold-necklace
+title: Gold Necklace
+examine: A proper chain, heavy enough that whoever owns it will notice tonight.
+value: 15
+
+# item coloured-glass
+title: Coloured Glass
+examine: Cut and faceted and worth exactly what glass is worth, which whoever put it in the chest was counting on.
+value: 1
+
+# item topaz
+title: Topaz
+examine: Gold-brown and clear right through.
+value: 25
+
+# item sapphire
+title: Sapphire
+examine: Blue in the way that only one stone is blue.
+value: 50
+
+# item ruby
+title: Ruby
+examine: It is the size of a thumbnail and it is worth more than the house it was in.
+value: 150
+
+# droptable house-chest-contents
+one of:
+  6x: give: 1 polished-buttons
+  3x: give: 1 gold-ring
+  1x: give: 1 gold-necklace
+
+# droptable treasure-chest-contents
+one of:
+  8x: give: 1 coloured-glass
+  5x: give: 1 topaz
+  3x: give: 1 sapphire
+  1x: give: 1 ruby

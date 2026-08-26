@@ -92,7 +92,7 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[0]).toBe('Guide House (first-steps.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven');
-    expect(lines[3]).toBe('Health: ██████████ 30/30');
+    expect(lines[3]).toBe('Health: ██████████ 31.3/31.3');
     expect(lines).toContain('  1) [Presence] Miki: Talk to Miki');
     expect(lines).toContain('  2) [Presence] Miki: Examine');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
@@ -178,12 +178,15 @@ describe('play-cli renders what a command result says happened', () => {
       'Inventory: {}',
     ]);
     // Under the name the world gives a thing as well as the id it is addressed by: an id-only
-    // readout was the whole of what a player at this terminal ever saw of a skill or a stat.
-    expect(state[4]).toMatch(/^XP: \{"Thieving \(core\.thieving\)":0,"Melee \(core\.melee\)":0,"Cooking \(core\.cooking\)":0[,}]/);
+    // readout was the whole of what a player at this terminal ever saw of a skill or a stat. The
+    // shape is the claim rather than the list, so a skill the player picks up next month is drawn
+    // the same way with nothing edited here — and every skill they hold has to be on the line.
+    expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
+    for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
     expect(state.slice(5, 12)).toEqual([
-      'Equipped: {"Main Hand (mainhand)":null,"Off Hand (offhand)":null}',
+      'Equipped: {"Head (head)":null,"Main Hand (mainhand)":null,"Body (body)":null,"Off Hand (offhand)":null,"Gloves (gloves)":null,"Legs (legs)":null}',
       `stats: ${sheet}`,
-      'Health: ██████████ 30/30',
+      'Health: ██████████ 31.3/31.3',
       'discovered: 3',
       '  Guide House (first-steps.guide-house) at 0,0,0 -> first-steps.guide-house-upstairs, first-steps.basement',
       '  Guide House Upstairs (first-steps.guide-house-upstairs) at 0,0,1 -> first-steps.guide-house',

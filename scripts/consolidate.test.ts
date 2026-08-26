@@ -216,7 +216,7 @@ describe('a consolidation whose result does not load writes nothing either', () 
 
 describe('the command surface', () => {
   it('defaults to every .dsl under content/ but the local file, and takes an override', () => {
-    expect(contentFiles(parseArgs([]))).toEqual(shippedNames().map((name) => `${CORPUS_DIR}/${name}`));
+    expect([...contentFiles(parseArgs([]))].sort()).toEqual(shippedNames().map((name) => `${CORPUS_DIR}/${name}`).sort());
     expect(contentFiles(parseArgs([`local=${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`]))).not.toContain(`${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`);
     expect(contentFiles(parseArgs(['content=a.dsl, b.dsl']))).toEqual(['a.dsl', 'b.dsl']);
   });

@@ -10,6 +10,11 @@ export const qualify = (namespace: string | null, id: string): string => (namesp
 
 const OWNER_KINDED: ReadonlySet<string> = new Set([ACTION_MEMBER]);
 
+// Whether a key of this kind carries its module one segment in, under its owner's kind, rather than
+// as its own first word. Anything reading a module off a key has to know which of the two it is
+// looking at, and this is the one place that says.
+export const keyedUnderOwnerKind = (kind: string): boolean => OWNER_KINDED.has(kind);
+
 export const memberOwnerPrefix = (memberKind: string, ownerKind: string, owner: string): string => (OWNER_KINDED.has(memberKind) ? `${ownerKind}.${owner}` : owner);
 
 export const memberKey = (memberKind: string, ownerKind: string, owner: string, name: string): string => `${memberOwnerPrefix(memberKind, ownerKind, owner)}.${name}`;

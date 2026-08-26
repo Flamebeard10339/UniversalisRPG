@@ -253,8 +253,10 @@ const everyTake = (registry: Registry): Array<{ obj: string; objId: string; acti
 describe('every door the corpus writes that takes something from the player', () => {
   const registry = loadUniverse(shippedSources());
 
-  it('is 5 of them — three meals, the oven, and the second look in the mirror — so the two claims below are about something', () => {
-    expect(everyTake(registry).length).toBe(5);
+  // A guard against the two claims below being about nothing, and not a count of the corpus: a meal
+  // or a recipe added next month is a door like the others and should not have to be counted here.
+  it('is more than a handful of them, so the two claims below are about something', () => {
+    expect(everyTake(registry).length).toBeGreaterThan(4);
   });
 
   it('moves not one thing when the player carries nothing, because each asks before it acts', () => {

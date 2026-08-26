@@ -61,9 +61,12 @@ say: You grind the blade to a killing edge.
 # save two-blades
 {"version":${SAVE_VERSION},"equipped":{"mainhand":"1"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"blade","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"blade","payload":{"roll":0.75,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// The one thing here that does stack, worn with none left behind it.
+// The one thing here that does stack, worn with none left behind it, and the same worn with one.
 # save one-hauberk
 {"version":${SAVE_VERSION},"equipped":{"offhand":"hauberk"}}
+
+# save one-hauberk-worn-one-packed
+{"version":${SAVE_VERSION},"equipped":{"offhand":"hauberk"},"inventory":{"hauberk":1}}
 `;
 
 const registry = loadInEnglish(MODULE);
@@ -122,25 +125,42 @@ describe('a grown copy is never spent', () => {
     expect(played.grown).toEqual({ '1': 'blade' });
   });
 
-  it('refuses an action whose cost only the copy in the slot covers, and says why', () => {
+  it('refuses an action whose cost only the worn copy covers, because the plane is what cannot be spent', () => {
     const session = grownFrom('one-blade');
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'temper' });
 
     const played = view(session);
-    expect(played.said).toContain('Your Blade is the one you are wearing, and what you wear is never spent.');
+    expect(played.said).toContain('Your Blade has grown a plane of its own, and a grown item is never spent.');
     expect(played.said).not.toContain('She quenches the blade and hands it back.');
     expect(played.grown).toEqual({ '1': 'blade' });
     expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
   });
+});
 
-  it('refuses a cost a worn stack copy alone covers, and leaves it on', () => {
+// The other half of the rule above, and the reason it is about the plane rather than about the
+// slot: a plain thing on the body is held like anything else, so a cost the pack cannot cover takes
+// it off rather than turning the player away over something they are carrying.
+describe('a plain copy is spent wherever it is being kept', () => {
+  it('pays a cost out of the slot when the pack holds none, and the slot is empty after', () => {
     const session = startSession(registry);
     applyDirective(session, { kind: 'load', save: 'one-hauberk' });
     applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'mend' });
 
     const played = view(session);
-    expect(played.said).toContain('Your Hauberk is the one you are wearing, and what you wear is never spent.');
+    expect(played.said).toContain('She hammers the rings back true.');
+    expect(played.equipment).toEqual([]);
+    expect(played.inventory.hauberk).toBeUndefined();
+  });
+
+  it('spends the pack before the body, so wearing the last one is not what loses it', () => {
+    const session = startSession(registry);
+    applyDirective(session, { kind: 'load', save: 'one-hauberk-worn-one-packed' });
+    applyDirective(session, { kind: 'use', obj: 'entity', objId: 'smith', actionId: 'mend' });
+
+    const played = view(session);
+    expect(played.said).toContain('She hammers the rings back true.');
     expect(played.equipment).toEqual([{ slot: 'offhand', title: 'Offhand', item: 'hauberk', name: 'Hauberk' }]);
+    expect(played.inventory.hauberk).toBeUndefined();
   });
 
   it('refuses however many copies are held, because a base never joins the stack a cost is taken from', () => {

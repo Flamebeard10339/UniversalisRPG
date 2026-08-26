@@ -1,7 +1,11 @@
 // The engine's own furniture, which every region depends on: the stat bases, the
-// health pool and its regeneration, the factions, the skills, the equipment
-// slots, the player, the passives and cluster jewels, the droptables, the
-// generic items, and melee-combat.
+// health pool and its regeneration, the factions, the equipment slots, the
+// passives and cluster jewels, the droptables, the generic items, and
+// melee-combat.
+//
+// Not the player, and not a skill. Which skills a character has is a fact about
+// the world they are in rather than about the engine, and a skill is one module
+// each — so the region that knows all of them is the one that says who you are.
 //
 // Nothing here stands anywhere. A location, an entity that occupies one, or a
 // line somebody says belongs to the region it happens in, so this module holds
@@ -200,16 +204,10 @@ colour: #94a3b8
 # flag fainted
 
 // --- skills ---
-
-# skill thieving
-stat: attack
-
-# skill melee
-stat: attack
-
-# skill cooking
-
-# skill fishing
+//
+// One skill is one module, and each of them declares the stat it raises, the ways it is trained and
+// the gear it is trained in, and puts itself on the player from there. What is left here is the one
+// this town has never given anybody a second way to practise.
 
 # skill woodcutting
 
@@ -236,13 +234,29 @@ stat: attack
 // words the equipment page draws, where on the body it draws them, and the keys
 // a translation answers. The body is three columns wide because the hands stand
 // either side of a torso; a slot added down the middle needs no other change.
+# slot head
+title: Head
+at: 2 1
+
 # slot mainhand
 title: Main Hand
-at: 1 1
+at: 1 2
+
+# slot body
+title: Body
+at: 2 2
 
 # slot offhand
 title: Off Hand
-at: 3 1
+at: 3 2
+
+# slot gloves
+title: Gloves
+at: 1 3
+
+# slot legs
+title: Legs
+at: 2 3
 
 // --- stations ---
 
@@ -676,107 +690,3 @@ one of:
   1x:
     give: 1 rats-eye-gem
     say: Something glints in the dust, and it is looking back at you.
-
-// --- the player ---
-
-// The player is an entity like any other, and declares everything that measures
-// it. The global `# stat` bases above are what something that names none falls
-// back to; they stopped being this sheet.
-//
-// The swing varies because the arm does, not because the weapon does: `attack`
-// is a range here for the same reason the rat writes `attack 6-8` on its own
-// sheet, and an unarmed player is as uneven as an armed one. Every level of
-// `melee` shifts both ends by one, and a weapon's `+n attack` shifts both ends
-// again, so *base plus level* reads straight off this line.
-# entity player
-title: You
-faction: player
-stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
-skills: melee, cooking, thieving
-equipment-slots: mainhand, offhand
-uses: melee-combat
-on death:
-  say: You slump to the floor, spent, and come to a long while later back where you started out. (You should have eaten something.)
-  set: fainted
-  restore: health
-  if setting.hardcore:
-    say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
-    take: everything
-  relocate: starting-location
-  stop
-
-// --- recipes ---
-
-# recipe dough
-in: jug-of-water, pot-of-flour
-out: dough
-skill: cooking 2
-time: 2
-say: You knead water and flour into a ball of dough.
-
-# recipe bread
-station: oven
-in: dough
-out: bread
-skill: cooking 4
-time: 3
-say: The oven bakes your dough into a golden loaf.
-
-# recipe cooked-herring
-station: stove
-in: herring
-out: cooked-herring
-skill: cooking 3
-time: 4
-say: You grill the herring through, which is the only way it is worth eating.
-
-// --- tests ---
-
-// `# stat max-health` above declares no base at all, so a thirty read off the
-// player is the player's own line and could have come from nowhere else — which
-// is the whole of what the global bases stopping being anyone's sheet means.
-// The pool takes its ceiling from the same place, so the second line says the
-// resource reads the entity rather than the stat table.
-# test the-players-own-sheet-is-what-the-engine-reads
-assert: stat.max-health = 30
-assert: resource.health = 30
-
-// The one thing in the corpus that empties the player's own pool on purpose. A
-// claim about what fainting does needs a faint, and the only other way to one is
-// a fight somewhere, which would make this a claim about that fight's numbers as
-// much as about the death handler. A thousand is more than any sheet will carry.
-# item deaths-door
-DEBUG
-step-through:
-  drain: 1000 health
-
-// Every shape a holding takes: a stack, two things standing alone, a rolled
-// blade in a row of its own, and a second blade on the arm rather than in the
-// pack. The two are one template and neither joins the other: a level is rolled
-// per copy, and that is the whole of why a base does not stack.
-# save four-rows-and-a-blade-worn
-DEBUG
-{"version":13,"inventory":{"core.bent-coin":2,"core.rats-eye-gem":1,"core.deaths-door":1},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.75,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
-
-// The difference hardcore makes, stated as a difference: the same faint down the
-// same handler leaves all five holdings standing with it off and none of them
-// with it on, and the player comes back at the full thirty either way. A run
-// that asserted only the empty pack would pass in a world where fainting always
-// emptied it. `inventory.<item>` counts a stack, a grown copy and a worn one
-// alike, so the two blades are the one in the pack and the one on the arm.
-# test hardcore-death-empties-five-holdings-a-plain-faint-leaves-standing
-DEBUG
-load: four-rows-and-a-blade-worn
-use: item.deaths-door.step-through
-assert: inventory.bent-coin = 2
-assert: inventory.rats-eye-gem = 1
-assert: inventory.iron-sword = 2
-assert: resource.health = 30
-load: four-rows-and-a-blade-worn
-setting: hardcore on
-use: item.deaths-door.step-through
-assert: inventory.bent-coin = 0
-assert: inventory.rats-eye-gem = 0
-assert: inventory.iron-sword = 0
-assert: inventory.deaths-door = 0
-assert: resource.health = 30

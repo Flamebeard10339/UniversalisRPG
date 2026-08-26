@@ -1,0 +1,192 @@
+// Crafting — everything the town wears and uses that is not made of metal, made out of what came off
+// the things it was made of.
+//
+// Where smithing buys its stock over a counter, crafting is paid for by having been somewhere: hide
+// off the cattle, pelt off the wolves, feather off the chickens, gut off whatever was on the slab.
+// It needs no station at all — a knife and a lap is the whole of the workshop — so every recipe here
+// is one a player can run standing in the room they got the material in.
+//
+// It is also where fishing's tackle comes from, which is the one place two of these skills touch: a
+// line is a crafted thing that is spent by fishing, so a player who fishes either buys line forever
+// or learns to make it.
+
+# info crafting
+version: 1.0.0
+dependencies:
+  core
+  combat
+  fishing
+
+// The cadence every recipe here runs at, the way `smithing` is for the anvil. Nothing crafted can be
+// spoiled, so what the levels buy is the speed of the pile.
+# stat crafting
+title: Crafting
+base: 30
+group: core.knack
+
+# skill crafting
+title: Crafting
+stat: crafting
+
+
+// --- what a hide becomes on the way ---
+
+# item leather
+title: Leather
+examine: Tanned, trimmed square, and it still curls at the corners if you leave it alone.
+value: 20
+
+# item sinew
+title: Sinew
+examine: Dried and split into threads. It goes stiff in the cold and holds anything.
+value: 6
+
+# item wolfskin
+title: Wolfskin
+examine: A pelt cured with the guard hairs left on, which is the whole point of a wolfskin.
+value: 40
+
+# item quill
+title: Quill
+examine: A cut feather. Fletchers want them by the hundred and so, it turns out, does anybody making a line.
+value: 2
+
+// --- the leathers, which are the tier below bronze ---
+
+# item leather-coif
+title: Leather Coif
+examine: A hood of it, laced under the chin, and it will stop precisely one thing once.
+slot: head
+value: 22
+armour, +1 core.defense, +2 core.max-health
+
+# item leather-body
+title: Leather Body
+examine: A hardened jerkin. Cheap, quiet, and it does not rust in the sewer.
+slot: body
+value: 34
+armour, +2 core.defense, +1 core.max-health
+
+# item leather-chaps
+title: Leather Chaps
+examine: Over the knee and laced at the back, and every wolf in the pinewood has been through a pair.
+slot: legs
+value: 28
+armour, +2 core.defense
+
+# item leather-gloves
+title: Leather Gloves
+examine: Close-cut, thin at the fingers, made by somebody who had to keep working in them.
+slot: gloves
+value: 24
+armour, +1 core.defense, +1 core.max-health
+
+# item wolfskin-gloves
+title: Wolfskin Gloves
+examine: Fur to the wrist and leather in the palm. Nothing you do in these is quick, and nothing you do in these is cold.
+slot: gloves
+requires: level.crafting >= 15
+value: 90
+armour, +2 core.defense, +4 core.max-health
+
+// --- turning what you killed into what you can use ---
+
+# recipe leather
+in: 1 combat.cowhide
+out: 1 leather
+skill: crafting 18
+rate: crafting
+say: You scrape the hide down, work it soft, and cut what is left square.
+
+# recipe sinew
+in: 1 combat.raw-beef
+out: 2 sinew
+skill: crafting 10
+rate: crafting
+say: You strip the sinew out along the grain of the meat and hang it to dry.
+
+# recipe wolfskin
+in: 1 combat.wolf-pelt
+out: 1 wolfskin
+skill: crafting 30
+rate: crafting
+say: The guard hairs stay on, which means the whole thing has to be cured twice.
+
+# recipe quill
+in: 3 combat.feather
+out: 1 quill
+skill: crafting 4
+rate: crafting
+say: You strip and square the feather down to the shaft.
+
+# recipe leather-coif
+in: 1 leather, 1 sinew
+out: 1 leather-coif
+skill: crafting 26
+rate: crafting
+say: You lace it under the chin and it fits nobody, which is normal.
+
+# recipe leather-gloves
+in: 1 leather, 2 sinew
+out: 1 leather-gloves
+skill: crafting 34
+rate: crafting
+say: Four fingers and a thumb, and the thumb takes as long as the fingers.
+
+# recipe leather-chaps
+in: 2 leather, 2 sinew
+out: 1 leather-chaps
+skill: crafting 46
+rate: crafting
+say: You cut them long and lace them at the back, because that is where the wolf is not.
+
+# recipe leather-body
+in: 3 leather, 3 sinew
+out: 1 leather-body
+skill: crafting 62
+rate: crafting
+say: Hardened in wax, and it takes the shape of whoever is standing in it when it cools.
+
+# recipe wolfskin-gloves
+in: 2 wolfskin, 1 leather, 2 sinew
+out: 1 wolfskin-gloves
+skill: crafting 120
+rate: crafting
+say: Fur out, leather in the palm, and the seam hidden along the side of the finger.
+
+// --- the tackle, which is fishing's and is made here ---
+
+# recipe gut-line
+in: 2 sinew
+out: 1 fishing.gut-line
+skill: crafting 14
+rate: crafting
+say: Two lengths of it twisted against each other, which is the whole of a gut line.
+
+# recipe braided-fiber-line
+in: 4 sinew, 1 quill
+out: 1 fishing.braided-fiber-line
+skill: crafting 40
+rate: crafting
+say: Four strands round a quill core, laid so no one of them ever takes the whole pull.
+
+# recipe horsehair-line
+in: 6 sinew, 3 quill, 1 leather
+out: 1 fishing.horsehair-line
+skill: crafting 96
+rate: crafting
+say: It takes an afternoon and one horse's worth of patience, and it will outlast three of anything else.
+
+# recipe small-fishing-net
+in: 6 sinew
+out: 1 fishing.small-fishing-net
+skill: crafting 22
+rate: crafting
+say: Knotted square, mesh by mesh, until it is the size of the fish you have in mind.
+
+# recipe large-fishing-net
+in: 14 sinew, 1 leather
+out: 1 fishing.large-fishing-net
+skill: crafting 70
+rate: crafting
+say: The same knot four hundred more times, and a leather edge so the weight of it does not tear the mesh.

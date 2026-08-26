@@ -278,7 +278,9 @@ describe('core health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
     const full = state.resources['core.health'];
-    expect(full).toBe(toMilliUnits(30));
+    // The thirty on the player's own sheet, and the level of Health they stand at, which is worth a
+    // flat point of it and a percent of the whole.
+    expect(full).toBe(toMilliUnits(31.31));
 
     state.location = 'first-steps.basement';
     useFight('core.melee-combat', 'first-steps.giant-rat', registry, state);

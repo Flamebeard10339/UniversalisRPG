@@ -2,7 +2,7 @@ import type { ModalChoice, ModalOption } from './modalOption';
 import { isBase, Item } from '../content/sections/item';
 import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
-import { equip, unequip } from './equipment';
+import { equip, unequip, wearable } from './equipment';
 import { Answer, Localized, itemExamine, Localizer, localizerOf } from './localized';
 import { destroyItem, itemTemplate } from './itemInstance';
 import { carriedEntries, carriedFrame, type CarriedEntry } from './carried';
@@ -18,7 +18,7 @@ const CONFIRMED_SHOWN: EngineKey = 'engine.carried.confirmed';
 interface CarriedVerb {
   readonly value: Answer;
   readonly shown: EngineKey;
-  applies(item: Item | undefined, entry: CarriedEntry): boolean;
+  applies(item: Item | undefined, entry: CarriedEntry, state: GameState, registry: Registry): boolean;
   confirms(entry: CarriedEntry): boolean;
   take(entry: CarriedEntry, state: GameState, registry: Registry): ModalFrame | null;
 }
@@ -34,7 +34,7 @@ const VERBS: readonly CarriedVerb[] = [
   {
     value: 'equip',
     shown: 'engine.carried.verb.equip',
-    applies: (item, entry) => item?.slot !== undefined && entry.worn === undefined,
+    applies: (item, entry, state, registry) => item?.slot !== undefined && entry.worn === undefined && wearable(state, registry, entry.id),
     confirms: () => false,
     take: (entry, state, registry) => {
       equip(state, registry, entry.id);
@@ -65,7 +65,7 @@ const VERBS: readonly CarriedVerb[] = [
 
 function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): readonly CarriedVerb[] {
   const item = registry.items.get(itemTemplate(state, entry.id));
-  return VERBS.filter((verb) => verb.applies(item, entry));
+  return VERBS.filter((verb) => verb.applies(item, entry, state, registry));
 }
 
 function heading(localizer: Localizer, entry: CarriedEntry, state: GameState): Localized {

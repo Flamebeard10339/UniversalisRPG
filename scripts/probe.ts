@@ -9,12 +9,15 @@ import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } f
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 import { createGameState } from '../src/runtime/state';
 import { runTest } from '../src/runtime/session';
+import { serializeSave } from '../src/runtime/save';
+import { endSaveId } from '../src/runtime/runLog';
 
 export type RoundTripMode = 'universe' | 'module';
 
 export interface ProbeOptions {
   show: string[];
   test?: string[];
+  record?: string[];
   roundTrip: boolean;
   roundTripMode?: RoundTripMode;
   each?: boolean;
@@ -34,10 +37,15 @@ const SHOWABLE = new Map<string, string>(contentSectionMaps());
 export const DOCUMENT_SEPARATOR = '---';
 
 const usage = [
-  'Usage: npm run probe -- <source>... [--show <kind>.<id>] [--test <id>] [--round-trip] [--each]',
+  'Usage: npm run probe -- <source>... [--show <kind>.<id>] [--test <id>] [--record <id>] [--round-trip] [--each]',
   '',
   '  <source>       a DSL file, a directory of them, or - to read from stdin',
   '  --show         print one registry record as JSON; repeatable',
+  '  --record       run one # test and print the state it ends on as the # save section',
+  '                 an expect: sheet is written from, named as runLog names one;',
+  '                 repeatable.',
+  '                 A route whose content changed on purpose is re-recorded with this',
+  '                 and the printed section replaces the one in the file.',
   '  --test         run one # test and report PASSED/FAILED; repeatable. An id',
   '                 that names no test but stands as a prefix over some — a',
   '                 module id — runs every test under it',
@@ -78,6 +86,10 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--show wants a <kind>.<id> after it');
       args.show.push(spec);
+    } else if (arg === '--record') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--record wants a # test id after it');
+      (args.record ??= []).push(spec);
     } else if (arg === '--test') {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--test wants a # test id after it');
@@ -90,7 +102,7 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
   }
   if (args.sources.length === 0) throw new Error(`name at least one source\n\n${usage}`);
   if (args.sources.filter((source) => source === '-').length > 1) throw new Error('stdin can only be read once — pass - at most once, and split the body on a line of ---');
-  if (args.each && (args.show.length > 0 || args.test!.length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show, --test or --round-trip');
+  if (args.each && (args.show.length > 0 || args.test!.length > 0 || (args.record ?? []).length > 0 || args.roundTrip)) throw new Error('--each surveys sources one at a time, so it cannot be combined with --show, --test or --round-trip');
   return args;
 }
 
@@ -151,6 +163,35 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
       })();
       lines.push(failure === null ? `${id}: PASSED` : `${id}: FAILED — ${failure}`);
       if (failure !== null) ok = false;
+    }
+  }
+  return { lines, ok };
+}
+
+// A route's end state, written the way a `# save` writes one. `runTest` leaves the state it walked
+// to, so recording a sheet is running the route and serializing what it stopped on — there is no
+// second reading of the world here, which is the whole reason a re-recorded sheet can be trusted.
+// What such a save is called is `runLog`'s, and asked of it rather than spelled again.
+function recordTests(registry: Registry, specs: readonly string[]): { lines: string[]; ok: boolean } {
+  const lines: string[] = [];
+  let ok = true;
+  for (const spec of specs) {
+    const named = testsNamed(registry, spec);
+    if (named.length === 0) {
+      lines.push(`${spec}: no # test with that id, and none under it.`);
+      ok = false;
+      continue;
+    }
+    for (const id of named) {
+      const state = createGameState();
+      try {
+        runTest(id, registry, state);
+      } catch (error) {
+        lines.push(`${id}: threw before it could be recorded — ${error instanceof Error ? error.message : String(error)}`);
+        ok = false;
+        continue;
+      }
+      lines.push(`# save ${endSaveId(id.split('.').pop()!)}`, serializeSave(state, registry), '');
     }
   }
   return { lines, ok };
@@ -228,6 +269,13 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   const named = options.test ?? [];
   if (named.length > 0) {
     const ran = runTests(loaded.registry, named);
+    lines.push('', ...ran.lines);
+    if (!ran.ok) ok = false;
+  }
+
+  const recorded = options.record ?? [];
+  if (recorded.length > 0) {
+    const ran = recordTests(loaded.registry, recorded);
     lines.push('', ...ran.lines);
     if (!ran.ok) ok = false;
   }

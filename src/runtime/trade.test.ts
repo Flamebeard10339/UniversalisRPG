@@ -220,7 +220,7 @@ describe('a grown copy sells for what its base is worth', () => {
     expect(wanted(shopOf('stall'), state, registry)).toEqual([]);
     expect(sell(shopOf('stall'), state, registry, copy, 1)).toBe('not-carried');
     expect(state.inventory.coin ?? 0).toBe(0);
-    expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 0, worn: 1 });
+    expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
   });
 
   it("draws the copy on the counter under the copy's own name, not its base's", () => {

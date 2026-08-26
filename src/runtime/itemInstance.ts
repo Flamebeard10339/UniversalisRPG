@@ -82,6 +82,9 @@ export function carriesItem(state: GameState, id: string): boolean {
   return copiesOf(state, id).stack > 0;
 }
 
+// Every copy the player has falls in exactly one of these: a depth of the stack, a grown copy
+// wherever it is standing, or a plain one on the body. `grown` counts a worn one too, because what
+// makes a grown copy unspendable is the plane on it and not where it is being kept.
 export interface Copies {
   stack: number;
   grown: number;
@@ -102,10 +105,10 @@ export function itemCopies(state: GameState): Map<string, Copies> {
   for (const [id, count] of Object.entries(state.inventory)) {
     if (count > 0) entry(id).stack = count;
   }
-  for (const [id, template] of Object.entries(grownItems(state))) {
-    if (wornIn(state, id) === undefined) entry(template).grown += 1;
+  for (const template of Object.values(grownItems(state))) entry(template).grown += 1;
+  for (const worn of Object.values(state.equipped)) {
+    if (grown(state, worn) === undefined) entry(itemTemplate(state, worn)).worn += 1;
   }
-  for (const worn of Object.values(state.equipped)) entry(itemTemplate(state, worn)).worn += 1;
   return items;
 }
 
@@ -113,9 +116,12 @@ export function copiesOf(state: GameState, itemId: string): Copies {
   return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
-// A grown copy is a thing in its own right and a worn one is on the player, so neither is a unit of the stack and neither can be handed over by name — which is the count `handOver` moves and the only count anything parting with an item may ask for.
+// A grown copy is a thing in its own right rather than a unit of anything, so it is never handed
+// over by name. A plain one is, wherever it is being kept: what is worn comes off to pay a cost the
+// pack alone cannot, which is the count `handOver` moves and the only count anything parting with an
+// item may ask for.
 export function spendable(copies: Copies): number {
-  return copies.stack;
+  return copies.stack + copies.worn;
 }
 
 export function spendableCount(state: GameState, itemId: string): number {
@@ -227,8 +233,12 @@ export class HandOver {
   }
 }
 
+// The stack goes first and the body only for what the stack could not cover, so wearing the last one
+// is what it costs to keep it and never a way of losing it early.
 export function handOver(state: GameState, parting: HandOver): number {
-  return -writeStack(state, parting.item, -parting.count);
+  let gone = -writeStack(state, parting.item, -parting.count);
+  while (gone < parting.count && destroyItem(state, parting.item).ok) gone += 1;
+  return gone;
 }
 
 // What the player is holding, in the terms a change to it would have to move. Compared against what

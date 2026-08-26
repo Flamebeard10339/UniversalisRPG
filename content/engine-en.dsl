@@ -23,7 +23,6 @@ engine.requires.unmet: You cannot do that yet.
 engine.target.absent: There is no {target} here.
 engine.inputs.short: You don't have enough {item}.
 engine.inputs.grown: Your {item} has grown a plane of its own, and a grown item is never spent.
-engine.inputs.worn: Your {item} is the one you are wearing, and what you wear is never spent.
 engine.combat.player.hit: You hit the {target} for {damage}.
 engine.combat.player.miss: You miss the {target}.
 engine.combat.foe.hit: The {attacker} hits you for {damage}.
@@ -57,6 +56,7 @@ engine.growth.unknown-item: there is no item or item instance called {item}
 engine.growth.not-a-base: {item} is not a base: only an item you can wear has a plane to grow
 engine.growth.not-a-jewel: {item} is not a cluster jewel
 engine.pack.full: Your pack is full, so the {item} stays where it is.
+engine.equip.requires: You are not the {item}'s match yet, and it stays in your pack.
 engine.plane.base: Base
 engine.plane.go: Go to {hex}
 engine.plane.slot: slot: {direction} with {jewel}

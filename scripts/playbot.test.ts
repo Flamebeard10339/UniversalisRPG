@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
-import { moduleSource, shippedFiles } from '../src/content/shipped';
+import { moduleSource, shippedFiles, standingSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { journalWindowText, NOTE_FIELDS, runAsSections, runId, type RunLogEntry } from '../src/runtime/runLog';
@@ -30,10 +30,11 @@ import {
   type TurnRequest,
 } from './playbot';
 
-// The island and quest actually played: standing Tulsa, plus the tutorial quest module —
-// deliberately not the whole shipped corpus, so the archetype pack Tulsa names optionally is
-// absent and a run here never meets a jewel.
-const PLAYED_MODULES = ['core', 'tulsa', 'first-steps'];
+// The island and quest actually played: the standing world and nothing else — deliberately not the
+// whole shipped corpus, so the archetype pack Tulsa names optionally is absent and a run here never
+// meets a jewel. Read off the corpus rather than listed, so a module the tutorial comes to lean on
+// is played here the day it does.
+const PLAYED_MODULES = standingSources().map((source) => source.name);
 
 // The island and quest actually played, same corpus session.test.ts drives.
 const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), ...PLAYED_MODULES.map(moduleSource)];

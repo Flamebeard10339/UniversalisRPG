@@ -426,7 +426,7 @@ describe('cancelAction', () => {
     const session = primed(tutorial(), { inventory: { 'core.dough': 2 } });
     readRoom(session);
 
-    beginAction(session, 'craft:core.bread');
+    beginAction(session, 'craft:cooking.bread');
     const baked = wait(session, 4);
     expect(baked.inventory['core.bread']).toBe(1);
     expect(baked.action).not.toBeNull();

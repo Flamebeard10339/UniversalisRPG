@@ -154,7 +154,7 @@ describe('the GUI driver', () => {
     const driver = createDriver(SHIPPED_SOURCES);
     // A pack with something in it, which is the one of the three doors a fresh session cannot open.
     driver.send('/dev on');
-    driver.send('/load core.four-rows-and-a-blade-worn');
+    driver.send('/load tulsa.four-rows-and-a-blade-worn');
     const opening: Array<[string, () => void]> = [
       ['quest-journal', () => driver.readQuest(shown(driver).journal[0]!.quest)],
       ['stat-breakdown', () => driver.readStat(shown(driver).stats[0]!.id)],
