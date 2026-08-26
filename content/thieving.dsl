@@ -24,6 +24,15 @@ title: Thieving
 base: 60
 group: core.knack
 
+// How often a hand goes out, which is a stat rather than a number on each pocket
+// so that something can take it away. A rate that resolves to zero stalls the run
+// outright — the bar stops rather than crawls — and that is the whole of what
+// being caught is meant to feel like.
+# stat thieving-rate
+title: Thieving Speed
+base: 30
+group: core.upkeep
+
 # skill thieving
 title: Thieving
 stat: thieving
@@ -31,11 +40,12 @@ stat: thieving
 
 // Three seconds of being no use to anybody, which is what a hand caught in somebody's pocket costs.
 // A buff is an item the world inflicts rather than one anybody carries, so it is not for sale and
-// has no value.
+// has no value. The hundred off `thieving-rate` is what stops the hand rather than slowing it: a
+// pace of zero is a stalled run, so the three seconds are three seconds of standing there.
 # item dazed
 title: Dazed
 examine: You are standing very still and hoping the moment passes.
-3s, -90% core.attack-rate, -90% thieving
+3s, -90% core.attack-rate, -90% thieving, -100% thieving-rate
 
 // --- what is worth taking ---
 
