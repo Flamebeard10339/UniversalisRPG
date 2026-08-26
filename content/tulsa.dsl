@@ -107,7 +107,7 @@ lift an axe off the rack:
 # location market-rooftops
 x: 4, y: 0, z: 1
 title: Market Rooftops
-examine: Tile and thatch, and the castle's upper windows across the way. @@@ Attention to Detail wants a vantage on the duke from up here; the watch is written and what it is worth seeing is that quest's to say.
+examine: Tile and thatch, and the castle's upper windows across the way.
 adjacent:
   market-row
 watch the castle windows:
@@ -321,7 +321,7 @@ entities:
 # location hive-mouth
 x: 10, y: 3
 title: The Third Hive
-examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee. @@@ Birds and the Bees wants this instanced and reset on entry; the engine has no instancing, so it is one ordinary room and the boss it holds belongs to that quest.
+examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee.
 adjacent:
   apiary-field
 look into the comb:
@@ -495,7 +495,7 @@ title: Oolga's Counter
 examine: A counter with nothing on it. Everything worth buying is on the shelves behind her, and the shelves are not for you.
 ask after her wares:
   instant
-  say: Oolga looks at the shelves, then at you, and puts her back to them. Nothing behind her is for sale, and she does not say what would change that. @@@ Kill it with Fire is what opens this counter; until that module is loaded there is nothing to sell you.
+  say: Oolga looks at the shelves, then at you, and puts her back to them. Nothing behind her is for sale, and she does not say what would change that.
 
 // --- stations and props ---
 
@@ -567,7 +567,7 @@ unlock with the key:
 
 # entity key-table
 title: Table
-examine: A table with a key on it, and a book beside the key. @@@ Ball of a Boy wants the book to hold the procedure for turning a man into a ratman; the words are that quest's to write.
+examine: A table with a key on it, and a book beside the key.
 flags: taken
 take the key:
   instant
@@ -578,7 +578,7 @@ take the key:
 
 # entity anvil
 title: Anvil
-examine: A good anvil, cold. It is not yours to use. @@@ A Grand Blade is what earns the use of it.
+examine: A good anvil, cold. It is not yours to use.
 stations: anvil
 strike it:
   instant
@@ -649,7 +649,7 @@ take the leaf:
 
 # entity dumped-crates
 title: Dumped Crates
-examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a scatter of insect eggs, broken and badly wrong. @@@ The Swampy Menace wants this to be found in the order the herbs are; the crates say it plainly instead.
+examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a scatter of insect eggs, broken and badly wrong.
 
 // --- what is already hostile ---
 
