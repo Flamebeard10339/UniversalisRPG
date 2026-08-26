@@ -10,7 +10,7 @@ import { applyDirective, startSession, view } from './session';
 import { copiesOf, heldCount, itemInstance, itemLevel, itemTemplate, packRows, receiveItem } from './itemInstance';
 import { equip } from './equipment';
 import { rowAnswer, shopFrame, shopOptions } from './shopScreen';
-import { buy, coinHeld, countProblem, forSale, sell, stockNow, wanted } from './trade';
+import { buy, coinHeld, countAsked, forSale, sell, stockNow, wanted } from './trade';
 
 const MINUTE = 60_000;
 
@@ -300,9 +300,15 @@ describe('replenishing runs on simulated time', () => {
 });
 
 describe('how many is a number of things', () => {
-  it('refuses everything that is not a whole number above zero', () => {
-    for (const written of ['', 'close', '0', '-2', '1.5', 'two', '3x']) expect(countProblem(written), written).toBe('not-a-count');
-    for (const written of ['1', '23', ' 7 ']) expect(countProblem(written), written).toBeUndefined();
+  it('reads a whole number and nothing else, zero among them', () => {
+    for (const written of ['', 'close', '-2', '1.5', 'two', '3x']) expect(countAsked(written), written).toBeUndefined();
+    for (const [written, count] of [
+      ['0', 0],
+      ['1', 1],
+      ['23', 23],
+      [' 7 ', 7],
+    ] as const)
+      expect(countAsked(written), written).toBe(count);
   });
 });
 

@@ -9,10 +9,15 @@ export interface Answer {
   value: string;
 }
 
+// A screen is left by answering the question it is asking with the value it says it leaves by, so a
+// question that is not offering that value cannot be left that way. A screen taking free text offers
+// nothing and takes anything: there is no list for the word to be missing from, and the screen's own
+// submit is what makes sense of it — which is the only way out a typed question has.
 export function dismissal(modals: readonly Modal[]): Answer | null {
   const leaving = modals[modals.length - 1]?.leaving;
   const asking = askedOption(modals);
-  if (!leaving || !asking?.values?.some((choice) => choice.value === leaving)) return null;
+  if (!leaving || !asking) return null;
+  if (asking.values !== null && !asking.values.some((choice) => choice.value === leaving)) return null;
   return { key: asking.key, value: leaving };
 }
 
