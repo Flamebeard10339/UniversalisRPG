@@ -996,15 +996,13 @@ on death:
     take: everything
   relocate: starting-location
   stop
+// A pool going empty is the player's, so the handler for it is the player's; what an emptied line
+// costs is fishing's, and `fishing.parted-tackle` is where fishing says it. A seventh net is added
+// beside the other six and nothing here is touched.
 on line-parted:
   say: The line goes slack in your hands, and what was on the end of it is somewhere under the water with the fish.
   restore: fishing.line-health
-  take: 1 fishing.small-fishing-net
-  take: 1 fishing.large-fishing-net
-  take: 1 fishing.gut-line
-  take: 1 fishing.braided-fiber-line
-  take: 1 fishing.horsehair-line
-  take: 1 fishing.steel-line
+  roll: fishing.parted-tackle
 
 // --- recipes ---
 

@@ -123,6 +123,29 @@ slot: gloves
 value: 60
 tackle, +5 max-line-health, +100% max-line-health, -6 fishing
 
+// What an emptied line takes with it, which is every piece of tackle above that grants a line to
+// empty. Nothing in the language selects an item by the keyword it carries, so this is a list — but
+// it is a list six lines under its own subjects, so a seventh net is a section here and a line here
+// and nothing in another module has to be remembered. `tulsa.player`'s `on line-parted:` rolls it,
+// because a pool going empty is the player's and what it costs is fishing's.
+# droptable parted-tackle
+take: 1 small-fishing-net
+take: 1 large-fishing-net
+take: 1 gut-line
+take: 1 braided-fiber-line
+take: 1 horsehair-line
+take: 1 steel-line
+
+// The one thing two waters both do, and the only part of a cast that is neither the fish nor the
+// water: a rod eats a strip every time the deep water wins. Both `cast for` blocks below roll this
+// rather than restating it.
+# droptable spend-bait
+if has wrigglers:
+  3 in 4:
+    take: 1 wrigglers
+if not has wrigglers:
+  take: 1 dried-fish-bait
+
 // --- what comes out of the water ---
 
 # item raw-shrimp
@@ -189,11 +212,7 @@ cast for trout:
   continuous
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 20
-  if has wrigglers:
-    3 in 4:
-      take: 1 wrigglers
-  if not has wrigglers:
-    take: 1 dried-fish-bait
+  roll: spend-bait
   one of:
     fishing:
       give: 1 raw-trout
@@ -209,11 +228,7 @@ cast for salmon:
   continuous
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 20
-  if has wrigglers:
-    3 in 4:
-      take: 1 wrigglers
-  if not has wrigglers:
-    take: 1 dried-fish-bait
+  roll: spend-bait
   one of:
     fishing:
       give: 1 raw-salmon
