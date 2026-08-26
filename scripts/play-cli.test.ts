@@ -93,7 +93,7 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
     expect(lines[3]).toBe('Health: ██████████ 31.3/31.3');
-    expect(lines).toContain('  1) [Presence] Miki: Talk to Miki');
+    expect(lines).toContain('  1) [Presence] Miki: Talk');
     expect(lines).toContain('  2) [Presence] Miki: Examine');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
   });

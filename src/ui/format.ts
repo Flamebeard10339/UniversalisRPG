@@ -10,13 +10,7 @@ export function fillPercent(current: number, max: number): number {
   return max > 0 ? Math.min(100, Math.max(0, (current / max) * 100)) : 0;
 }
 
-export function tidy(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
-}
-
-export function signed(value: number): string {
-  return value < 0 ? tidy(value) : `+${tidy(value)}`;
-}
+export { signed, tidy } from '../runtime/figures';
 
 // `×3` beside a bar is how a reader tells a fresh foe at full health from the one they were hitting
 // healing itself back up. A numeral reads the same in every language a pool line is written in, so

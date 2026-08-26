@@ -112,6 +112,26 @@ of the one thing this repo spends 11.5% of its commits undoing. Shape B is what 
 repo's own doctrine selects and should be taken the next time a driver is open for
 another reason, not on its own account.
 
+**Measured again on 2026-08-26, and the hole is wider than one mutant.** A lane
+rebuilding the shop found that `stats[].from[].title` carries
+`["Base","Attack","Elf","Health", ...]` — every word of which is also held by
+`stats[].title` or `player.race.title`. So `drawnHere` never proves that path for
+**any** driver and `driftingPaths` filters it as "drawn by none". The terminal was
+missing a whole screen and the harness was structurally incapable of noticing.
+
+What the lane did about it is a third option this line did not have. Rather than
+declaring aliases or rekeying every driver, it added a claim beside the
+word-counting one: the walk opens all nine screens and compares what it opened
+against `MODAL_NAMES` **read off the engine**. That is a reachability claim, not a
+word claim — it asks whether a surface can get to a screen at all, which is the
+question the word counter cannot ask. It was verified by reinstating the
+terminal's gap and watching it fail. Cost: each driver now walks once, memoized,
+so the larger script runs faster than the old one (2.9s against 3.7s).
+
+That does not answer this line, but it changes what is left of it. Reachability
+is now covered; what is still unproved is whether the *words* on a reached screen
+are the right ones when two paths share them.
+
 *Moves when: the owner picks a shape, or accepts the recommendation and this line is
 deleted, with the commit that deletes it naming the blind spot and naming B as its
 answer if it ever matters.*

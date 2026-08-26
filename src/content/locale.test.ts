@@ -80,7 +80,7 @@ describe('what a locale covers, and what it invents (c7)', () => {
 
   it('says nothing about a translation that does match, engine key or content key', () => {
     expect(unmatchedLocaleKeys(translated().locales)).toEqual([]);
-    expect(unmatchedLocaleKeys(loadModule('# locale es\nengine.talk.to: Habla con {entity}\n').locales)).toEqual([]);
+    expect(unmatchedLocaleKeys(loadModule('# locale es\nengine.travel.to: Viaja a {destination}\n').locales)).toEqual([]);
   });
 
   it('answers which keys a language does not cover, without a view', () => {

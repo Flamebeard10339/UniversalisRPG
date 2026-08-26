@@ -878,8 +878,8 @@ describe('nothing a player answers with carries words', () => {
       const open = view(session).modals;
       const top = open[open.length - 1];
       const asking = askedOption(open);
-      // A screen that names no way out is one there is no leaving early — character creation is answered, a dialogue menu is chosen — and says so by publishing none.
-      if (top?.leaving && asking) leavable.push({ name: top.name, offers: (asking.values ?? []).some((choice) => choice.value === top.leaving) });
+      // A screen that names no way out is one there is no leaving early — character creation is answered, a dialogue menu is chosen — and says so by publishing none. A screen taking free text offers the way out by taking anything: there is no list for it to be missing from.
+      if (top?.leaving && asking) leavable.push({ name: top.name, offers: asking.values === null || asking.values.some((choice) => choice.value === top.leaving) });
     };
 
     applyDirective(session, { kind: 'open-modal', modal: 'name-yourself' });

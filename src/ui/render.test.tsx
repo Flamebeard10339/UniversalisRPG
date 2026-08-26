@@ -34,11 +34,9 @@ const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, 
 
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'use:entity.first-steps.oven.roast-chestnuts';
+const ROAST = 'craft:cooking.roasted-chestnut';
 const TALK = 'talk:first-steps.miki';
 
-// The corpus grants no raw chestnut, so the only continuous action it ships is
-// offered to nobody until this save puts the ingredient in hand.
 const STOCKED = { kind: 'load', save: 'first-steps.chestnuts-in-hand' } as const;
 
 const readable = (html: string): string[] => htmlRuns(html).filter((run) => /[A-Za-z]/.test(run));
