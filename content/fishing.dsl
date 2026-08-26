@@ -26,13 +26,13 @@ dependencies:
 # stat fishing
 title: Fishing
 base: 60
-group: core.knack
+group: core.skilling
 
 // Deliberately without a base, like `max-health`: a player wearing no tackle has no line to lose,
 // and `line-health` is not a pool they have at all until something grants this.
 # stat max-line-health
 title: Line
-group: core.upkeep
+group: core.skilling
 
 # resource line-health
 title: Line

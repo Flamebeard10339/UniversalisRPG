@@ -22,7 +22,7 @@ dependencies:
 # stat thieving
 title: Thieving
 base: 60
-group: core.knack
+group: core.skilling
 
 // How often a hand goes out, which is a stat rather than a number on each pocket
 // so that something can take it away. A rate that resolves to zero stalls the run
@@ -31,7 +31,7 @@ group: core.knack
 # stat thieving-rate
 title: Thieving Speed
 base: 30
-group: core.upkeep
+group: core.skilling
 
 # skill thieving
 title: Thieving

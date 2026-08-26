@@ -20,7 +20,7 @@ dependencies:
 # stat smithing
 title: Smithing
 base: 30
-group: core.knack
+group: core.skilling
 
 # skill smithing
 title: Smithing

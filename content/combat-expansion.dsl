@@ -41,16 +41,16 @@ dependencies: core
 // the passive has a pool at all, so the rate below reaches nothing until one is
 // allocated.
 
-// Both are upkeep on the character sheet rather than fighting: a pool that fills
-// while you swing and empties while you do not is not what a blow is decided by,
-// and rage drain is the stat the owner named as the one he did not want on the
-// front page.
+// Both are `other` on the character sheet rather than combat, which is the whole
+// of what that tab is for: a player who never allocates the passive has no rage
+// pool at all, and a stat they will never own should not take a line on a tab
+// they read every fight.
 # stat max-rage
-group: core.upkeep
+group: core.other
 
 # stat rage-drain
 base: -30
-group: core.upkeep
+group: core.other
 
 # resource rage
 rate: rage-drain
