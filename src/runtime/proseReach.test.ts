@@ -84,12 +84,13 @@ function probedUniverse(shipped: Registry): { registry: Registry; jewelBases: re
     // The pack this author's sight fills is every item at once, which is more than any world would let a player carry.
     '# variable inventory-slots',
     'value: 0',
-    ...jewels.flatMap((id) => ['', `# item base-${flat(id)}`, 'slot: mainhand', 'item-level: 4', `origin-cluster: ${id}`]),
+    // Numbered rather than named after the jewel: an id built out of a module's own words is title-cased into English that lands in the haystack below, and a field would then count as said because this file invented a name for it.
+    ...jewels.flatMap((id, at) => ['', `# item base-${at}`, 'slot: mainhand', 'item-level: 4', `origin-cluster: ${id}`]),
     ...locations.flatMap((id) => ['', `# save at-${flat(id)}`, JSON.stringify({ version: SAVE_VERSION, location: id, inventory })]),
   ].join('\n');
   return {
     registry: loadUniverse([...shippedSources(), { name: 'prose-probe', text }]),
-    jewelBases: jewels.map((id) => `prose-probe.base-${flat(id)}`),
+    jewelBases: jewels.map((_id, at) => `prose-probe.base-${at}`),
     standings: new Map(locations.map((id) => [id, `prose-probe.at-${flat(id)}`])),
   };
 }

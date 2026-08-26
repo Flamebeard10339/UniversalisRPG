@@ -98,6 +98,12 @@ export interface Sheet {
 
 const HEADER = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[^\s]+))?[ \t]*$/;
 
+// A key names the module that says it in one of exactly two places: first for what a module declares of its own, second for what one module gives another's section. Any segment further in is part of an id, and a module whose name a section happened to be given — a `# group combat` under core — is not the one that has to review it.
+function saidBy(key: string, module: string): boolean {
+  const segments = key.split('.');
+  return segments[0] === module || segments[1] === module;
+}
+
 interface Header {
   kind: string;
   id: string;
@@ -164,7 +170,7 @@ export function sheetFor(registry: Registry, module: string, source: string, tex
       ...(standing === undefined ? {} : { standing }),
     };
     if (claim) said.get(claim.header)!.push(one);
-    else if (key.startsWith(`${module}.`) || key.includes(`.${module}.`)) loose.push(one);
+    else if (saidBy(key, module)) loose.push(one);
   }
 
   // What a module declares outright, which is how the engine's own English arrives: a `# locale` section names its keys rather than growing them off a section's fields, so nothing above would ever reach them.
