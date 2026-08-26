@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createVitest, type RunnerTask, type RunnerTestFile, type Vitest } from 'vitest/node';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -30,7 +30,7 @@ export interface TestRun {
   raw: string;
 }
 
-export type RunTests = (tests: readonly string[] | undefined, test?: string) => TestRun;
+export type RunTests = (tests: readonly string[] | undefined, test?: string) => TestRun | Promise<TestRun>;
 
 export interface Baseline {
   failed: number;
@@ -39,7 +39,7 @@ export interface Baseline {
   failures: string[];
 }
 
-export type BaselineFor = (tests: readonly string[] | undefined, test?: string) => Baseline | undefined;
+export type BaselineFor = (tests: readonly string[] | undefined, test?: string) => Baseline | undefined | Promise<Baseline | undefined>;
 
 export type Verdict = 'KILLED' | 'SURVIVED' | 'ERROR' | 'UNSTABLE';
 
@@ -103,38 +103,6 @@ export function parseManifest(text: string): Mutation[] {
     if (entry.note !== undefined && typeof entry.note !== 'string') throw new Error(`${at}: note must be a string`);
     return { ...(entry as unknown as Mutation) };
   });
-}
-
-export function parseVitestTally(output: string): { failed: number; passed: number; total: number; filesFailed: number } | null {
-  const files = [...output.matchAll(/^[ \t]*Test Files[ \t]+(.+)$/gm)];
-  const filesFailed = files.length === 0 ? 0 : Number(/(\d+) failed/.exec(files[files.length - 1][1])?.[1] ?? 0);
-  const matches = [...output.matchAll(/^[ \t]*Tests[ \t]+(.+)$/gm)];
-  if (matches.length === 0) return null;
-  const summary = matches[matches.length - 1][1];
-  if (/no tests/i.test(summary)) return { failed: 0, passed: 0, total: 0, filesFailed };
-  const total = /\((\d+)\)/.exec(summary);
-  if (total === null) return null;
-  return { failed: Number(/(\d+) failed/.exec(summary)?.[1] ?? 0), passed: Number(/(\d+) passed/.exec(summary)?.[1] ?? 0), total: Number(total[1]), filesFailed };
-}
-
-export function parseFailedTests(output: string): string[] {
-  const named: string[] = [];
-  for (const match of output.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*FAIL\s+(?:\|[^|\n]+\|\s+)?(\S+ > .*\S)\s*$/gm)) {
-    named.push(match[1]);
-  }
-  return named;
-}
-
-// vitest prints its summary tally on stdout and its `Failed Tests` detail on stderr.
-export function tallyOf(streams: { stdout: string; stderr: string }): TestRun {
-  const raw = `${streams.stdout}${streams.stderr}`;
-  const tally = parseVitestTally(streams.stdout);
-  if (tally === null) throw new Error(`could not read a test tally out of the run\n${outputTail(raw)}`);
-  const failures = parseFailedTests(streams.stderr);
-  if (failures.length < tally.failed) {
-    throw new Error(`the run reported ${tally.failed} failing test(s) and named ${failures.length} of them, so no verdict could be attributed to a test\n${outputTail(raw)}`);
-  }
-  return { ...tally, failures, raw };
 }
 
 export function outputTail(raw: string, lines = 12): string {
@@ -264,7 +232,7 @@ const ladderAbove = (mutation: Mutation): Pick<Mutation, 'tests' | 'test'>[] => 
   return rungs;
 };
 
-export function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor, tree?: () => readonly string[]): MutationReport {
+export async function runMutations(mutations: readonly Mutation[], files: FileStore, runTests: RunTests, baselineFor?: BaselineFor, tree?: () => readonly string[]): Promise<MutationReport> {
   const originals = new Map<string, string>();
   const refusals = refusalsFor(mutations, files, originals);
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
@@ -277,15 +245,15 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   }
 
   const baselines = new Map<string, Baseline | undefined>();
-  const baselineAt = (scope: Pick<Mutation, 'tests' | 'test'>): Baseline | undefined => {
+  const baselineAt = async (scope: Pick<Mutation, 'tests' | 'test'>): Promise<Baseline | undefined> => {
     const key = scopeOf(scope);
-    if (!baselines.has(key)) baselines.set(key, baselineFor?.(scope.tests, scope.test));
+    if (!baselines.has(key)) baselines.set(key, await baselineFor?.(scope.tests, scope.test));
     return baselines.get(key);
   };
 
   for (const mutation of mutations) {
     if (mutation.test === undefined) continue;
-    const baseline = baselineAt(mutation);
+    const baseline = await baselineAt(mutation);
     if (baseline !== undefined && baseline.ran === 0) refusals.push(`${mutation.name}: no test named "${mutation.test}" ran in ${scopeOf({ tests: mutation.tests })} — the name must match a test that exists there`);
   }
   if (refusals.length > 0) return { results: [], refusals, unrestored: [], ok: false };
@@ -293,12 +261,12 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
   const touched = new Set<string>();
   const restoreFailures = new Set<string>();
 
-  const around = (mutation: Mutation, scope: string, measure: () => MutationResult): MutationResult => {
+  const around = async (mutation: Mutation, scope: string, measure: () => MutationResult | Promise<MutationResult>): Promise<MutationResult> => {
     const original = originals.get(mutation.file)!;
     touched.add(mutation.file);
     files.write(mutation.file, applyTo(original, mutation));
     try {
-      return measure();
+      return await measure();
     } catch (error) {
       return { name: mutation.name, verdict: 'ERROR', failed: 0, total: 0, scope, detail: (error as Error).message };
     } finally {
@@ -310,20 +278,21 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     }
   };
 
-  const results = mutations.map((mutation) => {
-    const baseline = baselineAt(mutation);
-    return around(mutation, scopeOf(mutation), () => verdictOf(mutation, scopeOf(mutation), runTests(mutation.tests, mutation.test), baseline));
-  });
+  const results: MutationResult[] = [];
+  for (const mutation of mutations) {
+    const baseline = await baselineAt(mutation);
+    results.push(await around(mutation, scopeOf(mutation), async () => verdictOf(mutation, scopeOf(mutation), await runTests(mutation.tests, mutation.test), baseline)));
+  }
 
   for (let index = 0; index < results.length; index++) {
     for (const rung of ladderAbove(mutations[index])) {
       if (results[index].verdict !== 'SURVIVED') break;
       const mutation = mutations[index];
-      const baseline = baselineAt(rung);
+      const baseline = await baselineAt(rung);
       const scope = scopeOf(rung);
       const from = results[index];
       const escalatedFrom = from.escalatedFrom === undefined ? from.scope : `${from.escalatedFrom} -> ${from.scope}`;
-      results[index] = { ...around(mutation, scope, () => verdictOf(mutation, scope, runTests(rung.tests, rung.test), baseline)), escalatedFrom };
+      results[index] = { ...(await around(mutation, scope, async () => verdictOf(mutation, scope, await runTests(rung.tests, rung.test), baseline))), escalatedFrom };
     }
   }
 
@@ -331,9 +300,9 @@ export function runMutations(mutations: readonly Mutation[], files: FileStore, r
     const found = results[index];
     if (found.verdict !== 'KILLED' || found.attributed === undefined) continue;
     const rung: Pick<Mutation, 'tests' | 'test'> = { tests: filesOf(found.attributed) };
-    const baseline = baselineAt(rung);
+    const baseline = await baselineAt(rung);
     const scope = scopeOf(rung);
-    results[index] = { ...around(mutations[index], scope, () => confirmKill(found, runTests(rung.tests, rung.test), baseline, scope)), escalatedFrom: found.escalatedFrom };
+    results[index] = { ...(await around(mutations[index], scope, async () => confirmKill(found, await runTests(rung.tests, rung.test), baseline, scope))), escalatedFrom: found.escalatedFrom };
   }
 
   const unrestored: string[] = [];
@@ -536,30 +505,82 @@ export function recoverFrom(entries: Record<string, string>, files: FileStore, a
   return { restored, refused };
 }
 
-export function resolveVitest(): { cli: string } | { missing: string } {
-  try {
-    const manifest = createRequire(import.meta.url).resolve('vitest/package.json');
-    const bin = (JSON.parse(readFileSync(manifest, 'utf8')) as { bin?: string | Record<string, string> }).bin;
-    const entry = typeof bin === 'string' ? bin : bin?.vitest;
-    if (entry === undefined) return { missing: `${manifest} declares no vitest bin` };
-    const cli = path.resolve(path.dirname(manifest), entry);
-    return existsSync(cli) ? { cli } : { missing: `${manifest} names ${entry} as its bin, and ${cli} is not there` };
-  } catch (error) {
-    return { missing: (error as Error).message };
-  }
+const NAME_PART = ' > ';
+
+// Every test in a file under the name a verdict reports it by: the path it lives in, the
+// suites it is nested in, then its own.
+function namedTests(file: RunnerTestFile): { task: RunnerTask; name: string }[] {
+  const walk = (task: RunnerTask, above: readonly string[]): { task: RunnerTask; name: string }[] =>
+    task.type === 'suite' ? task.tasks.flatMap((child) => walk(child, [...above, task.name])) : [{ task, name: [...above, task.name].join(NAME_PART) }];
+  return file.tasks.flatMap((child) => walk(child, [file.name]));
 }
 
-function main(): void {
+export function tallyRun(files: readonly RunnerTestFile[], unhandled: readonly unknown[] = []): TestRun {
+  const tests = files.flatMap(namedTests);
+  const stateOf = (each: { task: RunnerTask }): string | undefined => each.task.result?.state;
+  const raw = [
+    ...files.flatMap((file) => (file.result?.errors ?? []).map((error) => `${file.name}: ${error.stack ?? error.message}`)),
+    ...unhandled.map((error) => String((error as Error)?.stack ?? error)),
+  ].join('\n');
+  return {
+    failed: tests.filter((each) => stateOf(each) === 'fail').length,
+    passed: tests.filter((each) => stateOf(each) === 'pass').length,
+    total: tests.length,
+    filesFailed: files.filter((file) => file.result?.state === 'fail').length,
+    failures: tests.filter((each) => stateOf(each) === 'fail').map((each) => each.name),
+    raw,
+  };
+}
+
+// A test is named by a manifest as the words it was written under, not as a pattern.
+export const asLiteralPattern = (name: string): string => name.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&');
+
+export interface WarmVitest {
+  run: RunTests;
+  invalidate(file: string): void;
+  close(): Promise<void>;
+}
+
+// A held module graph serves the file it already read, so writing a mutation and telling the
+// graph about it are one act. Anything measured through a store that is not this one measures
+// the tree as it stood before the mutation, and every mutation survives.
+export const watchedBy = (files: FileStore, invalidate: (file: string) => void): FileStore => ({
+  read: (file) => files.read(file),
+  write: (file, text) => {
+    files.write(file, text);
+    invalidate(file);
+  },
+});
+
+// Starting vitest costs about a second and a half before it reads a test, and a manifest pays
+// that once per measurement — twice per mutation, plus once per scope. One instance held open
+// across the whole run pays it once. What is held open is a module graph, so a file written
+// under a mutation has to be invalidated by hand: without that the next run serves the
+// unmutated module out of cache and every mutation survives.
+export async function warmVitest(root: string): Promise<WarmVitest> {
+  // A reporter with nothing to say. What a run reported is read back off its state, and the
+  // only thing this run prints is its own verdicts.
+  const vitest: Vitest = await createVitest('test', { root, watch: false, reporters: [{}], configLoader: 'runner' });
+  return {
+    run: async (tests, test) => {
+      if (test === undefined) vitest.resetGlobalTestNamePattern();
+      else vitest.setGlobalTestNamePattern(new RegExp(asLiteralPattern(test)));
+      const specs = await vitest.globTestSpecifications(tests === undefined ? [] : [...tests]);
+      const ran = new Set(specs.map((spec) => spec.moduleId));
+      await vitest.runTestSpecifications(specs, true);
+      // getFiles() keeps every file this instance has ever run, so a scope is read back by
+      // the specifications this run asked for and not by what the instance remembers.
+      return tallyRun(vitest.state.getFiles().filter((file) => ran.has(file.filepath)), vitest.state.getUnhandledErrors());
+    },
+    invalidate: (file) => vitest.invalidateFile(path.resolve(root, file).split(path.sep).join('/')),
+    close: () => vitest.close(),
+  };
+}
+
+async function main(): Promise<void> {
   const manifestPath = process.argv[2];
   if (manifestPath === undefined || manifestPath === '--help' || manifestPath === '-h') {
     console.error(usage);
-    process.exit(2);
-  }
-
-  const vitest = resolveVitest();
-  if ('missing' in vitest) {
-    console.error(`vitest could not be resolved from ${import.meta.filename}, so no mutation could be measured — ${vitest.missing}`);
-    console.error('Run `npm install` in the checkout this tree resolves against. Nothing was mutated.');
     process.exit(2);
   }
 
@@ -649,26 +670,30 @@ function main(): void {
   process.on('SIGINT', () => process.exit(130));
   process.on('SIGTERM', () => process.exit(143));
 
-  const runTests: RunTests = (tests, test) => {
-    const name = test === undefined ? [] : ['-t', test.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&')];
-    const result = spawnSync(process.execPath, [vitest.cli, 'run', '--configLoader', 'runner', ...(tests ?? []), ...name], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-    if (result.error) throw new Error(`the test command did not run: ${result.error.message}`);
-    return tallyOf({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
-  };
-
   const refusals = refusalsFor(mutations, files);
   if (refusals.length > 0) {
     console.log(formatReport({ results: [], refusals, unrestored: [], ok: false }));
     process.exit(1);
   }
 
+  let vitest: WarmVitest;
+  try {
+    vitest = await warmVitest(repoRoot);
+  } catch (error) {
+    console.error(`vitest could not be started from ${import.meta.filename}, so no mutation could be measured — ${(error as Error).message}`);
+    console.error('Run `npm install` in the checkout this tree resolves against. Nothing was mutated.');
+    process.exit(2);
+  }
+  const runTests: RunTests = (tests, test) => vitest.run(tests, test);
+  const watched = watchedBy(files, vitest.invalidate);
+
   const measured = new Map<string, Baseline | undefined>();
-  const baselineFor: BaselineFor = (tests, test) => {
+  const baselineFor: BaselineFor = async (tests, test) => {
     const key = scopeOf({ tests: tests === undefined ? undefined : [...tests], test });
     if (!measured.has(key)) {
       console.error(`measuring the unmutated baseline for ${key}...`);
       try {
-        const run = runTests(tests, test);
+        const run = await runTests(tests, test);
         measured.set(key, { failed: run.failed, total: run.total, ran: run.failed + run.passed, failures: run.failures });
       } catch (error) {
         console.error(`  no baseline for ${key} — ${outputTail((error as Error).message, 1)}`);
@@ -685,9 +710,15 @@ function main(): void {
     return (listing.stdout ?? '').split('\n').filter((line) => line !== '');
   };
 
-  const report = runMutations(mutations, files, runTests, baselineFor, tree);
+  const report = await runMutations(mutations, watched, runTests, baselineFor, tree);
+  await vitest.close();
   console.log(formatReport(report));
   process.exit(report.ok ? 0 : 1);
 }
 
-if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
+if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) {
+  void main().catch((error: unknown) => {
+    console.error(`the run did not finish: ${(error as Error).stack ?? String(error)}`);
+    process.exit(2);
+  });
+}

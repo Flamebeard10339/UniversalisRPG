@@ -1,7 +1,7 @@
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyTo, escapesRoot, filesOf, findMissRefusal, formatReport, journalVerdict, outputTail, parseFailedTests, parseManifest, parseVitestTally, journalPathFor, pidIsAlive, putBackAll, readJournal, recoveryStanding, scopeOf, type Baseline, type BaselineFor, type RunTests, recoverFrom, refusalsFor, resolveVitest, runMutations, tallyOf, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
+import type { RunnerTestFile } from 'vitest/node';
+import { applyTo, asLiteralPattern, watchedBy, escapesRoot, filesOf, findMissRefusal, formatReport, journalVerdict, outputTail, parseManifest, journalPathFor, pidIsAlive, putBackAll, readJournal, recoveryStanding, scopeOf, tallyRun, type Baseline, type BaselineFor, type RunTests, recoverFrom, refusalsFor, runMutations, visibleWhitespace, type FileStore, type Mutation, type TestRun } from './mutate';
 
 const ORIGINAL = 'const base = entityTypeBase(merged, section);\nconst other = 1;\n';
 
@@ -42,28 +42,28 @@ const runOf = (failures: string[], total = 20): TestRun => ({ failed: failures.l
 const baselineOf = (failures: string[], total = 20): Baseline => ({ failed: failures.length, total, ran: total, failures });
 
 describe('mutate: restoring the file', () => {
-  it('puts back exactly what it captured, and the run leaves no trace', () => {
+  it('puts back exactly what it captured, and the run leaves no trace', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    runMutations([mutation()], files, killing);
+    await runMutations([mutation()], files, killing);
     expect(files.read('a.ts')).toBe(ORIGINAL);
   });
 
-  it('restores work that is not in git, because it never asks git for the original', () => {
+  it('restores work that is not in git, because it never asks git for the original', async () => {
     const uncommitted = `${ORIGINAL}// an edit no commit holds\n`;
     const files = store({ 'a.ts': uncommitted });
-    runMutations([mutation()], files, killing);
+    await runMutations([mutation()], files, killing);
     expect(files.read('a.ts')).toBe(uncommitted);
   });
 
-  it('restores when the test command reports failures', () => {
+  it('restores when the test command reports failures', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    runMutations([mutation()], files, () => tally(19, 20));
+    await runMutations([mutation()], files, () => tally(19, 20));
     expect(files.read('a.ts')).toBe(ORIGINAL);
   });
 
-  it('restores when the test command throws, and reports the mutation as errored', () => {
+  it('restores when the test command throws, and reports the mutation as errored', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations(
+    const report = await runMutations(
       [mutation()],
       files,
       () => {
@@ -75,10 +75,10 @@ describe('mutate: restoring the file', () => {
     expect(report.results[0].detail).toContain('spawn failed');
   });
 
-  it('restores between mutations, so the second never sees the first', () => {
+  it('restores between mutations, so the second never sees the first', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const seen: string[] = [];
-    runMutations([mutation({ name: 'c1' }), mutation({ name: 'c2', find: 'const other = 1', replace: 'const other = 2' })], files, () => {
+    await runMutations([mutation({ name: 'c1' }), mutation({ name: 'c2', find: 'const other = 1', replace: 'const other = 2' })], files, () => {
       seen.push(files.read('a.ts'));
       return killing();
     });
@@ -86,10 +86,10 @@ describe('mutate: restoring the file', () => {
     expect(seen[1]).toContain('entityTypeBase(merged, section)');
   });
 
-  it('writes the mutant before the tests run, not after', () => {
+  it('writes the mutant before the tests run, not after', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     let duringRun = '';
-    runMutations([mutation()], files, () => {
+    await runMutations([mutation()], files, () => {
       duringRun = files.read('a.ts');
       return killing();
     });
@@ -99,24 +99,24 @@ describe('mutate: restoring the file', () => {
 });
 
 describe('mutate: refusing before it writes', () => {
-  it('refuses a find text the file does not contain, by name', () => {
+  it('refuses a find text the file does not contain, by name', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations([mutation({ find: 'nothing like this' })], files, killing);
+    const report = await runMutations([mutation({ find: 'nothing like this' })], files, killing);
     expect(report.refusals.join('\n')).toContain('c1');
     expect(files.writes).toEqual([]);
   });
 
-  it('refuses an ambiguous find rather than guessing which one was meant', () => {
+  it('refuses an ambiguous find rather than guessing which one was meant', async () => {
     const files = store({ 'a.ts': 'x = 1;\nx = 1;\n' });
-    const report = runMutations([mutation({ find: 'x = 1', replace: 'x = 2' })], files, killing);
+    const report = await runMutations([mutation({ find: 'x = 1', replace: 'x = 2' })], files, killing);
     expect(report.refusals.join('\n')).toMatch(/2 times/);
     expect(files.writes).toEqual([]);
   });
 
-  it('takes an ambiguous find when the mutation says all', () => {
+  it('takes an ambiguous find when the mutation says all', async () => {
     const files = store({ 'a.ts': 'x = 1;\nx = 1;\n' });
     let duringRun = '';
-    const report = runMutations([mutation({ find: 'x = 1', replace: 'x = 2', all: true })], files, () => {
+    const report = await runMutations([mutation({ find: 'x = 1', replace: 'x = 2', all: true })], files, () => {
       duringRun = files.read('a.ts');
       return killing();
     });
@@ -124,94 +124,94 @@ describe('mutate: refusing before it writes', () => {
     expect(duringRun).toBe('x = 2;\nx = 2;\n');
   });
 
-  it('refuses a file it cannot read', () => {
-    const report = runMutations([mutation({ file: 'gone.ts' })], store({}), killing);
+  it('refuses a file it cannot read', async () => {
+    const report = await runMutations([mutation({ file: 'gone.ts' })], store({}), killing);
     expect(report.refusals.join('\n')).toContain('gone.ts');
   });
 
-  it('applies nothing at all when one mutation of several is bad', () => {
+  it('applies nothing at all when one mutation of several is bad', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations([mutation({ name: 'good' }), mutation({ name: 'bad', find: 'absent' })], files, killing);
+    const report = await runMutations([mutation({ name: 'good' }), mutation({ name: 'bad', find: 'absent' })], files, killing);
     expect(report.results).toEqual([]);
     expect(files.writes).toEqual([]);
     expect(report.ok).toBe(false);
   });
 
-  it('names every bad mutation, not only the first', () => {
-    const report = runMutations([mutation({ name: 'bad1', find: 'absent' }), mutation({ name: 'bad2', find: 'also absent' })], store({ 'a.ts': ORIGINAL }), killing);
+  it('names every bad mutation, not only the first', async () => {
+    const report = await runMutations([mutation({ name: 'bad1', find: 'absent' }), mutation({ name: 'bad2', find: 'also absent' })], store({ 'a.ts': ORIGINAL }), killing);
     expect(report.refusals).toHaveLength(2);
   });
 
-  it('refuses a replacement identical to what it finds, which would measure nothing', () => {
-    const report = runMutations([mutation({ find: 'const other = 1', replace: 'const other = 1' })], store({ 'a.ts': ORIGINAL }), killing);
+  it('refuses a replacement identical to what it finds, which would measure nothing', async () => {
+    const report = await runMutations([mutation({ find: 'const other = 1', replace: 'const other = 1' })], store({ 'a.ts': ORIGINAL }), killing);
     expect(report.refusals.join('\n')).toContain('c1');
   });
 });
 
 describe('mutate: the verdict', () => {
-  it('calls a mutation the suite noticed KILLED, with the count', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 20));
+  it('calls a mutation the suite noticed KILLED, with the count', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 20));
     expect(report.results[0].verdict).toBe('KILLED');
     expect(report.results[0].failed).toBe(3);
     expect(report.results[0].total).toBe(20);
   });
 
-  it('calls a mutation nothing noticed SURVIVED', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
+  it('calls a mutation nothing noticed SURVIVED', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
     expect(report.results[0].verdict).toBe('SURVIVED');
   });
 
-  it('records the scope every verdict was measured against', () => {
-    const scoped = runMutations([mutation({ tests: ['src/content/entityType.test.ts'] })], store({ 'a.ts': ORIGINAL }), killing);
+  it('records the scope every verdict was measured against', async () => {
+    const scoped = await runMutations([mutation({ tests: ['src/content/entityType.test.ts'] })], store({ 'a.ts': ORIGINAL }), killing);
     expect(scoped.results[0].scope).toBe('src/content/entityType.test.ts');
   });
 
-  it('measures a mutation that names no scope against the whole suite, and says so', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
+  it('measures a mutation that names no scope against the whole suite, and says so', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
     expect(report.results[0].scope).toBe('whole suite');
   });
 
-  it('hands the runner exactly the tests the mutation named', () => {
+  it('hands the runner exactly the tests the mutation named', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    runMutations([mutation({ tests: ['a.test.ts', 'b.test.ts'] }), mutation({ name: 'c2' })], store({ 'a.ts': ORIGINAL }), (tests) => {
+    await runMutations([mutation({ tests: ['a.test.ts', 'b.test.ts'] }), mutation({ name: 'c2' })], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return killing();
     });
     expect(asked).toEqual([['a.test.ts', 'b.test.ts'], undefined, ['one.test.ts'], ['one.test.ts']]);
   });
 
-  it('will not call a suite that never ran either killed or survived', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => noTests);
+  it('will not call a suite that never ran either killed or survived', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => noTests);
     expect(report.results[0].verdict).toBe('ERROR');
     expect(report.results[0].detail).toMatch(/no tests/i);
   });
 
-  it('keeps the run output on an errored mutation, which is where the reason is', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => ({ failed: 0, passed: 0, total: 0, filesFailed: 1, failures: [], raw: 'Transform failed\nUnexpected token (14:8)\nTests  no tests' }));
+  it('keeps the run output on an errored mutation, which is where the reason is', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => ({ failed: 0, passed: 0, total: 0, filesFailed: 1, failures: [], raw: 'Transform failed\nUnexpected token (14:8)\nTests  no tests' }));
     expect(report.results[0].output).toContain('Unexpected token');
     expect(formatReport(report)).toContain('Unexpected token');
   });
 
-  it('is not satisfied by a run that produced a survivor', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving).ok).toBe(false);
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).ok).toBe(true);
+  it('is not satisfied by a run that produced a survivor', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving)).ok).toBe(false);
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing)).ok).toBe(true);
   });
 });
 
 describe('mutate: proving the restore', () => {
-  it('reports a file it could not put back as a failure of the run, not a result', () => {
+  it('reports a file it could not put back as a failure of the run, not a result', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const readOnly: FileStore = { read: files.read, write: (file, text) => files.write(file, file === 'a.ts' ? `${text}corrupted` : text) };
-    const report = runMutations([mutation()], readOnly, killing);
+    const report = await runMutations([mutation()], readOnly, killing);
     expect(report.ok).toBe(false);
     expect(report.unrestored).toEqual(['a.ts']);
   });
 
-  it('says nothing about restoration when every file came back byte-identical', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing).unrestored).toEqual([]);
+  it('says nothing about restoration when every file came back byte-identical', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing)).unrestored).toEqual([]);
   });
 
-  it('reports a restore that threw even though the bytes did land', () => {
+  it('reports a restore that threw even though the bytes did land', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const flushedThenFailed: FileStore = {
       read: files.read,
@@ -220,13 +220,13 @@ describe('mutate: proving the restore', () => {
         if (text === ORIGINAL) throw new Error('EIO: bytes written, close failed');
       },
     };
-    const report = runMutations([mutation()], flushedThenFailed, killing);
+    const report = await runMutations([mutation()], flushedThenFailed, killing);
     expect(files.read('a.ts')).toBe(ORIGINAL);
     expect(report.unrestored).toEqual(['a.ts']);
     expect(report.ok).toBe(false);
   });
 
-  it('survives a restore write that throws, still runs the rest, and still reports', () => {
+  it('survives a restore write that throws, still runs the rest, and still reports', async () => {
     const files = store({ 'a.ts': ORIGINAL, 'b.ts': 'other' });
     let restores = 0;
     const flaky: FileStore = {
@@ -236,7 +236,7 @@ describe('mutate: proving the restore', () => {
         files.write(file, text);
       },
     };
-    const report = runMutations([mutation({ name: 'first' }), mutation({ name: 'second', file: 'b.ts', find: 'other', replace: 'changed' })], flaky, killing);
+    const report = await runMutations([mutation({ name: 'first' }), mutation({ name: 'second', file: 'b.ts', find: 'other', replace: 'changed' })], flaky, killing);
     expect(report.results.map((result) => result.name)).toEqual(['first', 'second']);
     expect(report.unrestored).toContain('a.ts');
     expect(report.ok).toBe(false);
@@ -244,9 +244,9 @@ describe('mutate: proving the restore', () => {
 });
 
 describe('mutate: what the run left behind', () => {
-  it('a file the tree gained while a mutant was on disk is named in the report', () => {
+  it('a file the tree gained while a mutant was on disk is named in the report', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations(
+    const report = await runMutations(
       [mutation()],
       files,
       () => {
@@ -260,16 +260,16 @@ describe('mutate: what the run left behind', () => {
     expect(formatReport(report)).toContain('dropping.txt');
   });
 
-  it('a run that added nothing says so rather than staying silent', () => {
+  it('a run that added nothing says so rather than staying silent', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations([mutation()], files, killing, undefined, files.paths);
+    const report = await runMutations([mutation()], files, killing, undefined, files.paths);
     expect(report.treeDelta).toEqual({ gained: [], lost: [] });
     expect(formatReport(report)).toContain('gained nothing');
   });
 
-  it('a path the run gained is reported and not deleted', () => {
+  it('a path the run gained is reported and not deleted', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations(
+    const report = await runMutations(
       [mutation()],
       files,
       () => {
@@ -283,15 +283,15 @@ describe('mutate: what the run left behind', () => {
     expect(files.read('dropping.txt')).toBe('left behind');
   });
 
-  it('a path the run lost is named the same way', () => {
+  it('a path the run lost is named the same way', async () => {
     const listings: string[][] = [['a.ts', 'b.txt'], ['a.ts']];
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing, undefined, () => listings.shift()!);
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing, undefined, () => listings.shift()!);
     expect(report.treeDelta?.lost).toEqual(['b.txt']);
     expect(formatReport(report)).toContain('b.txt');
   });
 
-  it('claims nothing about the tree when the run had no way to look', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing);
+  it('claims nothing about the tree when the run had no way to look', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), killing);
     expect(report.treeDelta).toBeUndefined();
     expect(formatReport(report)).not.toContain('gained nothing');
   });
@@ -508,9 +508,9 @@ describe('mutate: putting the tree back on the way out', () => {
 describe('mutate: escalating a narrow survivor', () => {
   const narrow = { tests: ['one.test.ts'] };
 
-  it('re-runs a scoped survivor against the whole suite, and reports both scopes', () => {
+  it('re-runs a scoped survivor against the whole suite, and reports both scopes', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       if (tests === undefined) return tallyIn('wide.test.ts', 2, 900);
       return tests[0] === 'wide.test.ts' ? tallyIn('wide.test.ts', 2, 30) : tally(0, 12);
@@ -522,44 +522,44 @@ describe('mutate: escalating a narrow survivor', () => {
     expect(formatReport(report)).toContain('one.test.ts -> whole suite');
   });
 
-  it('leaves a survivor a survivor when the whole suite misses it too', () => {
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => (tests === undefined ? tally(0, 900) : tally(0, 12)));
+  it('leaves a survivor a survivor when the whole suite misses it too', async () => {
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => (tests === undefined ? tally(0, 900) : tally(0, 12)));
     expect(report.results[0].verdict).toBe('SURVIVED');
     expect(report.results[0].total).toBe(900);
     expect(report.results[0].escalatedFrom).toBe('one.test.ts');
   });
 
-  it('does not escalate a mutation the narrow scope already killed', () => {
+  it('does not escalate a mutation the narrow scope already killed', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+    await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return killing();
     });
     expect(asked).toEqual([['one.test.ts'], ['one.test.ts']]);
   });
 
-  it('does not escalate a mutation already measured against the whole suite', () => {
+  it('does not escalate a mutation already measured against the whole suite', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    runMutations([mutation()], store({ 'a.ts': ORIGINAL }), (tests) => {
+    await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return surviving();
     });
     expect(asked).toEqual([undefined]);
   });
 
-  it('does not escalate an errored mutation, which measured nothing to escalate', () => {
+  it('does not escalate an errored mutation, which measured nothing to escalate', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+    await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return noTests;
     });
     expect(asked).toEqual([['one.test.ts']]);
   });
 
-  it('keeps the file mutated across the escalation, so the wider run measures the same thing', () => {
+  it('keeps the file mutated across the escalation, so the wider run measures the same thing', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const seen: string[] = [];
-    runMutations([mutation(narrow)], files, (tests) => {
+    await runMutations([mutation(narrow)], files, (tests) => {
       seen.push(files.read('a.ts'));
       return tests === undefined ? tally(0, 900) : tally(0, 12);
     });
@@ -568,13 +568,13 @@ describe('mutate: escalating a narrow survivor', () => {
     expect(seen[1]).toContain('const base = undefined;');
   });
 
-  it('asks for the whole suite baseline only when something escalates', () => {
+  it('asks for the whole suite baseline only when something escalates', async () => {
     const asked: string[] = [];
     const watching: BaselineFor = (tests) => {
       asked.push(scopeOf({ tests: tests === undefined ? undefined : [...tests] }));
       return { failed: 0, total: 12, ran: 12, failures: [] };
     };
-    runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), killing, watching);
+    await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), killing, watching);
     expect(asked).toEqual(['one.test.ts']);
   });
 });
@@ -582,9 +582,9 @@ describe('mutate: escalating a narrow survivor', () => {
 describe('mutate: naming a single test', () => {
   const named = { tests: ['one.test.ts'], test: 'the one' };
 
-  it('a mutation may name one test, and is measured against that test alone', () => {
+  it('a mutation may name one test, and is measured against that test alone', async () => {
     const asked: { tests?: readonly string[]; test?: string }[] = [];
-    const report = runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (tests, test) => {
+    const report = await runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (tests, test) => {
       asked.push({ tests, test });
       return killing();
     });
@@ -593,18 +593,18 @@ describe('mutate: naming a single test', () => {
     expect(report.results[0].scope).toBe('one.test.ts "the one"');
   });
 
-  it('a manifest naming a test that does not exist is refused before anything is written', () => {
+  it('a manifest naming a test that does not exist is refused before anything is written', async () => {
     const files = store({ 'a.ts': ORIGINAL });
-    const report = runMutations([mutation(named)], files, killing, () => ({ failed: 0, total: 20, ran: 0, failures: [] }));
+    const report = await runMutations([mutation(named)], files, killing, () => ({ failed: 0, total: 20, ran: 0, failures: [] }));
     expect(report.results).toEqual([]);
     expect(report.refusals.join('\n')).toContain('the one');
     expect(files.writes).toEqual([]);
     expect(report.ok).toBe(false);
   });
 
-  it('a mutation surviving its named test is re-measured against the whole file before the whole suite', () => {
+  it('a mutation surviving its named test is re-measured against the whole file before the whole suite', async () => {
     const asked: { tests?: readonly string[]; test?: string }[] = [];
-    const report = runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (tests, test) => {
+    const report = await runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (tests, test) => {
       asked.push({ tests, test });
       return test !== undefined ? surviving() : killing();
     });
@@ -614,20 +614,20 @@ describe('mutate: naming a single test', () => {
     expect(report.results[0].escalatedFrom).toBe('one.test.ts "the one"');
   });
 
-  it('a verdict names every scope an escalation climbed through', () => {
-    const report = runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), surviving);
+  it('a verdict names every scope an escalation climbed through', async () => {
+    const report = await runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), surviving);
     expect(report.results[0].verdict).toBe('SURVIVED');
     expect(report.results[0].scope).toBe('whole suite');
     expect(formatReport(report)).toContain('one.test.ts "the one" -> one.test.ts -> whole suite');
   });
 
-  it('pays for the baselines the ladder reached, and no others', () => {
+  it('pays for the baselines the ladder reached, and no others', async () => {
     const asked: string[] = [];
     const watching: BaselineFor = (tests, test) => {
       asked.push(scopeOf({ tests: tests === undefined ? undefined : [...tests], test }));
       return { failed: 0, total: 12, ran: 12, failures: [] };
     };
-    runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (_tests, test) => (test !== undefined ? surviving() : killing()), watching);
+    await runMutations([mutation(named)], store({ 'a.ts': ORIGINAL }), (_tests, test) => (test !== undefined ? surviving() : killing()), watching);
     expect(asked).toEqual(['one.test.ts "the one"', 'one.test.ts']);
   });
 });
@@ -649,72 +649,68 @@ describe('mutate: taking the baseline on an unmutated tree', () => {
     };
   };
 
-  it('measures the narrow baseline before the mutant is written', () => {
+  it('measures the narrow baseline before the mutant is written', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const watch = watchTree(files);
-    runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    await runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
     expect(watch.seen.filter((each) => each.at.startsWith('baseline')).every((each) => each.sawMutant)).toBe(false);
     expect(watch.seen[0]).toEqual({ at: 'baseline(narrow)', sawMutant: false });
   });
 
-  it('measures the whole-suite baseline before re-writing the mutant to escalate', () => {
+  it('measures the whole-suite baseline before re-writing the mutant to escalate', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const watch = watchTree(files);
-    runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    await runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
     const whole = watch.seen.find((each) => each.at === 'baseline(whole)');
     expect(whole).toEqual({ at: 'baseline(whole)', sawMutant: false });
   });
 
-  it('reports the shortfall a mutated baseline would have hidden', () => {
+  it('reports the shortfall a mutated baseline would have hidden', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const watch = watchTree(files);
-    const report = runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    const report = await runMutations([mutation({ tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
     expect(report.results[0].shortfall).toBe(15);
   });
 
-  it('asks for the whole-suite baseline only once, however many survivors escalate', () => {
+  it('asks for the whole-suite baseline only once, however many survivors escalate', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const watch = watchTree(files);
-    runMutations([mutation({ name: 'a', tests: ['a.test.ts'] }), mutation({ name: 'b', find: 'const other = 1', replace: 'const other = 2', tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
+    await runMutations([mutation({ name: 'a', tests: ['a.test.ts'] }), mutation({ name: 'b', find: 'const other = 1', replace: 'const other = 2', tests: ['a.test.ts'] })], files, watch.runTests, watch.baselineFor);
     expect(watch.seen.filter((each) => each.at === 'baseline(whole)')).toHaveLength(1);
   });
 });
 
 describe('mutate: a file that failed to collect', () => {
-  it('is an error, not a verdict, when files failed and no test did', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 1));
+  it('is an error, not a verdict, when files failed and no test did', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 1));
     expect(report.results[0].verdict).toBe('ERROR');
     expect(report.results[0].detail).toContain('failed to collect');
   });
 
-  it('is still a kill when a test actually failed alongside it', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 30, 1)).results[0].verdict).toBe('KILLED');
+  it('is still a kill when a test actually failed alongside it', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 30, 1))).results[0].verdict).toBe('KILLED');
   });
 
-  it('leaves an ordinary clean run alone', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 0)).results[0].verdict).toBe('SURVIVED');
-  });
-
-  it('reads the failed file count off the Test Files line', () => {
-    expect(parseVitestTally(' Test Files  1 failed | 1 passed (2)\n      Tests  30 passed (30)\n')).toEqual({ failed: 0, passed: 30, total: 30, filesFailed: 1 });
+  it('leaves an ordinary clean run alone', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(0, 30, 0))).results[0].verdict).toBe('SURVIVED');
   });
 });
 
 describe('mutate: a tree that was already red', () => {
-  it('does not credit a mutation for failures the baseline already had', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 100), baseline({ 'whole suite': 100 }, 2));
+  it('does not credit a mutation for failures the baseline already had', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(2, 100), baseline({ 'whole suite': 100 }, 2));
     expect(report.results[0].verdict).toBe('SURVIVED');
     expect(report.results[0].baselineFailed).toBe(2);
     expect(formatReport(report)).toContain('already failing');
   });
 
-  it('still kills a mutation that broke something beyond what was already red', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 100), baseline({ 'whole suite': 100 }, 2));
+  it('still kills a mutation that broke something beyond what was already red', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 100), baseline({ 'whole suite': 100 }, 2));
     expect(report.results[0].verdict).toBe('KILLED');
   });
 
-  it('says nothing about a red baseline when the tree was green', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(1, 100), baseline({ 'whole suite': 100 }));
+  it('says nothing about a red baseline when the tree was green', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(1, 100), baseline({ 'whole suite': 100 }));
     expect(report.results[0].baselineFailed).toBeUndefined();
     expect(formatReport(report)).not.toContain('already failing');
   });
@@ -723,62 +719,40 @@ describe('mutate: a tree that was already red', () => {
 describe('mutate: attributing a verdict to a test', () => {
   const WATCHER = 'x.test.ts > the suite > the watcher';
 
-  it('names the test whose result changed, rather than reporting that a number went up', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf([]));
+  it('names the test whose result changed, rather than reporting that a number went up', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf([]));
     expect(report.results[0].verdict).toBe('KILLED');
     expect(report.results[0].attributed).toEqual([WATCHER]);
     expect(formatReport(report)).toContain(`killed by ${WATCHER}`);
   });
 
-  it('kills on a different test failing, even when the same number of them failed', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf(['x.test.ts > the suite > something else']));
+  it('kills on a different test failing, even when the same number of them failed', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf(['x.test.ts > the suite > something else']));
     expect(report.results[0].verdict).toBe('KILLED');
     expect(report.results[0].attributed).toEqual([WATCHER]);
   });
 
-  it('does not credit a mutation for a test that was failing without it', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf([WATCHER]));
+  it('does not credit a mutation for a test that was failing without it', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([WATCHER]), () => baselineOf([WATCHER]));
     expect(report.results[0].verdict).toBe('SURVIVED');
   });
 
-  it('is an error, not a kill, when the failures that appeared cannot be named', () => {
+  it('is an error, not a kill, when the failures that appeared cannot be named', async () => {
     const unnamed: TestRun = { failed: 3, passed: 17, total: 20, filesFailed: 0, failures: [], raw: 'Tests  3 failed | 17 passed (20)' };
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => unnamed, () => baselineOf([]));
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => unnamed, () => baselineOf([]));
     expect(report.results[0].verdict).toBe('ERROR');
     expect(report.results[0].detail).toContain('a count going up is not a kill');
   });
 
-  it('reads the names vitest prints, and takes a file that never collected for none of them', () => {
-    const output = [' FAIL  scripts/a.test.ts [ scripts/a.test.ts ]', ' FAIL  scripts/a.test.ts > outer > fails on purpose', ' FAIL  scripts/b.test.ts > outer > parametrised 2'].join('\n');
-    expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'scripts/b.test.ts > outer > parametrised 2']);
-  });
-
-  it('reads a name behind the |project| prefix, and still takes a prefixed never-collected file for none', () => {
-    const output = [' FAIL  |tools| scripts/a.test.ts [ scripts/a.test.ts ]', ' FAIL  |tools| scripts/a.test.ts > outer > fails on purpose', ' FAIL  |app| src/b.test.tsx > outer > renders'].join('\n');
-    expect(parseFailedTests(output)).toEqual(['scripts/a.test.ts > outer > fails on purpose', 'src/b.test.tsx > outer > renders']);
-  });
-
-  it('reads a name a colouring terminal wrapped in escape codes', () => {
-    expect(parseFailedTests(' \u001b[41m FAIL \u001b[0m scripts/a.test.ts > outer > coloured\n')).toEqual(['scripts/a.test.ts > outer > coloured']);
-  });
-
-  it('refuses to hand back a run whose failures it could not name', () => {
-    expect(() => tallyOf({ stdout: '      Tests  2 failed | 1 passed (3)\n', stderr: ' FAIL  a.test.ts > s > only one of them\n' })).toThrow(/named 1 of them/);
-  });
-
-  it('accepts more names than failures, which is what a broken hook prints', () => {
-    const run = tallyOf({ stdout: '      Tests  1 failed | 2 skipped (3)\n', stderr: ' FAIL  a.test.ts > the suite\n FAIL  a.test.ts > other > victim\n' });
-    expect(run.failures).toEqual(['a.test.ts > the suite', 'a.test.ts > other > victim']);
-  });
 });
 
 describe('mutate: a kill that has to happen twice', () => {
   const CONTENDED = 'slow.test.ts > the suite > tips over under contention';
   const narrow = { tests: ['one.test.ts'] };
 
-  it('will not let a failure that only happens under the whole suite become proof', () => {
+  it('will not let a failure that only happens under the whole suite become proof', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return tests === undefined ? runOf([CONTENDED], 900) : runOf([], 12);
     });
@@ -789,16 +763,16 @@ describe('mutate: a kill that has to happen twice', () => {
     expect(formatReport(report)).toContain('did not happen again on the same tree');
   });
 
-  it('still kills when the test the wider scope found fails again on its own', () => {
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => (tests?.[0] === 'one.test.ts' ? runOf([], 12) : runOf([CONTENDED], 900)));
+  it('still kills when the test the wider scope found fails again on its own', async () => {
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => (tests?.[0] === 'one.test.ts' ? runOf([], 12) : runOf([CONTENDED], 900)));
     expect(report.results[0].verdict).toBe('KILLED');
     expect(report.results[0].attributed).toEqual([CONTENDED]);
     expect(report.results[0].confirmedAt).toBe('slow.test.ts');
   });
 
-  it('measures a narrow kill at its own scope a second time before reporting it', () => {
+  it('measures a narrow kill at its own scope a second time before reporting it', async () => {
     const scopes: string[] = [];
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), (tests) => {
       scopes.push(scopeOf({ tests: tests === undefined ? undefined : [...tests] }));
       return runOf(['one.test.ts > the suite > the watcher'], 12);
     });
@@ -807,17 +781,17 @@ describe('mutate: a kill that has to happen twice', () => {
     expect(report.results[0].confirmedAt).toBe('one.test.ts');
   });
 
-  it('reports a verdict that changed between two identical measurements as unstable, not as fact', () => {
+  it('reports a verdict that changed between two identical measurements as unstable, not as fact', async () => {
     let measured = 0;
-    const report = runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), () => (measured++ === 0 ? runOf(['one.test.ts > the suite > the flaky one'], 12) : runOf([], 12)));
+    const report = await runMutations([mutation(narrow)], store({ 'a.ts': ORIGINAL }), () => (measured++ === 0 ? runOf(['one.test.ts > the suite > the flaky one'], 12) : runOf([], 12)));
     expect(report.results[0].verdict).toBe('UNSTABLE');
     expect(report.results[0].unreproduced).toEqual(['one.test.ts > the suite > the flaky one']);
     expect(report.ok).toBe(false);
   });
 
-  it('does not confirm a kill by a test that is red at the scope it was re-run in', () => {
+  it('does not confirm a kill by a test that is red at the scope it was re-run in', async () => {
     const alreadyRed = 'red.test.ts > the suite > broken on its own';
-    const report = runMutations(
+    const report = await runMutations(
       [mutation(narrow)],
       store({ 'a.ts': ORIGINAL }),
       (tests) => (tests?.[0] === 'one.test.ts' ? runOf([], 12) : runOf([alreadyRed], 900)),
@@ -830,9 +804,9 @@ describe('mutate: a kill that has to happen twice', () => {
     expect(filesOf(['b.test.ts > s > two', 'a.test.ts > s > one', 'a.test.ts > s > another'])).toEqual(['a.test.ts', 'b.test.ts']);
   });
 
-  it('leaves a survivor alone, since nothing was claimed that needs confirming', () => {
+  it('leaves a survivor alone, since nothing was claimed that needs confirming', async () => {
     const asked: (readonly string[] | undefined)[] = [];
-    runMutations([mutation()], store({ 'a.ts': ORIGINAL }), (tests) => {
+    await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), (tests) => {
       asked.push(tests);
       return runOf([]);
     });
@@ -843,60 +817,60 @@ describe('mutate: a kill that has to happen twice', () => {
 describe('mutate: a scope that did not report the same thing twice', () => {
   const FLAKY = 'flaky.test.ts > the suite > goes both ways';
 
-  it('names a test the baseline saw fail and the mutated run saw pass', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([], 20), () => baselineOf([FLAKY], 20));
+  it('names a test the baseline saw fail and the mutated run saw pass', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([], 20), () => baselineOf([FLAKY], 20));
     expect(report.results[0].verdict).toBe('SURVIVED');
     expect(report.results[0].flaked).toEqual([FLAKY]);
     expect(formatReport(report)).toContain('did not report the same thing twice');
   });
 
-  it('says nothing of the sort when tests stopped running, where the same shape is a shortfall', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([], 12), () => baselineOf([FLAKY], 20));
+  it('says nothing of the sort when tests stopped running, where the same shape is a shortfall', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([], 12), () => baselineOf([FLAKY], 20));
     expect(report.results[0].flaked).toBeUndefined();
     expect(report.results[0].shortfall).toBe(8);
   });
 
-  it('says nothing at all when the baseline and the run agree', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([FLAKY], 20), () => baselineOf([FLAKY], 20));
+  it('says nothing at all when the baseline and the run agree', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => runOf([FLAKY], 20), () => baselineOf([FLAKY], 20));
     expect(report.results[0].flaked).toBeUndefined();
     expect(formatReport(report)).not.toContain('did not report the same thing twice');
   });
 });
 
 describe('mutate: the baseline', () => {
-  it('reports how many tests stopped running when the denominator shrank', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950), baseline({ 'whole suite': 1000 }));
+  it('reports how many tests stopped running when the denominator shrank', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950), baseline({ 'whole suite': 1000 }));
     expect(report.results[0].shortfall).toBe(50);
     expect(formatReport(report)).toContain('50 fewer tests ran');
   });
 
-  it('says nothing when the count held', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1000), baseline({ 'whole suite': 1000 }));
+  it('says nothing when the count held', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1000), baseline({ 'whole suite': 1000 }));
     expect(report.results[0].shortfall).toBeUndefined();
     expect(formatReport(report)).not.toContain('fewer tests');
   });
 
-  it('does not treat a suite that grew as a shortfall', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1100), baseline({ 'whole suite': 1000 })).results[0].shortfall).toBeUndefined();
+  it('does not treat a suite that grew as a shortfall', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 1100), baseline({ 'whole suite': 1000 }))).results[0].shortfall).toBeUndefined();
   });
 
-  it('matches a baseline to the scope it was measured for', () => {
-    const report = runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), () => tally(1, 5), baseline({ 'one.test.ts': 9 }));
+  it('matches a baseline to the scope it was measured for', async () => {
+    const report = await runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), () => tally(1, 5), baseline({ 'one.test.ts': 9 }));
     expect(report.results[0].shortfall).toBe(4);
   });
 
-  it('reports nothing when no baseline was measured at all', () => {
-    expect(runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950)).results[0].shortfall).toBeUndefined();
+  it('reports nothing when no baseline was measured at all', async () => {
+    expect((await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), () => tally(3, 950))).results[0].shortfall).toBeUndefined();
   });
 
-  it('says on the row when a scope had no baseline, rather than looking like a clean measurement', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
+  it('says on the row when a scope had no baseline, rather than looking like a clean measurement', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving);
     expect(report.results[0].unmeasured).toBe(true);
     expect(formatReport(report)).toContain('no baseline');
   });
 
-  it('says nothing of the sort when the scope did have one', () => {
-    const report = runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving, baseline({ 'whole suite': 20 }));
+  it('says nothing of the sort when the scope did have one', async () => {
+    const report = await runMutations([mutation()], store({ 'a.ts': ORIGINAL }), surviving, baseline({ 'whole suite': 20 }));
     expect(report.results[0].unmeasured).toBe(false);
     expect(formatReport(report)).not.toContain('no baseline');
   });
@@ -949,75 +923,74 @@ describe('mutate: a find that missed', () => {
   });
 });
 
-describe('mutate: finding the test runner', () => {
-  it('resolves the vitest CLI this checkout would actually run', () => {
-    const resolved = resolveVitest();
-    expect(resolved).not.toHaveProperty('missing');
-    expect((resolved as { cli: string }).cli).toMatch(/vitest\.mjs$/);
-    expect(existsSync((resolved as { cli: string }).cli)).toBe(true);
+describe('mutate: telling the held module graph what changed', () => {
+  it('announces every file it writes, in the order it wrote them', () => {
+    const heard: string[] = [];
+    const files = store({ 'a.ts': ORIGINAL, 'b.ts': 'const b = 1;\n' });
+    const watched = watchedBy(files, (file) => heard.push(file));
+
+    watched.write('a.ts', 'mutant');
+    watched.write('b.ts', 'mutant');
+    watched.write('a.ts', ORIGINAL);
+
+    expect(heard).toEqual(['a.ts', 'b.ts', 'a.ts']);
+  });
+
+  it('announces every write a whole run makes, restores included, however many runs it took', async () => {
+    const heard: string[] = [];
+    const files = store({ 'a.ts': ORIGINAL });
+
+    await runMutations([mutation()], watchedBy(files, (file) => heard.push(file)), killing);
+
+    expect(heard).toEqual(files.writes.map((write) => write.file));
+    expect(heard.length).toBeGreaterThan(0);
+    expect(files.read('a.ts')).toBe(ORIGINAL);
+  });
+
+  it('says nothing about a file it only read', () => {
+    const heard: string[] = [];
+    watchedBy(store({ 'a.ts': ORIGINAL }), (file) => heard.push(file)).read('a.ts');
+
+    expect(heard).toEqual([]);
   });
 });
 
-describe('mutate: reading vitest back', () => {
-  it('reads a mixed tally', () => {
-    expect(parseVitestTally('   Tests  1 failed | 15 passed (16)\n')).toEqual({ failed: 1, passed: 15, total: 16, filesFailed: 0 });
+describe('mutate: what a run reported', () => {
+  const test = (name: string, state?: string) => ({ type: 'test', name, result: state === undefined ? undefined : { state } });
+  const suite = (name: string, tasks: unknown[]) => ({ type: 'suite', name, tasks });
+  const ran = (name: string, tasks: unknown[], result?: unknown): RunnerTestFile => ({ name, filepath: `/repo/${name}`, type: 'suite', tasks, result }) as unknown as RunnerTestFile;
+
+  it('names a test by its file, the suites it is nested in, and its own name', () => {
+    const run = tallyRun([ran('scripts/a.test.ts', [suite('outer', [suite('inner', [test('fails on purpose', 'fail')])])])]);
+
+    expect(run.failures).toEqual(['scripts/a.test.ts > outer > inner > fails on purpose']);
+    expect(filesOf(run.failures)).toEqual(['scripts/a.test.ts']);
   });
 
-  it('reads an all-passing tally', () => {
-    expect(parseVitestTally(' Test Files  45 passed (45)\n      Tests  985 passed (985)\n')).toEqual({ failed: 0, passed: 985, total: 985, filesFailed: 0 });
+  it('counts a test that did not run in the total and in neither of what passed or failed', () => {
+    const run = tallyRun([ran('a.test.ts', [suite('outer', [test('ran', 'pass'), test('filtered out')])])]);
+
+    expect(run).toMatchObject({ total: 2, passed: 1, failed: 0 });
   });
 
-  it('reads a tally carrying skips', () => {
-    expect(parseVitestTally('Tests  2 failed | 3 passed | 1 skipped (6)')).toEqual({ failed: 2, passed: 3, total: 6, filesFailed: 0 });
+  it('takes a file that never collected for a failed file naming no test, and keeps what it recorded', () => {
+    const run = tallyRun([ran('a.test.ts', [], { state: 'fail', errors: [{ message: 'Cannot find name x' }] })]);
+
+    expect(run).toMatchObject({ total: 0, failed: 0, filesFailed: 1, failures: [] });
+    expect(run.raw).toContain('Cannot find name x');
   });
 
-  it('reads an all-skipped tally as zero run, keeping the total', () => {
-    expect(parseVitestTally(' Test Files  1 skipped (1)\n      Tests  113 skipped (113)\n')).toEqual({ failed: 0, passed: 0, total: 113, filesFailed: 0 });
-  });
+  it('cannot report more failures than it can name, because it counts the same tests it names', () => {
+    const run = tallyRun([ran('a.test.ts', [suite('outer', [test('one', 'fail'), test('two', 'fail')])])]);
 
-  it('reports no tally when the run collected nothing', () => {
-    expect(parseVitestTally(' Test Files  1 failed (1)\n      Tests  no tests\n')).toEqual({ failed: 0, passed: 0, total: 0, filesFailed: 1 });
-  });
-
-  it('returns null when there is no Tests line at all', () => {
-    expect(parseVitestTally('command not found')).toBeNull();
-  });
-
-  it('returns null for a Tests line it cannot read a count out of', () => {
-    expect(parseVitestTally('Tests  something went very wrong')).toBeNull();
-  });
-
-  it('still reads a genuine no-tests run as a tally of zero', () => {
-    expect(parseVitestTally('Tests  no tests')).toEqual({ failed: 0, passed: 0, total: 0, filesFailed: 0 });
-  });
-
-  it('takes the last tally when the output carries more than one', () => {
-    expect(parseVitestTally('Tests  1 failed | 1 passed (2)\nrerun\nTests  4 failed | 1 passed (5)')).toEqual({ failed: 4, passed: 1, total: 5, filesFailed: 0 });
+    expect(run.failures).toHaveLength(run.failed);
   });
 });
 
-describe('mutate: which stream the tally comes from', () => {
-  const SUMMARY = ' Test Files  2 passed (2)\n      Tests  1 failed | 1 passed (2)\n';
-  const DETAIL = ' FAIL  a.test.ts > the suite > the one that failed\n';
-
-  it('ignores a tally-shaped line a failing test printed to stderr', () => {
-    const run = tallyOf({ stdout: SUMMARY, stderr: `${DETAIL}Tests  0 failed | 999 passed (999)\n` });
-    expect(run.failed).toBe(1);
-    expect(run.total).toBe(2);
-  });
-
-  it('ignores a stderr decoy that would have inverted the verdict the other way', () => {
-    const run = tallyOf({ stdout: ' Test Files  1 passed (1)\n      Tests  20 passed (20)\n', stderr: 'Tests  3 failed | 1 passed (4)\n' });
-    expect(run.failed).toBe(0);
-    expect(run.total).toBe(20);
-  });
-
-  it('keeps both streams in raw, so the report can still show what happened', () => {
-    expect(tallyOf({ stdout: SUMMARY, stderr: `${DETAIL}the failure detail lives here` }).raw).toContain('the failure detail lives here');
-  });
-
-  it('throws rather than guessing when stdout carries no tally at all', () => {
-    expect(() => tallyOf({ stdout: '', stderr: 'Tests  1 failed | 1 passed (2)' })).toThrow(/could not read a test tally/);
+describe('mutate: naming one test to vitest', () => {
+  it('asks for the words a manifest wrote, not for the pattern they happen to spell', () => {
+    expect(new RegExp(asLiteralPattern('a kill (that has to happen) twice')).test('a kill (that has to happen) twice')).toBe(true);
+    expect(new RegExp(asLiteralPattern('costs $1.50 [or more]')).test('costs $1.50 [or more]')).toBe(true);
   });
 });
 
@@ -1073,21 +1046,21 @@ describe('mutate: the manifest', () => {
 });
 
 describe('mutate: the report', () => {
-  it('leads with the survivors, because a survivor is the finding', () => {
-    const report = runMutations([mutation({ name: 'lived' }), mutation({ name: 'died', find: 'const other = 1', replace: 'const other = 2', tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), (tests) => (tests === undefined ? surviving() : killing()));
+  it('leads with the survivors, because a survivor is the finding', async () => {
+    const report = await runMutations([mutation({ name: 'lived' }), mutation({ name: 'died', find: 'const other = 1', replace: 'const other = 2', tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), (tests) => (tests === undefined ? surviving() : killing()));
     const printed = formatReport(report);
     expect(printed).toContain('SURVIVED');
     expect(printed.indexOf('lived')).toBeLessThan(printed.indexOf('died'));
   });
 
-  it('never prints a verdict without the scope it was measured against', () => {
-    const report = runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), surviving);
+  it('never prints a verdict without the scope it was measured against', async () => {
+    const report = await runMutations([mutation({ tests: ['one.test.ts'] })], store({ 'a.ts': ORIGINAL }), surviving);
     expect(formatReport(report)).toContain('one.test.ts');
   });
 
-  it('says plainly when a file did not come back', () => {
+  it('says plainly when a file did not come back', async () => {
     const files = store({ 'a.ts': ORIGINAL });
     const readOnly: FileStore = { read: files.read, write: (file, text) => files.write(file, `${text}corrupted`) };
-    expect(formatReport(runMutations([mutation()], readOnly, killing))).toMatch(/NOT RESTORED|not restored/i);
+    expect(formatReport(await runMutations([mutation()], readOnly, killing))).toMatch(/NOT RESTORED|not restored/i);
   });
 });
