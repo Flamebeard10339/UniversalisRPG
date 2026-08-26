@@ -17,7 +17,7 @@ engine.travel.nowhere: No road leads anywhere you have found from here.
 engine.travel.unknown-origin: unknown travel origin: {location}
 engine.travel.unknown-destination: unknown travel destination: {location}
 engine.craft.label: Craft {recipe}
-engine.talk.to: Talk to {entity}
+engine.talk.to: Talk
 engine.requires.item: You need {item} for that.
 engine.requires.unmet: You cannot do that yet.
 engine.target.absent: There is no {target} here.
@@ -93,7 +93,7 @@ engine.cluster.effect-repeated: the cluster at {hex} already carries {effect}
 engine.cluster.slots-full: the cluster at {hex} fills all {count} of its mod slots
 engine.said.elided: … {dropped} more lines
 engine.stat.base: Base
-engine.shop.label: Trade with {entity}
+engine.shop.label: Trade
 engine.shop.counter: The counter — you are carrying {held} {coin}
 engine.shop.side.buy: Buy
 engine.shop.side.sell: Sell

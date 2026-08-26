@@ -97,7 +97,7 @@ Suppose the view shows:
   location: The Guide House (first-steps.guide-house)
   here: Miki, the front door, a mirror
   choices:
-    id=talk:first-steps.miki :: Talk to Miki
+    id=talk:first-steps.miki :: Miki: Talk
     id=use:entity.first-steps.mirror.look-in :: Look in the mirror
     id=travel:tulsa.market-square :: Travel to the market square
 
