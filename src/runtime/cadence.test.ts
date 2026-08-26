@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
+import { actionProgress, actionStalled, armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
 import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { startSession, view } from './session';
@@ -34,6 +34,12 @@ examine: Still twitching.
 
 # item sword-oil
 food, +25% attack-rate, 60s
+
+// Nothing a player carries: what a world inflicts to take somebody's pace to
+// nothing, which is a rate like any other rather than an impossible one.
+# item cold-iron
+examine: Your arms will not do what you tell them.
+-100% attack-rate, 20s
 
 # stat max-carapace
 
@@ -267,5 +273,63 @@ describe('rate: as the per-minute cadence, to the millisecond', () => {
 
     expect(attemptDuration(action(registry, 'oven', 'roast'), state, registry)).toBe(secondsToMs(4));
     expect(attemptDuration(action(registry, 'slow-oven', 'roast'), state, registry)).toBe(secondsToMs(4));
+  });
+});
+
+// Five attempts to one completion, so the clock inside an attempt and the cycle a player watches
+// differ by a factor of five — which is the gap that pinned the drawn bar flat at nothing.
+const bell = (seconds: string): string =>
+  ['# item note', 'examine: A note.', '# stat toll', 'base: 0.2', '# entity bell', 'ring:', '  continuous', `  time: ${seconds}`, '  damage: toll', '  give: 1 note'].join('\n');
+
+describe('the bar draws the cycle it is a bar for', () => {
+  it('fills across every attempt one cycle takes, and comes back to the beginning when the cycle does', () => {
+    const registry = loadModule(bell('1'));
+    const state = createGameState();
+    armAction('entity', 'bell', 'ring', registry, state);
+
+    const drawn: number[] = [];
+    for (let second = 1; second <= 5; second++) {
+      resolve(state, registry, secondsToMs(second));
+      drawn.push(actionProgress(state, registry));
+    }
+
+    expect(drawn[0], 'a bar that never leaves nothing is the one this drew').toBeGreaterThan(0);
+    for (let at = 1; at < 4; at++) expect(drawn[at], `attempt ${at + 1}`).toBeGreaterThan(drawn[at - 1]!);
+    expect(drawn[3], 'and it is not capped at the one attempt it counts within').toBeGreaterThan(0.5);
+    expect(drawn[4], 'the cycle came round, so the bar is back at the beginning').toBeLessThan(drawn[3]!);
+  });
+
+  it('keeps the milliseconds a repeat carries over, so a repeating action does not run slow', () => {
+    const registry = loadModule(bell('0.3'));
+    const state = createGameState();
+    armAction('entity', 'bell', 'ring', registry, state);
+
+    resolve(state, registry, secondsToMs(15));
+
+    expect(state.inventory['note'], 'ten completions of 1.5s each fit in fifteen seconds').toBe(10);
+  });
+});
+
+describe('a pace taken to nothing stops the run rather than losing it', () => {
+  it('counts no time against it while it stands still, and picks it up where it stood', () => {
+    const registry = loaded();
+    const state = fighting(registry);
+    resolve(state, registry, secondsToMs(1));
+
+    const held = playerClock(state).progress;
+    expect(held).toBeGreaterThan(0);
+
+    grantBuff(state, PLAYER, registry.items.get('cold-iron')!, secondsToMs(20));
+    expect(actionStalled(state, registry)).toBe(true);
+    expect(actionProgress(state, registry), 'a stopped bar is stopped rather than crawling').toBe(0);
+
+    resolve(state, registry, secondsToMs(15));
+    expect(playerClock(state).progress, 'nothing is counted against a run standing still').toBe(held);
+    expect(state.activeAction, 'standing still is not being over').not.toBeNull();
+    expect(playerClock(state).attemptsMade, 'and no attempt was made in all that time').toBe(0);
+
+    resolve(state, registry, secondsToMs(25));
+    expect(actionStalled(state, registry)).toBe(false);
+    expect(playerClock(state).attemptsMade, 'the run picked back up once it wore off').toBeGreaterThan(0);
   });
 });
