@@ -23,45 +23,50 @@ directions.
 
 ---
 
-## Tulsa first, then the quests one by one
+## Six quests stand in the journal that nobody can begin
 
-**One task, not four.** Ruled 2026-08-25, folding together what were four separate
-headings here: the ten quest notes in `.planning/planning_quests/`, the eight `@@@`
-marks the corpus holds, the unreachable `sewer-toll-paid` road, and the deferred
-question of whether a quest can own all of its own state. *"This task needs to be
-combined with the next stretch of work… It is a single task. Once tulsa is ready we
-will start making quests one by one."*
+A new game's journal now lists eight quests, six of them stubs that nothing starts:
 
-So none of the four is separately answerable, and the ordering is settled: **the town
-is finished first**, and then each quest is written in turn with playbot testers in a
-loop. What the town still owes is in `open-agent.md` and is a full queue.
+    unstarted  A Grand Blade — The forge in the market row is cold, and the young
+               smith at it does not look like a man who chose the work.
+    unstarted  Attention to Detail — Somebody in town pays for what can be learned…
+    unstarted  Ball of a Boy — There is a boy hunched over the sewer grate…
+    unstarted  Birds and the Bees — Kelsa's bees have turned on anything…
+    unstarted  Kill it with Fire — Grandma Oolga keeps her shelves behind her…
+    unstarted  The Swampy Menace — The guard captain has been asking after me…
 
-The three facts a lane will need when this starts, kept here so they are not
-re-derived:
+That is the journal working as written — `listedToPlayer` filters only `DEBUG`, and
+its own comment says a journal listing only what has been started would be a list of
+what the player already knows. So six hooks on turn one is either the quest board
+doing its job or six dead ends, and which one it is is a call about the game.
 
-- **The eight `@@@` marks are entities waiting on quests** — the anvil on A Grand
-  Blade, Oolga's counter on Kill it with Fire, the hive mouth on Birds and the Bees.
-- **`sewer-toll-paid` is read and never set.** `castle-yard`'s road to
-  `sewer-entrance` is gated on it and nothing in the corpus sets it, so that road is
-  unreachable. It is Larry's toll, and it is written when Larry's quest is.
-- **A quest cannot hold all of its own state, and the engine refuses the fix.**
-  `tulsa.mirror` sets `mirror-done` and `tulsa.giant-rat` sets `rats-killed`; both
-  are read only by `tutorial-quests` and neither can move there, because `tulsa` does
-  not depend on `tutorial-quests`:
+The mechanism is not free either way. Holding a stub back means `DEBUG`, and a
+`DEBUG` section says nothing in any language, so it never reaches the locale that
+`npm run notes` walks — the note that is the whole point of the stub disappears with
+it. Measured both ways on 2026-08-25.
 
-      town [town] resolve: # entity town.mirror action "look in" set: names
-      errand.mirror-done, but errand is not this module or one of its dependencies
+*Moves on a ruling on whether an unwritten quest is visible to a player. If it must
+be held back, that is engine work a lane can take: some way for a section to ship
+its prose to `npm run notes` without shipping the quest to the journal.*
 
-  A `# quest` hands **dialogue** to an upstream entity and cannot hand it an
-  **action**, so moving the flag by moving what sets it does not work either. The
-  corpus has zero `+` field edits and this is not an argument for inventing one.
-  Entity-private flags (`tulsa.mirror.done`) would work today and were rejected: they
-  re-home the flag without re-homing the quest, which is the requirement.
+## Four of the ten quest notes have no module, and nothing says which is written first
 
-*Moves quest by quest, when the owner says the town is ready and a note is levelled
-enough to author from. The language design under the third bullet is engine work a
-lane can take and prove the moment the first quest actually needs it — which is the
-event that un-defers it, rather than a separate ruling.*
+Six of the ten notes in `.planning/planning_quests/` became modules because Tulsa
+held a `@@@` naming them. Plague Matters, Reverse Infiltration, The Bar's Crawl and
+The Rat Conspiracy held none, so nothing moved for them and they have no file.
+
+The ordering that used to sit here — the town finished first, then quests one by one
+— was overturned on 2026-08-25: *"the whole premise is wrong. We already have a
+quest."* First Steps is that quest and is now its own module. What the town still
+owes is in `open-agent.md` and is unchanged; it is no longer a gate on writing a
+quest.
+
+The notes are uneven, which is why this waits. Ball of a Boy and Kill it with Fire
+are written through to their last beat; Attention to Detail is two lines and Plague
+Matters is a heading with seven empty numbers under it.
+
+*Moves on naming the quest to author first, and on whether the four unstubbed notes
+get modules now or when they are levelled enough to author from.*
 
 ## Whether the view may declare two paths aliases of one fact
 
