@@ -305,7 +305,13 @@ function entityAliasesTravelTo(location: Location, target: string, registry: Reg
 // Two things are deliberately never masked. One with no `examine:` mints no offer that could lift
 // the mask, so masking it would leave it standing with nothing a player could ever do; and a foe in
 // the fight under way has been met, whatever anybody has read.
+//
+// And a run may turn the whole of it off, which is how an author sees a room as it is written rather
+// than clicking through a list of question marks to find out what they wrote. It is a setting rather
+// than a fact about dev mode because it is saved, replayed and reachable from a `# test` that way,
+// and because the rule about what is held back has one home and this is it.
 function maskedHere(registry: Registry, state: GameState, location: Location): ReadonlySet<string> {
+  if (settingStands(state.settings, 'masking') !== true) return new Set();
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const masked = new Set<string>();
   for (const entityId of standingHere(registry, state, location)) {

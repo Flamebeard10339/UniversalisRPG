@@ -735,13 +735,21 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
   }
 }
 
+// An author's session shows a room as it is written. Set through the ordinary settings path, so it is
+// saved with the dev slot, comes back with it, and can be turned on again by anyone who wants to see
+// what a player sees.
+function unmasked(ctx: CommandContext, result: CommandResult): CommandResult {
+  applyDirective(ctx.session, { kind: 'setting', setting: 'masking', value: 'off' });
+  return { ...result, view: view(ctx.session) };
+}
+
 function devOn(ctx: CommandContext, save: SaveContext): CommandResult {
   const authoring = enterDev(save, serializeSession(ctx.session));
-  if (authoring === null) return noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`);
+  if (authoring === null) return unmasked(ctx, noted('ok', `Dev mode on, writing slot ${liveSlot(save)}.`));
 
   const result = importPayload(ctx, authoring, `Dev mode on, slot ${DEV_SLOT} picked up.`, DEV_SLOT);
-  if (loaded(result)) return result;
-  return { ...result, output: [...result.output, note('warn', `Dev mode is on, but slot ${DEV_SLOT} could not be picked up, so this session is left as it is and will not be written there. /save takes it.`)] };
+  if (loaded(result)) return unmasked(ctx, result);
+  return unmasked(ctx, { ...result, output: [...result.output, note('warn', `Dev mode is on, but slot ${DEV_SLOT} could not be picked up, so this session is left as it is and will not be written there. /save takes it.`)] });
 }
 
 function devOff(ctx: CommandContext, save: SaveContext): CommandResult {

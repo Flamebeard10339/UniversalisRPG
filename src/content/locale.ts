@@ -316,6 +316,8 @@ export const ENGINE_KEYS = [
   'engine.setting.hardcore.note',
   'engine.setting.reveal',
   'engine.setting.reveal.note',
+  'engine.setting.masking',
+  'engine.setting.masking.note',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

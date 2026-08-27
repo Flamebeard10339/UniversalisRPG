@@ -323,3 +323,5 @@ engine.setting.hardcore: Hardcore
 engine.setting.hardcore.note: Fainting costs you everything you were carrying and wearing.
 engine.setting.reveal: Paced dialogue
 engine.setting.reveal.note: What is said to you arrives a line at a time, at reading speed, rather than all at once.
+engine.setting.masking: Look before you know
+engine.setting.masking.note: Something nobody has looked at keeps its name and everything it offers back until somebody does. Off, a room reads as it is written — which is what an author wants and a player does not.

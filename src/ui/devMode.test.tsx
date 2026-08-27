@@ -337,3 +337,32 @@ describe('with dev off, nothing changes (c11)', () => {
     expect(serializeSession(session)).not.toBe(before);
   });
 });
+
+// A room reads as it is written for whoever is writing it. The rule about what is held back has one
+// home — `maskedHere` — and dev mode turns it off through the ordinary settings path rather than
+// growing a second copy of the rule beside it.
+describe('an author sees the room as it is written (c9)', () => {
+  const masking = (driver: Driver): string | undefined => driver.snapshot().view.settings.find((row) => row.name === 'masking')?.standing;
+
+  it('holds a name back from a player, and hands it over in dev', () => {
+    const driver = playing().driver;
+    const unread = (): number => driver.snapshot().view.entities.filter((each) => each.masked).length;
+    expect(unread()).toBeGreaterThan(0);
+    expect(masking(driver)).toBe('on');
+
+    driver.send(devLine(true));
+
+    expect(masking(driver)).toBe('off');
+    expect(unread()).toBe(0);
+    expect(driver.snapshot().view.entities.length).toBeGreaterThan(0);
+  });
+
+  it('can be turned back on by anyone who wants to see what a player sees', () => {
+    const driver = playing().driver;
+    driver.send(devLine(true));
+    driver.send('/settings masking on');
+
+    expect(masking(driver)).toBe('on');
+    expect(driver.snapshot().view.entities.some((each) => each.masked)).toBe(true);
+  });
+});
