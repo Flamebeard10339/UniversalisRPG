@@ -1,6 +1,6 @@
 import { DISCOVERED } from '../content/sections/location';
 import type { Edge } from '../content/sections/location';
-import type { Registry } from '../content/registry';
+import { startingLocationId, type Registry } from '../content/registry';
 import { evaluateCondition, truthy } from './conditions';
 import type { GameState } from './state';
 
@@ -68,4 +68,29 @@ export function reachable(from: string, registry: Registry, state: GameState): M
   }
 
   return found;
+}
+
+// How far each location stands from where a game begins, in roads walked. `reachable` above asks
+// about a player — where can this one walk now, given the gates they have opened and the places
+// they have found. This asks about the map: where a thing sits in the world whether anybody has
+// been there or not, which is why it takes no state. A road held shut by a condition is still a
+// road, because a gate is a beat in the story rather than a distance, and a location no road
+// reaches is absent rather than infinitely far.
+export function roadDepths(registry: Registry): ReadonlyMap<string, number> {
+  const start = startingLocationId(registry);
+  const depths = new Map<string, number>();
+  if (start === undefined) return depths;
+  depths.set(start, 0);
+  for (let frontier = [start]; frontier.length > 0; ) {
+    const next: string[] = [];
+    for (const at of frontier) {
+      for (const edge of effectiveAdjacent(registry, at)) {
+        if (depths.has(edge.target)) continue;
+        depths.set(edge.target, depths.get(at)! + 1);
+        next.push(edge.target);
+      }
+    }
+    frontier = next;
+  }
+  return depths;
 }

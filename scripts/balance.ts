@@ -5,7 +5,7 @@ import { DEBUG_MARK } from '../src/content/sections/define';
 import { printDirective } from '../src/content/sections/test';
 import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
-import { roadDepths } from '../src/runtime/balance';
+import { roadDepths } from '../src/runtime/journey';
 import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
 import { applyDirective, choiceToDirective, readRoom, runTest, sessionStatus, startSession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
