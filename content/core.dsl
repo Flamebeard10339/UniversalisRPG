@@ -43,6 +43,13 @@ value: 2
 # variable inventory-slots
 value: 28
 
+// How far apart one step of this world's coordinates is drawn on the map, in
+// pixels. Two places a square apart have to have room for both their names
+// between them and a road that can be seen; raise it to spread a crowded
+// quarter out, lower it to fit more of the world on a phone at once.
+# variable map-grid
+value: 140
+
 // --- stats ---
 
 // Each one says what kind of measure it is, which is the same `group:` an item or

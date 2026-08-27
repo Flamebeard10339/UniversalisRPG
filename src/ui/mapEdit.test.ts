@@ -4,7 +4,10 @@ import type { Location } from '../content/sections/location';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { addressable, MAPPED_KIND, names, NOWHERE, offeredBy, type Section } from './authoringSurface';
 import { gotoLine } from './devMode';
-import { drawnAt, PER_UNIT, placedAt, type Node } from './discovery';
+import { drawnAt, placedAt, type Node } from './discovery';
+
+// Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
+const GRID = 140;
 import { createDriver, type Driver } from './driver';
 import { answering, centredOn, created, droppedAt, joined, joinedInto, linkedTo, movedTo, placedInto, settledOn, stagedKey, unlinkedFrom } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -137,7 +140,7 @@ describe('where the map lets a place go (c8)', () => {
     const node = drawn(moved);
     const before = REGISTRY_PLACES.get(moved)!;
 
-    const staged = droppedAt(DRAWN, node, { x: PER_UNIT * 3, y: PER_UNIT * -2 });
+    const staged = droppedAt(DRAWN, node, { x: GRID * 3, y: GRID * -2 }, GRID);
 
     expect(staged).toHaveProperty('line');
     expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual({ ...before, x: before.x + 3, y: before.y - 2 });
@@ -148,7 +151,7 @@ describe('where the map lets a place go (c8)', () => {
       const place = REGISTRY_PLACES.get(moved)!;
       const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
 
-      const staged = droppedAt(DRAWN, off, { x: 0, y: 0 });
+      const staged = droppedAt(DRAWN, off, { x: 0, y: 0 }, GRID);
 
       expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual(place);
     });
@@ -157,7 +160,7 @@ describe('where the map lets a place go (c8)', () => {
   it('refuses a place the map is drawing that no module declares', () => {
     const stray: Node = { place: { id: 'nowhere.at-all', title: '' as never, x: 0, y: 0, z: 0, adjacent: [] }, here: false, climb: 0, at: { x: 0, y: 0 } };
 
-    expect(droppedAt(DRAWN, stray, { x: 0, y: 0 })).toEqual({ refused: 'the map is drawing nowhere.at-all, which no module declares' });
+    expect(droppedAt(DRAWN, stray, { x: 0, y: 0 }, GRID)).toEqual({ refused: 'the map is drawing nowhere.at-all, which no module declares' });
     expect(placedInto(DRAWN, 'nowhere.at-all', { x: 1, y: 1 })).toHaveProperty('refused');
   });
 
@@ -257,9 +260,9 @@ describe('a connection is a section edit and nothing else', () => {
 
 describe('a new place is written where the map is looking', () => {
   it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
-    expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 })).toEqual({ x: 0, y: 0 });
-    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 1 })).toEqual({ x: 1, y: 0 });
-    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 2 })).toEqual({ x: 0.5, y: 0 });
+    expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 0, y: 0 });
+    expect(centredOn({ pan: { x: -GRID, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 1, y: 0 });
+    expect(centredOn({ pan: { x: -GRID, y: 0 }, zoom: 2 }, GRID)).toEqual({ x: 0.5, y: 0 });
   });
 
   it('writes the plane it was drawn on and leaves the ground plane unsaid', () => {

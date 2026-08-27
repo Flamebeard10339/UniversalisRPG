@@ -6,7 +6,7 @@ import { parseModule, sectionFor } from '../content/sections';
 import { DslError } from '../grammar/parser';
 import { moduleLocalId, type AnySchema } from '../grammar/section';
 import { MAPPED_KIND, names, stage, type Section, type Staged } from './authoringSurface';
-import { PER_UNIT, placedAt, spotOf, type Node } from './discovery';
+import { placedAt, spotOf, type Node } from './discovery';
 import { lookingAt, type Point } from './viewport';
 
 export const settledOn = (at: Point): Point => ({ x: Math.round(at.x), y: Math.round(at.y) });
@@ -53,9 +53,9 @@ export function placedInto(sections: readonly Section[], address: string, at: Po
   return movedTo(section, at);
 }
 
-export function droppedAt(sections: readonly Section[], node: Node, carried: Point): Staged {
-  const spot = spotOf(node);
-  return placedInto(sections, node.place.id, placedAt({ x: (spot.x + carried.x) / PER_UNIT, y: (spot.y + carried.y) / PER_UNIT }, node.climb));
+export function droppedAt(sections: readonly Section[], node: Node, carried: Point, grid: number): Staged {
+  const spot = spotOf(node, grid);
+  return placedInto(sections, node.place.id, placedAt({ x: (spot.x + carried.x) / grid, y: (spot.y + carried.y) / grid }, node.climb));
 }
 
 export function movedTo(section: Section, to: Point): Staged {
@@ -75,9 +75,9 @@ export type MapMode = (typeof MAP_MODES)[number];
 
 export const modeNamed = (value: unknown): MapMode | undefined => MAP_MODES.find((mode) => mode === value);
 
-export function centredOn(hold: { pan: Point; zoom: number }): Point {
+export function centredOn(hold: { pan: Point; zoom: number }, grid: number): Point {
   const middle = lookingAt(hold.pan, hold.zoom);
-  return { x: middle.x / PER_UNIT, y: middle.y / PER_UNIT };
+  return { x: middle.x / grid, y: middle.y / grid };
 }
 
 const NAMED = /^[a-z][a-z0-9-]*$/;

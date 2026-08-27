@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, centreOf, clampPan, clampZoom, drawnBox, lookingAt, midpoint, panAfterZoom, panOnto, settled, spanBetween, tapTarget, TOUCH_FLOOR, ZOOM_MAX, ZOOM_MIN, zoomByWheel } from './viewport';
+import { bounds, centreOf, clampPan, clampZoom, drawnBox, EDGE_GAP, leaving, lookingAt, midpoint, panAfterZoom, panOnto, settled, spanBetween, tapTarget, TOUCH_FLOOR, ZOOM_MAX, ZOOM_MIN, zoomByWheel } from './viewport';
 
 describe('how far a sheet can be pushed around', () => {
   it('gives back the room everything drawn takes up', () => {
@@ -164,5 +164,33 @@ describe('how big a node is to tap', () => {
     for (const scale of [ZOOM_MIN, 0.5, 0.75, 1, 2, ZOOM_MAX]) {
       expect(tapTarget(scale) * scale).toBeGreaterThanOrEqual(TOUCH_FLOOR);
     }
+  });
+});
+
+describe('where a road between two places starts and stops', () => {
+  const BUBBLE = { width: 100, height: 40 };
+
+  it('leaves the box it starts in, rather than the point at the middle of it', () => {
+    expect(leaving({ x: 0, y: 0 }, { x: 500, y: 0 }, BUBBLE)).toEqual({ x: 50 + EDGE_GAP, y: 0 });
+    expect(leaving({ x: 0, y: 0 }, { x: 0, y: -500 }, BUBBLE)).toEqual({ x: 0, y: -(20 + EDGE_GAP) });
+  });
+
+  it('leaves by whichever side the road actually crosses', () => {
+    const corner = leaving({ x: 0, y: 0 }, { x: 500, y: 500 }, BUBBLE);
+
+    expect(corner.x).toBeCloseTo(20 + EDGE_GAP, 10);
+    expect(corner.y).toBeCloseTo(20 + EDGE_GAP, 10);
+  });
+
+  it('stops at the far end rather than running past it, for two places nearly on top of each other', () => {
+    expect(leaving({ x: 0, y: 0 }, { x: 3, y: 0 }, BUBBLE)).toEqual({ x: 3, y: 0 });
+  });
+
+  it('holds still for two places drawn in the same spot', () => {
+    expect(leaving({ x: 7, y: 7 }, { x: 7, y: 7 }, BUBBLE)).toEqual({ x: 7, y: 7 });
+  });
+
+  it('is the middle of the place itself when nothing has been measured yet', () => {
+    expect(leaving({ x: 0, y: 0 }, { x: 500, y: 0 }, { width: 0, height: 0 })).toEqual({ x: EDGE_GAP, y: 0 });
   });
 });

@@ -71,11 +71,11 @@ export function drawnFor(view: PlayView, asked: number | null): Drawn {
   return { plane, here, sheet: sheetAt(discovered, here, plane, travels), travels };
 }
 
-export const PER_UNIT = 104;
+// The pixels one step of the world's coordinates is drawn as. The world says it — `# variable
+// map-grid` — and it arrives on the view beside the places, so nothing here holds a size of its own.
+export const spotOf = (node: Node, grid: number): Point => ({ x: node.at.x * grid, y: node.at.y * grid });
 
-export const spotOf = (node: Node): Point => ({ x: node.at.x * PER_UNIT, y: node.at.y * PER_UNIT });
-
-export const mapBox = (nodes: readonly Node[]): Box => bounds(nodes.map(spotOf));
+export const mapBox = (nodes: readonly Node[], grid: number): Box => bounds(nodes.map((node) => spotOf(node, grid)));
 
 export function walkLine(here: string, journey: PlayView['journey']): string[] {
   if (!journey || journey.legs.length === 0) return [];

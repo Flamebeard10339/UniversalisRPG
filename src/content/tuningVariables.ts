@@ -7,6 +7,7 @@ export const CONTEST_SPREAD = 'contest-spread';
 export const DEFAULT_ACTION_DURATION = 'default-action-duration';
 export const INVENTORY_SLOTS = 'inventory-slots';
 export const ENGAGEMENT_SECONDS = 'engagement-seconds';
+export const MAP_GRID = 'map-grid';
 
 const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = {
   [CONTEST_SPREAD]: {
@@ -24,6 +25,10 @@ const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = 
   [INVENTORY_SLOTS]: {
     least: 0,
     why: 'a pack cannot hold fewer things than none, and zero is how a world says it holds any number',
+  },
+  [MAP_GRID]: {
+    least: 1,
+    why: 'a grid of nothing draws every place on top of every other',
   },
   [ENGAGEMENT_SECONDS]: {
     least: 0,

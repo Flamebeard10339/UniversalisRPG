@@ -1,5 +1,5 @@
 import type { Registry } from '../content/registry';
-import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, ENGAGEMENT_SECONDS, INVENTORY_SLOTS, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
+import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, ENGAGEMENT_SECONDS, INVENTORY_SLOTS, MAP_GRID, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
 import { secondsToMs } from './units';
 
 const DEFAULT_TRAVEL_SECONDS = 3;
@@ -41,4 +41,14 @@ export function inventorySlots(registry: Registry): number {
 // you there arrives the instant you do, which is what every world played before this did.
 export function engagementDelay(registry: Registry): number {
   return Math.max(0, secondsToMs(registry.variables.get(ENGAGEMENT_SECONDS)?.value ?? 0));
+}
+
+const DEFAULT_MAP_GRID = 140;
+
+// How far apart one step of a world's own coordinates is drawn, in pixels. The one number the map is
+// built on: how far a place is dragged, how much room a road has to be seen in, and how close two
+// places may be written before their labels touch. A world's to say, because how much room a map
+// wants is a fact about that world's map and not about the engine drawing it.
+export function mapGrid(registry: Registry): number {
+  return Math.max(1, registry.variables.get(MAP_GRID)?.value ?? DEFAULT_MAP_GRID);
 }

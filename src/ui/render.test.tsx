@@ -11,7 +11,6 @@ import { applyDirective, readRoom, sheetOffers, startSession, unreadHere, view, 
 import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
-import { PER_UNIT } from './discovery';
 import { offerCells } from './choices';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
@@ -354,14 +353,30 @@ describe('what the shell puts on the screen', () => {
   it('puts them as far apart as the engine put them, a unit of world at a time', () => {
     const driver = createDriver([SURVEYED]);
     driver.choose(position(driver, LOOK_OUT));
+    const grid = driver.snapshot().view.mapGrid;
     const found = driver.snapshot().view.discovered;
 
     const drawn = places(renderToStaticMarkup(<App driver={driver} />));
 
     const [first, second] = found.map((place) => ({ place, node: drawn.find((entry) => entry.id === place.id)! }));
     expect(second.place.x - first.place.x).not.toBe(0);
-    expect(second.node.left - first.node.left).toBe((second.place.x - first.place.x) * PER_UNIT);
-    expect(second.node.top - first.node.top).toBe((second.place.y - first.place.y) * PER_UNIT);
+    expect(second.node.left - first.node.left).toBe((second.place.x - first.place.x) * grid);
+    expect(second.node.top - first.node.top).toBe((second.place.y - first.place.y) * grid);
+  });
+
+  // The number is the world's, not the engine's: `# variable map-grid`. A world that wants its quarter
+  // spread out says so in its own file, and every surface that draws a map draws it at that size.
+  it('draws the world at the grid the world declares', () => {
+    const wider = { ...SURVEYED, text: SURVEYED.text.replace('# stat might', ['# variable map-grid', 'value: 300', '', '# stat might'].join('\n')) };
+    const driver = createDriver([wider]);
+    driver.choose(position(driver, LOOK_OUT));
+
+    expect(driver.snapshot().view.mapGrid).toBe(300);
+    const drawn = places(renderToStaticMarkup(<App driver={driver} />));
+    const found = driver.snapshot().view.discovered;
+    const [first, second] = found.map((place) => ({ place, node: drawn.find((entry) => entry.id === place.id)! }));
+
+    expect(second.node.left - first.node.left).toBe((second.place.x - first.place.x) * 300);
   });
 
   it('acknowledges the place that has just arrived, and leaves the known one alone', () => {

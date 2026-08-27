@@ -44,6 +44,7 @@ import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { grouping, offeredBy, type GroupRow } from './grouping';
+import { mapGrid } from './tuning';
 export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
@@ -174,6 +175,9 @@ export interface PlayStatus {
   stats: StatRow[];
   flags: AnswerTable<boolean | number>;
   discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
+  // How far apart one step of this world's coordinates is drawn. Published beside the places rather
+  // than held by whoever is drawing them, so every surface that draws a map draws it at one size.
+  mapGrid: number;
   locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
   journal: JournalEntry[];
@@ -555,6 +559,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     stats: listedToPlayer(registry.stats.values()).map((stat) => statRow(stat.id, state, registry, localizer)),
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
+    mapGrid: mapGrid(registry),
     locations: listedToPlayer(registry.locations.values()).map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),

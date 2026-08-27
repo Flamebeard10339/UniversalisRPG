@@ -9,7 +9,7 @@ import { answering, centredOn, created, droppedAt, joinedInto, placedInto, stage
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
-import { panOnto, tapTarget, type Point } from './viewport';
+import { leaving, panOnto, tapTarget, type Point, type Size } from './viewport';
 import type { Words } from './words';
 
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
@@ -31,6 +31,7 @@ function Bubble({
   node,
   arrived,
   walking,
+  grid,
   scale,
   held,
   go,
@@ -42,6 +43,7 @@ function Bubble({
   node: Node;
   arrived: boolean;
   walking: Walking | undefined;
+  grid: number;
   scale: number;
   held: (element: HTMLButtonElement | null) => void;
   go: (() => void) | null;
@@ -50,7 +52,7 @@ function Bubble({
   grip: Grip | null;
   chosen: boolean;
 }): JSX.Element {
-  const spot = spotOf(node);
+  const spot = spotOf(node, grid);
   const flash = useMoment('arrival', arrived, node.place.id);
 
   const look = {
@@ -98,9 +100,10 @@ function Bubble({
 }
 
 // Whether a road is walked both ways is what the line is: solid for a road walked both, dashed and pointed for one walked only towards where it points. Whether it is open is the weight and the colour, so the two facts do not share a channel.
-function Road({ from, to, open, mutual, walking }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: Walked | null }): JSX.Element {
-  const a = spotOf(from);
-  const b = spotOf(to);
+function Road({ from, to, open, mutual, walking, grid, bubble }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: Walked | null; grid: number; bubble: Size }): JSX.Element {
+  const ends = [spotOf(from, grid), spotOf(to, grid)];
+  const a = leaving(ends[0], ends[1], bubble);
+  const b = leaving(ends[1], ends[0], bubble);
   const now = walking?.stretch === 'now';
   const look = {
     className: walking ? 'stroke-accent-strong' : open ? 'stroke-accent' : 'stroke-text-subtle',
@@ -167,7 +170,8 @@ export function MapPane({
   const [naming, setNaming] = useState('');
 
   const { plane: at, here, sheet, travels } = drawnFor(view, plane);
-  const spots = sheet.nodes.map(spotOf);
+  const grid = view.mapGrid;
+  const spots = sheet.nodes.map((node) => spotOf(node, grid));
   const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
 
   const walk = walkLine(here, view.journey);
@@ -177,7 +181,7 @@ export function MapPane({
     const drawn = drawnFor(view, floor);
     const standing = drawn.sheet.nodes.find((each) => each.place.id === here);
     setPlane(floor);
-    hold.settle(standing ? panOnto(spotOf(standing), 1) : { x: 0, y: 0 }, 1);
+    hold.settle(standing ? panOnto(spotOf(standing, grid), 1) : { x: 0, y: 0 }, 1);
   };
 
   const lineFor = (id: string): string | null => tappedPlace(dev, id, travels.get(id) ?? null);
@@ -193,7 +197,7 @@ export function MapPane({
 
   function letGo(id: string, carried: Point): void {
     const node = sheet.nodes.find((each) => each.place.id === id);
-    if (node) answering(droppedAt(sections, node, carried), answer);
+    if (node) answering(droppedAt(sections, node, carried, grid), answer);
   }
 
   const roadsFrom = (id: string): string[] => (view.discovered.find((place) => place.id === id)?.adjacent ?? []).map((edge) => String(edge.to));
@@ -207,7 +211,7 @@ export function MapPane({
 
   const make = (id: string): void => {
     if (view.locations.some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
-    const staged = created(id, centredOn(hold), at);
+    const staged = created(id, centredOn(hold, grid), at);
     if ('refused' in staged) return onNote(staged.refused);
     onSend(staged.line);
     onSend(gotoLine(stagedKey(id)));
@@ -313,7 +317,16 @@ export function MapPane({
     >
       <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
         {map.sheet.roads.map((road) => (
-          <Road key={`${road.from.place.id}>${road.to.place.id}`} from={road.from} to={road.to} open={road.open} mutual={road.mutual} walking={onWalk(walk, road.from.place.id, road.to.place.id)} />
+          <Road
+            key={`${road.from.place.id}>${road.to.place.id}`}
+            from={road.from}
+            to={road.to}
+            open={road.open}
+            mutual={road.mutual}
+            grid={grid}
+            bubble={hold.node}
+            walking={onWalk(walk, road.from.place.id, road.to.place.id)}
+          />
         ))}
       </svg>
 
@@ -323,6 +336,7 @@ export function MapPane({
           node={node}
           arrived={arrivals.includes(node.place.id)}
           walking={walkingAt(walk, node)}
+          grid={grid}
           go={mode === 'link' ? () => link(node.place.id) : lineFor(node.place.id) === null ? null : () => go(node.place.id)}
           chosen={node.place.id === from}
           scale={map.zoom}

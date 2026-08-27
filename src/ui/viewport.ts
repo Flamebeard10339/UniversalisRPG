@@ -87,5 +87,20 @@ export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan
 
 export const panOnto = (target: Point, zoom: number): Point => ({ x: 0 - target.x * zoom, y: 0 - target.y * zoom });
 
+// How much air is left between a place and the road out of it.
+export const EDGE_GAP = 5;
+
+// Where a line drawn from the middle of one box towards another leaves that box. A road runs from
+// where one place stops to where the next one starts, so what is drawn is the road rather than the
+// part of it lying under a name — and a road too short to leave its own box is not drawn at all.
+export function leaving(from: Point, to: Point, box: Size): Point {
+  const run = Math.hypot(to.x - from.x, to.y - from.y);
+  if (run === 0) return from;
+  const along = { x: (to.x - from.x) / run, y: (to.y - from.y) / run };
+  const sides = [along.x === 0 ? Infinity : (box.width / 2 + EDGE_GAP) / Math.abs(along.x), along.y === 0 ? Infinity : (box.height / 2 + EDGE_GAP) / Math.abs(along.y)];
+  const reach = Math.min(run, ...sides);
+  return { x: from.x + along.x * reach, y: from.y + along.y * reach };
+}
+
 // The point of the sheet the middle of the frame is looking at.
 export const lookingAt = (pan: Point, zoom: number): Point => ({ x: 0 - pan.x / zoom, y: 0 - pan.y / zoom });

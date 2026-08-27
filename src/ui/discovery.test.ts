@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { PlayView } from '../runtime/session';
 import { waysOut } from '../runtime/waysOut';
-import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, PER_UNIT, sheetAt, onWalk, walkingAt, walkLine, type Node, type Place } from './discovery';
+import { CLIMB_NUDGE, drawnAt, mapBox, newlyFound, sheetAt, onWalk, walkingAt, walkLine, type Node, type Place } from './discovery';
+
+// Any grid proves the same rule; the world's own number is `# variable map-grid` and is not this file's business.
+const GRID = 140;
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -112,11 +115,11 @@ describe('one plane of the map', () => {
 
 describe('the room the map takes up', () => {
   it('is the places it draws, turned into the pixels a viewport is held against', () => {
-    expect(mapBox(sheetAt(HOUSE, 'hall', 0).nodes)).toEqual({
-      minX: -CLIMB_NUDGE * PER_UNIT,
-      minY: -CLIMB_NUDGE * PER_UNIT,
-      maxX: 2 * PER_UNIT,
-      maxY: CLIMB_NUDGE * PER_UNIT,
+    expect(mapBox(sheetAt(HOUSE, 'hall', 0).nodes, GRID)).toEqual({
+      minX: -CLIMB_NUDGE * GRID,
+      minY: -CLIMB_NUDGE * GRID,
+      maxX: 2 * GRID,
+      maxY: CLIMB_NUDGE * GRID,
     });
   });
 });
