@@ -4,6 +4,7 @@ import { DIRECTION_VECTORS } from '../content/sections/location';
 import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
 import type { PlayChoice } from './session';
 import { loadUniverse } from '../content/load';
+import { shippedSources } from '../content/shipped';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -26,6 +27,7 @@ const travel = (to: string, legs = 1): PlayChoice => ({ id: `travel:${to}`, kind
 
 const status = (places: readonly Place[], here: string, choices: readonly PlayChoice[] = []): Standing => ({
   discovered: [...places],
+  undiscovered: [],
   regions: [],
   location: { id: here },
   choices: [...choices],
@@ -151,15 +153,27 @@ describe('which way one place lies from another', () => {
   });
 
   it('points between two of them where a place lies between them', () => {
-    expect(bearingOf(from, { x: 3, y: 3, z: 0 })).toBe('north-east');
-    expect(bearingOf(from, { x: -3, y: 3, z: 0 })).toBe('north-west');
-    expect(bearingOf(from, { x: 3, y: -3, z: 0 })).toBe('south-east');
-    expect(bearingOf(from, { x: -3, y: -3, z: 0 })).toBe('south-west');
+    expect(bearingOf(from, { x: 3, y: -3, z: 0 })).toBe('north-east');
+    expect(bearingOf(from, { x: -3, y: -3, z: 0 })).toBe('north-west');
+    expect(bearingOf(from, { x: 3, y: 3, z: 0 })).toBe('south-east');
+    expect(bearingOf(from, { x: -3, y: 3, z: 0 })).toBe('south-west');
   });
 
   it('rounds to the nearest of the eight rather than refusing anything off them', () => {
     expect(bearingOf(from, { x: 10, y: 1, z: 0 })).toBe('east');
-    expect(bearingOf(from, { x: 10, y: 8, z: 0 })).toBe('north-east');
+    expect(bearingOf(from, { x: 10, y: -8, z: 0 })).toBe('north-east');
+  });
+
+  // The world's own words and the map's own bearings have to agree, and they did not: the corpus
+  // writes its north gate above its square, and the language said north was below.
+  it('agrees with what the shipped world calls its gates', () => {
+    const places = loadUniverse([...shippedSources()]).locations;
+    const square = places.get('tulsa.market-square')!;
+
+    expect(bearingOf(square, places.get('tulsa.kings-road')!)).toContain('north');
+    expect(bearingOf(square, places.get('tulsa.riverside')!)).toContain('south');
+    expect(bearingOf(square, places.get('tulsa.swamp-edge')!)).toBe('west');
+    expect(bearingOf(square, places.get('tulsa.market-row')!)).toBe('east');
   });
 
   it('is a floor rather than a heading for a place straight above or below', () => {

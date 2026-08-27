@@ -99,6 +99,7 @@ describe('the map as a driving agent reaches it', () => {
   const sheet = sheetOf(
     {
       discovered: HOUSE,
+      undiscovered: [],
       regions: [],
       location: { id: 'hall' },
       choices: [{ id: 'travel:cellar', kind: 'travel', label: asLocalized('down'), leadsTo: 'cellar', legs: 1 }, { id: 'travel:beach', kind: 'travel', label: asLocalized('east'), leadsTo: 'beach', legs: 1 }],

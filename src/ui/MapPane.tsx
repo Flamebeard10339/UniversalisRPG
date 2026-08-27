@@ -60,11 +60,12 @@ function Bubble({
   const look = {
     ref: held,
     'data-place': node.place.id,
+    'data-found': node.found ? undefined : 'no',
     'data-walk': walking,
     style: { left: spot.x + carried.x, top: spot.y + carried.y },
     className: `absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
       walking === undefined ? 'border-border bg-panel' : WALKING_CLASS[walking]
-    } ${node.climb !== 0 ? 'opacity-70' : ''} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-danger' : ''}`,
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${node.found ? '' : 'border-dashed opacity-60'} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-danger' : ''}`,
   };
 
   const inside = (
@@ -149,9 +150,20 @@ export function roundedRing(points: readonly Point[], reach = CORNER): string {
 }
 
 function RegionShape({ region, grid, carried }: { region: Sheet['regions'][number]; grid: number; carried: Point }): JSX.Element | null {
-  const path = roundedRing(region.hull.map((point) => ({ x: point.x * grid + carried.x, y: point.y * grid + carried.y })));
+  const corners = region.hull.map((point) => ({ x: point.x * grid + carried.x, y: point.y * grid + carried.y }));
+  const path = roundedRing(corners);
   if (path === '') return null;
-  return <path data-region={region.id} d={path} className="fill-accent/5 stroke-accent/40" strokeWidth={2} strokeDasharray="7 5" />;
+  // Named above the shape rather than inside it, where a room would be standing on the letters.
+  const top = Math.min(...corners.map((point) => point.y));
+  const middle = corners.reduce((sum, point) => sum + point.x, 0) / corners.length;
+  return (
+    <g data-region={region.id}>
+      <path d={path} className="fill-accent/5 stroke-accent/40" strokeWidth={2} strokeDasharray="7 5" />
+      <text x={middle} y={top - 6} textAnchor="middle" className="fill-text-subtle text-[11px] uppercase tracking-wide">
+        {region.title}
+      </text>
+    </g>
+  );
 }
 
 const HEAD = 10;
@@ -194,7 +206,9 @@ export function MapPane({
   const [from, setFrom] = useState<string | null>(null);
   const [naming, setNaming] = useState('');
 
-  const { plane: at, here, sheet: whole } = drawnFor(view, plane);
+  // An author is shown every place on the floor they are looking at, found or not: a map that draws
+  // only what a player has found is no use for putting the next place beside the last one.
+  const { plane: at, here, sheet: whole } = drawnFor(view, plane, dev ? 'every' : 'found');
   const grid = view.mapGrid;
   const spots = whole.nodes.map((node) => spotOf(node, grid));
   const hold = useSheetHold(spots, bubbles, JSON.stringify(whole.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
@@ -208,7 +222,7 @@ export function MapPane({
 
   const recentre = (): void => {
     const floor = view.discovered.find((place) => place.id === here)?.z ?? null;
-    const drawn = drawnFor(view, floor);
+    const drawn = drawnFor(view, floor, dev ? 'every' : 'found');
     const standing = drawn.sheet.nodes.find((each) => each.place.id === here);
     setPlane(floor);
     hold.settle(standing ? panOnto(spotOf(standing, grid), 1) : { x: 0, y: 0 }, 1);
@@ -243,7 +257,7 @@ export function MapPane({
   };
 
   const make = (id: string): void => {
-    if (view.locations.some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
+    if ([...view.discovered, ...view.undiscovered].some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
     const staged = created(id, centredOn(hold, grid), at);
     if ('refused' in staged) return onNote(staged.refused);
     onSend(staged.line);

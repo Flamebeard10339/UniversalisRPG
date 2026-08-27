@@ -10,6 +10,7 @@ const COLUMN = LABEL + GAP;
 
 const HERE = '>';
 const SHUT = '·';
+const UNFOUND = '?';
 const UP = '^';
 const DOWN = 'v';
 
@@ -24,7 +25,9 @@ interface Cell {
 function labelOf(node: Sheet['nodes'][number]): string {
   const climb = node.climb === 0 ? '' : node.climb > 0 ? UP : DOWN;
   const numbered = node.goes === null ? '' : `${node.goes}:`;
-  return cut(`${node.here ? HERE : ''}${numbered}${climb}${String(node.place.title)}`, LABEL);
+  // A place the player has not found is only ever drawn for an author, and is marked so that what is
+  // on the map and what is in the world are never read as the same thing.
+  return cut(`${node.here ? HERE : ''}${node.found ? '' : UNFOUND}${numbered}${climb}${String(node.place.title)}`, LABEL);
 }
 
 // The lattice the drawn positions make, with the columns and rows nothing stands on taken out. A
@@ -33,7 +36,7 @@ function labelOf(node: Sheet['nodes'][number]): string {
 // places touch — a square with no line to the square beside it is joined to nothing.
 function lattice(sheet: Sheet): { cells: Map<string, Cell>; columns: number[]; rows: number[]; crowded: string[] } {
   const columns = [...new Set(sheet.nodes.map((node) => node.at.x))].sort((low, high) => low - high);
-  const rows = [...new Set(sheet.nodes.map((node) => node.at.y))].sort((low, high) => high - low);
+  const rows = [...new Set(sheet.nodes.map((node) => node.at.y))].sort((low, high) => low - high);
   const cells = new Map<string, Cell>();
   const taken = new Set<string>();
   const crowded: string[] = [];

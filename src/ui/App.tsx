@@ -208,7 +208,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
     sections,
     declared,
     standing: standingIn(view),
-    places: view.locations,
+    places: [...view.discovered, ...view.undiscovered],
     editing,
     controls: editControls(
       { sections, declared, editing },

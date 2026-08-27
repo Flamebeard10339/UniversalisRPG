@@ -1,4 +1,4 @@
-import { sheetOf, type Node, type Sheet } from '../runtime/map';
+import { sheetOf, type Node, type Sheet, type Showing } from '../runtime/map';
 import type { PlayView } from '../runtime/session';
 import { bounds, type Box, type Point } from './viewport';
 
@@ -11,8 +11,8 @@ export interface Drawn {
   sheet: Sheet;
 }
 
-export const drawnFor = (view: PlayView, asked: number | null): Drawn => {
-  const sheet = sheetOf(view, asked);
+export const drawnFor = (view: PlayView, asked: number | null, showing: Showing = 'found'): Drawn => {
+  const sheet = sheetOf(view, asked, showing);
   return { plane: sheet.plane, here: sheet.here, sheet };
 };
 

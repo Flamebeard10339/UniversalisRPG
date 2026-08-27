@@ -199,12 +199,15 @@ export interface PlayStatus {
   xp: SkillRow[];
   stats: StatRow[];
   flags: AnswerTable<boolean | number>;
+  // Every place there is, split by whether the player has found it. Two lists rather than one with a
+  // flag on it, because almost everything that reads them wants the found ones and nothing else; and
+  // not one list plus a second saying which ids exist, because that was the same fact written twice.
   discovered: Place[];
+  undiscovered: Place[];
   // How far apart one step of this world's coordinates is drawn. Published beside the places rather
   // than held by whoever is drawing them, so every surface that draws a map draws it at one size.
   mapGrid: number;
   regions: Region[];
-  locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
   journal: JournalEntry[];
   player: PlayerRows;
@@ -584,10 +587,9 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     xp: listedToPlayer(registry.skills.values()).map(({ id }) => skillRow(id, state.xp[id] ?? 0, localizer)),
     stats: listedToPlayer(registry.stats.values()).map((stat) => statRow(stat.id, state, registry, localizer)),
     flags: { ...state.flags },
-    discovered: publishDiscovered(state, registry),
+    ...publishPlaces(state, registry),
     mapGrid: mapGrid(registry),
     regions: listedToPlayer(registry.regions.values()).map((each) => ({ id: each.id, title: localizer.title('region', each.id), holds: [...each.holds] })),
-    locations: listedToPlayer(registry.locations.values()).map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),
     player: playerRows(state, registry),
@@ -631,11 +633,15 @@ export function carriedListing(session: PlaySession): CarriedEntry[] {
   return carriedEntries(stateOf(session), session.registry);
 }
 
-function publishDiscovered(state: GameState, registry: Registry): PlayStatus['discovered'] {
+// Every place, split by whether it has been found. A found place's roads run only to other found
+// places — a road to somewhere nobody has heard of is not a road anybody can be told about — while a
+// place nobody has found carries all of its roads, since what an author is looking at when they ask
+// for the whole floor is the map as it is written.
+function publishPlaces(state: GameState, registry: Registry): { discovered: Place[]; undiscovered: Place[] } {
   const localizer = localizerOf(registry, state);
-  const found = listedToPlayer(registry.locations.values()).filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`]));
-  const known = new Set(found.map((each) => each.id));
-  return found.map((each) => ({
+  const every = listedToPlayer(registry.locations.values());
+  const known = new Set(every.filter((each) => truthy(state.flags[`${each.id}.${DISCOVERED}`])).map((each) => each.id));
+  const published = (each: Location, only: ReadonlySet<Answer> | null): Place => ({
     id: each.id,
     title: localizer.title('location', each.id),
     x: each.x,
@@ -643,9 +649,13 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
     z: each.z,
     ...(each.relative === undefined ? {} : { relative: { direction: each.relative.direction, of: each.relative.of } }),
     adjacent: effectiveAdjacent(registry, each.id)
-      .filter((edge) => known.has(edge.target))
+      .filter((edge) => only === null || only.has(edge.target))
       .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state, registry) })),
-  }));
+  });
+  return {
+    discovered: every.filter((each) => known.has(each.id)).map((each) => published(each, known)),
+    undiscovered: every.filter((each) => !known.has(each.id)).map((each) => published(each, null)),
+  };
 }
 
 function publishResources(state: GameState, registry: Registry): PlayStatus['resources'] {

@@ -24,7 +24,7 @@ const HOUSE: Place[] = [
   place('cove', 2, 0, 0, 'beach'),
 ];
 
-const drawn = (here: string, plane: number) => sheetOf({ discovered: HOUSE, regions: [], location: { id: here }, choices: [], mapGrid: GRID }, plane);
+const drawn = (here: string, plane: number) => sheetOf({ discovered: HOUSE, undiscovered: [], regions: [], location: { id: here }, choices: [], mapGrid: GRID }, plane);
 
 describe('the room the map takes up', () => {
   it('is the places it draws, turned into the pixels a viewport is held against', () => {
@@ -94,7 +94,7 @@ describe('the walk under way', () => {
   });
 });
 
-const at = (id: string, here = false): Node => ({ place: place(id, 0, 0, 0), here, climb: 0, at: { x: 0, y: 0 }, goes: null, bearing: null });
+const at = (id: string, here = false): Node => ({ place: place(id, 0, 0, 0), here, climb: 0, at: { x: 0, y: 0 }, goes: null, bearing: null, found: true });
 
 describe('what a place is while a journey is on', () => {
   const line = walkLine('a', { to: 'd', legs: ['b', 'c', 'd'] });
@@ -129,7 +129,7 @@ describe('what a place is while a journey is on', () => {
 describe('a map folded up', () => {
   const REGION = { id: 'house', title: asLocalized('The House'), holds: ['hall', 'landing', 'cellar'] };
 
-  const sheetWith = (here = 'beach') => sheetOf({ discovered: HOUSE, regions: [REGION], location: { id: here }, choices: [], mapGrid: GRID }, 0);
+  const sheetWith = (here = 'beach') => sheetOf({ discovered: HOUSE, undiscovered: [], regions: [REGION], location: { id: here }, choices: [], mapGrid: GRID }, 0);
 
   it('draws a region as one place standing where its rooms stand', () => {
     const drawn = folded(sheetWith());
@@ -152,7 +152,7 @@ describe('a map folded up', () => {
   });
 
   it('leaves a map with no regions on it exactly as it was', () => {
-    const bare = sheetOf({ discovered: HOUSE, regions: [], location: { id: 'hall' }, choices: [], mapGrid: GRID }, 0);
+    const bare = sheetOf({ discovered: HOUSE, undiscovered: [], regions: [], location: { id: 'hall' }, choices: [], mapGrid: GRID }, 0);
 
     expect(folded(bare)).toBe(bare);
   });

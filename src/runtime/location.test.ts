@@ -34,8 +34,9 @@ describe('recursivelyResolveRelativeCoordinates', () => {
       relative('u', 'up', 'home'),
       relative('d', 'down', 'home'),
     );
-    expect(map.get('n')).toMatchObject({ x: 0, y: 1, z: 0 });
-    expect(map.get('s')).toMatchObject({ x: 0, y: -1, z: 0 });
+    // North is a smaller `y`, the way it is on every map anybody has drawn.
+    expect(map.get('n')).toMatchObject({ x: 0, y: -1, z: 0 });
+    expect(map.get('s')).toMatchObject({ x: 0, y: 1, z: 0 });
     expect(map.get('e')).toMatchObject({ x: 1, y: 0, z: 0 });
     expect(map.get('w')).toMatchObject({ x: -1, y: 0, z: 0 });
     expect(map.get('u')).toMatchObject({ x: 0, y: 0, z: 1 });

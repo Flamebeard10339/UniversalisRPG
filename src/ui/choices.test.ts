@@ -126,7 +126,7 @@ describe('the offers on the sheet', () => {
     const discovered = [at('landing', 1, 'hall'), at('hall', 0, 'landing', 'cellar'), at('cellar', -1, 'hall')];
     const walk: PlayView['choices'][number] = { id: 'travel:cellar', kind: 'travel', label: asLocalized('Travel to Cellar'), leadsTo: 'cellar', legs: 2 };
     const offers = [choice('a', 'Talk to Miki'), walk];
-    const view = { discovered, regions: [], location: { id: 'landing' }, choices: offers } as unknown as PlayView;
+    const view = { discovered, undiscovered: [], regions: [], location: { id: 'landing' }, choices: offers } as unknown as PlayView;
 
     expect(groupOffers(sheet(...offers)).flatMap((group) => group.offers.map((offer) => offer.id))).toEqual(['a']);
     const drawn = drawnFor(view, null);

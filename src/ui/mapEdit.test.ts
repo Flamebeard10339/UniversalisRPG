@@ -26,7 +26,7 @@ const at = (id: string, x: number, y: number, z = 0, ...adjacent: string[]): Pla
   adjacent: adjacent.map((to) => ({ to, open: true })),
 });
 
-const drawn = (places: readonly Place[], here: string): Sheet => sheetOf({ discovered: places, regions: [], location: { id: here }, choices: [], mapGrid: GRID }, null);
+const drawn = (places: readonly Place[], here: string): Sheet => sheetOf({ discovered: places, undiscovered: [], regions: [], location: { id: here }, choices: [], mapGrid: GRID }, null);
 
 describe('where a drag lets go is where the place is (c8)', () => {
   it('rounds to the units a location can be written in', () => {
@@ -40,7 +40,7 @@ describe('where a drag lets go is where the place is (c8)', () => {
     }
   });
 
-  const node = (x: number, y: number, climb = 0): Node => ({ place: at('somewhere', x, y, climb), here: false, climb, goes: null, bearing: null, at: drawnAt({ x, y, z: climb }, 0) });
+  const node = (x: number, y: number, climb = 0): Node => ({ place: at('somewhere', x, y, climb), here: false, climb, goes: null, bearing: null, found: true, at: drawnAt({ x, y, z: climb }, 0) });
 
   it('turns the pixels a finger carried a place into the square it landed on', () => {
     expect(droppedAt(node(3, -4), { x: GRID * 3, y: GRID * -2 }, GRID)).toEqual({ x: 6, y: -6 });

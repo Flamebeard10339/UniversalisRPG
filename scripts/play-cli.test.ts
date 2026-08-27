@@ -188,7 +188,7 @@ describe('play-cli renders what a command result says happened', () => {
       `stats: ${sheet}`,
       'Health: ██████████ 31.3/31.3',
     ]);
-    expect(state[8]).toMatch(/^locations: 1 of \d+ found; not yet found: tulsa\./);
+    expect(state[8]).toMatch(/^discovered: 1 of \d+ found; not yet found: /);
     expect(state[8]).toContain('tulsa.market-square');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
   });
@@ -218,7 +218,7 @@ x: 1, y: 0
 
     expect(drawn).toContain('a road that is shut');
     expect(drawn).not.toContain('─');
-    expect(shown(runLine(ctx, '/state'))).toContain('locations: 2 of 2 found');
+    expect(shown(runLine(ctx, '/state'))).toContain('discovered: 2 of 2 found');
   });
 
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {

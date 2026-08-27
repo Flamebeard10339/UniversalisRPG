@@ -100,9 +100,13 @@ export const relativeValue: Parser<Relative> = {
   examples: ['north of clearing', 'down of shaft'],
 };
 
+// Which way each direction goes, in the coordinates a world writes. North is a smaller `y`, the way
+// it is on every map anybody has drawn: `y` counts down the page, so the north gate of a town is
+// written above its square and drawn above it. Everything that has an opinion about which way a place
+// lies reads this, so a world that wanted its map the other way up would turn it here and nowhere else.
 export const DIRECTION_VECTORS: Record<Direction, readonly [number, number, number]> = {
-  north: [0, 1, 0],
-  south: [0, -1, 0],
+  north: [0, -1, 0],
+  south: [0, 1, 0],
   east: [1, 0, 0],
   west: [-1, 0, 0],
   up: [0, 0, 1],

@@ -32,7 +32,7 @@ export interface EditHeld {
   sections: readonly Section[];
   declared: readonly Addressed[];
   standing: Standing;
-  places: PlayView['locations'];
+  places: PlayView['discovered'];
   editing: Editing;
   controls: EditControls;
 }

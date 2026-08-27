@@ -257,9 +257,9 @@ function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
 // `/map`, which draws the sheet the engine builds; a state dump that drew a second map of its own
 // was the third reading of one thing.
 function formatMap(status: PlayStatus): ToolLine[] {
-  const found = new Set(status.discovered.map((place) => place.id));
-  const unfound = status.locations.flatMap((each) => (found.has(each.id) ? [] : [String(each.id)]));
-  return [field('locations', `${found.size} of ${status.locations.length} found${unfound.length === 0 ? '' : `; not yet found: ${unfound.join(', ')}`}`)];
+  const unfound = status.undiscovered.map((each) => `${each.title} (${each.id})`);
+  const every = status.discovered.length + unfound.length;
+  return [field('discovered', `${status.discovered.length} of ${every} found${unfound.length === 0 ? '' : `; not yet found: ${unfound.join(', ')}`}`)];
 }
 
 function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {

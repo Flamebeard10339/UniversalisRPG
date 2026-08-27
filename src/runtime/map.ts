@@ -8,6 +8,7 @@ export type { Place, Region } from './session';
 // What the map is drawn from, which is a corner of what a view publishes.
 export interface Standing {
   discovered: readonly Place[];
+  undiscovered: readonly Place[];
   regions: readonly Region[];
   location: { id: Answer };
   choices: readonly PlayChoice[];
@@ -68,6 +69,8 @@ export interface Node {
   // of here leads to it now.
   goes: number | null;
   bearing: Bearing | null;
+  // Whether the player has found this place. Only an author is ever shown one they have not.
+  found: boolean;
 }
 
 export interface Road {
@@ -205,8 +208,14 @@ function regionsOn(regions: readonly Region[], nodes: readonly Node[]): Drawn[] 
 export const regionHolding = (regions: readonly { holds: readonly Answer[] }[], place: Answer): { holds: readonly Answer[] } | undefined =>
   regions.find((region) => region.holds.includes(place));
 
-export function sheetOf(status: Standing, asked: number | null): Sheet {
-  const places = status.discovered;
+// What a map may draw: what the player has found, or — for an author editing one — every place there
+// is on the floor they are looking at. A map that draws only what a player has found is no use for
+// putting the next place beside the last one.
+export type Showing = 'found' | 'every';
+
+export function sheetOf(status: Standing, asked: number | null, showing: Showing = 'found'): Sheet {
+  const places = showing === 'every' ? [...status.discovered, ...status.undiscovered] : status.discovered;
+  const found = new Set(status.discovered.map((place) => place.id));
   const here = status.location.id;
   const standing = places.find((place) => place.id === here);
   const plane = asked ?? standing?.z ?? 0;
@@ -226,6 +235,7 @@ export function sheetOf(status: Standing, asked: number | null): Sheet {
     at: drawnAt(place, plane),
     goes: travels.get(place.id) ?? null,
     bearing: standing ? bearingOf(standing, place) : null,
+    found: found.has(place.id),
   }));
 
   const drawn = new Set(nodes.map((node) => node.place.id));

@@ -958,7 +958,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'none',
     summary: 'draw the map: the floor you are on, the roads across it, and every way out under the number that walks it',
     parse: nothing,
-    run: (ctx) => ({ output: [{ kind: 'map', map: sheetOf(ctx.view, null) }], quit: false, recorded: [] }),
+    run: (ctx) => ({ output: [{ kind: 'map', map: sheetOf(ctx.view, null, ctx.save?.dev === true ? 'every' : 'found') }], quit: false, recorded: [] }),
   }),
   define({
     name: '/state',
