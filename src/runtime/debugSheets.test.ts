@@ -98,6 +98,11 @@ stats: max-health 1
 DEBUG
 x: 9, y: 9
 
+# region probe-region
+DEBUG
+holds:
+  probe-location
+
 # station probe-station
 DEBUG
 

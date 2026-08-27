@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from './localizedFixture';
 import { DIRECTION_VECTORS } from '../content/sections/location';
-import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
+import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
 import type { PlayChoice } from './session';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
@@ -25,6 +25,7 @@ const travel = (to: string, legs = 1): PlayChoice => ({ id: `travel:${to}`, kind
 
 const status = (places: readonly Place[], here: string, choices: readonly PlayChoice[] = []): Standing => ({
   discovered: [...places],
+  regions: [],
   location: { id: here },
   choices: [...choices],
   mapGrid: 140,
@@ -227,5 +228,64 @@ describe('the nine squares a way out is offered in', () => {
     ]);
     expect(compassOf(drawn.ways).cells[5]?.to).toBe('beach');
     expect(compassOf(drawn.ways).rest.map((each) => String(each.to))).toEqual(['landing']);
+  });
+});
+
+// A region is drawn and nothing else. Nothing in the engine reads one, so what there is to prove is
+// about the shape: that it goes round what the region holds, and that what it holds moves together.
+describe('the shape a region draws', () => {
+  const HOUSE_REGION = { id: 'house', title: asLocalized('The House'), holds: ['hall', 'landing', 'cellar'] };
+
+  const withRegions = (regions: readonly { id: string; title: ReturnType<typeof asLocalized>; holds: string[] }[], here = 'hall', plane: number | null = 0): Sheet =>
+    sheetOf({ ...status(HOUSE, here), regions }, plane);
+
+  const inside = (hull: readonly { x: number; y: number }[], point: { x: number; y: number }): boolean =>
+    hull.every((corner, at) => {
+      const next = hull[(at + 1) % hull.length]!;
+      return (next.x - corner.x) * (point.y - corner.y) - (next.y - corner.y) * (point.x - corner.x) >= -1e-9;
+    });
+
+  it('goes round every place it holds that the sheet is drawing', () => {
+    const drawn = withRegions([HOUSE_REGION]).regions[0]!;
+
+    expect(drawn.drawn.sort()).toEqual(['cellar', 'hall', 'landing']);
+    for (const id of drawn.drawn) {
+      const node = withRegions([HOUSE_REGION]).nodes.find((each) => each.place.id === id)!;
+      expect(inside(drawn.hull, node.at), id).toBe(true);
+    }
+  });
+
+  it('leaves outside it a place it does not hold', () => {
+    const drawn = withRegions([HOUSE_REGION]).regions[0]!;
+    const beach = withRegions([HOUSE_REGION]).nodes.find((each) => each.place.id === 'beach')!;
+
+    expect(inside(drawn.hull, beach.at)).toBe(false);
+  });
+
+  it('draws a shape for one place and for two, which have no ring of their own', () => {
+    for (const holds of [['hall'], ['hall', 'beach']]) {
+      const drawn = withRegions([{ ...HOUSE_REGION, holds }]).regions[0]!;
+
+      expect(drawn.hull.length, holds.join()).toBeGreaterThanOrEqual(4);
+      for (const id of holds) {
+        const node = withRegions([{ ...HOUSE_REGION, holds }]).nodes.find((each) => each.place.id === id)!;
+        expect(inside(drawn.hull, node.at), id).toBe(true);
+      }
+    }
+  });
+
+  it('draws nothing for a region none of whose places are on this floor', () => {
+    expect(withRegions([{ ...HOUSE_REGION, holds: ['nowhere-at-all'] }]).regions).toEqual([]);
+  });
+
+  it('draws round what is on this floor, for a region that reaches onto another', () => {
+    const drawn = withRegions([HOUSE_REGION], 'beach').regions[0]!;
+
+    expect(drawn.drawn).toEqual(['hall']);
+  });
+
+  it('says which region carries a place, so a drag knows what it is holding', () => {
+    expect(regionHolding([HOUSE_REGION], 'landing')?.holds).toEqual(HOUSE_REGION.holds);
+    expect(regionHolding([HOUSE_REGION], 'beach')).toBeUndefined();
   });
 });

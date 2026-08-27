@@ -1,13 +1,14 @@
 import { DIRECTION_VECTORS, type Direction } from '../content/sections/location';
 import type { Answer } from './localized';
-import type { Place, PlayChoice } from './session';
+import type { Place, PlayChoice, Region } from './session';
 import { waysOut, type WayOut } from './waysOut';
 
-export type { Place } from './session';
+export type { Place, Region } from './session';
 
 // What the map is drawn from, which is a corner of what a view publishes.
 export interface Standing {
   discovered: readonly Place[];
+  regions: readonly Region[];
   location: { id: Answer };
   choices: readonly PlayChoice[];
   mapGrid: number;
@@ -93,6 +94,7 @@ export interface Sheet {
   nodes: Node[];
   roads: Road[];
   ways: Way[];
+  regions: Drawn[];
 }
 
 // How far off the drawn floor a place is nudged so it does not sit under the place above it.
@@ -117,6 +119,91 @@ function planesFrom(places: readonly Place[], standing: Place | undefined): numb
   }
   return [...floors].sort((low, high) => low - high);
 }
+
+// How much air a region's shape leaves round the places it holds, in the world's own squares. Wide
+// enough that a place inside one is plainly inside it and a place beside one is plainly not.
+export const REGION_PAD = 0.5;
+
+interface Spot {
+  x: number;
+  y: number;
+}
+
+const cross = (o: Spot, a: Spot, b: Spot): number => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+
+// The smallest convex ring the points sit inside, walked anticlockwise. Andrew's monotone chain: the
+// points sorted, the lower side and the upper side each walked once, turns that go the wrong way
+// dropped. Fewer than three points, or points all in a line, leave a ring with no inside.
+function ring(points: readonly Spot[]): Spot[] {
+  const sorted = [...points].sort((left, right) => left.x - right.x || left.y - right.y);
+  if (sorted.length < 3) return sorted;
+  const half = (walk: readonly Spot[]): Spot[] => {
+    const side: Spot[] = [];
+    for (const point of walk) {
+      while (side.length >= 2 && cross(side[side.length - 2]!, side[side.length - 1]!, point) <= 0) side.pop();
+      side.push(point);
+    }
+    side.pop();
+    return side;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+const boxRound = (points: readonly Spot[], pad: number): Spot[] => {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const [left, right, low, high] = [Math.min(...xs) - pad, Math.max(...xs) + pad, Math.min(...ys) - pad, Math.max(...ys) + pad];
+  return [
+    { x: left, y: low },
+    { x: right, y: low },
+    { x: right, y: high },
+    { x: left, y: high },
+  ];
+};
+
+// The shape drawn round a group of places: the ring they sit inside, pushed out from their middle so
+// the places are within it rather than on it. One place, two places, or a row of them in a line have
+// no ring with an inside, so those get a box round what they cover — which is the same shape a ring
+// of two would have been if a ring of two were a shape.
+export function hullOf(points: readonly Spot[], pad = REGION_PAD): Spot[] {
+  if (points.length === 0) return [];
+  const found = ring(points);
+  if (found.length < 3) return boxRound(points, pad);
+  const middle = { x: found.reduce((sum, point) => sum + point.x, 0) / found.length, y: found.reduce((sum, point) => sum + point.y, 0) / found.length };
+  return found.map((point) => {
+    const run = Math.hypot(point.x - middle.x, point.y - middle.y);
+    if (run === 0) return point;
+    return { x: point.x + ((point.x - middle.x) / run) * pad, y: point.y + ((point.y - middle.y) / run) * pad };
+  });
+}
+
+export interface Drawn extends Region {
+  // The places of this region the sheet is drawing. A region reaching onto another floor draws round
+  // what is on this one.
+  drawn: Answer[];
+  hull: Spot[];
+  // Where the region is drawn when it is drawn as one thing rather than as its places.
+  at: Spot;
+}
+
+const middleOf = (points: readonly Spot[]): Spot =>
+  points.length === 0 ? { x: 0, y: 0 } : { x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length };
+
+function regionsOn(regions: readonly Region[], nodes: readonly Node[]): Drawn[] {
+  const at = new Map(nodes.map((node) => [node.place.id, node.at]));
+  return regions.flatMap((region) => {
+    const drawn = region.holds.filter((held) => at.has(held));
+    if (drawn.length === 0) return [];
+    const points = drawn.map((held) => at.get(held)!);
+    return [{ ...region, drawn, hull: hullOf(points), at: middleOf(points) }];
+  });
+}
+
+// Which region a place belongs to, and so which places move together when one of them is dragged.
+// The first that holds it: a place in two regions is drawn inside both and carried by whichever
+// declared it first, because a place cannot be in two places at once however it is drawn.
+export const regionHolding = (regions: readonly { holds: readonly Answer[] }[], place: Answer): { holds: readonly Answer[] } | undefined =>
+  regions.find((region) => region.holds.includes(place));
 
 export function sheetOf(status: Standing, asked: number | null): Sheet {
   const places = status.discovered;
@@ -153,7 +240,7 @@ export function sheetOf(status: Standing, asked: number | null): Sheet {
     }
   }
 
-  return { plane, planes: planesFrom(places, standing), here, grid: status.mapGrid, nodes, roads, ways };
+  return { plane, planes: planesFrom(places, standing), here, grid: status.mapGrid, nodes, roads, ways, regions: regionsOn(status.regions, nodes) };
 }
 
 // The nine squares a way out is offered in, laid out the way it lies: north-west at the top left,

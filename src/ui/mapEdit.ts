@@ -58,6 +58,21 @@ export function droppedAt(sections: readonly Section[], node: Node, carried: Poi
   return placedInto(sections, node.place.id, placedAt({ x: (spot.x + carried.x) / grid, y: (spot.y + carried.y) / grid }, node.climb));
 }
 
+// Every place one drag carries, and the line that puts each where it landed. A region is what pins
+// them together — a house dragged by its front door brings its rooms with it — and a place placed
+// relative to another needs no line at all, since where it is is worked out from where that one is
+// and that one is being carried too.
+export function draggedTo(sections: readonly Section[], carried: readonly Node[], by: Point, grid: number): Staged[] {
+  const moving = carried.map((node) => String(node.place.id));
+  return carried.flatMap((node) => {
+    const section = sections.find((each) => each.kind === MAPPED_KIND && names(each.address, String(node.place.id)));
+    if (!section) return [{ refused: `the map is drawing ${node.place.id}, which no module declares` }];
+    const value = declared(section.text);
+    if (!stated(value) && value.relative !== undefined && moving.some((id) => names(id, value.relative!.of))) return [];
+    return [droppedAt(sections, node, by, grid)];
+  });
+}
+
 export function movedTo(section: Section, to: Point): Staged {
   const value = declared(section.text);
   if (stated(value)) return { refused: value.problem };

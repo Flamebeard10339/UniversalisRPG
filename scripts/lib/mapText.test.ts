@@ -18,7 +18,7 @@ const place = (id: string, x: number, y: number, z = 0, ...adjacent: string[]): 
 const travel = (to: string): PlayChoice => ({ id: `travel:${to}`, kind: 'travel', label: asLocalized(`Travel to ${to}`), leadsTo: to, legs: 1 });
 
 const sheet = (places: readonly Place[], here: string, choices: readonly PlayChoice[] = []): Sheet =>
-  sheetOf({ discovered: places, location: { id: here }, choices, mapGrid: 140 }, null);
+  sheetOf({ discovered: places, regions: [], location: { id: here }, choices, mapGrid: 140 }, null);
 
 const ROW = [place('west-gate', 0, 0, 0, 'square'), place('square', 1, 0, 0, 'west-gate', 'east-gate'), place('east-gate', 2, 0, 0, 'square')];
 

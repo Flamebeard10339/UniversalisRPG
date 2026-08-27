@@ -27,6 +27,7 @@ function viewAt(id: string, plain: string[] = [], description = ''): PlayView {
     flags: {},
     discovered: [],
     mapGrid: 140,
+    regions: [],
     locations: [],
     player: { name: null, race: null },
     settings: [],

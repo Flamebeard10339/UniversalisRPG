@@ -2,14 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
 import { names, type Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
-import { drawnFor, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
+import { drawnFor, folded, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { answering, centredOn, created, droppedAt, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
+import { answering, centredOn, created, draggedTo, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
-import { leaving, panOnto, tapTarget, type Point, type Size } from './viewport';
+import { folding, leaving, panOnto, tapTarget, type Point, type Size } from './viewport';
+import type { Sheet } from '../runtime/map';
 import type { Words } from './words';
 
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
@@ -127,6 +128,31 @@ function Road({ from, to, open, mutual, walking, grid, bubble }: { from: Node; t
   );
 }
 
+// The shape drawn round a region: its own ring, with the corners taken off. How round a corner is is
+// how far the curve reaches back along each side, so a shape stays the shape the engine gave it and
+// only stops having points on it.
+const CORNER = 0.28;
+
+export function roundedRing(points: readonly Point[], reach = CORNER): string {
+  if (points.length < 3) return '';
+  const along = (from: Point, to: Point, part: number): Point => ({ x: from.x + (to.x - from.x) * part, y: from.y + (to.y - from.y) * part });
+  const steps = points.map((point, at) => {
+    const before = points[(at + points.length - 1) % points.length]!;
+    const after = points[(at + 1) % points.length]!;
+    return { in: along(point, before, reach), out: along(point, after, reach), corner: point };
+  });
+  const [first, ...rest] = steps;
+  const path = [`M ${first!.out.x} ${first!.out.y}`];
+  for (const step of [...rest, first!]) path.push(`L ${step!.in.x} ${step!.in.y}`, `Q ${step!.corner.x} ${step!.corner.y} ${step!.out.x} ${step!.out.y}`);
+  return `${path.join(' ')} Z`;
+}
+
+function RegionShape({ region, grid, carried }: { region: Sheet['regions'][number]; grid: number; carried: Point }): JSX.Element | null {
+  const path = roundedRing(region.hull.map((point) => ({ x: point.x * grid + carried.x, y: point.y * grid + carried.y })));
+  if (path === '') return null;
+  return <path data-region={region.id} d={path} className="fill-accent/5 stroke-accent/40" strokeWidth={2} strokeDasharray="7 5" />;
+}
+
 const HEAD = 10;
 const BARB = 7;
 
@@ -169,11 +195,15 @@ export function MapPane({
   const [from, setFrom] = useState<string | null>(null);
   const [naming, setNaming] = useState('');
 
-  const { plane: at, here, sheet } = drawnFor(view, plane);
-  const drawn = new Map(sheet.nodes.map((node) => [String(node.place.id), node]));
+  const { plane: at, here, sheet: whole } = drawnFor(view, plane);
   const grid = view.mapGrid;
-  const spots = sheet.nodes.map((node) => spotOf(node, grid));
-  const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
+  const spots = whole.nodes.map((node) => spotOf(node, grid));
+  const hold = useSheetHold(spots, bubbles, JSON.stringify(whole.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
+  // Folded up while the map is too far out to read a label on, which is the one thing about the map
+  // that is a question about the screen rather than about the world. The room the sheet takes up is
+  // the unfolded one either way, so folding moves nothing under the finger holding it.
+  const sheet = folding(hold.zoom) ? folded(whole) : whole;
+  const drawn = new Map(sheet.nodes.map((node) => [String(node.place.id), node]));
 
   const walk = walkLine(here, view.journey);
 
@@ -196,9 +226,21 @@ export function MapPane({
 
   const place = (id: string, at: Point): void => answering(placedInto(sections, id, at), answer);
 
-  function letGo(id: string, carried: Point): void {
-    const node = sheet.nodes.find((each) => each.place.id === id);
-    if (node) answering(droppedAt(sections, node, carried, grid), answer);
+  // Everything one drag carries: the place under the finger and the rest of the region it belongs to.
+  // Read while the finger is still down as well as on the drop, so the places and the shape round
+  // them move together rather than the shape catching up afterwards.
+  const carriedWith = (id: string): ReadonlySet<string> => {
+    const region = whole.regions.find((each) => each.holds.map(String).includes(id));
+    return new Set(region ? region.holds.map(String) : [id]);
+  };
+
+  const carrying = hold.carried === null ? null : carriedWith(hold.carried.id);
+
+  const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.has(String(id))) ? hold.carried.by : NOT_CARRIED);
+
+  function letGo(id: string, by: Point): void {
+    const moving = carriedWith(id);
+    for (const staged of draggedTo(sections, whole.nodes.filter((each) => moving.has(String(each.place.id))), by, grid)) answering(staged, answer);
   }
 
   const roadsFrom = (id: string): string[] => (view.discovered.find((place) => place.id === id)?.adjacent ?? []).map((edge) => String(edge.to));
@@ -317,6 +359,9 @@ export function MapPane({
       }
     >
       <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
+        {map.sheet.regions.map((region) => (
+          <RegionShape key={region.id} region={region} grid={grid} carried={carriedBy(region.drawn)} />
+        ))}
         {map.sheet.roads.map((road) => (
           <Road
             key={`${road.from}>${road.to}`}
@@ -343,7 +388,7 @@ export function MapPane({
           scale={map.zoom}
           held={(element) => void (bubbles.current[at] = element)}
           dragged={hold.dragged}
-          carried={hold.carried?.id === node.place.id ? hold.carried.by : NOT_CARRIED}
+          carried={carriedBy([node.place.id])}
           grip={mode === 'place' ? hold.grip(node.place.id) : null}
         />
       ))}

@@ -283,6 +283,32 @@ adjacent:
 entities:
   treasure-chest
 
+// The castle is seven rooms on three floors and a wall around all of it. The
+// region draws that wall: nothing in the engine reads it, and a room inside it
+// is exactly as far from the square as its coordinates say it is. What it buys
+// is a map somebody can read — the castle is one thing on it, and which of its
+// rooms you are looking at is a question you only ask once you are inside.
+# region castle
+title: The Castle
+holds:
+  castle-gate
+  castle-yard
+  castle-hall
+  castle-kitchen
+  castle-quarters
+  castle-solar
+  castle-cellar
+  guard-barracks
+
+// Two rooms and a ladder between them, which is a house rather than a building,
+// and is here because the shape has to hold for the small case as well as the
+// grand one.
+# region oolga-house
+title: Oolga's
+holds:
+  oolga-house
+  oolga-basement
+
 // --- the lanes, and the people who live on them ---
 //
 // Two lanes of ordinary houses, one either side of the town, and they are where

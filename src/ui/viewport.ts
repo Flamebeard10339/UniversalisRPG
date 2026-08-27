@@ -36,6 +36,13 @@ export const ZOOM_MAX = 3;
 
 export const clampZoom = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
 
+// Below this the labels on a map are too small to read, so a region stops being a shape round its
+// rooms and becomes one thing standing where they are. Zoomed out is asking what the town looks
+// like, and the answer to that has a castle in it rather than seven rooms of one.
+export const FOLDED_BELOW = 0.7;
+
+export const folding = (zoom: number): boolean => zoom < FOLDED_BELOW;
+
 export const TOUCH_FLOOR = 44;
 
 export const tapTarget = (scale: number): number => TOUCH_FLOOR / Math.min(1, scale);

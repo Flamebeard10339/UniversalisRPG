@@ -168,6 +168,15 @@ export interface Place {
   adjacent: Array<{ to: Answer; open: boolean }>;
 }
 
+// A shape the map draws round a group of places. Published whole rather than cut down to what has
+// been found: which places a region holds is the world's fact, and which of those are on the map is
+// the map's.
+export interface Region {
+  id: Answer;
+  title: Localized;
+  holds: Answer[];
+}
+
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
   // What stands here, and whether the view is holding its name back because nobody has read it yet.
@@ -190,6 +199,7 @@ export interface PlayStatus {
   // How far apart one step of this world's coordinates is drawn. Published beside the places rather
   // than held by whoever is drawing them, so every surface that draws a map draws it at one size.
   mapGrid: number;
+  regions: Region[];
   locations: Array<{ id: Answer; title: Localized }>;
   journey: Journey | null;
   journal: JournalEntry[];
@@ -572,6 +582,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     flags: { ...state.flags },
     discovered: publishDiscovered(state, registry),
     mapGrid: mapGrid(registry),
+    regions: listedToPlayer(registry.regions.values()).map((each) => ({ id: each.id, title: localizer.title('region', each.id), holds: [...each.holds] })),
     locations: listedToPlayer(registry.locations.values()).map((each) => ({ id: each.id, title: localizer.title('location', each.id) })),
     journey: state.journey ? { to: state.journey.to, legs: [...state.journey.legs] } : null,
     journal: journal(registry, state),

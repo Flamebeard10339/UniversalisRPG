@@ -107,7 +107,10 @@ export function drawnMap(sheet: Sheet): string[] {
   // The one line of legend, and only where it is needed: a dotted road is a road nobody can walk
   // today, which a reader has no way of guessing from the dots.
   const legend = sheet.roads.some((road) => !road.open) ? [`${SHUT.repeat(4)} a road that is shut`] : [];
-  const under = [...legend, ...aside.map((line) => `also: ${line}`)];
+  // A shape has nothing to draw in characters, so a region says instead what it gathers. A reader who
+  // wants to know where the castle is looks at the rooms; this says which rooms are the castle.
+  const shapes = sheet.regions.map((region) => `${String(region.title)}: ${region.drawn.map((held) => cells.get(String(held))?.label ?? String(held)).join(', ')}`);
+  const under = [...legend, ...shapes, ...aside.map((line) => `also: ${line}`)];
   return under.length === 0 ? drawing : [...drawing, '', ...under];
 }
 
