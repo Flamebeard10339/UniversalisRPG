@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, centreOf, clampPan, clampZoom, drawnBox, midpoint, panAfterZoom, panOnto, settled, spanBetween, tapTarget, TOUCH_FLOOR, ZOOM_MAX, ZOOM_MIN, zoomByWheel } from './viewport';
+import { bounds, centreOf, clampPan, clampZoom, drawnBox, lookingAt, midpoint, panAfterZoom, panOnto, settled, spanBetween, tapTarget, TOUCH_FLOOR, ZOOM_MAX, ZOOM_MIN, zoomByWheel } from './viewport';
 
 describe('how far a sheet can be pushed around', () => {
   it('gives back the room everything drawn takes up', () => {
@@ -11,14 +11,15 @@ describe('how far a sheet can be pushed around', () => {
     expect(centreOf(bounds([]))).toEqual({ x: 0, y: 0 });
   });
 
-  it('lets the furthest node be dragged to the middle, and no further', () => {
-    expect(clampPan(900, 1000)).toBe(500);
-    expect(clampPan(-900, 1000)).toBe(-500);
-    expect(clampPan(100, 1000)).toBe(100);
+  it('lets a sheet be pushed a whole drawing away from the middle, and no further', () => {
+    expect(clampPan(1900, 1000)).toBe(1000);
+    expect(clampPan(-1900, 1000)).toBe(-1000);
+    expect(clampPan(900, 1000)).toBe(900);
   });
 
   it('still moves a sheet narrower than the window, which is most of them zoomed in', () => {
-    expect(clampPan(200, 300)).toBe(150);
+    expect(clampPan(200, 300)).toBe(200);
+    expect(clampPan(400, 300)).toBe(300);
   });
 
   it('holds still when there is one node and nowhere to pan to', () => {
@@ -103,14 +104,20 @@ describe('where a sheet comes to rest', () => {
     expect(close).toBeGreaterThan(far);
   });
 
-  it('stops with the outer edge of the last bubble under the middle of the window', () => {
-    expect(settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x).toBe((416 + 150) / 2);
+  // Measured from where the drawing's own middle would sit rather than from the sheet's origin: the
+  // limit is about the drawing, and the origin may be nowhere near it.
+  it('stops a whole drawing away from the middle of the window', () => {
+    const drawn = 416 + 150;
+    const middle = 416 / 2;
+
+    expect(settled({ x: 9999, y: 0 }, 1, BOX, BUBBLE).pan.x).toBe(drawn - middle);
+    expect(settled({ x: -9999, y: 0 }, 1, BOX, BUBBLE).pan.x).toBe(-drawn - middle);
   });
 
   it('still leaves a lone node room to be dragged off centre by its own width', () => {
     const alone = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
-    expect(settled({ x: 500, y: 500 }, 1, alone, BUBBLE).pan).toEqual({ x: 75, y: 17 });
+    expect(settled({ x: 500, y: 500 }, 1, alone, BUBBLE).pan).toEqual({ x: 150, y: 34 });
   });
 
   it('refuses to move a sheet with nowhere to go, however far the gesture went', () => {
@@ -121,25 +128,29 @@ describe('where a sheet comes to rest', () => {
 });
 
 describe('putting one node back in the middle', () => {
-  const BOX = { minX: 0, minY: 0, maxX: 400, maxY: 200 };
-
-  it('is no pan at all for the node the sheet is already centred on', () => {
-    expect(panOnto(centreOf(BOX), BOX, 1)).toEqual({ x: 0, y: 0 });
+  it('is no pan at all for the node standing on the sheet’s own origin', () => {
+    expect(panOnto({ x: 0, y: 0 }, 1)).toEqual({ x: 0, y: 0 });
   });
 
-  it('carries a node at the corner back by the distance it is off centre, at the zoom drawn', () => {
-    expect(panOnto({ x: 0, y: 0 }, BOX, 1)).toEqual({ x: 200, y: 100 });
-    expect(panOnto({ x: 0, y: 0 }, BOX, 2)).toEqual({ x: 400, y: 200 });
+  it('carries a node back by how far it stands from that origin, at the zoom drawn', () => {
+    expect(panOnto({ x: 200, y: 100 }, 1)).toEqual({ x: -200, y: -100 });
+    expect(panOnto({ x: 200, y: 100 }, 2)).toEqual({ x: -400, y: -200 });
   });
 
+  // The one claim: whatever `panOnto` hands back, the middle of the frame is then looking at the node
+  // it was given, whatever the sheet had got to and whatever else is drawn on it.
   it('lands the node in the middle from wherever the sheet had got to', () => {
-    const node = { x: 320, y: 40 };
-    const zoom = 1.5;
-    const pan = panOnto(node, BOX, zoom);
-    const centre = centreOf(BOX);
+    for (const zoom of [0.5, 1, 1.5, 3]) {
+      const node = { x: 320, y: 40 };
+      expect(lookingAt(panOnto(node, zoom), zoom).x).toBeCloseTo(node.x, 10);
+      expect(lookingAt(panOnto(node, zoom), zoom).y).toBeCloseTo(node.y, 10);
+    }
+  });
 
-    expect(pan.x + (node.x - centre.x) * zoom).toBeCloseTo(0, 10);
-    expect(pan.y + (node.y - centre.y) * zoom).toBeCloseTo(0, 10);
+  // What a place is dragged to, and where a new place is put, are read back through this: they are
+  // sheet points, and nothing about the frame of reference may depend on what else is drawn.
+  it('reads back the same point whatever else the sheet holds', () => {
+    expect(lookingAt({ x: -300, y: 50 }, 2)).toEqual({ x: 150, y: -25 });
   });
 });
 

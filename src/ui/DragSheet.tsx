@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { heldStill } from './gesture';
-import { bounds, centreOf, clampZoom, drawnBox, midpoint, panAfterZoom, settled, spanBetween, zoomByWheel, type Box, type Point, type Size } from './viewport';
+import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, settled, spanBetween, zoomByWheel, type Box, type Point, type Size } from './viewport';
 
 interface Grab {
   kind: 'pan';
@@ -158,7 +158,6 @@ export function DragSheet({
   const frame = useRef<HTMLDivElement>(null);
   const release = useRef<() => void>(() => undefined);
   const gesture = hold.gesture;
-  const centre = centreOf(hold.box);
   const carrying = (): boolean => hold.gripped.current !== null;
 
   const fromCentre = (x: number, y: number): Point => {
@@ -263,7 +262,7 @@ export function DragSheet({
       <div
         className="absolute left-1/2 top-1/2 origin-top-left"
         // translate, never translate3d: a promoted layer is rastered once and every label goes soft when the sheet is zoomed.
-        style={{ transform: `translate(${hold.pan.x - centre.x * hold.zoom}px, ${hold.pan.y - centre.y * hold.zoom}px) scale(${hold.zoom})` }}
+        style={{ transform: `translate(${hold.pan.x}px, ${hold.pan.y}px) scale(${hold.zoom})` }}
       >
         {debug === undefined ? null : (
           <div data-debug="drawn-box" className="pointer-events-none absolute border-2 border-dashed border-accent/60" style={drawnBox(hold.box, hold.node)}>

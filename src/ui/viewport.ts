@@ -54,8 +54,7 @@ export const spanBetween = (a: Point, b: Point): number => Math.hypot(a.x - b.x,
 export const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
 export function clampPan(offset: number, reach: number): number {
-  const slack = reach / 2;
-  return Math.min(slack, Math.max(-slack, offset));
+  return Math.min(reach, Math.max(-reach, offset));
 }
 
 export function drawnBox(box: Box, bubble: Size): Frame {
@@ -67,12 +66,26 @@ export function drawnBox(box: Box, bubble: Size): Frame {
   };
 }
 
+// `pan` says where the sheet's own origin is drawn, measured from the middle of the frame. The
+// origin and not the middle of whatever happens to be drawn: a frame of reference read off the
+// things on the sheet moves when any one of them moves, which is how dragging one place slid every
+// other place across the map.
 export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan: Point; scale: number } {
   const drawn = drawnBox(box, bubble);
-  return { scale: zoom, pan: { x: clampPan(pan.x, drawn.width * zoom), y: clampPan(pan.y, drawn.height * zoom) } };
+  const middle = centreOf(box);
+  // How far the drawing may be pushed from the frame before it counts as lost: a whole width of
+  // itself. Generous on purpose — the limit is here to stop a map being shoved off the edge and
+  // never to nudge one while an author is working near it.
+  return {
+    scale: zoom,
+    pan: {
+      x: clampPan(pan.x + middle.x * zoom, drawn.width * zoom) - middle.x * zoom,
+      y: clampPan(pan.y + middle.y * zoom, drawn.height * zoom) - middle.y * zoom,
+    },
+  };
 }
 
-export function panOnto(target: Point, box: Box, zoom: number): Point {
-  const centre = centreOf(box);
-  return { x: (centre.x - target.x) * zoom, y: (centre.y - target.y) * zoom };
-}
+export const panOnto = (target: Point, zoom: number): Point => ({ x: 0 - target.x * zoom, y: 0 - target.y * zoom });
+
+// The point of the sheet the middle of the frame is looking at.
+export const lookingAt = (pan: Point, zoom: number): Point => ({ x: 0 - pan.x / zoom, y: 0 - pan.y / zoom });

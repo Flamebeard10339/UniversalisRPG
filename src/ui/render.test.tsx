@@ -624,18 +624,32 @@ describe('what the shell puts on the screen', () => {
       expect(onScreen(readable(html), shellWord('recentre'))).toBe(true);
     });
 
-    it('draws the sheet under the pan and the zoom it reports', () => {
+    it('draws the sheet under the pan and the zoom it reports, and nothing else', () => {
       const driver = createDriver([SURVEYED]);
       driver.choose(position(driver, LOOK_OUT));
       const view = driver.snapshot().view;
 
       const under = drawnAt(renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />));
 
-      const xs = view.discovered.map((place) => place.x);
-      const ys = view.discovered.map((place) => place.y);
-      const centre = { x: ((Math.min(...xs) + Math.max(...xs)) / 2) * PER_UNIT, y: ((Math.min(...ys) + Math.max(...ys)) / 2) * PER_UNIT };
+      expect(under).toEqual({ x: MAPPING.where.pan.x, y: MAPPING.where.pan.y, zoom: MAPPING.where.zoom });
+    });
 
-      expect(under).toEqual({ x: -centre.x, y: -centre.y, zoom: 1 });
+    // The frame of reference is the sheet's own origin and not the middle of what happens to be on it.
+    // Read off the drawn things, it moved whenever any one of them moved — which is why dragging a
+    // place in dev mode slid every other place across the map under the finger holding it.
+    it('leaves every other place where it was when one place moves', () => {
+      const driver = createDriver([SURVEYED]);
+      driver.choose(position(driver, LOOK_OUT));
+      const view = driver.snapshot().view;
+      const shifted = { ...view, discovered: view.discovered.map((place, at) => (at === 0 ? { ...place, x: place.x + 9, y: place.y - 7 } : place)) };
+
+      const before = renderToStaticMarkup(<MapPane words={shellWord} view={view} arrivals={[]} generation={0} {...MAPPING} />);
+      const after = renderToStaticMarkup(<MapPane words={shellWord} view={shifted} arrivals={[]} generation={0} {...MAPPING} />);
+
+      expect(drawnAt(after)).toEqual(drawnAt(before));
+      const stood = places(before).slice(1).map((place) => [place.id, place.left, place.top]);
+      expect(places(after).slice(1).map((place) => [place.id, place.left, place.top])).toEqual(stood);
+      expect(stood.length).toBeGreaterThan(0);
     });
 
     it('draws one skill panel per row the view publishes, each with its own level in its own ring', () => {

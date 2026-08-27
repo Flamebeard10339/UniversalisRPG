@@ -7,7 +7,7 @@ import { DslError } from '../grammar/parser';
 import { moduleLocalId, type AnySchema } from '../grammar/section';
 import { MAPPED_KIND, names, stage, type Section, type Staged } from './authoringSurface';
 import { PER_UNIT, placedAt, spotOf, type Node } from './discovery';
-import { centreOf, type Box, type Point } from './viewport';
+import { lookingAt, type Point } from './viewport';
 
 export const settledOn = (at: Point): Point => ({ x: Math.round(at.x), y: Math.round(at.y) });
 
@@ -75,9 +75,9 @@ export type MapMode = (typeof MAP_MODES)[number];
 
 export const modeNamed = (value: unknown): MapMode | undefined => MAP_MODES.find((mode) => mode === value);
 
-export function centredOn(hold: { pan: Point; zoom: number; box: Box }): Point {
-  const middle = centreOf(hold.box);
-  return { x: (middle.x - hold.pan.x / hold.zoom) / PER_UNIT, y: (middle.y - hold.pan.y / hold.zoom) / PER_UNIT };
+export function centredOn(hold: { pan: Point; zoom: number }): Point {
+  const middle = lookingAt(hold.pan, hold.zoom);
+  return { x: middle.x / PER_UNIT, y: middle.y / PER_UNIT };
 }
 
 const NAMED = /^[a-z][a-z0-9-]*$/;

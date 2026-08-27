@@ -9,7 +9,7 @@ import { answering, centredOn, created, droppedAt, joinedInto, placedInto, stage
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
-import { bounds, panOnto, tapTarget, type Point } from './viewport';
+import { panOnto, tapTarget, type Point } from './viewport';
 import type { Words } from './words';
 
 const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
@@ -70,9 +70,12 @@ function Bubble({
     </>
   );
 
+  // `data-still` is what tells the sheet under it that a press here is not a press on the sheet. The
+  // grip stops the pointer event it holds, but the sheet listens for a mouse and a touch, which are
+  // events of their own — so without this a finger on a place both carries the place and drags the map.
   if (grip) {
     return (
-      <button data-drive="map.place" type="button" {...grip} {...look}>
+      <button data-drive="map.place" data-still type="button" {...grip} {...look}>
         {inside}
       </button>
     );
@@ -174,7 +177,7 @@ export function MapPane({
     const drawn = drawnFor(view, floor);
     const standing = drawn.sheet.nodes.find((each) => each.place.id === here);
     setPlane(floor);
-    hold.settle(standing ? panOnto(spotOf(standing), bounds(drawn.sheet.nodes.map(spotOf)), 1) : { x: 0, y: 0 }, 1);
+    hold.settle(standing ? panOnto(spotOf(standing), 1) : { x: 0, y: 0 }, 1);
   };
 
   const lineFor = (id: string): string | null => tappedPlace(dev, id, travels.get(id) ?? null);

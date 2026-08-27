@@ -195,7 +195,7 @@ export function PlaneModal({
     const root = graph.nodes.find((each) => each.standing === 'allocated') ?? graph.nodes[0];
     if (opened.current || !root) return;
     opened.current = true;
-    hold.settle(panOnto(root.at, hold.box, 1), 1);
+    hold.settle(panOnto(root.at, 1), 1);
   }, [graph]);
 
   useEffect(() => {

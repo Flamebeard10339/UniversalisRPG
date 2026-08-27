@@ -257,11 +257,9 @@ describe('a connection is a section edit and nothing else', () => {
 
 describe('a new place is written where the map is looking', () => {
   it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
-    const box = { minX: 0, minY: 0, maxX: 2 * PER_UNIT, maxY: 2 * PER_UNIT };
-
-    expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1, box })).toEqual({ x: 1, y: 1 });
-    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 1, box })).toEqual({ x: 2, y: 1 });
-    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 2, box })).toEqual({ x: 1.5, y: 1 });
+    expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 })).toEqual({ x: 0, y: 0 });
+    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 1 })).toEqual({ x: 1, y: 0 });
+    expect(centredOn({ pan: { x: -PER_UNIT, y: 0 }, zoom: 2 })).toEqual({ x: 0.5, y: 0 });
   });
 
   it('writes the plane it was drawn on and leaves the ground plane unsaid', () => {
