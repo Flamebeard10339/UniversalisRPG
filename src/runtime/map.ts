@@ -1,18 +1,9 @@
 import { DIRECTION_VECTORS, type Direction } from '../content/sections/location';
-import type { Answer, Localized } from './localized';
-import type { PlayChoice } from './session';
+import type { Answer } from './localized';
+import type { Place, PlayChoice } from './session';
 import { waysOut, type WayOut } from './waysOut';
 
-// A place on the map, as every surface is handed it. Declared here because the map is what a place's
-// coordinates and roads are for; the view publishes these and nothing restates their shape.
-export interface Place {
-  id: Answer;
-  title: Localized;
-  x: number;
-  y: number;
-  z: number;
-  adjacent: Array<{ to: Answer; open: boolean }>;
-}
+export type { Place } from './session';
 
 // What the map is drawn from, which is a corner of what a view publishes.
 export interface Standing {
@@ -179,7 +170,9 @@ export interface Compass {
 export function compassOf(ways: readonly Way[]): Compass {
   const cells: (Way | null)[] = COMPASS.map(() => null);
   const rest: Way[] = [];
-  for (const way of ways) {
+  // Only the roads out of here. A journey across the map has a heading too, but it is not a door out
+  // of this room, and the lists both surfaces draw leave it out for the same reason.
+  for (const way of ways.filter((each) => each.legs <= 1)) {
     const at = way.bearing === null ? -1 : COMPASS.indexOf(way.bearing);
     if (at < 0 || cells[at] !== null) rest.push(way);
     else cells[at] = way;

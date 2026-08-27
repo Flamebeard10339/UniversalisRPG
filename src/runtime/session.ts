@@ -45,7 +45,6 @@ import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { grouping, offeredBy, type GroupRow } from './grouping';
 import { mapGrid } from './tuning';
-import type { Place } from './map';
 export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
@@ -155,6 +154,18 @@ export interface SettingRow {
   note: Localized;
   standing: Answer;
   choices: SettingChoiceRow[];
+}
+
+// A place the player has found, as every surface is handed it. Its own interface because the map is
+// what its coordinates and roads are for, and a map that had to name a field of a field to say what
+// it draws is a map that cannot be read.
+export interface Place {
+  id: Answer;
+  title: Localized;
+  x: number;
+  y: number;
+  z: number;
+  adjacent: Array<{ to: Answer; open: boolean }>;
 }
 
 export interface PlayStatus {

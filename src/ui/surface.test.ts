@@ -56,6 +56,8 @@ const DISPATCHES = [
   'partStanding',
   'sheetOffers',
   'sheetOf',
+  'compassOf',
+  'COMPASS',
   'BASE_LANGUAGE',
   'createTicker',
   'liveAgain',

@@ -8,6 +8,7 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { leaves } from '../runtime/viewLeaves';
 import { LIVE_TICK_MS, newContext, runLine, type Ticker } from '../runtime/command';
 import { applyDirective, readRoom, sheetOffers, startSession, unreadHere, view, type PlayView } from '../runtime/session';
+import { sheetOf } from '../runtime/map';
 import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
@@ -766,5 +767,44 @@ describe('what a screen wider than it is tall gets', () => {
     for (const columns of [1, 2]) {
       for (const pane of ['first', 'second', 'third']) expect(strip(columns), `${columns} columns`).toContain(pane);
     }
+  });
+});
+
+// The travel offers are drawn where they lie rather than in the order the engine happened to list
+// them, and the square each one sits in is the map's own judgement rather than the sheet's.
+describe('the ways out, laid out the way they lie', () => {
+  const compass = (html: string): Array<{ bearing: string; runs: string[] }> =>
+    [...html.matchAll(/<button([^>]*data-bearing="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, , bearing, inner]) => ({ bearing, runs: readable(inner) }));
+
+  it('gives each way out its own square, and draws it nowhere else on the sheet', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send('/dev on');
+    driver.send('/goto tulsa.market-square');
+    const view = driver.snapshot().view;
+
+    const html = renderToStaticMarkup(<App driver={driver} />);
+    const drawn = compass(html);
+    const ways = sheetOf(view, null).ways.filter((way) => way.legs <= 1);
+
+    expect(drawn.length).toBeGreaterThan(2);
+    for (const square of drawn) {
+      const way = ways.find((each) => String(each.label) === square.runs.join(''));
+      expect(way, `${square.bearing} holds ${square.runs.join('')}`).toBeDefined();
+      expect(way!.bearing).toBe(square.bearing);
+    }
+    // Each way out is on the screen once: in its square, and not among the cells above it too.
+    const runs = readable(html);
+    for (const square of drawn) expect(runs.filter((run) => run === square.runs.join('')), square.runs.join('')).toHaveLength(1);
+  });
+
+  it('puts the room the player is standing in in the middle, where no heading points', () => {
+    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    driver.send('/dev on');
+    driver.send('/goto tulsa.market-square');
+
+    const html = renderToStaticMarkup(<App driver={driver} />);
+
+    expect(html).toContain('data-drive="compass"');
+    expect(compass(html).map((square) => square.bearing)).not.toContain('');
   });
 });

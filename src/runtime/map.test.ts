@@ -179,7 +179,7 @@ describe('which way one place lies from another', () => {
 });
 
 describe('the nine squares a way out is offered in', () => {
-  const way = (bearing: Bearing | null, at: number): Way => ({ to: `to-${at}`, at, label: asLocalized(`Way ${at}`), bearing });
+  const way = (bearing: Bearing | null, at: number, legs = 1): Way => ({ to: `to-${at}`, at, label: asLocalized(`Way ${at}`), legs, bearing });
 
   it('holds a square for each of the eight headings and the player in the middle', () => {
     expect(COMPASS).toHaveLength(9);
@@ -208,6 +208,14 @@ describe('the nine squares a way out is offered in', () => {
 
     expect(cells.every((cell) => cell === null)).toBe(true);
     expect(rest.map((each) => each.at)).toEqual([1, 2, 3]);
+  });
+
+  it('leaves out a journey across the map, which is a way to somewhere and not a way out of here', () => {
+    const { cells, rest } = compassOf([way('east', 1), way('north', 2, 3)]);
+
+    expect(cells[5]?.at).toBe(1);
+    expect(cells[1]).toBeNull();
+    expect(rest).toEqual([]);
   });
 
   it('reads the ways the sheet already worked out, in the order the engine offers them', () => {

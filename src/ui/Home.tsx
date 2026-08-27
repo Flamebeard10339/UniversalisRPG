@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { COMPASS, compassOf, sheetOf } from '../runtime/map';
+import type { Localized } from '../runtime/localized';
 import { sheetOffers, type PlayView } from '../runtime/session';
 import { drawsNothing, offerCells } from './choices';
 import { Console } from './Console';
@@ -25,9 +27,47 @@ function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElem
   );
 }
 
+// The ways out, laid out the way they lie: north-east is the square at the top right, and the
+// square in the middle is the room the player is standing in. Which square a way belongs in is the
+// engine's judgement, read off the map's own sheet — the compass and the bubbles on the map pane are
+// pointing the same way because they are one answer, not two.
+function Compass({ compass, here, onChoose }: { compass: ReturnType<typeof compassOf>; here: Localized; onChoose: (position: number) => void }): JSX.Element {
+  return (
+    <div data-drive="compass" className="mx-auto mt-3 grid max-w-2xl grid-cols-3 gap-2">
+      {COMPASS.map((bearing, at) => {
+        const way = compass.cells[at];
+        if (bearing === null) {
+          return (
+            <p key="here" className="flex items-center justify-center rounded-2xl border border-dashed border-border px-2 py-2 text-center text-xs text-text-subtle">
+              {here}
+            </p>
+          );
+        }
+        if (way === null) return <span key={bearing} aria-hidden className="rounded-2xl border border-dashed border-border/40" />;
+        return (
+          <button
+            key={bearing}
+            data-drive="choose"
+            data-bearing={bearing}
+            type="button"
+            onClick={() => onChoose(way.at)}
+            className="rounded-2xl border border-border bg-panel px-2 py-2 text-xs font-medium transition-transform duration-75 active:scale-[0.97] active:border-accent active:bg-accent-strong active:text-accent-text"
+          >
+            {way.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Sheet({ view, words, onChoose }: { view: PlayView; words: Words; onChoose: (position: number) => void }): JSX.Element {
-  const offers = sheetOffers(view);
-  if (drawsNothing(offers)) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;
+  const compass = compassOf(sheetOf(view, null).ways);
+  // A way out drawn in its own square is not drawn again among the rest; one that no square points
+  // at — a floor up or down, a second road the same way — falls through to the ordinary cells.
+  const squared = new Set(compass.cells.filter((cell) => cell !== null).map((cell) => cell!.at));
+  const offers = sheetOffers(view).filter((offer) => !squared.has(offer.position));
+  if (drawsNothing(sheetOffers(view))) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;
   return (
     <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       <div className={`mx-auto max-w-2xl ${GRID}`}>
@@ -57,6 +97,7 @@ function Sheet({ view, words, onChoose }: { view: PlayView; words: Words; onChoo
           </div>
         ))}
       </div>
+      {squared.size === 0 ? null : <Compass compass={compass} here={view.location.title} onChoose={onChoose} />}
     </div>
   );
 }
