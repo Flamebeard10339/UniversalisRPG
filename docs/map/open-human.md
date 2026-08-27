@@ -24,11 +24,12 @@ at, and the other is either kept as a setting or taken out.
 
 ## Does a region name its own entrances, or does the drawing work them out?
 
-A region is drawn as its rooms and never as one thing, so nothing has to work out
-which room a tap on the castle means any more. The question that is left is the one
-about other people's modules: a region naming entrance points is what would let one
-module join another module's region without knowing what is inside it. Shipping
-`holds:` only.
+The drawing works them out, and nothing is authored: a room of a region is on the map
+when a road from where you stand reaches it, so standing in the market square the
+castle is its shape with the gate inside it, and every road in lands on a room that is
+there to land on. The question that is left is the one about other people's modules: a
+region naming entrance points is what would let one module join another module's
+region without knowing what is inside it. Shipping `holds:` only.
 *Closes when:* you say whether `entrances:` earns its place, or that a region names
 only what it holds.
 

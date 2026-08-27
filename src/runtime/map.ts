@@ -193,25 +193,35 @@ export function hullOf(points: readonly Spot[], pad = REGION_PAD): Spot[] {
 }
 
 export interface Drawn extends Region {
-  // The places of this region the sheet is drawing. A region reaching onto another floor draws round
-  // what is on this one.
+  // The places of this region the sheet is drawing, which is not what the shape is drawn round: a
+  // room the map is holding back is still inside the building.
   drawn: Answer[];
   hull: Spot[];
-  // Where the region is drawn when it is drawn as one thing rather than as its places.
+  // The middle of the whole footprint, which is where the region is if it is anywhere.
   at: Spot;
 }
 
 const middleOf = (points: readonly Spot[]): Spot =>
   points.length === 0 ? { x: 0, y: 0 } : { x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length };
 
-function regionsOn(regions: readonly Region[], nodes: readonly Node[], shape: RegionShape): Drawn[] {
-  const at = new Map(nodes.map((node) => [node.place.id, node.at]));
+// The shape a region draws is its whole footprint: every place it holds, at the spot this floor would
+// draw it, found or not and drawn or not. Read off what the sheet happens to be drawing, it moved and
+// resized every time a room was found or a room was held back — a building that changes shape while
+// you are looking at it. What a region holds is the world's fact, so the shape round it is one too.
+//
+// What is the sheet's is whether the building is on the map at all, and that is whether any of it has
+// been found. A region whose rooms are all shut away is still drawn: walking out of the castle leaves
+// the castle standing where it stood.
+function regionsOn(regions: readonly Region[], seen: readonly Place[], everywhere: readonly Place[], plane: number, nodes: readonly Node[], shape: RegionShape): Drawn[] {
+  const footing = new Map(everywhere.map((place) => [place.id, drawnAt(place, plane)]));
+  const known = new Set(seen.map((place) => place.id));
+  const showing = new Set(nodes.map((node) => node.place.id));
   const round = shape === 'box' ? boxRound : hullOf;
   return regions.flatMap((region) => {
-    const drawn = region.holds.filter((held) => at.has(held));
-    if (drawn.length === 0) return [];
-    const points = drawn.map((held) => at.get(held)!);
-    return [{ ...region, drawn, hull: round(points, REGION_PAD), at: middleOf(points) }];
+    if (!region.holds.some((held) => known.has(held))) return [];
+    const footprint = region.holds.flatMap((held) => (footing.has(held) ? [footing.get(held)!] : []));
+    if (footprint.length === 0) return [];
+    return [{ ...region, drawn: region.holds.filter((held) => showing.has(held)), hull: round(footprint, REGION_PAD), at: middleOf(footprint) }];
   });
 }
 
@@ -239,14 +249,24 @@ export function sheetOf(status: Standing, asked: number | null, showing: Showing
   });
   const travels = new Map(ways.map((way) => [way.to, way.at]));
 
-  // The floors drawn: the one asked for, and one more being looked at over its shoulder. A player is
-  // shown the floors a step from here would put them on as well, because a ladder they can climb is
-  // part of the room they are in; an author is shown the floor they asked for and nothing else, so
-  // the map they are laying out is the one they are looking at.
+  // The floors drawn: the one asked for, and one more being looked at over its shoulder. An author is
+  // shown the floor they asked for and nothing else, so the map they are laying out is the one they
+  // are looking at.
   const floors = new Set(ghost === null ? [plane] : [plane, ghost]);
   const reachable = new Set(standing?.adjacent.map((edge) => edge.to) ?? []);
-  const stepAway = (place: Place): boolean => showing === 'found' && (place.id === here || reachable.has(place.id) || travels.has(place.id));
-  const shown = places.filter((place) => floors.has(place.z) || stepAway(place));
+  // A step from here: the room you are in, the rooms a road out of it reaches, and anywhere the view
+  // is offering a walk to. A ladder you can climb is part of the room you are in, which is why a
+  // floor of its own is not a condition of being drawn.
+  const stepAway = (place: Place): boolean => place.id === here || reachable.has(place.id) || travels.has(place.id);
+  // A region is a building, and a building shows its rooms to somebody who is in it. From outside, the
+  // only room of one on the map is the one a road from here reaches — its door — so a region reads as
+  // a shape with a way in until the way in has been taken. It is the rule the map already uses for a
+  // floor overhead, said about a wall instead of a ceiling; and it is why no road can be left pointing
+  // at a room that is not there, since a road from here is exactly what puts one there.
+  const openRegion = new Set(status.regions.filter((region) => region.holds.some((held) => held === here)).map((region) => region.id));
+  const shut = (place: Place): boolean => status.regions.some((region) => !openRegion.has(region.id) && region.holds.some((held) => held === place.id));
+  const shown =
+    showing === 'every' ? places.filter((place) => floors.has(place.z)) : places.filter((place) => stepAway(place) || (floors.has(place.z) && !shut(place)));
   const nodes: Node[] = shown.map((place) => ({
     place,
     here: place.id === here,
@@ -273,7 +293,7 @@ export function sheetOf(status: Standing, asked: number | null, showing: Showing
     }
   }
 
-  return { plane, planes: planesFrom(places, showing === 'every' ? undefined : standing), here, grid: status.mapGrid, nodes, roads: [...roads.values()], ways, regions: regionsOn(status.regions, nodes, regionShape(status.settings ?? [])) };
+  return { plane, planes: planesFrom(places, showing === 'every' ? undefined : standing), here, grid: status.mapGrid, nodes, roads: [...roads.values()], ways, regions: regionsOn(status.regions, places, [...status.discovered, ...status.undiscovered], plane, nodes, regionShape(status.settings ?? [])) };
 }
 
 // The nine squares a way out is offered in, laid out the way it lies: north-west at the top left,

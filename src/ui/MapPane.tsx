@@ -303,6 +303,10 @@ export function MapPane({
 
   const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.includes(String(id))) ? hold.carried.by : NOT_CARRIED);
 
+  // A region follows the finger when the finger has hold of the region, which is not the same as one
+  // of its rooms moving: a region with every room shut away inside it still has a shape to carry.
+  const carriedRegion = (id: string): Point => (hold.carried !== null && regionGripped(hold.carried.id) === String(id) ? hold.carried.by : NOT_CARRIED);
+
   function letGo(id: string, by: Point): void {
     const region = regionGripped(id);
     if (region !== null) return onSend(shiftLine(region, shiftedBy(by, grid)));
@@ -461,7 +465,7 @@ export function MapPane({
     >
       <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
         {map.sheet.regions.map((region) => (
-          <RegionShape key={region.id} region={region} grid={grid} carried={carriedBy(region.drawn)} chosen={chosenRegion(region.id)} />
+          <RegionShape key={region.id} region={region} grid={grid} carried={carriedRegion(region.id)} chosen={chosenRegion(region.id)} />
         ))}
         {map.sheet.roads.map((road) => (
           <Road
@@ -482,7 +486,7 @@ export function MapPane({
           key={region.id}
           region={region}
           grid={grid}
-          carried={carriedBy(region.drawn)}
+          carried={carriedRegion(region.id)}
           chosen={chosenRegion(region.id)}
           grip={mode === 'place' ? hold.grip(gripOnRegion(String(region.id))) : null}
           onChoose={mode === 'region' ? () => setGathering(String(region.id)) : null}

@@ -326,6 +326,51 @@ describe('the shape a region draws', () => {
     }
   });
 
+  // A building does not change shape while you are looking at it. Drawn round what the sheet was
+  // showing, the castle moved and resized every time a room of it was found — which is what an
+  // arrival inside one looked like from outside.
+  it('draws the same shape however few of its places the sheet is showing', () => {
+    const whole = withRegions([HOUSE_REGION]).regions[0]!;
+    const one = sheetOf({ ...status(HOUSE, 'hall'), discovered: [HOUSE[0]!], undiscovered: HOUSE.slice(1), regions: [HOUSE_REGION] }, 0).regions[0]!;
+
+    expect(one.drawn).toEqual(['hall']);
+    expect(one.hull).toEqual(whole.hull);
+    expect(one.at).toEqual(whole.at);
+  });
+
+  // A region is a building, and a building shows its rooms to somebody who is in it. From outside, the
+  // one room of it on the map is the one a road from here reaches — which is why a road into a region
+  // can never be left pointing at a room that is not drawn: the road is what draws it.
+  it('shows the room a road from out here reaches, and keeps the rest of the building shut', () => {
+    const outside = withRegions([HOUSE_REGION], 'beach');
+
+    expect(outside.nodes.map((node) => String(node.place.id)).sort()).toEqual(['beach', 'cove', 'hall']);
+    expect(outside.regions[0]!.drawn).toEqual(['hall']);
+  });
+
+  // Opening a region does not open the floors it reaches onto: a room overhead is drawn when a step
+  // from here would put you in it, region or no region, which is the rule this one is said beside.
+  it('shows every room of it to somebody standing in one of them, on the floors they could step to', () => {
+    expect(withRegions([HOUSE_REGION], 'hall').regions[0]!.drawn.sort()).toEqual(['cellar', 'hall', 'landing']);
+    expect(withRegions([HOUSE_REGION], 'cellar').regions[0]!.drawn.sort()).toEqual(['cellar', 'hall']);
+  });
+
+  it('leaves the building standing once its rooms are shut away again', () => {
+    const away = [...HOUSE, place('dune', 3, 0, 0, 'cove')];
+    const gone = sheetOf({ ...status(away, 'dune'), regions: [HOUSE_REGION] }, 0);
+
+    expect(gone.nodes.map((node) => String(node.place.id))).not.toContain('hall');
+    expect(gone.regions[0]!.drawn).toEqual([]);
+    expect(gone.regions[0]!.hull).toEqual(withRegions([HOUSE_REGION]).regions[0]!.hull);
+  });
+
+  it('shows an author every room of every region, because a floor is what they are laying out', () => {
+    const author = sheetOf({ ...status(HOUSE, 'beach'), regions: [HOUSE_REGION] }, 0, 'every');
+
+    expect(author.regions[0]!.drawn).toEqual(['hall']);
+    expect(sheetOf({ ...status(HOUSE, 'beach'), regions: [HOUSE_REGION] }, 1, 'every').regions[0]!.drawn).toEqual(['landing']);
+  });
+
   it('draws nothing for a region none of whose places are on this floor', () => {
     expect(withRegions([{ ...HOUSE_REGION, holds: ['nowhere-at-all'] }]).regions).toEqual([]);
   });
