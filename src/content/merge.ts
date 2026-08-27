@@ -19,7 +19,7 @@ function identifies(pattern: unknown, candidate: unknown): boolean {
   return Object.entries(pattern).every(([key, value]) => identifies(value, (candidate as Fields)[key]));
 }
 
-function applyEdits(held: unknown, edits: FieldEdits): unknown[] {
+export function applyEdits(held: unknown, edits: FieldEdits): unknown[] {
   let values = Array.isArray(held) ? [...held] : [];
   for (const { op, values: operands } of edits.ops) {
     for (const operand of operands) {

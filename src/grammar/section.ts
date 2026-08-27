@@ -125,7 +125,24 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return sectionParser((read: RawSection) => readSection(read, schema))(section);
 }
 
-function readSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>): Authored<H> {
+// Where one field a section writes is written, as offsets into the source it was read from: from the
+// key through the end of its value, taking the block under it in. A field written beside another on
+// one line, one written as a block, and one written with a `+` are a site each, and none of them is
+// found by pattern — the parser that read the value says where it read it, so a kind that changes how
+// it is written moves its own sites with it.
+export interface FieldSite {
+  field: string;
+  start: number;
+  end: number;
+}
+
+export function fieldSites(section: RawSection, schema: AnySchema): FieldSite[] {
+  const sites: FieldSite[] = [];
+  sectionParser((read: RawSection) => readSection(read, schema as unknown as SectionSchema<{ id: string }>, sites))(section);
+  return sites;
+}
+
+function readSection<H extends { id: string }, F extends keyof H = never, E extends keyof H = never>(section: RawSection, schema: SectionSchema<H, F, E>, sites?: FieldSite[]): Authored<H> {
   if (section.kind !== schema.kind) throw new DslError(`expected # ${schema.kind}, got # ${section.kind}`, section.span);
   if (!section.id) throw new DslError(`# ${schema.kind} requires an id`, section.span);
 
@@ -137,7 +154,7 @@ function readSection<H extends { id: string }, F extends keyof H = never, E exte
   const bare = schema.bare as string | undefined;
   const entries = schema.entries as EntryConfig | undefined;
   const authored: Record<string, unknown> = { id: section.id };
-  for (const line of section.body) parseLine(line, fields, byKeyword, keywords, clauses, bare, entries, schema.kind, authored);
+  for (const line of section.body) parseLine(line, fields, byKeyword, keywords, clauses, bare, entries, schema.kind, authored, sites);
 
   if (schema.exclusive) {
     const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
@@ -171,7 +188,7 @@ export function typoOf(key: string, known: readonly string[]): string | undefine
 
 const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
-function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>): void {
+function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>, sites: FieldSite[] | undefined): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
   while (!cursor.done) {
@@ -201,6 +218,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const inline = !cursor.done;
         const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
+        sites?.push({ field: name, start: keySpan.start, end: !inline && hasBlock(line) ? line.children[line.children.length - 1]!.span.end : cursor.abs(cursor.pos) });
         // A key written with nothing after it is a line the author has begun and the engine reads no value from. It holds none, and it is still written, which is what a rule about the lines a section has is asked.
         if (value === undefined) {
           if (!(name in authored)) authored[name] = undefined;
@@ -352,6 +370,10 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   if (spec.printed === 'unless-default' && spec.default !== undefined && parser.print(spec.default(held as never, DEFAULT_CONTEXT)) === printed) return [];
   return label(printed);
 }
+
+// One field written in its kind's own hand, which is what a patcher lays over the lines it replaces.
+export const writeField = (schema: AnySchema, field: string, value: unknown, context: PrintContext): string[] =>
+  fieldLines(schema, field, schema.fields[field]!, { [field]: value }, context);
 
 export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
   const held = value as Record<string, unknown>;
