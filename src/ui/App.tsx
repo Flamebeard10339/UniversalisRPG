@@ -261,7 +261,6 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           generation={generation}
           words={words}
           dev={dev}
-          sections={sections}
           where={editing.map}
           onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
           onSend={driver.send}

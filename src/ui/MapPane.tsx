@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
-import { names, type Section } from './authoringSurface';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
+import { names } from './authoringSurface';
 import { drawnFor, folded, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
+import { carriedWith } from '../runtime/mapEdit';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { answering, carriedWith, centredOn, created, draggedTo, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
+import { centredOn, created, droppedAt, joinedInto, placeLine, settledOn, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
@@ -172,7 +173,6 @@ export function MapPane({
   generation,
   words,
   dev,
-  sections,
   where,
   onWhere,
   onSend,
@@ -183,7 +183,6 @@ export function MapPane({
   generation: number;
   words: Words;
   dev: boolean;
-  sections: readonly Section[];
   where: MapWhere;
   onWhere: (where: MapWhere) => void;
   onSend: (line: string) => void;
@@ -222,27 +221,24 @@ export function MapPane({
     if (line !== null) onSend(line);
   };
 
-  const answer = { send: onSend, note: onNote };
+  const place = (id: string, at: Point): void => onSend(placeLine(id, settledOn(at)));
 
-  const place = (id: string, at: Point): void => answering(placedInto(sections, id, at), answer);
+  // Which places move with the one under the finger is the engine's judgement — a region, and
+  // whatever is written off one of its places — so it is asked once, and asked while the finger is
+  // still down as well as on the drop, so a house and the shape round it move together.
+  const carrying = hold.carried === null ? null : carriedWith(view.regions, view.discovered, hold.carried.id);
 
-  // Read while the finger is still down as well as on the drop, so the places and the shape round
-  // them move together rather than the shape catching up afterwards.
-  const carrying = hold.carried === null ? null : carriedWith(whole, hold.carried.id);
-
-  const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.has(String(id))) ? hold.carried.by : NOT_CARRIED);
+  const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.includes(String(id))) ? hold.carried.by : NOT_CARRIED);
 
   function letGo(id: string, by: Point): void {
-    const moving = carriedWith(whole, id);
-    for (const staged of draggedTo(sections, whole.nodes.filter((each) => moving.has(String(each.place.id))), by, grid)) answering(staged, answer);
+    const node = sheet.nodes.find((each) => String(each.place.id) === id);
+    if (node) onSend(placeLine(id, droppedAt(node, by, grid)));
   }
-
-  const roadsFrom = (id: string): string[] => (view.discovered.find((place) => place.id === id)?.adjacent ?? []).map((edge) => String(edge.to));
 
   const link = (id: string): void => {
     if (from === id) return setFrom(null);
     if (from === null) return setFrom(id);
-    answering(joinedInto(sections, from, id, roadsFrom(from)), answer);
+    onSend(joinedInto(whole, from, id));
     setFrom(null);
   };
 

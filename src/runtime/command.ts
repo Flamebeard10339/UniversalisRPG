@@ -1,7 +1,7 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { DslError } from '../grammar/parser';
-import { formatModuleDiagnostic } from '../content/registry';
+import { formatModuleDiagnostic, type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { type ModuleSource } from '../content/universe';
 import {
@@ -24,6 +24,7 @@ import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { sheetOf, type Sheet } from './map';
+import { joining, placing, type Editing } from './mapEdit';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
@@ -161,12 +162,27 @@ export interface SectionArg {
   body: string;
 }
 
+export interface PlacingArg {
+  location: string;
+  x: number;
+  y: number;
+  z?: number;
+}
+
+export interface JoiningArg {
+  from: string;
+  to: string;
+  road: boolean;
+}
+
 interface ArgTypes {
   none: undefined;
   number: number;
   id: string;
   directive: Directive;
   section: SectionArg;
+  placing: PlacingArg;
+  joining: JoiningArg;
   local: LocalOp;
   setting: SettingOp;
   cadence: Cadence;
@@ -492,6 +508,34 @@ export function stageLocalSections(ctx: CommandContext, sections: readonly strin
     if (error instanceof DslError) return noted('error', error.message);
     return refused(error);
   }
+}
+
+const joiningFrom =
+  (road: boolean) =>
+  (rest: string): JoiningArg | { problem: string } => {
+    const match = /^(?<from>\S+)[ 	]+(?<to>\S+)$/.exec(rest)?.groups;
+    return match ? { from: match.from!, to: match.to!, road } : { problem: `${road ? '/link' : '/unlink'} requires <location> <location>` };
+  };
+
+// A location named the way a player names one: whole, or by the last part of it where that names one
+// thing. The map hands whole addresses; somebody typing wants to write `market-square`.
+function addressOf(ctx: CommandContext, written: string): string {
+  const places = [...ctx.session.registry.locations.keys()];
+  if (places.includes(written)) return written;
+  const named = places.filter((id) => id.endsWith(`.${written}`));
+  return named.length === 1 ? named[0]! : written;
+}
+
+// Every map edit takes the same road: work out the patches, stage them together, adopt once. A
+// refusal writes nothing, so a move that could not carry one room of a house moves none of it.
+function runMapEdit(ctx: CommandContext, edit: (registry: Registry, local: string) => Editing): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  const source = localSourceNow(authoring);
+  if (!source.read) return source.refusal;
+  const asked = edit(ctx.session.registry, source.text);
+  if ('refused' in asked) return noted('error', asked.refused);
+  return stageLocalSections(ctx, asked.patches.map((each) => each.text));
 }
 
 const addressed = (at: SectionAddress): string => `# ${at.kind} ${at.id}`;
@@ -978,6 +1022,37 @@ export const COMMANDS: readonly CommandSpec[] = [
       return { kind: match.kind, id: match.id, body: match.body ?? '' };
     },
     run: runSectionEdit,
+  }),
+  define({
+    name: '/place',
+    arg: 'placing',
+    argHint: '<location> <x> <y> [<z>]',
+    audience: 'author',
+    summary: 'put a location on the map, carrying the region it belongs to and everything written off it; staged as a local change like any other edit',
+    parse: (rest) => {
+      const match = /^(?<location>\S+)[ 	]+(?<x>-?\d+)[ 	]+(?<y>-?\d+)(?:[ 	]+(?<z>-?\d+))?$/.exec(rest)?.groups;
+      if (!match) return { problem: '/place requires <location> <x> <y> [<z>]' };
+      return { location: match.location!, x: Number(match.x), y: Number(match.y), ...(match.z === undefined ? {} : { z: Number(match.z) }) };
+    },
+    run: (ctx, arg) => runMapEdit(ctx, (registry, local) => placing(registry, local, addressOf(ctx, arg.location), arg)),
+  }),
+  define({
+    name: '/link',
+    arg: 'joining',
+    argHint: '<location> <location>',
+    audience: 'author',
+    summary: 'draw a road between two locations, or take one away with /unlink; staged as a local change like any other edit',
+    parse: joiningFrom(true),
+    run: (ctx, arg) => runMapEdit(ctx, (registry, local) => joining(registry, local, addressOf(ctx, arg.from), addressOf(ctx, arg.to), arg.road)),
+  }),
+  define({
+    name: '/unlink',
+    arg: 'joining',
+    argHint: '<location> <location>',
+    audience: 'author',
+    summary: 'take away a road between two locations',
+    parse: joiningFrom(false),
+    run: (ctx, arg) => runMapEdit(ctx, (registry, local) => joining(registry, local, addressOf(ctx, arg.from), addressOf(ctx, arg.to), arg.road)),
   }),
   define({
     name: '/local',

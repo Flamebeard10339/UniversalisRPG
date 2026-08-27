@@ -1,105 +1,33 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
-import { patchedInto, refused } from '../content/patch';
-import type { Location } from '../content/sections/location';
-import { parseModule, sectionFor } from '../content/sections';
-import { DslError } from '../grammar/parser';
-import { moduleLocalId, type AnySchema } from '../grammar/section';
-import { MAPPED_KIND, names, stage, type Section, type Staged } from './authoringSurface';
-import { placedAt, spotOf, type Node } from './discovery';
+import { stage, type Staged } from './authoringSurface';
+import { placedAt, spotOf, type Node, type Sheet } from './discovery';
 import { lookingAt, type Point } from './viewport';
 
+// What a gesture on the map is, said as a line the command line takes. The edit itself — which
+// places move, what a patch says, what is refused — belongs to the runtime's own map editing, because
+// a map only a screen can edit is a map an agent driving the game cannot. What is here is the
+// arithmetic of pixels, which is the one thing the engine has no business knowing.
+
 export const settledOn = (at: Point): Point => ({ x: Math.round(at.x), y: Math.round(at.y) });
-
-const declared = (text: string): Partial<Location> | { problem: string } => {
-  try {
-    const [section] = parseModule(text);
-    return section.value as Partial<Location>;
-  } catch (error) {
-    if (error instanceof DslError) return { problem: error.message };
-    throw error;
-  }
-};
-
-const stated = (value: Partial<Location> | { problem: string }): value is { problem: string } => 'problem' in value;
 
 export const answering = (staged: Staged, act: { send(line: string): void; note(text: string): void }): void =>
   void ('refused' in staged ? act.note(staged.refused) : act.send(staged.line));
 
-// The address written the way the module that owns it writes it. A patch reads better for saying
-// `riverside` where the section it patches says `riverside`, and it goes home to that module's file
-// looking like the lines around it rather than like something the map wrote.
-const asWritten = (address: string, target: string): string => {
-  const at = address.lastIndexOf('.');
-  return at < 0 ? target : moduleLocalId(address.slice(0, at), target);
-};
+// Where a place lands when a finger lets go of it: the pixels it was carried by, turned back into
+// the world's own squares, with the nudge a place off the drawn floor was drawn with taken out.
+export const droppedAt = (node: Node, carried: Point, grid: number): Point =>
+  settledOn(placedAt({ x: (spotOf(node, grid).x + carried.x) / grid, y: (spotOf(node, grid).y + carried.y) / grid }, node.climb));
 
-// A map edit is a patch: the section says only the fields the edit touched, and the language lays
-// those over whatever the id already holds. What the map stages is therefore the patch it has just
-// written folded onto whatever patch was already staged there — never over the shipped body, which
-// is the whole point: a drag that restated a location's every line was a diff nobody could read.
-function staging(section: Section, lines: readonly string[]): Staged {
-  const schema = sectionFor(MAPPED_KIND)?.schema;
-  if (section.kind !== MAPPED_KIND || schema === undefined) return { refused: `# ${section.kind} ${section.address} is not drawn on the map` };
-  const written = [`# ${MAPPED_KIND} ${section.address}`, ...lines].join('\n');
-  if (!section.staged) return stage(written);
-  const folded = patchedInto(section.text, written, schema as AnySchema);
-  return refused(folded) ? folded : stage(folded.text);
-}
+export const placeLine = (id: string, at: Point): string => `/place ${id} ${at.x} ${at.y}`;
 
-export function placedInto(sections: readonly Section[], address: string, at: Point): Staged {
-  const section = sections.find((each) => each.kind === MAPPED_KIND && names(each.address, address));
-  if (!section) return { refused: `the map is drawing ${address}, which no module declares` };
-  return movedTo(section, at);
-}
+export const joinLine = (from: string, to: string, road: boolean): string => `${road ? '/link' : '/unlink'} ${from} ${to}`;
 
-export function droppedAt(sections: readonly Section[], node: Node, carried: Point, grid: number): Staged {
-  const spot = spotOf(node, grid);
-  return placedInto(sections, node.place.id, placedAt({ x: (spot.x + carried.x) / grid, y: (spot.y + carried.y) / grid }, node.climb));
-}
-
-// Every place one drag carries, and the line that puts each where it landed. A region is what pins
-// them together — a house dragged by its front door brings its rooms with it — and a place placed
-// relative to another needs no line at all, since where it is is worked out from where that one is
-// and that one is being carried too.
-export function draggedTo(sections: readonly Section[], carried: readonly Node[], by: Point, grid: number): Staged[] {
-  const moving = carried.map((node) => String(node.place.id));
-  return carried.flatMap((node) => {
-    const anchor = node.place.relative;
-    if (anchor !== undefined && moving.some((id) => names(id, String(anchor.of)))) return [];
-    return [droppedAt(sections, node, by, grid)];
-  });
-}
-
-// Everything one drag carries: the place under the finger, the rest of the region it belongs to, and
-// whatever hangs off any of those. A house dragged by its front door brings its rooms with it, and a
-// cellar written `down of the hall` comes along whether or not anybody drew a shape round the two.
-export function carriedWith(sheet: { nodes: readonly Node[]; regions: readonly { holds: readonly string[] }[] }, id: string): ReadonlySet<string> {
-  const region = sheet.regions.find((each) => each.holds.map(String).includes(id));
-  const moving = new Set(region ? region.holds.map(String) : [id]);
-  for (let grew = true; grew; ) {
-    grew = false;
-    for (const node of sheet.nodes) {
-      const anchor = node.place.relative;
-      if (anchor === undefined || moving.has(String(node.place.id))) continue;
-      if (!moving.has(String(anchor.of))) continue;
-      moving.add(String(node.place.id));
-      grew = true;
-    }
-  }
-  return moving;
-}
-
-export function movedTo(section: Section, to: Point): Staged {
-  const value = declared(section.text);
-  if (stated(value)) return { refused: value.problem };
-  if (value.relative) {
-    return { refused: `${section.address} is placed ${value.relative.direction} of ${value.relative.of}, so move that one — or say where this one is instead of how it stands to another` };
-  }
-
-  const spot = settledOn(to);
-  return staging(section, [`x: ${spot.x}, y: ${spot.y}`]);
-}
+// Whether a road already runs to there is asked of the world rather than of any section's text: a
+// patch restates none of the roads already written, and a road the far end wrote is walked from this
+// one too without this one saying so.
+export const joinedInto = (sheet: Sheet, from: string, to: string): string =>
+  joinLine(from, to, !(sheet.nodes.find((node) => String(node.place.id) === from)?.place.adjacent ?? []).some((edge) => String(edge.to) === to));
 
 export const MAP_MODES = ['go', 'place', 'link'] as const;
 
@@ -121,20 +49,4 @@ export function created(id: string, at: Point, plane: number): Staged {
   const spot = settledOn(at);
   const where = plane === 0 ? `x: ${spot.x}, y: ${spot.y}` : `x: ${spot.x}, y: ${spot.y}, z: ${plane}`;
   return stage([`# location ${id}`, where].join('\n'));
-}
-
-export const linkedTo = (section: Section, to: string): Staged => staging(section, [`+adjacent: ${asWritten(section.address, to)}`]);
-
-export const unlinkedFrom = (section: Section, to: string): Staged => staging(section, [`-adjacent: ${asWritten(section.address, to)}`]);
-
-// Whether a road already runs to there is asked of the world rather than of the section's own text:
-// a patch says what it changes and restates none of the roads already written, and a road the far
-// end wrote is walked from this one too without this one saying so.
-export const joined = (section: Section, to: string, roads: readonly string[]): Staged =>
-  (roads.some((target) => names(target, to)) ? unlinkedFrom : linkedTo)(section, to);
-
-export function joinedInto(sections: readonly Section[], from: string, to: string, roads: readonly string[]): Staged {
-  const section = sections.find((each) => each.kind === MAPPED_KIND && names(each.address, from));
-  if (!section) return { refused: `the map is drawing ${from}, which no module declares` };
-  return joined(section, to, roads);
 }

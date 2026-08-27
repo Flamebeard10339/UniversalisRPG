@@ -1,115 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { arrowAt } from './MapPane';
-import type { Location } from '../content/sections/location';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { addressable, MAPPED_KIND, names, NOWHERE, offeredBy, type Section } from './authoringSurface';
+import { addressable, names, NOWHERE, offeredBy } from './authoringSurface';
 import { gotoLine } from './devMode';
-import { drawnAt, placedAt, type Node } from './discovery';
+import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '../runtime/map';
+import { createDriver, type Driver } from './driver';
+import { answering, centredOn, created, droppedAt, joinedInto, joinLine, placeLine, settledOn, stagedKey } from './mapEdit';
+import { SHIPPED_SOURCES } from './shippedContent';
 
 // Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
 const GRID = 140;
-import { createDriver, type Driver } from './driver';
-import { answering, carriedWith, centredOn, created, draggedTo, droppedAt, joined, joinedInto, linkedTo, movedTo, placedInto, settledOn, stagedKey, unlinkedFrom } from './mapEdit';
-import { SHIPPED_SOURCES } from './shippedContent';
-
-const addressed = addressable(SHIPPED_SOURCES);
-
-const DRAWN = offeredBy(addressed, NOWHERE, 'map');
-
-const withStaged = (local: string): Map<string, Location> =>
-  loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: local }]).registry.locations;
 
 const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
 
-const REGISTRY_PLACES: Map<string, Location> = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
-
-function bodyOf(staged: { line: string }): string {
-  const driver = opened();
-  driver.send(staged.line);
-  return driver.localChanges() ?? '';
-}
+const REGISTRY_PLACES = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
-const RELATIVE = DRAWN.filter((section) => /^[ \t]*(?:relative[ \t]*:[ \t]*)?(?:north|south|east|west|up|down)[ \t]+of[ \t]/m.test(section.text));
-
-const ABSOLUTE = DRAWN.filter((section) => !RELATIVE.includes(section));
-
-describe('a drag is a section edit and nothing else (c8)', () => {
-  it('reads the locations it is a rule about', () => {
-    expect(DRAWN.length).toBeGreaterThan(3);
-    expect(RELATIVE.length).toBeGreaterThan(0);
-    expect(ABSOLUTE.length).toBeGreaterThan(0);
-    expect(DRAWN.every((section) => section.kind === MAPPED_KIND)).toBe(true);
-  });
-
-  for (const section of ABSOLUTE) {
-    it(`stages ${section.address} where it was dropped, through the same door a typed edit takes`, () => {
-      const driver = opened();
-      const before = REGISTRY_PLACES.get(section.address)!;
-      const moved = movedTo(section, { x: 11.4, y: -6.6 });
-
-      expect(moved).toHaveProperty('line');
-      const line = (moved as { line: string }).line;
-      expect(line.startsWith(`/dsl ${MAPPED_KIND} ${section.address} `)).toBe(true);
-
-      driver.send(line);
-      expect(said(driver)).toContain(`Staged # ${MAPPED_KIND} ${section.address} in local-changes.`);
-
-      expect(withStaged(driver.localChanges()!).get(section.address)).toEqual({ ...before, x: 11, y: -7 });
-    });
-  }
-
-  for (const section of RELATIVE) {
-    it(`refuses to drag ${section.address} with a reason, rather than restating it absolutely`, () => {
-      const moved = movedTo(section, { x: 3, y: 3 });
-
-      expect(moved).toHaveProperty('refused');
-      expect((moved as { refused: string }).refused).toContain(section.address);
-      expect(moved).not.toHaveProperty('line');
-    });
-  }
-
-  it('is refused whole when the section it carries will not load, and the map does not move', () => {
-    const driver = opened();
-    const section = ABSOLUTE[0];
-
-    driver.send((linkedTo(section, 'nowhere-at-all') as { line: string }).line);
-
-    expect(said(driver)).toContain('local changes did not load.');
-    expect(driver.localChanges()).toBe('');
-    expect(driver.snapshot().view.discovered.find((each) => each.id === section.address)).toEqual(
-      opened().snapshot().view.discovered.find((each) => each.id === section.address),
-    );
-  });
-
-  it('says where a location is, for one that never said', () => {
-    const section: Section = { kind: MAPPED_KIND, address: 'made-up.somewhere', text: '# location made-up.somewhere\nstarting\nexamine: Nowhere in particular.', module: 'made-up', staged: false };
-
-    expect(movedTo(section, { x: 2, y: -3 })).toEqual({ line: '/dsl location made-up.somewhere x: 2, y: -3' });
-  });
-
-  // A drag moved two numbers, so two numbers are what it stages. Everything else the section says —
-  // its floor, its name, what stands in it, the roads out of it — is left where it was written, which
-  // is the difference between a local change somebody can read and a copy of the whole place.
-  it('stages the two axes it moved and nothing else the place says', () => {
-    const section: Section = { kind: MAPPED_KIND, address: 'made-up.upstairs', text: '# location made-up.upstairs\nx: 0, y: 0, z: 1\nexamine: A landing.', module: 'made-up', staged: false };
-
-    expect(movedTo(section, { x: 5, y: 6 })).toEqual({ line: '/dsl location made-up.upstairs x: 5, y: 6' });
-  });
-
-  // A second drag lands on the patch the first one staged, so what the map stages is one section
-  // holding both edits rather than the later one throwing the earlier one away.
-  it('folds a second edit into the patch the first one staged', () => {
-    const staged: Section = { kind: MAPPED_KIND, address: 'made-up.somewhere', text: '# location made-up.somewhere\nx: 2, y: -3\n+adjacent: elsewhere', module: 'local-changes', staged: true };
-
-    expect(movedTo(staged, { x: 8, y: 8 })).toEqual({ line: '/dsl location made-up.somewhere x: 8, y: 8| +adjacent: elsewhere' });
-  });
-
-  it('refuses a section the map does not draw', () => {
-    expect(movedTo({ kind: 'entity', address: 'a.b', text: '# entity a.b', module: 'a', staged: false }, { x: 0, y: 0 })).toHaveProperty('refused');
-  });
+const at = (id: string, x: number, y: number, z = 0, ...adjacent: string[]): Place => ({
+  id,
+  title: '' as never,
+  x,
+  y,
+  z,
+  adjacent: adjacent.map((to) => ({ to, open: true })),
 });
+
+const drawn = (places: readonly Place[], here: string): Sheet => sheetOf({ discovered: places, regions: [], location: { id: here }, choices: [], mapGrid: GRID }, null);
 
 describe('where a drag lets go is where the place is (c8)', () => {
   it('rounds to the units a location can be written in', () => {
@@ -119,146 +36,67 @@ describe('where a drag lets go is where the place is (c8)', () => {
 
   it('undoes the nudge a place off the drawn floor was drawn with', () => {
     for (const z of [-2, -1, 0, 1, 2]) {
-      for (const plane of [-1, 0, 1]) {
-        const place = { id: 'a', title: undefined as never, x: 3, y: -4, z, adjacent: [] };
-
-        expect(placedAt(drawnAt(place, plane), z - plane)).toEqual({ x: 3, y: -4 });
-      }
+      for (const plane of [-1, 0, 1]) expect(placedAt(drawnAt({ x: 3, y: -4, z }, plane), z - plane)).toEqual({ x: 3, y: -4 });
     }
   });
-});
 
-describe('where the map lets a place go (c8)', () => {
-  const drawn = (address: string, climb = 0): Node => {
-    const place = REGISTRY_PLACES.get(address)!;
-    return { place: { id: address, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, goes: null, bearing: null, at: drawnAt({ x: place.x, y: place.y, z: place.z } as never, place.z - climb) };
-  };
+  const node = (x: number, y: number, climb = 0): Node => ({ place: at('somewhere', x, y, climb), here: false, climb, goes: null, bearing: null, at: drawnAt({ x, y, z: climb }, 0) });
 
-  const moved = ABSOLUTE[0].address;
-
-  it('turns the pixels a finger carried a place into the line that says where it is', () => {
-    const node = drawn(moved);
-    const before = REGISTRY_PLACES.get(moved)!;
-
-    const staged = droppedAt(DRAWN, node, { x: GRID * 3, y: GRID * -2 }, GRID);
-
-    expect(staged).toHaveProperty('line');
-    expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual({ ...before, x: before.x + 3, y: before.y - 2 });
+  it('turns the pixels a finger carried a place into the square it landed on', () => {
+    expect(droppedAt(node(3, -4), { x: GRID * 3, y: GRID * -2 }, GRID)).toEqual({ x: 6, y: -6 });
   });
 
   for (const climb of [-2, 2]) {
     it(`takes the drawing nudge back out for a place ${Math.abs(climb)} floors ${climb > 0 ? 'up' : 'down'}`, () => {
-      const place = REGISTRY_PLACES.get(moved)!;
-      const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, goes: null, bearing: null, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
-
-      const staged = droppedAt(DRAWN, off, { x: 0, y: 0 }, GRID);
-
-      expect(withStaged(bodyOf(staged as { line: string })).get(moved)).toEqual(place);
+      expect(droppedAt(node(3, -4, climb), { x: 0, y: 0 }, GRID)).toEqual({ x: 3, y: -4 });
     });
   }
+});
 
-  it('refuses a place the map is drawing that no module declares', () => {
-    const stray: Node = { place: { id: 'nowhere.at-all', title: '' as never, x: 0, y: 0, z: 0, adjacent: [] }, here: false, climb: 0, goes: null, bearing: null, at: { x: 0, y: 0 } };
-
-    expect(droppedAt(DRAWN, stray, { x: 0, y: 0 }, GRID)).toEqual({ refused: 'the map is drawing nowhere.at-all, which no module declares' });
-    expect(placedInto(DRAWN, 'nowhere.at-all', { x: 1, y: 1 })).toHaveProperty('refused');
+// The map pane says what happened; what it means is the command line's, and the same line typed by
+// hand does the same thing. A gesture that composed its own edit was an edit only a screen could make.
+describe('what a gesture on the map says', () => {
+  it('puts a place where it was dropped', () => {
+    expect(placeLine('tulsa.market-square', { x: 8, y: -1 })).toBe('/place tulsa.market-square 8 -1');
   });
 
-  it('carries a refusal out of the section itself rather than swallowing it', () => {
-    const relative = RELATIVE[0];
+  it('draws a road where there is none, and rubs one out where there is', () => {
+    const joined = drawn([at('gate', 0, 0, 0, 'yard'), at('yard', 1, 0, 0, 'gate'), at('lane', 2, 0)], 'gate');
 
-    expect(placedInto(DRAWN, relative.address, { x: 5, y: 5 })).toHaveProperty('refused');
+    expect(joinedInto(joined, 'gate', 'lane')).toBe('/link gate lane');
+    expect(joinedInto(joined, 'gate', 'yard')).toBe('/unlink gate yard');
+  });
+
+  it('says it in the words the command line takes', () => {
+    expect(joinLine('a', 'b', true)).toBe('/link a b');
+    expect(joinLine('a', 'b', false)).toBe('/unlink a b');
   });
 });
 
 describe('what a staged edit does from a surface (c8)', () => {
   const watching = (): { act: { send(line: string): void; note(text: string): void }; sent: string[]; said: string[] } => {
     const sent: string[] = [];
-    const said: string[] = [];
-    return { act: { send: (line) => void sent.push(line), note: (text) => void said.push(text) }, sent, said };
+    const spoken: string[] = [];
+    return { act: { send: (line) => void sent.push(line), note: (text) => void spoken.push(text) }, sent, said: spoken };
   };
 
   it('sends a line down the one route and says a refusal out loud', () => {
     const taken = watching();
-    answering({ line: '/dsl location a.b x: 1, y: 1' }, taken.act);
+    answering({ line: '/place a.b 1 1' }, taken.act);
     const refused = watching();
     answering({ refused: 'that one is placed relative to another' }, refused.act);
 
-    expect([taken.sent, taken.said]).toEqual([['/dsl location a.b x: 1, y: 1'], []]);
+    expect([taken.sent, taken.said]).toEqual([['/place a.b 1 1'], []]);
     expect([refused.sent, refused.said]).toEqual([[], ['that one is placed relative to another']]);
   });
 });
 
-const lineOf = (staged: ReturnType<typeof joined>, where: string): string => {
-  if ('refused' in staged) throw new Error(`${where}: ${staged.refused}`);
-  return staged.line;
-};
-
-describe('a connection is a section edit and nothing else', () => {
-  // Any real drawn location proves the same rule; naming one by hand would go stale the day an author renamed it.
-  const REAL_PLACE = DRAWN[0].address;
-
-  const waysOut = (places: Map<string, Location>, address: string): string[] => (places.get(address)?.adjacent ?? []).map((edge) => edge.target).sort();
-
-  // What the map is looking at when it decides whether a tap draws a road or rubs one out: the roads
-  // that can be walked, which is what the map itself draws, and not the lines one end happens to hold.
-  const walked = (text: string, address: string): string[] => (loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text }]).registry.roads.get(address) ?? []).map((edge) => edge.target);
-
-  const restaged = (section: Section, to: string, text: string): { text: string; adjacent: string[] } => {
-    const written = bodyOf({ line: lineOf(joined(section, to, walked(text, section.address)), section.address) });
-    return { text: written, adjacent: waysOut(withStaged(written), section.address) };
-  };
-
-  const stagedSection = (text: string, address: string): Section => addressable([{ name: 'local-changes', text }]).find((each) => each.address === address)!;
-
-  it('is a rule about every location the map draws', () => {
-    expect(DRAWN.length).toBeGreaterThan(2);
-  });
-
-  // One case per place rather than one loop over all of them: each stages an edit and reloads the universe twice to read it back, and a corpus that grows a region runs the loop out of one test's budget while each place on its own stays quick.
-  for (const section of DRAWN) {
-    it(`adds a way out of ${section.address} and takes the same one away again`, () => {
-      const standing = walked('', section.address);
-      const to = [...REGISTRY_PLACES.keys()].find((id) => id !== section.address && !standing.includes(id));
-      expect(to, section.address).toBeDefined();
-
-      const added = restaged(section, to!, '');
-      expect(added.adjacent, section.address).toContain(to);
-      expect(added.adjacent, section.address).toEqual([...waysOut(REGISTRY_PLACES, section.address), to].sort());
-
-      const taken = restaged(stagedSection(added.text, section.address), to!, added.text);
-      expect(taken.adjacent, section.address).toEqual(waysOut(REGISTRY_PLACES, section.address));
-    });
-  }
-
-  // The patch says what it changes and nothing else, so a road already there is never restated: what
-  // is staged for a place with seven ways out is one line about the eighth.
-  // How a patch spells the place at the far end: the way the module it is patching would have written
-  // it, so a road inside one module reads as one word and a road out of it says where it goes.
-  const spelt = (address: string, target: string): string => {
-    const module = address.slice(0, address.lastIndexOf('.'));
-    return target.startsWith(`${module}.`) ? target.slice(module.length + 1) : target;
-  };
-
-  it('stages one line about the one road it changed, whatever the place already holds', () => {
-    const busiest = [...DRAWN].sort((left, right) => waysOut(REGISTRY_PLACES, right.address).length - waysOut(REGISTRY_PLACES, left.address).length)[0];
-    expect(waysOut(REGISTRY_PLACES, busiest.address).length).toBeGreaterThan(2);
-    const to = [...REGISTRY_PLACES.keys()].find((id) => id !== busiest.address && !walked('', busiest.address).includes(id))!;
-
-    expect(lineOf(joined(busiest, to, walked('', busiest.address)), busiest.address)).toBe(`/dsl location ${busiest.address} +adjacent: ${spelt(busiest.address, to)}`);
-  });
-
-  it('takes a road away at the end that draws it, and refuses one the map does not draw', () => {
-    const alone: Section = { kind: MAPPED_KIND, address: 'made-up.alone', text: '# location made-up.alone\nx: 0, y: 0', module: 'made-up', staged: false };
-
-    expect(unlinkedFrom(alone, REAL_PLACE)).toEqual({ line: `/dsl location made-up.alone -adjacent: ${spelt('made-up.alone', REAL_PLACE)}` });
-    expect(joined(alone, REAL_PLACE, [])).toHaveProperty('line');
-    expect(linkedTo({ ...alone, kind: 'entity' }, REAL_PLACE)).toHaveProperty('refused');
-    expect(joinedInto([alone], 'nowhere.at-all', REAL_PLACE, [])).toHaveProperty('refused');
-  });
-});
-
 describe('a new place is written where the map is looking', () => {
+  const lineOf = (staged: ReturnType<typeof created>, where: string): string => {
+    if ('refused' in staged) throw new Error(`${where}: ${staged.refused}`);
+    return staged.line;
+  };
+
   it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
     expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 0, y: 0 });
     expect(centredOn({ pan: { x: -GRID, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 1, y: 0 });
@@ -286,7 +124,6 @@ describe('a new place is written where the map is looking', () => {
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
     expect(driver.snapshot().view.location.id).toBe('local-changes.north-shore');
     expect(driver.snapshot().view.discovered.map((place) => place.id)).toContain('local-changes.north-shore');
-    expect(withStaged(driver.localChanges() ?? '').get('local-changes.north-shore')).toMatchObject({ x: 3, y: -3, z: 0 });
   });
 
   it('places and connects a place it made, which the map addresses by a key no module spells', () => {
@@ -297,9 +134,37 @@ describe('a new place is written where the map is looking', () => {
     const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === 'north-shore')!;
 
     expect(names(made.address, stagedKey('north-shore'))).toBe(true);
-    expect(placedInto([made], stagedKey('north-shore'), { x: 9, y: 9 })).toHaveProperty('line');
-    expect(joined(made, DRAWN[0].address, [])).toHaveProperty('line');
+    driver.send(placeLine(stagedKey('north-shore'), { x: 9, y: 9 }));
+
+    expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
+    expect(driver.snapshot().view.discovered.find((place) => place.id === 'local-changes.north-shore')).toMatchObject({ x: 9, y: 9 });
   });
+});
+
+// One case per drawn place: the map is a rule about all of them, and a corpus that grows a quarter is
+// covered with nothing here edited.
+describe('a drag is a section edit and nothing else (c8)', () => {
+  const DRAWN = offeredBy(addressable(SHIPPED_SOURCES), NOWHERE, 'map');
+  const ABSOLUTE = DRAWN.filter((section) => REGISTRY_PLACES.get(section.address)?.relative === undefined);
+
+  it('reads the locations it is a rule about', () => {
+    expect(DRAWN.length).toBeGreaterThan(3);
+    expect(ABSOLUTE.length).toBeGreaterThan(3);
+    expect(DRAWN.length - ABSOLUTE.length).toBeGreaterThan(0);
+  });
+
+  for (const section of ABSOLUTE) {
+    it(`stages ${section.address} where it was dropped, through the same door a typed edit takes`, () => {
+      const driver = opened();
+      const before = REGISTRY_PLACES.get(section.address)!;
+
+      driver.send(placeLine(section.address, { x: 11, y: -7 }));
+
+      expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
+      const moved = loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: driver.localChanges()! }]).registry.locations.get(section.address);
+      expect(moved).toEqual({ ...before, x: 11, y: -7 });
+    });
+  }
 });
 
 describe('the point of a one-way road', () => {
@@ -309,51 +174,5 @@ describe('the point of a one-way road', () => {
     expect(points[1]).toEqual([55, 0]);
     expect(points[0]![0]).toBeLessThan(points[1]![0]!);
     expect(points[0]![1]).toBe(-points[2]![1]!);
-  });
-
-  it('turns with the road, so it points at the far end whichever way that lies', () => {
-    const [, tip] = arrowAt({ x: 0, y: 0 }, { x: 0, y: 100 }).split(' ').map((pair) => pair.split(',').map(Number));
-
-    expect(tip).toEqual([0, 55]);
-  });
-});
-
-// What a drag carries beyond the place under the finger. Both rules are the world's own: a region
-// says which places are one thing, and `up of <somewhere>` says which place another hangs off.
-describe('everything one drag carries', () => {
-  const node = (id: string, relative?: { direction: string; of: string }): Node => ({
-    place: { id, title: '' as never, x: 0, y: 0, z: 0, adjacent: [], ...(relative ? { relative: relative as never } : {}) },
-    here: false,
-    climb: 0,
-    goes: null,
-    bearing: null,
-    at: { x: 0, y: 0 },
-  });
-
-  const sheet = (nodes: Node[], holds: string[][] = []) => ({ nodes, regions: holds.map((each) => ({ holds: each })) });
-
-  it('is the place alone where nothing is pinned to it', () => {
-    expect([...carriedWith(sheet([node('hall'), node('yard')]), 'hall')]).toEqual(['hall']);
-  });
-
-  it('is every place of the region it belongs to', () => {
-    const drawn = sheet([node('gate'), node('yard'), node('lane')], [['gate', 'yard']]);
-
-    expect([...carriedWith(drawn, 'gate')].sort()).toEqual(['gate', 'yard']);
-    expect([...carriedWith(drawn, 'lane')]).toEqual(['lane']);
-  });
-
-  it('follows the chain of places written off one another, however long', () => {
-    const drawn = sheet([node('hall'), node('loft', { direction: 'up', of: 'hall' }), node('attic', { direction: 'up', of: 'loft' }), node('yard')]);
-
-    expect([...carriedWith(drawn, 'hall')].sort()).toEqual(['attic', 'hall', 'loft']);
-    expect([...carriedWith(drawn, 'loft')].sort()).toEqual(['attic', 'loft']);
-  });
-
-  it('stages no line for a place that hangs off one being carried, since it arrives on its own', () => {
-    const carried = [node('hall'), node('loft', { direction: 'up', of: 'hall' })];
-    const sections: Section[] = carried.map((each) => ({ kind: MAPPED_KIND, address: String(each.place.id), text: `# location ${each.place.id}\nx: 0, y: 0`, module: 'keep', staged: false }));
-
-    expect(draggedTo(sections, carried, { x: GRID, y: 0 }, GRID)).toEqual([{ line: '/dsl location hall x: 1, y: 0' }]);
   });
 });

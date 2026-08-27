@@ -38,7 +38,7 @@ function reaches(source: { text: string }): string[] {
   return [...source.text.matchAll(REACHES)].map(([, module]) => module);
 }
 
-const PLAY_SURFACE = ['session', 'command', 'figures', 'localized', 'map', 'modalOption', 'statScreen', 'store', 'saveSlots', 'openUniverse', 'runFiling', 'runLog'];
+const PLAY_SURFACE = ['session', 'command', 'figures', 'localized', 'map', 'mapEdit', 'modalOption', 'statScreen', 'store', 'saveSlots', 'openUniverse', 'runFiling', 'runLog'];
 
 const BROUGHT_IN = /import\s+(type\s+)?\{([^}]*)\}\s*from\s*['"`][^'"`]*\/runtime\/[\w.-]+['"`]/g;
 
@@ -56,6 +56,7 @@ const DISPATCHES = [
   'partStanding',
   'sheetOffers',
   'sheetOf',
+  'carriedWith',
   'compassOf',
   'COMPASS',
   'BASE_LANGUAGE',
