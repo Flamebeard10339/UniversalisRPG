@@ -375,6 +375,15 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
 export const writeField = (schema: AnySchema, field: string, value: unknown, context: PrintContext): string[] =>
   fieldLines(schema, field, schema.fields[field]!, { [field]: value }, context);
 
+// A list field written as what it adds and takes away rather than as what it holds. Written inline
+// whatever the field's own layout is: a `+` line says the members it names and nothing about the
+// rest, and a block under it would read as the whole list.
+export function writeEdits(schema: AnySchema, field: string, edits: FieldEdits): string[] {
+  const spec = schema.fields[field]!;
+  const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
+  return edits.ops.filter((op) => op.values.length > 0).map(({ op, values }) => `${op}${keywordOf(field, spec)}: ${parser.printBlock!(values).join(', ')}`);
+}
+
 export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
   const held = value as Record<string, unknown>;
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];

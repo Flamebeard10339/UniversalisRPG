@@ -6,7 +6,9 @@ import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type Lo
 import { declaredKey } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
+import { patchedInto, writesEntries } from '../src/content/patch';
 import { registryDiff } from '../src/content/registryDiff';
+import { sectionFor } from '../src/content/sections';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { Removal } from '../src/content/sections/remove';
 import type { ModuleSource, ParsedModule } from '../src/content/universe';
@@ -128,6 +130,20 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 
 const rehead = (heading: string, section: string): string => [heading, ...section.split('\n').slice(1)].join('\n');
 
+// A staged section is a patch over the one that declares the id, however much of it it happens to
+// write: the fields it names go home where that file writes them and every other line is left
+// standing. Two staged sections cannot travel that way and go home whole instead, as every one of
+// them did before — a kind that reads its own body, which has no fields to name, and a section
+// holding an entry, which goes home by its label rather than by where it is written.
+function foldedHome(base: readonly ModuleSource[], declaration: Declaration, section: LocalSection): { text: string } | { refused: string } {
+  const written = rehead(declaration.heading, section.text);
+  const schema = sectionFor(section.kind)?.schema;
+  if (schema === undefined || writesEntries(written, schema)) return { text: written };
+  const source = base.find((each) => each.name === declaration.source);
+  if (source === undefined) return { refused: `${declaration.source} is not among the files being consolidated into` };
+  return patchedInto(source.text.slice(declaration.start, declaration.end).replace(/\r\n?/g, '\n'), written, schema);
+}
+
 export function consolidate(base: readonly ModuleSource[], local: ModuleSource): Consolidation {
   const before = loadUniverseWithDiagnostics([...base, local]);
   if (before.diagnostics.length > 0) return refusal(base, local, before.diagnostics.map(formatModuleDiagnostic));
@@ -163,8 +179,13 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
       unplaced.push({ heading, reason: `two staged sections go home to ${declaration.source}'s ${declaration.heading}` });
       continue;
     }
+    const folded = target.remove ? { text: null } : foldedHome(base, declaration, section);
+    if ('refused' in folded) {
+      unplaced.push({ heading, reason: folded.refused });
+      continue;
+    }
     const into = edits.get(declaration.source) ?? [];
-    into.push({ start: declaration.start, end: declaration.end, text: target.remove ? null : rehead(declaration.heading, section.text) });
+    into.push({ start: declaration.start, end: declaration.end, text: folded.text });
     edits.set(declaration.source, into);
     placed.push({ heading, kind: target.kind, id: target.id, source: declaration.source });
   }
@@ -281,7 +302,6 @@ export function run(argv: readonly string[]): void {
   if (result.differences.length > 0) {
     console.error('Consolidation would not preserve the universe, so nothing was written:');
     for (const line of result.differences) console.error(line);
-    console.error('A staged section replaces the whole section it goes home to; a partial edit has to be staged whole.');
     process.exitCode = 1;
     return;
   }

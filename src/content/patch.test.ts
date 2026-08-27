@@ -123,3 +123,28 @@ describe('a patch means the same folded home as it does staged', () => {
     });
   }
 });
+
+describe('a patch written over a patch', () => {
+  const STAGED = '# location market-square\nx: 3, y: 4\n+adjacent: kiln-lane';
+
+  it('keeps the fields the second one is silent about', () => {
+    expect(folded(STAGED, '# location market-square\ny: 9')).toBe('# location market-square\nx: 3, y: 9\n+adjacent: kiln-lane');
+  });
+
+  it('stays a patch: two runs of list edits are said as one, not resolved against a list that is not here', () => {
+    expect(folded(STAGED, '# location market-square\n+adjacent: riverside')).toBe('# location market-square\nx: 3, y: 4\n+adjacent: kiln-lane, riverside');
+  });
+
+  // Not nothing: adding a road the declaration already holds says nothing, so what an add and its
+  // undoing leave behind is the undoing — the one of the two that still means something at home.
+  it('lets the later word stand where the two disagree about one member', () => {
+    expect(folded(STAGED, '# location market-square\n-adjacent: kiln-lane')).toBe('# location market-square\nx: 3, y: 4\n-adjacent: kiln-lane');
+    expect(folded('# location market-square\n-adjacent: kiln-lane', '# location market-square\n+adjacent: kiln-lane')).toBe('# location market-square\n+adjacent: kiln-lane');
+  });
+
+  it('takes a whole list written later over every edit that came before it', () => {
+    expect(folded('# location market-square\n+adjacent: kiln-lane\n-adjacent: riverside', '# location market-square\nadjacent: forge')).toBe(
+      '# location market-square\nadjacent: forge',
+    );
+  });
+});

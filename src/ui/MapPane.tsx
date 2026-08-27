@@ -193,10 +193,12 @@ export function MapPane({
     if (node) answering(droppedAt(sections, node, carried), answer);
   }
 
+  const roadsFrom = (id: string): string[] => (view.discovered.find((place) => place.id === id)?.adjacent ?? []).map((edge) => String(edge.to));
+
   const link = (id: string): void => {
     if (from === id) return setFrom(null);
     if (from === null) return setFrom(id);
-    answering(joinedInto(sections, from, id), answer);
+    answering(joinedInto(sections, from, id, roadsFrom(from)), answer);
     setFrom(null);
   };
 

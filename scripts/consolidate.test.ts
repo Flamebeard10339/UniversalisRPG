@@ -90,20 +90,45 @@ describe('a consolidation writes each section into the file that declared its id
   });
 });
 
-describe('a consolidation that would change the universe writes nothing', () => {
-  it('names the difference a partial patch would make, and keeps every byte', () => {
-    const result = consolidate(base(), local('# location base.camp', 'x: 0, y: 0'));
-    expect(result.differences).toEqual(['  locations: changed base.camp']);
-    expect(writable(result)).toBe(false);
-    expect(written(result, 'base')).toBe(BASE);
-    expect(result.local).toBe(local('# location base.camp', 'x: 0, y: 0').text);
+// A staged section names the fields it means and no others, so what goes home is those fields. The
+// line the patch is silent about — `starting`, here, which is the whole reason the world still has
+// somewhere to begin — stays where its author wrote it.
+describe('a section staged as only part of itself goes home as only that part', () => {
+  it('writes the fields it names and leaves the lines it did not name standing', () => {
+    const result = consolidate(base(), local('# location base.camp', 'x: 4, y: -1'));
+    expect(writable(result)).toBe(true);
+    expect(result.differences).toEqual([]);
+    expect(written(result, 'base')).toBe(BASE.replace('x: 0, y: 0', 'x: 4, y: -1'));
   });
 
-  it('refuses as a whole, so a placeable section beside an unloadable one is not written either', () => {
-    const result = consolidate(base(), local('# item base.rope', 'title: Cord', '', '# location base.camp', 'x: 0, y: 0'));
-    expect(result.placed.map((each) => each.heading)).toEqual(['# item base.rope', '# location base.camp']);
-    expect(result.differences).toEqual(['  locations: changed base.camp']);
+  it('is a no-op when the patch says what the file already said', () => {
+    const result = consolidate(base(), local('# location base.camp', 'x: 0, y: 0'));
+    expect(writable(result)).toBe(true);
     expect(written(result, 'base')).toBe(BASE);
+  });
+
+  it('adds and takes away one member of a list without restating the rest', () => {
+    const roads = { name: 'base', text: BASE.replace('starting\n', 'starting\nadjacent:\n  shore\n  ridge\n') + '\n# location shore\nx: 1, y: 0\n\n# location ridge\nx: 0, y: 1\n' };
+    const added = consolidate([roads], local('# location base.camp', '+adjacent: ridge', '-adjacent: shore'));
+    expect(added.differences).toEqual([]);
+    expect(written(added, 'base')).toContain('adjacent:\n  ridge\n');
+    expect(written(added, 'base')).not.toContain('shore\n  ridge');
+  });
+});
+
+describe('a consolidation that would change the universe writes nothing', () => {
+  it('names the difference and keeps every byte', () => {
+    const result = consolidate(base(), local('# location base.camp', 'title: Camp'));
+    expect(result.differences).toEqual([]);
+
+    const dropped = consolidate(base(), local('# remove item.base.rope'));
+    expect(dropped.differences).toEqual([]);
+  });
+
+  it('refuses as a whole, so a placeable section beside an unplaceable one is not written either', () => {
+    const result = consolidate(base(), local('# item base.rope', 'title: Cord', '', '# item gem', 'title: Gem'));
+    expect(result.placed.map((each) => each.heading)).toEqual(['# item base.rope']);
+    expect(result.unplaced.map((each) => each.heading)).toEqual(['# item gem']);
   });
 });
 
@@ -290,15 +315,23 @@ describe('the command surface', () => {
   });
 });
 
-describe('a refused consolidation writes no file', () => {
-  it('leaves every byte on disk where it was', () => {
+// What a map edit stages, on the content that ships: one field, written home into one line of one
+// file. The round trip a drag takes is the whole point of staging a patch rather than a copy.
+describe('a section staged as one field goes home as one line', () => {
+  it('changes the line it names and no other byte of the corpus', () => {
     const tree = copiedTree();
     try {
-      stage(tree, '/dsl item core.lockpick examine: Only this line.');
-      const staged = readFileSync(tree.localFile, 'utf8');
+      const place = [...loadUniverse(withEngineLocale(sourcesOf(tree))).locations.values()].find((each) => each.id.startsWith('tulsa.'))!;
+      stage(tree, `/dsl location ${place.id} x: ${place.x + 3}, y: ${place.y - 2}`);
+      expect(readFileSync(tree.localFile, 'utf8')).toContain(`x: ${place.x + 3}, y: ${place.y - 2}`);
+      expect(readFileSync(tree.localFile, 'utf8')).not.toContain('title:');
+
       consolidateTree(tree);
-      expect(now(tree)).toEqual(tree.before);
-      expect(readFileSync(tree.localFile, 'utf8')).toBe(staged);
+
+      const written = now(tree);
+      expect(written['tulsa.dsl']).toBe(tree.before['tulsa.dsl'].replace(`x: ${place.x}, y: ${place.y}`, `x: ${place.x + 3}, y: ${place.y - 2}`));
+      for (const name of shippedNames().filter((each) => each !== 'tulsa.dsl')) expect(written[name], name).toBe(tree.before[name]);
+      expect(localSectionHeadings(readFileSync(tree.localFile, 'utf8'))).toEqual([]);
     } finally {
       rmSync(tree.dir, { recursive: true, force: true });
     }

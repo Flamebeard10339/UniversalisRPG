@@ -30,6 +30,22 @@ export function applyEdits(held: unknown, edits: FieldEdits): unknown[] {
   return values;
 }
 
+// Two runs of list edits said as one, for a patch written over a patch. A value the later run
+// settles is settled by it, so an id added and then taken away leaves nothing behind rather than
+// both lines; anything the later run is silent about keeps what the earlier one said.
+export function composeEdits(into: FieldEdits, from: FieldEdits): FieldEdits {
+  const settled = from.ops.flatMap((each) => each.values);
+  const held = into.ops.flatMap(({ op, values }) => values.filter((value) => !settled.some((later) => identifies(later, value) && identifies(value, later))).map((value) => ({ op, value })));
+  const laid = [...held, ...from.ops.flatMap(({ op, values }) => values.map((value) => ({ op, value })))];
+  const ops: FieldEdits['ops'] = [];
+  for (const { op, value } of laid) {
+    const last = ops[ops.length - 1];
+    if (last?.op === op) last.values.push(value);
+    else ops.push({ op, values: [value] });
+  }
+  return { ops };
+}
+
 function mergeEntries(into: Labelled[], from: Labelled[]): Labelled[] {
   let merged = [...into];
   for (const entry of from) {

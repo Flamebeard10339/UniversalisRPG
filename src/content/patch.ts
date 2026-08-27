@@ -1,7 +1,7 @@
 import { DslError } from '../grammar/parser';
-import { AnySchema, FieldSite, PrintContext, fieldSites, isFieldEdits, parseSection, writeField } from '../grammar/section';
+import { AnySchema, FieldSite, PrintContext, fieldSites, isFieldEdits, parseSection, writeEdits, writeField } from '../grammar/section';
 import { RawSection, splitSections } from '../grammar/structure';
-import { applyEdits } from './merge';
+import { applyEdits, composeEdits } from './merge';
 
 // A section written as only the fields it means. Everything the language does with one is already
 // settled — `mergeFields` lays those fields over whatever the id already holds and leaves the rest
@@ -65,12 +65,25 @@ interface Edit {
   text: string;
 }
 
-// A field written whole goes home as the author wrote it; one written with `+` or `-` has to be
-// resolved against what the declaration holds, so the merged list is written out afresh.
+// A field taken out altogether — two runs of edits that cancelled, or a second writing of a field the
+// first has already answered for. A field that had a line to itself takes the line with it; one
+// written beside another leaves the line and the comma that led to it.
+function struck(text: string, site: FieldSite): Edit {
+  if (!alone(text, site)) return { start: text.lastIndexOf(',', site.start) + 1 || site.start, end: site.end, text: '' };
+  const start = text.lastIndexOf(NEWLINE, site.start - 1);
+  return { start: start < 0 ? 0 : start, end: site.end, text: '' };
+}
+
+// A field written whole goes home as the author wrote it. One written with `+` or `-` depends on
+// what it is going home to: over a section that holds the list, the two are resolved and the list is
+// written out afresh; over another patch, there is no list yet to resolve against, so the two runs of
+// edits are said as one and stay edits.
 function linesFor(field: string, from: Read, into: Read, schema: AnySchema, patch: string): string[] {
   const held = from.authored[field];
-  if (isFieldEdits(held)) return writeField(schema, field, applyEdits(into.authored[field], held), CONTEXT);
-  return sitesOf(from, field).map((site) => patch.slice(site.start, site.end));
+  if (!isFieldEdits(held)) return sitesOf(from, field).map((site) => patch.slice(site.start, site.end));
+  const standing = into.authored[field];
+  if (isFieldEdits(standing)) return writeEdits(schema, field, composeEdits(standing, held));
+  return writeField(schema, field, applyEdits(standing, held), CONTEXT);
 }
 
 // The patch's fields, gathered by the line the author wrote them on, so fields written beside each
@@ -82,6 +95,16 @@ function byLine(read: Read): FieldSite[][] {
     groups.set(at, [...(groups.get(at) ?? []), site]);
   }
   return [...groups.entries()].sort(([left], [right]) => left - right).map(([, sites]) => sites);
+}
+
+// Whether a section says anything a patch cannot place field by field. An entry — an action, an
+// event — goes home by the label it carries rather than by where it is written, and a field site
+// says nothing about labels, so a section holding one is not a patch and has to travel whole.
+export function writesEntries(text: string, schema: AnySchema): boolean {
+  const into = schema.entries?.into;
+  if (into === undefined) return false;
+  const held = read(text, schema);
+  return 'refused' in held ? false : Array.isArray(held.authored[into]) && (held.authored[into] as unknown[]).length > 0;
 }
 
 export function patchedInto(declared: string, patch: string, schema: AnySchema): Patching {
@@ -111,8 +134,8 @@ export function patchedInto(declared: string, patch: string, schema: AnySchema):
       if (written.includes(NEWLINE) && !alone(declared, first)) {
         return { refused: `${site.field} is written beside another field on one line, so it cannot take a block; give it a line of its own first` };
       }
-      edits.push({ start: first.start, end: first.end, text: written });
-      for (const spent of rest) edits.push({ start: spent.start, end: spent.end, text: '' });
+      edits.push(written === '' ? struck(declared, first) : { start: first.start, end: first.end, text: written });
+      for (const spent of rest) edits.push(struck(declared, spent));
     }
   }
 
