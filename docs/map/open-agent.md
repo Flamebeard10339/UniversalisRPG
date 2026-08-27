@@ -3,63 +3,33 @@
 ## The map cannot tell a one-way road from a two-way one
 
 `Road.mutual` in `src/runtime/map.ts` is computed by asking whether the far end lists
-this one — but `effectiveAdjacent` closes every road both ways before the view is
+this one — but `closeAdjacency` closes every road both ways before the view is
 published, so `mutual` is always true. The dashed line and arrowhead in
 `MapPane.tsx`, and the `->` in `scripts/lib/mapText.ts`, are unreachable. The
-authored direction never leaves the registry.
-*Closes when:* `publishDiscovered` says which end of each road authored it, both
-renderers draw a one-way road as one, and `unlinkedFrom` stages the removal at the
-end that wrote it rather than at whichever end the author clicked first. Waits on
-the ruling in `open-human.md` about what one-way should mean on the shipped map.
+authored direction never leaves the registry, so `/unlink` also stages its removal
+at whichever end was named rather than at the end that wrote the road — which is a
+no-op when the far end wrote it.
+*Closes when:* `publishPlaces` says which end of each road authored it, both
+renderers draw a one-way road as one, and `joining` takes a road away at the end
+that wrote it. Waits on the ruling in `open-human.md` about what one-way should mean
+on the shipped map.
 
-## A place placed relative to another does not move with it
+## Dragging a place placed off another still refuses, with no warning first
 
-`up of market-row` and the five others like it in `content/tulsa.dsl` already mean
-"this follows that", and `recursivelyResolveRelativeCoordinates` erases the fact at
-load, so the map cannot show it and a drag on the parent cannot carry the child.
-`movedTo` refuses to drag such a place, which is right, but nothing says beforehand
-which places are pinned to the one under the finger.
-*Closes when:* the view publishes what each place is placed relative to, dragging a
-place carries everything hanging off it, and the pinning is visible before the drag
-rather than discovered by a refusal.
+`up of castle-hall` now survives into the view, so a drag carries what hangs off the
+place under the finger and `/place` writes no line for it. What is still missing is
+the other direction: dragging the hung place itself refuses, and nothing says so
+until the refusal arrives.
+*Closes when:* a place written off another is drawn as pinned — a tether, a badge,
+something — so the refusal is never a surprise.
 
-## Regions
+## A region cannot be edited from the map
 
-Nothing declares one yet. `# region <id>` with `title:` and `holds:` naming member
-locations, purely visual: a hull drawn round wherever the members happen to sit, one
-collapsed bubble when the map is zoomed out far enough, and the drag group — moving
-one member moves them all.
-*Closes when:* `src/content/sections/region.ts` exists with its line in
-`sections/index.ts`, the hull is computed in `src/runtime/map.ts` rather than in a
-renderer, and dragging a member of a region moves the region.
-
-## Dev mode cannot show a whole floor
-
-The map draws what has been discovered. An author editing a map wants every place on
-the floor they are looking at, found or not. `PlayStatus.locations` publishes only
-`{id, title}`, so the coordinates of an undiscovered place never reach a surface.
-*Closes when:* the sheet can be asked for every place on the floor, both `/map` and
-the map pane show the undiscovered ones marked as such while dev is on, and nothing
-publishes one list of places twice.
-
-## Every map edit must be reachable without the GUI
-
-Placing, linking and creating go through `/dsl`, so an agent can already do them —
-but only by knowing the patch grammar, and `src/ui/mapEdit.ts` is where the grammar
-is known. There is no command that says "put this place here".
-*Closes when:* the map edits have commands of their own, refused off dev the way
-`/goto` is, the patch-writing sits under `src/runtime/`, and the GUI's controls send
-those lines rather than composing `/dsl` bodies for themselves.
-
-## Everything in a room is unread until it is clicked, even for an author
-
-`maskedHere` in `src/runtime/session.ts` holds back the name and the offers of
-anything nobody has examined. That is the game, and it is in the author's way: dev
-mode has no way to see a room as it really is. The fact that a session is an
-author's lives in `SaveContext.dev`, above the runtime, so `maskedHere` cannot ask.
-*Closes when:* the runtime can be told a session is an author's — a setting looks
-like the cheapest shape, since it is saved, replayable and reachable from a `# test`
-— and `maskedHere` reads it in the one place the masking rule already lives.
+`# region` is authored by hand. Adding a place to one, taking one out, and making a
+region out of a few places selected on the map all go through `/dsl region <id>
++holds: …`, which is a line an author has to know.
+*Closes when:* regions have the same treatment places got — a command that says what
+it means, and a control on the map that sends it.
 
 ## An entry cannot travel as a patch
 
@@ -71,3 +41,19 @@ existed. Nothing regressed, but a partial edit that adds one action to a locatio
 still overwrites the rest of it.
 *Closes when:* entry sites carry their labels and `patchedInto` matches an entry home
 by label, or the fallback is proved unnecessary because nothing stages one.
+
+## The text map gives up on a road it cannot draw straight
+
+`drawnMap` draws a road along a row, up a column, or across one corner, and says the
+rest in words under the map. Standing in the market square that is one road out of
+about a dozen; standing in the castle it is two. Correct, and further from a picture
+than it needs to be.
+*Closes when:* a road that has to bend is drawn bending, or the lattice leaves a lane
+between columns for one to run down.
+
+## `/place` cannot make a place, only move one
+
+Making one is `/dsl location <id> x: …`, which the map pane sends. That is one line
+and it reads well enough, but it is the one map edit that is not a command of its own.
+*Closes when:* making a place is `/place` on an id nothing declares, or a command
+beside it, and the map pane sends that.
