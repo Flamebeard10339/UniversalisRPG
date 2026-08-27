@@ -268,3 +268,171 @@ thin for a tool whose whole purpose is that sheets stop being hand-maintained.
 
 *Closes when:* `sessionOver` is exported and `--record` compares `walked.length` to
 `testSteps().length`, refusing outright rather than printing a body it knows is short.
+
+## A quest edited from inside a run is silently thrown away
+
+This is the blocker under everything below, and it was measured rather than suspected.
+
+`define.ts` gives a kind that declares `fields` a merge built from them, and a kind that
+declares its own `parse` gets `into ?? from` — **the first module to write an id wins and
+every later module's section is discarded, whole, with no diagnostic**. Only `dialogue`
+declares a `merge` of its own, so this is `quest`, `droptable`, `action`, `save` and
+`test`.
+
+Measured on a copy of `content/` with one section appended to `local-changes.dsl`:
+
+- `# item tulsa.sewer-key` writing only `examine:` — merged; `title:` survived. Every
+  schema-driven kind behaves this way, which is why `/place` and `/link` work.
+- `# quest ball-of-a-boy.down-the-grate` rewritten **whole** — `probe --show` prints the
+  shipped quest, unchanged. `/dsl` answers `Staged # quest …` either way.
+
+So an author's session, the app's edit pane and a playbot handed `/dsl` can all stage a
+quest edit, watch `/reload` succeed, and change nothing.
+
+The field loss this looks like is real too, and lands one step later: `foldedHome`
+(`scripts/consolidate.ts:137`) returns the staged text **whole** when the kind has no
+schema, so a partial quest edit that did nothing in the session would replace the whole
+quest in `ball-of-a-boy.dsl` on consolidation. Both halves are the same missing fact —
+these kinds have no answer for *what a second body at one id means*.
+
+*Closes when:* every content kind that lands in a map answers that question in its own
+file, and a claim in `src/content/dsl.test.ts` derives its subjects from the section list
+rather than naming them — for each kind, a second body at a declared id either merges by a
+rule that kind states or is refused where it is written. Silently keeping the first is the
+one answer that must stop being available. `quest` is the one with a real design question
+in it (a stage list is closer to `entries` than to a field); the rest can likely refuse.
+
+## A section authored during a run has no way home
+
+Measured: `# quest brand-new-quest` staged in a copy of `local-changes.dsl` loads clean and
+lands in the registry as `local-changes.brand-new-quest`. `npm run contribution:consolidate`
+then answers `no file under content/ declares quest local-changes.brand-new-quest` and
+leaves it staged, because `declarations()` (`scripts/consolidate.ts:63`) only ever looks for
+a file that already declares the key.
+
+Home-derived-from-id is therefore true of **edits** and not of **new sections**, which is
+the whole deliverable of anything that plays content into existence rather than fixing it.
+
+*Closes when:* a staged section whose id nothing declares names its own destination, and
+the id it lands under stops being `local-changes.…`. The cheapest shape that does not add a
+second authority: the module a new section belongs to is written in its id the way every
+other address is — `# quest ball-of-a-boy.mouse-pays-the-toll` — and consolidation places a
+section whose namespace names a loaded module into that module's file, landing among the
+sections already of its kind, the way `npm run move-sections` already does it. Refusing a
+bare unqualified id at `/dsl` is what makes the rule legible at the point of writing.
+
+## The playbot cannot ask what a kind may hold
+
+`sdkOptionsFor` passes `tools: []` and the reply schema is one flat JSON object, so the
+model's only channel is one line of this game's own command line per turn. No command
+prints a kind's grammar: the two renderers are `scripts/oracle.ts` — which itself imports
+`src/ui/offerGroups` — and `src/ui/editControls.ts`, both above `runtime`, so a `/grammar`
+command cannot reuse either. It could read `sectionFor(kind).grammar` (`content` is below
+it) and render it a third time, which is the thing this repo is worst at.
+
+The measurement that bounds the alternative: `systemPromptFor('author')` is 11,971
+characters today, and the oracle's own output for the kinds a quest touches is about
+25.6 KB — `item` 9.3 KB, `entity` 7.9, `quest` 7.0, `location` 5.8, `dialogue` 4.9. Putting
+them in the prompt roughly triples it. That is a cache write once per run and a cache read
+per turn, so the price is small; the cost is dilution of a prompt whose whole subject is
+*you are the player and not the author*.
+
+*Closes when:* the grammar is in reach of a run without a third renderer existing — either
+the oracle's rendering moves down beside the declarations it reads and an `audience: 'author'`
+command prints it, or the editing modes' prompts carry the kinds they are allowed to write
+and the choice is stated where the mode is declared. Not both.
+
+## The playbot's mode carries framing but not ability
+
+`MODE_FRAMING: Record<PlaybotMode, string>` is the whole of what a mode is, and two places
+hardcode the player audience instead of reading it: `playerCommands()` filters
+`audience === 'player'` for the vocabulary block, and `offMenuCommand` refuses any
+non-player command **before `runLine` sees it** — module-level, mode-blind, and the one
+place the classification makes a behavioural difference rather than a prompt-text one.
+`runPlaybot` also builds its context as `newContext(session, view(session))` with no
+options, so `ctx.authoring` is undefined and every authoring command answers
+`local authoring is unavailable.` — `fileAuthoring` (`scripts/play-cli.ts:293`) is exported
+and in the same layer, and passes absolute paths through unchanged, so a bot's own corpus
+copy and local file are the whole of the wiring.
+
+Two hazards in the naming. `--mode author` today means the *exploratory* bot and is also
+the **default** (`parseArgs` initialises `mode = 'author'`), so retiring the token means
+naming a new default, not only rejecting the old one. And `fileAuthoring` snapshots
+`baseSources` at construction while `fileContentReader` re-expands per turn, so a bot that
+authors a new module mid-run stages against a stale dependency list.
+
+*Closes when:* a mode is one declaration holding its framing and the audiences it may run,
+the vocabulary block and the off-menu refusal both read the audiences off it, `requireMode`
+rejects `author` naming both replacements, and `runPlaybot` takes an authoring context.
+Three modes: a reader (today's `author` framing), a bughunter that may fix, and one that
+carries a brief. Nothing new to keep in sync — one entry per mode.
+
+## Reporting has to stay the precondition for fixing, not the alternative
+
+The naive first read is the thing a playbot produces that nothing else can. A bot that can
+edit will answer a gap with a diff, and a diff is the less valuable half — it can be
+re-derived from the report, and the report cannot be re-derived from it.
+
+A required field on the reply would be a second copy of the report and would drift from it.
+The gate is derivable: `runTurn` already holds `deps.log`, so a `/dsl` line may be refused
+on a turn whose journal window carries no non-empty `expected` or `confusion`. Same shape
+as `stoppedBy` — read off the log, nothing stored.
+
+*Closes when:* an editing mode's `/dsl` turn is refused unless the log behind it holds a
+report, proved in `scripts/playbot.test.ts` over a fake client the way `stoppedBy` is.
+
+## Nobody has established that editing while playing is cheaper than reporting and fixing
+
+The premise of handing a playbot the authoring vocabulary is that a bot editing in situ
+beats a bot reporting and an agent fixing. It is a real hunch and it is not measured, and
+the arms it is usually stated as — *fleet* against *global agent* — do not isolate it,
+because they differ in two things at once: **who found the gap** and **who wrote the DSL**.
+
+What is already known cuts across it. Where the edit is a fact about the world you are
+standing in and the kind is schema-driven, editing in situ plainly wins, and `/place` and
+`/link` are that case working today. Where the edit is a quest — stages, conditions and
+dialogue, written at `effort: 'low'` by a model with no grammar in reach, one line per
+turn, no way to run a `# test`, and both of the blockers above in the way — an agent with
+the corpus, the oracle and `npm test` is not obviously paying more.
+
+*Closes when:* the sweep is run as three arms over one brief — report-only bot then coding
+agent, editing bot alone, coding agent alone — and the report says what each cost and what
+each landed. The fan-out that makes it affordable, and its price: `--save` opens a run on a
+fixture, `content/first-steps.dsl` carries 15 and `tulsa.dsl` 18, and a state bug is found
+starting mid-quest and leaving wrong rather than playing forward from turn one. One bot per
+save at the default 100 turns is 1,500 model calls a sweep. Isolation is a copy of
+`content/` per bot and a local file of its own — `isolatedCwd()` and absolute paths already
+carry it, and nothing commits, so the one-writer rule has nothing to bite on.
+
+## N bots hitting one edge case would file N near-identical proofs
+
+`runAsSections` turns a run into a `# test`, which is what makes a fan-out cheap to keep.
+It is also this repository's worst failure mode pointed at its own suite: three harnesses
+replay every corpus `# test`, `npm run review` walks them, and the first item in this file
+already says the suite holds duplicate proofs. A sweep that files every bot's run adds to
+that by construction.
+
+`npm run mutate` cannot be the gate — it writes a break into the working tree, so it may not
+run in a checkout anyone else is in, and it costs a suite run per line.
+
+*Closes when:* the merge step over N staged local-changes files is written with a stated
+rule that at most one route is kept per end that was not reachable before, and the rest are
+read and discarded. Two staged sections at one id are k candidate implementations and the
+diffs are the argument; two staged sections at different ids for one gap is the one-home
+call, and the only judgement the loop owes a human.
+
+## `localChanges` and `authoringSurface` each own a copy of *a section's verbatim text*
+
+`readSections` (`src/content/localChanges.ts:36`) and `sectionsIn`
+(`src/ui/authoringSurface.ts:31`) both walk `splitSections` and slice
+`text.slice(span.start, span.end).trimEnd()`. What they do with it differs — one keeps the
+local id and throws on a missing one, the other re-heads with the qualified address and
+reports the module — but the slice is one fact written twice, and `content` is below both.
+
+This is small, and it is not what gates the editing work; it is worth doing because
+anything that prints a shipped section verbatim — a command, the pane, consolidation —
+becomes the third copy otherwise. Verbatim and never `printSectionOf`: a re-emitted
+canonical print drops the comments above a section on every edit.
+
+*Closes when:* the slice lives once under `content/`, both callers read it, and whatever
+prints a shipped section to an author reads it too.
