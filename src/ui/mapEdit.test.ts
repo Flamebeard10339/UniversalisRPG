@@ -9,7 +9,7 @@ import { drawnAt, placedAt, type Node } from './discovery';
 // Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
 const GRID = 140;
 import { createDriver, type Driver } from './driver';
-import { answering, centredOn, created, droppedAt, joined, joinedInto, linkedTo, movedTo, placedInto, settledOn, stagedKey, unlinkedFrom } from './mapEdit';
+import { answering, carriedWith, centredOn, created, draggedTo, droppedAt, joined, joinedInto, linkedTo, movedTo, placedInto, settledOn, stagedKey, unlinkedFrom } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 const addressed = addressable(SHIPPED_SOURCES);
@@ -315,5 +315,45 @@ describe('the point of a one-way road', () => {
     const [, tip] = arrowAt({ x: 0, y: 0 }, { x: 0, y: 100 }).split(' ').map((pair) => pair.split(',').map(Number));
 
     expect(tip).toEqual([0, 55]);
+  });
+});
+
+// What a drag carries beyond the place under the finger. Both rules are the world's own: a region
+// says which places are one thing, and `up of <somewhere>` says which place another hangs off.
+describe('everything one drag carries', () => {
+  const node = (id: string, relative?: { direction: string; of: string }): Node => ({
+    place: { id, title: '' as never, x: 0, y: 0, z: 0, adjacent: [], ...(relative ? { relative: relative as never } : {}) },
+    here: false,
+    climb: 0,
+    goes: null,
+    bearing: null,
+    at: { x: 0, y: 0 },
+  });
+
+  const sheet = (nodes: Node[], holds: string[][] = []) => ({ nodes, regions: holds.map((each) => ({ holds: each })) });
+
+  it('is the place alone where nothing is pinned to it', () => {
+    expect([...carriedWith(sheet([node('hall'), node('yard')]), 'hall')]).toEqual(['hall']);
+  });
+
+  it('is every place of the region it belongs to', () => {
+    const drawn = sheet([node('gate'), node('yard'), node('lane')], [['gate', 'yard']]);
+
+    expect([...carriedWith(drawn, 'gate')].sort()).toEqual(['gate', 'yard']);
+    expect([...carriedWith(drawn, 'lane')]).toEqual(['lane']);
+  });
+
+  it('follows the chain of places written off one another, however long', () => {
+    const drawn = sheet([node('hall'), node('loft', { direction: 'up', of: 'hall' }), node('attic', { direction: 'up', of: 'loft' }), node('yard')]);
+
+    expect([...carriedWith(drawn, 'hall')].sort()).toEqual(['attic', 'hall', 'loft']);
+    expect([...carriedWith(drawn, 'loft')].sort()).toEqual(['attic', 'loft']);
+  });
+
+  it('stages no line for a place that hangs off one being carried, since it arrives on its own', () => {
+    const carried = [node('hall'), node('loft', { direction: 'up', of: 'hall' })];
+    const sections: Section[] = carried.map((each) => ({ kind: MAPPED_KIND, address: String(each.place.id), text: `# location ${each.place.id}\nx: 0, y: 0`, module: 'keep', staged: false }));
+
+    expect(draggedTo(sections, carried, { x: GRID, y: 0 }, GRID)).toEqual([{ line: '/dsl location hall x: 1, y: 0' }]);
   });
 });

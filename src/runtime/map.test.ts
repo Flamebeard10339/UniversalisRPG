@@ -3,6 +3,7 @@ import { asLocalized } from './localizedFixture';
 import { DIRECTION_VECTORS } from '../content/sections/location';
 import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
 import type { PlayChoice } from './session';
+import { loadUniverse } from '../content/load';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -287,5 +288,29 @@ describe('the shape a region draws', () => {
   it('says which region carries a place, so a drag knows what it is holding', () => {
     expect(regionHolding([HOUSE_REGION], 'landing')?.holds).toEqual(HOUSE_REGION.holds);
     expect(regionHolding([HOUSE_REGION], 'beach')).toBeUndefined();
+  });
+});
+
+// A place written `up of castle-hall` is somewhere the moment the world loads, and it still says
+// what it hangs off — which is what prints it back the way it was written, and what tells a map that
+// moving the hall moves this too.
+describe('a place placed by how it stands to another', () => {
+  const world = () =>
+    loadUniverse([
+      {
+        name: 'keep',
+        text: ['# info keep', 'version: 1.0.0', '', '# location hall', 'x: 4, y: 2', 'starting', '', '# location loft', 'up of hall', '', '# location attic', 'up of loft'].join('\n'),
+      },
+    ]);
+
+  it('is where the direction puts it, and says which place put it there', () => {
+    const places = world().locations;
+
+    expect(places.get('keep.loft')).toMatchObject({ x: 4, y: 2, z: 1, relative: { direction: 'up', of: 'keep.hall' } });
+    expect(places.get('keep.attic')).toMatchObject({ x: 4, y: 2, z: 2, relative: { direction: 'up', of: 'keep.loft' } });
+  });
+
+  it('says nothing of the sort for a place that said where it is', () => {
+    expect(world().locations.get('keep.hall')?.relative).toBeUndefined();
   });
 });

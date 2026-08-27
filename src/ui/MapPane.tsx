@@ -5,7 +5,7 @@ import { DragSheet, useSheetHold, type Grip } from './DragSheet';
 import { drawnFor, folded, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { answering, centredOn, created, draggedTo, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
+import { answering, carriedWith, centredOn, created, draggedTo, joinedInto, placedInto, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
@@ -226,20 +226,14 @@ export function MapPane({
 
   const place = (id: string, at: Point): void => answering(placedInto(sections, id, at), answer);
 
-  // Everything one drag carries: the place under the finger and the rest of the region it belongs to.
   // Read while the finger is still down as well as on the drop, so the places and the shape round
   // them move together rather than the shape catching up afterwards.
-  const carriedWith = (id: string): ReadonlySet<string> => {
-    const region = whole.regions.find((each) => each.holds.map(String).includes(id));
-    return new Set(region ? region.holds.map(String) : [id]);
-  };
-
-  const carrying = hold.carried === null ? null : carriedWith(hold.carried.id);
+  const carrying = hold.carried === null ? null : carriedWith(whole, hold.carried.id);
 
   const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.has(String(id))) ? hold.carried.by : NOT_CARRIED);
 
   function letGo(id: string, by: Point): void {
-    const moving = carriedWith(id);
+    const moving = carriedWith(whole, id);
     for (const staged of draggedTo(sections, whole.nodes.filter((each) => moving.has(String(each.place.id))), by, grid)) answering(staged, answer);
   }
 

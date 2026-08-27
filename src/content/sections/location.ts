@@ -160,10 +160,14 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
   };
 
   for (const location of locations.values()) place(location);
+  // The coordinates are worked out and written on; how they were arrived at is kept. A place written
+  // `up of castle-hall` is somewhere the moment the world is loaded — nothing downstream resolves
+  // anything — and it still says what it hangs off, which is what prints it back the way it was
+  // written and what tells a map that moving the hall moves this too.
   for (const location of [...locations.values()]) {
     if (!location.relative) continue;
     const [x, y, z] = coords.get(location.id)!;
-    locations.set(location.id, { ...location, x, y, z, relative: undefined });
+    locations.set(location.id, { ...location, x, y, z });
   }
 }
 

@@ -1,7 +1,7 @@
 import { endJourney } from './actionEnd';
 import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
-import { DISCOVERED, Location } from '../content/sections/location';
+import { DISCOVERED, Location, type Direction } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { actionProgress, actionStalled, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
@@ -166,6 +166,10 @@ export interface Place {
   y: number;
   z: number;
   adjacent: Array<{ to: Answer; open: boolean }>;
+  // What this place hangs off, for one placed by saying which way it lies from another rather than
+  // by saying where it is. Its coordinates above are already worked out; this is how they were
+  // arrived at, and so what moves when the place it names moves.
+  relative?: { direction: Direction; of: Answer };
 }
 
 // A shape the map draws round a group of places. Published whole rather than cut down to what has
@@ -637,6 +641,7 @@ function publishDiscovered(state: GameState, registry: Registry): PlayStatus['di
     x: each.x,
     y: each.y,
     z: each.z,
+    ...(each.relative === undefined ? {} : { relative: { direction: each.relative.direction, of: each.relative.of } }),
     adjacent: effectiveAdjacent(registry, each.id)
       .filter((edge) => known.has(edge.target))
       .map((edge) => ({ to: edge.target, open: !edge.condition || evaluateCondition(edge.condition, state, registry) })),

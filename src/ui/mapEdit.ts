@@ -65,12 +65,29 @@ export function droppedAt(sections: readonly Section[], node: Node, carried: Poi
 export function draggedTo(sections: readonly Section[], carried: readonly Node[], by: Point, grid: number): Staged[] {
   const moving = carried.map((node) => String(node.place.id));
   return carried.flatMap((node) => {
-    const section = sections.find((each) => each.kind === MAPPED_KIND && names(each.address, String(node.place.id)));
-    if (!section) return [{ refused: `the map is drawing ${node.place.id}, which no module declares` }];
-    const value = declared(section.text);
-    if (!stated(value) && value.relative !== undefined && moving.some((id) => names(id, value.relative!.of))) return [];
+    const anchor = node.place.relative;
+    if (anchor !== undefined && moving.some((id) => names(id, String(anchor.of)))) return [];
     return [droppedAt(sections, node, by, grid)];
   });
+}
+
+// Everything one drag carries: the place under the finger, the rest of the region it belongs to, and
+// whatever hangs off any of those. A house dragged by its front door brings its rooms with it, and a
+// cellar written `down of the hall` comes along whether or not anybody drew a shape round the two.
+export function carriedWith(sheet: { nodes: readonly Node[]; regions: readonly { holds: readonly string[] }[] }, id: string): ReadonlySet<string> {
+  const region = sheet.regions.find((each) => each.holds.map(String).includes(id));
+  const moving = new Set(region ? region.holds.map(String) : [id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const node of sheet.nodes) {
+      const anchor = node.place.relative;
+      if (anchor === undefined || moving.has(String(node.place.id))) continue;
+      if (!moving.has(String(anchor.of))) continue;
+      moving.add(String(node.place.id));
+      grew = true;
+    }
+  }
+  return moving;
 }
 
 export function movedTo(section: Section, to: Point): Staged {
