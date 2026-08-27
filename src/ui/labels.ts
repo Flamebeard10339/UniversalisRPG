@@ -57,6 +57,8 @@ export const LABELS = {
   link: 'engine.shell.link',
   region: 'engine.shell.region',
   'region-hint': 'engine.shell.region-hint',
+  pin: 'engine.shell.pin',
+  'pin-hint': 'engine.shell.pin-hint',
   dev: 'engine.shell.dev',
   speed: 'engine.shell.speed',
   clear: 'engine.shell.clear',

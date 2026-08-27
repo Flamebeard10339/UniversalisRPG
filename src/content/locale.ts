@@ -207,6 +207,8 @@ export const ENGINE_KEYS = [
   'engine.shell.link',
   'engine.shell.region',
   'engine.shell.region-hint',
+  'engine.shell.pin',
+  'engine.shell.pin-hint',
   'engine.shell.dev',
   'engine.shell.speed',
   'engine.shell.clear',

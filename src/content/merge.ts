@@ -1,4 +1,4 @@
-import { AnySchema, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
+import { AnySchema, clearedBy, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
 
 type Fields = Record<string, unknown>;
 
@@ -68,5 +68,6 @@ export function mergeFields(into: Fields, from: Fields, schema: AnySchema): Fiel
     else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = applyEdits(into[key], value);
     else if (value !== undefined) merged[key] = value;
   }
+  for (const key of clearedBy(schema, Object.keys(from).filter((key) => from[key] !== undefined))) delete merged[key];
   return merged;
 }

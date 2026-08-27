@@ -58,6 +58,19 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
+// Which fields writing these ones takes away. A kind's `exclusive` groups say that two fields are one
+// question asked two different ways — where a place is, or how it stands to another — and a section
+// holding both is refused. So an edit that answers the question one way strikes the other way rather
+// than folding home a section that will not load. Read off the same declaration that does the
+// refusing, so a kind that grows a third way of asking needs nothing edited here.
+export function clearedBy(schema: Pick<AnySchema, 'exclusive'>, written: Iterable<string>): string[] {
+  if (schema.exclusive === undefined) return [];
+  const said = new Set(written);
+  const answered = schema.exclusive.filter((group) => group.some((key) => said.has(key)));
+  if (answered.length !== 1) return [];
+  return schema.exclusive.filter((group) => group !== answered[0]).flat();
+}
+
 export interface AnyField extends FieldPrinting {
   parser: unknown;
   keyword?: string;
@@ -73,6 +86,7 @@ export interface AnySchema {
   keywords?: readonly string[];
   keywordsAfter?: string;
   entries?: { into: string; body: EntryBody };
+  exclusive?: readonly (readonly string[])[];
   needs?: Record<string, string>;
 }
 
@@ -272,7 +286,12 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
             start: cursor.abs(cursor.pos),
             end: cursor.abs(line.text.length),
           });
+        const start = cursor.abs(cursor.pos);
         authored[bare] = fields[bare].parser.parse(cursor);
+        // A field written with no key of its own is still a field written somewhere. Left unsited, a
+        // patch could neither put one in nor take one out, which is what stopped `up of hall` from
+        // being written or unwritten by anything but a hand.
+        sites?.push({ field: bare, start, end: cursor.abs(cursor.pos) });
       } else {
         throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
       }

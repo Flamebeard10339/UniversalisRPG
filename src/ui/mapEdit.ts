@@ -1,7 +1,8 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
+import { stepToward, type Direction } from '../content/sections/location';
 import { stage, type Staged } from './authoringSurface';
-import { placedAt, spotOf, type Node, type Sheet } from './discovery';
+import { placedAt, spotOf, type Node, type Place, type Sheet } from './discovery';
 import { lookingAt, type Point } from './viewport';
 
 // What a gesture on the map is, said as a line the command line takes. The edit itself — which
@@ -47,7 +48,25 @@ export const shiftedBy = (carried: Point, grid: number): Point => settledOn({ x:
 
 export const gatherLine = (region: string, place: string, holding: boolean): string => `/region ${region} ${holding ? '+' : '-'}${place}`;
 
-export const MAP_MODES = ['go', 'place', 'link', 'region'] as const;
+export const pinLine = (id: string, direction: Direction, of: string): string => `/place ${id} ${direction} of ${of}`;
+
+// Writing one place off another from the map. Which direction it is written in is not asked of the
+// author: a place hangs off another as one step in one direction, and which step that is is already
+// answered by where the two stand — so tapping the sewer and then the street above it says `down of`,
+// and the sewer lands under the street rather than near it.
+//
+// Asked of every place there is rather than of the sheet, because the two taps need not land on one
+// floor: the point of writing a cellar off the room above it is that they are on different floors.
+export function pinnedInto(places: readonly Place[], id: string, of: string): Staged {
+  const one = places.find((place) => String(place.id) === id);
+  const anchor = places.find((place) => String(place.id) === of);
+  if (one === undefined || anchor === undefined) return { refused: `both places have to be on the map to write one off the other` };
+  const direction = stepToward(anchor, one);
+  if (direction === null) return { refused: `${id} and ${of} stand in the same square, so there is no step from one to the other to write down` };
+  return { line: pinLine(id, direction, of) };
+}
+
+export const MAP_MODES = ['go', 'place', 'link', 'region', 'pin'] as const;
 
 export type MapMode = (typeof MAP_MODES)[number];
 

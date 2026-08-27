@@ -93,6 +93,7 @@ const INERT: MapControls = {
   go: () => undefined,
   place: () => undefined,
   link: () => undefined,
+  pin: () => undefined,
   make: () => undefined,
   gather: () => undefined,
   shift: () => undefined,

@@ -214,6 +214,8 @@ engine.shell.place: Place
 engine.shell.link: Link
 engine.shell.region: Region
 engine.shell.region-hint: name one, then tap rooms to gather them
+engine.shell.pin: Pin
+engine.shell.pin-hint: tap a place, then the one it hangs off
 engine.shell.dev: Dev mode
 engine.shell.speed: Speed
 engine.shell.clear: Clear local changes

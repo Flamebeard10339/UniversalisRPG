@@ -1,5 +1,5 @@
 import { DslError } from '../grammar/parser';
-import { AnySchema, FieldSite, PrintContext, fieldSites, isFieldEdits, parseSection, writeEdits, writeField } from '../grammar/section';
+import { AnySchema, clearedBy, FieldSite, PrintContext, fieldSites, isFieldEdits, parseSection, writeEdits, writeField } from '../grammar/section';
 import { RawSection, splitSections } from '../grammar/structure';
 import { applyEdits, composeEdits } from './merge';
 
@@ -107,6 +107,19 @@ export function writesEntries(text: string, schema: AnySchema): boolean {
   return 'refused' in held ? false : Array.isArray(held.authored[into]) && (held.authored[into] as unknown[]).length > 0;
 }
 
+// Several fields taken out at once. A line whose every field is going goes with them; a line that
+// keeps one loses the others where they stand. Struck one at a time, `x: 1, y: 1, z: 2` left the
+// commas that had held them apart behind.
+function strikeAll(text: string, read: Read, going: ReadonlySet<FieldSite>): Edit[] {
+  return byLine(read).flatMap((group) => {
+    const cut = group.filter((site) => going.has(site));
+    if (cut.length === 0) return [];
+    if (cut.length < group.length) return cut.map((site) => struck(text, site));
+    const start = text.lastIndexOf(NEWLINE, Math.min(...group.map((site) => site.start)) - 1);
+    return [{ start: start < 0 ? 0 : start, end: Math.max(...group.map((site) => site.end)), text: '' }];
+  });
+}
+
 export function patchedInto(declared: string, patch: string, schema: AnySchema): Patching {
   const into = read(declared, schema);
   if ('refused' in into) return into;
@@ -139,7 +152,15 @@ export function patchedInto(declared: string, patch: string, schema: AnySchema):
     }
   }
 
+  // A field written strikes the fields it cannot stand beside, so a patch saying where a place is
+  // takes away how it stood to another rather than folding home a section that refuses to load.
+  const cleared = clearedBy(schema, from.sites.map((site) => site.field));
+  if (cleared.length > 0) edits.push(...strikeAll(declared, into, new Set(into.sites.filter((site) => cleared.includes(site.field)))));
+
   let written = declared;
-  for (const edit of [...edits].sort((left, right) => right.start - left.start)) written = written.slice(0, edit.start) + edit.text + written.slice(edit.end);
+  // Last edit first, and where two begin together the one that takes something out goes before the one
+  // that puts something in — otherwise a field struck from the line a new field is written on takes
+  // the new field away with it.
+  for (const edit of [...edits].sort((left, right) => right.start - left.start || right.end - left.end)) written = written.slice(0, edit.start) + edit.text + written.slice(edit.end);
   return { text: written };
 }

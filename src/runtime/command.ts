@@ -24,7 +24,8 @@ import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { sheetOf, type Sheet } from './map';
-import { gathering, joining, placing, shifting, type Editing } from './mapEdit';
+import type { Direction } from '../content/sections/location';
+import { gathering, joining, pinning, placing, shifting, type Editing } from './mapEdit';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
@@ -162,12 +163,10 @@ export interface SectionArg {
   body: string;
 }
 
-export interface PlacingArg {
-  location: string;
-  x: number;
-  y: number;
-  z?: number;
-}
+// Where a place is, said either way the language says it: outright, or as one step off another place.
+// One command because it is one question — and because answering it one way is what takes the other
+// answer away, which a second command would have had to know about this one.
+export type PlacingArg = { location: string; at: { x: number; y: number; z?: number } } | { location: string; off: { direction: Direction; of: string } };
 
 export interface JoiningArg {
   from: string;
@@ -1042,15 +1041,22 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/place',
     arg: 'placing',
-    argHint: '<location> <x> <y> [<z>]',
+    argHint: '<location> <x> <y> [<z>] | <location> <direction> of <location>',
     audience: 'author',
-    summary: 'put a location on the map, carrying the region it belongs to and everything written off it; staged as a local change like any other edit',
+    summary: 'say where a location is, outright or as one step off another; a place given coordinates stops hanging off anything, and one written off another moves with it. Staged as a local change like any other edit',
     parse: (rest) => {
+      const off = /^(?<location>\S+)[ 	]+(?<direction>north|south|east|west|up|down)[ 	]+of[ 	]+(?<of>\S+)$/.exec(rest)?.groups;
+      if (off) return { location: off.location!, off: { direction: off.direction as Direction, of: off.of! } };
       const match = /^(?<location>\S+)[ 	]+(?<x>-?\d+)[ 	]+(?<y>-?\d+)(?:[ 	]+(?<z>-?\d+))?$/.exec(rest)?.groups;
-      if (!match) return { problem: '/place requires <location> <x> <y> [<z>]' };
-      return { location: match.location!, x: Number(match.x), y: Number(match.y), ...(match.z === undefined ? {} : { z: Number(match.z) }) };
+      if (!match) return { problem: '/place requires <location> <x> <y> [<z>] or <location> <direction> of <location>' };
+      return { location: match.location!, at: { x: Number(match.x), y: Number(match.y), ...(match.z === undefined ? {} : { z: Number(match.z) }) } };
     },
-    run: (ctx, arg) => runMapEdit(ctx, (registry, local) => placing(registry, local, addressOf(ctx, arg.location), arg)),
+    run: (ctx, arg) =>
+      runMapEdit(ctx, (registry, local) =>
+        'off' in arg
+          ? pinning(registry, local, addressOf(ctx, arg.location), arg.off.direction, addressOf(ctx, arg.off.of))
+          : placing(registry, local, addressOf(ctx, arg.location), arg.at),
+      ),
   }),
   define({
     name: '/region',

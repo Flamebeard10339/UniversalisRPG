@@ -113,6 +113,21 @@ export const DIRECTION_VECTORS: Record<Direction, readonly [number, number, numb
   down: [0, 0, -1],
 };
 
+// Which single step out of one place points at another. A place is written off another as one step in
+// one direction, so this is the direction that step would have to be: the floor between them if they
+// are on different floors, because a heading keeps its floor and only `up` and `down` leave it, and
+// otherwise whichever heading runs most nearly the way the far place lies. Both halves are read off
+// the vectors above rather than listed, so a language that grew a seventh direction offers it here
+// with nothing edited. Nothing at all for a place and itself, which is no step.
+export function stepToward(from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }): Direction | null {
+  const run = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };
+  if (run.x === 0 && run.y === 0 && run.z === 0) return null;
+  const climb = Math.sign(run.z);
+  const going = (Object.keys(DIRECTION_VECTORS) as Direction[]).filter((direction) => Math.sign(DIRECTION_VECTORS[direction][2]) === climb);
+  const runs = (direction: Direction): number => DIRECTION_VECTORS[direction][0] * run.x + DIRECTION_VECTORS[direction][1] * run.y;
+  return going.reduce((best, direction) => (runs(direction) > runs(best) ? direction : best));
+}
+
 // Where a player may walk up to each entity anything stands. Nothing else puts one in a room — a
 // population only counts the deficit against this list — so an entity absent here is one no player
 // meets, which is what the entity a game is played as has in common with a template nobody stands.

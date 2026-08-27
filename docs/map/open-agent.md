@@ -17,15 +17,6 @@ draw a one-way road from that, and `joining` takes a road away at the end that w
 it. Waits on the ruling in `open-human.md` about what one-way should mean on the
 shipped map.
 
-## Dragging a place placed off another still refuses, with no warning first
-
-`up of castle-hall` now survives into the view, so a drag carries what hangs off the
-place under the finger and `/place` writes no line for it. What is still missing is
-the other direction: dragging the hung place itself refuses, and nothing says so
-until the refusal arrives.
-*Closes when:* a place written off another is drawn as pinned — a tether, a badge,
-something — so the refusal is never a surprise.
-
 ## A region's shape waits for the drop when one of its rooms is dragged
 
 Dragging a room now moves that room alone, which is what `place` mode is for; the
@@ -35,6 +26,15 @@ moves shape and rooms together, because everything it holds is being carried.
 *Closes when:* the hull is redrawn under the finger — which means the pane asking the
 engine for the shape of a set of points it has moved, rather than working one out of
 its own, since which shape a region draws is a setting.
+
+## A place written off another can only be written off one that is on the map
+
+`pin` mode takes two taps and works the direction out of where the two places stand, so
+the second tap has to land on something drawn. Two floors are reachable at once — the
+first tap survives changing floors — but a place on a floor the author cannot see from
+here cannot be tapped at all, and neither can one no region has opened.
+*Closes when:* the second tap can name a place the map is not drawing, or the floor
+selector can be held open while the map is worked on.
 
 ## An entry cannot travel as a patch
 

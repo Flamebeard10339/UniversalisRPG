@@ -5,7 +5,7 @@ import { addressable, names, NOWHERE, offeredBy } from './authoringSurface';
 import { gotoLine } from './devMode';
 import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '../runtime/map';
 import { createDriver, type Driver } from './driver';
-import { answering, centredOn, created, droppedAt, joinedInto, joinLine, placeLine, settledOn, stagedKey } from './mapEdit';
+import { answering, centredOn, created, droppedAt, joinedInto, joinLine, pinnedInto, placeLine, settledOn, stagedKey } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 // Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
@@ -70,6 +70,25 @@ describe('what a gesture on the map says', () => {
   it('says it in the words the command line takes', () => {
     expect(joinLine('a', 'b', true)).toBe('/link a b');
     expect(joinLine('a', 'b', false)).toBe('/unlink a b');
+  });
+
+  // Which way one place hangs off another is not asked of the author, because where the two stand
+  // already answers it. A floor between them is the only thing a relation can be — a heading keeps its
+  // floor — so a room and the cellar under it say `down of` however far apart their labels are drawn.
+  it('works out which step the pin is from where the two places stand', () => {
+    const places = [at('street', 4, 4, 0), at('sewer', 4, 4, -1), at('gate', 5, 4, 0), at('far', 9, 5, 0)];
+
+    expect(pinnedInto(places, 'sewer', 'street')).toEqual({ line: '/place sewer down of street' });
+    expect(pinnedInto(places, 'street', 'sewer')).toEqual({ line: '/place street up of sewer' });
+    expect(pinnedInto(places, 'gate', 'street')).toEqual({ line: '/place gate east of street' });
+    expect(pinnedInto(places, 'far', 'street')).toEqual({ line: '/place far east of street' });
+  });
+
+  it('refuses a pin between two places drawn in the same square, which is no step at all', () => {
+    const places = [at('one', 2, 2, 0), at('other', 2, 2, 0)];
+
+    expect(pinnedInto(places, 'one', 'other')).toEqual({ refused: expect.stringContaining('same square') });
+    expect(pinnedInto(places, 'one', 'nowhere')).toEqual({ refused: expect.stringContaining('on the map') });
   });
 });
 

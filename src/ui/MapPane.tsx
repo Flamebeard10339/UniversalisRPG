@@ -6,7 +6,7 @@ import { drawnFor, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, 
 import { carriedWith } from '../runtime/mapEdit';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { centredOn, created, droppedAt, gatherLine, gripOnRegion, joinedInto, MAP_MODES, placeLine, regionGripped, settledOn, shiftedBy, shiftLine, stagedKey, type MapMode } from './mapEdit';
+import { answering, centredOn, created, droppedAt, gatherLine, gripOnRegion, joinedInto, MAP_MODES, pinnedInto, placeLine, regionGripped, settledOn, shiftedBy, shiftLine, stagedKey, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
@@ -61,11 +61,12 @@ function Bubble({
     ref: held,
     'data-place': node.place.id,
     'data-found': node.found ? undefined : 'no',
+    'data-pinned': node.place.relative ? `${node.place.relative.direction} of ${node.place.relative.of}` : undefined,
     'data-walk': walking,
     style: { left: spot.x + carried.x, top: spot.y + carried.y },
     className: `absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border px-3 py-2 text-xs ${flash} ${
       walking === undefined ? 'border-border bg-panel' : WALKING_CLASS[walking]
-    } ${node.climb !== 0 ? 'opacity-70' : ''} ${node.found ? '' : 'border-dashed opacity-60'} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-danger' : ''}`,
+    } ${node.climb !== 0 ? 'opacity-70' : ''} ${node.found ? '' : 'border-dashed opacity-60'} ${node.place.relative ? 'border-double border-4 px-2 py-1' : ''} ${go === null && !grip ? 'text-text-subtle' : ''} ${chosen ? 'ring-2 ring-danger' : ''}`,
   };
 
   const inside = (
@@ -321,6 +322,16 @@ export function MapPane({
     setFrom(null);
   };
 
+  // The same two taps a road is drawn with, saying something else: the first place is written off the
+  // second and lands one step from it. The two need not be tapped on one floor — the first is still
+  // held while the author changes floors, which is how a cellar is written off the room above it.
+  const pin = (id: string): void => {
+    if (from === id) return setFrom(null);
+    if (from === null) return setFrom(id);
+    answering(pinnedInto([...view.discovered, ...view.undiscovered], from, id), { send: onSend, note: onNote });
+    setFrom(null);
+  };
+
   const shift = (region: string, by: Point): void => onSend(shiftLine(region, settledOn(by)));
 
   const chosenRegion = (id: string): boolean => mode === 'region' && gathering.trim() !== '' && names(id, gathering.trim());
@@ -353,7 +364,7 @@ export function MapPane({
     onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
   }, [hold.pan.x, hold.pan.y, hold.zoom, plane]);
 
-  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, ghost: setGhost, recentre, mode: setMode, place, go, link, make, gather, shift } });
+  useTestSurface('map', { map, controls: { settle: hold.settle, plane: setPlane, ghost: setGhost, recentre, mode: setMode, place, go, link, pin, make, gather, shift } });
 
   return (
     <DragSheet
@@ -402,6 +413,7 @@ export function MapPane({
                 {words('new')}
               </button>
             </form>
+            {mode === 'pin' ? <span className="text-xs text-text-subtle">{words('pin-hint')}</span> : null}
             {mode === 'region' ? (
               <div className="flex items-center gap-2">
                 <input
@@ -500,7 +512,7 @@ export function MapPane({
           arrived={arrivals.includes(node.place.id)}
           walking={walkingAt(walk, node)}
           grid={grid}
-          go={mode === 'link' ? () => link(node.place.id) : mode === 'region' ? () => gather(gathering.trim(), node.place.id) : lineFor(node.place.id) === null ? null : () => go(node.place.id)}
+          go={mode === 'link' ? () => link(node.place.id) : mode === 'pin' ? () => pin(node.place.id) : mode === 'region' ? () => gather(gathering.trim(), node.place.id) : lineFor(node.place.id) === null ? null : () => go(node.place.id)}
           chosen={node.place.id === from}
           scale={map.zoom}
           held={(element) => void (bubbles.current[at] = element)}

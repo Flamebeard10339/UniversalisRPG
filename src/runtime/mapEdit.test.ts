@@ -3,7 +3,7 @@ import { loadUniverse, loadUniverseWithDiagnostics } from '../content/load';
 import { initialLocalChangesModule, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { newContext, runLine, type AuthoringContext, type CommandContext } from './command';
-import { carriedWith, gathering, joining, placing, shifting, type Editing } from './mapEdit';
+import { carriedWith, gathering, joining, pinning, placing, shifting, type Editing } from './mapEdit';
 import { startSession, view } from './session';
 import { shippedSources } from '../content/shipped';
 
@@ -76,8 +76,19 @@ describe('putting a place on the map', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.lane', { x: 1, y: 1, z: 2 }))).toEqual(['# location keep.lane\nx: 1, y: 1, z: 2']);
   });
 
-  it('refuses to move a place written off another, and says which one to move instead', () => {
-    expect(why(placing(registryOf(), NOTHING, 'keep.loft', { x: 1, y: 1 }))).toContain('keep.hall');
+  // Saying where a place is is the other answer to the question `up of hall` answers, so it takes that
+  // answer away: the drag that used to refuse now unpins.
+  it('unpins a place written off another rather than refusing to move it', () => {
+    expect(patched(placing(registryOf(), NOTHING, 'keep.loft', { x: 1, y: 1 }))).toEqual(['# location keep.loft\nx: 1, y: 1, z: 1']);
+  });
+
+  it('writes a place off another, and leaves the one it hangs off alone', () => {
+    expect(patched(pinning(registryOf(), NOTHING, 'keep.lane', 'down', 'keep.hall'))).toEqual(['# location keep.lane\ndown of hall']);
+  });
+
+  it('refuses a pin that would leave neither place anywhere', () => {
+    expect(why(pinning(registryOf(), NOTHING, 'keep.hall', 'down', 'keep.loft'))).toContain('keep.loft');
+    expect(why(pinning(registryOf(), NOTHING, 'keep.hall', 'down', 'keep.hall'))).toContain('itself');
   });
 
   it('refuses a place nothing declares', () => {
@@ -213,9 +224,21 @@ describe('the map edited from the command line', () => {
   it('leaves the world where it was when it refuses', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/place castle-solar 1 1'))[0]).toContain('castle-quarters');
     expect(errors(runLine(game.ctx(), '/place nowhere-at-all 1 1'))[0]).toContain('nowhere-at-all');
+    expect(errors(runLine(game.ctx(), '/place castle-solar down of nowhere-at-all'))[0]).toContain('nowhere-at-all');
     expect(game.local()).not.toContain('# location');
+  });
+
+  // The whole round trip through the command line: a place written off another loses that when it is
+  // put somewhere, and can be written off one again.
+  it('pins a place under another and looses it again', () => {
+    const game = opened();
+
+    expect(errors(runLine(game.ctx(), '/place castle-solar 1 1'))).toEqual([]);
+    expect(game.local()).toContain('# location tulsa.castle-solar\nx: 1, y: 1, z: 2');
+    expect(errors(runLine(game.ctx(), '/place castle-solar up of castle-quarters'))).toEqual([]);
+    expect(game.local()).toContain('# location tulsa.castle-solar\nup of castle-quarters');
+    expect(game.local()).not.toContain('x: 1, y: 1');
   });
 
   it('draws a road and rubs it out again, leaving the world as it started', () => {

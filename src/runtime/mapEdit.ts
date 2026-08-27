@@ -3,7 +3,7 @@ import { patchedInto, refused } from '../content/patch';
 import { sectionFor } from '../content/sections';
 import { moduleLocalId, type AnySchema } from '../grammar/section';
 import type { Registry } from '../content/registry';
-import type { Location } from '../content/sections/location';
+import type { Direction, Location } from '../content/sections/location';
 
 // Editing the map: where a place is, and which roads run out of it. Written as patches over whatever
 // the world already says — the section that goes into local changes names the fields the edit
@@ -77,6 +77,10 @@ export interface Spot {
   z?: number;
 }
 
+// Where a place stands, written the way a location writes it: the floor left unsaid when it is the
+// ground one, because nothing else in the corpus says `z: 0` either.
+const written = (at: { x: number; y: number; z: number }): string => (at.z === 0 ? `x: ${at.x}, y: ${at.y}` : `x: ${at.x}, y: ${at.y}, z: ${at.z}`);
+
 // One move, however many places it carries: every place named is written where it now stands, and a
 // place written off another is left alone because it arrives on its own.
 function moved(registry: Registry, local: string, held: readonly string[], by: { x: number; y: number; z: number }): Editing {
@@ -84,7 +88,7 @@ function moved(registry: Registry, local: string, held: readonly string[], by: {
   for (const id of held) {
     const each = found(registry, id)!;
     if (each.relative) continue;
-    const where = each.z + by.z === 0 ? `x: ${each.x + by.x}, y: ${each.y + by.y}` : `x: ${each.x + by.x}, y: ${each.y + by.y}, z: ${each.z + by.z}`;
+    const where = written({ x: each.x + by.x, y: each.y + by.y, z: each.z + by.z });
     const one = patch(local, MAPPED_KIND, id, [where]);
     if ('refused' in one) return one;
     patches.push(one);
@@ -94,12 +98,36 @@ function moved(registry: Registry, local: string, held: readonly string[], by: {
 
 const everyPlace = (registry: Registry): Location[] => [...registry.locations.values()];
 
+// Saying where a place is says it outright, so a place that was written off another stops being: the
+// two are one question asked two ways, and the schema that refuses a section holding both is what
+// strikes the one this does not answer. Moving a pinned place is therefore unpinning it, which is the
+// only thing a drag on one could honestly mean — the alternative is a gesture that refuses.
 export function placing(registry: Registry, local: string, id: string, to: Spot): Editing {
   const place = found(registry, id);
   if (!place) return { refused: `no # location is called ${id}` };
-  if (place.relative) return { refused: `${id} is placed ${place.relative.direction} of ${place.relative.of}, so move that one — or say where this one is instead of how it stands to another` };
+  const by = { x: to.x - place.x, y: to.y - place.y, z: (to.z ?? place.z) - place.z };
+  if (!place.relative) return moved(registry, local, carriedWith(everyPlace(registry), [id]), by);
 
-  return moved(registry, local, carriedWith(everyPlace(registry), [id]), { x: to.x - place.x, y: to.y - place.y, z: (to.z ?? place.z) - place.z });
+  const loosed = patch(local, MAPPED_KIND, id, [written({ x: to.x, y: to.y, z: to.z ?? place.z })]);
+  if ('refused' in loosed) return loosed;
+  const rest = moved(registry, local, carriedWith(everyPlace(registry), [id]).filter((each) => each !== id), by);
+  return 'refused' in rest ? rest : { patches: [loosed, ...rest.patches] };
+}
+
+// A place written off another: one step in one direction from it, which is where it is put. This is
+// the one map edit that is not about where something is but about what keeps it there — the place
+// lands under the place it hangs off and stays under it when that one moves.
+export function pinning(registry: Registry, local: string, id: string, direction: Direction, of: string): Editing {
+  const place = found(registry, id);
+  if (!place) return { refused: `no # location is called ${id}` };
+  const anchor = found(registry, of);
+  if (!anchor) return { refused: `no # location is called ${of}` };
+  if (id === of) return { refused: `${id} cannot be written off itself` };
+  for (let up: Location | undefined = anchor; up?.relative; up = found(registry, up.relative.of)) {
+    if (up.relative.of === id) return { refused: `${of} already hangs off ${id}, so writing ${id} off ${of} would leave neither of them anywhere` };
+  }
+  const one = patch(local, MAPPED_KIND, id, [`${direction} of ${asWritten(id, of)}`]);
+  return 'refused' in one ? one : { patches: [one] };
 }
 
 // A region has no coordinates of its own — it is where its rooms are — so it is moved by how far and

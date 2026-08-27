@@ -176,6 +176,7 @@ export interface MapControls {
   mode(which: MapMode): void;
   place(id: string, at: Point): void;
   link(id: string): void;
+  pin(id: string): void;
   make(id: string): void;
   gather(region: string, place: string): void;
   shift(region: string, by: Point): void;
@@ -216,6 +217,7 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
         controls.mode(named);
       },
       link: (value) => controls.link(placeDrawn(map, value)),
+      pin: (value) => controls.pin(placeDrawn(map, value)),
       gather: (value) => {
         const { region, place } = (value ?? {}) as { region?: unknown; place?: unknown };
         controls.gather(String(region ?? map.gathering), placeDrawn(map, place));
