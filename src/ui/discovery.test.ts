@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { Node, Place } from '../runtime/map';
 import { CLIMB_NUDGE, sheetOf } from '../runtime/map';
-import { folded, mapBox, newlyFound, onWalk, walkingAt, walkLine } from './discovery';
+import { mapBox, newlyFound, onWalk, walkingAt, walkLine } from './discovery';
 
 // Any grid proves the same rule; the world's own number is `# variable map-grid` and is not this file's business.
 const GRID = 140;
@@ -120,40 +120,5 @@ describe('what a place is while a journey is on', () => {
 
   it('gives every place on the line one of the four and never nothing, so no leg goes undrawn', () => {
     expect(line.map((id) => walkingAt(line, at(id, id === 'a'))).filter((each) => each === undefined)).toEqual([]);
-  });
-});
-
-
-// Folding is the map answering a different question: zoomed out is asking what the town looks like,
-// and the answer to that has a castle in it rather than seven rooms of one.
-describe('a map folded up', () => {
-  const REGION = { id: 'house', title: asLocalized('The House'), holds: ['hall', 'landing', 'cellar'] };
-
-  const sheetWith = (here = 'beach') => sheetOf({ discovered: HOUSE, undiscovered: [], regions: [REGION], location: { id: here }, choices: [], mapGrid: GRID }, 0);
-
-  it('draws a region as one place standing where its rooms stand', () => {
-    const drawn = folded(sheetWith());
-
-    expect(drawn.nodes.map((node) => String(node.place.id)).sort()).toEqual(['beach', 'cove', 'hall'].sort());
-    expect(String(drawn.nodes.find((node) => node.place.id === 'hall')!.place.title)).toBe('The House');
-  });
-
-  it('redraws the roads into it to the one thing it became, and drops the roads inside it', () => {
-    const drawn = folded(sheetWith());
-
-    expect(drawn.roads.map((road) => [String(road.from), String(road.to)].sort().join('-')).sort()).toEqual(['beach-cove', 'beach-hall']);
-  });
-
-  it('keeps the player on the map when they are standing inside one', () => {
-    const drawn = folded(sheetWith('cellar'));
-
-    expect(drawn.nodes.filter((node) => node.here).map((node) => String(node.place.id))).toEqual(['cellar']);
-    expect(String(drawn.nodes.find((node) => node.here)!.place.title)).toBe('The House');
-  });
-
-  it('leaves a map with no regions on it exactly as it was', () => {
-    const bare = sheetOf({ discovered: HOUSE, undiscovered: [], regions: [], location: { id: 'hall' }, choices: [], mapGrid: GRID }, 0);
-
-    expect(folded(bare)).toBe(bare);
   });
 });

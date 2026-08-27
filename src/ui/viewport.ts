@@ -36,13 +36,6 @@ export const ZOOM_MAX = 3;
 
 export const clampZoom = (scale: number): number => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
 
-// Below this the labels on a map are too small to read, so a region stops being a shape round its
-// rooms and becomes one thing standing where they are. Zoomed out is asking what the town looks
-// like, and the answer to that has a castle in it rather than seven rooms of one.
-export const FOLDED_BELOW = 0.7;
-
-export const folding = (zoom: number): boolean => zoom < FOLDED_BELOW;
-
 export const TOUCH_FLOOR = 44;
 
 export const tapTarget = (scale: number): number => TOUCH_FLOOR / Math.min(1, scale);
@@ -97,15 +90,25 @@ export const panOnto = (target: Point, zoom: number): Point => ({ x: 0 - target.
 // How much air is left between a place and the road out of it.
 export const EDGE_GAP = 5;
 
+// Which way one point lies from another, as a step of length one — or nowhere at all, for two points
+// drawn on top of each other. The one answer to "which way does this run", so a road and the arrow on
+// it cannot come to point different ways.
+export function heading(from: Point, to: Point): Point {
+  const run = Math.hypot(to.x - from.x, to.y - from.y);
+  return run === 0 ? { x: 0, y: 0 } : { x: (to.x - from.x) / run, y: (to.y - from.y) / run };
+}
+
 // Where a line drawn from the middle of one box towards another leaves that box. A road runs from
 // where one place stops to where the next one starts, so what is drawn is the road rather than the
-// part of it lying under a name — and a road too short to leave its own box is not drawn at all.
+// part of it lying under a name. Never past the halfway point: two places close enough that their
+// labels overlap meet in the middle rather than swapping ends, which is what drew a short road
+// backwards and put the arrow on it the wrong way round.
 export function leaving(from: Point, to: Point, box: Size): Point {
+  const along = heading(from, to);
+  if (along.x === 0 && along.y === 0) return from;
   const run = Math.hypot(to.x - from.x, to.y - from.y);
-  if (run === 0) return from;
-  const along = { x: (to.x - from.x) / run, y: (to.y - from.y) / run };
   const sides = [along.x === 0 ? Infinity : (box.width / 2 + EDGE_GAP) / Math.abs(along.x), along.y === 0 ? Infinity : (box.height / 2 + EDGE_GAP) / Math.abs(along.y)];
-  const reach = Math.min(run, ...sides);
+  const reach = Math.min(run / 2, ...sides);
   return { x: from.x + along.x * reach, y: from.y + along.y * reach };
 }
 

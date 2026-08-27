@@ -24,7 +24,7 @@ import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { sheetOf, type Sheet } from './map';
-import { joining, placing, type Editing } from './mapEdit';
+import { gathering, joining, placing, shifting, type Editing } from './mapEdit';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
@@ -175,6 +175,9 @@ export interface JoiningArg {
   road: boolean;
 }
 
+// What one `/region` says: which places it gathers or lets go, or how far the whole of it moves.
+export type GatheringArg = { region: string; places: string[]; holding: boolean } | { region: string; by: { x: number; y: number } };
+
 interface ArgTypes {
   none: undefined;
   number: number;
@@ -183,6 +186,7 @@ interface ArgTypes {
   section: SectionArg;
   placing: PlacingArg;
   joining: JoiningArg;
+  gathering: GatheringArg;
   local: LocalOp;
   setting: SettingOp;
   cadence: Cadence;
@@ -517,14 +521,18 @@ const joiningFrom =
     return match ? { from: match.from!, to: match.to!, road } : { problem: `${road ? '/link' : '/unlink'} requires <location> <location>` };
   };
 
-// A location named the way a player names one: whole, or by the last part of it where that names one
+// A section named the way a player names one: whole, or by the last part of it where that names one
 // thing. The map hands whole addresses; somebody typing wants to write `market-square`.
-function addressOf(ctx: CommandContext, written: string): string {
-  const places = [...ctx.session.registry.locations.keys()];
-  if (places.includes(written)) return written;
-  const named = places.filter((id) => id.endsWith(`.${written}`));
+function addressIn(ids: Iterable<string>, written: string): string {
+  const known = [...ids];
+  if (known.includes(written)) return written;
+  const named = known.filter((id) => id.endsWith(`.${written}`));
   return named.length === 1 ? named[0]! : written;
 }
+
+const addressOf = (ctx: CommandContext, written: string): string => addressIn(ctx.session.registry.locations.keys(), written);
+
+const regionOf = (ctx: CommandContext, written: string): string => addressIn(ctx.session.registry.regions.keys(), written);
 
 // Every map edit takes the same road: work out the patches, stage them together, adopt once. A
 // refusal writes nothing, so a move that could not carry one room of a house moves none of it.
@@ -1043,6 +1051,25 @@ export const COMMANDS: readonly CommandSpec[] = [
       return { location: match.location!, x: Number(match.x), y: Number(match.y), ...(match.z === undefined ? {} : { z: Number(match.z) }) };
     },
     run: (ctx, arg) => runMapEdit(ctx, (registry, local) => placing(registry, local, addressOf(ctx, arg.location), arg)),
+  }),
+  define({
+    name: '/region',
+    arg: 'gathering',
+    argHint: '<region> +<location>... | -<location>... | by <x> <y>',
+    audience: 'author',
+    summary: 'gather locations into a region, let some go, or move the whole of one; a name nothing declares yet becomes a region of your own',
+    parse: (rest) => {
+      const match = /^(?<region>\S+)[ 	]+(?:by[ 	]+(?<x>-?\d+)[ 	]+(?<y>-?\d+)|(?<sign>[+-])[ 	]*(?<places>\S.*))$/.exec(rest)?.groups;
+      if (!match) return { problem: '/region requires <region> +<location>... or <region> -<location>... or <region> by <x> <y>' };
+      if (match.x !== undefined) return { region: match.region!, by: { x: Number(match.x), y: Number(match.y) } };
+      return { region: match.region!, places: match.places!.split(/[ 	]+/).filter((each) => each !== ''), holding: match.sign === '+' };
+    },
+    run: (ctx, arg) =>
+      runMapEdit(ctx, (registry, local) =>
+        'by' in arg
+          ? shifting(registry, local, regionOf(ctx, arg.region), arg.by)
+          : gathering(registry, local, regionOf(ctx, arg.region), arg.places.map((place) => addressOf(ctx, place)), arg.holding),
+      ),
   }),
   define({
     name: '/link',

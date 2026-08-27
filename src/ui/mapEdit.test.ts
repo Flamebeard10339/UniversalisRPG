@@ -168,11 +168,17 @@ describe('a drag is a section edit and nothing else (c8)', () => {
 });
 
 describe('the point of a one-way road', () => {
-  it('stands in the middle of it, pointing the way it is walked', () => {
-    const points = arrowAt({ x: 0, y: 0 }, { x: 100, y: 0 }).split(' ').map((pair) => pair.split(',').map(Number));
+  it('stands where it is put, pointing the way it is given', () => {
+    const points = arrowAt({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 1, y: 0 }).split(' ').map((pair) => pair.split(',').map(Number));
 
     expect(points[1]).toEqual([55, 0]);
     expect(points[0]![0]).toBeLessThan(points[1]![0]!);
     expect(points[0]![1]).toBe(-points[2]![1]!);
+  });
+
+  // Two places drawn on top of each other leave no road between them to read a direction off, so the
+  // arrow takes the direction the places themselves lie in and stays an arrow.
+  it('points nowhere rather than somewhere wrong when it is given nowhere', () => {
+    expect(arrowAt({ x: 40, y: 0 }, { x: 60, y: 0 }, { x: 0, y: 0 })).toBe('50,0 50,0 50,0');
   });
 });

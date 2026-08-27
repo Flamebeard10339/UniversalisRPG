@@ -182,8 +182,11 @@ describe('where a road between two places starts and stops', () => {
     expect(corner.y).toBeCloseTo(20 + EDGE_GAP, 10);
   });
 
-  it('stops at the far end rather than running past it, for two places nearly on top of each other', () => {
-    expect(leaving({ x: 0, y: 0 }, { x: 3, y: 0 }, BUBBLE)).toEqual({ x: 3, y: 0 });
+  // Past the middle and the two ends swap over, which drew a short road backwards and put the arrow
+  // on it the wrong way round.
+  it('stops at the middle rather than running past it, for two places nearly on top of each other', () => {
+    expect(leaving({ x: 0, y: 0 }, { x: 3, y: 0 }, BUBBLE)).toEqual({ x: 1.5, y: 0 });
+    expect(leaving({ x: 3, y: 0 }, { x: 0, y: 0 }, BUBBLE)).toEqual({ x: 1.5, y: 0 });
   });
 
   it('holds still for two places drawn in the same spot', () => {

@@ -55,6 +55,8 @@ export const LABELS = {
   copy: 'engine.shell.copy',
   place: 'engine.shell.place',
   link: 'engine.shell.link',
+  region: 'engine.shell.region',
+  'region-hint': 'engine.shell.region-hint',
   dev: 'engine.shell.dev',
   speed: 'engine.shell.speed',
   clear: 'engine.shell.clear',

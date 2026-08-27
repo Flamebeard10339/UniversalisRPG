@@ -3,7 +3,7 @@ import { loadUniverse, loadUniverseWithDiagnostics } from '../content/load';
 import { initialLocalChangesModule, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 import { newContext, runLine, type AuthoringContext, type CommandContext } from './command';
-import { carriedWith, joining, placing, type Editing } from './mapEdit';
+import { carriedWith, gathering, joining, placing, shifting, type Editing } from './mapEdit';
 import { startSession, view } from './session';
 import { shippedSources } from '../content/shipped';
 
@@ -58,8 +58,10 @@ describe('putting a place on the map', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.gate', { x: 4, y: -1 }))).toEqual(['# location keep.gate\nx: 4, y: -1']);
   });
 
-  it('carries the region it belongs to, each of them by the same step', () => {
-    expect(patched(placing(registryOf(), NOTHING, 'keep.yard', { x: 5, y: 1 }))).toEqual(['# location keep.yard\nx: 5, y: 1', '# location keep.hall\nx: 5, y: 3']);
+  // A room of a house is a place. Carrying its whole house was what stopped an author laying out the
+  // rooms inside one; a house is moved by its own shape, which is the gesture that says so.
+  it('carries nothing but itself for a place a region holds', () => {
+    expect(patched(placing(registryOf(), NOTHING, 'keep.yard', { x: 5, y: 1 }))).toEqual(['# location keep.yard\nx: 5, y: 1']);
   });
 
   it('writes no line for a place that hangs off one being carried, since it arrives on its own', () => {
@@ -111,21 +113,50 @@ describe('drawing a road between two places', () => {
 });
 
 describe('everything one move carries', () => {
-  const regions = () => [...registryOf().regions.values()];
   const places = () => [...registryOf().locations.values()];
 
   it('is the place alone where nothing is pinned to it', () => {
-    expect(carriedWith(regions(), places(), 'keep.lane')).toEqual(['keep.lane']);
+    expect(carriedWith(places(), ['keep.lane'])).toEqual(['keep.lane']);
   });
 
-  it('is every place of the region it belongs to', () => {
-    expect(carriedWith(regions(), places(), 'keep.yard').sort()).toEqual(['keep.hall', 'keep.loft', 'keep.yard']);
+  it('is every place named, and whatever hangs off any of them', () => {
+    expect(carriedWith(places(), ['keep.yard', 'keep.hall']).sort()).toEqual(['keep.hall', 'keep.loft', 'keep.yard']);
   });
 
   it('follows the chain of places written off one another, however long', () => {
     const tower: ModuleSource = { name: 'tower', text: '# info tower\nversion: 1.0.0\ndependencies:\n  keep\n\n# location spire\nup of keep.loft' };
 
-    expect(carriedWith([], [...loadUniverse([KEEP, tower]).locations.values()], 'keep.hall').sort()).toEqual(['keep.hall', 'keep.loft', 'tower.spire']);
+    expect(carriedWith([...loadUniverse([KEEP, tower]).locations.values()], ['keep.hall']).sort()).toEqual(['keep.hall', 'keep.loft', 'tower.spire']);
+  });
+});
+
+// A region is where its rooms are: it is gathered, let go and moved, and every one of those is a
+// patch over whatever the world already says, like every other map edit.
+describe('editing a region', () => {
+  it('moves every place it holds by the same step, and none it does not', () => {
+    expect(patched(shifting(registryOf(), NOTHING, 'keep.keep', { x: 3, y: -1 }))).toEqual(['# location keep.yard\nx: 5, y: -1', '# location keep.hall\nx: 5, y: 1']);
+  });
+
+  it('gathers a place into one, and lets one go, saying nothing about what it already holds', () => {
+    expect(patched(gathering(registryOf(), NOTHING, 'keep.keep', ['keep.lane'], true))).toEqual(['# region keep.keep\n+holds: lane']);
+    expect(patched(gathering(registryOf(), NOTHING, 'keep.keep', ['keep.hall'], false))).toEqual(['# region keep.keep\n-holds: hall']);
+  });
+
+  it('makes a region of a name nothing declares, the way a new place is made', () => {
+    expect(patched(gathering(registryOf(), NOTHING, 'lanes', ['keep.lane'], true))).toEqual(['# region lanes\n+holds: keep.lane']);
+  });
+
+  it('refuses to empty one, to let go of a region nothing declares, and to gather a place nothing declares', () => {
+    expect(why(gathering(registryOf(), NOTHING, 'keep.keep', ['keep.yard', 'keep.hall'], false))).toContain('holding nothing');
+    expect(why(gathering(registryOf(), NOTHING, 'nowhere', ['keep.lane'], false))).toContain('nowhere');
+    expect(why(gathering(registryOf(), NOTHING, 'keep.keep', ['keep.nowhere'], true))).toContain('keep.nowhere');
+    expect(why(shifting(registryOf(), NOTHING, 'keep.nowhere', { x: 1, y: 1 }))).toContain('keep.nowhere');
+  });
+
+  it('folds onto the patch already staged there rather than replacing it', () => {
+    const staged = `${NOTHING}\n# region keep.keep\n+holds: lane\n`;
+
+    expect(patched(gathering(registryOf(), staged, 'keep.keep', ['keep.gate'], true))).toEqual(['# region keep.keep\n+holds: lane, gate']);
   });
 });
 
@@ -153,13 +184,30 @@ describe('the map edited from the command line', () => {
     expect(game.local()).toContain('# location tulsa.market-square\nx: 20, y: 20');
   });
 
-  it('moves the castle and every room of it, and writes nothing for the rooms above and below', () => {
+  it('moves one room of the castle and no other, because a room is a place', () => {
     const game = opened();
 
     expect(errors(runLine(game.ctx(), '/place castle-hall 20 20'))).toEqual([]);
+    expect(game.local()).toContain('# location tulsa.castle-hall\nx: 20, y: 20');
+    for (const room of ['castle-gate', 'castle-yard', 'castle-kitchen']) expect(game.local(), room).not.toContain(`# location tulsa.${room}`);
+  });
+
+  it('moves the castle and every room of it, and writes nothing for the rooms above and below', () => {
+    const game = opened();
+
+    expect(errors(runLine(game.ctx(), '/region castle by 3 -2'))).toEqual([]);
     const staged = game.local();
     for (const room of ['castle-gate', 'castle-yard', 'castle-hall', 'castle-kitchen', 'guard-barracks']) expect(staged, room).toContain(`# location tulsa.${room}`);
     for (const hung of ['castle-quarters', 'castle-solar', 'castle-cellar']) expect(staged, hung).not.toContain(`# location tulsa.${hung}`);
+  });
+
+  it('gathers a room into a region named the short way, and lets one go again', () => {
+    const game = opened();
+
+    expect(errors(runLine(game.ctx(), '/region castle +market-square'))).toEqual([]);
+    expect(game.local()).toContain('# region tulsa.castle\n+holds: market-square');
+    expect(errors(runLine(game.ctx(), '/region castle -castle-kitchen'))).toEqual([]);
+    expect(game.local()).toContain('-holds: castle-kitchen');
   });
 
   it('leaves the world where it was when it refuses', () => {

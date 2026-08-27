@@ -1411,6 +1411,7 @@ const ACTS_ON: Record<string, string> = {
   '/goto': 'camp',
   '/place': 'camp 3 4',
   '/link': 'camp isle',
+  '/region': 'camps +camp',
   '/unlink': 'camp shore',
   '/wait': '1',
   '/speed': '2',

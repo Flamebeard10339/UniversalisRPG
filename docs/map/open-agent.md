@@ -2,17 +2,20 @@
 
 ## The map cannot tell a one-way road from a two-way one
 
-`Road.mutual` in `src/runtime/map.ts` is computed by asking whether the far end lists
-this one — but `closeAdjacency` closes every road both ways before the view is
-published, so `mutual` is always true. The dashed line and arrowhead in
-`MapPane.tsx`, and the `->` in `scripts/lib/mapText.ts`, are unreachable. The
-authored direction never leaves the registry, so `/unlink` also stages its removal
-at whichever end was named rather than at the end that wrote the road — which is a
-no-op when the far end wrote it.
-*Closes when:* `publishPlaces` says which end of each road authored it, both
-renderers draw a one-way road as one, and `joining` takes a road away at the end
-that wrote it. Waits on the ruling in `open-human.md` about what one-way should mean
-on the shipped map.
+`Road.mutual` is now simply true: every road the load path publishes is walked both
+ways, because `closeAdjacency` closes each authored edge back before anything sees it.
+It used to be derived by asking whether the far end listed this one, which is a
+question about **discovery** and not about direction — a found place publishes only
+the roads to places the player has found, so on an author's map most roads read as
+one-way and drew a dashed line with an arrow on it that nobody had written. The
+derivation is gone; the dashed line and the arrowhead in `MapPane.tsx`, and the `->`
+in `scripts/lib/mapText.ts`, are unreachable again. The authored direction still never
+leaves the registry, so `/unlink` also stages its removal at whichever end was named
+rather than at the end that wrote the road.
+*Closes when:* `publishPlaces` says which end of each road authored it, both renderers
+draw a one-way road from that, and `joining` takes a road away at the end that wrote
+it. Waits on the ruling in `open-human.md` about what one-way should mean on the
+shipped map.
 
 ## Dragging a place placed off another still refuses, with no warning first
 
@@ -23,13 +26,15 @@ until the refusal arrives.
 *Closes when:* a place written off another is drawn as pinned — a tether, a badge,
 something — so the refusal is never a surprise.
 
-## A region cannot be edited from the map
+## A region's shape waits for the drop when one of its rooms is dragged
 
-`# region` is authored by hand. Adding a place to one, taking one out, and making a
-region out of a few places selected on the map all go through `/dsl region <id>
-+holds: …`, which is a line an author has to know.
-*Closes when:* regions have the same treatment places got — a command that says what
-it means, and a control on the map that sends it.
+Dragging a room now moves that room alone, which is what `place` mode is for; the
+shape round it is the engine's `hull`, worked out before the drag started, so it sits
+still until the room lands and the sheet is drawn again. Dragging the region's own tag
+moves shape and rooms together, because everything it holds is being carried.
+*Closes when:* the hull is redrawn under the finger — which means the pane asking the
+engine for the shape of a set of points it has moved, rather than working one out of
+its own, since which shape a region draws is a setting.
 
 ## An entry cannot travel as a patch
 
@@ -54,6 +59,8 @@ between columns for one to run down.
 ## `/place` cannot make a place, only move one
 
 Making one is `/dsl location <id> x: …`, which the map pane sends. That is one line
-and it reads well enough, but it is the one map edit that is not a command of its own.
+and it reads well enough, but it is the one map edit that is not a command of its own
+— `/region` now makes a region of a name nothing declares, so the two are no longer
+alike.
 *Closes when:* making a place is `/place` on an id nothing declares, or a command
 beside it, and the map pane sends that.

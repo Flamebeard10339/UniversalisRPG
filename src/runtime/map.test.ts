@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from './localizedFixture';
 import { DIRECTION_VECTORS } from '../content/sections/location';
-import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
+import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, REGION_PAD, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
 import type { PlayChoice } from './session';
 import { loadUniverse } from '../content/load';
 import { shippedSources } from '../content/shipped';
@@ -37,8 +37,6 @@ const status = (places: readonly Place[], here: string, choices: readonly PlayCh
 const sheet = (places: readonly Place[], here: string, plane: number | null = null, choices: readonly PlayChoice[] = []): Sheet => sheetOf(status(places, here, choices), plane);
 
 const idsOf = (drawn: Sheet): string[] => drawn.nodes.map((node) => String(node.place.id));
-
-const roadOf = (drawn: Sheet, one: string, other: string) => drawn.roads.find((road) => [road.from, road.to].sort().join('-') === [one, other].sort().join('-'));
 
 describe('one floor of the map', () => {
   it('draws what stands on the floor being looked at', () => {
@@ -118,12 +116,30 @@ describe('the roads a sheet draws', () => {
     expect(sheet(HOUSE, 'hall', 0).roads.filter((road) => [road.from, road.to].sort().join('-') === 'beach-hall')).toHaveLength(1);
   });
 
-  it('says of a road whether it is walked both ways or only the way it points', () => {
-    const oneWay = [place('cliff', 0, 0, 0, 'ledge'), place('ledge', 1, 0, 0)];
+  it('draws a road once for a pair only one end of which lists it, and calls it walked both ways', () => {
+    const oneEnd = [place('cliff', 0, 0, 0, 'ledge'), place('ledge', 1, 0, 0)];
 
-    expect(sheet(oneWay, 'cliff', 0).roads).toEqual([{ from: 'cliff', to: 'ledge', open: true, mutual: false }]);
-    expect(roadOf(sheet(HOUSE, 'hall', 0), 'hall', 'beach')?.mutual).toBe(true);
-    expect(roadOf(sheet(HOUSE, 'hall', 0), 'cove', 'beach')?.mutual).toBe(false);
+    expect(sheet(oneEnd, 'cliff', 0).roads).toEqual([{ from: 'cliff', to: 'ledge', open: true, mutual: true }]);
+    expect(sheet(oneEnd, 'ledge', 0).roads).toEqual([{ from: 'cliff', to: 'ledge', open: true, mutual: true }]);
+  });
+
+  // A found place lists only the roads to places the player has found, so from the market square
+  // there is no edge to a room nobody has been in — and an author, who is shown both, would have been
+  // shown half their map as roads running one way that nobody wrote.
+  it('draws the road to a place the player has not found from the end that still lists it', () => {
+    const found = [place('hall', 0, 0, 0), place('shed', 1, 0, 0, 'hall')];
+    const drawn = sheetOf({ ...status(found, 'hall'), discovered: [found[0]!], undiscovered: [found[1]!] }, 0, 'every');
+
+    expect(drawn.roads).toEqual([{ from: 'hall', to: 'shed', open: true, mutual: true }]);
+  });
+
+  it('shuts a road either end of which says it is shut', () => {
+    const gated: Place[] = [
+      { ...place('yard', 0, 0, 0), adjacent: [{ to: 'gate', open: false }] },
+      { ...place('gate', 1, 0, 0), adjacent: [{ to: 'yard', open: true }] },
+    ];
+
+    expect(sheet(gated, 'yard', 0).roads[0]!.open).toBe(false);
   });
 
   it('leaves out a road to somewhere this floor is not drawing', () => {
@@ -260,13 +276,20 @@ describe('the shape a region draws', () => {
       return (next.x - corner.x) * (point.y - corner.y) - (next.y - corner.y) * (point.x - corner.x) >= -1e-9;
     });
 
-  it('goes round every place it holds that the sheet is drawing', () => {
-    const drawn = withRegions([HOUSE_REGION]).regions[0]!;
+  // Not the point a place is drawn at but the whole square it stands in: only one place can be at a
+  // coordinate, so the square is what a place occupies, and a shape that held only the middles left
+  // every room of the castle sitting half outside its own wall.
+  const squareOf = (at: { x: number; y: number }): { x: number; y: number }[] =>
+    [-1, 1].flatMap((across) => [-1, 1].map((down) => ({ x: at.x + across * REGION_PAD, y: at.y + down * REGION_PAD })));
+
+  it('goes round the whole square of every place it holds that the sheet is drawing', () => {
+    const sheet = withRegions([HOUSE_REGION]);
+    const drawn = sheet.regions[0]!;
 
     expect(drawn.drawn.sort()).toEqual(['cellar', 'hall', 'landing']);
     for (const id of drawn.drawn) {
-      const node = withRegions([HOUSE_REGION]).nodes.find((each) => each.place.id === id)!;
-      expect(inside(drawn.hull, node.at), id).toBe(true);
+      const node = sheet.nodes.find((each) => each.place.id === id)!;
+      for (const corner of squareOf(node.at)) expect(inside(drawn.hull, corner), `${id} ${corner.x},${corner.y}`).toBe(true);
     }
   });
 
@@ -279,13 +302,27 @@ describe('the shape a region draws', () => {
 
   it('draws a shape for one place and for two, which have no ring of their own', () => {
     for (const holds of [['hall'], ['hall', 'beach']]) {
-      const drawn = withRegions([{ ...HOUSE_REGION, holds }]).regions[0]!;
+      const sheet = withRegions([{ ...HOUSE_REGION, holds }]);
+      const drawn = sheet.regions[0]!;
 
       expect(drawn.hull.length, holds.join()).toBeGreaterThanOrEqual(4);
       for (const id of holds) {
-        const node = withRegions([{ ...HOUSE_REGION, holds }]).nodes.find((each) => each.place.id === id)!;
-        expect(inside(drawn.hull, node.at), id).toBe(true);
+        const node = sheet.nodes.find((each) => each.place.id === id)!;
+        for (const corner of squareOf(node.at)) expect(inside(drawn.hull, corner), `${holds.join()} ${id}`).toBe(true);
       }
+    }
+  });
+
+  // The setting is the whole of the difference, so what there is to prove is that the map reads it
+  // and that the other shape still holds what the region holds.
+  it('draws one rectangle round the lot for a run standing at the other shape', () => {
+    const boxed = sheetOf({ ...status(HOUSE, 'hall'), regions: [HOUSE_REGION], settings: [{ name: 'regions', standing: 'box' }] }, 0).regions[0]!;
+
+    expect(boxed.hull).toHaveLength(4);
+    expect(new Set(boxed.hull.map((corner) => corner.x)).size).toBe(2);
+    for (const id of boxed.drawn) {
+      const node = withRegions([HOUSE_REGION]).nodes.find((each) => each.place.id === id)!;
+      for (const corner of squareOf(node.at)) expect(inside(boxed.hull, corner), id).toBe(true);
     }
   });
 
@@ -351,5 +388,29 @@ describe('the whole floor, for whoever is writing it', () => {
   it('draws the roads to a place nobody has found, which the found ones do not name', () => {
     expect(both('found').roads).toEqual([]);
     expect(both('every').roads.map((road) => [String(road.from), String(road.to)])).toEqual([['hall', 'vault']]);
+  });
+
+  // A floor a step away is part of the room a player is standing in; it is not part of the floor an
+  // author is laying out, and drawing it there put rooms on the map that the floor being edited does
+  // not have on it.
+  const STOREYED: Place[] = [place('hall', 0, 0, 0, 'cellar'), place('cellar', 0, 0, -1, 'hall'), place('attic', 2, 0, 1)];
+
+  const storeys = (showing: 'found' | 'every', ghost: number | null = null): Sheet =>
+    sheetOf({ discovered: STOREYED, undiscovered: [], regions: [], location: { id: 'hall' }, choices: [], mapGrid: 140 }, 0, showing, ghost);
+
+  it('draws the floor it was asked for and no other, where a player is shown the one a step away', () => {
+    expect(idsOf(storeys('found'))).toContain('cellar');
+    expect(idsOf(storeys('every'))).toEqual(['hall']);
+  });
+
+  it('draws a second floor beside it when one is being looked at, on either showing', () => {
+    expect(idsOf(storeys('every', -1)).sort()).toEqual(['cellar', 'hall']);
+    expect(idsOf(storeys('every', 1)).sort()).toEqual(['attic', 'hall']);
+    expect(storeys('every', -1).nodes.find((node) => node.place.id === 'cellar')?.climb).toBe(-1);
+  });
+
+  it('offers every floor there is to whoever is writing it, road or no road', () => {
+    expect(storeys('found').planes).toEqual([-1, 0]);
+    expect(storeys('every').planes).toEqual([-1, 0, 1]);
   });
 });

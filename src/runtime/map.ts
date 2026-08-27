@@ -1,6 +1,7 @@
 import { DIRECTION_VECTORS, type Direction } from '../content/sections/location';
 import type { Answer } from './localized';
 import type { Place, PlayChoice, Region } from './session';
+import { regionShape, type RegionShape } from './settings';
 import { waysOut, type WayOut } from './waysOut';
 
 export type { Place, Region } from './session';
@@ -13,6 +14,10 @@ export interface Standing {
   location: { id: Answer };
   choices: readonly PlayChoice[];
   mapGrid: number;
+  // The preferences the run is played by, of which the map reads one: which shape a region is drawn
+  // as. Optional because a sheet drawn without them is drawn at the standing every setting declares,
+  // which is what a caller holding no run has.
+  settings?: readonly { name: Answer; standing: Answer }[];
 }
 
 // Which way one place lies from another. The four the language declares, the four that lie between
@@ -77,8 +82,9 @@ export interface Road {
   from: Answer;
   to: Answer;
   open: boolean;
-  // Connectivity is directional, so a road only walked one way is a different road from one walked
-  // both, and is drawn as one.
+  // Whether the road is walked both ways, which every road the load path publishes is: it closes each
+  // authored edge back before anything sees it. What a one-way road should mean, and how the end that
+  // wrote one would reach here, is `docs/map/open-human.md`.
   mutual: boolean;
 }
 
@@ -110,9 +116,11 @@ export function drawnAt(place: { x: number; y: number; z: number }, plane: numbe
 
 export const placedAt = (at: { x: number; y: number }, climb: number): { x: number; y: number } => ({ x: at.x - climb * CLIMB_NUDGE, y: at.y + climb * CLIMB_NUDGE });
 
-// The floors the player may look at: the one they are standing on, and any a road out of here
-// actually reaches. A cellar under a castle nobody can get into from the market is not a floor of
-// the market, and offering it is offering to look through the floor.
+// The floors that may be looked at: the one being stood on, and any a road out of here actually
+// reaches. A cellar under a castle nobody can get into from the market is not a floor of the market,
+// and offering it is offering to look through the floor. An author, who is shown every place there
+// is, is offered every floor there is for the same reason — a floor with nothing on it yet is where
+// the next room goes.
 function planesFrom(places: readonly Place[], standing: Place | undefined): number[] {
   if (!standing) return [...new Set(places.map((place) => place.z))].sort((low, high) => low - high);
   const floors = new Set([standing.z]);
@@ -123,8 +131,10 @@ function planesFrom(places: readonly Place[], standing: Place | undefined): numb
   return [...floors].sort((low, high) => low - high);
 }
 
-// How much air a region's shape leaves round the places it holds, in the world's own squares. Wide
-// enough that a place inside one is plainly inside it and a place beside one is plainly not.
+// How far a region's shape reaches past the middle of a place it holds, in the world's own squares.
+// Half a square, because a square is what a place occupies — only one place stands at a coordinate —
+// so the shape stops exactly where the next place along could begin: every room plainly inside it,
+// and the first square that is not the region's plainly outside.
 export const REGION_PAD = 0.5;
 
 interface Spot {
@@ -152,6 +162,7 @@ function ring(points: readonly Spot[]): Spot[] {
   return [...half(sorted), ...half([...sorted].reverse())];
 }
 
+// The other shape a region can be drawn as: one rectangle covering every square its places stand in.
 const boxRound = (points: readonly Spot[], pad: number): Spot[] => {
   const xs = points.map((point) => point.x);
   const ys = points.map((point) => point.y);
@@ -164,20 +175,21 @@ const boxRound = (points: readonly Spot[], pad: number): Spot[] => {
   ];
 };
 
-// The shape drawn round a group of places: the ring they sit inside, pushed out from their middle so
-// the places are within it rather than on it. One place, two places, or a row of them in a line have
-// no ring with an inside, so those get a box round what they cover — which is the same shape a ring
-// of two would have been if a ring of two were a shape.
+const squareRound = (point: Spot, pad: number): Spot[] => [
+  { x: point.x - pad, y: point.y - pad },
+  { x: point.x + pad, y: point.y - pad },
+  { x: point.x + pad, y: point.y + pad },
+  { x: point.x - pad, y: point.y + pad },
+];
+
+// The shape drawn round a group of places: the ring round the squares they stand in, rather than
+// round the points they stand at. Pushing a ring of points outwards left every place on the shape's
+// own edge and the corner ones half outside it; a ring round the corners of their squares holds all
+// of them by construction, and holds one place, two, or a row of them in a line with no case of its
+// own — four corners are never in a line.
 export function hullOf(points: readonly Spot[], pad = REGION_PAD): Spot[] {
   if (points.length === 0) return [];
-  const found = ring(points);
-  if (found.length < 3) return boxRound(points, pad);
-  const middle = { x: found.reduce((sum, point) => sum + point.x, 0) / found.length, y: found.reduce((sum, point) => sum + point.y, 0) / found.length };
-  return found.map((point) => {
-    const run = Math.hypot(point.x - middle.x, point.y - middle.y);
-    if (run === 0) return point;
-    return { x: point.x + ((point.x - middle.x) / run) * pad, y: point.y + ((point.y - middle.y) / run) * pad };
-  });
+  return ring(points.flatMap((point) => squareRound(point, pad)));
 }
 
 export interface Drawn extends Region {
@@ -192,13 +204,14 @@ export interface Drawn extends Region {
 const middleOf = (points: readonly Spot[]): Spot =>
   points.length === 0 ? { x: 0, y: 0 } : { x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length };
 
-function regionsOn(regions: readonly Region[], nodes: readonly Node[]): Drawn[] {
+function regionsOn(regions: readonly Region[], nodes: readonly Node[], shape: RegionShape): Drawn[] {
   const at = new Map(nodes.map((node) => [node.place.id, node.at]));
+  const round = shape === 'box' ? boxRound : hullOf;
   return regions.flatMap((region) => {
     const drawn = region.holds.filter((held) => at.has(held));
     if (drawn.length === 0) return [];
     const points = drawn.map((held) => at.get(held)!);
-    return [{ ...region, drawn, hull: hullOf(points), at: middleOf(points) }];
+    return [{ ...region, drawn, hull: round(points, REGION_PAD), at: middleOf(points) }];
   });
 }
 
@@ -213,7 +226,7 @@ export const regionHolding = (regions: readonly { holds: readonly Answer[] }[], 
 // putting the next place beside the last one.
 export type Showing = 'found' | 'every';
 
-export function sheetOf(status: Standing, asked: number | null, showing: Showing = 'found'): Sheet {
+export function sheetOf(status: Standing, asked: number | null, showing: Showing = 'found', ghost: number | null = null): Sheet {
   const places = showing === 'every' ? [...status.discovered, ...status.undiscovered] : status.discovered;
   const found = new Set(status.discovered.map((place) => place.id));
   const here = status.location.id;
@@ -226,8 +239,14 @@ export function sheetOf(status: Standing, asked: number | null, showing: Showing
   });
   const travels = new Map(ways.map((way) => [way.to, way.at]));
 
+  // The floors drawn: the one asked for, and one more being looked at over its shoulder. A player is
+  // shown the floors a step from here would put them on as well, because a ladder they can climb is
+  // part of the room they are in; an author is shown the floor they asked for and nothing else, so
+  // the map they are laying out is the one they are looking at.
+  const floors = new Set(ghost === null ? [plane] : [plane, ghost]);
   const reachable = new Set(standing?.adjacent.map((edge) => edge.to) ?? []);
-  const shown = places.filter((place) => place.z === plane || place.id === here || reachable.has(place.id) || travels.has(place.id));
+  const stepAway = (place: Place): boolean => showing === 'found' && (place.id === here || reachable.has(place.id) || travels.has(place.id));
+  const shown = places.filter((place) => floors.has(place.z) || stepAway(place));
   const nodes: Node[] = shown.map((place) => ({
     place,
     here: place.id === here,
@@ -239,18 +258,22 @@ export function sheetOf(status: Standing, asked: number | null, showing: Showing
   }));
 
   const drawn = new Set(nodes.map((node) => node.place.id));
-  const roads: Road[] = [];
+  // One road per pair of places, drawn from whichever end sorts first, and shut if either end says
+  // it is shut. Which ends list which is not asked: a view trims a found place's roads to the places
+  // the player has found, so an end's silence about the other says something about discovery and
+  // nothing about direction — asking it drew half the author's map as one-way roads nobody wrote.
+  const roads = new Map<string, Road>();
   for (const node of nodes) {
     for (const edge of node.place.adjacent) {
-      const from = node.place.id;
       if (!drawn.has(edge.to)) continue;
-      const mutual = places.find((place) => place.id === edge.to)?.adjacent.some((back) => back.to === from) === true;
-      if (mutual && String(from) > String(edge.to)) continue;
-      roads.push({ from, to: edge.to, open: edge.open, mutual });
+      const [from, to] = String(node.place.id) < String(edge.to) ? [node.place.id, edge.to] : [edge.to, node.place.id];
+      const key = `${from}>${to}`;
+      const held = roads.get(key);
+      roads.set(key, { from, to, open: held === undefined ? edge.open : held.open && edge.open, mutual: true });
     }
   }
 
-  return { plane, planes: planesFrom(places, standing), here, grid: status.mapGrid, nodes, roads, ways, regions: regionsOn(status.regions, nodes) };
+  return { plane, planes: planesFrom(places, showing === 'every' ? undefined : standing), here, grid: status.mapGrid, nodes, roads: [...roads.values()], ways, regions: regionsOn(status.regions, nodes, regionShape(status.settings ?? [])) };
 }
 
 // The nine squares a way out is offered in, laid out the way it lies: north-west at the top left,

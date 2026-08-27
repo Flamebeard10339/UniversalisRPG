@@ -25,11 +25,29 @@ export const joinLine = (from: string, to: string, road: boolean): string => `${
 
 // Whether a road already runs to there is asked of the world rather than of any section's text: a
 // patch restates none of the roads already written, and a road the far end wrote is walked from this
-// one too without this one saying so.
+// one too without this one saying so. Asked of the roads the sheet drew rather than of either end's
+// own list, because a view trims a found place's roads to the places the player has found — so from
+// the market square there is no edge to a room nobody has been in yet, road or no road.
 export const joinedInto = (sheet: Sheet, from: string, to: string): string =>
-  joinLine(from, to, !(sheet.nodes.find((node) => String(node.place.id) === from)?.place.adjacent ?? []).some((edge) => String(edge.to) === to));
+  joinLine(from, to, !sheet.roads.some((road) => [String(road.from), String(road.to)].sort().join('>') === [from, to].sort().join('>')));
 
-export const MAP_MODES = ['go', 'place', 'link'] as const;
+// A region is not a place and is not dragged like one, so a grip says which vocabulary the id it
+// holds is written in. Nothing else has to keep the two apart.
+const REGION_GRIP = 'region:';
+
+export const gripOnRegion = (id: string): string => `${REGION_GRIP}${id}`;
+
+export const regionGripped = (held: string): string | null => (held.startsWith(REGION_GRIP) ? held.slice(REGION_GRIP.length) : null);
+
+// A region is where its rooms are, so a drag on its shape says how far it went and not where it
+// landed — there is no point on the map that is the region's own to land on.
+export const shiftLine = (id: string, by: Point): string => `/region ${id} by ${by.x} ${by.y}`;
+
+export const shiftedBy = (carried: Point, grid: number): Point => settledOn({ x: carried.x / grid, y: carried.y / grid });
+
+export const gatherLine = (region: string, place: string, holding: boolean): string => `/region ${region} ${holding ? '+' : '-'}${place}`;
+
+export const MAP_MODES = ['go', 'place', 'link', 'region'] as const;
 
 export type MapMode = (typeof MAP_MODES)[number];
 

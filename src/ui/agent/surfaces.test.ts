@@ -87,12 +87,15 @@ describe('the shell as a driving agent reaches it', () => {
 const INERT: MapControls = {
   settle: () => undefined,
   plane: () => undefined,
+  ghost: () => undefined,
   recentre: () => undefined,
   mode: () => undefined,
   go: () => undefined,
   place: () => undefined,
   link: () => undefined,
   make: () => undefined,
+  gather: () => undefined,
+  shift: () => undefined,
 };
 
 describe('the map as a driving agent reaches it', () => {
@@ -107,7 +110,7 @@ describe('the map as a driving agent reaches it', () => {
     },
     0,
   );
-  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, mode: 'go' as const, from: null, sheet };
+  const view = { plane: 0, ghost: null, zoom: 1, pan: { x: 0, y: 0 }, mode: 'go' as const, from: null, gathering: '', sheet };
 
   it('publishes what is drawn and where, so nothing has to be read off the markup', () => {
     const state = mapState(view);

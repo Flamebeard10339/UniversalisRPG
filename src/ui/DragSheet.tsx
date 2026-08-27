@@ -26,11 +26,13 @@ export interface Carried {
   by: Point;
 }
 
+// Written over `Element` rather than over an HTML one: a place is a button and a region is a path in
+// the sheet's own drawing, and both are carried by the same grip.
 export interface Grip {
-  onPointerDown(event: React.PointerEvent<HTMLElement>): void;
-  onPointerMove(event: React.PointerEvent<HTMLElement>): void;
-  onPointerUp(event: React.PointerEvent<HTMLElement>): void;
-  onPointerCancel(event: React.PointerEvent<HTMLElement>): void;
+  onPointerDown(event: React.PointerEvent<Element>): void;
+  onPointerMove(event: React.PointerEvent<Element>): void;
+  onPointerUp(event: React.PointerEvent<Element>): void;
+  onPointerCancel(event: React.PointerEvent<Element>): void;
 }
 
 export const carriedFar = (by: Point, zoom: number): boolean => Math.abs(by.x * zoom) > DRAG_SLOP_PX || Math.abs(by.y * zoom) > DRAG_SLOP_PX;
@@ -41,6 +43,8 @@ export interface Carrier {
 }
 
 const cameBy = (from: Point, at: Point, zoom: number): Point => ({ x: (at.x - from.x) / zoom, y: (at.y - from.y) / zoom });
+
+const widest = (sizes: readonly Size[]): Size => ({ width: Math.max(0, ...sizes.map((each) => each.width)), height: Math.max(0, ...sizes.map((each) => each.height)) });
 
 export function gripFor(id: string, held: { current: { id: string; from: Point } | null }, zoom: number, carrier: Carrier): Grip {
   const at = (event: { clientX: number; clientY: number }): Point => ({ x: event.clientX, y: event.clientY });
@@ -75,6 +79,10 @@ export interface SheetHold {
   pan: Point;
   zoom: number;
   box: Box;
+  // How big each drawn thing is, in the order they were handed over, and the biggest of them. Two
+  // readings of one measurement: a road stops at the box of the place it runs to, and the room the
+  // whole sheet takes up is the widest label plus the spread of the points.
+  sizes: Size[];
   node: Size;
   settle(pan: Point, zoom: number): void;
   dragged(): boolean;
@@ -103,24 +111,20 @@ export function useSheetHold(
   const [carried, setCarried] = useState<Carried | null>(null);
   const [pan, setPan] = useState<Point>(opening?.pan ?? AT_REST);
   const [zoom, setZoom] = useState(opening?.zoom ?? 1);
-  const [node, setNode] = useState<Size>({ width: 0, height: 0 });
+  const [sizes, setSizes] = useState<Size[]>([]);
   const box = bounds(points);
+  const node = widest(sizes);
 
   useLayoutEffect(() => {
-    const drawn = measured.current.slice(0, points.length);
-    setNode((were) => {
-      const now = {
-        width: Math.max(0, ...drawn.map((each) => each?.offsetWidth ?? 0)),
-        height: Math.max(0, ...drawn.map((each) => each?.offsetHeight ?? 0)),
-      };
-      return now.width === were.width && now.height === were.height ? were : now;
-    });
+    const now = measured.current.slice(0, points.length).map((each) => ({ width: each?.offsetWidth ?? 0, height: each?.offsetHeight ?? 0 }));
+    setSizes((were) => (were.length === now.length && were.every((was, at) => was.width === now[at]!.width && was.height === now[at]!.height) ? were : now));
   }, [keyed]);
 
   return {
     pan: settled(pan, zoom, box, node).pan,
     zoom,
     box,
+    sizes,
     node,
     settle: (next, scale) => {
       setZoom(scale);

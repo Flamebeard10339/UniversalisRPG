@@ -31,9 +31,12 @@ function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElem
 // square in the middle is the room the player is standing in. Which square a way belongs in is the
 // engine's judgement, read off the map's own sheet — the compass and the bubbles on the map pane are
 // pointing the same way because they are one answer, not two.
+//
+// Every row is the height of the tallest, so a row of nothing but empty squares still stands where
+// it lies: a compass whose top row collapses puts north where north-west was a moment ago.
 function Compass({ compass, here, onChoose }: { compass: ReturnType<typeof compassOf>; here: Localized; onChoose: (position: number) => void }): JSX.Element {
   return (
-    <div data-drive="compass" className="mx-auto mt-3 grid max-w-2xl grid-cols-3 gap-2">
+    <div data-drive="compass" className="mx-auto mt-3 grid max-w-2xl auto-rows-fr grid-cols-3 gap-2">
       {COMPASS.map((bearing, at) => {
         const way = compass.cells[at];
         if (bearing === null) {

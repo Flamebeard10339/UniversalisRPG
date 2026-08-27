@@ -143,20 +143,27 @@ export interface MapPlace {
 
 export interface MapState {
   plane: number;
+  // The floor being looked at over the shoulder of the one drawn, which is a floor the author is
+  // pointing at rather than one they have gone to.
+  ghost: number | null;
   planes: readonly number[];
   zoom: number;
   pan: Point;
   mode: MapMode;
   from: string | null;
+  // The region a gathering gesture is aimed at, as the author has it typed.
+  gathering: string;
   places: MapPlace[];
 }
 
 export interface MapView {
   plane: number;
+  ghost: number | null;
   zoom: number;
   pan: Point;
   mode: MapMode;
   from: string | null;
+  gathering: string;
   sheet: Sheet;
 }
 
@@ -164,21 +171,26 @@ export interface MapControls {
   settle(pan: Point, zoom: number): void;
   go(id: string): void;
   plane(at: number): void;
+  ghost(at: number | null): void;
   recentre(): void;
   mode(which: MapMode): void;
   place(id: string, at: Point): void;
   link(id: string): void;
   make(id: string): void;
+  gather(region: string, place: string): void;
+  shift(region: string, by: Point): void;
 }
 
 export function mapState(map: MapView): MapState {
   return {
     plane: map.plane,
+    ghost: map.ghost,
     planes: map.sheet.planes,
     zoom: map.zoom,
     pan: map.pan,
     mode: map.mode,
     from: map.from,
+    gathering: map.gathering,
     places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: node.goes, bearing: node.bearing })),
   };
 }
@@ -196,6 +208,7 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
       pan: (value) => controls.settle(pointFrom(value), map.zoom),
       zoom: (value) => controls.settle(map.pan, zoomFrom(value)),
       plane: (value) => controls.plane(planeFrom(value, map.sheet.planes)),
+      ghost: (value) => controls.ghost(value === null || value === undefined ? null : planeFrom(value, map.sheet.planes)),
       recentre: () => controls.recentre(),
       mode: (value) => {
         const named = modeNamed(value);
@@ -203,6 +216,14 @@ export function mapSurface(map: MapView, controls: MapControls): TestSurface {
         controls.mode(named);
       },
       link: (value) => controls.link(placeDrawn(map, value)),
+      gather: (value) => {
+        const { region, place } = (value ?? {}) as { region?: unknown; place?: unknown };
+        controls.gather(String(region ?? map.gathering), placeDrawn(map, place));
+      },
+      shift: (value) => {
+        const { region, ...by } = (value ?? {}) as { region?: unknown };
+        controls.shift(String(region ?? map.gathering), pointFrom(by));
+      },
       make: (value) => controls.make(String(value)),
       go: (value) => controls.go(placeDrawn(map, value)),
       place: (value) => {

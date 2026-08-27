@@ -15,6 +15,7 @@ import { type Registry } from '../content/registry';
 import { CRAFT_ADDRESS } from '../content/sections/recipe';
 import { loadUniverse } from '../content/load';
 import { GameState, type ModalFrame } from './state';
+import { settingNamed, SETTING_NAMES } from './settings';
 import { toMilliUnits } from './units';
 import { receiveItem } from './itemInstance';
 
@@ -827,6 +828,16 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
       expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff }, registry)).not.toThrow();
     });
   }
+
+  // A save written before a setting was declared holds nothing under its name. Refusing that would
+  // mean every setting added is a setting that shuts the saves written the month before it.
+  it('opens a save written before any one setting there is was declared', () => {
+    for (const missing of SETTING_NAMES) {
+      const settings = Object.fromEntries(SETTING_NAMES.filter((name) => name !== missing).map((name) => [name, settingNamed(name).standing]));
+      expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { settings } }, registry), missing).not.toThrow();
+    }
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, diff: { settings: { hardcore: {} } } }, registry)).toThrow(/^save field settings/);
+  });
 
   it('turns a raise from below the checks into a diagnostic, whatever raised', () => {
     const raising = loadInEnglish(MODULE);

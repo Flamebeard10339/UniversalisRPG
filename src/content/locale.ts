@@ -205,6 +205,8 @@ export const ENGINE_KEYS = [
   'engine.shell.copy',
   'engine.shell.place',
   'engine.shell.link',
+  'engine.shell.region',
+  'engine.shell.region-hint',
   'engine.shell.dev',
   'engine.shell.speed',
   'engine.shell.clear',
@@ -318,6 +320,10 @@ export const ENGINE_KEYS = [
   'engine.setting.reveal.note',
   'engine.setting.masking',
   'engine.setting.masking.note',
+  'engine.setting.regions',
+  'engine.setting.regions.note',
+  'engine.setting.regions.blob',
+  'engine.setting.regions.box',
 ] as const;
 
 export type EngineKey = (typeof ENGINE_KEYS)[number];

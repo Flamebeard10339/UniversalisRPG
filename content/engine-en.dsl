@@ -212,6 +212,8 @@ engine.shell.unstage: Unstage
 engine.shell.copy: Copy
 engine.shell.place: Place
 engine.shell.link: Link
+engine.shell.region: Region
+engine.shell.region-hint: name one, then tap rooms to gather them
 engine.shell.dev: Dev mode
 engine.shell.speed: Speed
 engine.shell.clear: Clear local changes
@@ -325,3 +327,7 @@ engine.setting.reveal: Paced dialogue
 engine.setting.reveal.note: What is said to you arrives a line at a time, at reading speed, rather than all at once.
 engine.setting.masking: Look before you know
 engine.setting.masking.note: Something nobody has looked at keeps its name and everything it offers back until somebody does. Off, a room reads as it is written — which is what an author wants and a player does not.
+engine.setting.regions: Region shape
+engine.setting.regions.note: Whether a region is drawn as a shape that follows the rooms it holds, or as one rectangle around all of them.
+engine.setting.regions.blob: Blob
+engine.setting.regions.box: Box
