@@ -328,3 +328,28 @@ describe('a place placed by how it stands to another', () => {
     expect(world().locations.get('keep.hall')?.relative).toBeUndefined();
   });
 });
+
+// A map that draws only what a player has found is no use for putting the next place beside the
+// last one, so an author may ask for the whole floor. What has not been found says so.
+describe('the whole floor, for whoever is writing it', () => {
+  const HIDDEN: Place[] = [place('hall', 0, 0, 0, 'vault'), place('vault', 1, 0, 0, 'hall'), place('attic', 2, 0, 1)];
+
+  const both = (showing: 'found' | 'every'): Sheet =>
+    sheetOf({ discovered: [HIDDEN[0]!], undiscovered: HIDDEN.slice(1), regions: [], location: { id: 'hall' }, choices: [], mapGrid: 140 }, 0, showing);
+
+  it('draws what has been found, and nothing else, unless it is asked', () => {
+    expect(idsOf(both('found'))).toEqual(['hall']);
+  });
+
+  it('draws every place on the floor when it is asked, and says which have been found', () => {
+    const drawn = both('every');
+
+    expect(idsOf(drawn).sort()).toEqual(['hall', 'vault']);
+    expect(Object.fromEntries(drawn.nodes.map((node) => [node.place.id, node.found]))).toEqual({ hall: true, vault: false });
+  });
+
+  it('draws the roads to a place nobody has found, which the found ones do not name', () => {
+    expect(both('found').roads).toEqual([]);
+    expect(both('every').roads.map((road) => [String(road.from), String(road.to)])).toEqual([['hall', 'vault']]);
+  });
+});

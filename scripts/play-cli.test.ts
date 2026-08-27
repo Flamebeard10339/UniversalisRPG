@@ -1518,6 +1518,24 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
     }
   }
 
+  // An author is shown every place on the floor they are looking at, found or not, so that putting
+  // the next place beside the last one is something they can actually see.
+  it('draws the whole floor once dev is on, and only what was found before that', () => {
+    const game = playing(SAVING_SOURCE + `
+# location shed
+x: 3, y: 0
+`);
+
+    const before = shown(runLine(game.ctx, '/map')).join(' ');
+    expect(before).not.toContain('Shed');
+
+    runLine(game.ctx, '/dev on');
+    const after = shown(runLine(game.ctx, '/map')).join(' ');
+
+    expect(after).toContain('?Shed');
+    rmSync(game.dir, { recursive: true, force: true });
+  });
+
   it('walks the whole command table, twice per entry', () => {
     expect(COMMANDS.length).toBeGreaterThan(20);
   });
