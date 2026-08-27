@@ -45,6 +45,7 @@ import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { grouping, offeredBy, type GroupRow } from './grouping';
 import { mapGrid } from './tuning';
+import type { Place } from './map';
 export type { GroupRow } from './grouping';
 
 export type PlayChoiceKind = 'talk' | 'action' | 'travel' | 'craft' | 'shop';
@@ -174,7 +175,7 @@ export interface PlayStatus {
   xp: SkillRow[];
   stats: StatRow[];
   flags: AnswerTable<boolean | number>;
-  discovered: Array<{ id: Answer; title: Localized; x: number; y: number; z: number; adjacent: Array<{ to: Answer; open: boolean }> }>;
+  discovered: Place[];
   // How far apart one step of this world's coordinates is drawn. Published beside the places rather
   // than held by whoever is drawing them, so every surface that draws a map draws it at one size.
   mapGrid: number;

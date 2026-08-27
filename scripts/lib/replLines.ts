@@ -8,6 +8,8 @@ import type { Focus } from '../../src/runtime/modals';
 import { sheetOffers, type OfferedChoice, type PlayStatus, type PlayView } from '../../src/runtime/session';
 import { grouped } from '../../src/runtime/grouping';
 import { formatPlane } from '../planeView';
+import { drawnCompass, drawnMap } from './mapText';
+import type { Sheet } from '../../src/runtime/map';
 
 // What a command answered with, written out as lines a player reads. Both drivers that put words
 // in front of a player one line at a time — the terminal in scripts/play-cli.ts and the model in
@@ -251,23 +253,13 @@ function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
   return [field('action', `${action.label}${aimedAt} ${tidy(action.progress)} after ${action.attempts}${counting}`)];
 }
 
-// Coordinates put a location on an integer lattice, but what can be walked is `adjacent`, and
-// neither implies the other: two places one step apart on the grid need not be joined, and a road
-// may run the width of the map. So the roads are what is drawn, with each place's coordinates
-// named beside it — a grid would make its own visual neighbours a claim the world never makes.
+// How much of the world has been found, and no more. What has been found and how it is joined up is
+// `/map`, which draws the sheet the engine builds; a state dump that drew a second map of its own
+// was the third reading of one thing.
 function formatMap(status: PlayStatus): ToolLine[] {
   const found = new Set(status.discovered.map((place) => place.id));
-  const roadsOf = (place: PlayStatus['discovered'][number]): string =>
-    place.adjacent.map((edge) => (edge.open ? String(edge.to) : `${edge.to} (shut)`)).join(', ');
   const unfound = status.locations.flatMap((each) => (found.has(each.id) ? [] : [String(each.id)]));
-  return [
-    field('discovered', String(status.discovered.length)),
-    ...status.discovered.map((place) => {
-      const roads = roadsOf(place);
-      return note(`${place.title} (${place.id}) at ${place.x},${place.y},${place.z}${roads === '' ? '' : ` -> ${roads}`}`, 2);
-    }),
-    field('locations', `${found.size} of ${status.locations.length} found${unfound.length === 0 ? '' : `; not yet found: ${unfound.join(', ')}`}`),
-  ];
+  return [field('locations', `${found.size} of ${status.locations.length} found${unfound.length === 0 ? '' : `; not yet found: ${unfound.join(', ')}`}`)];
 }
 
 function formatState(status: PlayStatus, localizer: Localizer): ReplLine[] {
@@ -292,6 +284,24 @@ function formatHelp(entry: CommandHelp): ToolLine {
   return note(`${label.padEnd(HELP_COLUMN)} ${entry.summary}`, 2);
 }
 
+// The map, drawn. The floor being looked at, the floors that may be asked for, the places and the
+// roads between them, then the nine squares a way out is offered in. Nothing is worked out here that
+// the sheet does not already say.
+function formatDrawnMap(sheet: Sheet, localizer: Localizer): ToolLine[] {
+  if (sheet.nodes.length === 0) return [note(String(localizer.engine('engine.travel.nowhere')))];
+  const floors = sheet.planes.length > 1 ? ` of ${sheet.planes.join(', ')}` : '';
+  // A square says where it goes, not what the choice was called: the list of offers already reads
+  // "Travel to Market Row" out, and nine squares of that is nine copies of one word.
+  const titles = new Map(sheet.nodes.map((node) => [String(node.place.id), String(node.place.title)]));
+  const indented = (line: string): ToolLine => note(line, line === '' ? 0 : 2);
+  return [
+    note(`floor: ${sheet.plane}${floors}`),
+    ...drawnMap(sheet).map(indented),
+    ...(sheet.ways.length === 0 ? [] : [note('')]),
+    ...drawnCompass(sheet, (way) => titles.get(String(way.to)) ?? String(way.label)).map(indented),
+  ];
+}
+
 export function formatOutput(output: CommandOutput, localizer: Localizer): ReplLine[] {
   switch (output.kind) {
     case 'message':
@@ -304,6 +314,8 @@ export function formatOutput(output: CommandOutput, localizer: Localizer): ReplL
       return formatState(output.status, localizer);
     case 'choices':
       return formatChoices(sheetOffers(output), localizer);
+    case 'map':
+      return formatDrawnMap(output.map, localizer);
     case 'help':
       return [note('Commands:'), ...output.entries.map(formatHelp)];
     case 'source':

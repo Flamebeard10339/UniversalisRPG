@@ -23,7 +23,7 @@ import { describeCondition } from './runtime';
 import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
-import { waysOut } from './waysOut';
+import { sheetOf, type Sheet } from './map';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
 import { anId, say, says, type Said } from './said';
@@ -90,6 +90,7 @@ export type CommandOutput =
   | { kind: 'view'; view: PlayView; reread: boolean }
   | { kind: 'status'; status: PlayStatus }
   | { kind: 'choices'; choices: PlayChoice[] }
+  | { kind: 'map'; map: Sheet }
   | { kind: 'help'; words: 'tool'; entries: CommandHelp[] }
   | { kind: 'source'; words: 'tool'; lines: string[] }
   | { kind: 'authored'; words: 'tool'; blocks: string[][] };
@@ -911,14 +912,9 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/map',
     arg: 'none',
-    summary: 'list the places a road reaches from here, each under the number that walks to it',
+    summary: 'draw the map: the floor you are on, the roads across it, and every way out under the number that walks it',
     parse: nothing,
-    run: (ctx) => {
-      const localizer = sessionLocalizer(ctx.session);
-      const ways = waysOut(ctx.view.choices);
-      if (ways.length === 0) return said('plain', localizer.engine('engine.travel.nowhere'));
-      return { output: ways.map((way) => message('plain', localizer.engine('engine.repl.choice', { index: way.at, choice: way.label }))), quit: false, recorded: [] };
-    },
+    run: (ctx) => ({ output: [{ kind: 'map', map: sheetOf(ctx.view, null) }], quit: false, recorded: [] }),
   }),
   define({
     name: '/state',

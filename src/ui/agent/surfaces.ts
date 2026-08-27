@@ -1,6 +1,6 @@
 import type { Answer } from '../../runtime/localized';
 import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
-import type { Sheet } from '../discovery';
+import type { Bearing, Sheet } from '../../runtime/map';
 import { colourIn, draftIn, kindsIn, offeringIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
 import { modeNamed, type MapMode } from '../mapEdit';
 import { clampZoom, type Point } from '../viewport';
@@ -136,6 +136,9 @@ export interface MapPlace {
   here: boolean;
   climb: number;
   goes: number | null;
+  // Which way this place lies from where the player stands, which is how a driver with no eyes asks
+  // for the road going north without working the geometry out for itself.
+  bearing: Bearing | null;
 }
 
 export interface MapState {
@@ -155,7 +158,6 @@ export interface MapView {
   mode: MapMode;
   from: string | null;
   sheet: Sheet;
-  travels: ReadonlyMap<string, number>;
 }
 
 export interface MapControls {
@@ -177,7 +179,7 @@ export function mapState(map: MapView): MapState {
     pan: map.pan,
     mode: map.mode,
     from: map.from,
-    places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: map.travels.get(node.place.id) ?? null })),
+    places: map.sheet.nodes.map((node) => ({ id: node.place.id, at: node.at, here: node.here, climb: node.climb, goes: node.goes, bearing: node.bearing })),
   };
 }
 

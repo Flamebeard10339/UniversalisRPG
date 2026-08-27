@@ -132,7 +132,7 @@ describe('the offers on the sheet', () => {
     const drawn = drawnFor(view, null);
     expect(drawn.plane).toBe(1);
     expect(drawn.sheet.nodes.map((node) => node.place.id)).toContain('cellar');
-    expect(drawn.travels.get('cellar')).toBe(2);
+    expect(drawn.sheet.nodes.find((node) => node.place.id === 'cellar')?.goes).toBe(2);
   });
 });
 

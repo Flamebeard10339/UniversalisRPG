@@ -100,7 +100,7 @@ export const relativeValue: Parser<Relative> = {
   examples: ['north of clearing', 'down of shaft'],
 };
 
-const DIRECTION_VECTORS: Record<Direction, [number, number, number]> = {
+export const DIRECTION_VECTORS: Record<Direction, readonly [number, number, number]> = {
   north: [0, 1, 0],
   south: [0, -1, 0],
   east: [1, 0, 0],

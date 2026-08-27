@@ -64,6 +64,10 @@ const PARITY_EXCUSED: readonly PathExcuse[] = [
 
 const ANSWER_EXCUSED: readonly CommandExcuse[] = [
   {
+    command: '/map',
+    why: 'the app draws the same sheet the command hands back, on a page of its own that is pannable and draggable and shows where a journey has got to; writing a picture of it into the command log would be the map said twice, worse the second time',
+  },
+  {
     command: '/state',
     why: 'every figure a status holds has a page of its own in the app — stats, skills, equipment, inventory, the map — so dumping the same numbers into the command log would be a second and worse copy of what the player is already looking at',
   },

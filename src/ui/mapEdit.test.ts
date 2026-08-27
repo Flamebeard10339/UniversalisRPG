@@ -131,7 +131,7 @@ describe('where a drag lets go is where the place is (c8)', () => {
 describe('where the map lets a place go (c8)', () => {
   const drawn = (address: string, climb = 0): Node => {
     const place = REGISTRY_PLACES.get(address)!;
-    return { place: { id: address, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ x: place.x, y: place.y, z: place.z } as never, place.z - climb) };
+    return { place: { id: address, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, goes: null, bearing: null, at: drawnAt({ x: place.x, y: place.y, z: place.z } as never, place.z - climb) };
   };
 
   const moved = ABSOLUTE[0].address;
@@ -149,7 +149,7 @@ describe('where the map lets a place go (c8)', () => {
   for (const climb of [-2, 2]) {
     it(`takes the drawing nudge back out for a place ${Math.abs(climb)} floors ${climb > 0 ? 'up' : 'down'}`, () => {
       const place = REGISTRY_PLACES.get(moved)!;
-      const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
+      const off: Node = { place: { id: moved, title: place.title as never, x: place.x, y: place.y, z: place.z, adjacent: [] }, here: false, climb, goes: null, bearing: null, at: drawnAt({ ...place, adjacent: [] } as never, place.z - climb) };
 
       const staged = droppedAt(DRAWN, off, { x: 0, y: 0 }, GRID);
 
@@ -158,7 +158,7 @@ describe('where the map lets a place go (c8)', () => {
   }
 
   it('refuses a place the map is drawing that no module declares', () => {
-    const stray: Node = { place: { id: 'nowhere.at-all', title: '' as never, x: 0, y: 0, z: 0, adjacent: [] }, here: false, climb: 0, at: { x: 0, y: 0 } };
+    const stray: Node = { place: { id: 'nowhere.at-all', title: '' as never, x: 0, y: 0, z: 0, adjacent: [] }, here: false, climb: 0, goes: null, bearing: null, at: { x: 0, y: 0 } };
 
     expect(droppedAt(DRAWN, stray, { x: 0, y: 0 }, GRID)).toEqual({ refused: 'the map is drawing nowhere.at-all, which no module declares' });
     expect(placedInto(DRAWN, 'nowhere.at-all', { x: 1, y: 1 })).toHaveProperty('refused');

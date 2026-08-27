@@ -169,7 +169,8 @@ export function MapPane({
   const [from, setFrom] = useState<string | null>(null);
   const [naming, setNaming] = useState('');
 
-  const { plane: at, here, sheet, travels } = drawnFor(view, plane);
+  const { plane: at, here, sheet } = drawnFor(view, plane);
+  const drawn = new Map(sheet.nodes.map((node) => [String(node.place.id), node]));
   const grid = view.mapGrid;
   const spots = sheet.nodes.map((node) => spotOf(node, grid));
   const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
@@ -184,7 +185,7 @@ export function MapPane({
     hold.settle(standing ? panOnto(spotOf(standing, grid), 1) : { x: 0, y: 0 }, 1);
   };
 
-  const lineFor = (id: string): string | null => tappedPlace(dev, id, travels.get(id) ?? null);
+  const lineFor = (id: string): string | null => tappedPlace(dev, id, drawn.get(id)?.goes ?? null);
 
   const go = (id: string): void => {
     const line = lineFor(id);
@@ -218,7 +219,7 @@ export function MapPane({
     setNaming('');
   };
 
-  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, travels, mode, from };
+  const map = { plane: at, zoom: hold.zoom, pan: hold.pan, sheet, mode, from };
 
   useEffect(() => {
     onWhere({ pan: hold.pan, zoom: hold.zoom, plane });
@@ -318,14 +319,14 @@ export function MapPane({
       <svg className="pointer-events-none absolute overflow-visible" width={1} height={1}>
         {map.sheet.roads.map((road) => (
           <Road
-            key={`${road.from.place.id}>${road.to.place.id}`}
-            from={road.from}
-            to={road.to}
+            key={`${road.from}>${road.to}`}
+            from={drawn.get(road.from)!}
+            to={drawn.get(road.to)!}
             open={road.open}
             mutual={road.mutual}
             grid={grid}
             bubble={hold.node}
-            walking={onWalk(walk, road.from.place.id, road.to.place.id)}
+            walking={onWalk(walk, road.from, road.to)}
           />
         ))}
       </svg>

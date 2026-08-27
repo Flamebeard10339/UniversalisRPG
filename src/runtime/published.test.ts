@@ -77,7 +77,6 @@ const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/dialogue-runtime.ts#MenuEntry', why: 'the words for one entry of a dialogue list, and the name that picks it, on their way to one `ModalChoice`' },
   { type: 'src/runtime/effects.ts#Segment', why: 'why what is under way is over, carried from the result that said so to the `endAction` that writes it onto the state' },
   { type: 'src/runtime/runtime.ts#WaitedOut', why: 'why a span the engine ran unattended could not finish, said to the player in the log and answered to whoever issued the directive' },
-  { type: 'src/runtime/waysOut.ts#WayOut', why: 'one published choice read as the way to a place: the words on it are that choice’s own, on their way from the list a view publishes to the map that draws them' },
   { type: 'src/runtime/modalOption.ts#ChoicePart', why: 'the published cells of one option gathered under the side they name, on their way from the `ModalChoice` list a view publishes to the tabs and headings a surface draws it as' },
 ];
 
@@ -203,6 +202,13 @@ function walkType(node: ts.TypeNode, file: string, where: string, walk: Walk): v
   if (ts.isTypeLiteralNode(node)) return speaksForTheTool(node.members) ? undefined : walkMembers(node.members, file, where, walk);
   if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) return walkReference(node.typeName.text, node.typeArguments, file, where, walk);
   if (ts.isIndexedAccessTypeNode(node)) return walkIndexedAccess(node, file, where, walk);
+  // A template literal type is a word built out of other words. What it holds is whatever its spans
+  // hold, so a `${string}` in one is as bare as a bare string and anything built from named words is
+  // a name itself.
+  if (ts.isTemplateLiteralTypeNode(node)) {
+    for (const span of node.templateSpans) walkType(span.type, file, where, walk);
+    return;
+  }
 
   walk.unread.push(`${where}: ${ts.SyntaxKind[node.kind]}`);
 }

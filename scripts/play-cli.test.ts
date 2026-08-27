@@ -168,9 +168,9 @@ describe('play-cli renders what a command result says happened', () => {
     const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [`${row.title} (${row.id})`, row.value])));
     const state = shown(runLine(ctx, '/state'));
     // Every line the readout is made of, and no other. What the world holds beyond the one room
-    // stood in here is its size rather than this readout's shape, so the two lines that count it
-    // are read for their form.
-    expect(state).toHaveLength(11);
+    // stood in here is its size rather than this readout's shape, so the line that counts it is
+    // read for its form.
+    expect(state).toHaveLength(9);
     expect(state.slice(0, 4)).toEqual([
       'Location: first-steps.guide-house',
       'Elapsed simulated time: 7s',
@@ -183,15 +183,13 @@ describe('play-cli renders what a command result says happened', () => {
     // the same way with nothing edited here — and every skill they hold has to be on the line.
     expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
     for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
-    expect(state.slice(5, 10)).toEqual([
+    expect(state.slice(5, 8)).toEqual([
       'Equipped: {"Head (head)":null,"Main Hand (mainhand)":null,"Body (body)":null,"Off Hand (offhand)":null,"Gloves (gloves)":null,"Legs (legs)":null}',
       `stats: ${sheet}`,
       'Health: ██████████ 31.3/31.3',
-      'discovered: 1',
-      '  Guide House (first-steps.guide-house) at 0,0,0',
     ]);
-    expect(state[10]).toMatch(/^locations: 1 of \d+ found; not yet found: tulsa\./);
-    expect(state[10]).toContain('tulsa.market-square');
+    expect(state[8]).toMatch(/^locations: 1 of \d+ found; not yet found: tulsa\./);
+    expect(state[8]).toContain('tulsa.market-square');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
   });
 
@@ -216,11 +214,11 @@ x: 1, y: 0
 `,
     );
     runLine(ctx, '/load both-found');
-    const lines = shown(runLine(ctx, '/state'));
+    const drawn = shown(runLine(ctx, '/map')).join(' ');
 
-    expect(lines).toContain('  Camp (camp) at 0,0,0 -> vault (shut)');
-    expect(lines).toContain('  Vault (vault) at 1,0,0 -> camp (shut)');
-    expect(lines).toContain('locations: 2 of 2 found');
+    expect(drawn).toContain('a road that is shut');
+    expect(drawn).not.toContain('─');
+    expect(shown(runLine(ctx, '/state'))).toContain('locations: 2 of 2 found');
   });
 
   it('names grown copies on a line of their own, above the stack counts’ neighbours', () => {

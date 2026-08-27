@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../../runtime/localizedFixture';
 import { layerNamed, mapState, mapSurface, pointFrom, shellSurface, subpageNamed, zoomFrom, type MapControls } from './surfaces';
-import { CLIMB_NUDGE, sheetAt, type Place } from '../discovery';
+import { CLIMB_NUDGE, sheetOf, type Place } from '../../runtime/map';
 import { ZOOM_MAX, ZOOM_MIN, type Point } from '../viewport';
 import { HOME_LAYER, LAYERS, OPENING, shellState, toLayer, type Where } from '../nav';
 
@@ -96,16 +96,23 @@ const INERT: MapControls = {
 };
 
 describe('the map as a driving agent reaches it', () => {
-  const sheet = sheetAt(HOUSE, 'hall', 0);
-  const travels = new Map([['beach', 3]]);
-  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, mode: 'go' as const, from: null, sheet, travels };
+  const sheet = sheetOf(
+    {
+      discovered: HOUSE,
+      location: { id: 'hall' },
+      choices: [{ id: 'travel:cellar', kind: 'travel', label: asLocalized('down'), leadsTo: 'cellar', legs: 1 }, { id: 'travel:beach', kind: 'travel', label: asLocalized('east'), leadsTo: 'beach', legs: 1 }],
+      mapGrid: 140,
+    },
+    0,
+  );
+  const view = { plane: 0, zoom: 1, pan: { x: 0, y: 0 }, mode: 'go' as const, from: null, sheet };
 
   it('publishes what is drawn and where, so nothing has to be read off the markup', () => {
     const state = mapState(view);
 
     expect(state).toMatchObject({ plane: 0, planes: [-1, 0, 1], zoom: 1, pan: { x: 0, y: 0 } });
     expect(state.places.find((place) => place.id === 'hall')).toMatchObject({ here: true, climb: 0, goes: null });
-    expect(state.places.find((place) => place.id === 'beach')).toMatchObject({ here: false, goes: 3 });
+    expect(state.places.find((place) => place.id === 'beach')).toMatchObject({ here: false, goes: 2, bearing: 'east' });
     expect(state.places.find((place) => place.id === 'landing')).toMatchObject({ climb: 1, at: { x: CLIMB_NUDGE, y: -CLIMB_NUDGE } });
   });
 
