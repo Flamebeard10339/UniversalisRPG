@@ -107,7 +107,7 @@ entities:
   mouse, town-crier, sewer-grate, bench, 8 civilian
 
 # location market-row
-x: 10, y: 0
+x: 8, y: 0
 title: Market Row
 examine: The east road out of the square, stalls down both sides of it: groceries, fishing tackle, and a rack of axes nobody is watching closely enough.
 adjacent:
@@ -140,7 +140,7 @@ watch the castle windows:
   say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against. It means something to somebody. It does not yet mean anything to you.
 
 # location forge
-x: 12, y: 0
+x: 9, y: -1
 title: The Forge
 examine: A low stone shop at the end of the row with the fire banked. An anvil stands unused in the middle of the floor.
 adjacent:
@@ -153,7 +153,7 @@ entities:
 // than any expansion's: a walled fixture off the forge that is here whatever
 // else is loaded.
 # location proving-ground
-x: 12, y: -2
+x: 11, y: -1
 title: Proving Ground
 examine: A walled yard behind the armoury, sand raked flat and stained, with the town wall for one of its four sides.
 adjacent:
@@ -162,7 +162,7 @@ entities:
   armourers-chest, proving-post, spined-urchin
 
 # location tavern-street
-x: 5, y: -2
+x: 8, y: 1
 title: Tavern Street
 examine: The lane running north-west off the square, and it smells of spilled beer at any hour. Sha Dynasty's is the door with the lantern over it.
 adjacent:
@@ -173,7 +173,7 @@ entities:
   charlie-the-tramp, 5 civilian
 
 # location sha-dynastys
-x: 3, y: -2
+x: 9, y: 2
 title: Sha Dynasty's
 examine: The city's bar. Low beams, long tables, and a stove in the corner that has never been cold.
 adjacent:
@@ -182,7 +182,7 @@ entities:
   sunny, bar-stove, drunk-patron, 3 civilian
 
 # location oolga-house
-x: 3, y: -4
+x: 8, y: 2
 title: Oolga's House
 examine: A crooked house wedged between two straighter ones at the top of the lane. Bundles of something dry hang from every beam.
 adjacent:
@@ -204,7 +204,7 @@ entities:
 // --- the castle, at the top of the town ---
 
 # location castle-gate
-x: 7, y: -3
+x: 5, y: -2
 title: Castle Gate
 examine: The gatehouse of Tulsa's castle, which is a wall inside a wall. Two guards, bored, and a road running round the back.
 adjacent:
@@ -216,7 +216,7 @@ entities:
   2 castle-guard, 4 guardsman
 
 # location guard-barracks
-x: 5, y: -4
+x: 3, y: -3
 title: Guard Barracks
 examine: Bunks, a weapon rack, and a table with the town's troubles laid out on it in no particular order.
 adjacent:
@@ -225,7 +225,7 @@ entities:
   guard-captain, 4 guardsman
 
 # location castle-yard
-x: 9, y: -5
+x: 7, y: -4
 title: Castle Yard
 examine: Round the back of the castle: barrels, a midden, and a hatch into the sewers with a guard sat on it.
 adjacent:
@@ -235,7 +235,7 @@ entities:
   larry, sewer-hatch, 4 knight
 
 # location castle-hall
-x: 7, y: -5
+x: 5, y: -4
 title: Banquet Hall
 examine: The ground floor of the castle, given over to one long table that seats forty and rarely does.
 adjacent:
@@ -247,7 +247,7 @@ entities:
   4 knight
 
 # location castle-kitchen
-x: 5, y: -6
+x: 3, y: -5
 title: Castle Kitchen
 examine: Copper overhead, a range along one wall, and staff who do not look up.
 adjacent:
@@ -317,7 +317,7 @@ holds:
 // of why a thief walks these rather than the square.
 
 # location well-lane
-x: 5, y: 2
+x: 4, y: 1
 title: Well Lane
 examine: The lane down the west side, running from the marsh gate to the water. There is a well at the turn of it and a queue at the well most of the day.
 adjacent:
@@ -331,7 +331,7 @@ entities:
   washing-line, 6 civilian
 
 # location town-well
-x: 5, y: 1
+x: 6, y: 2
 title: The Well
 examine: A stone kerb worn into scallops by two hundred years of rope, and a bucket somebody left on it.
 adjacent:
@@ -340,7 +340,7 @@ entities:
   the-well, bench, 3 civilian
 
 # location nans-house
-x: 3, y: 3
+x: 4, y: 2
 title: Nan's House
 examine: One room and a loft over it, the fire banked low, and more chairs in it than the room can hold.
 adjacent:
@@ -349,7 +349,7 @@ entities:
   nan, nans-hearth, house-chest, 2 civilian
 
 # location hasks-house
-x: 5, y: 4
+x: 5, y: 2
 title: Hask's House
 examine: A cooper's, and the front room is staves. Somewhere behind the staves a family is having its dinner.
 adjacent:
@@ -358,7 +358,7 @@ entities:
   hask, hasks-stove, house-chest, 2 civilian
 
 # location doss-house
-x: 3, y: 1
+x: 3, y: 2
 title: The Doss House
 examine: Beds by the night, eleven of them in one room, and a fire at the end that everybody cooks on and nobody cleans.
 adjacent:
@@ -367,7 +367,7 @@ entities:
   doss-house-fire, 7 civilian
 
 # location kiln-lane
-x: 12, y: 2
+x: 11, y: 1
 title: Kiln Lane
 examine: The lane down the east side, behind the market row. It is warmer than the rest of the town and it smells of bread and fired clay.
 adjacent:
@@ -380,7 +380,7 @@ entities:
   pie-window, 6 civilian
 
 # location motts-house
-x: 14, y: 1
+x: 10, y: 0
 title: Mott's House
 examine: A bakehouse with the living done in the back of it. The oven is the size of the room it is in and it has never once been let go out.
 adjacent:
@@ -389,7 +389,7 @@ entities:
   mott, motts-oven, 2 civilian
 
 # location bels-house
-x: 14, y: 3
+x: 11, y: 0
 title: Bel's House
 examine: A potter's, and the yard behind it is stacked with things that did not survive the kiln.
 adjacent:
@@ -398,7 +398,7 @@ entities:
   bel, bels-kiln, house-chest, 2 civilian
 
 # location aggies-house
-x: 12, y: 4
+x: 12, y: 0
 title: Aggie's House
 examine: Nets over every surface that will take one, and a stove going under a pan that has fish in it whatever hour you arrive.
 adjacent:
@@ -412,7 +412,7 @@ entities:
 // market has all four on the map at once and can see which way the town ends.
 
 # location kings-road
-x: 9, y: -2
+x: 8, y: -1
 title: The King's Gate
 examine: The north gate, and the biggest of the four: a barrel vault deep enough to be dark in the middle of it, with the portcullis housing overhead and the King's Road running out under the arch.
 adjacent:
@@ -430,7 +430,7 @@ adjacent:
   kings-road
 
 # location swamp-edge
-x: 3, y: 0
+x: 3, y: 1
 title: The Marsh Gate
 examine: The west gate, and the low one. The coast road runs out of it and the ground on the north side of that road starts drinking within fifty paces. A dead alder leans over the ditch outside the arch.
 adjacent:
@@ -441,7 +441,7 @@ entities:
   dead-alder, bench, 2 guardsman
 
 # location riverside
-x: 7, y: 3
+x: 7, y: 1
 title: The Water Gate
 examine: The south gate, where the river comes under the wall through a grate too narrow for a boat and wide enough for a boy. Stone stairs go down to the shingle, and the shingle is busy with people who are not fishing.
 adjacent:
@@ -452,7 +452,7 @@ entities:
   fishing.shrimp-shoal, fishing.anchovy-shoal, bench, 4 civilian
 
 # location bee-gate
-x: 9, y: 4
+x: 10, y: 2
 title: The Bee Gate
 examine: The east gate, and hardly a gate at all: a postern in the corner of Kelsa's yard that the town gave up minding when it gave up minding the bees.
 adjacent:
@@ -464,7 +464,7 @@ adjacent:
 // --- Kelsa's steading, in the east corner of the wall ---
 
 # location kelsa-farmhouse
-x: 9, y: 2
+x: 9, y: 1
 title: Kelsa's Farmhouse
 examine: A working farmhouse built against the inside of the east wall, with the door wedged open and the yard running back to a postern. Nothing here stings.
 adjacent:
@@ -477,7 +477,7 @@ entities:
 // --- outside the wall ---
 
 # location apiary-field
-x: 11, y: 6
+x: 10, y: 3
 title: The Apiary
 examine: Three hives on the far side of the property, and the air between them is not calm.
 adjacent:
@@ -487,7 +487,7 @@ entities:
   5 drone-bee, first-hive, second-hive
 
 # location hive-mouth
-x: 14, y: 6
+x: 10, y: 4
 title: The Third Hive
 examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee.
 adjacent:
@@ -497,7 +497,7 @@ look into the comb:
   say: You put your face to the gap. The comb is chewed out to the depth of your arm and the cut edges of it are still wet. Whatever did it is not in there now, and it did not leave the way you came in.
 
 # location pasture
-x: 11, y: 8
+x: 9, y: 3
 title: The Pasture
 examine: Kelsa's field beyond the hives, cropped short, with a gate at the top of it and cattle who have never once used the gate.
 adjacent:
@@ -506,7 +506,7 @@ entities:
   4 combat.cow, 6 combat.chicken
 
 # location tunnel-mouth
-x: 14, y: 8
+x: 11, y: 5
 title: Tunnel Mouth
 examine: A hole in the turf at the edge of Kelsa's land, shored with timber by somebody who knew how.
 adjacent:
@@ -533,7 +533,7 @@ entities:
   2 border-guard
 
 # location swamp-mire
-x: 1, y: -3
+x: 2, y: 2
 title: The Mire
 examine: Standing water to the knee, a quarter-mile off the coast road. Thistle on the hummocks, root under the mud, and broken things half-buried where somebody dumped them.
 adjacent:
@@ -542,7 +542,7 @@ entities:
   3 swamp-mollusk, 2 bog-lurker, herb-patch, dumped-crates
 
 # location north-road
-x: 11, y: -5
+x: 8, y: -5
 title: The North Road
 examine: Out of the King's Gate and banked either side, with rocks along the top of the bank that are a very good size for standing behind.
 adjacent:
@@ -552,7 +552,7 @@ entities:
   4 combat.highwayman
 
 # location pinewood
-x: 13, y: -7
+x: 8, y: -6
 title: The Pinewood
 examine: Black pine and no undergrowth at all, which means you can see a long way and so can everything else.
 adjacent:
@@ -577,7 +577,7 @@ entities:
 // rats are.
 
 # location sewer-entrance
-x: 9, y: -5, z: -1
+x: 9, y: -1, z: -1
 title: Sewer Entrance
 examine: A brick chamber under the hatch, swept clean and lit. Whoever pays the toll gets this much for it.
 adjacent:
@@ -585,7 +585,7 @@ adjacent:
   sewer-junction
 
 # location sewer-junction
-x: 7, y: -3, z: -1
+x: 9, y: 0, z: -1
 title: Sewer Junction
 examine: Four channels meet here under a low vault. Painted signs on the brick point up at the buildings above: MARKET, CASTLE, GATE.
 adjacent:

@@ -779,7 +779,7 @@ on death:
       roll: trinket
 
 # location guide-house
-x: 0, y: 0
+x: 6, y: 0
 starting
 examine: A cluttered but cozy cottage. Miki's guide house.
 adjacent:
@@ -798,7 +798,7 @@ entities:
   miki, front-door, stairs, mirror, oven, back-door
 
 # location guide-house-upstairs
-x: 0, y: 0, z: 1
+x: 6, y: 0, z: 1
 examine: A narrow landing with a dresser and a view of the coast.
 adjacent:
   guide-house
@@ -817,7 +817,7 @@ entities:
 // the shoal standing here is the one the riverside stands on, so a net that works
 // in this yard works in the river and a net that does not works in neither.
 # location backyard
-x: -1, y: 0
+x: 5, y: 0
 examine: A strip of grass behind the house, walled on three sides, with a pond at the end of it deeper than it has any business being.
 adjacent:
   guide-house
