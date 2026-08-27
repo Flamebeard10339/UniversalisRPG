@@ -70,14 +70,3 @@ road only one end writes — which is most of them in Tulsa. It is also what wou
 *Closes when:* you say whether a road written from one end only should read as
 one-way on the map, or whether one-way should mean something narrower — a road that
 genuinely cannot be walked back.
-
-## The playbot still cannot author, and it may be that you meant it should
-
-`/place`, `/link`, `/unlink` and now `/region` are `audience: 'author'`, like `/dsl` —
-so the REPL, the app's command line, and anything driving `runLine` can use them, and
-an agent driving the app through `window.__test` can too. `scripts/playbot.ts` refuses
-every non-player command outright, because the model there is told it is the player
-and not the author. That is deliberate and it predates this work.
-*Closes when:* you say whether the playbot's `author` mode should be handed the
-authoring vocabulary as well, or whether an agent that means to edit the map should be
-driving the app rather than playing it.
