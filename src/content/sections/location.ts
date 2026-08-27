@@ -78,26 +78,50 @@ export const edgeValue: Parser<Edge> = {
   examples: ['clearing', 'clearing while has-key'],
 };
 
-const DIRECTION = /north|south|east|west|up|down/;
+// How a place written off another is written, one phrase per direction. The four headings take `of`;
+// the two floors read as the prepositions they already are, because `below market-row` is what
+// somebody would say and a floor written as a heading is not.
+//
+// A record over `Direction`, so a language that grew a seventh would not compile until this said how
+// to write it. And the only place the phrasing is written: reading one, printing one, and the forms
+// the editing page offers are this table read three ways, so the wording is changed here and in the
+// worlds that were written in it, and nowhere else.
+const RELATIVE_WORDS: Record<Direction, string> = {
+  north: 'north of',
+  south: 'south of',
+  east: 'east of',
+  west: 'west of',
+  up: 'above',
+  down: 'below',
+};
+
+// Longest phrase first, so a short one that begins a long one could never win the match.
+const RELATIVE_ORDER = (Object.keys(RELATIVE_WORDS) as Direction[]).sort((one, other) => RELATIVE_WORDS[other].length - RELATIVE_WORDS[one].length);
+
+const RELATIVE_PATTERN = new RegExp(RELATIVE_ORDER.map((direction) => RELATIVE_WORDS[direction].replace(/ /g, '[ \\t]+')).join('|'));
+
+const directionWritten = (phrase: string): Direction | undefined => RELATIVE_ORDER.find((direction) => RELATIVE_WORDS[direction] === phrase.replace(/[ \t]+/g, ' '));
 
 export const relativeValue: Parser<Relative> = {
   parse(cursor) {
-    const direction = cursor.take(DIRECTION);
-    if (direction === null)
-      throw new DslError('expected a direction', {
+    const start = cursor.pos;
+    const phrase = cursor.take(RELATIVE_PATTERN);
+    const direction = phrase === null ? undefined : directionWritten(phrase);
+    if (direction === undefined)
+      throw new DslError(`expected one of ${RELATIVE_ORDER.map((each) => RELATIVE_WORDS[each]).join(', ')}`, {
+        start: cursor.abs(start),
+        end: cursor.abs(cursor.pos),
+      });
+    if (cursor.take(/[ \t]+/) === null)
+      throw new DslError(`expected a location after ${RELATIVE_WORDS[direction]}`, {
         start: cursor.abs(cursor.pos),
         end: cursor.abs(cursor.pos),
       });
-    if (cursor.take(/[ \t]+of[ \t]+/) === null)
-      throw new DslError("expected 'of' after a direction", {
-        start: cursor.abs(cursor.pos),
-        end: cursor.abs(cursor.pos),
-      });
-    return { direction: direction as Direction, of: id.parse(cursor) };
+    return { direction, of: id.parse(cursor) };
   },
-  print: (value) => `${value.direction} of ${id.print(value.of)}`,
-  forms: ['<direction> of <location>'],
-  examples: ['north of clearing', 'down of shaft'],
+  print: (value) => `${RELATIVE_WORDS[value.direction]} ${id.print(value.of)}`,
+  forms: RELATIVE_ORDER.map((direction) => `${RELATIVE_WORDS[direction]} <location>`),
+  examples: RELATIVE_ORDER.map((direction) => `${RELATIVE_WORDS[direction]} clearing`),
 };
 
 // Which way each direction goes, in the coordinates a world writes. North is a smaller `y`, the way
@@ -180,7 +204,7 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
 
   for (const location of locations.values()) place(location);
   // The coordinates are worked out and written on; how they were arrived at is kept. A place written
-  // `up of castle-hall` is somewhere the moment the world is loaded — nothing downstream resolves
+  // `above castle-hall` is somewhere the moment the world is loaded — nothing downstream resolves
   // anything — and it still says what it hangs off, which is what prints it back the way it was
   // written and what tells a map that moving the hall moves this too.
   for (const location of [...locations.values()]) {

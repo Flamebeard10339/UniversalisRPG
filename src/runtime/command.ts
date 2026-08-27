@@ -1,6 +1,6 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
-import { DslError } from '../grammar/parser';
+import { Cursor, DslError } from '../grammar/parser';
 import { formatModuleDiagnostic, type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { type ModuleSource } from '../content/universe';
@@ -24,7 +24,7 @@ import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
 import { sheetOf, type Sheet } from './map';
-import type { Direction } from '../content/sections/location';
+import { relativeValue, type Relative } from '../content/sections/location';
 import { gathering, joining, pinning, placing, shifting, type Editing } from './mapEdit';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
@@ -166,7 +166,7 @@ export interface SectionArg {
 // Where a place is, said either way the language says it: outright, or as one step off another place.
 // One command because it is one question — and because answering it one way is what takes the other
 // answer away, which a second command would have had to know about this one.
-export type PlacingArg = { location: string; at: { x: number; y: number; z?: number } } | { location: string; off: { direction: Direction; of: string } };
+export type PlacingArg = { location: string; at: { x: number; y: number; z?: number } } | { location: string; off: Relative };
 
 export interface JoiningArg {
   from: string;
@@ -510,6 +510,21 @@ export function stageLocalSections(ctx: CommandContext, sections: readonly strin
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
     return refused(error);
+  }
+}
+
+// `/place a below b` is read with the parser that reads `below b` in a `# location`, so the command
+// line takes exactly what the language takes and the two cannot come to disagree about the wording.
+function writtenOff(rest: string): PlacingArg | undefined {
+  const match = /^(?<location>\S+)[ \t]+(?<off>.+)$/.exec(rest)?.groups;
+  if (!match) return undefined;
+  const cursor = new Cursor(match.off!, 0, 0);
+  try {
+    const off = relativeValue.parse(cursor);
+    cursor.take(/[ \t]*/);
+    return cursor.done ? { location: match.location!, off } : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -1041,14 +1056,14 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/place',
     arg: 'placing',
-    argHint: '<location> <x> <y> [<z>] | <location> <direction> of <location>',
+    argHint: `<location> <x> <y> [<z>] | <location> ${relativeValue.forms[0]}`,
     audience: 'author',
     summary: 'say where a location is, outright or as one step off another; a place given coordinates stops hanging off anything, and one written off another moves with it. Staged as a local change like any other edit',
     parse: (rest) => {
-      const off = /^(?<location>\S+)[ 	]+(?<direction>north|south|east|west|up|down)[ 	]+of[ 	]+(?<of>\S+)$/.exec(rest)?.groups;
-      if (off) return { location: off.location!, off: { direction: off.direction as Direction, of: off.of! } };
+      const off = writtenOff(rest);
+      if (off) return off;
       const match = /^(?<location>\S+)[ 	]+(?<x>-?\d+)[ 	]+(?<y>-?\d+)(?:[ 	]+(?<z>-?\d+))?$/.exec(rest)?.groups;
-      if (!match) return { problem: '/place requires <location> <x> <y> [<z>] or <location> <direction> of <location>' };
+      if (!match) return { problem: `/place requires <location> <x> <y> [<z>] or <location> ${relativeValue.forms[0]}` };
       return { location: match.location!, at: { x: Number(match.x), y: Number(match.y), ...(match.z === undefined ? {} : { z: Number(match.z) }) } };
     },
     run: (ctx, arg) =>

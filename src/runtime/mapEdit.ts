@@ -3,7 +3,7 @@ import { patchedInto, refused } from '../content/patch';
 import { sectionFor } from '../content/sections';
 import { moduleLocalId, type AnySchema } from '../grammar/section';
 import type { Registry } from '../content/registry';
-import type { Direction, Location } from '../content/sections/location';
+import { relativeValue, type Direction, type Location } from '../content/sections/location';
 
 // Editing the map: where a place is, and which roads run out of it. Written as patches over whatever
 // the world already says — the section that goes into local changes names the fields the edit
@@ -126,7 +126,7 @@ export function pinning(registry: Registry, local: string, id: string, direction
   for (let up: Location | undefined = anchor; up?.relative; up = found(registry, up.relative.of)) {
     if (up.relative.of === id) return { refused: `${of} already hangs off ${id}, so writing ${id} off ${of} would leave neither of them anywhere` };
   }
-  const one = patch(local, MAPPED_KIND, id, [`${direction} of ${asWritten(id, of)}`]);
+  const one = patch(local, MAPPED_KIND, id, [relativeValue.print({ direction, of: asWritten(id, of) })]);
   return 'refused' in one ? one : { patches: [one] };
 }
 

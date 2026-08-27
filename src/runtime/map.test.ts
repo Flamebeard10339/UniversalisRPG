@@ -387,7 +387,7 @@ describe('the shape a region draws', () => {
   });
 });
 
-// A place written `up of castle-hall` is somewhere the moment the world loads, and it still says
+// A place written `above castle-hall` is somewhere the moment the world loads, and it still says
 // what it hangs off — which is what prints it back the way it was written, and what tells a map that
 // moving the hall moves this too.
 describe('a place placed by how it stands to another', () => {
@@ -395,7 +395,7 @@ describe('a place placed by how it stands to another', () => {
     loadUniverse([
       {
         name: 'keep',
-        text: ['# info keep', 'version: 1.0.0', '', '# location hall', 'x: 4, y: 2', 'starting', '', '# location loft', 'up of hall', '', '# location attic', 'up of loft'].join('\n'),
+        text: ['# info keep', 'version: 1.0.0', '', '# location hall', 'x: 4, y: 2', 'starting', '', '# location loft', 'above hall', '', '# location attic', 'above loft'].join('\n'),
       },
     ]);
 

@@ -289,7 +289,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const start = cursor.abs(cursor.pos);
         authored[bare] = fields[bare].parser.parse(cursor);
         // A field written with no key of its own is still a field written somewhere. Left unsited, a
-        // patch could neither put one in nor take one out, which is what stopped `up of hall` from
+        // patch could neither put one in nor take one out, which is what stopped `above hall` from
         // being written or unwritten by anything but a hand.
         sites?.push({ field: bare, start, end: cursor.abs(cursor.pos) });
       } else {

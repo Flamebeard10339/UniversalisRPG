@@ -129,7 +129,7 @@ lift an axe off the rack:
 // The roof layer the outline asks for, and the only way onto it is a climb.
 // What it overlooks is a quest's business rather than the town's.
 # location market-rooftops
-up of market-row
+above market-row
 title: Market Rooftops
 examine: Tile and thatch over the stalls, the wall-walk one roof away, and the castle's upper windows across the town.
 adjacent:
@@ -192,7 +192,7 @@ entities:
   oolga, oolgas-counter, house-chest
 
 # location oolga-basement
-down of oolga-house
+below oolga-house
 title: Oolga's Cellar
 examine: A dirt-floored cellar. Something has been at the sacks in the corner, and part of the far wall has fallen in.
 adjacent:
@@ -256,7 +256,7 @@ entities:
   castle-range, range-drawer, 3 civilian
 
 # location castle-quarters
-up of castle-hall
+above castle-hall
 title: Castle Quarters
 examine: The second floor: bedrooms along one side, and a sewing room at the end with the door open.
 adjacent:
@@ -266,7 +266,7 @@ entities:
   2 house-chest
 
 # location castle-solar
-up of castle-quarters
+above castle-quarters
 title: The Duke's Solar
 examine: The top floor, and one room of it. The duke keeps his own counsel and most of the good chairs.
 adjacent:
@@ -275,7 +275,7 @@ entities:
   the-duke
 
 # location castle-cellar
-down of castle-hall
+below castle-hall
 title: Castle Cellar
 examine: Casks, cold air, and a drain in the floor carrying the noise of running water.
 adjacent:
@@ -423,7 +423,7 @@ entities:
   2 guardsman, bench, 3 civilian
 
 # location rampart
-up of kings-road
+above kings-road
 title: The Rampart
 examine: The wall-walk over the King's Gate. From here Tulsa is small and orderly and entirely enclosed, and the country past it is not any of the three.
 adjacent:

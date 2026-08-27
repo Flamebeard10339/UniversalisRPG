@@ -26,7 +26,7 @@ const KEEP: ModuleSource = {
     'x: 2, y: 2',
     '',
     '# location loft',
-    'up of hall',
+    'above hall',
     '',
     '# location lane',
     'x: 9, y: 9',
@@ -76,14 +76,14 @@ describe('putting a place on the map', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.lane', { x: 1, y: 1, z: 2 }))).toEqual(['# location keep.lane\nx: 1, y: 1, z: 2']);
   });
 
-  // Saying where a place is is the other answer to the question `up of hall` answers, so it takes that
+  // Saying where a place is is the other answer to the question `above hall` answers, so it takes that
   // answer away: the drag that used to refuse now unpins.
   it('unpins a place written off another rather than refusing to move it', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.loft', { x: 1, y: 1 }))).toEqual(['# location keep.loft\nx: 1, y: 1, z: 1']);
   });
 
   it('writes a place off another, and leaves the one it hangs off alone', () => {
-    expect(patched(pinning(registryOf(), NOTHING, 'keep.lane', 'down', 'keep.hall'))).toEqual(['# location keep.lane\ndown of hall']);
+    expect(patched(pinning(registryOf(), NOTHING, 'keep.lane', 'down', 'keep.hall'))).toEqual(['# location keep.lane\nbelow hall']);
   });
 
   it('refuses a pin that would leave neither place anywhere', () => {
@@ -135,7 +135,7 @@ describe('everything one move carries', () => {
   });
 
   it('follows the chain of places written off one another, however long', () => {
-    const tower: ModuleSource = { name: 'tower', text: '# info tower\nversion: 1.0.0\ndependencies:\n  keep\n\n# location spire\nup of keep.loft' };
+    const tower: ModuleSource = { name: 'tower', text: '# info tower\nversion: 1.0.0\ndependencies:\n  keep\n\n# location spire\nabove keep.loft' };
 
     expect(carriedWith([...loadUniverse([KEEP, tower]).locations.values()], ['keep.hall']).sort()).toEqual(['keep.hall', 'keep.loft', 'tower.spire']);
   });
@@ -225,7 +225,7 @@ describe('the map edited from the command line', () => {
     const game = opened();
 
     expect(errors(runLine(game.ctx(), '/place nowhere-at-all 1 1'))[0]).toContain('nowhere-at-all');
-    expect(errors(runLine(game.ctx(), '/place castle-solar down of nowhere-at-all'))[0]).toContain('nowhere-at-all');
+    expect(errors(runLine(game.ctx(), '/place castle-solar below nowhere-at-all'))[0]).toContain('nowhere-at-all');
     expect(game.local()).not.toContain('# location');
   });
 
@@ -236,8 +236,8 @@ describe('the map edited from the command line', () => {
 
     expect(errors(runLine(game.ctx(), '/place castle-solar 1 1'))).toEqual([]);
     expect(game.local()).toContain('# location tulsa.castle-solar\nx: 1, y: 1, z: 2');
-    expect(errors(runLine(game.ctx(), '/place castle-solar up of castle-quarters'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.castle-solar\nup of castle-quarters');
+    expect(errors(runLine(game.ctx(), '/place castle-solar above castle-quarters'))).toEqual([]);
+    expect(game.local()).toContain('# location tulsa.castle-solar\nabove castle-quarters');
     expect(game.local()).not.toContain('x: 1, y: 1');
   });
 

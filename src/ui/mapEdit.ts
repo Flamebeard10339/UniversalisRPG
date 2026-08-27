@@ -1,6 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
-import { stepToward, type Direction } from '../content/sections/location';
+import { relativeValue, stepToward, type Direction } from '../content/sections/location';
 import { stage, type Staged } from './authoringSurface';
 import { placedAt, spotOf, type Node, type Place, type Sheet } from './discovery';
 import { lookingAt, type Point } from './viewport';
@@ -48,7 +48,7 @@ export const shiftedBy = (carried: Point, grid: number): Point => settledOn({ x:
 
 export const gatherLine = (region: string, place: string, holding: boolean): string => `/region ${region} ${holding ? '+' : '-'}${place}`;
 
-export const pinLine = (id: string, direction: Direction, of: string): string => `/place ${id} ${direction} of ${of}`;
+export const pinLine = (id: string, direction: Direction, of: string): string => `/place ${id} ${relativeValue.print({ direction, of })}`;
 
 // Writing one place off another from the map. Which direction it is written in is not asked of the
 // author: a place hangs off another as one step in one direction, and which step that is is already

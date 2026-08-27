@@ -78,8 +78,8 @@ describe('what a gesture on the map says', () => {
   it('works out which step the pin is from where the two places stand', () => {
     const places = [at('street', 4, 4, 0), at('sewer', 4, 4, -1), at('gate', 5, 4, 0), at('far', 9, 5, 0)];
 
-    expect(pinnedInto(places, 'sewer', 'street')).toEqual({ line: '/place sewer down of street' });
-    expect(pinnedInto(places, 'street', 'sewer')).toEqual({ line: '/place street up of sewer' });
+    expect(pinnedInto(places, 'sewer', 'street')).toEqual({ line: '/place sewer below street' });
+    expect(pinnedInto(places, 'street', 'sewer')).toEqual({ line: '/place street above sewer' });
     expect(pinnedInto(places, 'gate', 'street')).toEqual({ line: '/place gate east of street' });
     expect(pinnedInto(places, 'far', 'street')).toEqual({ line: '/place far east of street' });
   });
