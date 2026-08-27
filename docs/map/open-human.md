@@ -11,15 +11,14 @@ the blob.
 *Closes when:* you say whether `entrances:` earns its place, or that a region names
 only what it holds.
 
-## What does the 3×3 grid put in the middle square?
+## Up and down have no square, and the middle holds the room you are in
 
-Eight compass cells have obvious occupants. The middle has the place you are already
-standing in — but up and down have no cell of their own either, and a guildhouse
-with a cellar and an upstairs is the common case, not the odd one. Options: leave the
-middle empty and list up/down beneath with the teleports; stack up and down in the
-middle; or draw them as a separate pair beside the grid.
-*Closes when:* you pick one, or say the middle stays empty and up/down go in the
-overflow list with everything else that has no bearing.
+Shipped that way: the middle square names where you are standing, and a floor up or
+down falls back to an ordinary cell above the grid with everything else that no
+heading points at. A guildhouse with a cellar and an upstairs is the common case
+rather than the odd one, so this may be the wrong half of the trade.
+*Closes when:* you have used it and said whether up and down want the middle square,
+a pair of their own beside the grid, or to stay where they are.
 
 ## How wide should the map be, now that it can be tuned?
 
