@@ -2,10 +2,10 @@
 // locked.
 //
 // Every theft is one roll weighed between two things: the player's `thieving` on one side and how
-// hard the mark is on the other, written as a plain number on the mark's own line. A pickpocket that
-// wins pays coin and experience; one that loses costs health and leaves the player dazed for three
-// seconds, which is long enough that a failed lift is felt rather than merely reported. A lock that
-// loses puts the player outside, which is the same idea with a longer walk.
+// hard the mark is on the other, written as a plain number on the mark's own line. That roll is the
+// same roll every time it is taken: a caught hand costs health and stops the hand for three seconds,
+// and it does not leave the next attempt harder than the first one was. A lock that loses puts the
+// player outside, which is the same idea with a longer walk.
 //
 // What is here is the skill itself: what it is measured in, what a caught hand costs, and what
 // comes out of a box. Who is worth stealing from is the town's, because a townsman is somebody two
@@ -17,8 +17,10 @@ dependencies:
   core
   combat
 
-// The one side of every theft the player brings. Sixty is about seven lifts in ten off a townsman
-// with nothing on and no levels; a knight at fifty-five is not worth attempting until it is.
+// The one side of every theft the player brings, and the mark's number is the other side of the same
+// total, so the two are in the same units and a point here is worth a point there. Sixty is about
+// seven lifts in ten off a townsman with nothing on and no levels, and a mark worth more is a bigger
+// number rather than a different rule.
 # stat thieving
 title: Thieving
 base: 60
@@ -41,11 +43,12 @@ stat: thieving
 // Three seconds of being no use to anybody, which is what a hand caught in somebody's pocket costs.
 // A buff is an item the world inflicts rather than one anybody carries, so it is not for sale and
 // has no value. The hundred off `thieving-rate` is what stops the hand rather than slowing it: a
-// pace of zero is a stalled run, so the three seconds are three seconds of standing there.
+// pace of zero is a stalled run, so the three seconds are three seconds of standing there, and the
+// whole of what being caught costs is time the player can watch going.
 # item dazed
 title: Dazed
 examine: You are standing very still and hoping the moment passes.
-3s, -90% core.attack-rate, -90% thieving, -100% thieving-rate
+3s, -90% core.attack-rate, -100% thieving-rate
 
 // --- what is worth taking ---
 
