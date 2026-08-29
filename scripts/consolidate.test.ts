@@ -304,9 +304,9 @@ describe('the command surface', () => {
   it('exits non-zero and writes nothing when nothing staged could be placed', () => {
     const tree = copiedTree();
     try {
-      stage(tree, '/dsl item gem title: Gem');
+      stage(tree, '/dsl item local-changes.gem title: Gem');
       const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
-      expect(result.err.join(' ')).toContain('Left staged: # item gem');
+      expect(result.err.join(' ')).toContain('Left staged: # item local-changes.gem');
       expect(result.code).toBe(1);
       expect(now(tree)).toEqual(tree.before);
     } finally {

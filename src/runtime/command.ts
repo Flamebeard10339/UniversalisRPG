@@ -13,6 +13,7 @@ import {
   upsertLocalSection,
   type LocalSection,
 } from '../content/localChanges';
+import { isOwnedKind } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import type { Resumption } from './openUniverse';
@@ -1043,12 +1044,14 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/dsl',
     arg: 'section',
-    argHint: '<kind> <id> [body]',
-    summary: 'stage or replace one local DSL section; use | for new lines',
+    argHint: '<kind> <module>.<id> [body]',
+    summary: 'stage or replace one local DSL section, under the module it belongs to; use | for new lines',
     audience: 'author',
     parse: (rest) => {
       const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
-      if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <id> [body]' };
+      if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <module>.<id> [body]' };
+      // An id a module owns says which module, whether the section is one already there or one being written for the first time: that is the whole of how a section authored in a run has somewhere to go home to.
+      if (isOwnedKind(match.kind) && !match.id.includes('.')) return { problem: `/dsl ${match.kind} ${match.id} names no module: write it as <module>.${match.id}, which is where the section belongs` };
       return { kind: match.kind, id: match.id, body: match.body ?? '' };
     },
     run: runSectionEdit,

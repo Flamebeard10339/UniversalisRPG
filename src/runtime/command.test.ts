@@ -1224,25 +1224,25 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
   it('/dsl stages a section, hands it to the writer it was given, reloads it, and /local can show/delete it', () => {
     const { ctx, session, authoring, writes } = authoringFixture();
 
-    const created = runLine(ctx, '/dsl item gem title: Gem | examine: Cut bright.');
-    expect(messages(created)[0].text).toBe('Staged # item gem in local-changes.');
+    const created = runLine(ctx, '/dsl item local-changes.gem title: Gem | examine: Cut bright.');
+    expect(messages(created)[0].text).toBe('Staged # item local-changes.gem in local-changes.');
     expect(writes).toHaveLength(1);
-    expect(authoring.localSource.text).toContain('# item gem');
+    expect(authoring.localSource.text).toContain('# item local-changes.gem');
     expect(authoring.localSource.text).toContain('dependencies:');
     expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
 
     const listed = runLine(ctx, '/local').output[0];
-    expect(listed.kind === 'source' && listed.lines).toEqual(['# item gem']);
+    expect(listed.kind === 'source' && listed.lines).toEqual(['# item local-changes.gem']);
 
     const shown = runLine(ctx, '/local show').output[0];
     expect(shown.kind).toBe('source');
     if (shown.kind === 'source') {
       expect(shown.lines).toContain('# info local-changes');
-      expect(shown.lines).toContain('# item gem');
+      expect(shown.lines).toContain('# item local-changes.gem');
     }
 
-    const removed = runLine(ctx, '/local delete item gem');
-    expect(messages(removed)[0].text).toBe('Deleted local # item gem.');
+    const removed = runLine(ctx, '/local delete item local-changes.gem');
+    expect(messages(removed)[0].text).toBe('Deleted local # item local-changes.gem.');
     expect(session.registry.items.has('local-changes.gem')).toBe(false);
     expect(messages(runLine(ctx, '/local'))[0].text).toBe('No local changes staged.');
   });
@@ -1250,7 +1250,7 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
   it('writes nothing anywhere when the authoring context supplies no writer', () => {
     const { ctx, session, authoring } = authoringFixture();
     delete authoring.writeLocalChanges;
-    const created = runLine(ctx, '/dsl item gem title: Gem');
+    const created = runLine(ctx, '/dsl item local-changes.gem title: Gem');
     expect(errors(created)).toEqual([]);
     expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
   });
@@ -1282,8 +1282,8 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
   it('/local clear reloads and prunes stale state from removed local content', () => {
     const { ctx } = authoringFixture();
 
-    runLine(ctx, '/dsl item gem title: Gem');
-    runLine(ctx, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
+    runLine(ctx, '/dsl item local-changes.gem title: Gem');
+    runLine(ctx, `/dsl save local-changes.carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
     runLine(ctx, '/load local-changes.carried');
     expect(ctx.view.inventory['local-changes.gem']).toBe(1);
 
@@ -1297,21 +1297,21 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
   it('/dsl can author every DSL section kind that local-changes is allowed to own', () => {
     const { ctx, session } = authoringFixture();
     const commands = [
-      '/dsl stat vigor base: 10',
-      '/dsl skill focus tags: +1 local-changes.vigor per level of local-changes.focus',
-      '/dsl item token title: Token',
-      '/dsl item ore title: Ore',
-      '/dsl item ingot title: Ingot',
-      '/dsl item temporary title: Temporary',
-      '/dsl entity npc title: NPC | cheer: say: Hello.',
-      '/dsl location grove x: 1, y: 0 | entities: local-changes.npc',
-      '/dsl flag levered',
+      '/dsl stat local-changes.vigor base: 10',
+      '/dsl skill local-changes.focus tags: +1 local-changes.vigor per level of local-changes.focus',
+      '/dsl item local-changes.token title: Token',
+      '/dsl item local-changes.ore title: Ore',
+      '/dsl item local-changes.ingot title: Ingot',
+      '/dsl item local-changes.temporary title: Temporary',
+      '/dsl entity local-changes.npc title: NPC | cheer: say: Hello.',
+      '/dsl location local-changes.grove x: 1, y: 0 | entities: local-changes.npc',
+      '/dsl flag local-changes.levered',
       '/dsl variable local-knob value: 2',
-      '/dsl resource stamina max: local-changes.vigor',
-      '/dsl recipe smelt in: local-changes.ore | out: local-changes.ingot',
-      '/dsl dialogue npc-chat owner = local-changes.npc | node greet: |   Hello there.',
-      `/dsl save blank {"version":${SAVE_VERSION}}`,
-      '/dsl test smoke assert: time >= 0',
+      '/dsl resource local-changes.stamina max: local-changes.vigor',
+      '/dsl recipe local-changes.smelt in: local-changes.ore | out: local-changes.ingot',
+      '/dsl dialogue local-changes.npc-chat owner = local-changes.npc | node greet: |   Hello there.',
+      `/dsl save local-changes.blank {"version":${SAVE_VERSION}}`,
+      '/dsl test local-changes.smoke assert: time >= 0',
       '/dsl remove item.local-changes.temporary',
     ];
 
@@ -1337,15 +1337,24 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
 
   it('reports the malformed and the unknown by name', () => {
     const { ctx } = authoringFixture();
-    expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <id> [body]']);
-    expect(errors(runLine(ctx, '/dsl item'))).toEqual(['/dsl requires <kind> <id> [body]']);
+    expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <module>.<id> [body]']);
+    expect(errors(runLine(ctx, '/dsl item'))).toEqual(['/dsl requires <kind> <module>.<id> [body]']);
     expect(errors(runLine(ctx, '/local bogus'))).toEqual(['unknown /local command: bogus']);
     expect(errors(runLine(ctx, '/local delete item nosuch'))).toEqual(['no local # item nosuch is staged.']);
   });
 
+  // Where a section goes home is written in its id and nowhere else, so an id that names no module
+  // is refused at the point of writing rather than landing in the local changes with no way back.
+  it('refuses an id of a kind a module owns that names no module', () => {
+    const { ctx } = authoringFixture();
+    expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual(['/dsl item gem names no module: write it as <module>.gem, which is where the section belongs']);
+    expect(errors(runLine(ctx, '/dsl item base.gem title: Gem'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl variable knob value: 2'))).toEqual([]);
+  });
+
   it('reports local authoring commands as unavailable when no authoring context is provided', () => {
     const { ctx } = fixture(AUTHORING_MODULE);
-    expect(errors(runLine(ctx, '/dsl item gem'))).toEqual(['local authoring is unavailable.']);
+    expect(errors(runLine(ctx, '/dsl item local-changes.gem'))).toEqual(['local authoring is unavailable.']);
     expect(errors(runLine(ctx, '/local'))).toEqual(['local authoring is unavailable.']);
     expect(errors(runLine(ctx, '/reload'))).toEqual(['local authoring is unavailable.']);
   });
@@ -1399,9 +1408,9 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
   it('prunes state the edit invalidated, reporting each prune, and leaves a state the registry resolves', () => {
     const { ctx, session, elsewhere } = authoringFixture();
-    runLine(ctx, '/dsl item gem title: Gem');
-    runLine(ctx, `/dsl save carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
-    runLine(ctx, '/dsl location outpost x: 2, y: 0');
+    runLine(ctx, '/dsl item local-changes.gem title: Gem');
+    runLine(ctx, `/dsl save local-changes.carried {"version":${SAVE_VERSION},"inventory":{"local-changes.gem":1}}`);
+    runLine(ctx, '/dsl location local-changes.outpost x: 2, y: 0');
     runLine(ctx, '/dsl location base.camp adjacent: |   outpost');
     runLine(ctx, '/load local-changes.carried');
     runLine(ctx, 'travel: local-changes.outpost');
@@ -1422,7 +1431,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
 
   it('says the same thing and leaves the same session however many times it is called', () => {
     const { ctx, session } = authoringFixture();
-    runLine(ctx, '/dsl item gem title: Gem');
+    runLine(ctx, '/dsl item local-changes.gem title: Gem');
     runLine(ctx, '/wait 4');
     const before = snapshotOf(session);
     const first = runLine(ctx, '/reload');
@@ -1472,11 +1481,11 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     elsewhere(TOWER);
     expect(authoring.localSource.text).not.toContain('# location tower');
 
-    expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl item local-changes.gem title: Gem'))).toEqual([]);
 
     expect(writes).toHaveLength(1);
     expect(writes[0]).toContain('# location tower');
-    expect(writes[0]).toContain('# item gem');
+    expect(writes[0]).toContain('# item local-changes.gem');
     expect(session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
     expect(session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
   });
@@ -1485,7 +1494,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const { ctx, writes, elsewhere } = authoringFixture();
     elsewhere(BROKEN_CHEST);
 
-    expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual(['local changes did not load.']);
+    expect(errors(runLine(ctx, '/dsl item local-changes.gem title: Gem'))).toEqual(['local changes did not load.']);
     expect(writes).toEqual([]);
   });
 
@@ -1509,7 +1518,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
       throw new Error('EACCES');
     };
 
-    for (const line of ['/dsl item gem title: Gem', '/local', '/local show', '/local delete item gem']) {
+    for (const line of ['/dsl item local-changes.gem title: Gem', '/local', '/local show', '/local delete item gem']) {
       expect(errors(runLine(ctx, line)), line).toEqual(['could not read local changes: EACCES']);
     }
     expect(writes).toEqual([]);
@@ -1519,20 +1528,20 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const { ctx, writes, elsewhereWholeFile } = authoringFixture();
     elsewhereWholeFile(['# info local-changes', 'version: 3.2.1', 'pack: shared', 'dependencies:', '  base', '', '# item gem', 'title: Gem', ''].join('\n'));
 
-    expect(errors(runLine(ctx, '/dsl item ruby title: Ruby'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl item local-changes.ruby title: Ruby'))).toEqual([]);
 
     expect(writes).toHaveLength(1);
     expect(writes[0]).toContain('version: 3.2.1');
     expect(writes[0]).toContain('pack: shared');
     expect(writes[0]).toContain('# item gem');
-    expect(writes[0]).toContain('# item ruby');
+    expect(writes[0]).toContain('# item local-changes.ruby');
   });
 
   it('refuses in the local file’s own name when the local file is what will not parse', () => {
     const { ctx, writes, elsewhereWholeFile } = authoringFixture();
     elsewhereWholeFile(['# info local-changes', 'version: 0.0.0', 'pack: local', 'dependencies:', '  base', '', '# item', 'title: Nameless', ''].join('\n'));
 
-    for (const line of ['/dsl item gem title: Gem', '/local', '/local delete item gem']) {
+    for (const line of ['/dsl item local-changes.gem title: Gem', '/local', '/local delete item gem']) {
       const refusal = messages(runLine(ctx, line))[0];
       expect(refusal.text, line).toBe('local-changes does not parse: # item requires an id');
       expect(refusal.detail, line).toEqual(['/local clear replaces it.']);
@@ -1553,8 +1562,8 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const { ctx, session, writes, elsewhereWholeFile } = authoringFixture();
     elsewhereWholeFile(['# info local-changes', 'version: 1.0.0', ''].join('\n'));
 
-    expect(errors(runLine(ctx, '/dsl entity watcher title: Watcher | poke: |   say: Hello.'))).toEqual([]);
-    expect(errors(runLine(ctx, '/dsl location depot x: 3, y: 0 | entities: |   base.chest'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl entity local-changes.watcher title: Watcher | poke: |   say: Hello.'))).toEqual([]);
+    expect(errors(runLine(ctx, '/dsl location local-changes.depot x: 3, y: 0 | entities: |   base.chest'))).toEqual([]);
 
     expect(writes[1]).toContain('version: 1.0.0');
     expect(writes[1]).toContain('  base');
@@ -1565,7 +1574,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const { ctx, session, elsewhereWholeFile } = authoringFixture();
     elsewhereWholeFile(['# info some-other-module', 'version: 1.0.0', 'dependencies:', '  base', ''].join('\n'));
 
-    expect(messages(runLine(ctx, '/dsl item ruby title: Ruby'))[0].text).toBe('Staged # item ruby in local-changes.');
+    expect(messages(runLine(ctx, '/dsl item local-changes.ruby title: Ruby'))[0].text).toBe('Staged # item local-changes.ruby in local-changes.');
     expect(session.registry.items.get('local-changes.ruby')?.title).toBe('Ruby');
     expect(session.registry.items.has('some-other-module.ruby')).toBe(false);
   });

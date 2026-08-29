@@ -123,8 +123,8 @@ describe('a new place is written where the map is looking', () => {
   });
 
   it('writes the plane it was drawn on and leaves the ground plane unsaid', () => {
-    expect(lineOf(created('north-shore', { x: 3.4, y: -2.6 }, 0), 'north-shore')).toBe('/dsl location north-shore x: 3, y: -3');
-    expect(lineOf(created('north-shore', { x: 0, y: 0 }, 2), 'north-shore')).toBe('/dsl location north-shore x: 0, y: 0, z: 2');
+    expect(lineOf(created('north-shore', { x: 3.4, y: -2.6 }, 0), 'north-shore')).toBe('/dsl location local-changes.north-shore x: 3, y: -3');
+    expect(lineOf(created('north-shore', { x: 0, y: 0 }, 2), 'north-shore')).toBe('/dsl location local-changes.north-shore x: 0, y: 0, z: 2');
   });
 
   it('refuses a name the DSL would not take rather than staging a section that will not load', () => {
@@ -150,7 +150,7 @@ describe('a new place is written where the map is looking', () => {
     driver.send('/dev on');
     driver.send(lineOf(created('north-shore', { x: 3, y: -3 }, 0), 'north-shore'));
     driver.send(gotoLine(stagedKey('north-shore')));
-    const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === 'north-shore')!;
+    const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === stagedKey('north-shore'))!;
 
     expect(names(made.address, stagedKey('north-shore'))).toBe(true);
     driver.send(placeLine(stagedKey('north-shore'), { x: 9, y: 9 }));
