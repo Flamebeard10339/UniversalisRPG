@@ -1,5 +1,5 @@
 import { fillingWords, type Offering } from '../content/completion';
-import { gathered } from './offerGroups';
+import { gathered } from '../content/offerGroups';
 
 const lineTo = (text: string, cursor: number): string => text.slice(text.lastIndexOf('\n', cursor - 1) + 1, cursor).trim();
 

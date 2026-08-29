@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Offer } from '../content/completion';
+import type { Offer } from './completion';
 import { gathered, shownIn } from './offerGroups';
 
 const offer = (form: string, family?: string, kind?: string): Offer => ({ form, insert: form, ...(family === undefined ? {} : { family }), ...(kind === undefined ? {} : { kind }) });

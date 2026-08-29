@@ -8,6 +8,7 @@ import { loadUniverse } from '../content/load';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule, renderLocalChangesModule } from '../content/localChanges';
+import { sectionKinds } from '../content/sections';
 import type { ModuleSource } from '../content/universe';
 import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
@@ -26,6 +27,7 @@ import {
   parseLine,
   runCommand,
   runLine,
+  UNAVAILABLE,
   type AuthoringContext,
   type Clock,
   type CommandContext,
@@ -1218,6 +1220,61 @@ function authoringFixture() {
   const elsewhereWholeFile = (text: string): void => void (onDisk = text);
   return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
 }
+
+// An author writing a section has two questions, and neither of them is answerable from the view:
+// what may be written under this kind, and what one already written looks like. Both are asked of
+// the same command line the writing itself goes through, so a driver with no filesystem — the
+// playbot — can ask them mid-run.
+describe('what an author may write, and what is already written', () => {
+  it('/grammar names the kinds there are, and writes out only the ones it was asked for', () => {
+    const { ctx } = authoringFixture();
+
+    const listed = runLine(ctx, '/grammar').output[0];
+    expect(listed.kind === 'source' && listed.lines).toEqual(['the kinds a section may be; /grammar <kind>... writes out what any of them holds:', ...sectionKinds().map((kind) => `  # ${kind}`)]);
+
+    const written = runLine(ctx, '/grammar item').output[0];
+    if (written.kind !== 'source') throw new Error('/grammar item said nothing');
+    expect(written.lines).toContain('# item <id>');
+    for (const kind of sectionKinds()) if (kind !== 'item') expect(written.lines, kind).not.toContain(`# ${kind} <id>`);
+  });
+
+  it('/grammar refuses a kind nothing declares, and says which there are', () => {
+    const { ctx } = authoringFixture();
+    const refused = errors(runLine(ctx, '/grammar nonsense'))[0];
+    expect(refused).toContain('/grammar: no such kind: nonsense');
+    for (const kind of sectionKinds()) expect(refused, kind).toContain(kind);
+  });
+
+  it('/source hands back a loaded section as its author wrote it, by id alone or under one kind', () => {
+    const { ctx } = authoringFixture();
+
+    const chest = runLine(ctx, '/source chest').output[0];
+    expect(chest.kind === 'source' && chest.lines).toEqual(['# entity chest', 'title: Chest', 'open:', '  say: Empty.']);
+    expect(runLine(ctx, '/source entity chest').output[0]).toEqual(chest);
+    // A section is written under its module-local id and addressed by the whole of it, and the
+    // view a player reads prints the whole of it — so that is the id /source has to answer to.
+    expect(runLine(ctx, '/source base.chest').output[0]).toEqual(chest);
+    expect(runLine(ctx, '/source entity base.chest').output[0]).toEqual(chest);
+
+    expect(errors(runLine(ctx, '/source item chest'))).toEqual(['nothing loaded is written as # item chest']);
+    expect(errors(runLine(ctx, '/source nobody-at-all'))).toEqual(['nothing loaded is written as nobody-at-all']);
+  });
+
+  it('/source reads a section staged this session as readily as one that shipped', () => {
+    const { ctx } = authoringFixture();
+    runLine(ctx, '/dsl item gem title: Gem | examine: Cut bright.');
+
+    const staged = runLine(ctx, '/source gem').output[0];
+    expect(staged.kind === 'source' && staged.lines).toEqual(['# item gem', 'title: Gem', 'examine: Cut bright.']);
+  });
+
+  it('/grammar and /source are refused outright where there is no authoring context', () => {
+    const { ctx } = fixture(AUTHORING_MODULE);
+    expect(errors(runLine(ctx, '/source chest'))).toEqual([UNAVAILABLE]);
+    // Grammar is the language itself and not this session's content, so it answers with or without one.
+    expect(errors(runLine(ctx, '/grammar item'))).toEqual([]);
+  });
+});
 
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
 

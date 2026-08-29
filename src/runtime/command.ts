@@ -10,11 +10,15 @@ import {
   listLocalSections,
   localSectionHeadings,
   renderLocalChangesModule,
+  sourceSections,
   upsertLocalSection,
   type LocalSection,
 } from '../content/localChanges';
+import { grammarLines } from '../content/grammarTree';
+import { isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
+import { declaredKey } from '../content/resolve';
 import type { Resumption } from './openUniverse';
 import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
@@ -163,6 +167,14 @@ export interface SectionArg {
   body: string;
 }
 
+// A section somebody is asking to read rather than to write. The kind is optional because an id is
+// what a view prints: an author who has just met `first-steps.guide-house` is asking about that,
+// and knowing it is a `# location` is half of what they were going to read the section to find out.
+export interface NamedSection {
+  kind: string | null;
+  id: string;
+}
+
 // Where a place is, said either way the language says it: outright, or as one step off another place.
 // One command because it is one question — and because answering it one way is what takes the other
 // answer away, which a second command would have had to know about this one.
@@ -183,6 +195,8 @@ interface ArgTypes {
   id: string;
   directive: Directive;
   section: SectionArg;
+  named: NamedSection;
+  kinds: readonly string[];
   placing: PlacingArg;
   joining: JoiningArg;
   gathering: GatheringArg;
@@ -220,6 +234,10 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly argHint: string;
   readonly summary: string;
   readonly audience: CommandAudience;
+  // Whether running this stages a change to the world's content. Declared here rather than counted
+  // anywhere else, so a driver that has something to say about editing — the playbot, which will
+  // not let a bot fix what it has not first reported — asks the command and not a list of names.
+  readonly edits: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }
@@ -232,10 +250,11 @@ function define<K extends ArgKind>(spec: {
   argHint?: string;
   summary: string;
   audience?: CommandAudience;
+  edits?: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }): CommandSpec {
-  return { aliases: [], match: 'name', argHint: '', audience: 'player', ...spec };
+  return { aliases: [], match: 'name', argHint: '', audience: 'player', edits: false, ...spec };
 }
 
 function isProblem(value: unknown): value is CommandProblem {
@@ -602,6 +621,49 @@ export function stagedSections(ctx: CommandContext): readonly LocalSection[] {
 }
 
 const runSectionEdit = (ctx: CommandContext, section: SectionArg): CommandResult => stageLocalSections(ctx, [localSectionSource(section)]);
+
+const asSource = (lines: readonly string[]): CommandResult => ({ output: [{ kind: 'source', words: 'tool', lines: [...lines] }], quit: false, recorded: [] });
+
+// What may be written, at the indentation it is written at. Asked with no kind it says which kinds
+// there are, because the whole grammar is tens of thousands of characters and nobody asked for all
+// of it at once — the kinds are the question a first ask is really putting.
+function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResult {
+  if (kinds.length === 0) return asSource(['the kinds a section may be; /grammar <kind>... writes out what any of them holds:', ...sectionKinds().map((kind) => `  # ${kind}`)]);
+  return asSource(grammarLines(kinds));
+}
+
+// A section as its author wrote it, out of the file it was written in. The world is read for
+// examples far oftener than it is written to, and a printed section is not an example of anything:
+// it has already lost the comments and the `@@@` notes that say what the author was reaching for.
+function sourceMatches(text: string, at: NamedSection): string[] {
+  const sections = sourceSections(text);
+  // A module is which module its own `# info` names, and a section's id inside it is written
+  // module-local. The loader's own answer for what that id is addressed as is asked for rather
+  // than spelled out again, so /source and the view agree about what a thing is called.
+  const namespace = sections.find((section) => section.kind === 'info')?.id ?? null;
+  return sections
+    .filter(
+      (section) =>
+        section.id !== undefined &&
+        (at.kind === null || section.kind === at.kind) &&
+        (section.id === at.id || declaredKey(namespace, section.kind, section.id) === at.id),
+    )
+    .map((section) => section.text);
+}
+
+function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  let found: string[];
+  try {
+    found = [...authoring.baseSources, authoring.localSource].flatMap((module) => sourceMatches(module.text, at));
+  } catch (error) {
+    if (error instanceof DslError) return noted('error', error.message);
+    throw error;
+  }
+  if (found.length === 0) return noted('error', `nothing loaded is written as ${at.kind === null ? at.id : `# ${at.kind} ${at.id}`}`);
+  return asSource(found.flatMap((text, index) => (index === 0 ? [] : ['']).concat(text.split('\n'))));
+}
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
@@ -1041,7 +1103,35 @@ export const COMMANDS: readonly CommandSpec[] = [
     run: (ctx) => runDirective(ctx, { kind: 'cancel' }),
   }),
   define({
+    name: '/grammar',
+    arg: 'kinds',
+    argHint: '[<kind>...]',
+    summary: 'print what may be written under a kind, at the indentation it is written at; with no kind, list the kinds',
+    audience: 'author',
+    parse: (rest) => {
+      const asked = rest.split(/[ \t]+/).filter((each) => each !== '');
+      const unknown = asked.filter((kind) => !isSectionKind(kind));
+      if (unknown.length > 0) return { problem: `/grammar: no such kind: ${unknown.join(', ')}. There is ${sectionKinds().join(', ')}` };
+      return asked;
+    },
+    run: runGrammar,
+  }),
+  define({
+    name: '/source',
+    arg: 'named',
+    argHint: '<id> | <kind> <id>',
+    summary: 'print a loaded section as its author wrote it, comments and all; with no kind, every section written under that id',
+    audience: 'author',
+    parse: (rest) => {
+      const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
+      if (!match) return { problem: '/source requires <id> or <kind> <id>' };
+      return { kind: match.kind ?? null, id: match.id! };
+    },
+    run: runSource,
+  }),
+  define({
     name: '/dsl',
+    edits: true,
     arg: 'section',
     argHint: '<kind> <id> [body]',
     summary: 'stage or replace one local DSL section; use | for new lines',
@@ -1055,6 +1145,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/place',
+    edits: true,
     arg: 'placing',
     argHint: `<location> <x> <y> [<z>] | <location> ${relativeValue.forms[0]}`,
     audience: 'author',
@@ -1075,6 +1166,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/region',
+    edits: true,
     arg: 'gathering',
     argHint: '<region> +<location>... | -<location>... | by <x> <y>',
     audience: 'author',
@@ -1094,6 +1186,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/link',
+    edits: true,
     arg: 'joining',
     argHint: '<location> <location>',
     audience: 'author',
@@ -1103,6 +1196,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/unlink',
+    edits: true,
     arg: 'joining',
     argHint: '<location> <location>',
     audience: 'author',

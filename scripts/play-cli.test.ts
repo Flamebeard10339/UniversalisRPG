@@ -7,7 +7,7 @@ import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { ENGINE_KEYS } from '../src/content/locale';
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
-import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
+import { loadUniverse } from '../src/content/load';
 import { standingSources } from '../src/content/shipped';
 import { FIXTURE_WORLD } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
@@ -575,7 +575,7 @@ describe('play-cli reaches its local module through the file rather than a remem
 
   function opened(localFile: string) {
     const baseSources = withEngineLocale([{ name: 'base', text: RELOAD_BASE } as ModuleSource]);
-    const authoring = fileAuthoring(baseSources, ['base'], localFile);
+    const authoring = fileAuthoring(() => baseSources, localFile);
     const repl = openRepl(baseSources, { authoring });
     return { ctx: repl.context, authoring };
   }
@@ -790,7 +790,7 @@ describe('export and import use the spelling the DSL already has (c6)', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-export-'));
     try {
       const sources: ModuleSource[] = withEngineLocale([{ name: 'exported', text: EXPORT_SOURCE }]);
-      const authoring = fileAuthoring(sources, loadUniverseWithDiagnostics(sources).loadedModules, path.join(dir, 'local-changes.dsl'));
+      const authoring = fileAuthoring(() => sources, path.join(dir, 'local-changes.dsl'));
       const repl = openRepl(sources, { authoring });
       runLine(repl.context, '/wait 5');
       const exported = linesOf(runLine(repl.context, '/export'))[0];
@@ -1425,6 +1425,8 @@ const ACTS_ON: Record<string, string> = {
   '/expect': 'stranger',
   '/assert': 'time >= 0',
   '/dsl': `save staged {"version":${SAVE_VERSION}}`,
+  '/grammar': 'item',
+  '/source': 'camp',
   '/local': 'list',
   '/create-test': 'made',
   '/create-valid-test': 'made-valid',
