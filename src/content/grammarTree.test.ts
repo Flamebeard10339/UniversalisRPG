@@ -131,6 +131,17 @@ describe('the grammar tree', () => {
       }
     });
 
+    // The page an agent reads start to end. A line that writes a shape out is grammar and has one home;
+    // a part heading labels the group under it and says where a grammar written elsewhere stands, and
+    // carries none. So the claim is about the first sort, and it is the whole of what one home means here.
+    it('writes every shape out once, over every kind there is', () => {
+      const shapes = grammarLines()
+        .map((line) => line.trim())
+        .filter((line) => line !== '' && !line.startsWith(PART) && !line.startsWith('# '));
+      const twice = shapes.filter((line, at) => shapes.indexOf(line) !== at);
+      expect([...new Set(twice)]).toEqual([]);
+    });
+
     it.each([1, sectionKinds().length])('says each rule once over %i kind(s)', (count) => {
       const answer = grammarLines(sectionKinds().slice(0, count));
       for (const rule of RULES) expect(answer.filter((line) => line === rule), rule).toHaveLength(1);

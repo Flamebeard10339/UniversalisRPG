@@ -34,6 +34,8 @@ export const blockCalled = (lines: readonly Written[]): string | undefined => (l
 export interface Written extends Filled {
   form: string;
   example: string;
+  // The named grammar this shape is one of, where a site writes the shapes out because the engine needs them to tell this line from another. The page says the name instead, once, rather than spelling that grammar a second time.
+  of?: string;
   family?: string;
   note?: string;
   needs?: string;

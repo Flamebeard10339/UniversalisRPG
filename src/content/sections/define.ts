@@ -23,12 +23,33 @@ export type Maps = Record<string, Map<string, never>>;
 // A section written to prove something about the engine, which ships to nobody. Upper case because nothing else in the language is, so it can never be read as an id, a keyword or a value of some kind's own; and written under the heading rather than in it, because a heading is rebuilt from its parts wherever a section is moved or renamed and a body line is carried along whole.
 export const DEBUG_MARK = 'DEBUG';
 
+// A second body at an id already written is laid over the one there rather than replacing it, and these are how it takes back what the first one wrote. The engine reads them for every kind, so they belong to none.
+const WRITTEN_AGAIN = 'writing over a body already there';
+
 // The line every kind takes and no kind declares. It is not in any kind's grammar because it belongs to none of them — what holds of every section is written here once, and the page an author reads says so in the same words.
 export const EVERY_SECTION: readonly Written[] = [
   {
     form: DEBUG_MARK,
     example: DEBUG_MARK,
-    note: 'the section is written to prove something about the engine, and ships to nobody: it says nothing in any language, it never reaches `npm run review`, and anything a player can reach is refused for naming it',
+    note: 'the section proves something about the engine and ships to nobody: it says nothing in any language, and anything a player can reach is refused for naming it',
+  },
+  {
+    form: '+<keyword>: <value>, …',
+    example: '+flags: watching',
+    family: WRITTEN_AGAIN,
+    note: 'adds to a list an earlier body already wrote there, instead of replacing what it wrote',
+  },
+  {
+    form: '-<keyword>: <value>, …',
+    example: '-flags: alert',
+    family: WRITTEN_AGAIN,
+    note: 'takes values back out of that list, and takes nothing out for a value the list has not got',
+  },
+  {
+    form: '-<keyword> <name>',
+    example: '-stage snubbed',
+    family: WRITTEN_AGAIN,
+    note: 'takes back out the one thing an earlier body named there, wherever a keyword names one thing and opens a block under it',
   },
 ];
 

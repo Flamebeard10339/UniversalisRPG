@@ -47,7 +47,24 @@ interface Sitting {
   indent: number;
 }
 
-function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, written: Already, label: string): string[] {
+// Shapes a site writes out because the engine needs them to tell one of its lines from another, where
+// what they are shapes of is a grammar this page has already written out. The page says the name once in
+// their place; where it has not written that grammar out, they stand as they are and nothing is lost.
+function spelling(lines: readonly Written[], written: Already): readonly Written[] {
+  const out: Written[] = [];
+  const said = new Set<string>();
+  for (const line of lines) {
+    if (line.of === undefined || heldBefore(written, line.of) === undefined) out.push(line);
+    else if (!said.has(line.of)) {
+      said.add(line.of);
+      out.push({ ...line, form: `<${line.of}>`, of: undefined });
+    }
+  }
+  return out;
+}
+
+function treeLines(written_: readonly Written[], pad: string, sitting: Sitting, written: Already, label: string): string[] {
+  const lines = spelling(written_, written);
   const held = new Map(lines.map((line) => [line.form, line]));
   const saidOf = (line: Written | undefined): string => {
     const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, namesKind(line));
@@ -55,16 +72,19 @@ function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, wri
   };
   // A block whose lines are the values the keyword already takes inline says nothing new: it is the same list, one to a line.
   const listed = (block: readonly Written[], beside: readonly { form: string }[]): boolean => block.every((line) => beside.some((offer) => offer.form.endsWith(`${line.form}, …`)));
-  const under = (line: Written | undefined, deeper: string, beside: readonly { form: string }[] = []): string[] => {
+  // What is indented under a line. A block written out already is a pointer and no grammar of its own, so
+  // it is said on the line it belongs to rather than on a line under it: a line reads once wherever it
+  // stands, and the page never says one sentence twice for want of somewhere to put it.
+  const under = (line: Written | undefined, deeper: string, beside: readonly { form: string }[] = []): { said?: string; lines: string[] } => {
     const block = line?.block?.();
-    if (block === undefined) return [];
-    if (listed(block, beside)) return [];
+    if (block === undefined) return { lines: [] };
+    if (listed(block, beside)) return { lines: [] };
     const inside: Sitting = { under: [sitting.under, `${' '.repeat(sitting.indent)}${line!.example}`].join('\n'), indent: sitting.indent + 2 };
     const sign = keyOf(block);
     const already = heldBefore(written, sign);
-    if (already !== undefined) return [`${deeper}…indented under it, what ${already} holds`];
+    if (already !== undefined) return { said: `what ${already} holds, indented under it` , lines: [] };
     holdNow(written, sign, line!.form);
-    return treeLines(block, deeper, inside, written, line!.form);
+    return { lines: treeLines(block, deeper, inside, written, line!.form) };
   };
   const out: string[] = [];
   for (const family of gathered(lines.map((line) => ({ ...line, insert: line.form })))) {
@@ -89,9 +109,12 @@ function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, wri
         const example = shown.find((each) => each !== undefined && /[<[]/.test(group.head === null ? shapes[0]! : `${group.head} ${shapes[0]!}`));
         return example === undefined ? '' : `   e.g. ${example}`;
       };
-      for (const [note, shapes] of apart) out.push(`${pad}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${like(shapes)}${note}`);
-      for (const offer of group.offers) out.push(...under(held.get(offer.form), pad + STEP));
-      out.push(...under(held.get(group.head ?? ''), pad + STEP, group.offers));
+      const inside = [...group.offers.map((offer) => under(held.get(offer.form), pad + STEP)), under(held.get(group.head ?? ''), pad + STEP, group.offers)];
+      // A pointer at a block already written out belongs on the line that opens it, and a keyword opening two such blocks points at both.
+      const points = [...new Set(inside.flatMap((each) => (each.said === undefined ? [] : [each.said])))];
+      const shown = [...apart].map(([note, shapes]) => `${pad}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${like(shapes)}${note}`);
+      if (points.length > 0 && shown.length > 0) shown[0] = `${shown[0]}${shown[0]!.includes('   — ') ? '; ' : '   — '}${points.join('; ')}`;
+      out.push(...shown, ...inside.flatMap((each) => each.lines));
     }
   }
   return out;
@@ -187,6 +210,8 @@ function preamble(kinds: readonly string[], seen: Seen): string[] {
     const already: Already = { kind: name, seen };
     // Registered as well as written out, so a keyword whose indented block is this grammar points back here rather than repeating it.
     holdNow(already, keyOf(block), name);
+    // Under the bare name as well, which is what a site writing this grammar's shapes out says it is spelling.
+    holdNow(already, called, name);
     out.push(`${PART}${headingOf(called)}`, ...treeLines(block, '', sitting, already, name), '');
   }
   const shared = [...sharedLines(kinds).values()];

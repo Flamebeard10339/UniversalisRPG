@@ -189,7 +189,7 @@ const ACTION_FIELDS: readonly (Filled & {
   note?: string;
 })[] = [
   { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when' },
-  { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', parser: optionalCondition, family: 'offered when' },
+  { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', parser: optionalCondition, family: 'offered when', note: 'the action is not offered at all while this holds, rather than offered and refused' },
   { written: 'on success', label: /on success:[ \t]*/, name: 'onSuccess', parser: results, family: 'and afterwards' },
   { written: 'on failure', label: /on failure:[ \t]*/, name: 'onFailure', parser: results, family: 'and afterwards' },
   { written: 'on unfinished', label: /on unfinished:[ \t]*/, name: 'onUnfinished', parser: results, family: 'and afterwards' },
@@ -352,6 +352,27 @@ const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => {
 // A bare clause on an action holds on whoever is performing it while it runs, which is what the part it stands under says. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
 const CLAUSES = 'what it is worth to whoever performs it, while it is under way';
 
+// Which shapes of a tag an action will not take, asked of `checkTags`, which is what refuses one — so a
+// shape it starts or stops taking is said here without an edit. Said on the first shape that stands,
+// because that is the line the page keeps where it says `<tag>` in place of all of them.
+const untaken = (): string[] => paired(tagClause.forms, tagClause.examples).flatMap((example, at) => (example === undefined || takesClause(example) ? [] : [`\`${tagClause.forms[at]!}\``]));
+
+const CLAUSE_NOTE = (): string | undefined => {
+  const refused = untaken();
+  return refused.length === 0 ? undefined : `in every shape but ${refused.join(' and ')}, which an action has no moment to roll`;
+};
+
+const firstTaken = (): number => paired(tagClause.forms, tagClause.examples).findIndex((example) => example !== undefined && takesClause(example));
+
+function takesClause(example: string): boolean {
+  try {
+    checkTags({ results: [], tags: tagClauses.parse(new Cursor(example)) }, '', undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const clauseLines = (): readonly Written[] =>
   paired(tagClause.forms, tagClause.examples).flatMap((example, at) => {
     if (example === undefined) return [];
@@ -360,7 +381,8 @@ const clauseLines = (): readonly Written[] =>
     } catch {
       return [];
     }
-    return [{ form: tagClause.forms[at]!, example, family: CLAUSES, ...filledBy(tagClause) }];
+    // The shapes are what tell a clause from a result where both may stand, so they are written out here; `of` says they are the one `<tag>` grammar, and the page says so rather than spelling it a second time.
+    return [{ form: tagClause.forms[at]!, example, family: CLAUSES, of: 'tag', ...(at === firstTaken() ? { note: CLAUSE_NOTE() } : {}), ...filledBy(tagClause) }];
   });
 
 // What a field's parser reads is what its lines offer. The shapes are the parser's own, so a shape the engine takes and the page will not show is not a thing that can be written here.

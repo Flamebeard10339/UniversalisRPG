@@ -25,7 +25,7 @@ export const passive = section<Passive>()({
     tags: {
       parser: list(tagClause),
       default: () => [],
-      note: 'a range here is rolled by the cluster that carries the passive, once, when that cluster enters a plane; a passive nothing sockets — one an entity carries — has no such moment and samples its range per swing, the way an item tag does',
+      note: 'a range is rolled once, when the cluster carrying this passive enters a plane; one an entity carries has no such moment and rolls per swing',
     },
     ...HOOK_FIELDS,
   },

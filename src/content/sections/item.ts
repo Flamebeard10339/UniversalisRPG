@@ -95,7 +95,7 @@ export const item = section<Item, never, 'actions'>()({
     itemLevel: {
       parser: range,
       keyword: 'item-level',
-      note: 'how many points one of these drops carrying, rolled once on arrival and fixed on that copy; declaring it is what gives the item a plane, and what makes two copies different enough that neither joins a stack',
+      note: 'how many points one of these drops carrying, rolled once on arrival and fixed on that copy; two copies that rolled differently do not stack',
     },
     tags: { parser: list(tagClause), default: () => [] },
     clusterJewel: { parser: id, keyword: 'cluster-jewel', names: { id: 'cluster-jewel' } },

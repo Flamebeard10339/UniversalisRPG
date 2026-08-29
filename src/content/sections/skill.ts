@@ -27,7 +27,7 @@ export const skill = section<Skill>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
-    stat: { parser: id, names: { id: 'stat' }, standsWithout: true, note: `raised by +${PER_LEVEL} and by +${PER_LEVEL_PERCENT}% for every level of this skill, which is the engine's rule and not a bonus anyone writes; a skill naming no stat raises none` },
+    stat: { parser: id, names: { id: 'stat' }, standsWithout: true, note: `raised by +${PER_LEVEL} and by +${PER_LEVEL_PERCENT}% for every level of this skill; a skill naming no stat raises none` },
     tags: { parser: list(tagClause), default: () => [], note: 'carried by anyone who has this skill' },
     grants: { parser: list(skillGrant), default: () => [], block: true },
   },

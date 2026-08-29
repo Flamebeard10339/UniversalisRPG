@@ -192,17 +192,14 @@ const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
   return leaves.length === 0 ? `nothing leaves stage ${stage.name}: give it a goto, a line that goes somewhere, or \`complete\`` : undefined;
 };
 
-// The journal is the player's own notebook and is written in their voice, which is the whole of what tells it from a walkthrough. Said on both `log:` lines, since that is the line an author reaches for a direction on.
-const JOURNAL_VOICE = 'the player writing, not the game instructing: what happened and what they made of it, in their own words. Never a route, a room or a step to take — working out what is next is the play, and a quest is allowed to be hard';
-
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
-const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored. Writing a stage the quest already has lays these lines over that one and leaves every line it says nothing about standing; a stage it has not is added after the stages it has, so the order they run in never shifts under a later body`;
+const STAGE_NOTE = `a step of the quest, which declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\``;
 
 // Said where a stage writes more than one line for one mouth.
-const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies. Writing one of these over a stage that already speaks writes all of that stage's lines, so a body giving a stage a word gives it every word it has there`;
+const SAYS_NOTE = `what that entity says while the quest stands here; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
 
 // A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, which the page writes out once under its own name rather than here.
-const DONE_WHEN_NOTE = 'the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag';
+const DONE_WHEN_NOTE = 'the quest leaves this stage on its own once this holds';
 
 function questProblem(quest: Quest): string | undefined {
   if (quest.stages.length === 0) return 'a quest is its stages, and this one has none';
@@ -240,14 +237,13 @@ export const quest = section<Quest>()({
   says: (value) => [spokenHere(value), ...value.stages.map(spokenHere)],
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
-    { form: '-stage <name>', example: '-stage snubbed', note: 'takes a stage out of a quest already written, and is spent where it is read rather than becoming a stage of anything: a name no stage of the quest answers to takes nothing out' },
-    { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: `what the journal reads before the quest has begun — ${JOURNAL_VOICE}` },
+    { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
     {
       form: 'stage <name>:',
       example: 'stage offered:',
       note: STAGE_NOTE,
       block: (): Written[] => [
-        { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: `the player's own note of what happened while the quest stood here, kept to a line or two — ${JOURNAL_VOICE}` },
+        { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: "the player's own note of what happened while the quest stood here" },
         { form: 'done when: <condition>', example: 'done when: rats-killed >= 3', family: 'where it goes', holds: () => ({ condition }), note: DONE_WHEN_NOTE },
         { form: 'goto <stage>', example: 'goto sendoff', family: 'where it goes' },
         { form: 'complete', example: 'complete', family: 'where it goes', note: 'the quest is done when it reaches here' },

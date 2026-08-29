@@ -479,7 +479,7 @@ const USED = { names: { id: '<kind>', action: null } };
 // sentence, written once. Under a note, a page move or another `refused` the mark would be about
 // nothing at all, and a mark about nothing reads exactly like a mark about something.
 const REFUSED_STANDS_UNDER =
-  'refused is about the line above it, which has to be a line the engine was asked to take — a recorded run keeps what did not work, and a replay where it now takes is how a fix is seen to have landed';
+  'refused is about the line above it, which has to be a line the engine was asked to take';
 
 function refusalStands(above: Directive | undefined, span: Span): void {
   if (above === undefined) throw new DslError(`${REFUSED_STANDS_UNDER}; nothing stands there`, span);
@@ -505,7 +505,7 @@ export const test = section<Test>()({
     {
       form: 'choose: <thread>',
       example: 'choose: sunny.the-stove',
-      note: 'the node a thread opens, under the name `visits` counts it by, and answerable by any tail of that name — what to write when talking to somebody put up a list, since that list is ordered by the words the player reads and reorders itself in another language',
+      note: 'the thread to pick out of the list, answerable by any tail of its name',
     },
     {
       form: 'choose: <position>',
@@ -526,7 +526,7 @@ export const test = section<Test>()({
     {
       form: 'journal: <quest> says <text>',
       example: 'journal: finding-your-feet says Talk to Miki in the guide house.',
-      note: 'the line the journal is standing on for that quest — the one `log:` of it not yet crossed off, and nothing once the quest is over; fails naming what the journal actually read',
+      note: 'the line the journal is standing on for that quest, and nothing once the quest is over',
     },
     { form: 'expect: <save>', example: 'expect: after-intro' },
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
@@ -538,7 +538,7 @@ export const test = section<Test>()({
     {
       form: 'wait: <n> times',
       example: 'wait: 4 times',
-      note: 'stands while what is under way comes round n more times, and fails where it stops short of them — how many times a player sat through a loop is the path they walked, and how long that took is balance',
+      note: 'stands while what is under way comes round n more times',
     },
     {
       form: '<a directive that starts an action> until done',
