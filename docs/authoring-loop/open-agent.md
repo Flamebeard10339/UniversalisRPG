@@ -47,13 +47,20 @@ All against a copy of `content/`, one bot, default effort, on 2026-08-29:
 | smoke | reader | 3 | 3 | 20.4s | 715 | 19,371 | 8,352 | — |
 | first-steps | bughunter | 60 | 44 | 366.4s | 21,735 | 621,666 | 127,284 | **0** |
 | ball-of-a-boy | briefed | 100 | 60 | 831.6s | 47,994 | 872,887 | 385,764 | 5 |
+| ball-of-a-boy, every argument landing | briefed | 120 | **120** | 1,147.9s | 70,739 | 1,933,201 | 809,546 | **0** |
 
 So a turn costs about **7 seconds when the bot is walking and about 14 when it is writing** — the
 staging turn alone produced 4,695 output tokens, where a walking turn produces about 300. The
 prompt is written once and read every turn, which is why cache read runs an order of magnitude
 above everything else and why prompt size is close to free after turn one.
 
-**Neither of the two long runs finished, and neither stopped for a reason about the game.** The
+**The one run that did finish spent 83 of its 120 turns reading.** 73 `/source` and 10 `/grammar`
+against 11 talks, 11 modal answers, 8 uses and 3 travels — and **no edit at all**. It is the arm
+with the most information and the best tools: the full brief, opened on `tulsa.in-town` in finished
+content, every argument delivered. The truncated one-paragraph brief, by contrast, staged a
+four-stage quest at turn 39. More to read made it write less, and that is the finding.
+
+**Neither of the two earlier long runs finished, and neither stopped for a reason about the game.** The
 bughunter stopped on a note field that spelled emptiness rather than being empty; the briefed run
 stopped on four `/dsl` refusals it could not read. Both are closed or queued. **Until a run ends
 because it finished, none of these numbers is a cost-to-complete** — they are a cost-to-die, and
