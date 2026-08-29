@@ -367,7 +367,10 @@ function openStat(ctx: CommandContext, stat: string): CommandResult {
 
 // The journal opened on one quest, which is the screen opened and then answered — the same two lines a recording would replay.
 function openJournal(ctx: CommandContext, entries: readonly JournalEntry[], quest: string): CommandResult {
-  const found = entries.find((entry) => entry.quest === quest || entry.quest.endsWith(`.${quest}`));
+  // A journal entry prints a quest's title and never its id, so the name a reader has for one is
+  // whatever half of the id they were handed — the module it is written in as readily as the id
+  // inside. Which words an address answers to is the editing page's rule, asked rather than made up.
+  const found = entries.find((entry) => namesFrom(entry.quest, quest));
   if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.journal.unknown', { quest: sessionLocalizer(ctx.session).identifier(quest) }));
 
   const opened = runDirective(ctx, { kind: 'open-modal', modal: 'quest-journal' });

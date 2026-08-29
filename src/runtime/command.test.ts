@@ -1363,6 +1363,12 @@ describe('finding a section in the shipped world by the only name anyone was giv
       expect([`# ${kind} ${ids[0]!.slice(module.length + 1)}`, `# ${kind} ${ids[0]}`], `${kind} ${ids[0]}`).toContain(read[0]);
     }
   });
+
+  it('opens the journal on a quest named by its module, which is the half the journal never prints', () => {
+    const ctx = opened();
+    const module = sourced(ctx, '/source quest')[1]!.trim().split('.')[0]!;
+    expect(errors(runLine(ctx, `/quests ${module}`)), module).toEqual([]);
+  });
 });
 
 describe('local DSL authoring takes its file as an argument, never reaching for one', () => {
