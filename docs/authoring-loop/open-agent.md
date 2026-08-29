@@ -28,39 +28,6 @@ and is the one place that rule is written.
 
 ---
 
-## From the owner's second playtest, 2026-08-25
-
-`.planning/yonatan-playtests/run-2026-08-25t14-51-24-926z-reviewed.md`, sixty turns
-through Miki's route recorded through the playtest tool against `56a2dca7`. Every
-line quotes what he wrote at the turn it happened. Four were measured against the
-live loader while the run was read, and those carry the measurement — the run is the
-evidence a line exists, and the measurement is the evidence about its cause.
-
-### The fight
-
-**Three siblings of the arming question are unasked, and they were measured while it was
-answered.** All three are the same conflation one step over, all reachable only by a
-directive, and none is reached by anything shipped today — which is why they are one line
-rather than an emergency.
-
-- **`use: location.<other-room>.<action>` still arms.** `armAction` passes a target only for
-  `obj === 'entity'`, and `isElsewhere` cannot cover a room because location ids are not in
-  `entitiesStood`. Same shape, different list to ask.
-- **`standsAgain` and `fightLeftItsLocation` still ask `isStanding`**, so a fight or a
-  repeating depleting action against an entity no room stands would stop, or fail to re-arm.
-  Nothing reaches it today.
-- **`actionVisible` throws before `whyRefused` runs**, so an action `hidden if:` from the far
-  room raises `action hidden: …` instead of being refused in the player's own words. Two of
-  the 82 corpus doors hit this, and the sweep that found them skips them honestly rather than
-  asserting on the raise.
-
-*Closes when:* each is either asked the same way the entity question now is, or written down
-as differing with its reason. **The third is the one to think about first** — it is the
-`hidden if:` rule and the refusal rule meeting, and which of them owns that moment is a
-design answer rather than a patch.
-
----
-
 ## Seven mechanisms have never been mutated
 
 The sweep that de-balanced the suite covered buff expiry (12 tests catch a break in it),
@@ -97,81 +64,25 @@ balance sweep and flagged rather than changed, because changing it is a question
 and the corpus harness's claim is the one that goes — not both, and whichever stands says
 in its own name that it is the verdict's home.
 
-## From the owner's third playtest, 2026-08-26
+## A run can read a section it can name, and cannot find out what anything is called
 
-`.planning/yonatan-playtests/run-2026-08-26t14-27-54-074z.md`, recorded against
-`8c853ce5`. Most of what it raised was taken straight into lanes on the day and is
-closed; what stands below is what nobody was briefed on, because it was measured
-while the run was being read rather than while it was being played.
+Measured on the first briefed run, 2026-08-29, against `932562e1`. The bot was told to write
+`ball-of-a-boy` and spent **five of its first six turns guessing the id**: `/source quest
+ball-of-a-boy`, `/source quest first-steps.ball-of-a-boy`, `/source first-steps.ball-of-a-boy`,
+`/journal ball-of-a-boy`, then `/grammar quest` — every one refused with *nothing loaded is
+written as …*. It gave up and walked out of the house to find the id in the world.
 
-### A failed lift makes the next one fail, and that is what "every single time" was
+`/grammar` answers what a kind may hold and `/source` answers what one section says, and
+between them there is nothing that answers **what is loaded**. The journal prints a quest's
+title and not its id, so the one place the bot could see the name it was briefed with is the
+one place that will not tell it the address.
 
-He wrote, at the third attempt on a townsman: *"I am taking damage every single time?
-You should only take damage when you fail."*
+This is what the reading-examples hypothesis actually costs today: reading is cheap once you
+can name a thing, and there is no way to learn a name.
 
-The literal reading is wrong and the experience is real. `drain: 1 health` sits only in
-the losing row of `pick their pocket:` (`content/tulsa.dsl`, civilian ~:772) — a
-successful lift costs nothing. What actually happened is a cascade:
-
-- `# stat thieving` is base **60**; the civilian's losing row is weighted **25x**. So a
-  first attempt wins 60/85 — about seven in ten, which is exactly what the module's own
-  header comment claims.
-- The losing row also does `inflict: thieving.dazed`, and `# item dazed` is
-  `3s, -90% core.attack-rate, -90% thieving` (`content/thieving.dsl:36`). Inside those
-  three seconds `thieving` is **6** against the same 25, so the next attempt wins 6/31 —
-  about **one in five**.
-- `rate: 30` is one attempt every two seconds, so the daze always covers the next
-  attempt and often the one after. One unlucky lift drops the player into a stretch
-  where four in five fail, each failure re-inflicting the daze.
-
-So the skill has two success rates — the advertised seven-in-ten on the first attempt,
-and one-in-five for as long as the player keeps trying — and nothing tells the player
-which one they are in. The module's header comment states only the first and is
-therefore wrong about the mechanism it introduces.
-
-**Half of this is now built and the half that matters is not.** A rate of zero stalls a
-run outright — `attemptDuration` returns `Infinity`, the bar stops rather than crawls,
-and the run resumes on expiry — and `# item dazed` carries `-100% thieving-rate` so
-being caught genuinely stops the hand. That is what the owner asked for on the screen.
-
-But `dazed` **still carries `-90% thieving`** beside it, and `thieving` is still the
-weight contested against the mark's fixed number. So the arithmetic above is unchanged:
-the second attempt is still about one in five where the first was about seven in ten.
-The stall makes the penalty visible; it does not make it smaller.
-
-*Closes when:* the penalty stops multiplying a weight contested against a fixed number,
-or the module says out loud that it has two success rates and which one a player is in.
-**Do not fix this by retuning the -90%** — that is a balance number, and what wants
-deciding is whether a penalty to a contested stat may swing a roll fourfold, which is a
-mechanism question. The evidence is the two arithmetic lines above, reproducible from
-the declarations alone.
-
-## `StatShare` sits above two of its readers
-
-`madeOf` moved down into `src/runtime/statScreen.ts` so both surfaces read one
-implementation, but it takes the share **structurally** rather than naming
-`StatShare`, because importing that type from `session.ts` closes a cycle:
-`session.ts -> runtime.ts` and `statScreen.ts -> session.ts`. `npm run layer-check`
-is what said so. `tsc` still binds them at every call site, so nothing is unsound
-today — the type is just not named where it is used.
-
-*Closes when:* `StatShare` lives beneath both, say `src/runtime/statShare.ts`,
-re-exported from `session.ts` so no published surface changes, and `madeOf` names
-it.
-
-## `--record` cannot refuse to print a body from a walk that stopped short
-
-`npm run probe -- content --record <test-id>` prints the run's verdict above the body, so a
-reader can see that a route failed before pasting what it ended on. It cannot do better than
-report: `sessionOver` is unexported from `src/runtime/session.ts`, so `walkTest`'s `walked`
-is unreachable over a bare `createGameState()` — which is what the tool runs on, because
-`startSession` would change every recorded body.
-
-So the guard against pasting a truncated sheet is currently a human reading a line. That is
-thin for a tool whose whole purpose is that sheets stop being hand-maintained.
-
-*Closes when:* `sessionOver` is exported and `--record` compares `walked.length` to
-`testSteps().length`, refusing outright rather than printing a body it knows is short.
+*Closes when:* a run can ask what is loaded of a kind and get the ids back — `/source <kind>`
+with no id is the shape that adds no new command — derived off the registry, and the same
+answer the refusal should be suggesting when it says nothing is written as that id.
 
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
