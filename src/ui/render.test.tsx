@@ -573,11 +573,18 @@ describe('what the shell puts on the screen', () => {
     expect(renderToStaticMarkup(<ModalSheet option={field} manner={{}} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
   });
 
-  it('moves a bar over exactly one tick of the cadence both drivers read', () => {
+  // A pool meter fills on the same declaration, so the duration is in the markup of any tree at all
+  // and finding it there says nothing. The bar under a run is the one that has to carry it.
+  it('moves a bar over exactly one tick of the cadence both drivers read, and draws none when nothing is under way', () => {
+    const idle = stocked();
+    expect(renderToStaticMarkup(<App driver={idle} />)).not.toContain('data-live="fill"');
+
     const driver = stocked();
     driver.choose(position(driver, ROAST));
+    const bar = renderToStaticMarkup(<App driver={driver} />).match(/<div[^>]*data-live="fill"[^>]*>/);
 
-    expect(renderToStaticMarkup(<App driver={driver} />)).toContain(`transition-duration:${LIVE_TICK_MS}ms`);
+    expect(bar, 'a run is under way, so a live bar is drawn').not.toBeNull();
+    expect(bar![0]).toContain(`transition-duration:${LIVE_TICK_MS}ms`);
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {

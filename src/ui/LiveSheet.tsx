@@ -15,7 +15,7 @@ export function LiveSheet({ progress, onCancel }: { progress: LiveProgress; onCa
             {progress.detail === undefined ? null : <span className="ml-2 text-xs font-normal text-text-subtle">{progress.detail}</span>}
           </p>
           <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-panel">
-            <div className={`${working} h-full bg-accent`} style={{ ...FILL_TRANSITION, width: `${fillPercent(progress.progress, 1)}%` }} />
+            <div data-live="fill" className={`${working} h-full bg-accent`} style={{ ...FILL_TRANSITION, width: `${fillPercent(progress.progress, 1)}%` }} />
           </div>
         </div>
         <button
