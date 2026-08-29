@@ -10,9 +10,12 @@ import {
   listLocalSections,
   localSectionHeadings,
   renderLocalChangesModule,
+  sectionsIn,
   upsertLocalSection,
   type LocalSection,
 } from '../content/localChanges';
+import { grammarLines } from '../content/grammarTree';
+import { isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import type { Resumption } from './openUniverse';
@@ -163,6 +166,14 @@ export interface SectionArg {
   body: string;
 }
 
+// A section somebody is asking to read rather than to write. The kind is optional because an id is
+// what a view prints: an author who has just met `first-steps.guide-house` is asking about that,
+// and knowing it is a `# location` is half of what they were going to read the section to find out.
+export interface NamedSection {
+  kind: string | null;
+  id: string;
+}
+
 // Where a place is, said either way the language says it: outright, or as one step off another place.
 // One command because it is one question — and because answering it one way is what takes the other
 // answer away, which a second command would have had to know about this one.
@@ -183,6 +194,8 @@ interface ArgTypes {
   id: string;
   directive: Directive;
   section: SectionArg;
+  named: NamedSection;
+  kinds: readonly string[];
   placing: PlacingArg;
   joining: JoiningArg;
   gathering: GatheringArg;
@@ -602,6 +615,36 @@ export function stagedSections(ctx: CommandContext): readonly LocalSection[] {
 }
 
 const runSectionEdit = (ctx: CommandContext, section: SectionArg): CommandResult => stageLocalSections(ctx, [localSectionSource(section)]);
+
+const asSource = (lines: readonly string[]): CommandResult => ({ output: [{ kind: 'source', words: 'tool', lines: [...lines] }], quit: false, recorded: [] });
+
+// What may be written, at the indentation it is written at. Asked with no kind it says which kinds
+// there are, because the whole grammar is tens of thousands of characters and nobody asked for all
+// of it at once — the kinds are the question a first ask is really putting.
+function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResult {
+  if (kinds.length === 0) return asSource(['the kinds a section may be; /grammar <kind>... writes out what any of them holds:', ...sectionKinds().map((kind) => `  # ${kind}`)]);
+  return asSource(grammarLines(kinds));
+}
+
+// A section as its author wrote it, out of the file it was written in. The world is read for
+// examples far oftener than it is written to, and a printed section is not an example of anything:
+// it has already lost the comments and the `@@@` notes that say what the author was reaching for.
+function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
+  const authoring = ctx.authoring;
+  if (!authoring) return noted('error', UNAVAILABLE);
+  const named = at.kind === null ? at.id : `# ${at.kind} ${at.id}`;
+  let found: { kind: string; text: string }[];
+  try {
+    found = [...authoring.baseSources, authoring.localSource].flatMap((module) =>
+      sectionsIn(module.text).filter((section) => section.id === at.id && (at.kind === null || section.kind === at.kind)),
+    );
+  } catch (error) {
+    if (error instanceof DslError) return noted('error', error.message);
+    throw error;
+  }
+  if (found.length === 0) return noted('error', `nothing loaded is written as ${named}`);
+  return asSource(found.flatMap((section, index) => (index === 0 ? [] : ['']).concat(section.text.split('\n'))));
+}
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
   const authoring = ctx.authoring;
@@ -1039,6 +1082,33 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'cancel the in-flight spannable action, if any',
     parse: nothing,
     run: (ctx) => runDirective(ctx, { kind: 'cancel' }),
+  }),
+  define({
+    name: '/grammar',
+    arg: 'kinds',
+    argHint: '[<kind>...]',
+    summary: 'print what may be written under a kind, at the indentation it is written at; with no kind, list the kinds',
+    audience: 'author',
+    parse: (rest) => {
+      const asked = rest.split(/[ \t]+/).filter((each) => each !== '');
+      const unknown = asked.filter((kind) => !isSectionKind(kind));
+      if (unknown.length > 0) return { problem: `/grammar: no such kind: ${unknown.join(', ')}. There is ${sectionKinds().join(', ')}` };
+      return asked;
+    },
+    run: runGrammar,
+  }),
+  define({
+    name: '/source',
+    arg: 'named',
+    argHint: '<id> | <kind> <id>',
+    summary: 'print a loaded section as its author wrote it, comments and all; with no kind, every section written under that id',
+    audience: 'author',
+    parse: (rest) => {
+      const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
+      if (!match) return { problem: '/source requires <id> or <kind> <id>' };
+      return { kind: match.kind ?? null, id: match.id! };
+    },
+    run: runSource,
   }),
   define({
     name: '/dsl',
