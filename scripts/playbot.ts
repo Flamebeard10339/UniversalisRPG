@@ -90,7 +90,7 @@ One thing about this world bears on "confusion" rather than on any single turn: 
 
 const SHARED_STOPPING = `## Ending the run
 
-"blocked" is normally an empty string. Put a sentence in it only when you judge the run genuinely cannot continue — the one path forward is refused every time you take it, every option leads back to the same wall, or the world has stopped responding to anything you do. Setting it ends the run immediately, so say what is blocking you and what you last tried.
+"blocked" is left empty on almost every turn — empty, not the two characters that spell an empty string. Put a sentence in it only when you judge the run genuinely cannot continue — the one path forward is refused every time you take it, every option leads back to the same wall, or the world has stopped responding to anything you do. Setting it ends the run immediately, so say what is blocking you and what you last tried.
 
 Two things about this. Saying a bug is severe in "confusion" does not stop anything; only "blocked" does, and a report that a run is unrecoverable followed by another attempt at the same refused line is worth less than stopping. And do not use it for a single refusal or an ordinary dead end: retry, try another way in, and reserve it for the case where you have run out of ways in.`;
 
@@ -353,6 +353,13 @@ function unreportedEdit(line: string, log: readonly RunLogEntry[]): string | nul
 
 const DEMANDED = ['line', ...NOTE_FIELDS.filter((field) => field.required).map((field) => field.name)];
 
+// A field told to be empty comes back holding a written-out empty string often enough to matter: a
+// run was stopped on turn 44 by the two characters `""` in `blocked`. What every note field is for
+// is a sentence, so one carrying no letter and no digit is carrying no sentence, whatever
+// punctuation it spells that with — and the same reading keeps a stray quote from passing for the
+// report an edit is gated on.
+const reported = (said: string | undefined): string => (said !== undefined && /[\p{L}\p{N}]/u.test(said) ? said : '');
+
 export function parseReply(raw: unknown, mode: PlaybotModeSpec): { ok: true; reply: TurnReply } | { ok: false; error: string } {
   if (!isRecord(raw)) return { ok: false, error: 'reply is not a JSON object' };
   const line = stringField(raw, 'line');
@@ -363,7 +370,7 @@ export function parseReply(raw: unknown, mode: PlaybotModeSpec): { ok: true; rep
   if (line.trim() === '') return { ok: false, error: 'reply.line is empty' };
   const offMenu = offMenuCommand(mode, line);
   if (offMenu) return { ok: false, error: `${offMenu.name} is not a command this player may run` };
-  const said = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, notes[field.name] ?? ''])) as RunNotes;
+  const said = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, reported(notes[field.name])])) as RunNotes;
   return { ok: true, reply: { ...said, line } };
 }
 

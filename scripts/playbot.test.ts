@@ -276,6 +276,24 @@ describe('playbot', () => {
     expect(exercised).toBeGreaterThan(10);
   });
 
+  // Measured on the bughunter run of 2026-08-29: told `blocked` was normally an empty string, the
+  // model wrote the two characters that spell one, and the run stopped on turn 44 having reported
+  // nothing. Every note field is for a sentence, so what carries no letter and no digit carries
+  // none — which is also what keeps a stray quote from passing for the report an edit is gated on.
+  describe('a note field that spells emptiness rather than being empty', () => {
+    const reply = (blocked: string) => parseReply({ line: '/look', note: 'n', expected: '', confusion: '', blocked }, modeSpec('bughunter'));
+
+    it.each(['""', "''", '  ', '-', '(none)'.replace(/[a-z]/g, '.')])('says nothing when it holds %j', (written) => {
+      const parsed = reply(written);
+      expect(parsed.ok && parsed.reply.blocked).toBe('');
+    });
+
+    it('still carries a sentence that has words in it', () => {
+      const parsed = reply('Every way out of this room is refused.');
+      expect(parsed.ok && parsed.reply.blocked).toBe('Every way out of this room is refused.');
+    });
+  });
+
   // c6's residue: without the view itself gating what parseReply accepts, the guarantee that
   // moves to runLine is the registry's own, not a positional one this loop keeps. The proof
   // covers three different directive shapes reaching runLine, so it is not one lucky case.
