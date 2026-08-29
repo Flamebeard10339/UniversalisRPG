@@ -20,6 +20,16 @@ export interface Parser<T> extends Filled {
   called?: string;
 }
 
+// A block of lines that is one grammar wherever it is written, under the name an author calls it. Laid
+// on the array rather than on each line, because it is the block that is the grammar and a line of it
+// says nothing about where it stands; and read back by whatever writes the page out, so a block met a
+// second time is pointed at rather than written again however its site parameterised it.
+const CALLED = Symbol.for('grammar.block.called');
+
+export const calledBlock = (called: string, lines: Written[]): Written[] => Object.defineProperty(lines, CALLED, { value: called });
+
+export const blockCalled = (lines: readonly Written[]): string | undefined => (lines as { [CALLED]?: string })[CALLED];
+
 // One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.
 export interface Written extends Filled {
   form: string;

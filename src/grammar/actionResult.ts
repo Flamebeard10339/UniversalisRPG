@@ -1,7 +1,7 @@
 import { Condition, condition } from './condition';
 import { writtenFrom } from './codec';
 import { ListParser } from './list';
-import { Cursor, DslError, Holds, Parser, Span, Written, requireEnd } from './parser';
+import { Cursor, DslError, Holds, Parser, Span, Written, calledBlock, requireEnd } from './parser';
 import { range, Range, scaleRange } from './range';
 import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
@@ -480,10 +480,8 @@ const LEAF_EXAMPLES: readonly string[] = [
   `take: ${EVERYTHING}`,
   'xp: mining 4-7',
   'relocate: camp',
-  `relocate: ${STARTING_LOCATION}`,
   'discover: camp',
-  `discover: ${STARTING_LOCATION}`,
-  ...MODAL_SCREENS.map((screen) => `open modal: ${screen}`),
+  `open modal: ${MODAL_SCREENS[0]}`,
   'drain: 5 health',
   'restore: 1-2 health',
   'restore: health',
@@ -503,11 +501,9 @@ const LEAF_FORMS: readonly string[] = [
   'take: <count> <item>',
   `take: ${EVERYTHING}`,
   'xp: <skill> <amount>',
-  'relocate: <location>',
-  `relocate: ${STARTING_LOCATION}`,
-  'discover: <location>',
-  `discover: ${STARTING_LOCATION}`,
-  ...MODAL_SCREENS.map((screen) => `open modal: ${screen}`),
+  'relocate: <place>',
+  'discover: <place>',
+  'open modal: <modal>',
   'drain: <amount> <resource>[ from <me or them>]',
   'restore: <amount> <resource>[ to <me or them>]',
   'restore: <resource>[ to <me or them>]',
@@ -516,10 +512,29 @@ const LEAF_FORMS: readonly string[] = [
   'stop',
 ];
 
+// A word standing for itself: it parses as the id it is written as, and its shapes are the whole of what may be written there.
+const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<string>> = {}): Parser<string> => ({
+  parse: (cursor) => id.parse(cursor),
+  print: (value) => value,
+  called,
+  forms,
+  examples: forms.filter((form) => !form.includes('<')),
+  ...said,
+});
+
+// Where a `relocate:` or a `discover:` puts the player: a location the world declares, or the one word
+// for wherever the world begins. The word is not a location anything declares, so it is said here, once,
+// rather than beside every keyword that takes a place.
+const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: { location: 'location' }, examples: ['camp', STARTING_LOCATION] });
+
+// The screens the engine runs. `MODAL_SCREENS` is the one home for which they are; this is the same list read as a grammar, so a screen added there is offered here.
+const modalScreen = oneOf('modal', MODAL_SCREENS);
+
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
   print: printResult,
   names: { variable: 'flag' },
+  holds: () => ({ place, modal: modalScreen }),
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,
 };
@@ -548,7 +563,8 @@ const WRAPPERS: readonly Written[] = [
   { form: 'credit:', example: 'credit:', family: SOMETIMES, note: 'its block runs for whoever brought the action, not whoever it landed on', block: () => resultGrammar() },
 ];
 
-export const resultGrammar = (): readonly Written[] => [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS];
+// The same grammar wherever a result is written, so it is named here and written out once wherever the page writes it out.
+export const resultGrammar = (): readonly Written[] => calledBlock('result', [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS]);
 
 const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
 

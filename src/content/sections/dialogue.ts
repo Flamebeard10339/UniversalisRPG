@@ -1,6 +1,6 @@
 import { ActionResult, itemCost, parseResultLine, resultGrammar, resultLines, startsResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
-import { Cursor, DslError, parseWhole, Written } from '../../grammar/parser';
+import { Cursor, DslError, calledBlock, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
@@ -82,8 +82,19 @@ function parseChoice(source: RawLine): Choice {
   return choice;
 }
 
+// Where a node goes next is the next thing in whatever it sits in, which is a stage under a quest and a
+// node under a dialogue. The hole is what an author standing in it is offered, so it is the one thing
+// written per site; the block it belongs to carries a name, so the page still writes it out once.
+const GOES = (goes: { hole: string; like: string }): Written => ({
+  form: `goto <${goes.hole}>`,
+  example: `goto ${goes.like}`,
+  family: 'where it goes',
+  note: 'the next place in whatever this node is written in: a node of the dialogue, or a stage of the quest',
+});
+
 // The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
-export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] => [
+export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] =>
+  calledBlock('node', [
   { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open — talking to somebody puts up every thread they have open at that moment, and a node offering nothing but `always` is not one of them, unless a quest gave it: a quest is what the player is in the middle of, so its line always stands in that list and stands first in it' },
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread, and writing it makes the node one — a thread with no `ask:` is named in the list by the first line it says, and is entered without a list at all when it is the only one open' },
@@ -91,10 +102,10 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
   { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without sticky says on a visit after its first, instead of the silence it would otherwise fall to — a sticky node is refused one, because it says everything again anyway' },
   { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
-  { form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' },
-  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ form: `goto <${goes.hole}>`, example: `goto ${goes.like}`, family: 'where it goes' }, ...resultGrammar()] },
+  GOES(goes),
+  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => calledBlock('choice', [GOES(goes), ...resultGrammar()]) },
   ...resultGrammar(),
-];
+  ]);
 
 // `sticky` says a node in full on every visit, and `again:` is what a node without it says instead of the silence it would otherwise fall to. A node writing both has written a line nothing reaches. A node reached on its own without being a thread is what is left when no thread is open, and one that takes has nothing behind it.
 function contradiction(node: DialogueNode): string | undefined {

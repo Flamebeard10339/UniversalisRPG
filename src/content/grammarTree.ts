@@ -1,4 +1,4 @@
-import type { Parser, Written } from '../grammar/parser';
+import { blockCalled, type Parser, type Written } from '../grammar/parser';
 import { writtenFrom } from '../grammar/codec';
 import { NOTE_MARK } from '../grammar/note';
 import { namesKind, offeringAt, said, type Offer } from './completion';
@@ -11,6 +11,11 @@ export const PART = '· ';
 
 // A block is known by the lines it holds and what they name, so the one the results grammar repeats down every branch is written out once and pointed at thereafter, while two lists of bare ids that name different kinds stay apart.
 const signOf = (lines: readonly Written[]): string => lines.map((line) => `${line.form} names ${namesKind(line) ?? 'nothing'}`).join('|');
+
+// What tells one block from another. A block that carries a name is that name however its site
+// parameterised it, which is what makes a node under a quest and a node under a dialogue one grammar;
+// anything else is known by the lines it holds and what they name.
+const keyOf = (lines: readonly Written[]): string => blockCalled(lines) ?? signOf(lines);
 
 // What has already been written out, and under which kind. A run printing every kind writes the results grammar once rather than once a kind, so a block met again is pointed back at across a heading as readily as under one.
 interface Already {
@@ -27,7 +32,9 @@ const heldBefore = (already: Already, sign: string): string | undefined => {
   if (found === undefined) return undefined;
   if (found.kind === already.kind) return `\`${found.label}\``;
   // A block held at the top of its own kind is pointed at by that heading and nothing else; saying the heading twice reads as two places.
-  return found.label === found.kind ? `\`${found.kind}\`` : `\`${found.label}\` under \`${found.kind}\``;
+  if (found.label === found.kind) return `\`${found.kind}\``;
+  // Where to look, but only where that is a heading a reader would have to go and find. What stands above every kind has already been read by anyone reading the page through, and naming it there reads as a second place.
+  return found.kind.startsWith('# ') ? `\`${found.label}\` under \`${found.kind}\`` : `\`${found.label}\``;
 };
 
 const holdNow = (already: Already, sign: string, label: string): void => {
@@ -53,7 +60,7 @@ function treeLines(lines: readonly Written[], pad: string, sitting: Sitting, wri
     if (block === undefined) return [];
     if (listed(block, beside)) return [];
     const inside: Sitting = { under: [sitting.under, `${' '.repeat(sitting.indent)}${line!.example}`].join('\n'), indent: sitting.indent + 2 };
-    const sign = signOf(block);
+    const sign = keyOf(block);
     const already = heldBefore(written, sign);
     if (already !== undefined) return [`${deeper}…indented under it, what ${already} holds`];
     holdNow(written, sign, line!.form);
@@ -100,14 +107,15 @@ export const RULES: readonly string[] = [
   `${PART}in a line the game says to a player, a \`${NOTE_MARK}\` and everything after it is a note the engine drops: write what you can say now, then \`${NOTE_MARK}\` alone to mark it rough, or \`${NOTE_MARK} <what you wanted>\` where the engine cannot do what was asked. \`npm run notes\` lists them`,
 ];
 
-export function treeOf(kind: string, seen: Seen = freshly()): string[] {
+export function treeOf(kind: string, seen: Seen = freshly(), said: ReadonlySet<string> = new Set()): string[] {
   const owner = sectionFor(kind);
   if (owner === undefined) return [`# ${kind} — no such kind`];
   const sitting = { under: `# ${kind} probe`, indent: 0 };
   const already: Already = { kind: `# ${kind}`, seen };
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
-  holdNow(already, signOf(owner.grammar), `# ${kind}`);
-  return [`# ${kind} <id>`, ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
+  holdNow(already, keyOf(owner.grammar), `# ${kind}`);
+  const own = owner.grammar.filter((line) => !said.has(sameLine(line)));
+  return [`# ${kind} <id>`, ...treeLines(own, '', sitting, already, `# ${kind}`)];
 }
 
 // The heading the lines every kind takes stand under, which is not a kind and so is not written as one.
@@ -119,15 +127,17 @@ export const headingOf = (called: string): string => `<${called}>, wherever a li
 // Every grammar the page names rather than writing out where it stands, found by walking what the
 // kinds' own lines hold. A grammar named next month is written out here for having been named, and
 // one nothing points at is never written out at all, so there is no list of them anywhere.
-export function namedGrammars(kinds: readonly string[]): Parser<unknown>[] {
-  const found = new Map<string, Parser<unknown>>();
+export function namedGrammars(kinds: readonly string[]): { called: string; lines: readonly Written[] }[] {
+  const found = new Map<string, readonly Written[]>();
   const walked = new Set<string>();
   const parser = (held: Parser<unknown>): void => {
-    if (held.called !== undefined && !found.has(held.called)) found.set(held.called, held);
+    if (held.called !== undefined && !found.has(held.called)) found.set(held.called, writtenFrom(held));
     lines(writtenFrom(held));
   };
   const lines = (block: readonly Written[]): void => {
-    const sign = signOf(block);
+    const called = blockCalled(block);
+    if (called !== undefined && !found.has(called)) found.set(called, block);
+    const sign = keyOf(block);
     if (walked.has(sign)) return;
     walked.add(sign);
     for (const line of block) {
@@ -138,24 +148,53 @@ export function namedGrammars(kinds: readonly string[]): Parser<unknown>[] {
   };
   lines(EVERY_SECTION);
   for (const kind of kinds) lines(sectionFor(kind)?.grammar ?? []);
-  return [...found.values()];
+  return [...found].map(([called, held]) => ({ called, lines: held }));
 }
 
-// What holds however the page was narrowed: the lines every kind takes, and every grammar the kinds
-// point at by name. Said once above the kinds rather than once under each, which is the same rule
-// `RULES` is said by and the reason a kind's tree can point back at a block it has already met.
+// The heading the lines more than one kind takes stand under, which is not a kind either.
+const SHARED_HEAD = 'taken by the kinds named beside it';
+
+// What tells one written-out line from another: the shape, and everything the page says about it. Two
+// kinds declaring the same field off one constant reach here as the same line and are written once.
+const sameLine = (line: Written): string => [line.form, line.example, line.family ?? '', line.note ?? '', line.needs ?? '', line.block === undefined ? '' : keyOf(line.block())].join(' ');
+
+// A line more than one kind takes, and the kinds that take it. A line that opens a block is the same
+// line only where the block is the same grammar, which is what `keyOf` answers.
+function sharedLines(kinds: readonly string[]): Map<string, { line: Written; kinds: string[] }> {
+  const held = new Map<string, { line: Written; kinds: string[] }>();
+  for (const kind of kinds) {
+    for (const line of sectionFor(kind)?.grammar ?? []) {
+      const sign = sameLine(line);
+      const found = held.get(sign);
+      if (found === undefined) held.set(sign, { line, kinds: [kind] });
+      else if (!found.kinds.includes(kind)) found.kinds.push(kind);
+    }
+  }
+  return new Map([...held].filter(([, each]) => each.kinds.length > 1));
+}
+
+// What holds however the page was narrowed: the lines every kind takes, every line more than one kind
+// takes, and every grammar the kinds point at by name. Said once above the kinds rather than once under
+// each, which is the same rule `RULES` is said by and the reason a kind's tree can point back at a
+// block it has already met.
 function preamble(kinds: readonly string[], seen: Seen): string[] {
   const sitting = { under: '# stat probe', indent: 0 };
   const every: Already = { kind: EVERY_HEAD, seen };
   const out = [`${PART}${EVERY_HEAD}`, ...treeLines(EVERY_SECTION, '', sitting, every, EVERY_HEAD), ''];
-  for (const held of namedGrammars(kinds)) {
+  for (const { called, lines: block } of namedGrammars(kinds)) {
     // The heading is a sentence and the name is what a line elsewhere writes, so a pointer back at this reads as the hole an author types rather than as the sentence over it.
-    const name = `<${held.called!}>`;
+    const name = `<${called}>`;
     const already: Already = { kind: name, seen };
-    const block = writtenFrom(held);
     // Registered as well as written out, so a keyword whose indented block is this grammar points back here rather than repeating it.
-    holdNow(already, signOf(block), name);
-    out.push(`${PART}${headingOf(held.called!)}`, ...treeLines(block, '', sitting, already, name), '');
+    holdNow(already, keyOf(block), name);
+    out.push(`${PART}${headingOf(called)}`, ...treeLines(block, '', sitting, already, name), '');
+  }
+  const shared = [...sharedLines(kinds).values()];
+  if (shared.length > 0) {
+    const already: Already = { kind: SHARED_HEAD, seen };
+    // Which kinds take it is read off the kinds themselves, so a field a second kind picks up next month says so without an edit here.
+    const said = shared.map(({ line, kinds: takers }) => ({ ...line, note: `${line.note === undefined ? '' : `${line.note} — `}taken by ${takers.map((kind) => `# ${kind}`).join(', ')}` }));
+    out.push(`${PART}${SHARED_HEAD}`, ...treeLines(said, '', sitting, already, SHARED_HEAD), '');
   }
   return out;
 }
@@ -166,7 +205,8 @@ function preamble(kinds: readonly string[], seen: Seen): string[] {
 // under a second kind is pointed back at rather than written out again.
 export function grammarLines(kinds: readonly string[] = sectionKinds()): string[] {
   const seen = freshly();
-  return [...RULES, '', ...preamble(kinds, seen), ...kinds.flatMap((kind) => [...treeOf(kind, seen), ''])];
+  const said = new Set(sharedLines(kinds).keys());
+  return [...RULES, '', ...preamble(kinds, seen), ...kinds.flatMap((kind) => [...treeOf(kind, seen, said), ''])];
 }
 
 // What may stand where somebody is standing, gathered under the parts and keywords it belongs to.
