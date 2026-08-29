@@ -314,3 +314,22 @@ once he says so. Either way the branch above holds the numbers.*
 *Beside it, and answerable in the same breath: `first-steps.two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down` is a test whose **name** is a balance number. Under the
 ruling that a test may not pin one, it is wrong whatever is decided here — but what it
 should assert instead depends on what a first fight is supposed to feel like.*
+
+## A tie-break that decides which module's body wins is provably dead
+
+`addressable`'s `declares` tie-break says in its own comment that when two modules write a
+section at one address, the **declaring** module's body is kept. Measured while the naming rule
+was being folded into one place: **533 of 533 shipped sections take the true branch**, so the
+tie-break never decides anything and the behaviour reduces to *last source wins*.
+
+The lane re-expressed it faithfully rather than changing it, which was right — but that leaves a
+comment claiming a rule the code does not enforce, and the two ways out are not equivalent. Making
+the comment true needs a `staged ||` exemption, or the shadowing rule that lets a staged edit
+override a shipped section breaks. Deleting the tie-break makes the code honest and quietly ratifies
+*last source wins* as the rule.
+
+*Moves when: he says whether a declaring module's body should beat a later one, or whether last
+source wins is the rule and the tie-break goes. The first is a small exemption and keeps staging
+working; the second is a deletion and a renamed test. A lane cannot pick, because both are
+defensible and one of them changes what an edit staged over a shipped section does.*
+

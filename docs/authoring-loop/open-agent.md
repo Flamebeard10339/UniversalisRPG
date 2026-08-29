@@ -88,19 +88,6 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## `authoringSurface` keeps its own copy of what a section is called and where it is
-
-`src/ui/authoringSurface.ts` still holds `sectionsIn`/`addressOf` and its own `names()`, all of
-which now exist once under `content/` — `sectionsWritten` walks the loaded sources and
-`namesFrom` answers whether an id names a section, and `/source`, its kind listing, its refusal
-and `/journal` all read those.
-
-The pane was left alone while two lanes were in that file. It is the same fact in two places,
-which is the thing this repository spends its commits undoing.
-
-*Closes when:* the pane reads the one walk and the one naming rule, and nothing under `ui`
-answers what a section is called.
-
 ## A bughunter never arrives at an edit, and it is not the framing
 
 Measured over **320 turns in six runs**, three per arm, 2026-08-29. Arm A is the shipped
