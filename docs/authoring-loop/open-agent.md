@@ -28,43 +28,6 @@ and is the one place that rule is written.
 
 ---
 
-## A test maintenance pass over the whole suite
-
-**The suite carries duplicate proofs, and three known tests still pin a balance number.**
-The evidence is `npm run mutate` plus the sweep done on 2026-08-26: bumping every
-`stats:` line in `tulsa` and `first-steps` by three and every `base:` in `core` by two
-reddened sixteen tests before that session's work and four after it. What is left is:
-
-- `scripts/play-cli.test.ts` — *"prints a view as narration, location, occupants, pools,
-  modals, choices and the clock"* and *"prints the status readout /state and /quit both
-  produce"*. Both draw pools and the clock into a snapshot, so a balance pass rewrites the
-  expected text. Closing it means the snapshot naming the shape it renders rather than the
-  numbers that happened to be in it.
-- `first-steps.thieving-route-full` — closes on `assert: resource.core.health = 26.31`.
-  Same disease as tulsa's nine and the same fix: what the route is for is the walk out
-  through the window, not what the drop cost. It was left alone because that session was
-  scoped to tulsa.
-- `tulsa.a-log-costs-four-swings-of-an-axe` — asserts `time > 3`, which a large enough
-  bump to `felling` still trips, because the alder then falls in one swing. That is
-  arguably the test doing its job: *chopping takes more than one swing* is design intent,
-  and a pass that breaks it should be seen. Left as-is deliberately; a lane that disagrees
-  should raise it rather than quietly loosen the threshold.
-
-The wider pass is the real line: **walk the suite for proofs that already exist elsewhere.**
-`npm run mutate` is the instrument and it is cheap — break the mechanism, read who catches
-it, and delete the copies. Do not build test telemetry to decide this. `.planning/.scratch.md`
-sketches a per-test store of runs, failures and mutation scores held as structural metadata;
-its own candidate-for-review rule needs `runs > 10,000`, which nothing here collects, and a
-store like that is a second home for a fact the mutation run already derives on demand.
-
-**Grep `src/` and `scripts/` for a test's id before deleting it** — a corpus route is often
-somebody's fixture, and that dependency is invisible to the mutation measurement.
-
-*Closes when:* a mutation sweep has been walked over the suite, the proofs it shows to be
-duplicated are deleted, and the three above are each either de-balanced or argued for in
-the commit that leaves them standing. The same bump that measured this — `stats:` +3 in
-`tulsa` and `first-steps`, `base:` +2 in `core` — reddens nothing when it is done.
-
 ## From the owner's second playtest, 2026-08-25
 
 `.planning/yonatan-playtests/run-2026-08-25t14-51-24-926z-reviewed.md`, sixty turns
@@ -98,31 +61,41 @@ design answer rather than a patch.
 
 ---
 
-## From the owner's rulings on `open-human.md`, 2026-08-26
+## Seven mechanisms have never been mutated
 
-Each line below crossed from `open-human.md` carrying what had already been measured
-for it. The ruling is quoted; the measurement under it is what the lane that raised it
-found, and is not re-derived.
+The sweep that de-balanced the suite covered buff expiry (12 tests catch a break in it),
+skill levelling (46), equipment slots (1), the thorns passive, the bench, the window drop
+and the live bar. What it did not reach: **drop tables, conditions, cadence and attempts,
+the save round-trip, dialogue, quests, and map travel.** Nothing says those are over-proved
+or under-proved; nobody has looked.
 
-### Nobody has swept the suite for asserts that pin a balance number
+The instrument is `npm run mutate -- <manifest.json>` and the finding it produces is either
+a duplicate to delete or a mechanism nothing catches, and both are worth having. It is a
+suite run per mutated line, so it is bounded by how many lines you pick rather than by the
+tool.
 
-The rule itself is settled and lives in `CLAUDE.md` — a test asserts that a mechanism
-works, never that a number is the number it is today. What is open is that **nobody
-knows how many tests still break the rule**, because it has only ever been applied
-where a lane happened to trip over one.
+**`npm run mutate` writes the break into the working tree and puts the file back
+afterwards, so it may only be run in a worktree nobody else is in.** An interrupted run
+leaves the file broken on disk.
 
-What is known, from lanes that did trip: two in `resolve.test.ts` and `driver.test.ts`
-were rewritten and renamed to say what they now assert; the engagement tests were found
-already clean, each declaring its own `# variable engagement-seconds` and reading it
-back rather than naming the world's; and `scripts/play-cli.test.ts` was found asserting
-a **flat progress bar that was a bug**, which is the shape that makes this worth
-sweeping — a pinned number does not merely churn, it can pin the defect.
+*Closes when:* each of the seven has had at least one mechanism broken and the catchers
+counted, the duplicates that shows are deleted, and anything caught by nothing is either
+proved or written down here as knowingly unproved.
 
-*Closes when:* the suite has been swept once and the count reported. `grep` for numeric
-asserts standing on `attack`, `health`, `damage`, `xp` and `rage`, and for `expect only:`
-sheets holding combat figures. Each one either stops asserting the number or asserts the
-shape instead — that a blow lands, that two swings differ, that a cap bites. **Report the
-count before editing**; if it is large, the sweep is its own commit.
+## `integration.test.ts` reports a route's verdict twice
+
+`played()` re-asserts each route's verdict, and the corpus harness already asserts it. A
+genuinely broken route therefore reddens two lines rather than one — the shape `CLAUDE.md`
+names when it says a route's verdict is reported once.
+
+It is milder than the rule's target case: both lines are in one file and both name the
+route, so a reader is not sent across the tree after a content bug. It was found during the
+balance sweep and flagged rather than changed, because changing it is a question about what
+`played()` is for rather than a line edit.
+
+*Closes when:* `played()` either stops asserting the verdict, or is the one place that does
+and the corpus harness's claim is the one that goes — not both, and whichever stands says
+in its own name that it is the verdict's home.
 
 ## From the owner's third playtest, 2026-08-26
 
@@ -172,25 +145,6 @@ or the module says out loud that it has two success rates and which one a player
 deciding is whether a penalty to a contested stat may swing a roll fourfold, which is a
 mechanism question. The evidence is the two arithmetic lines above, reproducible from
 the declarations alone.
-
-## A bar test passes whether or not a bar moves
-
-`src/ui/render.test.tsx`'s claim *"moves a bar over exactly one tick of the cadence
-both drivers read"* is vacuous, and it was measured rather than suspected: a lane
-mutated its fixture to an instant `examine`, watched two neighbouring tests go red,
-and that one stayed green.
-
-The cause is a shared constant doing two jobs. `FILL_TRANSITION`
-(`src/ui/transient.ts:27`) is read by `Meter.tsx` as well as `LiveSheet.tsx`, so
-`transition-duration:${LIVE_TICK_MS}ms` is in the markup whether or not a run is
-armed at all. The test finds it either way. This predates the lane that found it —
-nothing recent broke it, it never worked.
-
-*Closes when:* the claim fails on a tree where no run is under way. That probably
-means the bar's transition and a meter's are not the same fact and should not be
-the same constant, which is the interesting half; asserting on something only
-`LiveSheet` draws would also do it and is the cheap half. Whichever is taken, make
-the mutation first and watch it fail, because that is the step that was skipped.
 
 ## `StatShare` sits above two of its readers
 
