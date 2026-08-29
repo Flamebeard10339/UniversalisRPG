@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { arrowAt } from './MapPane';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { addressable, names, NOWHERE, offeredBy } from './authoringSurface';
+import { sameSection } from '../content/namespace';
+import { addressable, NOWHERE, offeredBy } from './authoringSurface';
 import { gotoLine } from './devMode';
 import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '../runtime/map';
 import { createDriver, type Driver } from './driver';
@@ -163,7 +164,7 @@ describe('a new place is written where the map is looking', () => {
     driver.send(gotoLine(MADE));
     const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === MADE)!;
 
-    expect(names(made.address, MADE)).toBe(true);
+    expect(sameSection(made.address, MADE)).toBe(true);
     driver.send(placeLine(MADE, { x: 9, y: 9 }));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);

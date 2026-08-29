@@ -8,6 +8,14 @@ export const MEMBER_KINDS: readonly string[] = [DIALOGUE_NODE, ACTION_MEMBER];
 
 export const qualify = (namespace: string | null, id: string): string => (namespace === null ? id : `${namespace}.${id}`);
 
+// Whether an id names the section a key holds. An id may be written whole or from any segment
+// boundary inward, so the shorter of the two is what the other has to end with.
+export const namesSection = (key: string, written: string): boolean => key === written || key.endsWith(`.${written}`);
+
+// Neither of two ids is known to be the fuller one: a view publishes a whole address and an author
+// writes as little of it as says which section, so either may be the short way of writing the other.
+export const sameSection = (one: string, other: string): boolean => namesSection(one, other) || namesSection(other, one);
+
 const OWNER_KINDED: ReadonlySet<string> = new Set([ACTION_MEMBER]);
 
 // Whether a key of this kind carries its module one segment in, under its owner's kind, rather than
@@ -153,7 +161,7 @@ export class Namespace {
 
     const matches: string[] = [];
     for (const [key, namespace] of this.keys(kind)) {
-      if (visible.has(namespace) && (key === suffix || key.endsWith(`.${suffix}`))) matches.push(key);
+      if (visible.has(namespace) && namesSection(key, suffix)) matches.push(key);
     }
     if (matches.length === 1) return matches[0];
     if (matches.length === 0) throw new DslError(`${where} names an unknown ${kind}: ${raw}`);

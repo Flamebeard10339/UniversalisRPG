@@ -14,7 +14,7 @@ import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, is
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
-import { ACTION_MEMBER, memberKey, Namespace, } from './namespace';
+import { ACTION_MEMBER, memberKey, namesSection, Namespace } from './namespace';
 import { isOwnedKind } from './sections';
 import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
@@ -428,11 +428,9 @@ function compileFactionBits(registry: Registry): void {
   registry.factionBits.clear();
   let next = 0;
   for (const id of registry.factions.keys()) {
-    registry.factionBits.set(id, namesSame(id, WORLD_FACTION) ? WORLD_BIT : 1 << ++next);
+    registry.factionBits.set(id, namesSection(id, WORLD_FACTION) ? WORLD_BIT : 1 << ++next);
   }
 }
-
-const namesSame = (id: string, written: string): boolean => id === written || id.endsWith(`.${written}`);
 
 function appendCondition(base: Condition | undefined, added: Condition): Condition {
   return base ? { kind: 'and', conditions: [base, added] } : added;
@@ -461,13 +459,13 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
       handlers.push({ event: block.event, results: block.results });
       continue;
     }
-    const used = entity.uses.find((id) => namesSame(id, block.label));
+    const used = entity.uses.find((id) => namesSection(id, block.label));
     if (used !== undefined) {
       if (overloads.has(used)) throw new DslError(`${JSON.stringify(block.label)} overloads ${used} more than once`);
       overloads.set(used, block);
       continue;
     }
-    const declared = [...registry.actions.keys()].find((id) => namesSame(id, block.label));
+    const declared = [...registry.actions.keys()].find((id) => namesSection(id, block.label));
     if (declared !== undefined) throw new DslError(`${JSON.stringify(block.label)} overloads # action ${declared}, which this entity does not use:`);
     own.push(block);
   }
@@ -498,8 +496,8 @@ function entityProblem(entity: Entity, registry: Registry, stoodIn: string | und
   const bare = stoodIn === undefined ? undefined : offersNothing(entity, registry.dialogues, stoodIn);
   if (bare) return bare;
   for (const ally of entity.allies) {
-    if (namesSame(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
-    if (namesSame(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
+    if (namesSection(entity.id, ally.entity)) return `allies: names this entity itself: ${ally.entity}`;
+    if (namesSection(ally.entity, PLAYER_ENTITY)) return `allies: names the player, who is a side rather than a member of one: ${ally.entity}`;
   }
   for (const handler of entity.handlers) {
     if (!registry.events.has(handler.event)) return `on ${handler.event}: names an unknown event: ${handler.event}`;
@@ -523,7 +521,7 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
       registry.entities.set(id, linked);
       const problem = entityProblem(linked, registry, stood.get(id));
       if (problem) throw new DslError(problem);
-      if (namesSame(id, PLAYER_ENTITY)) players.push(linked);
+      if (namesSection(id, PLAYER_ENTITY)) players.push(linked);
     } catch (raw) {
       if (!(raw instanceof DslError)) throw raw;
       const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);

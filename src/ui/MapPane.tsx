@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlayView } from '../runtime/session';
 import { DragSheet, useSheetHold, type Grip } from './DragSheet';
-import { names } from './authoringSurface';
+import { sameSection } from '../content/namespace';
 import { drawnFor, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, type Walking } from './discovery';
 import { carriedWith } from '../runtime/mapEdit';
 import { DevOnly } from './DevOnly';
@@ -334,9 +334,9 @@ export function MapPane({
 
   const shift = (region: string, by: Point): void => onSend(shiftLine(region, settledOn(by)));
 
-  const chosenRegion = (id: string): boolean => mode === 'region' && gathering.trim() !== '' && names(id, gathering.trim());
+  const chosenRegion = (id: string): boolean => mode === 'region' && gathering.trim() !== '' && sameSection(id, gathering.trim());
 
-  const holding = (region: string, place: string): boolean => (view.regions.find((each) => names(each.id, region))?.holds ?? []).some((held) => String(held) === place);
+  const holding = (region: string, place: string): boolean => (view.regions.find((each) => sameSection(each.id, region))?.holds ?? []).some((held) => String(held) === place);
 
   // Tapping a room while a region is named puts it in or takes it out; tapping one while no region is
   // named picks up the region it already belongs to, which is how an existing one is got hold of
@@ -350,7 +350,7 @@ export function MapPane({
   };
 
   const make = (id: string): void => {
-    if ([...view.discovered, ...view.undiscovered].some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
+    if ([...view.discovered, ...view.undiscovered].some((place) => sameSection(place.id, id))) return onNote(`${id} already names a location`);
     const address = addressFor(id, String(view.location.id));
     const staged = created(address, centredOn(hold, grid), at);
     if ('refused' in staged) return onNote(staged.refused);
