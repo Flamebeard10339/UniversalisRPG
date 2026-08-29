@@ -4,6 +4,7 @@ import { DslError, type Filled, type Parser, type Span, type Written } from '../
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
 import { EVERY_SECTION, parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
+import { namesSection, sameSection } from './namespace';
 import { filledBy } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
 
@@ -264,11 +265,10 @@ function refusalAt(text: string, within: Span, held: readonly Written[] | undefi
   return refusalOf(`${text.slice(0, within.end)}\n${indentLines([held[0]!.example], indent + 2).join('\n')}${text.slice(within.end)}`) === null ? null : said.refused;
 }
 
-const declares = (known: readonly Addressed[], kind: string, id: string): boolean =>
-  known.some((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`) || id.endsWith(`.${each.address}`)));
+const declares = (known: readonly Addressed[], kind: string, id: string): boolean => known.some((each) => each.kind === kind && sameSection(each.address, id));
 
 const resolves = (known: readonly Addressed[], kind: string, id: string): string | undefined => {
-  const matches = known.filter((each) => each.kind === kind && (each.address === id || each.address.endsWith(`.${id}`)));
+  const matches = known.filter((each) => each.kind === kind && namesSection(each.address, id));
   return matches.length === 1 ? matches[0]!.address : undefined;
 };
 
