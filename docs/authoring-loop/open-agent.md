@@ -94,22 +94,46 @@ which is the thing this repository spends its commits undoing.
 *Closes when:* the pane reads the one walk and the one naming rule, and nothing under `ui`
 answers what a section is called.
 
-## A bughunter reports and does not repair
+## A bughunter never arrives at an edit, and it is not the framing
 
-Measured on the run of 2026-08-29 against `46120faf`: 44 turns, `--mode bughunter`, the
-authoring vocabulary in its prompt and the report gate open behind it. It filed substantive
-reports throughout — including a real one, that Miki answers *"So you found the market…"* while
-the quest is asking for a pond fish — and it typed **no `/dsl`, no `/place`, no `/link`: zero
-edits in forty-four turns**.
+Measured over **320 turns in six runs**, three per arm, 2026-08-29. Arm A is the shipped
+`BUGHUNTER_FRAMING`; arm B states repairing in the imperative the way reporting is stated, keeps
+the report-first gate verbatim, and changes nothing else.
 
-Nothing refused it. It did not reach for the ability it had.
+| run | arm | turns | edits | reports | wall s | out tok |
+|---|---|---|---|---|---|---|
+| A1 | baseline | 40 | 0 | 36 | 370 | 23,110 |
+| A2 | baseline | 40 | 0 | 5 | 263 | 14,196 |
+| A3 | baseline | 80 | 0 | 31 | 575 | 34,664 |
+| B1 | imperative | 40 | 0 | 16 | 297 | 17,483 |
+| B2 | imperative | 40 | 0 | 9 | 271 | 13,659 |
+| B3 | imperative | 80 | 0 | 36 | 604 | 34,537 |
 
-That is the first real datapoint under the editing-versus-reporting line below, and it points
-the other way from the hunch that line records. It is one run and one framing, so it settles
-nothing on its own — but a bot that will not edit unless told to is a different animal from one
-that edits instead of reporting, and the sweep below should be read knowing this happened.
+**Zero `/dsl`, `/place`, `/link`, `/unlink`, `/region` in all 320 turns, in both arms.** The
+imperative rewrite was measured, found to change nothing, and reverted — the framing is unchanged
+and is not the cause. **The gate was never the obstacle either**: 133 of the 320 turns carried a
+report, so it stood open almost the whole time.
 
-*Closes when:* it is known whether this is the framing or the model — the same brief run with
-the repair asked for in the imperative, against the same save, and the edit counts compared. If
-it is the framing, `BUGHUNTER_FRAMING` says so plainly; if it is not, that is worth more than
-the sweep below and belongs above it.
+The bot does not refuse to edit. It never gets that far, for two reasons the logs show:
+
+- **It cannot address the section it wants.** `/source` was typed 11 times in 320 turns and **5 were refused for a guessed id**. The bot reads a choice id off the view — `entity.fishing.shrimp-shoal.net` — and tries `/source entity.fishing.shrimp-shoal`, which is not how `/source` is addressed. It then burns two to four turns triangulating. That is the line below.
+- **The horizon lands mid-diagnosis.** B1's last two turns were `/source quest first-steps.finding-your-feet` and `/source entity first-steps.giant-rat`, drilling into a real bug — three confirmed rat kills not incrementing `first-steps.rats-killed`. The run ended there. **More turns did not help**: both 80-turn runs typed *fewer* source reads than the 40-turn ones, because they wandered further into unfinished play instead.
+
+*Closes when:* a bughunter run reaches an edit, or it is known why one never can. The two things
+to try first, in this order: open the run on `--save` in finished content rather than in the
+tutorial, where every run so far spent its first ten to fifteen turns; and close the addressing
+line below, which is the one measured cost between a report and an edit.
+
+## A choice id is not an address `/source` accepts
+
+The view hands a player `entity.fishing.shrimp-shoal.net` and `/source` wants
+`entity fishing.shrimp-shoal`. Every id in the view is a thing the engine can already resolve, and
+the one command for reading how a thing is written will not take the form the view prints.
+
+Measured above: five of eleven `/source` attempts in 320 turns were refused for this, each costing
+two to four turns of triangulation, and it is the single most common refusal an authoring run hits.
+
+*Closes when:* an id the view printed is an id `/source` reads, deriving the section from whatever
+the engine already resolves that id to rather than by a second parse of the id's shape. A choice
+id names an action on an owner; the owner is the section, and the engine already knows that.
+
