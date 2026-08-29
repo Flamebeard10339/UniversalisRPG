@@ -5,6 +5,7 @@ import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
+import { LINE_BREAK } from '../runtime/command';
 
 export interface Section {
   kind: string;
@@ -173,16 +174,14 @@ export const searchHint = (words: string): string => `${words} ${Object.keys(STA
 
 export type Staged = { line: string } | { refused: string };
 
-export const BODY_SEPARATOR = '|';
-
 const HEADING = /^#[ \t]/;
 
 export function stage(text: string): Staged {
   const lines = oneNewline(text).split('\n');
   const at = lines.findIndex((line) => HEADING.test(line));
   if (at < 0) return { refused: 'an edit starts with the section it is: # <kind> <id>' };
-  if (lines.some((line) => line.includes(BODY_SEPARATOR))) {
-    return { refused: `${BODY_SEPARATOR} separates the lines of a staged section, so a section cannot hold one` };
+  if (lines.some((line) => line.includes(LINE_BREAK))) {
+    return { refused: `${LINE_BREAK} separates the lines of a staged section, so a section cannot hold one` };
   }
 
   let split;
@@ -196,7 +195,7 @@ export function stage(text: string): Staged {
   const [section] = split;
   if (!section.id) return { refused: `# ${section.kind} requires an id` };
 
-  const body = lines.slice(at + 1).map((line, after) => (after === 0 ? line : ` ${line}`)).join(BODY_SEPARATOR);
+  const body = lines.slice(at + 1).map((line, after) => (after === 0 ? line : ` ${line}`)).join(LINE_BREAK);
   return { line: `/dsl ${section.kind} ${section.id} ${body}`.trimEnd() };
 }
 
