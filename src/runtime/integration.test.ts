@@ -45,7 +45,9 @@ describe('shipped content', () => {
   it('assembles every module in content/ into one universe', () => {
     expect(shipped.tests.size).toBeGreaterThanOrEqual(registry.tests.size);
   });
+});
 
+describe("every route the corpus ships walks, which is where a route's verdict is reported", () => {
   for (const id of shipped.tests.keys()) {
     it(`test "${id}" passes`, () => {
       expect(runTest(id, shipped, createGameState())).toEqual({ passed: true });
@@ -84,9 +86,9 @@ describe("a shipped actor's swing is spent out of the range it stands at", () =>
 describe('the archetype jewels, read off the routes tulsa ships', () => {
   const POST = 'tulsa.proving-post';
 
-  const played = (testId: string): GameState => {
+  const endOf = (testId: string): GameState => {
     const state = createGameState();
-    expect(runTest(testId, shipped, state)).toEqual({ passed: true });
+    runTest(testId, shipped, state);
     return state;
   };
 
@@ -94,7 +96,7 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
     Object.fromEntries([...registry.stats.keys()].map((statId) => [statId, statValue(statId, state, registry, actorId)]));
 
   it('moves attack as rage accumulates, and moves nothing else at all', () => {
-    const state = played('tulsa.rage-rises-as-swings-land');
+    const state = endOf('tulsa.rage-rises-as-swings-land');
     // Where the route left the pool is the route's own `assert:` to say. What is needed here is
     // only that it left one, and the readings below are taken at the ceiling the jewel grants.
     expect(state.resources['combat-expansion.rage']).toBeGreaterThan(0);
@@ -116,7 +118,7 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
 
   it('separates what a stack pays from what the count is worth', () => {
     const reading = (testId: string, stacks: number): number => {
-      const state = played(testId);
+      const state = endOf(testId);
       clearBuffs(state, [PLAYER]);
       const bare = statValue('core.attack-rate', state, shipped);
       const vigor = shipped.items.get('combat-expansion.accelerated-vigor')!;
@@ -134,8 +136,8 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
   });
 
   it('holds poison on the struck party and on nobody else, and makes its pool fall', () => {
-    const poisoned = played('tulsa.poison-holds-the-struck-enemy');
-    const clean = played('tulsa.poison-holds-the-struck-enemy');
+    const poisoned = endOf('tulsa.poison-holds-the-struck-enemy');
+    const clean = endOf('tulsa.poison-holds-the-struck-enemy');
     clearBuffs(clean, [POST]);
 
     expect(buffsOf(poisoned, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
@@ -153,11 +155,11 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
   });
 
   it('lifts the debuff on its own clock, with nothing else asked to end it', () => {
-    expect(buffsOf(played('tulsa.poison-lifts-when-its-own-duration-runs-out'), POST)).toEqual([]);
+    expect(buffsOf(endOf('tulsa.poison-lifts-when-its-own-duration-runs-out'), POST)).toEqual([]);
   });
 
   it('costs a striker what the thorned enemy it struck carries', () => {
-    const state = played('tulsa.striking-a-thorned-enemy-costs-the-striker');
+    const state = endOf('tulsa.striking-a-thorned-enemy-costs-the-striker');
     const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
     const struck = state.resources['core.health'];
 
