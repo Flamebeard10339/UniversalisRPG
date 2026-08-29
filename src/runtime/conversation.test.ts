@@ -207,6 +207,18 @@ describe('a node the player is given a phrase for', () => {
   });
 });
 
+// A quest is the thing the player is in the middle of, so its line is never the fallback and stands
+// ahead of whatever else the entity holds open. The rest of the list is ordered by the words a player
+// reads, so the two phrases below run the other way round under that ordering on its own.
+describe('a line a quest gives an entity', () => {
+  const errand = ['# quest an-errand', 'title: An Errand', '', 'stage asking:', '  log: Asked.', '  miki says:', '    ask: What was that errand?', '    There is a thing I need.', '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
+  const bar = ['# dialogue miki', 'owner = miki', '', 'node the-ale:', '  always', '  ask: About the ale.', '  Whatever the brewery sends.'].join('\n');
+
+  it('stands first, ahead of a thread the entity holds of its own whose phrase reads earlier', () => {
+    expect(shown(loaded(bar, errand))).toEqual(['What was that errand?', 'About the ale.']);
+  });
+});
+
 // The equivalent of an action's `hidden if:`, written once in the `take:` itself rather than a
 // second time as a condition an author has to keep in step with it.
 describe('a node that would take what the player has not got', () => {
