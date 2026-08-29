@@ -15,11 +15,11 @@ import {
 } from '../content/localChanges';
 import { grammarLines } from '../content/grammarTree';
 import { namesFrom } from '../content/completion';
-import { oneNewline, writtenSections } from '../content/sectionSource';
+import { addressedSections, type AddressedSection } from '../content/sectionSource';
 import { isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, parseUsePayload, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
-import { declaredKey, homelessId } from '../content/resolve';
+import { homelessId } from '../content/resolve';
 import type { Resumption } from './openUniverse';
 import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
@@ -652,27 +652,6 @@ function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResu
   return asSource(grammarLines(kinds));
 }
 
-interface SectionWritten {
-  kind: string;
-  address: string;
-  written: string;
-  text: string;
-}
-
-// Everything one module wrote, at the address the loader files it under. Reading a section out,
-// listing a kind, and refusing an id all come off this one walk, so what /source can hand back and
-// what it can name are the same set and cannot say different things.
-function sectionsWritten(text: string): SectionWritten[] {
-  const sections = writtenSections(oneNewline(text));
-  // A module is which module its own `# info` names, and a section's id inside it is written
-  // module-local. The loader's own answer for what that id is addressed as is asked for rather
-  // than spelled out again, so /source and the view agree about what a thing is called.
-  const namespace = sections.find((section) => section.kind === 'info')?.id ?? null;
-  return sections.flatMap((section) =>
-    section.id === undefined ? [] : [{ kind: section.kind, address: declaredKey(namespace, section.kind, section.id) ?? section.id, written: section.id, text: section.text }],
-  );
-}
-
 // Past this many ids the list is longer than the answer it is standing in for, and Tulsa writes a
 // hundred and twelve items: what an author does next with a list that long is pick a module out of
 // it, so that is what a long one answers with instead.
@@ -691,12 +670,12 @@ function listedRows(addresses: readonly string[]): { rows: string[]; folded: boo
 // What a view prints beside whatever a section offers, under either of the ids that section answers
 // to. This is the half of a choice id that is not the action, so it is built the way the choice id
 // was built rather than recognised by shape.
-const ownerForms = (section: SectionWritten): string[] => [ownerRef(section.kind, section.address), ownerRef(section.kind, section.written)];
+const ownerForms = (section: AddressedSection): string[] => [ownerRef(section.kind, section.address), ownerRef(section.kind, section.id)];
 
 // Every name the engine itself writes one section under: the id its author typed inside the module,
 // the address the loader files it at, and the owner a view prints. An author types one of the first
 // two and a player is handed the third, so all of them have to arrive here.
-const namesOf = (section: SectionWritten): string[] => [section.written, section.address, ...ownerForms(section)];
+const namesOf = (section: AddressedSection): string[] => [section.id, section.address, ...ownerForms(section)];
 
 // A choice id is an action on an owner, and the owner is the section the action is written in. The
 // engine composed that id out of the two, so its own reading of it is asked for rather than the id
@@ -711,7 +690,7 @@ const wroteAs = (at: NamedSection): string => (at.kind === null ? String(at.id) 
 // An id that names nothing is nearly always an id half-remembered, and the editing page already has
 // the rule for whether an address answers to a word somebody typed — it is asked here rather than
 // guessed at again, so a refusal points at exactly what a completion would have offered.
-function noSuchSection(at: NamedSection, loaded: readonly SectionWritten[]): CommandResult {
+function noSuchSection(at: NamedSection, loaded: readonly AddressedSection[]): CommandResult {
   const near = loaded.filter((section) => namesOf(section).some((name) => namesFrom(name, at.id!))).map((section) => section.address);
   const under = at.kind === null ? 'loaded' : `loaded as # ${at.kind}`;
   if (near.length === 0) {
@@ -725,8 +704,8 @@ function noSuchSection(at: NamedSection, loaded: readonly SectionWritten[]): Com
 // An id that is at once a section's own name and an action on a different section is an id whose
 // reader meant one of the two, and nothing in the id says which. Both readings are named rather
 // than one of them picked.
-function bothWays(at: NamedSection, named: readonly SectionWritten[], owning: readonly SectionWritten[]): CommandResult {
-  const rows = (sections: readonly SectionWritten[], as: string): string[] => [...new Set(sections.map((section) => `  # ${section.kind} ${section.address} — ${as}`))].sort();
+function bothWays(at: NamedSection, named: readonly AddressedSection[], owning: readonly AddressedSection[]): CommandResult {
+  const rows = (sections: readonly AddressedSection[], as: string): string[] => [...new Set(sections.map((section) => `  # ${section.kind} ${section.address} — ${as}`))].sort();
   return noted('error', `${at.id} reads two ways and nothing in it says which`, [...rows(named, 'a section written under that id'), ...rows(owning, 'the section an action of that id is written in')]);
 }
 
@@ -738,9 +717,9 @@ function bothWays(at: NamedSection, named: readonly SectionWritten[], owning: re
 function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
-  let written: SectionWritten[];
+  let written: AddressedSection[];
   try {
-    written = [...authoring.baseSources, authoring.localSource].flatMap((module) => sectionsWritten(module.text));
+    written = [...authoring.baseSources, authoring.localSource].flatMap((module) => addressedSections(module).sections);
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
     throw error;

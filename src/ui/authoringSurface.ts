@@ -1,6 +1,7 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { sameSection } from '../content/namespace';
 import { declaredKey } from '../content/resolve';
-import { oneNewline, writtenSections, type WrittenSection } from '../content/sectionSource';
+import { addressedSections, HEADING_KIND, oneNewline, type WrittenModule } from '../content/sectionSource';
 import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
@@ -21,35 +22,31 @@ export type SurfaceId = (typeof SURFACES)[number];
 
 export const MAPPED_KIND = 'location';
 
-const HEADER_KIND = 'info';
-
-// What the loader would file this section under, asked of the loader rather than worked out again
-// here: an owned id that already names a module is a section of that module's being edited from this
-// one, and re-qualifying it would address a section nothing declares.
-const addressOf = (module: string, kind: string, id: string): string => (module === LOCAL_CHANGES_MODULE_ID ? id : (declaredKey(module, kind, id) ?? id));
-
+// A module's own heading is not a section anybody edits here. Everything else it wrote is handed over
+// headed by the address it answers to rather than by the id its author typed inside the file, so a
+// section reads the same wherever it came from, and under that heading stand the author's own bytes.
+// A module nothing here can read holds nothing to offer, which is what a file half-typed is.
 export function sectionsIn(source: ModuleSource): Section[] {
-  let split: WrittenSection[];
+  let written: WrittenModule;
   try {
-    split = writtenSections(oneNewline(source.text));
+    written = addressedSections(source);
   } catch (error) {
     if (error instanceof DslError) return [];
     throw error;
   }
-  const module = split.find((section) => section.kind === HEADER_KIND)?.id ?? source.name;
-  return split.flatMap((section) => {
-    if (section.kind === HEADER_KIND || !section.id) return [];
-    const address = addressOf(module, section.kind, section.id);
-    return [
-      {
-        kind: section.kind,
-        address,
-        text: [`# ${section.kind} ${address}`, ...section.text.split('\n').slice(1)].join('\n'),
-        module,
-        staged: module === LOCAL_CHANGES_MODULE_ID,
-      },
-    ];
-  });
+  return written.sections.flatMap((section) =>
+    section.kind === HEADING_KIND
+      ? []
+      : [
+          {
+            kind: section.kind,
+            address: section.address,
+            text: [`# ${section.kind} ${section.address}`, ...section.text.split('\n').slice(1)].join('\n'),
+            module: written.module,
+            staged: written.module === LOCAL_CHANGES_MODULE_ID,
+          },
+        ],
+  );
 }
 
 const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
@@ -59,7 +56,7 @@ const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section
 // declaring body is the one an author drags, types over and reads, so it is the one kept — asked of
 // the loader's own rule about which module an id belongs to rather than of the order the sources
 // happen to arrive in.
-const declares = (section: Section): boolean => addressOf(section.module, section.kind, section.address) === section.address;
+const declares = (section: Section): boolean => (declaredKey(section.module, section.kind, section.address) ?? section.address) === section.address;
 
 export function addressable(sources: readonly ModuleSource[]): Section[] {
   const held = new Map<string, Section>();
@@ -100,10 +97,8 @@ export interface Standing {
 
 export const NOWHERE: Standing = { location: '', entities: [] };
 
-export const names = (published: string, address: string): boolean => published === address || published.endsWith(`.${address}`) || address.endsWith(`.${published}`);
-
 const standingIn = (section: Section, standing: Standing): boolean =>
-  section.kind === MAPPED_KIND ? names(standing.location, section.address) : standing.entities.some((entity) => names(entity, section.address));
+  section.kind === MAPPED_KIND ? sameSection(standing.location, section.address) : standing.entities.some((entity) => sameSection(entity, section.address));
 
 export function surfaceOf(section: Section, standing: Standing): SurfaceId {
   if (standingIn(section, standing)) return 'local';
