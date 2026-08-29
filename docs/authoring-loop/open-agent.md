@@ -221,40 +221,6 @@ today — the type is just not named where it is used.
 re-exported from `session.ts` so no published surface changes, and `madeOf` names
 it.
 
-## Nothing refuses two rooms standing in one place
-
-Two `# location`s at the same `x/y/z` load clean, validate clean, and draw stacked on
-the map. `src/content/sections/location.ts:170-188` has no uniqueness check, and
-`spotOf` (`src/ui/discovery.ts:74-76`) is `at.x * PER_UNIT` with nothing behind it.
-
-Not hypothetical: **the shipped corpus had one**. `proving-ground` and `riverside` were
-both at `(5,1)`, drawing on top of each other, and it was found on 2026-08-26 only
-because a lane laying out a grid town wrote its own throwaway collision check to protect
-its own work — nothing in the repo would have said so. Relative placement (`east of X`)
-moves exactly one unit per step and resolves recursively, so a chain of them collides by
-accident easily.
-
-*Closes when:* the load path refuses a collision, naming both rooms. About ten lines over
-`registry.locations`, and it must exempt nothing — a genuine stack of floors already
-differs in `z` and passes on its own. It belongs in `src/content/`, beside the other
-things a location is refused for.
-
-## `north of X` draws X's neighbour below it
-
-`src/content/sections/location.ts:104` maps `north` to `[0, 1, 0]`, and `src/ui/discovery.ts:74-76`
-maps `y` straight to screen-y, where larger is *further down*. So a room written
-`north of market-square` is drawn south of it.
-
-The corpus already disagrees with itself about which convention it is using, which is how
-this survived unnoticed: some rooms are placed by the relative word and some by an explicit
-`y:`, and the two do not agree.
-
-*Closes when:* either the vector flips or the words are renamed, and the corpus is made
-consistent with whichever is chosen. **Check both spellings across `content/` before
-flipping anything** — the change that is one line in `location.ts` is a sweep through every
-explicit `y:` in the corpus, and the map's `CLIMB_NUDGE` for off-plane rooms reads the same
-axis.
-
 ## `--record` cannot refuse to print a body from a walk that stopped short
 
 `npm run probe -- content --record <test-id>` prints the run's verdict above the body, so a
