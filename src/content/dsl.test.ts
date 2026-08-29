@@ -19,7 +19,9 @@ import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, se
 import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
 import { isBase } from './sections/item';
+import { WEIGHT_SITE } from './refs';
 import { canSerialize, roundTripUniverse } from './serialize';
+import { tagClause } from '../grammar/tagClause';
 import { shippedSources } from './shipped';
 import type { Directive } from './sections/test';
 
@@ -643,6 +645,39 @@ describe('an action the corpus writes', () => {
     );
 
     expect([...new Set(unoffered)]).toEqual([]);
+  });
+});
+
+// A `one of:` row weight is a share of one total, so the mark's number and the player's stat are
+// written in the same units and the odds of the roll are their ratio. A percentage bonus to a stat
+// standing in such a row therefore multiplies those odds by that percentage outright, wherever the
+// numbers happen to stand — where a flat bonus moves them in the units the marks themselves are
+// written in. Both sides are read off the shipped corpus: every stat any kind names in a weight,
+// against every percentage an item carries, so a kind, a mark or a buff written next month is held
+// to this with no edit. The raise a `# skill` grants its own stat per level is the engine's rule and
+// nobody's tag, so it is no subject here and a level still tells.
+describe('a stat the corpus contests as a one of: row weight', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const contested = new Set<string>();
+  for (const [kind, primary] of contentSectionMaps()) {
+    for (const [id, value] of mapOf(registry, primary)) {
+      sectionFor(kind)!.visit(value as never, `# ${kind} ${id}`, (names, named, where) => {
+        if (names === 'stat' && where.endsWith(WEIGHT_SITE)) contested.add(named);
+        return named;
+      });
+    }
+  }
+
+  it('is contested by enough of the corpus, under more than one skill, for what is below to mean something', () => {
+    expect(contested.size).toBeGreaterThan(1);
+  });
+
+  it('carries no percentage an item writes, since a percentage on a share swings the roll by that factor and says so nowhere', () => {
+    const multiplied = [...registry.items.values()].flatMap((item) =>
+      item.tags.flatMap((tag) => (tag.kind === 'stat-bonus' && tag.percent && contested.has(tag.statId) ? [`# item ${item.id}: ${tagClause.print(tag)}`] : [])),
+    );
+
+    expect(multiplied).toEqual([]);
   });
 });
 

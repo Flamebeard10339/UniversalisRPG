@@ -10,6 +10,8 @@ import { COUNTERS, TagClause } from '../grammar/tagClause';
 
 export const INFLICT_SITE = 'inflict:';
 
+export const WEIGHT_SITE = 'one of: row';
+
 export type ReferenceKind = string;
 
 export type Visit = (kind: ReferenceKind, id: string, where: string) => string;
@@ -130,8 +132,8 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         break;
       case 'one-of':
         for (const row of result.rows) {
-          put(row, 'weight', 'stat', `${where} one of: row`, visit);
-          condition(row.requires, `${where} one of: row if`, visit);
+          put(row, 'weight', 'stat', `${where} ${WEIGHT_SITE}`, visit);
+          condition(row.requires, `${where} ${WEIGHT_SITE} if`, visit);
         }
         break;
       case 'xp':
