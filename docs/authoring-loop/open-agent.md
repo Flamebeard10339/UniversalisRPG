@@ -225,66 +225,6 @@ section whose namespace names a loaded module into that module's file, landing a
 sections already of its kind, the way `npm run move-sections` already does it. Refusing a
 bare unqualified id at `/dsl` is what makes the rule legible at the point of writing.
 
-## The playbot cannot ask what a kind may hold
-
-`sdkOptionsFor` passes `tools: []` and the reply schema is one flat JSON object, so the
-model's only channel is one line of this game's own command line per turn. No command
-prints a kind's grammar: the two renderers are `scripts/oracle.ts` — which itself imports
-`src/ui/offerGroups` — and `src/ui/editControls.ts`, both above `runtime`, so a `/grammar`
-command cannot reuse either. It could read `sectionFor(kind).grammar` (`content` is below
-it) and render it a third time, which is the thing this repo is worst at.
-
-The measurement that bounds the alternative: `systemPromptFor('author')` is 11,971
-characters today, and the oracle's own output for the kinds a quest touches is about
-25.6 KB — `item` 9.3 KB, `entity` 7.9, `quest` 7.0, `location` 5.8, `dialogue` 4.9. Putting
-them in the prompt roughly triples it. That is a cache write once per run and a cache read
-per turn, so the price is small; the cost is dilution of a prompt whose whole subject is
-*you are the player and not the author*.
-
-*Closes when:* the grammar is in reach of a run without a third renderer existing — either
-the oracle's rendering moves down beside the declarations it reads and an `audience: 'author'`
-command prints it, or the editing modes' prompts carry the kinds they are allowed to write
-and the choice is stated where the mode is declared. Not both.
-
-## The playbot's mode carries framing but not ability
-
-`MODE_FRAMING: Record<PlaybotMode, string>` is the whole of what a mode is, and two places
-hardcode the player audience instead of reading it: `playerCommands()` filters
-`audience === 'player'` for the vocabulary block, and `offMenuCommand` refuses any
-non-player command **before `runLine` sees it** — module-level, mode-blind, and the one
-place the classification makes a behavioural difference rather than a prompt-text one.
-`runPlaybot` also builds its context as `newContext(session, view(session))` with no
-options, so `ctx.authoring` is undefined and every authoring command answers
-`local authoring is unavailable.` — `fileAuthoring` (`scripts/play-cli.ts:293`) is exported
-and in the same layer, and passes absolute paths through unchanged, so a bot's own corpus
-copy and local file are the whole of the wiring.
-
-Two hazards in the naming. `--mode author` today means the *exploratory* bot and is also
-the **default** (`parseArgs` initialises `mode = 'author'`), so retiring the token means
-naming a new default, not only rejecting the old one. And `fileAuthoring` snapshots
-`baseSources` at construction while `fileContentReader` re-expands per turn, so a bot that
-authors a new module mid-run stages against a stale dependency list.
-
-*Closes when:* a mode is one declaration holding its framing and the audiences it may run,
-the vocabulary block and the off-menu refusal both read the audiences off it, `requireMode`
-rejects `author` naming both replacements, and `runPlaybot` takes an authoring context.
-Three modes: a reader (today's `author` framing), a bughunter that may fix, and one that
-carries a brief. Nothing new to keep in sync — one entry per mode.
-
-## Reporting has to stay the precondition for fixing, not the alternative
-
-The naive first read is the thing a playbot produces that nothing else can. A bot that can
-edit will answer a gap with a diff, and a diff is the less valuable half — it can be
-re-derived from the report, and the report cannot be re-derived from it.
-
-A required field on the reply would be a second copy of the report and would drift from it.
-The gate is derivable: `runTurn` already holds `deps.log`, so a `/dsl` line may be refused
-on a turn whose journal window carries no non-empty `expected` or `confusion`. Same shape
-as `stoppedBy` — read off the log, nothing stored.
-
-*Closes when:* an editing mode's `/dsl` turn is refused unless the log behind it holds a
-report, proved in `scripts/playbot.test.ts` over a fake client the way `stoppedBy` is.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ
