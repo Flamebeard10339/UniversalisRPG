@@ -252,7 +252,8 @@ function usage(): never {
       'Usage: tsx scripts/consolidate.ts [local=<file>] [content=<a.dsl,b.dsl>] [--dry-run]',
       '',
       'Writes every staged section back into the file that declared its id and empties the local module.',
-      'Refuses as a whole if the result would load into a different universe.',
+      'A section nothing declares yet goes into the file of the module its id names, among the',
+      'sections already of its kind. Refuses as a whole if the result would load into a different universe.',
     ].join('\n'),
   );
   process.exit(1);
