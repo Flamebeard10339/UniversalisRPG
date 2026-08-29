@@ -138,16 +138,6 @@ authoring mistake there is, and it catches it nowhere else either.
 author who meant the loaded one can take it. Not a refusal — the new section has to stay
 available — a report beside it, in the same place `/dsl` already answers.
 
-## A place the map draws still has nowhere to go home to
-
-`/dsl` now refuses an unqualified id, and a qualified one lands in the module its namespace
-names. The map pane was not brought over with it: a new place is written
-`# location local-changes.<id>`, and `contribution:consolidate` correctly answers that
-nothing declares that key, so map-drawn rooms stay staged for ever.
-
-*Closes when:* the map pane names a module the way `/dsl` now makes an author name one, and
-a place drawn on the map consolidates into that module's file.
-
 ## `squash-local-changes` has not been told about a section nothing declares
 
 `npm run contribution:squash` prints one module's canonical source with the staged changes

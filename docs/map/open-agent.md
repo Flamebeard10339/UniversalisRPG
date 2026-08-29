@@ -55,28 +55,3 @@ about a dozen; standing in the castle it is two. Correct, and further from a pic
 than it needs to be.
 *Closes when:* a road that has to bend is drawn bending, or the lattice leaves a lane
 between columns for one to run down.
-
-## `/place` cannot make a place, only move one
-
-Making one is `/dsl location <id> x: …`, which the map pane sends. That is one line
-and it reads well enough, but it is the one map edit that is not a command of its own
-— `/region` now makes a region of a name nothing declares, so the two are no longer
-alike.
-*Closes when:* making a place is `/place` on an id nothing declares, or a command
-beside it, and the map pane sends that.
-
-## The map editor can stage a collision, and only the loader says so
-
-The load path now refuses two places on one square (`refuseStackedLocations`,
-`src/content/sections/location.ts`), naming both rooms. The editor does not: `/place`
-and `/region <id> by <dx> <dy>` write coordinates without asking what already stands
-there, so the staged change loads no further and the author is told only the generic
-*local changes did not load*.
-
-Measured while the refusal was written: `/region castle by 3 -2` carries `castle-hall`
-onto `tulsa.pinewood` at `(8,-6)`, and a `/place` of a new room at `(3,-3)` lands on
-`tulsa.guard-barracks`. Both were live in tests until this branch moved them off.
-
-*Closes when:* `/place` and `/region … by` refuse a move onto an occupied square in the
-author's own words, naming both rooms, reading the same fact the loader reads rather
-than a second copy of it.
