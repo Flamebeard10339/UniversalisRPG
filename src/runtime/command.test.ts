@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest';
 import { createGameState } from './runtime';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { type Registry } from '../content/registry';
-import { loadUniverse } from '../content/load';
+import { loadUniverse, loadUniverseWithDiagnostics } from '../content/load';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { BASE_LANGUAGE, localizerFor } from './localized';
-import { initialLocalChangesModule, renderLocalChangesModule } from '../content/localChanges';
-import { sectionKinds } from '../content/sections';
+import { initialLocalChangesModule, LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
+import { ownedSectionKinds, sectionKinds } from '../content/sections';
+import { shippedSources } from '../content/shipped';
 import type { ModuleSource } from '../content/universe';
 import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
@@ -1256,8 +1257,29 @@ describe('what an author may write, and what is already written', () => {
     expect(runLine(ctx, '/source base.chest').output[0]).toEqual(chest);
     expect(runLine(ctx, '/source entity base.chest').output[0]).toEqual(chest);
 
-    expect(errors(runLine(ctx, '/source item chest'))).toEqual(['nothing loaded is written as # item chest']);
-    expect(errors(runLine(ctx, '/source nobody-at-all'))).toEqual(['nothing loaded is written as nobody-at-all']);
+    expect(errors(runLine(ctx, '/source item chest'))).toEqual(['nothing loaded is written as # item chest; /source item lists the 2 there are']);
+    expect(errors(runLine(ctx, '/source nobody-at-all'))).toEqual(['nothing loaded is written as nobody-at-all; /source <kind> lists what is loaded of a kind']);
+  });
+
+  it('/source with a kind and no id says what is loaded of it, and a word that is a kind is that ask', () => {
+    const { ctx } = authoringFixture();
+
+    const listed = runLine(ctx, '/source entity').output[0];
+    expect(listed.kind === 'source' && listed.lines).toEqual([
+      '1 loaded as # entity; /source entity <id> writes one out as its author wrote it:',
+      '  base.chest',
+    ]);
+    // Every id it lists is one it will read out, which is the whole use of listing them.
+    for (const line of listed.kind === 'source' ? listed.lines.slice(1) : []) expect(errors(runLine(ctx, `/source entity ${line.trim()}`)), line).toEqual([]);
+
+    expect(errors(runLine(ctx, '/source nothing-of-that-kind'))).toEqual(['nothing loaded is written as nothing-of-that-kind; /source <kind> lists what is loaded of a kind']);
+  });
+
+  it('/source refuses an id nothing is written as by naming the loaded ids that id names part of', () => {
+    const { ctx } = authoringFixture();
+    const refused = runLine(ctx, '/source entity base');
+    expect(errors(refused)).toEqual(['nothing loaded is written as # entity base']);
+    expect(messages(refused)[0]!.detail).toEqual(['1 loaded as # entity is named from base:', '  base.chest']);
   });
 
   it('/source reads a section staged this session as readily as one that shipped', () => {
@@ -1275,6 +1297,71 @@ describe('what an author may write, and what is already written', () => {
     expect(errors(runLine(ctx, '/source chest'))).toEqual([UNAVAILABLE]);
     // Grammar is the language itself and not this session's content, so it answers with or without one.
     expect(errors(runLine(ctx, '/grammar item'))).toEqual([]);
+  });
+});
+
+// A brief hands an author a module name and nothing else, and the world it names is far larger than
+// the fixture above: what a listing has to survive is the shipped corpus, where one kind runs to a
+// hundred sections and the id somebody is after is written inside one of eighteen modules.
+describe('finding a section in the shipped world by the only name anyone was given', () => {
+  const opened = (): CommandContext => {
+    const baseSources = [...shippedSources()];
+    const loaded = loadUniverseWithDiagnostics(baseSources);
+    const session = startSession(loaded.registry);
+    const authoring: AuthoringContext = {
+      baseSources,
+      dependencies: loaded.loadedModules,
+      localSource: { name: LOCAL_CHANGES_MODULE_ID, text: initialLocalChangesModule(loaded.loadedModules) },
+    };
+    return newContext(session, view(session), { authoring });
+  };
+
+  const sourced = (ctx: CommandContext, line: string): string[] => {
+    const out = runLine(ctx, line).output[0]!;
+    return out.kind === 'source' ? out.lines : [];
+  };
+
+  // Read off the head line rather than counted here, so a section written next month is counted too.
+  const counted = (head: string): number => Number(/^(\d+) loaded/.exec(head)![1]);
+
+  it('says how many of a kind are loaded, and writes them out unless there are more than a screenful', () => {
+    const ctx = opened();
+    let folded = 0;
+    for (const kind of sectionKinds()) {
+      const lines = sourced(ctx, `/source ${kind}`);
+      if (lines.length === 0) continue;
+      const rows = lines.slice(1);
+      const held = counted(lines[0]!);
+      expect(rows.length, kind).toBeLessThanOrEqual(held);
+      if (rows.length === held) continue;
+      folded += 1;
+      // A folded row stands for a family, and the families it folded to add back up to the whole.
+      expect(rows.map((row) => Number(/\((\d+)\)$/.exec(row)?.[1] ?? 1)).reduce((sum, each) => sum + each, 0), kind).toEqual(held);
+    }
+    // The shipped world is the reason the fold exists; a corpus small enough not to need it would
+    // leave the branch unproved and this says so rather than passing quietly.
+    expect(folded).toBeGreaterThan(0);
+  });
+
+  it('turns the module half of an id into the whole of it, which is all a brief ever gives', () => {
+    const ctx = opened();
+    for (const kind of ownedSectionKinds()) {
+      const listed = sourced(ctx, `/source ${kind}`);
+      if (listed.length === 0) continue;
+      // Whatever the first row names — a family or a whole id — the module is what stands before the
+      // first dot, and that is the half a brief hands over.
+      const module = listed[1]!.trim().split(' ')[0]!.split('.')[0]!;
+
+      const asked = runLine(ctx, `/source ${kind} ${module}`);
+      const named = messages(asked)[0]?.detail ?? sourced(ctx, `/source ${kind} ${module}`).slice(1);
+      const ids = named.map((line) => String(line).trim()).filter((line) => line.startsWith(`${module}.`));
+      expect(ids.length, `${kind} ${module}`).toBeGreaterThan(0);
+
+      // And every id it named is one it will write out, which is the whole use of naming them.
+      // A section is written under its module-local id, or whole where another module patches it.
+      const read = sourced(ctx, `/source ${kind} ${ids[0]}`);
+      expect([`# ${kind} ${ids[0]!.slice(module.length + 1)}`, `# ${kind} ${ids[0]}`], `${kind} ${ids[0]}`).toContain(read[0]);
+    }
   });
 });
 

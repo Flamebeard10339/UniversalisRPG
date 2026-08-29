@@ -14,6 +14,7 @@ import {
   type LocalSection,
 } from '../content/localChanges';
 import { grammarLines } from '../content/grammarTree';
+import { namesFrom } from '../content/completion';
 import { oneNewline, writtenSections } from '../content/sectionSource';
 import { isOwnedKind, isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
@@ -170,9 +171,11 @@ export interface SectionArg {
 // A section somebody is asking to read rather than to write. The kind is optional because an id is
 // what a view prints: an author who has just met `first-steps.guide-house` is asking about that,
 // and knowing it is a `# location` is half of what they were going to read the section to find out.
+// The id is optional the other way round: a kind alone is an author who cannot name anything yet,
+// which is the question that has to be answerable before reading a section is worth anything.
 export interface NamedSection {
   kind: string | null;
-  id: string;
+  id: string | null;
 }
 
 // Where a place is, said either way the language says it: outright, or as one step off another place.
@@ -632,37 +635,83 @@ function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResu
   return asSource(grammarLines(kinds));
 }
 
-// A section as its author wrote it, out of the file it was written in. The world is read for
-// examples far oftener than it is written to, and a printed section is not an example of anything:
-// it has already lost the comments and the `@@@` notes that say what the author was reaching for.
-function sourceMatches(text: string, at: NamedSection): string[] {
+interface SectionWritten {
+  kind: string;
+  address: string;
+  written: string;
+  text: string;
+}
+
+// Everything one module wrote, at the address the loader files it under. Reading a section out,
+// listing a kind, and refusing an id all come off this one walk, so what /source can hand back and
+// what it can name are the same set and cannot say different things.
+function sectionsWritten(text: string): SectionWritten[] {
   const sections = writtenSections(oneNewline(text));
   // A module is which module its own `# info` names, and a section's id inside it is written
   // module-local. The loader's own answer for what that id is addressed as is asked for rather
   // than spelled out again, so /source and the view agree about what a thing is called.
   const namespace = sections.find((section) => section.kind === 'info')?.id ?? null;
-  return sections
-    .filter(
-      (section) =>
-        section.id !== undefined &&
-        (at.kind === null || section.kind === at.kind) &&
-        (section.id === at.id || declaredKey(namespace, section.kind, section.id) === at.id),
-    )
-    .map((section) => section.text);
+  return sections.flatMap((section) =>
+    section.id === undefined ? [] : [{ kind: section.kind, address: declaredKey(namespace, section.kind, section.id) ?? section.id, written: section.id, text: section.text }],
+  );
 }
 
+// Past this many ids the list is longer than the answer it is standing in for, and Tulsa writes a
+// hundred and twelve items: what an author does next with a list that long is pick a module out of
+// it, so that is what a long one answers with instead.
+const SCREENFUL = 24;
+
+// One line per id, or — where there are more of them than a screenful and they gather into fewer
+// families than there are ids — one line per family, since a family is what the next ask narrows to.
+function listedRows(addresses: readonly string[]): { rows: string[]; folded: boolean } {
+  const ids = [...new Set(addresses)].sort();
+  const families = new Map<string, string[]>();
+  for (const id of ids) families.set(id.split('.')[0]!, [...(families.get(id.split('.')[0]!) ?? []), id]);
+  if (ids.length <= SCREENFUL || families.size >= ids.length) return { rows: ids.map((id) => `  ${id}`), folded: false };
+  return { rows: [...families].map(([family, held]) => (held.length === 1 ? `  ${held[0]}` : `  ${family} (${held.length})`)), folded: true };
+}
+
+const wroteAs = (at: NamedSection): string => (at.kind === null ? String(at.id) : `# ${at.kind} ${at.id}`);
+
+// An id that names nothing is nearly always an id half-remembered, and the editing page already has
+// the rule for whether an address answers to a word somebody typed — it is asked here rather than
+// guessed at again, so a refusal points at exactly what a completion would have offered.
+function noSuchSection(at: NamedSection, loaded: readonly SectionWritten[]): CommandResult {
+  const near = loaded.filter((section) => namesFrom(section.address, at.id!)).map((section) => section.address);
+  const under = at.kind === null ? 'loaded' : `loaded as # ${at.kind}`;
+  if (near.length === 0) {
+    const ask = at.kind === null ? '/source <kind> lists what is loaded of a kind' : `/source ${at.kind} lists the ${new Set(loaded.map((section) => section.address)).size} there are`;
+    return noted('error', `nothing loaded is written as ${wroteAs(at)}; ${ask}`);
+  }
+  const { rows } = listedRows(near);
+  return noted('error', `nothing loaded is written as ${wroteAs(at)}`, [`${new Set(near).size} ${under} ${new Set(near).size === 1 ? 'is' : 'are'} named from ${at.id}:`, ...rows]);
+}
+
+// A section as its author wrote it, out of the file it was written in. The world is read for
+// examples far oftener than it is written to, and a printed section is not an example of anything:
+// it has already lost the comments and the `@@@` notes that say what the author was reaching for.
+// Asked with a kind and no id it says which of them there are, because an author who cannot name a
+// section cannot read one, and until this answered nothing did.
 function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
-  let found: string[];
+  let written: SectionWritten[];
   try {
-    found = [...authoring.baseSources, authoring.localSource].flatMap((module) => sourceMatches(module.text, at));
+    written = [...authoring.baseSources, authoring.localSource].flatMap((module) => sectionsWritten(module.text));
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
     throw error;
   }
-  if (found.length === 0) return noted('error', `nothing loaded is written as ${at.kind === null ? at.id : `# ${at.kind} ${at.id}`}`);
-  return asSource(found.flatMap((text, index) => (index === 0 ? [] : ['']).concat(text.split('\n'))));
+  const loaded = at.kind === null ? written : written.filter((section) => section.kind === at.kind);
+  if (at.id === null) {
+    const { rows, folded } = listedRows(loaded.map((section) => section.address));
+    if (rows.length === 0) return noted('error', `nothing loaded is written as # ${at.kind}`);
+    const narrows = folded ? ', and an id naming part of one lists what it names' : '';
+    return asSource([`${new Set(loaded.map((section) => section.address)).size} loaded as # ${at.kind}; /source ${at.kind} <id> writes one out as its author wrote it${narrows}:`, ...rows]);
+  }
+  const found = loaded.filter((section) => section.address === at.id || section.written === at.id);
+  if (found.length === 0) return noSuchSection(at, loaded);
+  return asSource(found.flatMap((section, index) => (index === 0 ? [] : ['']).concat(section.text.split('\n'))));
 }
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {
@@ -1119,12 +1168,16 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '/source',
     arg: 'named',
-    argHint: '<id> | <kind> <id>',
-    summary: 'print a loaded section as its author wrote it, comments and all; with no kind, every section written under that id',
+    argHint: '<kind> | <id> | <kind> <id>',
+    summary: 'print a loaded section as its author wrote it, comments and all; with no kind, every section written under that id; with no id, the ids loaded of that kind',
     audience: 'author',
     parse: (rest) => {
       const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
-      if (!match) return { problem: '/source requires <id> or <kind> <id>' };
+      if (!match) return { problem: '/source requires <kind>, <id> or <kind> <id>' };
+      // One word that is a kind is asking after the kind. An id spelled the same as a kind is still
+      // reachable, under the kind it is of — and a word that names nothing at all is worth more read
+      // as the question somebody could not otherwise ask than as an id that is going to be refused.
+      if (match.kind === undefined && isSectionKind(match.id!)) return { kind: match.id!, id: null };
       return { kind: match.kind ?? null, id: match.id! };
     },
     run: runSource,
