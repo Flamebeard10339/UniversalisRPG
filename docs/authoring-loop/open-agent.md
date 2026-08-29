@@ -88,32 +88,72 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## A bughunter never arrives at an edit, and it is not the framing
+## A bot writes only when the turns run out
 
-Measured over **320 turns in six runs**, three per arm, 2026-08-29. Arm A is the shipped
-`BUGHUNTER_FRAMING`; arm B states repairing in the imperative the way reporting is stated, keeps
-the report-first gate verbatim, and changes nothing else.
+**Four interventions have been measured against this, and the queue below is what is left.** Every
+run was `--mode briefed` or `--mode bughunter` on a copy of `content/`, one bot, default effort,
+2026-08-29. An "edit" is a `/dsl`, `/place`, `/link`, `/unlink` or `/region` typed.
 
-| run | arm | turns | edits | reports | wall s | out tok |
-|---|---|---|---|---|---|---|
-| A1 | baseline | 40 | 0 | 36 | 370 | 23,110 |
-| A2 | baseline | 40 | 0 | 5 | 263 | 14,196 |
-| A3 | baseline | 80 | 0 | 31 | 575 | 34,664 |
-| B1 | imperative | 40 | 0 | 16 | 297 | 17,483 |
-| B2 | imperative | 40 | 0 | 9 | 271 | 13,659 |
-| B3 | imperative | 80 | 0 | 36 | 604 | 34,537 |
+| intervention | arms | turns | first edit | verdict |
+|---|---|---|---|---|
+| framing: repair stated in the imperative | 3 runs each | 320 | never, either arm | **no effect — reverted** |
+| addressing: a view's id readable by `/source` | shipped | 120 after | never | **no effect on its own — kept, it is right anyway** |
+| more turns | 40 vs 80 | 240 | never | **worse**: the 80s read *less* and wandered further |
+| horizon: `Turn N of M` | 2 runs each | 240 | **turn 58 / 59** | **kept** — moves it off zero and nothing more |
 
-**Zero `/dsl`, `/place`, `/link`, `/unlink`, `/region` in all 320 turns, in both arms.** The
-imperative rewrite was measured, found to change nothing, and reverted — the framing is unchanged
-and is not the cause. **The gate was never the obstacle either**: 133 of the 320 turns carried a
-report, so it stood open almost the whole time.
+What is ruled out: the framing, the report gate (133 of 320 turns carried a report, so it stood
+open almost throughout), the vocabulary, and the grammar being out of reach. What is established is
+that a bot **can** author — a truncated one-paragraph brief produced a staged four-stage quest at
+turn 39, and a horizon run staged a flag — and that it will not do so while it has turns left to
+read instead.
 
-The bot does not refuse to edit. It never gets that far, for two reasons the logs show:
+**The standing read: reading is safe and writing risks a refusal**, so the expected value of trying
+is bad until the deadline forces it. Both horizon runs ended by stopping themselves naming the
+deadline — *"Ran out of turns to reload and walk this final edit"* — which no control run ever did.
 
-- **It cannot address the section it wants.** `/source` was typed 11 times in 320 turns and **5 were refused for a guessed id**. The bot reads a choice id off the view — `entity.fishing.shrimp-shoal.net` — and tries `/source entity.fishing.shrimp-shoal`, which is not how `/source` is addressed. It then burns two to four turns triangulating. That is the line below.
-- **The horizon lands mid-diagnosis.** B1's last two turns were `/source quest first-steps.finding-your-feet` and `/source entity first-steps.giant-rat`, drilling into a real bug — three confirmed rat kills not incrementing `first-steps.rats-killed`. The run ended there. **More turns did not help**: both 80-turn runs typed *fewer* source reads than the 40-turn ones, because they wandered further into unfinished play instead.
+**The lever built against that read is shipped and unmeasured.** A refused edit now quotes the line
+as typed, sets under it the shapes the grammar would have taken there, and says outright that
+nothing was written; `/dsl`'s summary says the attempt is free. The lane that built it hit the
+account's spend limit before running its arm, so **whether it moves the first edit earlier than
+turn 58 is not known**. That measurement is the next thing to take, and it is one run against the
+horizon numbers above — the controls do not need re-running.
 
-*Closes when:* a bughunter run reaches an edit, or it is known why one never can. The two things
-to try first, in this order: open the run on `--save` in finished content rather than in the
-tutorial, where every run so far spent its first ten to fifteen turns; and close the addressing
-line below, which is the one measured cost between a report and an edit.
+*Closes when:* the first edit lands early enough in a run that the run can walk what it wrote. If
+the cheaper refusal does not do it, the untried levers are: opening on a `--save` in finished
+content rather than the tutorial, where every run so far spent its first ten to fifteen turns; and
+a brief so small there is nothing to defer into — which is the shape the deliverable line below
+now depends on.
+
+## Ball of a Boy is still unauthored, and the approach to take is known
+
+The quest is the push's deliverable and it did not land. `content/ball-of-a-boy.dsl` still holds
+`# quest down-the-grate` as a stub with one stage and its `@@@`. Tulsa ships the whole physical
+world for it — `mouse` and `sewer-grate` in the market square, `larry` on the hatch,
+`sewer-entrance` → `sewer-junction` → `sewer-outfall` → `sewer-locked-room`, `# item sewer-key`,
+`# flag sewer-toll-paid`, `# droptable ratman-remains`, and dialogue for Mouse, Larry and Charlie —
+so this is quest stages, dialogue gated on them, Larry's toll and the ratman book, and no engine
+work under it.
+
+`tulsa.sewer-toll-paid` is read by the road out of `castle-yard` and **nothing in the corpus sets
+it**, so that road is unreachable until this is written.
+
+**The approach, chosen against what was measured and not yet run:** several short briefed runs of
+25–40 turns, one beat per brief, all staging into the same accumulating `--local` file so each run
+opens with the last one's work already in the world. A small brief and a short run take away the
+room to defer into, which is what every long run used up. The lane that would have run this hit the
+spend limit before its first run.
+
+*Closes when:* the quest is authored by a bot, consolidated into `content/ball-of-a-boy.dsl` by
+`npm run contribution:consolidate`, and walked by a corpus `# test`. **If it is hand-authored
+instead, the exercise has failed and the commit says so** — the point is not the quest, it is
+whether a bot can write one.
+
+## Two traps that cost a run each, written down so they do not cost a third
+
+- **`npx` on Windows truncates a multi-line argument at its first newline and silently drops every argument after it.** A briefed run was launched with `--brief "$(cat brief.txt)" --save … --local … --turns 100`; `parseArgs` received five arguments, not nine. The bot ran with a one-paragraph brief, no `--save`, and staged into the shipped corpus. Nothing said so. **Use `node --import tsx scripts/playbot.ts`.**
+- **Nothing detects a truncated brief.** The run above was read as evidence for two hours before the cause was found. A brief that arrives as one line is indistinguishable from a brief that was one line.
+
+*Closes when:* a run refuses, or at least says out loud, that its brief arrived as a single line
+when the operator passed a file — or the brief is passed as a file rather than as an argument, which
+removes the shape of the trap rather than reporting it.
+
