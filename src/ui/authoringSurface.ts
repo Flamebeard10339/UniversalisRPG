@@ -1,5 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { declaredKey } from '../content/resolve';
+import { oneNewline, writtenSections, type WrittenSection } from '../content/sectionSource';
 import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
@@ -21,18 +22,15 @@ export const MAPPED_KIND = 'location';
 
 const HEADER_KIND = 'info';
 
-const normalized = (text: string): string => text.replace(/\r\n?/g, '\n');
-
 // What the loader would file this section under, asked of the loader rather than worked out again
 // here: an owned id that already names a module is a section of that module's being edited from this
 // one, and re-qualifying it would address a section nothing declares.
 const addressOf = (module: string, kind: string, id: string): string => (module === LOCAL_CHANGES_MODULE_ID ? id : (declaredKey(module, kind, id) ?? id));
 
 export function sectionsIn(source: ModuleSource): Section[] {
-  const text = normalized(source.text);
-  let split;
+  let split: WrittenSection[];
   try {
-    split = splitSections(text);
+    split = writtenSections(oneNewline(source.text));
   } catch (error) {
     if (error instanceof DslError) return [];
     throw error;
@@ -41,12 +39,11 @@ export function sectionsIn(source: ModuleSource): Section[] {
   return split.flatMap((section) => {
     if (section.kind === HEADER_KIND || !section.id) return [];
     const address = addressOf(module, section.kind, section.id);
-    const written = text.slice(section.span.start, section.span.end).trimEnd().split('\n');
     return [
       {
         kind: section.kind,
         address,
-        text: [`# ${section.kind} ${address}`, ...written.slice(1)].join('\n'),
+        text: [`# ${section.kind} ${address}`, ...section.text.split('\n').slice(1)].join('\n'),
         module,
         staged: module === LOCAL_CHANGES_MODULE_ID,
       },
@@ -181,7 +178,7 @@ export const BODY_SEPARATOR = '|';
 const HEADING = /^#[ \t]/;
 
 export function stage(text: string): Staged {
-  const lines = normalized(text).split('\n');
+  const lines = oneNewline(text).split('\n');
   const at = lines.findIndex((line) => HEADING.test(line));
   if (at < 0) return { refused: 'an edit starts with the section it is: # <kind> <id>' };
   if (lines.some((line) => line.includes(BODY_SEPARATOR))) {
