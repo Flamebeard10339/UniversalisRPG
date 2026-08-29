@@ -7,7 +7,7 @@ import { EVERY_SECTION, sectionFor, sectionKinds } from './sections';
 
 const STEP = '  ';
 // No line of the language begins with this, so what is written out here can be told from what an author writes.
-const PART = '· ';
+export const PART = '· ';
 
 // A block is known by the lines it holds and what they name, so the one the results grammar repeats down every branch is written out once and pointed at thereafter, while two lists of bare ids that name different kinds stay apart.
 const signOf = (lines: readonly Written[]): string => lines.map((line) => `${line.form} names ${namesKind(line) ?? 'nothing'}`).join('|');
@@ -113,7 +113,8 @@ export function treeOf(kind: string, seen: Seen = freshly()): string[] {
 // The heading the lines every kind takes stand under, which is not a kind and so is not written as one.
 const EVERY_HEAD = 'every section, of whatever kind';
 
-const headingOf = (called: string): string => `a <${called}> is written`;
+// The name first, because a line elsewhere points back at this by the hole an author types and a reader has to find it by the same word.
+export const headingOf = (called: string): string => `<${called}>, wherever a line takes one`;
 
 // Every grammar the page names rather than writing out where it stands, found by walking what the
 // kinds' own lines hold. A grammar named next month is written out here for having been named, and
@@ -148,12 +149,13 @@ function preamble(kinds: readonly string[], seen: Seen): string[] {
   const every: Already = { kind: EVERY_HEAD, seen };
   const out = [`${PART}${EVERY_HEAD}`, ...treeLines(EVERY_SECTION, '', sitting, every, EVERY_HEAD), ''];
   for (const held of namedGrammars(kinds)) {
-    const heading = headingOf(held.called!);
-    const already: Already = { kind: heading, seen };
+    // The heading is a sentence and the name is what a line elsewhere writes, so a pointer back at this reads as the hole an author types rather than as the sentence over it.
+    const name = `<${held.called!}>`;
+    const already: Already = { kind: name, seen };
     const block = writtenFrom(held);
-    // Registered under the heading as well as written out under it, so a keyword whose indented block is this grammar points back here rather than repeating it.
-    holdNow(already, signOf(block), heading);
-    out.push(`${PART}${heading}`, ...treeLines(block, '', sitting, already, heading), '');
+    // Registered as well as written out, so a keyword whose indented block is this grammar points back here rather than repeating it.
+    holdNow(already, signOf(block), name);
+    out.push(`${PART}${headingOf(held.called!)}`, ...treeLines(block, '', sitting, already, name), '');
   }
   return out;
 }

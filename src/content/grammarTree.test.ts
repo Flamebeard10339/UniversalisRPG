@@ -3,9 +3,10 @@ import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
 import { literalOf, offeringAt } from './completion';
 import { sectionFor, sectionKinds } from './sections';
-import { grammarLines, namedGrammars, RULES, standingAt, treeOf } from './grammarTree';
+import { grammarLines, headingOf, namedGrammars, PART, RULES, standingAt, treeOf } from './grammarTree';
 
-const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
+// A pointer names the line it points at, and where that line stands when it is under another heading.
+const REFERS = /…indented under it, what `(?<form>[^`]+)`(?: under `(?<kind>[^`]+)`)? holds$/;
 
 describe('the grammar tree', () => {
   it.each(sectionKinds())('%s is written out once, however deep its blocks reach', (kind) => {
@@ -106,9 +107,28 @@ describe('the grammar tree', () => {
       // A heading stands at the left margin and a pointer back at it is indented, which is how the one
       // place the grammar is opened is told from the lines that only send a reader to it.
       it.each(named)('%s is opened in one place, however many kinds take one', (called) => {
-        const opened = grammarLines().filter((line) => line === line.trimStart() && line.includes(`<${called}> is written`));
-        expect(opened).toHaveLength(1);
+        expect(grammarLines().filter((line) => line === `${PART}${headingOf(called)}`)).toHaveLength(1);
       });
+    });
+
+    // The same claim the kinds' own trees are held to, asked of the page they are read on: a pointer
+    // that resolves under one heading and dangles on the whole answer is the page an author meets.
+    it('points only back at something it has already written out', () => {
+      const page = grammarLines();
+      // A part is opened under the marker that says it is not a line anyone writes; a keyword opens itself.
+      const opens = (line: string, form: string): boolean => {
+        const bare = line.trim();
+        return (bare.startsWith(PART) ? bare.slice(PART.length) : bare).startsWith(form);
+      };
+      for (const [at, line] of page.entries()) {
+        const said = REFERS.exec(line)?.groups;
+        if (said === undefined) continue;
+        const above = page.slice(0, at);
+        // Both halves have to stand above: the line the pointer names, and the heading it says to find it under.
+        for (const named of [said.form!, ...(said.kind === undefined ? [] : [said.kind])]) {
+          expect(above.some((earlier) => opens(earlier, named)), `nothing above ${JSON.stringify(line)} opens ${named}`).toBe(true);
+        }
+      }
     });
 
     it.each([1, sectionKinds().length])('says each rule once over %i kind(s)', (count) => {
