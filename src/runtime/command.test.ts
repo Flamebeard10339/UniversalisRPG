@@ -14,7 +14,8 @@ import type { ModuleSource } from '../content/universe';
 import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
 import { FIXTURE_WORLD } from '../content/worldFixture';
-import { runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
+import { choiceToDirective, runTest, serializeSession, sessionStatus, startSession, view, type PlaySession } from './session';
+import { usePayload, type UseDirective } from '../content/sections/test';
 import {
   COMMANDS,
   createTicker,
@@ -1216,8 +1217,9 @@ open:
 title: Coin
 `;
 
-function authoringFixture() {
-  const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: AUTHORING_MODULE }];
+function authoringFixture(alsoWritten = '') {
+  const module = AUTHORING_MODULE + alsoWritten;
+  const baseSources: ModuleSource[] = [engineLocale(), { name: 'base', text: module }];
   const writes: string[] = [];
   let onDisk = initialLocalChangesModule(['base']);
   const authoring: AuthoringContext = {
@@ -1232,7 +1234,7 @@ function authoringFixture() {
   };
   const elsewhere = (...sections: string[]): void => void (onDisk = renderLocalChangesModule(['base'], sections));
   const elsewhereWholeFile = (text: string): void => void (onDisk = text);
-  return { ...fixture(AUTHORING_MODULE, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
+  return { ...fixture(module, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
 }
 
 // An author writing a section has two questions, and neither of them is answerable from the view:
@@ -1293,6 +1295,17 @@ describe('what an author may write, and what is already written', () => {
     const refused = runLine(ctx, '/source entity base');
     expect(errors(refused)).toEqual(['nothing loaded is written as # entity base']);
     expect(messages(refused)[0]!.detail).toEqual(['1 loaded as # entity is named from base:', '  base.chest']);
+  });
+
+  it('/source refuses an id that is at once a section and an action on another, and names both readings', () => {
+    const { ctx } = authoringFixture('\n# entity base\ntitle: Base\nchest:\n  say: A crate of them.\n');
+
+    const refused = runLine(ctx, '/source entity.base.chest');
+    expect(errors(refused)).toEqual(['entity.base.chest reads two ways and nothing in it says which']);
+    expect(messages(refused)[0]!.detail).toEqual([
+      '  # entity base.chest — a section written under that id',
+      '  # entity base.base — the section an action of that id is written in',
+    ]);
   });
 
   it('/source reads a section staged this session as readily as one that shipped', () => {
@@ -1374,6 +1387,25 @@ describe('finding a section in the shipped world by the only name anyone was giv
       // A section is written under its module-local id, or whole where another module patches it.
       const read = sourced(ctx, `/source ${kind} ${ids[0]}`);
       expect([`# ${kind} ${ids[0]!.slice(module.length + 1)}`, `# ${kind} ${ids[0]}`], `${kind} ${ids[0]}`).toContain(read[0]);
+    }
+  });
+
+  // The ids an author has in hand are the ones a run just printed at them, and a choice id names an
+  // action on an owner rather than a section. The section it reads out is the owner's, because the
+  // owner is the file the action is written in. Subjects are whatever the world offers where the
+  // player is standing, so an offer added next month is asked about too.
+  it('reads out an owner from the choice id of one of its actions, and from the owner id alone', () => {
+    const ctx = opened();
+    const asked = sessionStatus(ctx.session)
+      .choices.map((choice) => choiceToDirective(choice))
+      .filter((directive): directive is UseDirective => directive.kind === 'use');
+    expect(asked.length).toBeGreaterThan(0);
+
+    for (const use of asked) {
+      const read = sourced(ctx, `/source ${usePayload(use)}`);
+      expect([`# ${use.obj} ${use.objId.slice(use.objId.indexOf('.') + 1)}`, `# ${use.obj} ${use.objId}`], usePayload(use)).toContain(read[0]);
+      // The owner on its own is the other half of what a view prints, and it names the same section.
+      expect(sourced(ctx, `/source ${use.obj}.${use.objId}`), use.objId).toEqual(read);
     }
   });
 
