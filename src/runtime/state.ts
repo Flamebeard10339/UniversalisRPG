@@ -99,7 +99,7 @@ export interface DialogueCursor {
 export type ModalAnswers = Readonly<Record<Answer, Answer>>;
 
 export type ModalFrame =
-  | { readonly name: 'name-yourself'; readonly answers: ModalAnswers }
+  | { readonly name: 'choose-name'; readonly answers: ModalAnswers }
   | { readonly name: 'choose-race'; readonly answers: ModalAnswers }
   | { readonly name: 'carried-items'; readonly answers: ModalAnswers }
   | { readonly name: 'item-plane'; readonly answers: ModalAnswers; readonly target: string; readonly hex: string; readonly said?: Said }

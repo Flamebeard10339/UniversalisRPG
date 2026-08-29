@@ -77,7 +77,7 @@ const DRIVER_MODULE = {
     'look in:',
     '  instant',
     '  open modal: choose-race',
-    '  open modal: name-yourself',
+    '  open modal: choose-name',
     '',
   ].join('\n'),
 };

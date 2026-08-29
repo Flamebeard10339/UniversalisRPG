@@ -123,7 +123,7 @@ entities:
 look in:
   instant
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
 
 # race human
 
@@ -147,7 +147,7 @@ node greeting:
     let v = apply(session, 'use:entity.mirror.look-in');
     expect(v.modals).toEqual([
       { name: 'choose-race', leaving: null, options: [{ key: 'race', label: 'Race', values: [['human', 'Human'], ['elf', 'Elf'], ['dwarf', 'Dwarf'], ['orc', 'Orc']].map(([value, shown]) => ({ value, shown })) }] },
-      { name: 'name-yourself', leaving: null, options: [{ key: 'name', label: 'Name', values: null }] },
+      { name: 'choose-name', leaving: null, options: [{ key: 'name', label: 'Name', values: null }] },
     ]);
     expect(v.player).toEqual({ name: null, race: null });
 
@@ -520,7 +520,7 @@ entities:
 look in:
   instant
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
 
 # race human
 
@@ -569,7 +569,7 @@ submit-modal: choice=0
   it('fails, naming the modal, and passes once every option of it is answered', () => {
     const registry = loadInEnglish(module);
 
-    expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: name-yourself' });
+    expect(runTest('leaves-the-modal-open', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: choose-name' });
     expect(runTest('half-answers-the-modal', registry, createGameState())).toEqual({ passed: false, failure: 'modal left open: choose-race' });
 
     const answered = createGameState();
@@ -1099,7 +1099,7 @@ examine: Warm.
 look in:
   instant
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
 
 # race human
 

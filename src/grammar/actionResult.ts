@@ -15,7 +15,7 @@ export type Party = 'me' | 'them';
 export const STARTING_LOCATION = 'starting-location';
 
 // The screens the engine runs, and the whole of what `open modal:` may name. It is written beside the syntax because a screen is not something a module declares: a content kind holding the list could only restate this one, and the engine's own openers key off it from above.
-export const MODAL_SCREENS = ['name-yourself', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown'] as const;
+export const MODAL_SCREENS = ['choose-name', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown'] as const;
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
 
@@ -544,12 +544,15 @@ const RESULT: Holds = () => ({ result: actionResult });
 
 const ROW = 'one of these';
 
+// The three shapes are one row written three ways — a result inline, the word for no result, and a block of results — so the page says the row once and they stand together on its line.
+const ROW_NOTE = 'one of these is picked, weighed against the rows beside it';
+
 const WEIGHTED = { names: { weight: 'stat' }, holds: () => ({ condition, result: actionResult }) };
 
 const ROWS: readonly Written[] = [
-  { form: '<weight>[ if <condition>]: <result>', example: '3x: give: plank', family: ROW, ...WEIGHTED },
-  { form: '<weight>[ if <condition>]: nothing', example: '5x: nothing', family: ROW, ...WEIGHTED },
-  { form: '<weight>[ if <condition>]:', example: '3x if has-key:', family: ROW, ...WEIGHTED, block: () => resultGrammar() },
+  { form: '<weight>[ if <condition>]: <result>', example: '3x: give: plank', family: ROW, ...WEIGHTED, note: ROW_NOTE },
+  { form: '<weight>[ if <condition>]: nothing', example: '5x: nothing', family: ROW, ...WEIGHTED, note: ROW_NOTE },
+  { form: '<weight>[ if <condition>]:', example: '3x if has-key:', family: ROW, ...WEIGHTED, note: ROW_NOTE, block: () => resultGrammar() },
 ];
 
 export const HAPPENS = 'what happens';

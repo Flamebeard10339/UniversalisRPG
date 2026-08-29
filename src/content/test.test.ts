@@ -207,13 +207,13 @@ describe('expect only: compares just what the save names', () => {
 
 describe('open-modal: raises a screen by name', () => {
   it('takes the name of the screen and nothing else, so the route onto one is a recorded line', () => {
-    const source = ['# test opening', 'open-modal: name-yourself', 'open-modal: carried-items'].join('\n');
+    const source = ['# test opening', 'open-modal: choose-name', 'open-modal: carried-items'].join('\n');
     const [section] = parseModule(source) as {
       value: { directives: unknown[] };
     }[];
 
     expect(section.value.directives).toEqual([
-      { kind: 'open-modal', modal: 'name-yourself' },
+      { kind: 'open-modal', modal: 'choose-name' },
       { kind: 'open-modal', modal: 'carried-items' },
     ]);
   });

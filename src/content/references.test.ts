@@ -266,7 +266,7 @@ ${line}
 # test walk
 ${line}
 `);
-    expect(test('open-modal: name-yourself')).not.toThrow();
+    expect(test('open-modal: choose-name')).not.toThrow();
     expect(test('open-modal: no-such-screen')).toThrow(/a modal screen must be one of/);
   });
 

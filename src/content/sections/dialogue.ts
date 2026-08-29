@@ -31,7 +31,6 @@ export interface DialogueNode {
   always?: boolean;
   when?: Condition;
   ask?: Asked;
-  once?: boolean;
   sticky?: boolean;
   again?: Spoken;
   steps: NodeStep[];
@@ -98,12 +97,11 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open' },
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread; a thread with no `ask:` is named in the list by the first line it says' },
-  { form: 'once', example: 'once', family: 'reached when' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
   { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without `sticky` says on a visit after its first, instead of the silence it would fall to' },
   { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
   GOES(goes),
-  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => calledBlock('choice', [{ ...GOES(goes), note: 'where picking this choice leads' }, ...resultGrammar()]) },
+  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ ...GOES(goes), note: 'where picking this choice leads' }, ...resultGrammar()] },
   ...resultGrammar(),
   ]);
 
@@ -139,7 +137,6 @@ export function parseNode(name: string, source: RawLine): DialogueNode {
     else if (again) node.again = { segments: parseSegments(again.text, line.span.start) };
     else if (ask) node.ask = { kind: 'say', text: ask.text! };
     else if (line.text === 'always') node.always = true;
-    else if (line.text === 'once') node.once = true;
     else if (line.text === 'sticky') node.sticky = true;
     else if (goto) node.steps.push({ kind: 'goto', target: goto.target });
     else if (startsResult(new Cursor(line.text))) for (const result of parseResultLine(line)) node.steps.push({ kind: 'effect', result });
@@ -182,7 +179,6 @@ export function nodeBody(node: DialogueNode): string[] {
   if (node.always) lines.push('  always');
   if (node.when) lines.push(`  when: ${condition.print(node.when)}`);
   if (node.ask) lines.push(`  ask: ${node.ask.text}`);
-  if (node.once) lines.push('  once');
   if (node.sticky) lines.push('  sticky');
   if (node.again) lines.push(`  again: ${printSegments(node.again.segments)}`);
   for (const step of node.steps) {

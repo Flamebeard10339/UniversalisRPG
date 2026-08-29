@@ -18,7 +18,7 @@ export function dialogueFrame(cursor: DialogueCursor): ModalFrame {
 }
 
 const OPENERS: { [K in ModalScreen]: () => Frame<K> } = {
-  'name-yourself': () => ({ name: 'name-yourself', answers: {} }),
+  'choose-name': () => ({ name: 'choose-name', answers: {} }),
   'choose-race': () => ({ name: 'choose-race', answers: {} }),
   'carried-items': () => carriedFrame(),
   'quest-journal': () => questFrame(),
@@ -26,7 +26,7 @@ const OPENERS: { [K in ModalScreen]: () => Frame<K> } = {
 };
 
 const SAME: { [K in ModalName]: Same<K> | null } = {
-  'name-yourself': null,
+  'choose-name': null,
   'choose-race': null,
   'carried-items': null,
   'item-plane': samePlane,

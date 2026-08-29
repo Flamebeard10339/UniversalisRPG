@@ -55,6 +55,17 @@ const ROOTED_LINES = ENGINE_ROOT_NAMES.flatMap((root) => {
   return [{ form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` }];
 });
 
+// Everything the engine keeps about a run that a condition may weigh, said in one place because it is
+// one list: the roots are `ENGINE_ROOTS` and nothing else declares them, so a root added there reaches
+// the page here and every line that takes a condition is covered by having been written at all.
+export const engineState: Parser<string> = {
+  parse: (cursor) => cursor.take(/.+/) ?? '',
+  print: (value) => value,
+  called: 'engine state',
+  forms: ROOTED_LINES.map((line) => line.form),
+  examples: ROOTED_LINES.map((line) => line.example),
+};
+
 export const VISITS = 'visits';
 
 export const visitedNode = (path: readonly string[]): readonly string[] | null => (path.length > 1 && path[path.length - 1] === VISITS ? path.slice(0, -1) : null);
@@ -213,11 +224,11 @@ export const condition: Parser<Condition> = {
   parse: parseOr,
   print: printCondition,
   called: 'condition',
-  holds: () => ({ comparison, condition }),
+  holds: () => ({ comparison, condition, 'engine state': engineState }),
   forms: [
     '<flag>',
     '<flag> <comparison> <number>',
-    ...ROOTED_LINES.map((line) => line.form),
+    '<engine state>',
     'has <item>',
     'has <count> <item>',
     'not <condition>',
@@ -227,7 +238,7 @@ export const condition: Parser<Condition> = {
   examples: [
     'has-key',
     'quest.stage >= 2',
-    ...ROOTED_LINES.map((line) => line.example),
+    ROOTED_LINES[0]!.example,
     'has plank',
     'has 3 plank',
     'not has-key',

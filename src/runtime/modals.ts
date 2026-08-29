@@ -55,7 +55,7 @@ function raceChoices(registry: Registry, state: GameState): readonly { value: An
 }
 
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
-  'name-yourself': {
+  'choose-name': {
     options: (_frame, state, registry) => [{ key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null }],
     submit: (frame, state) => {
       state.player = { ...state.player, name: frame.answers.name };

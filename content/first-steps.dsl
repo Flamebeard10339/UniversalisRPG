@@ -707,7 +707,7 @@ look in:
   instant
   hidden if: mirror-done
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
   set: mirror-done
   on success:
     say: The glass gives you back a name and a people. Come and change your mind whenever you like - it will want paying next time, but it will not turn you away.
@@ -716,7 +716,7 @@ look in again:
   hidden if: not mirror-done
   take: 1000 coin
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
   on success:
     say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
   on failure:

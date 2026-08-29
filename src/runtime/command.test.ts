@@ -638,7 +638,7 @@ entities:
 look in:
   instant
   open modal: choose-race
-  open modal: name-yourself
+  open modal: choose-name
 
 # race human
 
@@ -695,7 +695,7 @@ owner = sage
 node greeting:
   when: not greeted
   set: greeted
-  open modal: name-yourself
+  open modal: choose-name
   -> Ask about the mirror.
 `;
 
@@ -704,7 +704,7 @@ describe('a modal is driven by its published name and options', () => {
     const { ctx } = fixture(MODAL_MODULE);
 
     const opened = runLine(ctx, 'use: entity.mirror.look-in');
-    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['choose-race', 'name-yourself']);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['choose-race', 'choose-name']);
     expect(opened.view?.modals[1].options.map((option) => option.key)).toEqual(['name']);
     expect(opened.view?.modals[1].options[0].values).toBeNull();
 
@@ -730,11 +730,11 @@ describe('a modal is driven by its published name and options', () => {
     const { ctx } = fixture(STACKED_MODAL_MODULE);
 
     const opened = runLine(ctx, 'talk: sage');
-    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['name-yourself', 'dialogue']);
+    expect(opened.view?.modals.map((modal) => modal.name)).toEqual(['choose-name', 'dialogue']);
 
     const answered = runLine(ctx, '1');
     expect(answered.recorded).toEqual(['submit-modal: choice=0']);
-    expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['name-yourself']);
+    expect(answered.view?.modals.map((modal) => modal.name)).toEqual(['choose-name']);
   });
 
   it('refuses a bare line while a modal is open instead of taking it as the field being asked for', () => {
@@ -746,7 +746,7 @@ describe('a modal is driven by its published name and options', () => {
 
     const still = sessionStatus(session);
     expect(still.player).toEqual({ name: null, race: null });
-    expect(still.modals.map((modal) => modal.name)).toEqual(['choose-race', 'name-yourself']);
+    expect(still.modals.map((modal) => modal.name)).toEqual(['choose-race', 'choose-name']);
     expect(recorder.history).toEqual(['use: entity.mirror.look-in']);
   });
 

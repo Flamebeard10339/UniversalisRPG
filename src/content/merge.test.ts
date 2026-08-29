@@ -141,8 +141,8 @@ describe('dialogue merges one node at a time', () => {
   });
 
   it('keeps the steps when a patch only changes a node property', () => {
-    const dialogue = dialogueOf('# dialogue base.miki-intro', 'node greet:', '  once');
-    expect(dialogue.nodes[0].once).toBe(true);
+    const dialogue = dialogueOf('# dialogue base.miki-intro', 'node greet:', '  sticky');
+    expect(dialogue.nodes[0].sticky).toBe(true);
     expect(dialogue.nodes[0].steps).toEqual([
       {
         kind: 'say',

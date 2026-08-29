@@ -417,14 +417,14 @@ describe('entity actions', () => {
   });
 
   it('parses every result verb, accepting both set forms', () => {
-    const source = ['# entity chest', 'loot:', '  set drawers-open', '  unset: sealed', '  give: 12 coins', '  take: 5 cooked-shrimp', '  xp: thieving 4', '  open modal: name-yourself'].join('\n');
+    const source = ['# entity chest', 'loot:', '  set drawers-open', '  unset: sealed', '  give: 12 coins', '  take: 5 cooked-shrimp', '  xp: thieving 4', '  open modal: choose-name'].join('\n');
     expect(parseOne(source, entity).blocks?.[0].results).toEqual([
       { kind: 'set', variable: 'drawers-open' },
       { kind: 'unset', variable: 'sealed' },
       { kind: 'give', item: 'coins', amount: point(12) },
       { kind: 'take', item: 'cooked-shrimp', amount: 5 },
       { kind: 'xp', skill: 'thieving', amount: point(4) },
-      { kind: 'open-modal', modal: 'name-yourself' },
+      { kind: 'open-modal', modal: 'choose-name' },
     ]);
   });
 

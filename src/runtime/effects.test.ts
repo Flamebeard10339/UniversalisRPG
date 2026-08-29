@@ -15,7 +15,7 @@ import { toMilliUnits } from './units';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { mintedName } from '../grammar/values';
 
-const OPENING_ONE = mintedName('name-yourself', DEFAULT_LANGUAGE);
+const OPENING_ONE = mintedName('choose-name', DEFAULT_LANGUAGE);
 
 const MODULE = `
 # stat max-health
@@ -218,9 +218,9 @@ describe('applyResults: watching what was applied', () => {
     const { registry, state } = fresh();
     const bare = newSegment(state, registry, []);
 
-    applyResults(bare, [{ kind: 'open-modal', modal: 'name-yourself' }], PLAYER);
+    applyResults(bare, [{ kind: 'open-modal', modal: 'choose-name' }], PLAYER);
 
-    expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
+    expect(state.modals.map((frame) => frame.name)).toEqual(['choose-name']);
     expect(state.log).toEqual([]);
   });
 
@@ -243,13 +243,13 @@ describe('applyResults: watching what was applied', () => {
     const wired = newSegment(state, registry);
 
     applyResults(wired, [
-      { kind: 'open-modal', modal: 'name-yourself' },
+      { kind: 'open-modal', modal: 'choose-name' },
       { kind: 'give', item: 'coin', amount: { min: 1, max: 4 } },
     ], PLAYER, 5);
 
     expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
-    expect(state.log[0], 'a screen names itself to a player in words, never as the address the engine keys it by').not.toContain('name-yourself');
-    expect(state.modals.map((frame) => frame.name)).toEqual(['name-yourself']);
+    expect(state.log[0], 'a screen names itself to a player in words, never as the address the engine keys it by').not.toContain('choose-name');
+    expect(state.modals.map((frame) => frame.name)).toEqual(['choose-name']);
   });
 
   it('lets a caller subscribe alongside the default list rather than in place of it', () => {
@@ -257,7 +257,7 @@ describe('applyResults: watching what was applied', () => {
     const { seen, observer } = watched();
     const segment = newSegment(state, registry, [...RESULT_OBSERVERS, observer]);
 
-    applyResults(segment, [{ kind: 'open-modal', modal: 'name-yourself' }], PLAYER);
+    applyResults(segment, [{ kind: 'open-modal', modal: 'choose-name' }], PLAYER);
 
     expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
     expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);

@@ -13,10 +13,15 @@ export interface OfferFamily {
 
 // A keyword can only stand apart from the shapes it takes if a space stands between them; `+<percent>%` gathered under `+` would read as though a space belonged there, and it does not.
 // An id stands under the module that declared it, which is the only thing a list of forty of them is ordered by that an author already knows.
-function headOf(offer: Offer): string {
+export function headOf(offer: Offer): string {
   if (offer.kind !== undefined) return offer.module != null && offer.form.startsWith(`${offer.module}.`) ? offer.module : '';
   const head = literalOf(offer.form).trimEnd();
-  return offer.form.length === head.length || offer.form[head.length] === ' ' ? head : '';
+  if (head !== '' && (offer.form.length === head.length || offer.form[head.length] === ' ')) return head;
+  // A shape that opens with a placeholder has no literal to gather under, and two of them that write the
+  // same keyword are still one keyword: `<weight>[ if <condition>]:` is what the rows of a `one of:` share,
+  // and gathering them under it is what lets the page say the row once with its shapes beside it.
+  const colon = offer.form.indexOf(':');
+  return colon === -1 || (colon + 1 < offer.form.length && offer.form[colon + 1] !== ' ') ? '' : offer.form.slice(0, colon + 1);
 }
 
 // A keyword gathers the shapes it takes wherever they were written, the way a part gathers its keywords.

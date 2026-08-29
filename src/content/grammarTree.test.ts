@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
-import { literalOf, offeringAt } from './completion';
+import { offeringAt, type Offer } from './completion';
+import { headOf, shownIn } from './offerGroups';
 import { sectionFor, sectionKinds } from './sections';
 import { grammarLines, headingOf, namedGrammars, PART, RULES, standingAt, treeOf } from './grammarTree';
 
@@ -28,9 +29,12 @@ describe('the grammar tree', () => {
   it.each(sectionKinds())('%s shows every shape the page offers at the top of it', (kind) => {
     const opening = `# ${kind} probe\n`;
     const tree = grammarLines([kind]).join('\n');
+    // How the page gathers a shape under a keyword is the page's own rule, so it is asked rather than
+    // worked out again here: a second copy of it passes while the page shows nothing.
     const shown = (form: string): boolean => {
-      const head = literalOf(form).trimEnd();
-      return tree.includes(form) || (head !== '' && tree.includes(head) && tree.includes(form.slice(head.length).trimStart()));
+      if (tree.includes(form)) return true;
+      const head = headOf({ form } as Offer);
+      return head !== '' && tree.includes(head) && tree.includes(shownIn({ head, opens: null, offers: [] }, { form } as Offer));
     };
     for (const offer of offeringAt(opening, opening.length, []).offers) expect(shown(offer.form), `# ${kind} offers ${offer.form}, and its tree does not show it`).toBe(true);
   });
@@ -50,10 +54,11 @@ describe('the grammar tree', () => {
     it.each(owners)('%s says how one of its actions is addressed and how far it reaches', (kind) => {
       const bearing = treeOf(kind).filter((line) => line.includes(`\`${kind}.<${kind}>.<action>\``));
 
-      expect(bearing).toHaveLength(actionBody.grammar.length);
-      for (const line of bearing) {
-        expect(line).toContain(' and offered ');
-        expect(actionBody.grammar.some((written) => line.trim().startsWith(written.form)), `# ${kind}: ${JSON.stringify(line)} is not a line an action is written on`).toBe(true);
+      expect(bearing.length).toBeGreaterThan(0);
+      for (const line of bearing) expect(line).toContain(' and offered ');
+      // Every shape an action is written on is on one of those lines, however the page gathered them.
+      for (const written of actionBody.grammar) {
+        expect(bearing.some((line) => line.includes(written.form)), `# ${kind}: nothing bearing the address shows ${written.form}`).toBe(true);
       }
     });
 

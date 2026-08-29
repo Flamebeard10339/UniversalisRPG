@@ -173,21 +173,21 @@ describe('loadSave', () => {
     const registry = loadInEnglish(MODULE);
     const state = createGameState();
     openModalNamed(state, 'choose-race');
-    openModalNamed(state, 'name-yourself');
+    openModalNamed(state, 'choose-name');
 
     const { version, ...diff } = JSON.parse(serializeSave(state, registry));
     const restored = createGameState();
     loadSave(restored, { version, diff }, registry);
     expect(restored.modals).toEqual([
       { name: 'choose-race', answers: {} },
-      { name: 'name-yourself', answers: {} },
+      { name: 'choose-name', answers: {} },
     ]);
 
     for (const body of [
-      'name-yourself',
+      'choose-name',
       [{ answers: {} }],
-      [{ name: 'name-yourself' }],
-      [{ name: 'name-yourself', answers: { name: 7 } }],
+      [{ name: 'choose-name' }],
+      [{ name: 'choose-name', answers: { name: 7 } }],
       [{ name: 'dialogue', answers: {} }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1.5, replay: true } }],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'chat', node: 'greeting', resumeIndex: 1 } }],
@@ -216,7 +216,7 @@ describe('loadSave', () => {
     for (const [frame, message] of [
       [{ name: 'haggling', answers: {} }, 'Closed modal Haggling because it is not a modal this engine knows.'],
       [{ name: 'dialogue', answers: {}, cursor: { dialogue: 'gone', node: 'greeting', resumeIndex: 1, replay: true } }, 'Closed modal Dialogue because dialogue gone is not loaded.'],
-      [{ name: 'name-yourself', answers: { name: 'Rowan' } }, 'Closed modal Name Yourself because it was saved with every option already answered.'],
+      [{ name: 'choose-name', answers: { name: 'Rowan' } }, 'Closed modal Choose Name because it was saved with every option already answered.'],
       [{ name: 'choose-race', answers: { race: 'wyvern' } }, 'Closed modal Choose Race because it has no race that takes "wyvern".'],
       [{ name: 'item-plane', answers: {}, target: 'charm', hex: '0,0' }, 'Closed modal Item Plane because it grows charm, which the player no longer carries.'],
       [{ name: 'item-plane', answers: {}, target: '4', hex: '0,0' }, 'Closed modal Item Plane because it grows 4, which the player no longer carries.'],

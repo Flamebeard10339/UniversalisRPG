@@ -103,7 +103,7 @@ const SCRIPT: readonly string[] = [
   // Character creation and the breakdown of one stat. Neither stands in anybody's way through the
   // world, so neither is reached by walking one — and a screen no walk reaches is a screen no driver
   // was ever asked to draw.
-  'open-modal: name-yourself',
+  'open-modal: choose-name',
   'submit-modal: name=Rowan',
   'open-modal: choose-race',
   'submit-modal: race=core.elf',

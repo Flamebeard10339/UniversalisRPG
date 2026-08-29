@@ -31,7 +31,6 @@ const usage = [
   'that already ships is read in place of the shipped one rather than beside it.',
   'Ids come from the corpus, and under --at from the draft as well, so what this',
   'prints is what the page would show with the draft loaded.',
-  'An answer given once is pointed back at rather than written out again.',
 ].join('\n');
 
 const corpus = (): ModuleSource[] => [...shippedSources()];

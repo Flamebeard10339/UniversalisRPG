@@ -47,7 +47,7 @@ owner = sage
 node greeting:
   when: not greeted
   set: greeted
-  open modal: name-yourself
+  open modal: choose-name
   -> Ask about the mirror.
     set: asked
   -> Say nothing.
@@ -123,7 +123,7 @@ node greeting:
   when: not greeted
   set: greeted
   -> Look at the mirror.
-    open modal: name-yourself
+    open modal: choose-name
     goto after
 
 node after:
@@ -227,11 +227,11 @@ describe('the modal stack', () => {
     const session = stackingSession();
 
     let v = apply(session, 'talk:sage');
-    expect(v.modals.map((modal) => modal.name)).toEqual(['name-yourself', 'dialogue']);
+    expect(v.modals.map((modal) => modal.name)).toEqual(['choose-name', 'dialogue']);
 
     v = submitModal(session, { choice: '0' });
     expect(v.flags.asked).toBe(true);
-    expect(v.modals.map((modal) => modal.name)).toEqual(['name-yourself']);
+    expect(v.modals.map((modal) => modal.name)).toEqual(['choose-name']);
 
     v = submitModal(session, { name: 'Rowan' });
     expect(v.modals).toEqual([]);
@@ -287,17 +287,17 @@ describe('opening and answering', () => {
 
   it('opens the same modal once however many times a batch applies the result', () => {
     const scaled = createGameState();
-    applyResultsNow(scaled, registry, [{ kind: 'open-modal', modal: 'name-yourself' }], 4);
-    expect(names(scaled)).toEqual(['name-yourself']);
+    applyResultsNow(scaled, registry, [{ kind: 'open-modal', modal: 'choose-name' }], 4);
+    expect(names(scaled)).toEqual(['choose-name']);
 
     const repeated = createGameState();
-    applyResultsNow(repeated, registry, [{ kind: 'open-modal', modal: 'name-yourself' }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 4);
-    expect(names(repeated)).toEqual(['name-yourself']);
+    applyResultsNow(repeated, registry, [{ kind: 'open-modal', modal: 'choose-name' }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 4);
+    expect(names(repeated)).toEqual(['choose-name']);
     expect(repeated.xp.lore).toBeGreaterThan(0);
 
     const wrapped = createGameState();
-    applyResultsNow(wrapped, registry, [{ kind: 'chance', numerator: 1, denominator: 1, results: [{ kind: 'open-modal', modal: 'name-yourself' }] }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 100);
-    expect(names(wrapped)).toEqual(['name-yourself']);
+    applyResultsNow(wrapped, registry, [{ kind: 'chance', numerator: 1, denominator: 1, results: [{ kind: 'open-modal', modal: 'choose-name' }] }, { kind: 'xp', skill: 'lore', amount: { min: 1, max: 4 } }], 100);
+    expect(names(wrapped)).toEqual(['choose-name']);
   });
 
   it('refuses a modal nothing defines, and one that carries a payload no result line can spell', () => {
@@ -331,9 +331,9 @@ describe('opening and answering', () => {
     const state = createGameState();
     expect(() => answerModal(state, registry, { name: 'Rowan' })).toThrow(/no modal is open/);
 
-    openModalNamed(state, 'name-yourself');
+    openModalNamed(state, 'choose-name');
     expect(() => answerModal(state, registry, { title: 'Ser' })).toThrow(/has no option title/);
-    expect(topModal(state)?.name).toBe('name-yourself');
+    expect(topModal(state)?.name).toBe('choose-name');
 
     openModalNamed(state, 'choose-race');
     expect(() => answerModal(state, registry, { race: 'Wyvern' })).toThrow(/has no race that takes "Wyvern"/);
@@ -376,11 +376,11 @@ describe('opening and answering', () => {
 
   it('closes a dialogue whose content is gone rather than carrying a cursor into a registry without it', () => {
     const state = talking(loadInEnglish(STACKING_MODULE));
-    expect(names(state)).toEqual(['name-yourself', 'dialogue']);
+    expect(names(state)).toEqual(['choose-name', 'dialogue']);
 
     const dropped = pruneModals(state, loadInEnglish('# location camp\nx: 0, y: 0\nstarting\n\n# race human\n'));
     expect(dropped).toEqual([{ name: 'dialogue', reason: 'dialogue sage-talk is not loaded' }]);
-    expect(names(state)).toEqual(['name-yourself']);
+    expect(names(state)).toEqual(['choose-name']);
   });
 
   it('closes a frame naming a modal nothing defines, and one whose node no longer offers a menu there', () => {
@@ -445,9 +445,9 @@ describe('opening and answering', () => {
   it('closes a frame a save left unanswerable — every option already answered, or one holding a value it refuses', () => {
     const registry = loadInEnglish(STACKING_MODULE);
     for (const [screen, answers, reason] of [
-      ['name-yourself', { name: 'Rowan' }, 'it was saved with every option already answered'],
+      ['choose-name', { name: 'Rowan' }, 'it was saved with every option already answered'],
       ['choose-race', { race: 'Wombat' }, 'it has no race that takes "Wombat"'],
-      ['name-yourself', { title: 'Ser' }, 'it has no option title'],
+      ['choose-name', { title: 'Ser' }, 'it has no option title'],
     ] as const) {
       const state = createGameState();
       (state.modals as ModalFrame[]).push({ name: screen, answers });
@@ -462,7 +462,7 @@ describe('opening and answering', () => {
     expect(modalNames(apply(session, 'talk:sage'))).toEqual(['dialogue']);
 
     const after = submitModal(session, { choice: '0' });
-    expect(after.modals.map((modal) => modal.name)).toEqual(['name-yourself', 'dialogue']);
+    expect(after.modals.map((modal) => modal.name)).toEqual(['choose-name', 'dialogue']);
     expect(takes(after.modals[1].options[0])).toEqual(['0']);
     expect(after.modals.filter((modal) => modal.name === 'dialogue')).toHaveLength(1);
   });
@@ -479,7 +479,7 @@ describe('opening and answering', () => {
   it('keeps the dialogue spelling from answering a modal that is not a dialogue', () => {
     const session = stackingSession();
     apply(session, 'talk:sage');
-    expect(modalNames(submitModal(session, { choice: '1' }))).toEqual(['name-yourself']);
+    expect(modalNames(submitModal(session, { choice: '1' }))).toEqual(['choose-name']);
 
     expect(() => applyDirective(session, { kind: 'choose', text: '1' })).toThrow(/choose with no active dialogue/);
     expect(view(session).modals[0].options.map((option) => option.key)).toEqual(['name']);
@@ -741,7 +741,7 @@ describe('the value a screen leaves by', () => {
     const opened = apply(session, 'talk:sage');
 
     expect(opened.modals.map((modal) => [modal.name, modal.leaving])).toEqual([
-      ['name-yourself', null],
+      ['choose-name', null],
       ['dialogue', null],
     ]);
   });
@@ -882,7 +882,7 @@ describe('nothing a player answers with carries words', () => {
       if (top?.leaving && asking) leavable.push({ name: top.name, offers: asking.values === null || asking.values.some((choice) => choice.value === top.leaving) });
     };
 
-    applyDirective(session, { kind: 'open-modal', modal: 'name-yourself' });
+    applyDirective(session, { kind: 'open-modal', modal: 'choose-name' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'name', value: 'Rowan' });
     applyDirective(session, { kind: 'open-modal', modal: 'choose-race' });
@@ -1013,7 +1013,7 @@ describe('a recorded answer is the value and never where it sat (c2)', () => {
     apply(session, 'talk:sage');
 
     const creation = view(session).modals[0];
-    expect(creation.name).toBe('name-yourself');
+    expect(creation.name).toBe('choose-name');
     expect(creation.options.map((option) => [option.key, option.values === null])).toEqual([['name', true]]);
     expect(submitModal(session, { choice: '1' }).modals[0].options[0].values).toBeNull();
     expect(submitModal(session, { name: 'Rowan' }).player.name).toEqual({ id: 'Rowan', label: 'Name', title: 'Rowan' });
