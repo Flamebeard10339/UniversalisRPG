@@ -28,49 +28,41 @@ and is the one place that rule is written.
 
 ---
 
-## Seven mechanisms have never been mutated
-
-The sweep that de-balanced the suite covered buff expiry (12 tests catch a break in it),
-skill levelling (46), equipment slots (1), the thorns passive, the bench, the window drop
-and the live bar. What it did not reach: **drop tables, conditions, cadence and attempts,
-the save round-trip, dialogue, quests, and map travel.** Nothing says those are over-proved
-or under-proved; nobody has looked.
-
-The instrument is `npm run mutate -- <manifest.json>` and the finding it produces is either
-a duplicate to delete or a mechanism nothing catches, and both are worth having. It is a
-suite run per mutated line, so it is bounded by how many lines you pick rather than by the
-tool.
-
-**`npm run mutate` writes the break into the working tree and puts the file back
-afterwards, so it may only be run in a worktree nobody else is in.** An interrupted run
-leaves the file broken on disk.
-
-*Closes when:* each of the seven has had at least one mechanism broken and the catchers
-counted, the duplicates that shows are deleted, and anything caught by nothing is either
-proved or written down here as knowingly unproved.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
-The premise of handing a playbot the authoring vocabulary is that a bot editing in situ
-beats a bot reporting and an agent fixing. It is a real hunch and it is not measured, and
-the arms it is usually stated as — *fleet* against *global agent* — do not isolate it,
-because they differ in two things at once: **who found the gap** and **who wrote the DSL**.
+The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a
+bot reporting and an agent fixing. It is a real hunch and it is not measured, and the arms it is
+usually stated as — *fleet* against *global agent* — do not isolate it, because they differ in two
+things at once: **who found the gap** and **who wrote the DSL**.
 
-What is already known cuts across it. Where the edit is a fact about the world you are
-standing in and the kind is schema-driven, editing in situ plainly wins, and `/place` and
-`/link` are that case working today. Where the edit is a quest — stages, conditions and
-dialogue, written at `effort: 'low'` by a model with no grammar in reach, one line per
-turn, no way to run a `# test`, and both of the blockers above in the way — an agent with
-the corpus, the oracle and `npm test` is not obviously paying more.
+What is already known cuts across it. Where the edit is a fact about the world you are standing in
+and the kind is schema-driven, editing in situ plainly wins, and `/place` and `/link` are that case
+working today.
 
-*Closes when:* the sweep is run as three arms over one brief — report-only bot then coding
-agent, editing bot alone, coding agent alone — and the report says what each cost and what
-each landed. The fan-out that makes it affordable, and its price: `--save` opens a run on a
-fixture, `content/first-steps.dsl` carries 15 and `tulsa.dsl` 18, and a state bug is found
-starting mid-quest and leaving wrong rather than playing forward from turn one. One bot per
-save at the default 100 turns is 1,500 model calls a sweep. Isolation is a copy of
-`content/` per bot and a local file of its own — `isolatedCwd()` and absolute paths already
-carry it, and nothing commits, so the one-writer rule has nothing to bite on.
+**Three runs have now been made, and what they cost is here so the sweep does not re-measure it.**
+All against a copy of `content/`, one bot, default effort, on 2026-08-29:
+
+| run | mode | turns asked | turns played | wall | out tokens | cache read | cache write | edits |
+|---|---|---|---|---|---|---|---|---|
+| smoke | reader | 3 | 3 | 20.4s | 715 | 19,371 | 8,352 | — |
+| first-steps | bughunter | 60 | 44 | 366.4s | 21,735 | 621,666 | 127,284 | **0** |
+| ball-of-a-boy | briefed | 100 | 60 | 831.6s | 47,994 | 872,887 | 385,764 | 5 |
+
+So a turn costs about **7 seconds when the bot is walking and about 14 when it is writing** — the
+staging turn alone produced 4,695 output tokens, where a walking turn produces about 300. The
+prompt is written once and read every turn, which is why cache read runs an order of magnitude
+above everything else and why prompt size is close to free after turn one.
+
+**Neither of the two long runs finished, and neither stopped for a reason about the game.** The
+bughunter stopped on a note field that spelled emptiness rather than being empty; the briefed run
+stopped on four `/dsl` refusals it could not read. Both are closed or queued. **Until a run ends
+because it finished, none of these numbers is a cost-to-complete** — they are a cost-to-die, and
+the sweep needs the first.
+
+*Closes when:* the sweep is run as three arms over one brief — report-only bot then coding agent,
+editing bot alone, coding agent alone — and the report says what each cost and what each landed.
+Isolation is a copy of `content/` per bot and a local file of its own, and nothing commits, so the
+one-writer rule has nothing to bite on.
 
 ## N bots hitting one edge case would file N near-identical proofs
 
