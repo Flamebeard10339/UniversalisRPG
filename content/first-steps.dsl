@@ -170,19 +170,23 @@ stage apologised:
 // anywhere puts its neighbours on the map: unlocking the door puts the market
 // on it, and Miki would say you had found it to someone still standing in his
 // front room. Gating on having stood there means Miki still gives his ordinary
-// sendoff on the way out; this quest is what he has to say once you come back
-// for one more word.
+// sendoff on the way out.
+//
+// The lockpick upstairs and the window beside it both reach the market with the
+// lesson still open, so every line here has to stand for a player Miki is in the
+// middle of teaching as well as one he is finished with: nothing said here may
+// send anybody off or call anything his last word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
 log: Up the road there is a town, and it goes on a while. Miki still calls this an island.
 
 stage adrift:
-  log: Miki had his last word about my leaving. Neither of us has moved since.
+  log: Miki says he will be here. Neither of us has moved since.
   first-steps.miki says:
     when: tulsa.market-square.touched
     sticky
     ask: About this island of yours.
-    So you found the market. That's the far side of the island, near enough. Off you go, then. I'll be here.
+    So you found the market. That's the far side of the island, near enough. I'll be here.
     goto adrift
   first-steps.miki says:
     when: first-steps.miki.angered
@@ -461,6 +465,37 @@ assert: not market-square.touched
 assert: guide-house.touched
 assert: xp.thieving = 4
 assert: time >= 4
+
+// --- the town found in the middle of the lesson ---
+//
+// The other three routes make their peace with Miki, one way or the other, before
+// they ever see the market. This one does not: the lock comes off the front door
+// with the dough still unbaked, so the eternal quest picks up while Miki is in the
+// middle of teaching, and from then on his island line stands in a list beside the
+// lesson he is still waiting on. Both are here at the end, which is what says
+// neither of them may talk as if the other were over.
+# test the-town-is-found-before-the-lesson-is-over
+run: quest-offered
+use: entity.mirror.look-in
+submit-modal: name=Rowan
+submit-modal: race=core.elf
+talk: first-steps.miki
+choose: continue
+assert: finding-your-feet.bake-bread
+use: entity.stairs.ascend
+use: entity.dresser.search-drawer
+use: entity.stairs-down.descend
+use: entity.front-door.pick-lock
+travel: market-square
+travel: guide-house
+talk: first-steps.miki
+choose: leave-tutorial-island.adrift.miki.0.said
+choose: continue
+assert: leave-tutorial-island.adrift and finding-your-feet.bake-bread
+talk: first-steps.miki
+choose: finding-your-feet.bake-bread.miki.0.said
+choose: continue
+journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
 // The house is walked into and not read off the map: a room of it reaches the
 // map by being stood in and not before, which is why every road out of the front
