@@ -9,11 +9,13 @@ version: 1.0.0
 base: 10
 
 # location start
+x: 0, y: 0
 title: Start
 starting
 adjacent: shore
 
 # location shore
+x: 1, y: 0
 title: Shore
 
 # item coin
@@ -32,9 +34,11 @@ dependencies:
   probe-island
 
 # location leave-probe-island
+x: 2, y: 0
 title: Leave Probe Island
 
 # location outpost
+x: 3, y: 0
 title: Outpost
 adjacent: probe-island.shore
 `;

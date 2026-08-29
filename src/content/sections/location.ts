@@ -176,6 +176,20 @@ export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<st
   return roads;
 }
 
+// Two places on one square are one place to everything that reads a coordinate: the map draws them
+// stacked, the compass has no bearing between them, and the step from one to the other is no step.
+// The squares are counted off whatever the registry holds rather than named here, so a floor genuinely
+// over another is told apart by its `z` and nothing has to be exempted.
+export function refuseStackedLocations(locations: ReadonlyMap<string, Location>): void {
+  const standing = new Map<string, string>();
+  for (const location of locations.values()) {
+    const square = `${location.x}, ${location.y}, ${location.z}`;
+    const already = standing.get(square);
+    if (already !== undefined) throw new DslError(`location '${location.id}' stands at ${square}, and so does '${already}'; two places on one square draw on top of each other`);
+    standing.set(square, location.id);
+  }
+}
+
 export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {
   const placing = new Set<string>();
   const coords = new Map<string, [number, number, number]>();

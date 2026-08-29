@@ -206,7 +206,7 @@ describe('the map edited from the command line', () => {
   it('moves the castle and every room of it, and writes nothing for the rooms above and below', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/region castle by 3 -2'))).toEqual([]);
+    expect(errors(runLine(game.ctx(), '/region castle by 0 -3'))).toEqual([]);
     const staged = game.local();
     for (const room of ['castle-gate', 'castle-yard', 'castle-hall', 'castle-kitchen', 'guard-barracks']) expect(staged, room).toContain(`# location tulsa.${room}`);
     for (const hung of ['castle-quarters', 'castle-solar', 'castle-cellar']) expect(staged, hung).not.toContain(`# location tulsa.${hung}`);

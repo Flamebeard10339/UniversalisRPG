@@ -11,11 +11,13 @@ base: 10
 // --- locations ---
 
 # location start
+x: 0, y: 0
 title: Start
 starting
 
 // The far end of the only road, and it is the one that moves.
 # location shore
+x: 1, y: 0
 title: Shore
 adjacent: start
 
@@ -45,6 +47,7 @@ dependencies:
   probe-island
 
 # location square
+x: 2, y: 0
 title: Square
 adjacent: probe-island.shore
 
