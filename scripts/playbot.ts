@@ -467,9 +467,10 @@ export interface PlaybotOptions {
   // When the run is played, which names the `# test` it comes back as. Passed in rather than read
   // off a clock here, so the caller owns the one instant the whole run is filed under.
   readonly at: string;
-  // Where an authoring command writes, for a mode that runs them. Without it the engine answers
-  // every one of them the same way it answers a terminal started without a local file.
-  readonly authoring?: AuthoringContext;
+  // Where an authoring command writes, asked for rather than given: a mode that runs none never
+  // calls this, so a reader run opens no staging file and the engine answers every authoring
+  // command the way it answers a terminal started without a local file.
+  readonly authoring?: () => AuthoringContext;
   readonly brief?: string;
   readonly now?: () => number;
 }
@@ -505,7 +506,7 @@ function stoppedBy(log: readonly RunLogEntry[]): string | null {
 export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
   const clock = options.now ?? Date.now;
   const started = clock();
-  const ctx = newContext(options.session, view(options.session), { authoring: options.authoring });
+  const ctx = newContext(options.session, view(options.session), { authoring: authorsTheWorld(options.mode) ? options.authoring?.() : undefined });
   const from = { bytes: serializeSession(options.session) };
   const id = runId(options.at);
   const log: RunLogEntry[] = [];
@@ -555,7 +556,7 @@ export function sdkOptionsFor(system: string, cwd: string): Options {
   };
 }
 
-export function isolatedCwd(): string {
+export function isolatedDir(): string {
   return mkdtempSync(path.join(os.tmpdir(), 'universalis-playbot-'));
 }
 
@@ -581,9 +582,17 @@ export function createSdkModelClient(cwd: string): ModelClient {
 
 export const DEFAULT_SOURCES = [CORPUS_DIR];
 
-// The file the terminal stages into as well, so what a run writes is what `npm run
-// contribution:consolidate` picks up afterwards without being told where to look.
-export const DEFAULT_LOCAL_CHANGES = 'content/local-changes.dsl';
+// A run stages into a directory of its own unless an operator names a file, because the run that
+// found this could not say --local: `npx` on Windows drops every argument after a multi-line one,
+// and a default inside the checkout turns that into a second writer in somebody else's tree.
+export function localChangesFile(named: string | undefined): string {
+  return named ?? path.join(isolatedDir(), 'local-changes.dsl');
+}
+
+// Whether the run authors at all, read off the mode rather than asked for separately: a mode that
+// offers no author command cannot reach an authoring context, so it is never handed one.
+export const authorsTheWorld = (mode: PlaybotMode): boolean => modeSpec(mode).audiences.includes('author');
+
 const DEFAULT_TURNS = 100;
 
 // A directory is expanded on every read, not once at startup, so a module authored while the run
@@ -615,7 +624,8 @@ const usage = [
   '  --brief    the job a briefed run is to carry out, in the operator\'s own words',
   '  --turns    how many turns to play, default 100',
   '  --save     open the run on a named # save fixture instead of a fresh session',
-  `  --local    where an editing run stages what it writes, default ${DEFAULT_LOCAL_CHANGES}`,
+  '  --local    where an editing run stages what it writes; with none, a fresh',
+  '             temporary directory outside this checkout, named when the run starts',
   '',
   'Plays the loaded content one turn at a time against a model client, logging',
   'each turn to stdout. Exits non-zero if no turn completed.',
@@ -627,7 +637,7 @@ interface CliArgs {
   readonly brief: string;
   readonly turns: number;
   readonly save: string | undefined;
-  readonly local: string;
+  readonly local: string | undefined;
 }
 
 // `author` named the exploratory framing and was also the only mode there was, so it now names two
@@ -677,7 +687,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
   let brief = '';
   let turns = DEFAULT_TURNS;
   let save: string | undefined;
-  let local = DEFAULT_LOCAL_CHANGES;
+  let local: string | undefined;
   const sources: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -778,7 +788,7 @@ async function main(): Promise<void> {
   }
   for (const warning of opened.warnings) console.error(warning.message);
 
-  const client = createSdkModelClient(isolatedCwd());
+  const client = createSdkModelClient(isolatedDir());
   const at = new Date().toISOString();
   const kept = await runPlaybot({
     session: opened.session,
@@ -789,8 +799,13 @@ async function main(): Promise<void> {
     turns: args.turns,
     at,
     // The same wiring the terminal authors through, over the same reader the turn loop reloads
-    // from, so a section this run stages is a section the next turn is standing in.
-    authoring: fileAuthoring(read, args.local),
+    // from, so a section this run stages is a section the next turn is standing in. Asked for
+    // once, by a mode that authors, and never by one that does not.
+    authoring: () => {
+      const file = localChangesFile(args.local);
+      console.log(`staging local changes into ${file}`);
+      return fileAuthoring(read, file);
+    },
     write: (line) => console.log(line),
   });
 
