@@ -20,7 +20,7 @@ export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
 import { foldStat, hasPool, statBreakdown } from './stats';
-import { midpoint, type Range } from '../grammar/range';
+import { midpoint } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
 import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
 import { isTwoSided } from '../grammar/action';
@@ -44,6 +44,8 @@ import { say } from './said';
 import { spanStart, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { grouping, offeredBy, type GroupRow } from './grouping';
+import type { StatShare } from './statShare';
+export type { StatShare } from './statShare';
 import { mapGrid } from './tuning';
 export type { GroupRow } from './grouping';
 
@@ -99,15 +101,6 @@ export interface CountedRow {
   id: Answer;
   title: Localized;
   value: number;
-}
-
-// One named share of a stat, in the two channels a bonus lands on. `increased` is a percentage, and
-// a share is drawn as it stands rather than resolved into the total, because *what is adding to
-// this* is the question and a resolved figure has stopped answering it.
-export interface StatShare {
-  title: Localized;
-  added: Range;
-  increased: number;
 }
 
 // A stat, and everything the engine folded to reach it — where it starts and what every carrier put
