@@ -3,7 +3,7 @@ import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
 import { literalOf, offeringAt } from './completion';
 import { sectionFor, sectionKinds } from './sections';
-import { grammarLines, RULES, treeOf } from './grammarTree';
+import { grammarLines, RULES, standingAt, treeOf } from './grammarTree';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -94,6 +94,24 @@ describe('the grammar tree', () => {
     it.each([1, sectionKinds().length])('says each rule once over %i kind(s)', (count) => {
       const answer = grammarLines(sectionKinds().slice(0, count));
       for (const rule of RULES) expect(answer.filter((line) => line === rule), rule).toHaveLength(1);
+    });
+  });
+
+  // What an author is handed where a line of theirs was refused. Every kind is asked, because a
+  // kind whose refusal names nothing leaves whoever met it with the same nothing they started with.
+  describe('what stands where a line was refused', () => {
+    const REFUSED = 'zzz-nothing-takes-this: x';
+    const written = (...lines: string[]): string => lines.join('\n');
+
+    it.each(sectionKinds())('%s names something that could stand where a line it will not take stood', (kind) => {
+      expect(standingAt(written(`# ${kind} probe`, REFUSED, ''), 2).length).toBeGreaterThan(0);
+    });
+
+    it('answers for the block a line sits in rather than the section it sits under', () => {
+      const inStage = standingAt(written('# quest a.b', 'title: T', 'stage one:', `  ${REFUSED}`, ''), 4);
+      const under = standingAt(written('# quest a.b', 'title: T', REFUSED, ''), 3);
+      expect(inStage.join('\n')).toContain('complete');
+      expect(under.join('\n')).not.toContain('complete');
     });
   });
 });

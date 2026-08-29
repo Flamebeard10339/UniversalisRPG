@@ -1,7 +1,7 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { Cursor, DslError } from '../grammar/parser';
-import { formatModuleDiagnostic, type Registry } from '../content/registry';
+import { formatModuleDiagnostic, type ModuleDiagnostic, type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { type ModuleSource } from '../content/universe';
 import {
@@ -13,7 +13,7 @@ import {
   upsertLocalSection,
   type LocalSection,
 } from '../content/localChanges';
-import { grammarLines } from '../content/grammarTree';
+import { grammarLines, standingAt } from '../content/grammarTree';
 import { namesFrom } from '../content/completion';
 import { addressedSections, type AddressedSection } from '../content/sectionSource';
 import { isSectionKind, sectionKinds } from '../content/sections';
@@ -435,12 +435,31 @@ function localSectionSource(section: SectionArg): string {
   return [`# ${section.kind} ${section.id}`, ...commandBodyLines(section.body)].join('\n') + '\n';
 }
 
-function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnType<typeof loadUniverseWithDiagnostics>['diagnostics']): string[] {
-  const said = diagnostics.map((diagnostic) => formatModuleDiagnostic(diagnostic));
-  if (said.length === 0) return [];
+function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnType<typeof loadUniverseWithDiagnostics>['diagnostics']): ModuleDiagnostic[] {
+  if (diagnostics.length === 0) return [];
   const stood = new Set(loadUniverseWithDiagnostics([...authoring.baseSources, authoring.localSource]).diagnostics.map((diagnostic) => formatModuleDiagnostic(diagnostic)));
-  const brought = said.filter((message) => !stood.has(message));
-  return brought.length > 0 ? brought : said;
+  const brought = diagnostics.filter((diagnostic) => !stood.has(formatModuleDiagnostic(diagnostic)));
+  return brought.length > 0 ? [...brought] : [...diagnostics];
+}
+
+// A refusal an author can write against next turn. The loader says what it stopped at; a line and
+// column into a file nobody here can open does not, so the line is quoted as it was typed and the
+// shapes the grammar would have taken there are set under it. Nothing is written when this is
+// answered with, which is what makes a draft worth typing to find out.
+function refusalLines(text: string, diagnostics: readonly ModuleDiagnostic[]): string[] {
+  const written = text.split('\n');
+  return diagnostics.flatMap((diagnostic) => {
+    const at = diagnostic.line === undefined ? undefined : written[diagnostic.line - 1];
+    if (at === undefined) return [`${diagnostic.stage}: ${diagnostic.message}`];
+    const standing = standingAt(text, diagnostic.line!);
+    const over = standing.length - SCREENFUL;
+    return [
+      `${diagnostic.stage}: ${diagnostic.message}`,
+      `  it stopped on this line of what you wrote: ${at.trim()}`,
+      ...(standing.length === 0 ? [] : ['  what may be written there instead:', ...standing.slice(0, SCREENFUL).map((line) => `    ${line}`)]),
+      ...(over > 0 ? [`    … and ${over} more, all of which /grammar writes out`] : []),
+    ];
+  });
 }
 
 function adoptLocalChanges(
@@ -454,7 +473,7 @@ function adoptLocalChanges(
   const localStatus = loaded.modules.find((module) => module.sourceName === authoring.localSource.name || module.moduleId === LOCAL_CHANGES_MODULE_ID);
   const diagnostics = localDiagnosticsFor(authoring, loaded.diagnostics);
   if (diagnostics.length > 0 || localStatus?.loaded !== true) {
-    return noted('error', 'local changes did not load.', diagnostics);
+    return noted('error', NOT_LOADED, refusalLines(text, diagnostics));
   }
 
   try {
@@ -480,6 +499,8 @@ function adoptLocalChanges(
 function commitLocalChanges(ctx: CommandContext, authoring: AuthoringContext, text: string, staged: string): CommandResult {
   return adoptLocalChanges(ctx, authoring, text, staged, authoring.writeLocalChanges);
 }
+
+export const NOT_LOADED = 'local changes did not load, so nothing was written and the world is as it was.';
 
 export const UNAVAILABLE = 'local authoring is unavailable.';
 
@@ -652,9 +673,9 @@ function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResu
   return asSource(grammarLines(kinds));
 }
 
-// Past this many ids the list is longer than the answer it is standing in for, and Tulsa writes a
-// hundred and twelve items: what an author does next with a list that long is pick a module out of
-// it, so that is what a long one answers with instead.
+// Past this many rows a list is longer than the answer it is standing in for, and Tulsa writes a
+// hundred and twelve items: what an author does next with a list that long is narrow it, so that is
+// what a long one answers with instead of the whole of itself.
 const SCREENFUL = 24;
 
 // One line per id, or — where there are more of them than a screenful and they gather into fewer
@@ -1221,7 +1242,8 @@ export const COMMANDS: readonly CommandSpec[] = [
     edits: true,
     arg: 'section',
     argHint: '<kind> <module>.<id> [body]',
-    summary: 'stage or replace one local DSL section, under the module it belongs to; use | for new lines',
+    summary:
+      'stage or replace one local DSL section, under the module it belongs to; use | for new lines. A section the engine will not take stages nothing and leaves the world exactly as it was, and answers with the line it stopped on and what may be written there instead — so a draft you are unsure of is cheaper to type than to read up on',
     audience: 'author',
     parse: (rest) => {
       const [head = '', ...more] = rest.split('\n');

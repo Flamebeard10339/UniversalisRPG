@@ -2,14 +2,13 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { align, type Hole } from '../src/grammar/form';
 import { amissIn, fillingWords, offeringAt, type Addressed, type Amiss } from '../src/content/completion';
-import { grammarLines } from '../src/content/grammarTree';
+import { grammarLines, standingLines } from '../src/content/grammarTree';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type ModuleDiagnostic } from '../src/content/registry';
 import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { declaredBy } from '../src/content/references';
 import { splitSections, type RawLine, type RawSection } from '../src/grammar/structure';
-import { gathered, shownIn } from '../src/content/offerGroups';
 import { sectionKinds } from '../src/content/sections';
 
 const usage = [
@@ -224,15 +223,7 @@ export function offeringLines(text: string, known: readonly Addressed[], only: n
       if (said !== undefined && !seen.has(said)) out.push(...said.split('\n'));
       if (said !== undefined) seen.add(said);
     }
-    if (line.trim() === '' && writing(index)) {
-      for (const family of gathered(offering.offers.filter((offer) => offer.kind === undefined))) {
-        out.push(`      ${family.name ?? '—'}`);
-        for (const group of family.groups) {
-          if (group.head !== null) out.push(`        ${group.head}${group.opens === null ? '' : ' — opens a block'}`);
-          for (const offer of group.offers) out.push(`        ${group.head === null ? '' : '  '}${shownIn(group, offer)}${offer.note === undefined ? '' : `   — ${offer.note}`}`);
-        }
-      }
-    }
+    if (line.trim() === '' && writing(index)) out.push(...standingLines(offering.offers).map((each) => `      ${each}`));
   }
   return out;
 }

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { newContext, runLine, type Ticker } from '../runtime/command';
+import { NOT_LOADED, newContext, runLine, type Ticker } from '../runtime/command';
 import { startSession, view, type PlayView } from '../runtime/session';
 import { slotStore, type SlotDriver } from '../runtime/store';
 import { dismissal } from './asking';
@@ -362,7 +362,7 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
 
     driver.send(`/dsl location ${STARTING_LOCATION} adjacent: nowhere-at-all`);
 
-    expect(said(driver)).toContain('local changes did not load.');
+    expect(said(driver)).toContain(NOT_LOADED);
     expect(shown(driver)).toEqual(before);
     expect(driver.localChanges()).toBe('');
   });
