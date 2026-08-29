@@ -22,6 +22,7 @@ import {
   parseReply,
   reportedIn,
   reloadInto,
+  renderPrompt,
   renderView,
   repoRoot,
   resolveSave,
@@ -89,8 +90,8 @@ describe('playbot', () => {
 
     const ctxA = newContext(sessionA, view(sessionA));
     const ctxB = newContext(sessionB, view(sessionB));
-    await runTurn({ ctx: ctxA, read: constantReader(PLAYED_SOURCES), client: recording, mode: 'reader', brief: '', log: [], turn: 1, report: () => {} });
-    await runTurn({ ctx: ctxB, read: constantReader(PLAYED_SOURCES), client: recording, mode: 'bughunter', brief: '', log: [], turn: 1, report: () => {} });
+    await runTurn({ ctx: ctxA, read: constantReader(PLAYED_SOURCES), client: recording, mode: 'reader', brief: '', log: [], turn: 1, turns: 1, report: () => {} });
+    await runTurn({ ctx: ctxB, read: constantReader(PLAYED_SOURCES), client: recording, mode: 'bughunter', brief: '', log: [], turn: 1, turns: 1, report: () => {} });
 
     expect(requests).toHaveLength(2);
     expect(requests[0].system).not.toBe(requests[1].system);
@@ -180,6 +181,28 @@ describe('playbot', () => {
     const distinctSystems = new Set(requests.map((request) => request.system));
     expect(distinctSystems.size).toBe(1);
     expect(requests[0].system.length).toBeGreaterThan(0);
+  });
+
+  // A run's turns are its budget, and a player told only which turn it is on cannot spend one
+  // knowing what it costs. So every turn opens by naming both, off the same `turns` the loop
+  // counts to — there is no second place the horizon is written.
+  it('opens every turn by naming the turn it is on and how many the run has', async () => {
+    const session = startSession(played());
+    const TURNS = 4;
+    const requests: TurnRequest[] = [];
+    const recording: ModelClient = {
+      send: async (request) => {
+        requests.push(request);
+        return wellBehavedReply(session);
+      },
+    };
+    await runPlaybot({ session, read: tutorialReader, client: recording, mode: 'reader', turns: TURNS, at: PLAYED_AT, write: () => {} });
+
+    expect(requests).toHaveLength(TURNS);
+    for (const request of requests) {
+      expect(request.turns).toBe(TURNS);
+      expect(renderPrompt(request).split('\n')[0]).toBe(`Turn ${request.turn} of ${TURNS}`);
+    }
   });
 
   // c5, the other half: byte identity is necessary and not sufficient. A frozen prefix under
@@ -642,7 +665,7 @@ adjacent:
     const masked = sessionStatus(session).entities.filter((entity) => entity.masked);
     expect(masked.length, 'the opening room has to hold a mask for this to be asking anything').toBeGreaterThan(0);
 
-    const entry = await runTurn({ ctx, read: tutorialReader, client, mode: 'reader', brief: '', log: [], turn: 1, report: () => undefined });
+    const entry = await runTurn({ ctx, read: tutorialReader, client, mode: 'reader', brief: '', log: [], turn: 1, turns: 1, report: () => undefined });
 
     expect(entry.turn).toBe(1);
     expect(asked).toHaveLength(1);

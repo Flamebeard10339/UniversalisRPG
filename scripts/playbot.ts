@@ -195,6 +195,7 @@ export interface TurnReply extends RunNotes {
 export interface TurnRequest {
   readonly system: string;
   readonly turn: number;
+  readonly turns: number;
   readonly journal: string;
   readonly view: string;
 }
@@ -312,7 +313,7 @@ export function renderView(v: PlayView, localizer: Localizer): string {
 }
 
 export function renderPrompt(request: TurnRequest): string {
-  return `Turn ${request.turn}\n\n${request.journal}\n\n${request.view}`;
+  return `Turn ${request.turn} of ${request.turns}\n\n${request.journal}\n\n${request.view}`;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -422,6 +423,7 @@ export interface RunTurnDeps {
   readonly brief: string;
   readonly log: readonly RunLogEntry[];
   readonly turn: number;
+  readonly turns: number;
   // What an edit mid-run dropped out of this session. It goes to whoever is reading the run, not
   // into the turn's own entry: the player did not do it and has nothing to answer for it.
   readonly report: (line: string) => void;
@@ -436,7 +438,7 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   deps.ctx.view = view(deps.ctx.session);
   const localizer = sessionLocalizer(deps.ctx.session);
   const mode = modeSpec(deps.mode);
-  const request: TurnRequest = { system: systemPromptFor(deps.mode, deps.brief), turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };
+  const request: TurnRequest = { system: systemPromptFor(deps.mode, deps.brief), turn: deps.turn, turns: deps.turns, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };
 
   let raw: unknown;
   try {
@@ -512,7 +514,7 @@ export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
   const log: RunLogEntry[] = [];
   const billed: TurnUsage[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {
-    const entry = await runTurn({ ctx, read: options.read, client: options.client, mode: options.mode, brief: options.brief ?? '', log, turn, report: options.write });
+    const entry = await runTurn({ ctx, read: options.read, client: options.client, mode: options.mode, brief: options.brief ?? '', log, turn, turns: options.turns, report: options.write });
     log.push(entry);
     const usage = options.client.lastUsage?.() ?? null;
     if (usage !== null) billed.push(usage);
