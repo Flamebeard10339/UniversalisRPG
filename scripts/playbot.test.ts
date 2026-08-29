@@ -1,3 +1,4 @@
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
@@ -10,10 +11,12 @@ import { journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, type Ru
 import { runTest, sessionLocalizer, sessionStatus, startSession, view, type PlaySession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/runtime';
 import {
+  authorsTheWorld,
   DEFAULT_MODE,
   DEFAULT_SOURCES,
   fileContentReader,
-  isolatedCwd,
+  isolatedDir,
+  localChangesFile,
   openSession,
   parseArgs,
   parseReply,
@@ -33,6 +36,7 @@ import {
   type ModelClient,
   type TurnRequest,
 } from './playbot';
+import { fileAuthoring } from './play-cli';
 
 // The island and quest actually played: the standing world and nothing else — deliberately not the
 // whole shipped corpus, so the archetype pack Tulsa names optionally is absent and a run here never
@@ -149,7 +153,7 @@ describe('playbot', () => {
   // tools, no filesystem settings, and (the opt-out c4 originally missed) a working directory
   // that does not resolve under this repository.
   it('[c4] the SDK options disable tools and settings and run outside the repository', () => {
-    const cwd = isolatedCwd();
+    const cwd = isolatedDir();
     expect(path.resolve(cwd).toLowerCase().startsWith(path.resolve(repoRoot).toLowerCase())).toBe(false);
 
     const options = sdkOptionsFor('THE SYSTEM PROMPT', cwd);
@@ -198,7 +202,7 @@ describe('playbot', () => {
   });
 
   it('[c1] the reply schema takes exactly the line and the fields a recorded turn carries', () => {
-    const schema = sdkOptionsFor('THE SYSTEM PROMPT', isolatedCwd()).outputFormat as unknown as { schema: { required: string[]; properties: Record<string, unknown> } };
+    const schema = sdkOptionsFor('THE SYSTEM PROMPT', isolatedDir()).outputFormat as unknown as { schema: { required: string[]; properties: Record<string, unknown> } };
     const expected = ['line', ...NOTE_FIELDS.map((field) => field.name)];
     expect(schema.schema.required).toEqual(expected);
     expect(Object.keys(schema.schema.properties)).toEqual(expected);
@@ -651,5 +655,66 @@ adjacent:
     const text = renderView({ ...sessionStatus(session), said: [] } as unknown as Parameters<typeof renderView>[0], sessionLocalizer(session));
     expect(text).toContain('location:');
     expect(text).toContain('choices:');
+  });
+});
+
+// Where the bytes land is asserted together with where they do not: a run that stages into the
+// checkout it was launched from is a second writer in somebody else's tree, and the file it lands
+// on is the one the terminal and the app both stage through.
+describe('a run stages where it was told and nowhere else', () => {
+  const CHECKOUT_LOCAL = path.join(repoRoot, 'content', 'local-changes.dsl');
+
+  const answering = (replies: readonly Record<string, string>[]): ModelClient => ({
+    send: async (request) => replies[request.turn - 1],
+  });
+
+  it('stages outside this checkout unless an operator names a file inside it', () => {
+    expect(path.relative(repoRoot, localChangesFile(undefined))).toMatch(/^\.\./);
+    expect(localChangesFile('content/local-changes.dsl')).toBe('content/local-changes.dsl');
+  });
+
+  it('writes a staged section into the file it was given and creates no other', async () => {
+    const dir = isolatedDir();
+    const local = path.join(dir, 'bot-local.dsl');
+    const standing = existsSync(CHECKOUT_LOCAL);
+    const session = startSession(played());
+    const kept = await runPlaybot({
+      session,
+      read: tutorialReader,
+      client: answering([
+        { line: '/help', note: 'looking around', expected: 'nothing here names a gem', confusion: '' },
+        { line: '/dsl item local-changes.bot-gem title: Gem | examine: Cut bright.', note: 'writing it', expected: '', confusion: '' },
+      ]),
+      mode: 'bughunter',
+      turns: 2,
+      at: '2026-01-01T00:00:00.000Z',
+      authoring: () => fileAuthoring(() => PLAYED_SOURCES, local),
+      write: () => undefined,
+    });
+
+    expect(kept.run.log[1].outcome).toBe('applied');
+    expect(readFileSync(local, 'utf8')).toContain('# item local-changes.bot-gem');
+    expect(existsSync(CHECKOUT_LOCAL)).toBe(standing);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it.each(PLAYBOT_MODE_NAMES)('%s asks for a staging file only if it runs an authoring command', async (mode) => {
+    let asked = false;
+    const session = startSession(played());
+    await runPlaybot({
+      session,
+      read: tutorialReader,
+      client: { send: async () => wellBehavedReply(session) },
+      mode,
+      turns: 1,
+      at: '2026-01-01T00:00:00.000Z',
+      authoring: () => {
+        asked = true;
+        return fileAuthoring(() => PLAYED_SOURCES, path.join(isolatedDir(), 'local-changes.dsl'));
+      },
+      write: () => undefined,
+    });
+
+    expect(asked).toBe(authorsTheWorld(mode));
   });
 });
