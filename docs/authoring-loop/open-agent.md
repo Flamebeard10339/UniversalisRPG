@@ -73,22 +73,6 @@ line quotes what he wrote at the turn it happened. Four were measured against th
 live loader while the run was read, and those carry the measurement — the run is the
 evidence a line exists, and the measurement is the evidence about its cause.
 
-### What the chat says, and when
-
-So: talking with more than one thread open **offers the paths as a choice**, quest
-threads ahead of the rest, each labelled in words rather than with its first spoken
-line. The reproduction is a fresh game on this branch — talk, take *"I'd rather find my
-own way"*, refuse again, leave by the window, come back — and today it says nothing and
-draws a bare list labelled with each thread's opening line. `isThread`
-(`src/content/sections/dialogue.ts`) is `when !== undefined || ask !== undefined`, so
-every quest-given node is a thread including one the author wrote `always` on, and
-fifteen of Miki's sixteen nodes are threads. **Do not take the one-line `isThread` fix
-on its own:** it was measured, it makes Miki speak, and it strands the whole
-`apologised` route, because `snubbed.miki.0` becomes an `otherwise` node and
-`adrift.miki.0` is `sticky` on a flag that never goes false. `apology-route-full`
-apologises before ever leaving the house, so the suite would not catch it — a proof
-that walks out of the house and back is part of closing this.
-
 ### The fight
 
 **Three siblings of the arming question are unasked, and they were measured while it was
