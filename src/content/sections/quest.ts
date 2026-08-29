@@ -201,8 +201,8 @@ const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' 
 // Said where a stage writes more than one line for one mouth.
 const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies. Writing one of these over a stage that already speaks writes all of that stage's lines, so a body giving a stage a word gives it every word it has there`;
 
-// A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, said out of that grammar's own forms so a form added to it is said here too.
-const DONE_WHEN_NOTE = `the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag: ${condition.forms.join(', ')}`;
+// A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, which the page writes out once under its own name rather than here.
+const DONE_WHEN_NOTE = 'the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag';
 
 function questProblem(quest: Quest): string | undefined {
   if (quest.stages.length === 0) return 'a quest is its stages, and this one has none';

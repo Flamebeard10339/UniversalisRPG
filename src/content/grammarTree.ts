@@ -1,4 +1,5 @@
-import type { Written } from '../grammar/parser';
+import type { Parser, Written } from '../grammar/parser';
+import { writtenFrom } from '../grammar/codec';
 import { NOTE_MARK } from '../grammar/note';
 import { namesKind, offeringAt, said, type Offer } from './completion';
 import { gathered, shownIn } from './offerGroups';
@@ -106,8 +107,55 @@ export function treeOf(kind: string, seen: Seen = freshly()): string[] {
   const already: Already = { kind: `# ${kind}`, seen };
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
   holdNow(already, signOf(owner.grammar), `# ${kind}`);
-  // The lines any section takes stand under the heading they are written under, before the kind's own: a page that offers a line and does not show it has told an author to guess.
-  return [`# ${kind} <id>`, ...treeLines(EVERY_SECTION, '', sitting, already, `# ${kind}`), ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
+  return [`# ${kind} <id>`, ...treeLines(owner.grammar, '', sitting, already, `# ${kind}`)];
+}
+
+// The heading the lines every kind takes stand under, which is not a kind and so is not written as one.
+const EVERY_HEAD = 'every section, of whatever kind';
+
+const headingOf = (called: string): string => `a <${called}> is written`;
+
+// Every grammar the page names rather than writing out where it stands, found by walking what the
+// kinds' own lines hold. A grammar named next month is written out here for having been named, and
+// one nothing points at is never written out at all, so there is no list of them anywhere.
+export function namedGrammars(kinds: readonly string[]): Parser<unknown>[] {
+  const found = new Map<string, Parser<unknown>>();
+  const walked = new Set<string>();
+  const parser = (held: Parser<unknown>): void => {
+    if (held.called !== undefined && !found.has(held.called)) found.set(held.called, held);
+    lines(writtenFrom(held));
+  };
+  const lines = (block: readonly Written[]): void => {
+    const sign = signOf(block);
+    if (walked.has(sign)) return;
+    walked.add(sign);
+    for (const line of block) {
+      for (const held of Object.values(line.holds?.() ?? {})) parser(held);
+      const inside = line.block?.();
+      if (inside !== undefined) lines(inside);
+    }
+  };
+  lines(EVERY_SECTION);
+  for (const kind of kinds) lines(sectionFor(kind)?.grammar ?? []);
+  return [...found.values()];
+}
+
+// What holds however the page was narrowed: the lines every kind takes, and every grammar the kinds
+// point at by name. Said once above the kinds rather than once under each, which is the same rule
+// `RULES` is said by and the reason a kind's tree can point back at a block it has already met.
+function preamble(kinds: readonly string[], seen: Seen): string[] {
+  const sitting = { under: '# stat probe', indent: 0 };
+  const every: Already = { kind: EVERY_HEAD, seen };
+  const out = [`${PART}${EVERY_HEAD}`, ...treeLines(EVERY_SECTION, '', sitting, every, EVERY_HEAD), ''];
+  for (const held of namedGrammars(kinds)) {
+    const heading = headingOf(held.called!);
+    const already: Already = { kind: heading, seen };
+    const block = writtenFrom(held);
+    // Registered under the heading as well as written out under it, so a keyword whose indented block is this grammar points back here rather than repeating it.
+    holdNow(already, signOf(block), heading);
+    out.push(`${PART}${heading}`, ...treeLines(block, '', sitting, already, heading), '');
+  }
+  return out;
 }
 
 // The whole answer to "what may I write", for whoever asks: the terminal's oracle, and the command
@@ -116,7 +164,7 @@ export function treeOf(kind: string, seen: Seen = freshly()): string[] {
 // under a second kind is pointed back at rather than written out again.
 export function grammarLines(kinds: readonly string[] = sectionKinds()): string[] {
   const seen = freshly();
-  return [...RULES, '', ...kinds.flatMap((kind) => [...treeOf(kind, seen), ''])];
+  return [...RULES, '', ...preamble(kinds, seen), ...kinds.flatMap((kind) => [...treeOf(kind, seen), ''])];
 }
 
 // What may stand where somebody is standing, gathered under the parts and keywords it belongs to.

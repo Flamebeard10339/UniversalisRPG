@@ -16,6 +16,8 @@ export interface Parser<T> extends Filled {
   print(value: T): string;
   forms: readonly string[];
   examples: readonly string[];
+  // What an author calls this grammar where a line points at it rather than writing its shapes out. A grammar that has one is written out once under that name, and every line taking a value of it says `<name>`; one without is short enough to read where it stands.
+  called?: string;
 }
 
 // One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.

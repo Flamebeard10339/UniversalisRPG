@@ -212,6 +212,7 @@ export const comparison: Parser<ComparisonOperator> = {
 export const condition: Parser<Condition> = {
   parse: parseOr,
   print: printCondition,
+  called: 'condition',
   holds: () => ({ comparison, condition }),
   forms: [
     '<flag>',

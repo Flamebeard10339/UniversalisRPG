@@ -105,6 +105,7 @@ function printAmount(value: BonusAmount): string {
 const printCounter = (value: Counter): string => COUNTERS[value.kind].written(value.id);
 
 export const tagClause: Parser<TagClause> = {
+  called: 'tag',
   parse(cursor) {
     const start = cursor.pos;
     const raw = (cursor.take(/[^,\n]+/) ?? '').trim();

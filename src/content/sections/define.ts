@@ -2,7 +2,7 @@ import { Action, actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
 import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
-import { DslError, Parser, Written } from '../../grammar/parser';
+import { DslError, Holds, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
@@ -118,7 +118,31 @@ interface Bespoke<V extends { id: string }> extends Common<V> {
   grammar: readonly Written[];
 }
 
+// What a keyword's shapes trail off in where it takes a list of them.
+const LISTED = ', …';
+
 const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('element' in parser ? () => (parser as ListParser<unknown>).lines() : undefined);
+
+// The parser a value of this one is written with, which for a list is the parser one item of it is written with.
+const valueOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
+
+// Every shape the parser takes, written out where it stands.
+const spelled = (parser: Parser<unknown>, written: (value: string) => string, said: object): Written[] =>
+  paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(example), ...said }]));
+
+// A grammar with a name of its own is pointed at rather than written out: the field takes `<name>`,
+// and what a `<name>` is written with is said once, wherever the page says it. What the hole holds is
+// the parser itself, which is how the same line still answers an author standing in it.
+function pointedAt(parser: Parser<unknown>, written: (value: string) => string, said: object): Written | undefined {
+  const called = parser.called;
+  if (called === undefined) return undefined;
+  const shown = spelled(parser, written, said)[0];
+  if (shown === undefined) return undefined;
+  const held = (said as { holds?: Holds }).holds?.() ?? {};
+  // A list is its element written over and over, so the name stands where one item does and the list's own `, …` is kept.
+  const list = parser.forms.every((form) => form.endsWith(LISTED));
+  return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: valueOf(parser) }) };
+}
 
 const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] => {
   const parser = spec.parser as Parser<unknown>;
@@ -131,7 +155,8 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const filled = { ...filledBy(parser), ...filledBy(spec) };
   // A family says what a line is for. Whether it was declared as a field, as a positional one or as a keyword is how the engine holds it, not what an author is choosing between, so a schema line joins no family unless its kind says which one it is in.
   const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }), ...filled };
-  const shapes = paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(example), ...said }]));
+  const named = pointedAt(parser, written, said);
+  const shapes = named === undefined ? spelled(parser, written, said) : [named];
   if (shapes.length === 0) return [];
   // A block's lines are a grammar of their own and already say what they hold; only what the field says over its parser is laid on them.
   const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...filledBy(spec) }));

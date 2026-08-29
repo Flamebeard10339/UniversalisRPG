@@ -3,7 +3,7 @@ import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
 import { literalOf, offeringAt } from './completion';
 import { sectionFor, sectionKinds } from './sections';
-import { grammarLines, RULES, standingAt, treeOf } from './grammarTree';
+import { grammarLines, namedGrammars, RULES, standingAt, treeOf } from './grammarTree';
 
 const REFERS = /…indented under it, what `(?<form>.+)` holds$/;
 
@@ -23,9 +23,10 @@ describe('the grammar tree', () => {
     }
   });
 
+  // The whole answer, not the kind's own tree: what holds of every kind is said once above them all, and an author reads the page rather than one heading out of it.
   it.each(sectionKinds())('%s shows every shape the page offers at the top of it', (kind) => {
     const opening = `# ${kind} probe\n`;
-    const tree = treeOf(kind).join('\n');
+    const tree = grammarLines([kind]).join('\n');
     const shown = (form: string): boolean => {
       const head = literalOf(form).trimEnd();
       return tree.includes(form) || (head !== '' && tree.includes(head) && tree.includes(form.slice(head.length).trimStart()));
@@ -70,9 +71,10 @@ describe('the grammar tree', () => {
       expect(lineOf('stage <name>:')).toContain('`<quest>.<stage>`');
     });
 
-    it('says the whole of the condition grammar where it says it is done, off that grammar itself', () => {
+    it('points at the condition grammar where it says it is done, rather than spelling it out there', () => {
       const said = lineOf('done when:');
-      for (const form of condition.forms) expect(said).toContain(form);
+      expect(said).toContain('<condition>');
+      expect(condition.forms.filter((form) => said.includes(form))).toEqual([]);
     });
   });
 
@@ -89,6 +91,24 @@ describe('the grammar tree', () => {
       const two = sectionKinds().slice(0, 2);
       const asked = grammarLines(two);
       for (const kind of sectionKinds()) expect(asked.includes(`# ${kind} <id>`), kind).toBe(two.includes(kind));
+    });
+
+    // A grammar with a name of its own is written out above the kinds and pointed at from every line
+    // that takes one, so the page says it once however many kinds take it. Its subjects are whatever
+    // the kinds' own lines name, so a grammar named next month is held to this without an edit here.
+    describe('a grammar the page names', () => {
+      const named = namedGrammars(sectionKinds()).map((each) => each.called!);
+
+      it('is one the kinds point at, or there is nothing here to prove', () => {
+        expect(named.length).toBeGreaterThan(0);
+      });
+
+      // A heading stands at the left margin and a pointer back at it is indented, which is how the one
+      // place the grammar is opened is told from the lines that only send a reader to it.
+      it.each(named)('%s is opened in one place, however many kinds take one', (called) => {
+        const opened = grammarLines().filter((line) => line === line.trimStart() && line.includes(`<${called}> is written`));
+        expect(opened).toHaveLength(1);
+      });
     });
 
     it.each([1, sectionKinds().length])('says each rule once over %i kind(s)', (count) => {
