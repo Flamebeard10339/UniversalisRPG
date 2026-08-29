@@ -137,7 +137,7 @@ describe('a new place is written where the map is looking', () => {
     const driver = opened();
     driver.send('/dev on');
 
-    driver.send(lineOf(created('north-shore', { x: 3, y: -3 }, 0), 'north-shore'));
+    driver.send(lineOf(created('north-shore', { x: 8, y: -8 }, 0), 'north-shore'));
     driver.send(gotoLine(stagedKey('north-shore')));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
@@ -148,7 +148,7 @@ describe('a new place is written where the map is looking', () => {
   it('places and connects a place it made, which the map addresses by a key no module spells', () => {
     const driver = opened();
     driver.send('/dev on');
-    driver.send(lineOf(created('north-shore', { x: 3, y: -3 }, 0), 'north-shore'));
+    driver.send(lineOf(created('north-shore', { x: 8, y: -8 }, 0), 'north-shore'));
     driver.send(gotoLine(stagedKey('north-shore')));
     const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === 'north-shore')!;
 
