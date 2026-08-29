@@ -6,7 +6,7 @@ import { drawnFor, onWalk, spotOf, walkingAt, walkLine, type Node, type Walked, 
 import { carriedWith } from '../runtime/mapEdit';
 import { DevOnly } from './DevOnly';
 import type { MapWhere } from './editorMemory';
-import { answering, centredOn, created, droppedAt, gatherLine, gripOnRegion, joinedInto, MAP_MODES, pinnedInto, placeLine, regionGripped, settledOn, shiftedBy, shiftLine, stagedKey, type MapMode } from './mapEdit';
+import { addressFor, answering, centredOn, created, droppedAt, gatherLine, gripOnRegion, joinedInto, MAP_MODES, pinnedInto, placeLine, regionGripped, settledOn, shiftedBy, shiftLine, type MapMode } from './mapEdit';
 import { useTestSurface } from './useTestSurface';
 import { MARCHING, MARCHING_BACK, useMoment } from './transient';
 import { gotoLine, tappedPlace } from './devMode';
@@ -351,10 +351,11 @@ export function MapPane({
 
   const make = (id: string): void => {
     if ([...view.discovered, ...view.undiscovered].some((place) => names(place.id, id))) return onNote(`${id} already names a location`);
-    const staged = created(id, centredOn(hold, grid), at);
+    const address = addressFor(id, String(view.location.id));
+    const staged = created(address, centredOn(hold, grid), at);
     if ('refused' in staged) return onNote(staged.refused);
     onSend(staged.line);
-    onSend(gotoLine(stagedKey(id)));
+    onSend(gotoLine(address));
     setNaming('');
   };
 

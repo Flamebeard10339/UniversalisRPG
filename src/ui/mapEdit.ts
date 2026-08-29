@@ -1,7 +1,7 @@
-import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
+import { homelessId, moduleNamed } from '../content/resolve';
 import { relativeValue, stepToward, type Direction } from '../content/sections/location';
-import { stage, type Staged } from './authoringSurface';
+import { MAPPED_KIND, type Staged } from './authoringSurface';
 import { placedAt, spotOf, type Node, type Place, type Sheet } from './discovery';
 import { lookingAt, type Point } from './viewport';
 
@@ -20,7 +20,7 @@ export const answering = (staged: Staged, act: { send(line: string): void; note(
 export const droppedAt = (node: Node, carried: Point, grid: number): Point =>
   settledOn(placedAt({ x: (spotOf(node, grid).x + carried.x) / grid, y: (spotOf(node, grid).y + carried.y) / grid }, node.climb));
 
-export const placeLine = (id: string, at: Point): string => `/place ${id} ${at.x} ${at.y}`;
+export const placeLine = (id: string, at: Point, plane?: number): string => `/place ${id} ${at.x} ${at.y}${plane === undefined ? '' : ` ${plane}`}`;
 
 export const joinLine = (from: string, to: string, road: boolean): string => `${road ? '/link' : '/unlink'} ${from} ${to}`;
 
@@ -77,13 +77,17 @@ export function centredOn(hold: { pan: Point; zoom: number }, grid: number): Poi
   return { x: middle.x / grid, y: middle.y / grid };
 }
 
-const NAMED = /^[a-z][a-z0-9-]*$/;
+// Which module a new room belongs to, which is the whole of where it will go home. The pane is no
+// second authority on that — the id is the address — so a name the author qualified is left exactly
+// as they wrote it, and a bare one is written under the module of the room they are standing in,
+// which is the room they are drawing beside.
+export const addressFor = (id: string, here: string): string => (moduleNamed(id) === null ? qualify(moduleNamed(here), id) : id);
 
-export const stagedKey = (id: string): string => qualify(LOCAL_CHANGES_MODULE_ID, id);
-
-export function created(id: string, at: Point, plane: number): Staged {
-  if (!NAMED.test(id)) return { refused: `a location is named in lower case with dashes, as in north-shore, and not ${JSON.stringify(id)}` };
-  const spot = settledOn(at);
-  const where = plane === 0 ? `x: ${spot.x}, y: ${spot.y}` : `x: ${spot.x}, y: ${spot.y}, z: ${plane}`;
-  return stage([`# location ${stagedKey(id)}`, where].join('\n'));
+// Making a place is the same command as moving one, because an id nothing declares is a place that
+// does not exist yet. What the language will and will not take as a name is the engine's word, asked
+// of it by sending the line; what is asked here is only the one thing the pane can answer, which is
+// whether the address it composed says a module at all.
+export function created(address: string, at: Point, plane: number): Staged {
+  const homeless = homelessId(MAPPED_KIND, address);
+  return homeless === null ? { line: placeLine(address, settledOn(at), plane) } : { refused: homeless };
 }
