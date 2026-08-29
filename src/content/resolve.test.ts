@@ -199,6 +199,27 @@ describe('a new game begins in exactly one place', () => {
   });
 });
 
+describe('two places may not stand on one square', () => {
+  it('refuses a collision, naming both places', () => {
+    expect(() => loadUniverse([module('base', '# location a', 'x: 5, y: 1', '# location b', 'x: 5, y: 1')])).toThrow(/location 'base.b' stands at 5, 1, 0, and so does 'base.a'/);
+  });
+
+  it('refuses one two modules made between them, which neither of them can see', () => {
+    const town = module('town', '# location square', 'x: 0, y: 0');
+    const guild = module('guild', 'dependencies: town', '# location hall', 'x: 0, y: 0');
+    expect(() => loadUniverse([town, guild])).toThrow(/two places on one square/);
+  });
+
+  it('refuses one a chain of relative placements walks into', () => {
+    const chain = module('base', '# location square', 'x: 0, y: 0', '# location gate', 'north of square', '# location watchtower', 'y: -1');
+    expect(() => loadUniverse([chain])).toThrow(/two places on one square/);
+  });
+
+  it('lets a floor stand over another, which differs in z', () => {
+    expect(() => loadUniverse([module('base', '# location hall', 'x: 0, y: 0', '# location loft', 'above hall')])).not.toThrow();
+  });
+});
+
 describe("an action's address is a member of the namespace", () => {
   const ISLA = module('isla', '# action pry', 'instant', 'say: creak', '# entity dresser', 'flags: searched', 'uses: pry', 'search drawer:', '  instant', '  say: dust', '# location shore', 'x: 0, y: 0', 'starting', 'light beacon:', '  instant', '  say: lit', '# item lamp', 'polish:', '  instant', '  say: shine');
 
