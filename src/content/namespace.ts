@@ -21,6 +21,18 @@ export const memberKey = (memberKind: string, ownerKind: string, owner: string, 
 
 const SELF = 'self';
 
+const SHORTEST_COMPARED = 4;
+
+function oneTypoApart(a: string, b: string): boolean {
+  if (a === b || Math.min(a.length, b.length) < SHORTEST_COMPARED || Math.abs(a.length - b.length) > 1) return false;
+  const [longer, shorter] = a.length < b.length ? [b, a] : [a, b];
+  let at = 0;
+  while (at < shorter.length && longer[at] === shorter[at]) at += 1;
+  if (longer.length !== shorter.length) return longer.slice(at + 1) === shorter.slice(at);
+  if (longer.slice(at + 1) === shorter.slice(at + 1)) return true;
+  return longer[at] === shorter[at + 1] && longer[at + 1] === shorter[at] && longer.slice(at + 2) === shorter.slice(at + 2);
+}
+
 export class Namespace {
   private readonly declared = new Map<string, Map<string, string | null>>();
   private readonly modules = new Set<string>();
@@ -117,6 +129,15 @@ export class Namespace {
 
   ownerOf(kind: string, key: string): string | null | undefined {
     return this.declared.get(kind)?.get(key);
+  }
+
+  nearMisses(kind: string, key: string): string[] {
+    const keys = this.declared.get(kind);
+    if (keys === undefined || keys.has(key)) return [];
+    const under = key.slice(0, key.lastIndexOf('.') + 1);
+    const local = key.slice(under.length);
+    const siblings = [...keys.keys()].filter((each) => each.startsWith(under) && !each.slice(under.length).includes('.'));
+    return siblings.filter((each) => oneTypoApart(each.slice(under.length), local)).sort();
   }
 
   resolve(kind: string, raw: string, self: string | null, visible: ReadonlySet<string | null>, where: string, inner: string | null = null): string {

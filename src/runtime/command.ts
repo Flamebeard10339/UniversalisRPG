@@ -509,6 +509,12 @@ function localSourceNow(authoring: AuthoringContext): { read: true; text: string
   return { read: true, text };
 }
 
+function nearMissNote(ctx: CommandContext, section: LocalSection): string {
+  const near = ctx.session.registry.namespace.nearMisses(section.kind, section.id);
+  if (near.length === 0) return '';
+  return ` Nothing declared ${section.kind} ${section.id} before this, and ${near.join(' and ')} ${near.length === 1 ? 'is' : 'are'} one edit away: /local delete ${section.kind} ${section.id} takes it back.`;
+}
+
 // Sections written straight into the local changes, upserted together and adopted once. Every
 // author-facing edit lands here — a section typed at `/dsl`, a run the app files when its author
 // stops recording — so nothing has a load-and-adopt path of its own.
@@ -523,7 +529,7 @@ export function stageLocalSections(ctx: CommandContext, sections: readonly strin
     for (const section of sections) {
       const edit = upsertLocalSection(text, authoring.dependencies, section);
       text = edit.text;
-      staged.push(`${edit.replaced ? 'Replaced' : 'Staged'} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.`);
+      staged.push(`${edit.replaced ? 'Replaced' : 'Staged'} # ${edit.section.kind} ${edit.section.id} in ${LOCAL_CHANGES_MODULE_ID}.${nearMissNote(ctx, edit.section)}`);
     }
     return commitLocalChanges(ctx, authoring, text, staged.join(' '));
   } catch (error) {
