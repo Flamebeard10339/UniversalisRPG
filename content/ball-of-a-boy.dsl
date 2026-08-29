@@ -1,9 +1,11 @@
-// Ball of a Boy — read off `.planning/planning_quests/Ball of a Boy.md`. A boy
-// with black eyes and twitchy ears has lost his ball down a grate, and what is
-// under the town is worse than rats.
+// Ball of a Boy — a boy with black eyes and twitchy ears has lost his ball
+// down a grate, and what is under the town is worse than rats.
 //
-// A stub: the quest stands in the journal as something known of and never begun,
-// and the `@@@` on its one stage is what is still owed. `npm run notes` lists it.
+// The quest owns no flags of its own beyond its stages: `sewer-toll-paid` is
+// tulsa's, set here because nothing else sets it, and the door and the key are
+// tulsa's too. Take this module out and Larry still sits on his hatch, the
+// locked room still holds its ratmen and its table, and nobody can pay the
+// toll or read what is on the table beside the key.
 
 # info ball-of-a-boy
 version: 0.1.0
@@ -16,5 +18,77 @@ title: Ball of a Boy
 log: There is a boy hunched over the sewer grate in the market square, and he will not say what he has lost.
 
 stage asked:
-  log: Mouse dropped his ball through the grate, and I said I would go down after it. @@@ unwritten past this line: nothing begins this quest and nothing carries it. The book on tulsa.key-table is to hold the procedure for turning a man into a ratman, and those words are this quest's to write. Larry's toll is this quest's too: tulsa.sewer-toll-paid is read by the road out of tulsa.castle-yard and nothing in the corpus sets it, so that road is unreachable until this is written.
+  log: Mouse dropped his ball through the grate, and I said I would go down after it.
+  tulsa.mouse says:
+    always
+    ask: What's wrong?
+    It went down the grate. My ball. I can't reach it and nobody else will go.
+    Will you get it back for me?
+    -> I'll get it back for you.
+      goto down-below
+
+stage down-below:
+  log: The channels under the town run to a barred door, and whatever the water carried went through it.
+  done when: tulsa.barred-door.unlocked
+  goto back-up
+
+stage back-up:
+  log: The grate was empty and so was Mouse's spot beside it when I climbed back out of the sewers. I should tell a guard what is down there.
+  tulsa.larry says:
+    always
+    ask: About what's under the town.
+    Larry doesn't say anything for a moment. "Ratmen," he says, like the word tastes wrong. "And somebody's book on making more of them."
+    He does not ask what happened to the boy, and he does not offer to go down and look either.
+    goto reported
+
+stage reported:
+  log: I told Larry what the book in that locked room said was done to a man down there. He did not look glad to know it.
   complete
+
+// --- what this quest owes the world ---
+
+# entity tulsa.larry
+pay the toll:
+  instant
+  hidden if: sewer-toll-paid
+  requires: has 5 core.coin
+  take: 5 core.coin
+  set: sewer-toll-paid
+  say: Larry weighs the coin in his palm, decides it outweighs the duke's word, and gets up off the hatch without quite looking at you. "Never saw you," he says, to the barrels.
+
+# entity tulsa.key-table
+read the book:
+  instant
+  say: The book beside the key sets out, step by patient step, how to turn a man into a ratman — what is broken first, what is fed to him, how long the change takes if he lives through it. Someone has read it enough times to have worn the corners round.
+
+// --- tests ---
+
+# save at-the-grate
+{"version":13,"location":"tulsa.market-square","inventory":{"core.coin":10,"core.lockpick":1}}
+
+# test the-ball-is-never-coming-back
+load: at-the-grate
+talk: tulsa.mouse
+choose: I'll get it back for you.
+assert: down-the-grate.down-below
+travel: castle-gate
+travel: castle-yard
+use: entity.larry.pay-the-toll
+assert: tulsa.sewer-toll-paid
+travel: sewer-entrance
+travel: sewer-junction
+wait: done
+travel: sewer-outfall
+wait: done
+use: entity.barred-door.pick-lock
+assert: barred-door.unlocked
+journal: down-the-grate says The grate was empty and so was Mouse's spot beside it when I climbed back out of the sewers. I should tell a guard what is down there.
+travel: sewer-locked-room
+use: entity.key-table.read-the-book
+use: entity.key-table.take-the-key
+travel: sewer-outfall
+travel: sewer-junction
+travel: sewer-entrance
+travel: castle-yard
+talk: tulsa.larry
+assert: down-the-grate.reported
