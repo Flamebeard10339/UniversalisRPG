@@ -2,7 +2,7 @@ import { ActionResult, resultBlock, resultGrammar, resultLines } from '../../gra
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { results } from '../refs';
-import { section } from './define';
+import { section, writtenWhole } from './define';
 
 export interface DropTable {
   id: string;
@@ -14,6 +14,7 @@ export const droptable = section<DropTable>()({
   kind: 'droptable',
   ids: 'owned',
   vocabulary: 'declared',
+  merge: writtenWhole,
   map: 'dropTables',
   grammar: resultGrammar(),
   parse: (raw) => {

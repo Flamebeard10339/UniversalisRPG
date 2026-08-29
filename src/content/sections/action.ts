@@ -7,7 +7,7 @@ import { declaredId } from './entity';
 import { actionSlug, localeKey } from '../locale';
 import type { Namespace } from '../namespace';
 import { visitAction } from '../refs';
-import { section } from './define';
+import { section, writtenWhole } from './define';
 
 export interface ActionDeclaration extends Action {
   id: string;
@@ -59,6 +59,7 @@ export const action = section<ActionDeclaration>()({
   kind: 'action',
   ids: 'owned',
   vocabulary: 'declared',
+  merge: writtenWhole,
   map: 'actions',
   grammar: [{ form: 'title: <text>', example: 'title: Chop Wood' }, ...actionLinesWritten()],
   parse: (raw) => {

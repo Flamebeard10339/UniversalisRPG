@@ -268,3 +268,22 @@ describe('a DEBUG mark survives every edit of the section', () => {
     expect(() => loadUniverse([module('base', '# stat attack', '# item rope', 'title: Hemp Rope'), patch('# item base.rope', 'DEBUG')])).toThrow(/# item base.rope: title: "Hemp Rope" is words a player reads/);
   });
 });
+
+// A kind that reads its own body has no fields to lay one writing over another with, so the later
+// writing is the section and nothing of the earlier one is left. A quest's stages read like entries
+// and are not: nothing in the language takes a stage back out again, so a stage list that merged by
+// name could be added to and never edited.
+describe('a quest is written whole', () => {
+  const ERRAND = module('base', '# quest errand', 'title: An Errand', 'stage offered:', '  goto sent', 'stage sent:', '  complete');
+
+  it('replaces every stage the first body wrote, and keeps none it does not write again', () => {
+    const quest = loadUniverse([ERRAND, patch('# quest base.errand', 'title: A Longer Errand', 'stage sent:', '  complete')]).quests.get('base.errand')!;
+    expect(quest.title).toBe('A Longer Errand');
+    expect(quest.stages.map((stage) => stage.name)).toEqual(['sent']);
+    expect(quest.flags).toEqual(['sent']);
+  });
+
+  it('refuses a second body that writes no stage, rather than letting it read as a patch of the title', () => {
+    expect(() => loadUniverse([ERRAND, patch('# quest base.errand', 'title: A Longer Errand')])).toThrow(/a quest is its stages/);
+  });
+});

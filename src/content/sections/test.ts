@@ -8,7 +8,7 @@ import type { Span } from '../../grammar/parser';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
 import type { EngineKey } from '../locale';
 
-import { section } from './define';
+import { section, writtenWhole } from './define';
 import { condition as visitCondition, put, putCarried, putLocation, type Visit } from '../refs';
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
@@ -489,6 +489,7 @@ export const test = section<Test>()({
   kind: 'test',
   ids: 'owned',
   vocabulary: 'declared',
+  merge: writtenWhole,
   map: 'tests',
   grammar: [
     { form: 'run: <test>', example: 'run: opening' },

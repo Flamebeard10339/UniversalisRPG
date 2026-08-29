@@ -6,7 +6,7 @@ import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
 import { lastSegment, text } from '../../grammar/values';
 import { condition as visitCondition, put, results, type Visit } from '../refs';
 import { Dialogue, DialogueNode, nodeBody, nodeGrammar, parseNode, visitDialogue } from './dialogue';
-import { section } from './define';
+import { section, writtenWhole } from './define';
 
 // What one NPC is given to say while a stage is the one the player is on.
 export interface QuestSpeech {
@@ -214,6 +214,7 @@ export const quest = section<Quest>()({
   kind: 'quest',
   ids: 'owned',
   vocabulary: 'declared',
+  merge: writtenWhole,
   text: ['title'],
   maps: {
     quests: (value) => [[value.id, value]],
