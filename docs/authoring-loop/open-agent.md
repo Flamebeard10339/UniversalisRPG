@@ -49,41 +49,6 @@ leaves the file broken on disk.
 counted, the duplicates that shows are deleted, and anything caught by nothing is either
 proved or written down here as knowingly unproved.
 
-## `integration.test.ts` reports a route's verdict twice
-
-`played()` re-asserts each route's verdict, and the corpus harness already asserts it. A
-genuinely broken route therefore reddens two lines rather than one — the shape `CLAUDE.md`
-names when it says a route's verdict is reported once.
-
-It is milder than the rule's target case: both lines are in one file and both name the
-route, so a reader is not sent across the tree after a content bug. It was found during the
-balance sweep and flagged rather than changed, because changing it is a question about what
-`played()` is for rather than a line edit.
-
-*Closes when:* `played()` either stops asserting the verdict, or is the one place that does
-and the corpus harness's claim is the one that goes — not both, and whichever stands says
-in its own name that it is the verdict's home.
-
-## A run can read a section it can name, and cannot find out what anything is called
-
-Measured on the first briefed run, 2026-08-29, against `932562e1`. The bot was told to write
-`ball-of-a-boy` and spent **five of its first six turns guessing the id**: `/source quest
-ball-of-a-boy`, `/source quest first-steps.ball-of-a-boy`, `/source first-steps.ball-of-a-boy`,
-`/journal ball-of-a-boy`, then `/grammar quest` — every one refused with *nothing loaded is
-written as …*. It gave up and walked out of the house to find the id in the world.
-
-`/grammar` answers what a kind may hold and `/source` answers what one section says, and
-between them there is nothing that answers **what is loaded**. The journal prints a quest's
-title and not its id, so the one place the bot could see the name it was briefed with is the
-one place that will not tell it the address.
-
-This is what the reading-examples hypothesis actually costs today: reading is cheap once you
-can name a thing, and there is no way to learn a name.
-
-*Closes when:* a run can ask what is loaded of a kind and get the ids back — `/source <kind>`
-with no id is the shape that adds no new command — derived off the registry, and the same
-answer the refusal should be suggesting when it says nothing is written as that id.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ
@@ -124,25 +89,35 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## A typo in a patch heading now makes a section instead of being refused
+## `authoringSurface` keeps its own copy of what a section is called and where it is
 
-Home-from-id was the trade: a staged `# item base.cabel` used to be refused as naming an
-unknown item, and now declares a new one under `base`. The lane that landed it said so
-plainly and rewrote the `resolve.test.ts` case that asserted the old refusal.
+`src/ui/authoringSurface.ts` still holds `sectionsIn`/`addressOf` and its own `names()`, all of
+which now exist once under `content/` — `sectionsWritten` walks the loaded sources and
+`namesFrom` answers whether an id names a section, and `/source`, its kind listing, its refusal
+and `/journal` all read those.
 
-That is the right default for a run that authors — a bot writing a section nothing declares
-is the whole deliverable — but it means the language has stopped catching the commonest
-authoring mistake there is, and it catches it nowhere else either.
+The pane was left alone while two lanes were in that file. It is the same fact in two places,
+which is the thing this repository spends its commits undoing.
 
-*Closes when:* a staged section whose id is one edit away from a loaded one says so, and an
-author who meant the loaded one can take it. Not a refusal — the new section has to stay
-available — a report beside it, in the same place `/dsl` already answers.
+*Closes when:* the pane reads the one walk and the one naming rule, and nothing under `ui`
+answers what a section is called.
 
-## `squash-local-changes` has not been told about a section nothing declares
+## A bughunter reports and does not repair
 
-`npm run contribution:squash` prints one module's canonical source with the staged changes
-folded in. It was written when every staged section was an edit to a shipped one, and it was
-not taught about a brand-new section arriving under a module it does not yet declare.
+Measured on the run of 2026-08-29 against `46120faf`: 44 turns, `--mode bughunter`, the
+authoring vocabulary in its prompt and the report gate open behind it. It filed substantive
+reports throughout — including a real one, that Miki answers *"So you found the market…"* while
+the quest is asking for a pond fish — and it typed **no `/dsl`, no `/place`, no `/link`: zero
+edits in forty-four turns**.
 
-*Closes when:* squashing a module shows a section staged under its name that it does not yet
-hold, in the place consolidation would put it.
+Nothing refused it. It did not reach for the ability it had.
+
+That is the first real datapoint under the editing-versus-reporting line below, and it points
+the other way from the hunch that line records. It is one run and one framing, so it settles
+nothing on its own — but a bot that will not edit unless told to is a different animal from one
+that edits instead of reporting, and the sweep below should be read knowing this happened.
+
+*Closes when:* it is known whether this is the framing or the model — the same brief run with
+the repair asked for in the imperative, against the same save, and the edit counts compared. If
+it is the framing, `BUGHUNTER_FRAMING` says so plainly; if it is not, that is worth more than
+the sweep below and belongs above it.
