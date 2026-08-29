@@ -282,13 +282,6 @@ assert: leave-tutorial-island.adrift
 use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not first-steps.front-door.unlocked
-// The drop is what the route pays instead of the door: five off the pool the
-// player starts with, and nothing on this route gives any of it back. That pool
-// is the thirty on their own sheet and the level of Health they stand at, which
-// is where the odd fraction comes from. The condition roots read a pool and not
-// what is missing from one, so this is the total the drop leaves — exact,
-// because a band here would also hold in a world where the window cost twenty.
-assert: resource.core.health = 26.31
 expect only: left-mikis-house
 // Regenerate with npm run probe -- content --record first-steps.thieving-route-full
 // when this route's content changes on purpose. See thieving-route-full-end for

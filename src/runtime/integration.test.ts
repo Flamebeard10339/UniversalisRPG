@@ -171,7 +171,11 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
     resolve(idle, shipped, idle.time + (state.time - idle.time));
     const regenerated = idle.resources['core.health'] - struck;
 
-    expect(opening + regenerated - struck).toBe(toMilliUnits(5) * attempts);
+    // What a spine costs is the urchin's passive to say, so it is read off the passive rather than
+    // written again here: a pass that retunes the thorns moves this claim with it.
+    const spine = shipped.passives.get('combat-expansion.retribution')!.whenHit.find((effect) => effect.kind === 'pool')!;
+    expect(spine.delta.min).toBe(spine.delta.max);
+    expect(opening + regenerated - struck).toBe(toMilliUnits(-spine.delta.min) * attempts);
   });
 });
 
@@ -287,12 +291,20 @@ describe('core health resource (Pass 2 end-to-end)', () => {
     useFight('core.melee-combat', 'first-steps.giant-rat', registry, state);
     expect(state.time).toBeGreaterThan(0);
 
+    // The pool is read as the fight runs and not once it is over: what the rat takes is the claim,
+    // and a world tuned to regenerate faster than it bites would stand back at the ceiling by the
+    // end of the window without a single bite having stopped landing.
+    let lowest = full;
+    for (let target = state.time + secondsToMs(1); target < secondsToMs(120); target += secondsToMs(1)) {
+      resolve(state, registry, target);
+      lowest = Math.min(lowest, state.resources['core.health']);
+    }
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health'];
     // Melee is continuous, so a Fight re-arms on the next rat still standing and the cellar empties
     // rather than stopping at the first. Two minutes is longer than any sheet would make that take.
     expect(state.flags['first-steps.rats-killed']).toBe(populationCount(cellarRats));
-    expect(afterFighting).toBeLessThan(full);
+    expect(lowest).toBeLessThan(full);
     expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
     expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
 
@@ -303,5 +315,23 @@ describe('core health resource (Pass 2 end-to-end)', () => {
 
     resolve(state, registry, state.time + secondsToMs(60));
     expect(state.resources['core.health']).toBe(Math.min(full, afterFighting + toMilliUnits(fed)));
+  });
+});
+
+describe('sitting down is worth more than standing about', () => {
+  // The bench adds to the regeneration everybody already has rather than restoring a pool of its
+  // own, so what it is worth can only be said against a span nobody sat out. A route can compare
+  // its pool to a figure and not to another run, which is why the walking is the corpus's and the
+  // paying is here: both sides of this are run, so a pass that retunes either moves them together.
+  it('leaves the sitter better off than the same span opened at the same pool', () => {
+    const sat = createGameState();
+    runTest('tulsa.the-bench-is-where-health-comes-back', shipped, sat);
+
+    const opened = (shipped.saves.get('tulsa.hurt-in-town')!.diff as { resources: Record<string, number> }).resources['core.health'];
+    const stood = initialState(shipped);
+    restorePools(stood, { 'core.health': opened });
+    resolve(stood, shipped, stood.time + (sat.time - stood.time));
+
+    expect(sat.resources['core.health']).toBeGreaterThan(stood.resources['core.health']);
   });
 });
