@@ -91,14 +91,57 @@ describe('putting a place on the map', () => {
     expect(why(pinning(registryOf(), NOTHING, 'keep.hall', 'down', 'keep.hall'))).toContain('itself');
   });
 
-  it('refuses a place nothing declares', () => {
-    expect(why(placing(registryOf(), NOTHING, 'keep.nowhere', { x: 0, y: 0 }))).toContain('keep.nowhere');
+  // Making one and moving one are the same command, because an id nothing declares yet is a place
+  // that does not exist yet. Which module it belongs to is written in the id and asked of nothing
+  // else, so an id saying no module is refused rather than staged where no file could take it back.
+  it('makes a place of an id nothing declares, under the module the id names', () => {
+    expect(patched(placing(registryOf(), NOTHING, 'keep.north-shore', { x: 4, y: 4 }))).toEqual(['# location keep.north-shore\nx: 4, y: 4']);
+    expect(patched(pinning(registryOf(), NOTHING, 'keep.cellar', 'down', 'keep.hall'))).toEqual(['# location keep.cellar\nbelow hall']);
+  });
+
+  it('refuses to make one under an id that names no module', () => {
+    expect(why(placing(registryOf(), NOTHING, 'north-shore', { x: 4, y: 4 }))).toContain('names no module');
+    expect(why(pinning(registryOf(), NOTHING, 'north-shore', 'down', 'keep.hall'))).toContain('names no module');
   });
 
   it('folds onto the patch already staged there rather than replacing it', () => {
     const staged = `${NOTHING}\n# location keep.gate\nx: 1, y: 1\n+adjacent: lane\n`;
 
     expect(patched(placing(registryOf(), staged, 'keep.gate', { x: 8, y: 8 }))).toEqual(['# location keep.gate\nx: 8, y: 8\n+adjacent: lane']);
+  });
+});
+
+// The load path refuses two places on one square. So does the editor now, and it has to be the same
+// refusal rather than a second one that agrees today: the words come back from the load path's own
+// account of a stack, put to the world the edit would make instead of the world it read.
+describe('a map edit that would stand two places on one square', () => {
+  const stackedByLoading = (): string => {
+    const collided = { ...KEEP, text: KEEP.text.replace('# location lane\nx: 9, y: 9', '# location lane\nx: 0, y: 0') };
+    return loadUniverseWithDiagnostics([collided]).diagnostics.map((each) => each.message).join('\n');
+  };
+
+  it('refuses it in the words the load path would have used for the same stack', () => {
+    const refusal = why(placing(registryOf(), NOTHING, 'keep.lane', { x: 0, y: 0 }));
+
+    expect(refusal).toContain('keep.lane');
+    expect(refusal).toContain('keep.gate');
+    expect(stackedByLoading()).toContain(refusal);
+  });
+
+  it('refuses a region move that would carry one of its rooms onto a room standing still', () => {
+    expect(why(shifting(registryOf(), NOTHING, 'keep.keep', { x: -2, y: 0 }))).toContain('keep.gate');
+  });
+
+  // The question is what stands where once the edit lands, not whether the square named is taken, so
+  // a place that rides along without a line of its own is counted too.
+  it('counts a place carried by the move that is written no line of its own', () => {
+    const attic: ModuleSource = { name: 'attic', text: '# info attic\nversion: 1.0.0\ndependencies:\n  keep\n\n# location roost\nx: 7, y: 7, z: 1' };
+
+    expect(why(placing(registryOf(attic), NOTHING, 'keep.hall', { x: 7, y: 7 }))).toContain('attic.roost');
+  });
+
+  it('leaves a place where it is rather than making a second one on top of it', () => {
+    expect(why(placing(registryOf(), NOTHING, 'keep.north-shore', { x: 0, y: 0 }))).toContain('keep.gate');
   });
 });
 
@@ -193,6 +236,16 @@ describe('the map edited from the command line', () => {
 
     expect(errors(runLine(game.ctx(), '/place market-square 20 20'))).toEqual([]);
     expect(game.local()).toContain('# location tulsa.market-square\nx: 20, y: 20');
+  });
+
+  // The other half of a room drawn on the map: it is staged in local changes, and the module its id
+  // names is the file it goes home to when the changes are consolidated.
+  it('makes a room the world holds under the module its id names, not under the changes it was staged in', () => {
+    const game = opened();
+
+    expect(errors(runLine(game.ctx(), '/place tulsa.north-shore 20 20'))).toEqual([]);
+    expect(game.local()).toContain('# location tulsa.north-shore\nx: 20, y: 20');
+    expect(loadUniverseWithDiagnostics([...shippedSources(), { name: LOCAL_CHANGES_MODULE_ID, text: game.local() }]).registry.locations.get('tulsa.north-shore')).toBeDefined();
   });
 
   it('moves one room of the castle and no other, because a room is a place', () => {

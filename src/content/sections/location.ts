@@ -178,16 +178,25 @@ export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<st
 
 // Two places on one square are one place to everything that reads a coordinate: the map draws them
 // stacked, the compass has no bearing between them, and the step from one to the other is no step.
-// The squares are counted off whatever the registry holds rather than named here, so a floor genuinely
-// over another is told apart by its `z` and nothing has to be exempted.
-export function refuseStackedLocations(locations: ReadonlyMap<string, Location>): void {
+// The squares are counted off whatever it is handed rather than named here, so a floor genuinely
+// over another is told apart by its `z` and nothing has to be exempted — and a map edit can put the
+// world it is about to write to the same question the load path puts to the world it read, getting
+// the same answer in the same words. Whatever is handed in last is the one the sentence leads with,
+// so an editor showing a move its own room first only has to say what is moving last.
+export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): string | undefined {
   const standing = new Map<string, string>();
-  for (const location of locations.values()) {
+  for (const location of placed) {
     const square = `${location.x}, ${location.y}, ${location.z}`;
     const already = standing.get(square);
-    if (already !== undefined) throw new DslError(`location '${location.id}' stands at ${square}, and so does '${already}'; two places on one square draw on top of each other`);
+    if (already !== undefined) return `location '${location.id}' stands at ${square}, and so does '${already}'; two places on one square draw on top of each other`;
     standing.set(square, location.id);
   }
+  return undefined;
+}
+
+export function refuseStackedLocations(locations: ReadonlyMap<string, Location>): void {
+  const stacked = stackedLocations(locations.values());
+  if (stacked !== undefined) throw new DslError(stacked);
 }
 
 export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {

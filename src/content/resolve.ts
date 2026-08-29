@@ -46,6 +46,18 @@ export function declaredKey(namespace: string | null, kind: string, id: string):
   return id.includes('.') ? null : qualify(namespace, id);
 }
 
+// The module an id names, which is the first thing written in it. Where a section belongs is read off
+// its id and asked of nothing else, so anything composing an id for a section it is about to make
+// takes the module apart the same way the loader puts it together.
+export const moduleNamed = (id: string): string | null => (id.includes('.') ? id.slice(0, id.indexOf('.')) : null);
+
+// Where a section goes home is written in its id and nowhere else, so a kind a module owns cannot be
+// made under a name that says no module: there would be no file to take it back to. Said here beside
+// the rule it is the refusal for, and read by every command that makes a section rather than by the
+// one that was written first.
+export const homelessId = (kind: string, id: string): string | null =>
+  isOwnedKind(kind) && !id.includes('.') ? `${id} names no module: write it as <module>.${id}, which is where the section belongs` : null;
+
 function targetKey(module: ParsedModule, kind: string, id: string, namespace: Namespace, visible: ReadonlySet<string | null>): string {
   const own = declaredKey(module.namespace, kind, id);
   if (own !== null) return own;
@@ -146,10 +158,9 @@ const createdSections = (module: ParsedModule): Created[] => module.sections.fil
 // section of the module it names. An id naming a module this one cannot see is left to `resolve`,
 // which says so in the words an author reads everywhere else.
 function writtenUnder(id: string, loaded: ReadonlySet<string>, visible: ReadonlySet<string | null>): { namespace: string; local: string } | null {
-  const at = id.indexOf('.');
-  if (at < 0) return null;
-  const named = id.slice(0, at);
-  return loaded.has(named) && visible.has(named) ? { namespace: named, local: id.slice(at + 1) } : null;
+  const named = moduleNamed(id);
+  if (named === null) return null;
+  return loaded.has(named) && visible.has(named) ? { namespace: named, local: id.slice(named.length + 1) } : null;
 }
 
 function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {

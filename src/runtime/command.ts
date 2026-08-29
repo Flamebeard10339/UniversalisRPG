@@ -15,10 +15,10 @@ import {
 } from '../content/localChanges';
 import { grammarLines } from '../content/grammarTree';
 import { oneNewline, writtenSections } from '../content/sectionSource';
-import { isOwnedKind, isSectionKind, sectionKinds } from '../content/sections';
+import { isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
-import { declaredKey } from '../content/resolve';
+import { declaredKey, homelessId } from '../content/resolve';
 import type { Resumption } from './openUniverse';
 import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
@@ -1140,7 +1140,8 @@ export const COMMANDS: readonly CommandSpec[] = [
       const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
       if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <module>.<id> [body]' };
       // An id a module owns says which module, whether the section is one already there or one being written for the first time: that is the whole of how a section authored in a run has somewhere to go home to.
-      if (isOwnedKind(match.kind) && !match.id.includes('.')) return { problem: `/dsl ${match.kind} ${match.id} names no module: write it as <module>.${match.id}, which is where the section belongs` };
+      const homeless = homelessId(match.kind, match.id);
+      if (homeless !== null) return { problem: `/dsl ${match.kind} ${homeless}` };
       return { kind: match.kind, id: match.id, body: match.body ?? '' };
     },
     run: runSectionEdit,
@@ -1151,7 +1152,8 @@ export const COMMANDS: readonly CommandSpec[] = [
     arg: 'placing',
     argHint: `<location> <x> <y> [<z>] | <location> ${relativeValue.forms[0]}`,
     audience: 'author',
-    summary: 'say where a location is, outright or as one step off another; a place given coordinates stops hanging off anything, and one written off another moves with it. Staged as a local change like any other edit',
+    summary:
+      'say where a location is, outright or as one step off another; a place given coordinates stops hanging off anything, and one written off another moves with it. An id nothing declares makes the place, under the module the id names. Staged as a local change like any other edit',
     parse: (rest) => {
       const off = writtenOff(rest);
       if (off) return off;
