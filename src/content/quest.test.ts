@@ -123,3 +123,86 @@ describe('what a quest is refused for', () => {
     expect(refusing('log: First.', 'log: Second.', 'stage one:', '  complete')).toThrow(/log: is defined more than once/);
   });
 });
+
+// The loop a quest is written in is: write it, walk it, see what is wrong, fix that part. That last
+// step is what a second body is for, so a body says what it means to change and nothing else.
+describe('a second body at a quest', () => {
+  const ERRAND = [
+    '# quest an-errand',
+    'title: An Errand',
+    '',
+    'stage offered:',
+    '  log: Miki asked for a thing.',
+    '  goto sent',
+    '  miki says:',
+    '    always',
+    '    Fetch it for me.',
+    '  miki says:',
+    '    when: mirror-done',
+    '    You have it already.',
+    '',
+    'stage sent:',
+    '  log: I went to fetch it.',
+    '  complete',
+    '',
+    'stage snubbed:',
+    '  log: I told Miki no.',
+    '  complete',
+  ].join('\n');
+
+  const again = (...lines: string[]) => loaded(ERRAND, ['# quest an-errand', ...lines].join('\n')).quests.get('an-errand')!;
+  const journal = (stage: { log?: object }): string | undefined => (stage.log as { text?: string } | undefined)?.text;
+
+  it('lays what it writes over the stage of that name and leaves the lines it says nothing about standing', () => {
+    const quest = again('stage sent:', '  log: I went and fetched it.');
+
+    expect(journal(quest.stages[1]!)).toBe('I went and fetched it.');
+    expect(quest.stages[1]!.complete).toBe(true);
+    expect(journal(quest.stages[0]!)).toBe('Miki asked for a thing.');
+    expect(quest.title).toBe('An Errand');
+  });
+
+  it('leaves the stages already written in the order they were written, however it orders them itself', () => {
+    const quest = again('stage snubbed:', '  log: I sent Miki away.', '', 'stage offered:', '  log: Miki asked me for something.');
+
+    expect(quest.stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed']);
+    expect(quest.flags).toEqual(['offered', 'sent', 'snubbed']);
+  });
+
+  it('puts a stage the quest has not got after the ones it has', () => {
+    const quest = again('stage offered:', '  goto grumbled', '', 'stage grumbled:', '  log: I went, grumbling.', '  complete');
+
+    expect(quest.stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed', 'grumbled']);
+  });
+
+  it('changes the title on its own, without a stage having to be written out again', () => {
+    const quest = again('title: A Longer Errand');
+
+    expect(quest.title).toBe('A Longer Errand');
+    expect(quest.stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed']);
+  });
+
+  // A stage's lines are told apart by the order they are written in and nothing else, so there is no
+  // name for a second body to lay one over: giving a stage a word is giving it every word it has there.
+  it('writes all of a stage\u2019s speech when it writes any of it', () => {
+    const quest = again('stage offered:', '  miki says:', '    always', '    Changed my mind.');
+
+    expect(quest.stages[0]!.speech).toHaveLength(1);
+    expect(quest.stages[0]!.speech[0]!.node.steps.flatMap((step) => (step.kind === 'say' ? step.segments.flatMap((segment) => (segment.kind === 'literal' ? [segment.text] : [])) : []))).toEqual(['Changed my mind.']);
+  });
+
+  it('takes a stage out where it writes -stage, and takes nothing out for a name no stage answers to', () => {
+    expect(again('-stage snubbed').stages.map((stage) => stage.name)).toEqual(['offered', 'sent']);
+    expect(again('-stage nowhere').stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed']);
+  });
+
+  // Silently taking nothing out is safe because the quest is answered for whole once the bodies are in:
+  // a stage cannot be taken out from under a goto that still names it.
+  it('is held to the quest the stages make once every body is in', () => {
+    expect(() => again('-stage sent')).toThrow(/stage offered goes to sent, which is no stage of this quest/);
+  });
+
+  it('refuses an indented block under a -stage, which reads as lines for a stage that is going', () => {
+    expect(() => again('-stage snubbed', '  log: I told Miki no.')).toThrow(/takes no indented block/);
+  });
+});

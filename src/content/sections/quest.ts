@@ -2,11 +2,12 @@ import { ActionResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { DslError, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
+import { indentLines, RawLine, requireNoBlock, takeBlock } from '../../grammar/structure';
 import { lastSegment, text } from '../../grammar/values';
+import { overlay } from '../merge';
 import { condition as visitCondition, put, results, type Visit } from '../refs';
 import { Dialogue, DialogueNode, nodeBody, nodeGrammar, parseNode, visitDialogue } from './dialogue';
-import { section, writtenWhole } from './define';
+import { section } from './define';
 
 // What one NPC is given to say while a stage is the one the player is on.
 export interface QuestSpeech {
@@ -16,6 +17,8 @@ export interface QuestSpeech {
 
 export interface QuestStage {
   name: string;
+  // A stage a later body takes back out, which is spent at merge and is never one of the stages a quest has.
+  removed?: true;
   // Held as spoken lines rather than as plain strings: a journal entry is said to a player, so it is addressed and translated like every other line the game says.
   log?: ActionResult;
   doneWhen?: Condition;
@@ -36,6 +39,7 @@ export interface Quest {
 
 const TITLE = /^title:[ \t]?(?<said>.*)$/;
 const STAGE = /^stage[ \t]+(?<name>[a-z][a-z0-9-]*):$/;
+const UNSTAGE = /^-[ \t]*stage[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
 const LOG = /^log:[ \t]?(?<said>.*)$/;
 const DONE = /^done when:[ \t]*(?<cond>.+)$/;
 const GOTO = /^goto[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
@@ -192,29 +196,42 @@ const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
 const JOURNAL_VOICE = 'the player writing, not the game instructing: what happened and what they made of it, in their own words. Never a route, a room or a step to take — working out what is next is the play, and a quest is allowed to be hard';
 
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
-const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored`;
+const STAGE_NOTE = `naming a stage declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`, which anything anywhere may read as a condition; which stage a quest stands on is worked out from the world each time it is asked and never stored. Writing a stage the quest already has lays these lines over that one and leaves every line it says nothing about standing; a stage it has not is added after the stages it has, so the order they run in never shifts under a later body`;
 
 // Said where a stage writes more than one line for one mouth.
-const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
+const SAYS_NOTE = `lines that entity speaks while the quest stands here, written as a dialogue node is; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies. Writing one of these over a stage that already speaks writes all of that stage's lines, so a body giving a stage a word gives it every word it has there`;
 
 // A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, said out of that grammar's own forms so a form added to it is said here too.
 const DONE_WHEN_NOTE = `the quest leaves this stage on its own once this holds, and it takes any condition, not only a flag: ${condition.forms.join(', ')}`;
 
 function questProblem(quest: Quest): string | undefined {
   if (quest.stages.length === 0) return 'a quest is its stages, and this one has none';
-  const seen = new Set<string>();
-  for (const stage of quest.stages) {
-    if (seen.has(stage.name)) return `stage ${stage.name} is written twice`;
-    seen.add(stage.name);
-  }
   return quest.stages.map((stage) => stageProblem(quest, stage)).find((problem) => problem !== undefined);
+}
+
+// A quest's stages are the names the rest of the world reads it by, so they are read off the stages a quest has rather than written down beside them.
+const withFlags = (quest: Quest): Quest => ({ ...quest, flags: quest.stages.filter((stage) => stage.removed === undefined).map((stage) => stage.name) });
+
+// A second body at a quest's id is laid over the one already there stage by stage, in the order it writes them: a stage nothing has written yet is added after the stages there, a stage already written keeps every line the second body is silent about, and a `-stage` takes one out. So the stages a quest already had never change order, and a title or a log written alone leaves every stage standing.
+function merged(into: Quest | undefined, from: Quest): Quest {
+  const held = into ?? { id: from.id, stages: [], flags: [] };
+  let stages = [...held.stages];
+  for (const stage of from.stages) {
+    if (stage.removed) {
+      stages = stages.filter((each) => each.name !== stage.name);
+      continue;
+    }
+    const at = stages.findIndex((each) => each.name === stage.name);
+    if (at === -1) stages.push(stage);
+    else stages[at] = overlay(stages[at] as unknown as Record<string, unknown>, stage as unknown as Record<string, unknown>) as unknown as QuestStage;
+  }
+  return withFlags({ ...held, ...(from.title === undefined ? {} : { title: from.title }), ...(from.log === undefined ? {} : { log: from.log }), stages });
 }
 
 export const quest = section<Quest>()({
   kind: 'quest',
   ids: 'owned',
   vocabulary: 'declared',
-  merge: writtenWhole,
   text: ['title'],
   maps: {
     quests: (value) => [[value.id, value]],
@@ -223,6 +240,7 @@ export const quest = section<Quest>()({
   says: (value) => [spokenHere(value), ...value.stages.map(spokenHere)],
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
+    { form: '-stage <name>', example: '-stage snubbed', note: 'takes a stage out of a quest already written, and is spent where it is read rather than becoming a stage of anything: a name no stage of the quest answers to takes nothing out' },
     { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: `what the journal reads before the quest has begun — ${JOURNAL_VOICE}` },
     {
       form: 'stage <name>:',
@@ -238,6 +256,7 @@ export const quest = section<Quest>()({
     },
   ],
   validate: questProblem,
+  merge: (into, from) => merged(into as Quest | undefined, from as Quest),
   parse: (raw) => {
     if (!raw.id) throw new DslError('# quest requires an id', raw.span);
     const parsed: Quest = { id: raw.id, stages: [], flags: [] };
@@ -245,12 +264,20 @@ export const quest = section<Quest>()({
       if (takeLog(line, parsed)) continue;
       const title = TITLE.exec(line.text)?.groups;
       const stage = STAGE.exec(line.text)?.groups;
+      const unstage = UNSTAGE.exec(line.text)?.groups;
       if (title) parsed.title = parseWhole(text, title.said!, line.span.start, 'a quest title');
-      else if (stage) parsed.stages.push(parseStage(stage.name!, line));
+      else if (stage) {
+        // Across bodies a stage written again is laid over the one already there. Written twice in one body it would only overlay itself, silently, so the second is refused where it stands.
+        if (parsed.stages.some((each) => each.removed === undefined && each.name === stage.name)) throw new DslError(`stage ${stage.name} is written twice`, line.span);
+        parsed.stages.push(parseStage(stage.name!, line));
+      }
+      else if (unstage) {
+        requireNoBlock(line);
+        parsed.stages.push({ name: unstage.name!, removed: true, speech: [] });
+      }
       else throw new DslError(`unexpected line in # quest: ${JSON.stringify(line.text)}`, line.span);
     }
-    parsed.flags = parsed.stages.map((each) => each.name);
-    return parsed;
+    return withFlags(parsed);
   },
   print: (value, { moduleId }) => [
     `# quest ${moduleLocalId(moduleId, value.id)}`,
