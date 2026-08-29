@@ -4,7 +4,7 @@ import { listedToPlayer } from '../content/sections';
 import { amounts, signed } from './figures';
 import type { ModalOption } from './modalOption';
 import { type Answer, type Localized, localizerOf } from './localized';
-import type { Range } from '../grammar/range';
+import type { StatShare } from './statShare';
 import type { GameState, ModalFrame } from './state';
 
 export const LEAVE: Answer = 'close';
@@ -39,7 +39,7 @@ export const holdsStat = (value: Record<string, unknown>): boolean => typeof val
 // order the engine folded them. A share that moves nothing still stands — the base of a stat nothing
 // touches is the whole answer to where its number came from. It lives here rather than beside either
 // surface because the screen and the scrollback have to say the same thing about the same stat.
-export function madeOf(shares: ReadonlyArray<{ title: Localized; added: Range; increased: number }>): Array<{ title: Localized; worth: string }> {
+export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; worth: string }> {
   return shares.map((share) => {
     const said = amounts(share.added, share.increased);
     return { title: share.title, worth: (said.length > 0 ? said : [signed(0)]).join(' ') };

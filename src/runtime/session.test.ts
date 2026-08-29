@@ -1933,12 +1933,18 @@ straighten:
   instant
   say: You set the scarecrow straight on its pole.
 
+# flag paid
+
 # entity gate-troll
 title: Gate Troll
 stats: max-health 1, dr 0
 haggle:
   instant
   say: The troll names a price and waits.
+cross:
+  hidden if: not paid
+  instant
+  say: The troll stands aside.
 
 # entity winch
 title: Winch
@@ -1946,12 +1952,21 @@ crank:
   instant
   say: Something far off clunks and gives.
 
+# entity straw-man
+title: Straw Man
+stats: max-health 1, dr 0
+
 # location camp
 entities: scarecrow
 
 # location bridge
+title: Bridge
 x: 1, y: 0
+adjacent: camp
 entities: gate-troll
+hoist:
+  instant
+  say: The gate grinds up.
 `;
 
 // A fight reaches the engine two ways, and only one of them can name a foe that is not there. What
@@ -2054,6 +2069,70 @@ describe('an entity action named on an entity that is not standing here', () => 
   it('says nothing about where an entity no room stands is, and does what it was asked', () => {
     expect(use(yard(), 'winch', 'crank').said.map(String)).toEqual(['Something far off clunks and gives.']);
   });
+
+  // Where the thing is comes before whether the world offers this at all, and this pair is the whole
+  // of that ruling. `hidden if:` gates what a room offers, and a room the player is not standing in
+  // offers them nothing to be gated — so from over here the gate is not a fact about anything, and
+  // the answer they get is the one they can act on. Standing where it stands, the same gate is the
+  // world saying this was never on offer, and a directive naming it anyway is the directive's
+  // mistake rather than the player's.
+  it('refuses a hidden action of an entity in another room in the player words, rather than raising', () => {
+    expect(use(yard(), 'gate-troll', 'cross').said.map(String)).toEqual(['There is no Gate Troll here.']);
+  });
+
+  it('raises for the same hidden action once the player is standing where the entity stands', () => {
+    const session = yard();
+    applyDirective(session, { kind: 'travel', location: 'bridge' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
+    expect(() => applyDirective(session, { kind: 'use', obj: 'entity', objId: 'gate-troll', actionId: 'cross' })).toThrow(/action hidden/);
+  });
+});
+
+// A place nests actions the same way an entity does and reaches the player the same one way — the
+// room they are standing in offers them, and only a directive can name one anywhere else. So it is
+// asked the same question, off the list that answers it for a room: a place is somewhere by being
+// itself, and every place the registry holds is one the player is either in or not.
+describe('an action named on a room the player is not standing in', () => {
+  const yard = (): PlaySession => startSession(loadInEnglish(YARD));
+
+  const raise = (session: PlaySession, room: string): PlayView => {
+    view(session);
+    applyDirective(session, { kind: 'use', obj: 'location', objId: room, actionId: 'hoist' });
+    return view(session);
+  };
+
+  it('refuses it in the words a player reads, and arms nothing', () => {
+    const session = yard();
+    const before = view(session).time;
+    const after = raise(session, 'bridge');
+
+    expect(after.said.map(String)).toEqual(['There is no Bridge here.']);
+    expect(after.action).toBeNull();
+    expect(after.time).toBe(before);
+  });
+
+  it('takes once the player is standing there, which is what makes the refusal about where they are', () => {
+    const session = yard();
+    applyDirective(session, { kind: 'travel', location: 'bridge' });
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
+    expect(raise(session, 'bridge').said.map(String)).toContain('The gate grinds up.');
+  });
+});
+
+// A fight opened on a foe no room stands anywhere. Nothing offers it, so only a directive reaches
+// here — and the loop asks where its foe is rather than whether this room stands it, because a
+// template the world never placed is not missing from this room and stopping the fight over that is
+// the room answering a question about something it was never going to hold.
+describe('a fight named on a foe no room stands', () => {
+  it('goes on once the clock moves, rather than stopping the moment it is asked to run', () => {
+    const session = startSession(loadInEnglish(YARD));
+    applyDirective(session, { kind: 'use-on', action: 'swing', target: 'straw-man' });
+    expect(view(session).action).not.toBeNull();
+
+    const before = view(session).time;
+    applyDirective(session, { kind: 'wait-out', until: 'done' });
+    expect(view(session).time).toBeGreaterThan(before);
+  });
 });
 
 // The subjects are the shipped world's own placements rather than a list, so an entity a room stands
@@ -2072,7 +2151,7 @@ describe('every entity the shipped world places, named by a directive from a roo
       const armed = armAction('entity', entityId, actionAddress(action), registry, state).armed;
       return { armed, said: state.log.length === 0 ? '' : String(state.log[state.log.length - 1]) };
     } catch {
-      return undefined; // Hidden from where it was named, and never reaches the question below.
+      return undefined; // Nothing should raise from over there, so this is a bucket the claim empties.
     }
   };
 
@@ -2093,7 +2172,8 @@ describe('every entity the shipped world places, named by a directive from a roo
     }
     expect(armed).toEqual([]);
     expect(unsaid).toEqual([]);
-    expect(told.length, 'a door hidden from the far room never reaches the question, and most of them are not').toBeGreaterThan(hidden.length);
+    expect(hidden, 'a door `hidden if:` from the far room is still a door the player cannot see from here, and is told so').toEqual([]);
+    expect(told.length).toBe(doors.length);
   });
 
   // Two of them in the shipped world, and the pair is the point: the entity the game is played as,

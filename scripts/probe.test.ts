@@ -410,13 +410,34 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     expect(rerun.ok).toBe(true);
   });
 
-  it('says which route failed and why, so a body recorded off a route that stopped short is not pasted in blind', () => {
+  // The stale sheet a re-recording exists to replace fails on the route's last directive, so failing
+  // is not what tells a short walk apart — how far it got is. A route stopped before its end left the
+  // world somewhere the route does not end, and printing that body is the one thing this tool must
+  // never do, because pasting it in writes a truncated run into the file as if it were the route.
+  it('refuses to print a body from a route that stopped short, and says where it stopped', () => {
     const source: ModuleSource = {
       name: 'm',
       text: ['# info m', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# save end', '{"version":13}', '', '# test short', 'assert: has m.rope', 'expect only: end'].join('\n'),
     };
     const result = report([source], { show: [], roundTrip: false, record: ['m.short'] });
+
     expect(result.lines.join('\n')).toContain('m.short: FAILED');
-    expect(result.lines.join('\n')).not.toContain('save mismatch');
+    expect(result.lines.join('\n')).toContain('stopped at step 1 of 2');
+    expect(result.lines.some((line) => line.startsWith('# save '))).toBe(false);
+    expect(result.ok).toBe(false);
+  });
+
+  // Its counterpart, and the reason the refusal is measured rather than read off the verdict: this
+  // route also fails, on the sheet that is stale by definition, and its body is the one to paste in.
+  it('prints the body of a route that failed only on its closing sheet, which is every re-recording', () => {
+    const source: ModuleSource = {
+      name: 'm',
+      text: ['# info m', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# location cave', 'x: 1, y: 0', '', '# save end', '{"version":13}', '', '# test walked', 'travel: cave', 'expect: end'].join('\n'),
+    };
+    const result = report([source], { show: [], roundTrip: false, record: ['m.walked'] });
+
+    expect(result.lines.join('\n')).toContain('m.walked: FAILED');
+    expect(result.lines).toContain('# save end');
+    expect(result.ok).toBe(true);
   });
 });
