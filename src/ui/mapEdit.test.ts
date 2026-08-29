@@ -5,8 +5,9 @@ import { addressable, names, NOWHERE, offeredBy } from './authoringSurface';
 import { gotoLine } from './devMode';
 import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '../runtime/map';
 import { createDriver, type Driver } from './driver';
-import { answering, centredOn, created, droppedAt, joinedInto, joinLine, pinnedInto, placeLine, settledOn, stagedKey } from './mapEdit';
+import { addressFor, answering, centredOn, created, droppedAt, joinedInto, joinLine, pinnedInto, placeLine, settledOn } from './mapEdit';
 import { SHIPPED_SOURCES } from './shippedContent';
+import type { Point } from './viewport';
 
 // Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
 const GRID = 140;
@@ -111,10 +112,15 @@ describe('what a staged edit does from a surface (c8)', () => {
 });
 
 describe('a new place is written where the map is looking', () => {
+  const HERE = 'tulsa.market-square';
+  const MADE = 'tulsa.north-shore';
+
   const lineOf = (staged: ReturnType<typeof created>, where: string): string => {
     if ('refused' in staged) throw new Error(`${where}: ${staged.refused}`);
     return staged.line;
   };
+
+  const madeAt = (at: Point, plane = 0): string => lineOf(created(addressFor('north-shore', HERE), at, plane), MADE);
 
   it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
     expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 0, y: 0 });
@@ -122,41 +128,46 @@ describe('a new place is written where the map is looking', () => {
     expect(centredOn({ pan: { x: -GRID, y: 0 }, zoom: 2 }, GRID)).toEqual({ x: 0.5, y: 0 });
   });
 
-  it('writes the plane it was drawn on and leaves the ground plane unsaid', () => {
-    expect(lineOf(created('north-shore', { x: 3.4, y: -2.6 }, 0), 'north-shore')).toBe('/dsl location local-changes.north-shore x: 3, y: -3');
-    expect(lineOf(created('north-shore', { x: 0, y: 0 }, 2), 'north-shore')).toBe('/dsl location local-changes.north-shore x: 0, y: 0, z: 2');
+  it('writes the plane it was drawn on, saying it the way a place already on the map is moved', () => {
+    expect(madeAt({ x: 3.4, y: -2.6 })).toBe(`/place ${MADE} 3 -3 0`);
+    expect(madeAt({ x: 0, y: 0 }, 2)).toBe(`/place ${MADE} 0 0 2`);
   });
 
-  it('refuses a name the DSL would not take rather than staging a section that will not load', () => {
-    for (const name of ['', 'North Shore', 'north shore', '3-shore', 'north.shore']) {
-      expect(created(name, { x: 0, y: 0 }, 0), name).toHaveProperty('refused');
-    }
+  // Where a room goes home is written in its id and nowhere else, so a bare name is written under the
+  // module of the room the author is standing beside — and a name they qualified is left as they wrote it.
+  it('names the module the new room belongs to, or keeps the one the author wrote', () => {
+    expect(addressFor('north-shore', HERE)).toBe(MADE);
+    expect(addressFor('elsewhere.north-shore', HERE)).toBe('elsewhere.north-shore');
+  });
+
+  it('refuses a room it could name no module for, rather than one nothing could take home', () => {
+    expect(created(addressFor('north-shore', 'nowhere'), { x: 0, y: 0 }, 0)).toHaveProperty('refused');
   });
 
   it('stands the author in the place they made, which is the one the map goes on to draw', () => {
     const driver = opened();
     driver.send('/dev on');
 
-    driver.send(lineOf(created('north-shore', { x: 8, y: -8 }, 0), 'north-shore'));
-    driver.send(gotoLine(stagedKey('north-shore')));
+    driver.send(madeAt({ x: 8, y: -8 }));
+    driver.send(gotoLine(MADE));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
-    expect(driver.snapshot().view.location.id).toBe('local-changes.north-shore');
-    expect(driver.snapshot().view.discovered.map((place) => place.id)).toContain('local-changes.north-shore');
+    expect(driver.snapshot().view.location.id).toBe(MADE);
+    expect(driver.snapshot().view.discovered.map((place) => place.id)).toContain(MADE);
   });
 
-  it('places and connects a place it made, which the map addresses by a key no module spells', () => {
+  it('places again a place it made, which is a section of the module its id named all along', () => {
     const driver = opened();
     driver.send('/dev on');
-    driver.send(lineOf(created('north-shore', { x: 8, y: -8 }, 0), 'north-shore'));
-    driver.send(gotoLine(stagedKey('north-shore')));
-    const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === stagedKey('north-shore'))!;
+    driver.send(madeAt({ x: 8, y: -8 }));
+    driver.send(gotoLine(MADE));
+    const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === MADE)!;
 
-    expect(names(made.address, stagedKey('north-shore'))).toBe(true);
-    driver.send(placeLine(stagedKey('north-shore'), { x: 9, y: 9 }));
+    expect(names(made.address, MADE)).toBe(true);
+    driver.send(placeLine(MADE, { x: 9, y: 9 }));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
-    expect(driver.snapshot().view.discovered.find((place) => place.id === 'local-changes.north-shore')).toMatchObject({ x: 9, y: 9 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === MADE)).toMatchObject({ x: 9, y: 9 });
   });
 });
 
