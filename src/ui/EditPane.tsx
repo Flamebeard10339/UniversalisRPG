@@ -3,7 +3,7 @@ import { searching, searchHint } from './authoringSurface';
 import { amissWith, colourIn, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, tonesIn, type EditHeld } from './editControls';
 import { pathOf } from './grammarPath';
 import { splitFrom } from './gesture';
-import { gathered, shownIn } from './offerGroups';
+import { gathered, shownIn } from '../content/offerGroups';
 import { Splitter } from './Splitter';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';

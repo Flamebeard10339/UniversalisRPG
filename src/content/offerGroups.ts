@@ -1,4 +1,4 @@
-import { literalOf, type Offer } from '../content/completion';
+import { literalOf, type Offer } from './completion';
 
 export interface OfferGroup {
   head: string | null;
