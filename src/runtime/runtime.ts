@@ -25,7 +25,7 @@ import { armedAction, Participant, participants, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
-import { applyRespawns, downOne, isElsewhere, isStanding, nextRespawn, standing } from './population';
+import { applyRespawns, downOne, isElsewhere, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/sections/action';
 import { Action, declaredId } from '../content/sections/entity';
 import { actionKind, isTwoSided } from '../grammar/action';
@@ -295,10 +295,14 @@ function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, t
   fireEvents(segment, PLAYER, outcome === 'completion' ? 'completed' : 'unfinished', undefined, batch.count);
 }
 
+// Whether a depleting loop has anything left to swing at. It asks where its foe is and not whether
+// the room stands it: a template no room stands anywhere is not missing from this one, so a fight
+// that a directive opened on it goes on rather than being stopped by a room that was never going to
+// stand it.
 function standsAgain(state: GameState, registry: Registry, action: Action, targetId: string): boolean {
   if (!action.depletes || isFightScoped(targetId)) return true;
   const location = registry.locations.get(state.location);
-  return !location || isStanding(state, registry, location, targetId);
+  return !location || !isElsewhere(state, registry, location, targetId);
 }
 
 // Nothing comes at the player for a beat. Arriving somewhere and felling something both say it, and
@@ -500,7 +504,7 @@ function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   const location = registry.locations.get(state.location);
   const target = active?.roster?.[PLAYER]?.target;
   if (!active?.actors || !location || target === undefined || isFightScoped(target) || !active.actors[target]) return false;
-  return !isStanding(state, registry, location, target);
+  return isElsewhere(state, registry, location, target);
 }
 
 // Who is standing here that will not let the player get on with anything else, once the room is
@@ -704,18 +708,38 @@ function runFreely(state: GameState, registry: Registry, owner: string, action: 
   if (segment.stopped) endAction(state, segment.stopped);
 }
 
+// What a directive named an action on: the kind and the id, as `# test` writes them. A fight names
+// the foe it swings at the same way, so both ways into arming ask the questions below about the
+// same thing.
+interface NamedOn {
+  obj: string;
+  id: string;
+}
+
+// That the thing an action was named on is somewhere the player is not, in the words they read. Two
+// lists answer it and they are one reading twice: a room is somewhere by being itself, and an entity
+// is somewhere by a room standing it. An owner in neither list — a recipe, an action of the player's
+// own, a thing in the pack that goes wherever they go, a template no room stands — is nowhere to be
+// missing from, so there is nothing to say about it.
+function whereItIsNot(named: NamedOn, registry: Registry, state: GameState): Localized | undefined {
+  const localizer = localizerOf(registry, state);
+  const absent = (target: Localized): Localized => localizer.engine('engine.target.absent', { target });
+  if (named.obj === 'location') {
+    return registry.locations.has(named.id) && named.id !== state.location ? absent(localizer.title('location', named.id)) : undefined;
+  }
+  if (named.obj !== 'entity') return undefined;
+  const here = registry.locations.get(state.location);
+  return here && isElsewhere(state, registry, here, named.id) ? absent(actorTitle(named.id, registry, state)) : undefined;
+}
+
 // Why an action a player was offered turns them away the moment they take it, in the words they
 // read — the one home for every such reason. An author's `on failure:` stands in place of all of
 // them.
-function whyRefused(action: Action, registry: Registry, state: GameState, target?: string): Localized | undefined {
+function whyRefused(action: Action, registry: Registry, state: GameState, named?: NamedOn): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const item = (id: string): Localized => localizer.title('item', id);
-  if (target !== undefined) {
-    const location = registry.locations.get(state.location);
-    if (location && isElsewhere(state, registry, location, target)) {
-      return localizer.engine('engine.target.absent', { target: actorTitle(target, registry, state) });
-    }
-  }
+  const absent = named && whereItIsNot(named, registry, state);
+  if (absent) return absent;
   if (action.requires && !requiresMet(action, state, registry)) {
     const missing = itemMissingFor(action.requires, state, registry);
     return missing === undefined ? localizer.engine('engine.requires.unmet') : localizer.engine('engine.requires.item', { item: item(missing) });
@@ -726,12 +750,24 @@ function whyRefused(action: Action, registry: Registry, state: GameState, target
   return undefined;
 }
 
-function refuseAction(action: Action, registry: Registry, state: GameState, target?: string): ArmResult | undefined {
-  const because = whyRefused(action, registry, state, target);
+function refuseWith(action: Action, registry: Registry, state: GameState, because: Localized | undefined): ArmResult | undefined {
   if (because === undefined) return undefined;
   if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
   else state.log.push(because);
   return { armed: false };
+}
+
+// The order arming asks its questions in, for both ways a directive reaches it. Where the thing is
+// comes first and `hidden if:` second: hiding is a gate on what a room offers, and a room the player
+// is not standing in offers them nothing to be gated — so an action hidden from over there is hidden
+// from nobody, and what the player has to be told is that the thing is not here. Standing where it
+// stands, the same gate is the world saying this was never on offer, and a directive that names it
+// anyway is a mistake in the directive rather than a player being turned away.
+function refuseArming(action: Action, named: NamedOn, written: string, registry: Registry, state: GameState): ArmResult | undefined {
+  const away = refuseWith(action, registry, state, whereItIsNot(named, registry, state));
+  if (away) return away;
+  if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${written}`);
+  return refuseWith(action, registry, state, whyRefused(action, registry, state, named));
 }
 
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
@@ -741,9 +777,8 @@ export function armAction(obj: string, objId: string, actionId: string, registry
 
   const action = target.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(actionId), owner: say.identifier(ownerRef(obj, objId)) }));
-  if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${obj}.${objId}.${actionId}`);
 
-  const refused = refuseAction(action, registry, state, obj === 'entity' ? objId : undefined);
+  const refused = refuseArming(action, { obj, id: objId }, `${obj}.${objId}.${actionId}`, registry, state);
   if (refused) return refused;
 
   const repeating = actionKind(action) === 'continuous';
@@ -813,9 +848,8 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
   if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
   if (!registry.entities.has(targetId)) throw new RuntimeError(`unknown entity: ${targetId}`);
-  if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${actionId}`);
 
-  const refused = refuseAction(action, registry, state, targetId);
+  const refused = refuseArming(action, { obj: 'entity', id: targetId }, actionId, registry, state);
   if (refused) return refused;
 
   armFight(state, registry, actionId, action, targetId);

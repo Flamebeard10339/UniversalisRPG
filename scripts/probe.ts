@@ -46,9 +46,10 @@ const usage = [
   '                 its own closing expect: names, so the printed section replaces that',
   '                 section in the file wholesale; repeatable. This is how a route whose',
   '                 content changed on purpose gets its sheet back. The run\'s verdict is',
-  '                 printed above the section: a stale sheet fails naming that sheet, and',
-  '                 a failure naming anything else is a route that stopped short — read it',
-  '                 before pasting.',
+  '                 printed above the section, and failing is the ordinary case because the',
+  '                 sheet being replaced is stale. A route that stopped before its last',
+  '                 directive ended somewhere it does not end, so that one is refused: it',
+  '                 says which step it stopped at, prints no body, and exits non-zero.',
   '  --test         run one # test and report PASSED/FAILED; repeatable. An id',
   '                 that names no test but stands as a prefix over some — a',
   '                 module id — runs every test under it',
@@ -213,9 +214,9 @@ function recordTests(registry: Registry, specs: readonly string[]): { lines: str
         continue;
       }
       const verdict = run.result.passed ? null : (run.result.failure ?? 'no reason given');
-      if (run.walked.length < run.steps.length) {
+      if (run.walked < run.steps) {
         lines.push(`${id}: FAILED — ${verdict ?? 'no reason given'}`);
-        lines.push(`${id}: stopped at step ${run.walked.length} of ${run.steps.length}, so the state it left is not the one this route ends on and no body is printed`);
+        lines.push(`${id}: stopped at step ${run.walked} of ${run.steps}, so the state it left is not the one this route ends on and no body is printed`);
         ok = false;
         continue;
       }

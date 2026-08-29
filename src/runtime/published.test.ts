@@ -45,6 +45,10 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/runLog.ts#RunHeader', why: 'when a run was played and which build it was played against, written on its first line for whoever reads it afterwards — a timestamp and a commit, neither of which any player is ever shown' },
   { type: 'src/runtime/runLog.ts#RunNotes', why: 'what the player said about a turn in their own words, keyed by the field names a reply and a run log both write. It rides in the run log above and reaches a player through no surface at all' },
   {
+    type: 'src/runtime/session.ts#TestRun',
+    why: "one walk of a `# test`: the verdict, and how far along the route the walk got before it stopped. Probe reads the second before it will print the sheet a route ends on. Like `RecordedTurn` above it is addressed to whoever reads the run afterwards and never to a player, which is why the reason it carries is one flat English string in every language",
+  },
+  {
     type: 'src/runtime/session.ts#PlaySession',
     why: 'the live session a driver threads through `apply`/`applyDirective`/`view`. Everything it publishes reaches this walk on its own — the view as `PlayView`, the status as `PlayStatus` — and its own `registry` field is content the walk is not about, for the same reason `OpenedUniverse.session` is passed over',
   },

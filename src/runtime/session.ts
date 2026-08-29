@@ -1049,12 +1049,12 @@ export function walkTest(session: PlaySession, steps: readonly Directive[], upTo
 
 export interface TestRun {
   readonly result: TestResult;
-  // What the route is made of, beside how much of it the walk reached. They are the same length or
-  // the walk stopped short, and a walk that stopped short left the state somewhere the route does
-  // not end — which is the difference between a stale sheet and a body nothing should be recorded
-  // from, and the verdict alone cannot tell them apart.
-  readonly steps: readonly Directive[];
-  readonly walked: readonly Directive[];
+  // How many directives the route is made of, beside how many of them the walk reached. They are
+  // equal or the walk stopped short, and a walk that stopped short left the state somewhere the
+  // route does not end — which is the difference between a stale sheet and a body nothing should be
+  // recorded from, and the verdict alone cannot tell them apart.
+  readonly steps: number;
+  readonly walked: number;
 }
 
 export function replayTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestRun {
@@ -1067,7 +1067,7 @@ export function replayTest(testId: string, registry: Registry, state: GameState,
       : open && awaitsAnAnswer(open)
         ? { passed: false, failure: `modal left open: ${open.name}` }
         : { passed: true };
-  return { result, steps, walked };
+  return { result, steps: steps.length, walked: walked.length };
 }
 
 export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
