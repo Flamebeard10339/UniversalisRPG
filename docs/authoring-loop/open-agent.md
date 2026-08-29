@@ -88,65 +88,65 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## A bot writes only when the turns run out
+## A bot cannot see why what it wrote did not load
 
-**Four interventions have been measured against this, and the queue below is what is left.** Every
-run was `--mode briefed` or `--mode bughunter` on a copy of `content/`, one bot, default effort,
-2026-08-29. An "edit" is a `/dsl`, `/place`, `/link`, `/unlink` or `/region` typed.
+**This is the last blocker, and it is the whole of what stopped the final run.**
 
-| intervention | arms | turns | first edit | verdict |
+Measured 2026-08-29 against `4bcdb1f1`, with the stage-merge landed and a quest editable one stage
+at a time. 117 turns, 24 minutes, $3.17. The bot typed four `/dsl` lines. **All four were refused,
+and every one got the same sentence:**
+
+    local changes did not load, so nothing was written and the world is as it was.
+
+That is the generic module-load failure. It does not say which line, which section, or what was
+wrong. The bot wrote a plausible quest body, was told nothing, guessed the indentation, was told
+the same nothing, guessed again — and stopped itself: *"Out of turns to iteratively fix DSL syntax
+errors ... rather than repeat guesses."*
+
+Turns 107 and 108 differ **only in the indentation of the line after `stage asked:`** — one space
+against two. Turns 116 and 117 are the same pair again on a renamed stage. That is a bot doing
+binary search on whitespace because nothing will tell it what it got wrong.
+
+A refusal that quotes the head line and names the shapes that could stand there already exists — it
+answers the *shape* refusal at `/dsl`'s own head. This is a different path: the section parsed, was
+staged, and then **the module failed to load**, and that path has no diagnostic at all. The loader
+knows exactly what is wrong: `loadUniverseWithDiagnostics` produces it and `formatModuleDiagnostic`
+renders it, and `scripts/playbot.ts` already imports both. It is not reaching the author.
+
+**The same sentence is the reported symptom of the map-editor line in `docs/map/open-agent.md`**,
+which is the second place an author meets it. One fix serves both.
+
+*Closes when:* a staged edit that will not load says what the loader said — the line and what was
+wrong with it — wherever an author meets it, reading the diagnostic the load path already produces
+rather than a second copy of it. **This is the highest-value line open**: every other affordance for
+authoring inside a run now exists and is proved, and this is the one that makes them unusable.
+
+## What the two arms cost, and what each landed
+
+Both arms ran the same brief over the same world on 2026-08-29. The playbot is Sonnet 5 at
+`effort: low`.
+
+| arm | wall | tokens | cost | quest |
 |---|---|---|---|---|
-| framing: repair stated in the imperative | 3 runs each | 320 | never, either arm | **no effect — reverted** |
-| addressing: a view's id readable by `/source` | shipped | 120 after | never | **no effect on its own — kept, it is right anyway** |
-| more turns | 40 vs 80 | 240 | never | **worse**: the 80s read *less* and wandered further |
-| horizon: `Turn N of M` | 2 runs each | 240 | **turn 58 / 59** | **kept** — moves it off zero and nothing more |
+| playbot, `--mode briefed`, 117 turns | 24.0 min | 95,208 out; 1.92M cache read; 732K cache write | **$3.17** | **none** — 4 edits typed, 4 refused, nothing staged |
+| a cold coding agent, same brief, no playbot | 17.2 min | 232,423 total | **~$0.65** | **all five beats**, walked by a corpus `# test` |
 
-What is ruled out: the framing, the report gate (133 of 320 turns carried a report, so it stood
-open almost throughout), the vocabulary, and the grammar being out of reach. What is established is
-that a bot **can** author — a truncated one-paragraph brief produced a staged four-stage quest at
-turn 39, and a horizon run staged a flag — and that it will not do so while it has turns left to
-read instead.
+The playbot spent **74 of its 117 turns reading** (61 `/source` applied, 13 refused) and reached its
+first edit at **turn 107 of 120**. The cold agent read the same world off disk and wrote the file.
 
-**The standing read: reading is safe and writing risks a refusal**, so the expected value of trying
-is bad until the deadline forces it. Both horizon runs ended by stopping themselves naming the
-deadline — *"Ran out of turns to reload and walk this final edit"* — which no control run ever did.
+So: **five times the money, forty percent more wall time, and nothing shipped.** Per turn the
+playbot is cheap — 2.7 cents — and per completed task it has no figure at all, because it has never
+completed one.
 
-**The lever built against that read is shipped and unmeasured.** A refused edit now quotes the line
-as typed, sets under it the shapes the grammar would have taken there, and says outright that
-nothing was written; `/dsl`'s summary says the attempt is free. The lane that built it hit the
-account's spend limit before running its arm, so **whether it moves the first edit earlier than
-turn 58 is not known**. That measurement is the next thing to take, and it is one run against the
-horizon numbers above — the controls do not need re-running.
+**This does not settle the premise, and the reason is the line above.** The final run failed on a
+missing diagnostic, not on the bot's judgement or its grasp of the language: it had read the corpus,
+found the right id, chosen the right stage, and written a body whose only visible defect was
+whitespace. What is measured here is a loop with one broken link, not a bot that cannot author.
 
-*Closes when:* the first edit lands early enough in a run that the run can walk what it wrote. If
-the cheaper refusal does not do it, the untried levers are: opening on a `--save` in finished
-content rather than the tutorial, where every run so far spent its first ten to fifteen turns; and
-a brief so small there is nothing to defer into — which is the shape the deliverable line below
-now depends on.
-
-## Ball of a Boy is still unauthored, and the approach to take is known
-
-The quest is the push's deliverable and it did not land. `content/ball-of-a-boy.dsl` still holds
-`# quest down-the-grate` as a stub with one stage and its `@@@`. Tulsa ships the whole physical
-world for it — `mouse` and `sewer-grate` in the market square, `larry` on the hatch,
-`sewer-entrance` → `sewer-junction` → `sewer-outfall` → `sewer-locked-room`, `# item sewer-key`,
-`# flag sewer-toll-paid`, `# droptable ratman-remains`, and dialogue for Mouse, Larry and Charlie —
-so this is quest stages, dialogue gated on them, Larry's toll and the ratman book, and no engine
-work under it.
-
-`tulsa.sewer-toll-paid` is read by the road out of `castle-yard` and **nothing in the corpus sets
-it**, so that road is unreachable until this is written.
-
-**The approach, chosen against what was measured and not yet run:** several short briefed runs of
-25–40 turns, one beat per brief, all staging into the same accumulating `--local` file so each run
-opens with the last one's work already in the world. A small brief and a short run take away the
-room to defer into, which is what every long run used up. The lane that would have run this hit the
-spend limit before its first run.
-
-*Closes when:* the quest is authored by a bot, consolidated into `content/ball-of-a-boy.dsl` by
-`npm run contribution:consolidate`, and walked by a corpus `# test`. **If it is hand-authored
-instead, the exercise has failed and the commit says so** — the point is not the quest, it is
-whether a bot can write one.
+*Closes when:* the diagnostic line above is closed and this run is repeated. If the bot then lands a
+quest, these numbers are the before. If it still does not, the premise is answered and the playbot
+is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
+came out of playbot reports, and no agent reading the corpus had found either.
 
 ## Two traps that cost a run each, written down so they do not cost a third
 
