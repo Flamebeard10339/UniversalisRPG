@@ -18,6 +18,7 @@ import { grammarLines } from '../content/grammarTree';
 import { isSectionKind, sectionKinds } from '../content/sections';
 import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
+import { declaredKey } from '../content/resolve';
 import type { Resumption } from './openUniverse';
 import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
@@ -634,21 +635,34 @@ function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResu
 // A section as its author wrote it, out of the file it was written in. The world is read for
 // examples far oftener than it is written to, and a printed section is not an example of anything:
 // it has already lost the comments and the `@@@` notes that say what the author was reaching for.
+function sourceMatches(text: string, at: NamedSection): string[] {
+  const sections = sourceSections(text);
+  // A module is which module its own `# info` names, and a section's id inside it is written
+  // module-local. The loader's own answer for what that id is addressed as is asked for rather
+  // than spelled out again, so /source and the view agree about what a thing is called.
+  const namespace = sections.find((section) => section.kind === 'info')?.id ?? null;
+  return sections
+    .filter(
+      (section) =>
+        section.id !== undefined &&
+        (at.kind === null || section.kind === at.kind) &&
+        (section.id === at.id || declaredKey(namespace, section.kind, section.id) === at.id),
+    )
+    .map((section) => section.text);
+}
+
 function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
-  const named = at.kind === null ? at.id : `# ${at.kind} ${at.id}`;
-  let found: { kind: string; text: string }[];
+  let found: string[];
   try {
-    found = [...authoring.baseSources, authoring.localSource].flatMap((module) =>
-      sourceSections(module.text).filter((section) => section.id === at.id && (at.kind === null || section.kind === at.kind)),
-    );
+    found = [...authoring.baseSources, authoring.localSource].flatMap((module) => sourceMatches(module.text, at));
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
     throw error;
   }
-  if (found.length === 0) return noted('error', `nothing loaded is written as ${named}`);
-  return asSource(found.flatMap((section, index) => (index === 0 ? [] : ['']).concat(section.text.split('\n'))));
+  if (found.length === 0) return noted('error', `nothing loaded is written as ${at.kind === null ? at.id : `# ${at.kind} ${at.id}`}`);
+  return asSource(found.flatMap((text, index) => (index === 0 ? [] : ['']).concat(text.split('\n'))));
 }
 
 function runLocal(ctx: CommandContext, op: LocalOp): CommandResult {

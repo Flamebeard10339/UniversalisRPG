@@ -1251,6 +1251,10 @@ describe('what an author may write, and what is already written', () => {
     const chest = runLine(ctx, '/source chest').output[0];
     expect(chest.kind === 'source' && chest.lines).toEqual(['# entity chest', 'title: Chest', 'open:', '  say: Empty.']);
     expect(runLine(ctx, '/source entity chest').output[0]).toEqual(chest);
+    // A section is written under its module-local id and addressed by the whole of it, and the
+    // view a player reads prints the whole of it — so that is the id /source has to answer to.
+    expect(runLine(ctx, '/source base.chest').output[0]).toEqual(chest);
+    expect(runLine(ctx, '/source entity base.chest').output[0]).toEqual(chest);
 
     expect(errors(runLine(ctx, '/source item chest'))).toEqual(['nothing loaded is written as # item chest']);
     expect(errors(runLine(ctx, '/source nobody-at-all'))).toEqual(['nothing loaded is written as nobody-at-all']);
