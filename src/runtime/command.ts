@@ -17,7 +17,7 @@ import { grammarLines } from '../content/grammarTree';
 import { namesFrom } from '../content/completion';
 import { oneNewline, writtenSections } from '../content/sectionSource';
 import { isSectionKind, sectionKinds } from '../content/sections';
-import { isGrowthDirective, parseDirectiveLine, printDirective, type Directive } from '../content/sections/test';
+import { isGrowthDirective, parseDirectiveLine, parseUsePayload, printDirective, type Directive } from '../content/sections/test';
 import { resolveCarried, resolveDirective } from '../content/typed';
 import { declaredKey, homelessId } from '../content/resolve';
 import type { Resumption } from './openUniverse';
@@ -33,6 +33,7 @@ import { relativeValue, type Relative } from '../content/sections/location';
 import { gathering, joining, pinning, placing, shifting, type Editing } from './mapEdit';
 import { type Answer, type Localized, type Localizer } from './localized';
 import { type Modal } from './modals';
+import { ownerRef } from './state';
 import { anId, say, says, type Said } from './said';
 import {
   DEV_SLOT,
@@ -687,13 +688,31 @@ function listedRows(addresses: readonly string[]): { rows: string[]; folded: boo
   return { rows: [...families].map(([family, held]) => (held.length === 1 ? `  ${held[0]}` : `  ${family} (${held.length})`)), folded: true };
 }
 
+// What a view prints beside whatever a section offers, under either of the ids that section answers
+// to. This is the half of a choice id that is not the action, so it is built the way the choice id
+// was built rather than recognised by shape.
+const ownerForms = (section: SectionWritten): string[] => [ownerRef(section.kind, section.address), ownerRef(section.kind, section.written)];
+
+// Every name the engine itself writes one section under: the id its author typed inside the module,
+// the address the loader files it at, and the owner a view prints. An author types one of the first
+// two and a player is handed the third, so all of them have to arrive here.
+const namesOf = (section: SectionWritten): string[] => [section.written, section.address, ...ownerForms(section)];
+
+// A choice id is an action on an owner, and the owner is the section the action is written in. The
+// engine composed that id out of the two, so its own reading of it is asked for rather than the id
+// taken apart again by shape.
+const ownerAsked = (id: string): string | null => {
+  const use = parseUsePayload(id);
+  return use === null ? null : ownerRef(use.obj, use.objId);
+};
+
 const wroteAs = (at: NamedSection): string => (at.kind === null ? String(at.id) : `# ${at.kind} ${at.id}`);
 
 // An id that names nothing is nearly always an id half-remembered, and the editing page already has
 // the rule for whether an address answers to a word somebody typed — it is asked here rather than
 // guessed at again, so a refusal points at exactly what a completion would have offered.
 function noSuchSection(at: NamedSection, loaded: readonly SectionWritten[]): CommandResult {
-  const near = loaded.filter((section) => namesFrom(section.address, at.id!)).map((section) => section.address);
+  const near = loaded.filter((section) => namesOf(section).some((name) => namesFrom(name, at.id!))).map((section) => section.address);
   const under = at.kind === null ? 'loaded' : `loaded as # ${at.kind}`;
   if (near.length === 0) {
     const ask = at.kind === null ? '/source <kind> lists what is loaded of a kind' : `/source ${at.kind} lists the ${new Set(loaded.map((section) => section.address)).size} there are`;
@@ -701,6 +720,14 @@ function noSuchSection(at: NamedSection, loaded: readonly SectionWritten[]): Com
   }
   const { rows } = listedRows(near);
   return noted('error', `nothing loaded is written as ${wroteAs(at)}`, [`${new Set(near).size} ${under} ${new Set(near).size === 1 ? 'is' : 'are'} named from ${at.id}:`, ...rows]);
+}
+
+// An id that is at once a section's own name and an action on a different section is an id whose
+// reader meant one of the two, and nothing in the id says which. Both readings are named rather
+// than one of them picked.
+function bothWays(at: NamedSection, named: readonly SectionWritten[], owning: readonly SectionWritten[]): CommandResult {
+  const rows = (sections: readonly SectionWritten[], as: string): string[] => [...new Set(sections.map((section) => `  # ${section.kind} ${section.address} — ${as}`))].sort();
+  return noted('error', `${at.id} reads two ways and nothing in it says which`, [...rows(named, 'a section written under that id'), ...rows(owning, 'the section an action of that id is written in')]);
 }
 
 // A section as its author wrote it, out of the file it was written in. The world is read for
@@ -725,7 +752,11 @@ function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
     const narrows = folded ? ', and an id naming part of one lists what it names' : '';
     return asSource([`${new Set(loaded.map((section) => section.address)).size} loaded as # ${at.kind}; /source ${at.kind} <id> writes one out as its author wrote it${narrows}:`, ...rows]);
   }
-  const found = loaded.filter((section) => section.address === at.id || section.written === at.id);
+  const named = loaded.filter((section) => namesOf(section).includes(at.id!));
+  const owner = ownerAsked(at.id);
+  const owning = owner === null ? [] : loaded.filter((section) => ownerForms(section).includes(owner));
+  if (named.length > 0 && owning.some((section) => !named.includes(section))) return bothWays(at, named, owning);
+  const found = named.length > 0 ? named : owning;
   if (found.length === 0) return noSuchSection(at, loaded);
   return asSource(found.flatMap((section, index) => (index === 0 ? [] : ['']).concat(section.text.split('\n'))));
 }
@@ -1193,7 +1224,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     name: '/source',
     arg: 'named',
     argHint: '<kind> | <id> | <kind> <id>',
-    summary: 'print a loaded section as its author wrote it, comments and all; with no kind, every section written under that id; with no id, the ids loaded of that kind',
+    summary: 'print a loaded section as its author wrote it, comments and all; any id a view printed will do, an action id reading out the entity, location or item it is written in; with no kind, every section written under that id; with no id, the ids loaded of that kind',
     audience: 'author',
     parse: (rest) => {
       const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
