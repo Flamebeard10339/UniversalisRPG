@@ -59,6 +59,49 @@ describe('squash-local-changes', () => {
     }
   });
 
+  it('shows a section staged under the target that the target does not declare yet, among its own kind', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-squash-'));
+    try {
+      const base = write(
+        path.join(dir, 'base.dsl'),
+        `
+        # info base
+        version: 1.0.0
+
+        # item bread
+        title: Bread
+
+        # location camp
+        x: 0, y: 0
+        starting
+        `,
+      );
+      const local = write(
+        path.join(dir, 'local-changes.dsl'),
+        `
+        # info local-changes
+        version: 0.0.0
+        dependencies:
+          base
+
+        # entity base.crab
+        title: Crab
+
+        # item base.gem
+        title: Gem
+        `,
+      );
+
+      const headings = runSquash([`local=${local}`, `content=${base}`])
+        .split('\n')
+        .filter((line) => line.startsWith('# '));
+
+      expect(headings).toEqual(['# info base', '# item bread', '# item gem', '# entity crab', '# location camp']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('fails instead of dropping local-created content from the squashed target', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-squash-'));
     try {
