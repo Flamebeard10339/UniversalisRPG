@@ -293,7 +293,7 @@ x: 1, y: 0
     const wait = COMMANDS.find((spec) => spec.name === '/wait')!;
     expect(lines).toContain(`  ${wait.name} ${wait.argHint}${' '.repeat(4)}${wait.summary}`);
     expect(lines).toContain('  /quit, /q    show final state and exit');
-    expect(lines).toContain('  /dsl <kind> <id> [body] stage or replace one local DSL section; use | for new lines');
+    expect(lines).toContain('  /dsl <kind> <module>.<id> [body] stage or replace one local DSL section, under the module it belongs to; use | for new lines');
 
     const startup = lines.filter((line) => line.includes('at startup'));
     expect(lines).toHaveLength(1 + COMMANDS.length + startup.length);
@@ -596,8 +596,8 @@ describe('play-cli reaches its local module through the file rather than a remem
   it('writes and re-reads the same file, so a staged section survives a reload', () => {
     inTempDir((localFile) => {
       const { ctx } = opened(localFile);
-      runLine(ctx, '/dsl item gem title: Gem');
-      expect(readFileSync(localFile, 'utf8')).toContain('# item gem');
+      runLine(ctx, '/dsl item local-changes.gem title: Gem');
+      expect(readFileSync(localFile, 'utf8')).toContain('# item local-changes.gem');
 
       expect(shown(runLine(ctx, '/reload'))).toContain('Reloaded local-changes.');
       expect(ctx.session.registry.items.get('local-changes.gem')?.title).toBe('Gem');
@@ -609,11 +609,11 @@ describe('play-cli reaches its local module through the file rather than a remem
       const { ctx } = opened(localFile);
       writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION]), 'utf8');
 
-      expect(shown(runLine(ctx, '/dsl item gem title: Gem'))).toContain('Staged # item gem in local-changes.');
+      expect(shown(runLine(ctx, '/dsl item local-changes.gem title: Gem'))).toContain('Staged # item local-changes.gem in local-changes.');
 
       const onDisk = readFileSync(localFile, 'utf8');
       expect(onDisk).toContain('# location tower');
-      expect(onDisk).toContain('# item gem');
+      expect(onDisk).toContain('# item local-changes.gem');
       expect(ctx.session.registry.locations.get('local-changes.tower')?.title).toBe('Tower');
     });
   });
@@ -795,7 +795,7 @@ describe('export and import use the spelling the DSL already has (c6)', () => {
       runLine(repl.context, '/wait 5');
       const exported = linesOf(runLine(repl.context, '/export'))[0];
 
-      expect(errorsOf(runLine(repl.context, `/dsl save carried ${exported}`))).toEqual([]);
+      expect(errorsOf(runLine(repl.context, `/dsl save local-changes.carried ${exported}`))).toEqual([]);
       runLine(repl.context, '/wait 9');
       expect(sessionStatus(repl.context.session).time).toBe(14);
 

@@ -140,8 +140,21 @@ type Created = { kind: string; value: MemberOwner };
 
 const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
 
+// A qualified id names the module the section belongs to, so a section nothing has declared yet is
+// declared there rather than under the module the writing arrived in. That is the whole of how a
+// section authored during a run — where every edit is staged in one module of its own — becomes a
+// section of the module it names. An id naming a module this one cannot see is left to `resolve`,
+// which says so in the words an author reads everywhere else.
+function writtenUnder(id: string, loaded: ReadonlySet<string>, visible: ReadonlySet<string | null>): { namespace: string; local: string } | null {
+  const at = id.indexOf('.');
+  if (at < 0) return null;
+  const named = id.slice(0, at);
+  return loaded.has(named) && visible.has(named) ? { namespace: named, local: id.slice(at + 1) } : null;
+}
+
 function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const missingOptional = missingOptionalDependencies(module, loaded);
+  const visible = visibleTo(module, loaded);
   module.sections = module.sections.filter((section) => {
     if (section.kind === 'remove') return !namesMissingOptional((section.value as Removal).kind, (section.value as Removal).target, missingOptional);
     const { id } = section.value as { id?: string };
@@ -155,10 +168,13 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
       if (under.kind !== kind || under.id !== value.id) namespace.mint(under.kind, under.id, minted.from);
     }
     const scope = idScopeOf(kind);
-    if (scope === 'none' || value.id === undefined || value.id.includes('.')) continue;
-    if (kind === 'flag' && value.id === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
+    if (scope === 'none' || value.id === undefined) continue;
+    const written = scope === 'owned' ? writtenUnder(value.id, loaded, visible) : null;
+    if (written === null && value.id.includes('.')) continue;
+    const own = written?.local ?? value.id;
+    if (kind === 'flag' && own === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
     // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
-    namespace.declare(kind, scope === 'owned' ? module.namespace : null, value.id);
+    namespace.declare(kind, scope === 'owned' ? (written?.namespace ?? module.namespace) : null, own);
   }
 }
 

@@ -1,17 +1,10 @@
 import { formatDependency, type Dependency } from '../grammar/dependency';
-import { DslError, type Span } from '../grammar/parser';
-import { splitSections } from '../grammar/structure';
+import { DslError } from '../grammar/parser';
 import { isSectionKind } from './sections';
+import { oneNewline, writtenSections } from './sectionSource';
 import { parseModuleSource } from './universe';
 
 export const LOCAL_CHANGES_MODULE_ID = 'local-changes';
-
-export interface SourceSection {
-  kind: string;
-  id: string | undefined;
-  text: string;
-  span: Span;
-}
 
 export interface LocalSection {
   kind: string;
@@ -32,30 +25,8 @@ export interface LocalSectionDelete {
 
 const MANAGED_INFO = 'info';
 
-function normalized(source: string): string {
-  return source.replace(/\r\n?/g, '\n');
-}
-
-function sectionText(source: string, start: number, end: number): string {
-  return source.slice(start, end).trimEnd();
-}
-
-// Every section a module's text holds, cut out of the text it was written in — the bytes an author
-// typed, comments and `@@@` notes and all. That is what a section has to be read back as by anyone
-// learning the language off one, and what the printer cannot give: it prints the section the
-// registry holds, which has already dropped everything that was not content.
-export function sourceSections(source: string): SourceSection[] {
-  const text = normalized(source);
-  return splitSections(text).map((section) => ({
-    kind: section.kind,
-    id: section.id,
-    text: sectionText(text, section.span.start, section.span.end),
-    span: section.span,
-  }));
-}
-
 function readSections(source: string): LocalSection[] {
-  return sourceSections(source).map((section) => {
+  return writtenSections(oneNewline(source)).map((section) => {
     if (!section.id) throw new DslError(`# ${section.kind} requires an id`, section.span);
     return { kind: section.kind, id: section.id, text: section.text };
   });
@@ -96,7 +67,7 @@ export function localSectionHeadings(source: string): string[] {
 }
 
 function parseLocalSection(sectionSource: string): LocalSection {
-  const text = normalized(sectionSource).trim();
+  const text = oneNewline(sectionSource).trim();
   const sections = readSections(text);
   if (sections.length !== 1) throw new DslError(`expected exactly one DSL section, got ${sections.length}`);
   const section = sections[0];

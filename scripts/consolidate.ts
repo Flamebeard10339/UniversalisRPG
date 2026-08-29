@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { moduleLocalId } from '../src/grammar/section';
 import { splitSections } from '../src/grammar/structure';
+import { gap, landing } from './lib/sectionPlacement';
 import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type LocalSection } from '../src/content/localChanges';
 import { declaredKey } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
@@ -153,12 +155,23 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
 
   const namespaces = new Map(before.parsed.map((module) => [module.source.name, module.namespace]));
   const declared = declarations(base, namespaces);
+  const files = new Map(base.flatMap((source) => (namespaces.get(source.name) == null ? [] : [[namespaces.get(source.name)!, source] as const])));
 
-  const resolved: { section: LocalSection; target: Target; declaration: Declaration | null; refused: string }[] = sections.map(({ section, target }) => {
+  // Where a section nothing declares yet goes home: the module its id is under, asked of the
+  // namespace that settled that id rather than read back out of the words in it.
+  const newIn = (target: Target): ModuleSource | undefined => {
+    if (target.remove) return undefined;
+    const owner = before.registry.namespace.ownerOf(target.kind, target.id);
+    return owner == null ? undefined : files.get(owner);
+  };
+
+  const resolved: { section: LocalSection; target: Target; declaration: Declaration | null; fresh: ModuleSource | null; refused: string }[] = sections.map(({ section, target }) => {
     const at = declared.get(declarationKey(target.kind, target.id)) ?? [];
-    if (at.length === 0) return { section, target, declaration: null, refused: `no file under content/ declares ${target.kind} ${target.id}` };
-    if (at.length > 1) return { section, target, declaration: null, refused: `${at.map((each) => each.source).sort().join(' and ')} both declare ${target.kind} ${target.id}` };
-    return { section, target, declaration: at[0], refused: '' };
+    if (at.length > 1) return { section, target, declaration: null, fresh: null, refused: `${at.map((each) => each.source).sort().join(' and ')} both declare ${target.kind} ${target.id}` };
+    if (at.length === 1) return { section, target, declaration: at[0], fresh: null, refused: '' };
+    const home = newIn(target);
+    if (home === undefined) return { section, target, declaration: null, fresh: null, refused: `no file under content/ declares ${target.kind} ${target.id}` };
+    return { section, target, declaration: null, fresh: home, refused: '' };
   });
 
   const span = (declaration: Declaration): string => `${declaration.source}:${declaration.start}`;
@@ -168,9 +181,16 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
   const placed: Placed[] = [];
   const unplaced: Unplaced[] = [];
   const edits = new Map<string, Edit[]>();
+  const arriving = new Map<string, string[]>();
 
-  for (const { section, target, declaration, refused } of resolved) {
+  for (const { section, target, declaration, fresh, refused } of resolved) {
     const heading = `# ${section.kind} ${section.id}`;
+    if (fresh) {
+      const local = moduleLocalId(namespaces.get(fresh.name)!, target.id);
+      arriving.set(`${fresh.name}\0${target.kind}`, [...(arriving.get(`${fresh.name}\0${target.kind}`) ?? []), rehead(`# ${target.kind} ${local}`, section.text)]);
+      placed.push({ heading, kind: target.kind, id: target.id, source: fresh.name });
+      continue;
+    }
     if (!declaration) {
       unplaced.push({ heading, reason: refused });
       continue;
@@ -188,6 +208,13 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
     into.push({ start: declaration.start, end: declaration.end, text: folded.text });
     edits.set(declaration.source, into);
     placed.push({ heading, kind: target.kind, id: target.id, source: declaration.source });
+  }
+
+  for (const [at, bodies] of arriving) {
+    const [name, kind] = at.split('\0');
+    const text = base.find((source) => source.name === name)!.text;
+    const to = landing(text, kind);
+    edits.set(name, [...(edits.get(name) ?? []), { start: to, end: to, text: bodies.map((body) => `${gap(text)}${body}`).join('') }]);
   }
 
   const sources = base.map((source) => (edits.has(source.name) ? { ...source, text: applyEdits(source.text, edits.get(source.name)!) } : source));
@@ -225,7 +252,8 @@ function usage(): never {
       'Usage: tsx scripts/consolidate.ts [local=<file>] [content=<a.dsl,b.dsl>] [--dry-run]',
       '',
       'Writes every staged section back into the file that declared its id and empties the local module.',
-      'Refuses as a whole if the result would load into a different universe.',
+      'A section nothing declares yet goes into the file of the module its id names, among the',
+      'sections already of its kind. Refuses as a whole if the result would load into a different universe.',
     ].join('\n'),
   );
   process.exit(1);

@@ -4,6 +4,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { registryDiff, type Rewriting } from '../src/content/registryDiff';
 import { splitSections } from '../src/grammar/structure';
+import { blockOf, gap, landing, lineStarts } from './lib/sectionPlacement';
 import { corpusOf, occurrencesOf, readScope, SCOPE, sourceOf, type TextFile } from './rename-module';
 
 export interface MoveReport {
@@ -24,50 +25,6 @@ export const parseHeading = (spec: string): Heading => {
 };
 
 const refused = (lines: string[]): MoveReport => ({ lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [] });
-
-interface Block {
-  cut: { start: number; end: number };
-  text: string;
-}
-
-function lineStarts(text: string): number[] {
-  const starts = [0];
-  for (let at = text.indexOf('\n'); at !== -1; at = text.indexOf('\n', at + 1)) starts.push(at + 1);
-  return starts;
-}
-
-const lineTextAt = (text: string, starts: readonly number[], index: number): string =>
-  text.slice(starts[index], index + 1 < starts.length ? starts[index + 1] : text.length).replace(/\r?\n$/, '');
-
-function lineAt(starts: readonly number[], offset: number): number {
-  let low = 0;
-  let high = starts.length - 1;
-  while (low < high) {
-    const mid = (low + high + 1) >> 1;
-    if (starts[mid] <= offset) low = mid;
-    else high = mid - 1;
-  }
-  return low;
-}
-
-// A section travels with the comment block written directly above it, which is where this corpus keeps what a section is for; a blank line is what separates one section's own paragraph from the heading of the group it sits under, which stays behind.
-function blockOf(text: string, starts: readonly number[], span: { start: number; end: number }): Block {
-  let first = lineAt(starts, span.start);
-  while (first > 0 && lineTextAt(text, starts, first - 1).trim().startsWith('//')) first -= 1;
-  const last = lineAt(starts, span.end);
-  const keepEnd = starts[last] + lineTextAt(text, starts, last).length;
-  let after = last;
-  while (after + 1 < starts.length && lineTextAt(text, starts, after + 1).trim() === '') after += 1;
-  return { cut: { start: starts[first], end: after + 1 < starts.length ? starts[after + 1] : text.length }, text: text.slice(starts[first], keepEnd) };
-}
-
-// Where a moved section lands: among the ones already of its kind, which is how both halves of a split module are laid out. A destination holding none of that kind takes it at the end.
-function landing(text: string, kind: string): number {
-  const held = splitSections(text).filter((section) => section.kind === kind);
-  if (held.length === 0) return text.replace(/\s+$/, '').length;
-  const last = blockOf(text, lineStarts(text), held[held.length - 1].span);
-  return last.cut.start + last.text.length;
-}
 
 interface Edit {
   start: number;
@@ -92,8 +49,6 @@ export const rewritingOf = (from: string, to: string, headings: readonly Heading
   for (const { kind, id } of headings) rules.push([occurrencesOf(`${from}.${kind}.${id}`), `${to}.${kind}.${id}`]);
   return (text) => rules.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), text);
 };
-
-const gap = (text: string): string => (text.includes('\r\n') ? '\r\n\r\n' : '\n\n');
 
 export function moveSections(files: readonly TextFile[], from: string, to: string, headings: readonly Heading[]): MoveReport {
   if (from === to) return refused([`${from} and ${to} are the same id, so there is nothing to move.`]);

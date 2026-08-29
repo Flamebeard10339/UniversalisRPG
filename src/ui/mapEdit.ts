@@ -85,5 +85,5 @@ export function created(id: string, at: Point, plane: number): Staged {
   if (!NAMED.test(id)) return { refused: `a location is named in lower case with dashes, as in north-shore, and not ${JSON.stringify(id)}` };
   const spot = settledOn(at);
   const where = plane === 0 ? `x: ${spot.x}, y: ${spot.y}` : `x: ${spot.x}, y: ${spot.y}, z: ${plane}`;
-  return stage([`# location ${id}`, where].join('\n'));
+  return stage([`# location ${stagedKey(id)}`, where].join('\n'));
 }

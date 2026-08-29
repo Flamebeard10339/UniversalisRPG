@@ -1,7 +1,7 @@
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { RawSection, sectionParser } from '../../grammar/structure';
-import { section } from './define';
+import { section, writtenWhole } from './define';
 
 export interface ParsedSave {
   version: number;
@@ -34,6 +34,7 @@ export const save = section<SaveSection>()({
   kind: 'save',
   ids: 'owned',
   vocabulary: 'declared',
+  merge: writtenWhole,
   maps: {
     // The section itself, rather than the two fields read off it: a mark laid on a section travels with the section, and one copied field at a time is one mark left behind.
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, value]],

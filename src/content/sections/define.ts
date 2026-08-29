@@ -194,6 +194,12 @@ const notContent = (kind: string): never => {
   throw new DslError(`a # ${kind} is not content and cannot be built into the registry`);
 };
 
+// What a second body at one id means for a kind whose body has no fields to lay over one another:
+// the later writing is the section, and the earlier one is gone. A kind with a rule of its own
+// declares it instead; a kind with neither is refused where it is declared, because keeping the
+// first and dropping the second is the one answer an author is never told about.
+export const writtenWhole = (_into: object | undefined, from: object): object => from;
+
 export const section =
   <V extends { id: string }, F extends keyof V = never, E extends keyof V = never>() =>
   <const Name extends string = never, Filled extends Record<string, unknown> = Record<Name, V>>(
@@ -207,6 +213,9 @@ export const section =
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
   if (schema === undefined && typeof (spec as Bespoke<V>).parse !== 'function') throw new Error(`# ${kind} declares neither fields nor a parse`);
+    if (schema === undefined && merge === undefined && (map !== undefined || maps !== undefined)) {
+      throw new Error(`# ${kind} reads its own body and lands in a map, so it must declare a merge: what a second body written at one of its ids means`);
+    }
     const names = schema === undefined ? [] : namedFields(schema);
     const written = schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar;
     const visited = (value: V, where: string, visit: Visit): void => {
@@ -256,7 +265,11 @@ export const section =
       for (const line of marks) requireNoBlock(line);
       return asDebug(readBody({ ...raw, body: raw.body.filter((line) => !isMark(line)) }) as object);
     };
-    const mergeBodies = merge ?? ((into: object | undefined, from: object) => (schema ? mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema) : (into ?? from)));
+    const mergeBodies =
+      merge ??
+      (schema
+        ? (into: object | undefined, from: object) => mergeFields((into as Record<string, unknown>) ?? { id: (from as V).id }, from as Record<string, unknown>, schema)
+        : (): never => notContent(kind));
     const hydrate = schema
       ? (authored: object, context: HydrateContext): V => built(hydrateSection(authored as Authored<V>, schema as unknown as SectionSchema<V, F, E>, context) as V, unmetNeed(authored as Record<string, unknown>, schema) ?? undefined)
       : (authored: object): V => built(authored as V);

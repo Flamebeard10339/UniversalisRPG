@@ -98,8 +98,16 @@ describe('a heading creates or edits by its shape alone', () => {
     expect(registry.items.get('base.rope')!.title).toBe('Frayed Rope');
   });
 
-  it('refuses to edit a path that names nothing', () => {
-    expect(() => loadUniverse([BASE, module('mod', 'dependencies: base', '# item base.cable', 'title: Cable')])).toThrow(/names an unknown item: base.cable/);
+  // A path is where a section belongs and not only where one already is, which is what gives a
+  // section written from a module of its own — a run's local changes — somewhere to go home to.
+  it('creates under the module the path names when nothing holds it yet', () => {
+    const registry = loadUniverse([BASE, module('mod', 'dependencies: base', '# item base.cable', 'title: Cable')]);
+    expect(registry.items.get('base.cable')!.title).toBe('Cable');
+    expect(registry.items.get('mod.cable')).toBeUndefined();
+  });
+
+  it('refuses a path naming a module this one does not depend on', () => {
+    expect(() => loadUniverse([BASE, module('mod', '# item base.cable', 'title: Cable')])).toThrow(/base is not this module or one of its dependencies/);
   });
 
   it('refuses to edit a dependency declared with ~ because it does not load first', () => {

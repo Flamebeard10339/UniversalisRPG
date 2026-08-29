@@ -1,3 +1,4 @@
+import { deepStrictEqual } from 'node:assert';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
@@ -5,7 +6,7 @@ import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
-import type { Written } from '../grammar/parser';
+import { DslError, type Written } from '../grammar/parser';
 import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
@@ -15,7 +16,7 @@ import { TOUCHED } from './sections/define';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, GENERATED_FIELD, localeKey } from './locale';
-import { contentSectionMaps, isCheckedKind, isDebug, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
+import { contentSectionMaps, isCheckedKind, isDebug, parseModule, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
 import { isBase } from './sections/item';
@@ -806,5 +807,58 @@ describe('every section kind', () => {
     expect(codecs.size).toBeGreaterThan(20);
     expect(collectionFailures(codecs)).toEqual([]);
     expect(shapeFailures(codecs)).toEqual([]);
+  });
+});
+
+describe('a second body written at an id a first body already holds', () => {
+  const AUTHORED = new Map<string, object[]>();
+  for (const source of CORPUS) for (const section of parseModule(source.text)) AUTHORED.set(section.kind, [...(AUTHORED.get(section.kind) ?? []), section.value]);
+
+  // Every kind whose sections land somewhere a second one could overwrite. A kind that lands nowhere is never merged, and a kind that writes no line has no body, so a second one of it says nothing the first did not.
+  const MAPPED = sections().filter((each) => Object.keys(each.maps).length > 0 && each.grammar.length > 0);
+
+  const same = (one: unknown, other: unknown): boolean => {
+    try {
+      deepStrictEqual(one, other);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Second bodies read off the kind's own grammar, one example line at a time, so what is written here follows a kind that gains or loses a line.
+  const secondBodies = (owner: Section, id: string): object[] =>
+    owner.grammar.flatMap((line) => {
+      const opens = line.block?.()[0]?.example;
+      const written = [`# ${owner.kind} ${id}`, line.example, ...(opens === undefined ? [] : indentLines([opens], 2))].join('\n');
+      try {
+        return [owner.parse(splitSections(written)[0]!)];
+      } catch {
+        return [];
+      }
+    });
+
+  it('is asked of every kind that lands in a map, which is most of them', () => {
+    expect(MAPPED.length).toBeGreaterThan(20);
+    expect(MAPPED.length).toBeLessThan(sections().length);
+  });
+
+  it.each(MAPPED.map((each) => each.kind))('%s says what it means, rather than keeping the first and dropping the second', (kind) => {
+    const owner = sectionFor(kind)!;
+    const first = AUTHORED.get(kind)?.[0];
+    expect(first, `the corpus writes no # ${kind}, so there is no first body to write a second over`).toBeDefined();
+    const seconds = secondBodies(owner, (first as { id: string }).id);
+    expect(seconds.length, `# ${kind} writes out no example line that parses on its own`).toBeGreaterThan(0);
+    const answers = seconds.map((second) => {
+      // A first body at an id nothing has written yet is never refused: what a kind may refuse is the second.
+      expect(() => owner.merge(undefined, structuredClone(second))).not.toThrow();
+      try {
+        return same(owner.merge(structuredClone(first!), structuredClone(second)), first) ? 'kept' : 'answered';
+      } catch (error) {
+        if (error instanceof DslError) return 'answered';
+        throw error;
+      }
+    });
+    expect(answers.includes('answered'), `# ${kind} keeps the first body and drops every second one, telling nobody`).toBe(true);
   });
 });

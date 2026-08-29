@@ -73,6 +73,28 @@ describe('a consolidation writes each section into the file that declared its id
     expect(localSectionHeadings(result.local)).toEqual(['# item gem']);
   });
 
+  // What closes the loop on a section written during a run: nothing declares it yet, and its id says
+  // which module it belongs to, so consolidation lands it there rather than leaving it staged.
+  it('lands a section nothing declares yet in the file of the module its id names, among its own kind', () => {
+    const result = consolidate(base(), local('# item base.lantern', 'title: Lantern'));
+    expect(writable(result)).toBe(true);
+    expect(result.placed).toEqual([{ heading: '# item base.lantern', kind: 'item', id: 'base.lantern', source: 'base' }]);
+    expect(written(result, 'base')).toBe(BASE.replace('# item bell\ntitle: Bell\n', '# item bell\ntitle: Bell\n\n# item lantern\ntitle: Lantern\n'));
+    expect(localSectionHeadings(result.local)).toEqual([]);
+  });
+
+  it('carries a whole quest home under the name its module writes it by', () => {
+    const errands: ModuleSource = { name: 'errands', text: ['# info errands', 'version: 1.0.0', 'dependencies:', '  base', '', '# quest fetch', 'title: Fetch', 'stage sent:', '  complete', ''].join('\n') };
+    const staged: ModuleSource = {
+      name: LOCAL_CHANGES_MODULE_ID,
+      text: [`# info ${LOCAL_CHANGES_MODULE_ID}`, 'version: 0.0.0', 'dependencies:', '  base', '  errands', '', '# quest errands.return', 'title: Return', 'stage back:', '  complete', ''].join('\n'),
+    };
+    const result = consolidate([...base(), errands], staged);
+    expect(writable(result)).toBe(true);
+    expect(written(result, 'errands')).toContain(['# quest return', 'title: Return', 'stage back:', '  complete'].join('\n'));
+    expect(loadUniverse(result.sources).quests.get('errands.return')?.title).toBe('Return');
+  });
+
   it('refuses a section two files both declare, rather than choosing one', () => {
     const other: ModuleSource = { name: 'other', text: '# info other\nversion: 1.0.0\ndependencies:\n  base\n\n# variable pace\nvalue: 2\n' };
     const withVariable = { name: 'base', text: `${BASE}\n# variable pace\nvalue: 1\n` };
@@ -304,9 +326,9 @@ describe('the command surface', () => {
   it('exits non-zero and writes nothing when nothing staged could be placed', () => {
     const tree = copiedTree();
     try {
-      stage(tree, '/dsl item gem title: Gem');
+      stage(tree, '/dsl item local-changes.gem title: Gem');
       const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`]);
-      expect(result.err.join(' ')).toContain('Left staged: # item gem');
+      expect(result.err.join(' ')).toContain('Left staged: # item local-changes.gem');
       expect(result.code).toBe(1);
       expect(now(tree)).toEqual(tree.before);
     } finally {
