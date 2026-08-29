@@ -1054,15 +1054,31 @@ export function walkTest(session: PlaySession, steps: readonly Directive[], upTo
   return { walked, failure: null };
 }
 
-export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
-  const session = sessionOver(registry, state);
-  const replayed = walkTest(session, testSteps(testId, registry, stack));
-  if (replayed.failure !== null) return { passed: false, failure: replayed.failure };
+export interface TestRun {
+  readonly result: TestResult;
+  // What the route is made of, beside how much of it the walk reached. They are the same length or
+  // the walk stopped short, and a walk that stopped short left the state somewhere the route does
+  // not end — which is the difference between a stale sheet and a body nothing should be recorded
+  // from, and the verdict alone cannot tell them apart.
+  readonly steps: readonly Directive[];
+  readonly walked: readonly Directive[];
+}
 
+export function replayTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestRun {
+  const steps = testSteps(testId, registry, stack);
+  const { walked, failure } = walkTest(sessionOver(registry, state), steps);
   const open = topModal(state);
-  if (open && awaitsAnAnswer(open)) return { passed: false, failure: `modal left open: ${open.name}` };
+  const result: TestResult =
+    failure !== null
+      ? { passed: false, failure }
+      : open && awaitsAnAnswer(open)
+        ? { passed: false, failure: `modal left open: ${open.name}` }
+        : { passed: true };
+  return { result, steps, walked };
+}
 
-  return { passed: true };
+export function runTest(testId: string, registry: Registry, state: GameState, stack: readonly string[] = []): TestResult {
+  return replayTest(testId, registry, state, stack).result;
 }
 
 export function runSessionTest(session: PlaySession, testId: string): TestResult {

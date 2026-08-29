@@ -9,7 +9,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
 import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 import { createGameState } from '../src/runtime/state';
-import { runTest } from '../src/runtime/session';
+import { replayTest, runTest, type TestRun } from '../src/runtime/session';
 import { serializeSave } from '../src/runtime/save';
 import { endSaveId } from '../src/runtime/runLog';
 
@@ -183,12 +183,15 @@ export function recordedSheetId(registry: Registry, testId: string): string | un
   return closing === undefined ? undefined : localId(registry.namespace.ownerOf('save', closing) ?? null, closing);
 }
 
-// A route's end state, written the way a `# save` writes one. `runTest` leaves the state it walked
-// to, so recording a sheet is running the route and serializing what it stopped on — there is no
-// second reading of the world here, which is the whole reason a re-recorded sheet can be trusted.
-// The verdict is printed beside it because a re-recording is run against a route whose sheet is
-// stale by definition: a failure naming that sheet is the expected one, and a failure naming
-// anything else is a route that stopped short of its end and a body that must not be pasted in.
+// A route's end state, written the way a `# save` writes one. The walk leaves the state it reached,
+// so recording a sheet is running the route and serializing what it stopped on — there is no second
+// reading of the world here, which is the whole reason a re-recorded sheet can be trusted.
+//
+// A re-recording is run against a route whose sheet is stale by definition, so failing is the
+// ordinary case and the verdict cannot say whether the body is worth having. How far the walk got
+// can: a route that reached its last directive ended where it ends, whatever that directive said
+// about the sheet, and one that stopped before it ended somewhere else entirely. Only the first
+// prints a body.
 function recordTests(registry: Registry, specs: readonly string[]): { lines: string[]; ok: boolean } {
   const lines: string[] = [];
   let ok = true;
@@ -201,12 +204,18 @@ function recordTests(registry: Registry, specs: readonly string[]): { lines: str
     }
     for (const id of named) {
       const state = createGameState();
-      let verdict: string | null;
+      let run: TestRun;
       try {
-        const result = runTest(id, registry, state);
-        verdict = result.passed ? null : (result.failure ?? 'no reason given');
+        run = replayTest(id, registry, state);
       } catch (error) {
         lines.push(`${id}: threw before it could be recorded — ${error instanceof Error ? error.message : String(error)}`);
+        ok = false;
+        continue;
+      }
+      const verdict = run.result.passed ? null : (run.result.failure ?? 'no reason given');
+      if (run.walked.length < run.steps.length) {
+        lines.push(`${id}: FAILED — ${verdict ?? 'no reason given'}`);
+        lines.push(`${id}: stopped at step ${run.walked.length} of ${run.steps.length}, so the state it left is not the one this route ends on and no body is printed`);
         ok = false;
         continue;
       }
