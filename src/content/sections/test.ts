@@ -26,13 +26,16 @@ export interface NoteField {
   // Whether a reply that does not carry it as a string is refused, and whether a turn that left it
   // empty still says so where a run is read as prose.
   readonly required: boolean;
+  // Whether what is written here is the first read of the world — the thing a playtest produces
+  // that nothing else can. A commentary on the move and a signal that the run is over are neither.
+  readonly reports: boolean;
 }
 
 export const NOTE_FIELDS: readonly NoteField[] = [
-  { name: 'note', asks: 'engine.playtest.note', required: true },
-  { name: 'expected', asks: 'engine.playtest.expected', required: true },
-  { name: 'confusion', asks: 'engine.playtest.confusion', required: true },
-  { name: 'blocked', asks: 'engine.playtest.blocked', required: false },
+  { name: 'note', asks: 'engine.playtest.note', required: true, reports: false },
+  { name: 'expected', asks: 'engine.playtest.expected', required: true, reports: true },
+  { name: 'confusion', asks: 'engine.playtest.confusion', required: true, reports: true },
+  { name: 'blocked', asks: 'engine.playtest.blocked', required: false, reports: false },
 ];
 
 export type NoteName = NoteField['name'];

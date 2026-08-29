@@ -70,8 +70,12 @@ export interface RunHeader {
 export const describeRun = (log: readonly RunLogEntry[], header?: RunHeader): string =>
   [...(header === undefined ? [] : [`# played ${header.at} against ${header.built}`, '']), ...log.map(describeEntry)].join('\n');
 
+// The turns a player is still holding in mind, which is the whole of what any harness may reason
+// about a run's own past from: there is no second store, and a turn older than this is gone.
+export const journalWindow = (log: readonly RunLogEntry[]): readonly RunLogEntry[] => log.slice(-JOURNAL_WINDOW);
+
 export function journalWindowText(log: readonly RunLogEntry[]): string {
-  const windowed = log.slice(-JOURNAL_WINDOW);
+  const windowed = journalWindow(log);
   if (windowed.length === 0) return '(run just started; no turns yet)';
   return windowed.map(describeEntry).join('\n');
 }

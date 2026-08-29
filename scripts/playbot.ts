@@ -9,11 +9,12 @@ import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { ParsedSave } from '../src/content/sections/save';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
-import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
+import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, type AuthoringContext, type CommandAudience, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
 import type { PruneWarning } from '../src/runtime/pruning';
-import { blocking, describeEntry, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
+import { blocking, describeEntry, journalWindow, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, sheetOffers, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
+import { fileAuthoring } from './play-cli';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 import { sourceFiles } from './probe';
 
@@ -22,15 +23,26 @@ import { sourceFiles } from './probe';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
 
-export const PLAYBOT_MODES = ['author', 'bughunt'] as const;
-export type PlaybotMode = (typeof PLAYBOT_MODES)[number];
+// A mode is one declaration and nothing else: the framing it plays under, which of the command
+// line's audiences it may run, and whether it is turned loose on the world or handed a job. The
+// vocabulary its prompt lists and the lines its replies may carry are both read off `audiences`,
+// so a mode cannot offer a command it would then refuse, or refuse one it offered.
+export interface PlaybotModeSpec {
+  readonly framing: string;
+  readonly audiences: readonly CommandAudience[];
+  readonly carriesBrief: boolean;
+}
 
 const SHARED_INTRO = `You are playing Universalis RPG, a text game, through a programmatic loop rather than a chat conversation. Each message you receive is one turn: it shows you everything visible from the current moment, and you answer with exactly one structured reply. You do not see the turns before this one directly — instead, a short journal of the last several turns is included above the view, summarizing what you tried and what happened. Treat that journal as your memory of the run; nothing else persists between turns.
 
-The world is described entirely through the view you are given: a location, what is here, what you can do, and — when the world is asking you something directly — a screen you must answer before anything else. You are the player, not the author and not the engine: everything you do goes through this game's own command line, one line per turn, using only the exact tokens the current view hands you or the direct actions listed below.`;
+The world is described entirely through the view you are given: a location, what is here, what you can do, and — when the world is asking you something directly — a screen you must answer before anything else. Everything you do goes through this game's own command line, one line per turn, using only the exact tokens the current view hands you or the direct actions listed below.`;
 
-function playerCommands(): readonly CommandSpec[] {
-  return COMMANDS.filter((spec) => spec.match === 'name' && spec.audience === 'player');
+const PLAYER_ONLY = `You are the player, not the author and not the engine.`;
+
+const PLAYER_AND_AUTHOR = `You are the player first and the author second: you walk the world the way anybody else would, and you may also change what you walk through. Both go down the same command line, and playing is what tells you what is worth changing.`;
+
+function vocabulary(mode: PlaybotModeSpec): readonly CommandSpec[] {
+  return COMMANDS.filter((spec) => spec.match === 'name' && mode.audiences.includes(spec.audience));
 }
 
 function commandLine(spec: CommandSpec): string {
@@ -41,11 +53,11 @@ function commandLine(spec: CommandSpec): string {
 
 // Read off COMMANDS rather than written out, so a command's audience is the one place that
 // decides both what /help lists for an author and what this block tells the model exists.
-function playerVocabularyBlock(): string {
-  return playerCommands().map(commandLine).join('\n');
+function vocabularyBlock(mode: PlaybotModeSpec): string {
+  return vocabulary(mode).map(commandLine).join('\n');
 }
 
-const SHARED_MECHANISM = `## How you act
+const mechanismFor = (mode: PlaybotModeSpec): string => `## How you act
 
 Every turn ends with exactly one JSON object, matching this shape:
 
@@ -62,9 +74,9 @@ Every turn ends with exactly one JSON object, matching this shape:
 - Anything printed as "?" is something nobody has looked at yet, and looking at it is the only thing it offers until someone has. That is not a fault and not a missing name: take the look, and the thing's own name and everything else it offers come back at once.
 - If the view shows an open screen (a modal — dialogue, character creation, an inventory screen, a crafting confirmation, anything the world is actively asking you), "line" is "submit-modal: <key>=<value>", using the exact key the screen names and, when it lists values, one of those values verbatim. Free-text fields (like a character's name) take a short plain-text value instead of a listed one. A modal always takes priority: while one is open there are no choices alongside it, and you must answer it before anything else happens.
 
-Beyond those two shapes, the command line also answers to a small set of direct actions a player — never this game's own authors — may use without a choice being offered first:
+Beyond those two shapes, the command line also answers to a set of direct actions that may be used without a choice being offered first. ${mode.audiences.includes('author') ? "Some of these are this game's own authoring commands: in this mode you may change the world as well as walk through it, and everything below is yours to type." : "This is the player's set — this game's own authoring commands are not in it, and a line naming one is refused before the engine sees it."}
 
-${playerVocabularyBlock()}
+${vocabularyBlock(mode)}
 
 Every one of those is available on every turn, in every location, whether or not this turn's view mentions it — the view lists what this place is offering you, never the whole of what you are able to do — and each one's own summary above is the complete account of what it does, so do not narrow it to the one use you have already seen it put to. Most turns are still spent on a choice id or a modal answer. But the view reports state as well as choices, and when its state is the thing that needs answering and no offered choice answers it — a pool sitting low, an action part-way through, an item in hand that nothing here invites you to use — the right turn is a direct action from that list, not a choice picked because it was printed. A reply naming anything this turn's view did not offer, or a line this game's own command line refuses for any reason, is refused outright and the turn ends without your action having any effect — the loop does not try to guess what you meant, and does not fall back to the closest match. If you are unsure what is available, re-read the view rather than reusing something you remember from an earlier turn: ids can stop existing when an author edits the world mid-run, and a dialogue option's value is only ever its current position, not a name that survives being reordered.`;
 
@@ -82,13 +94,23 @@ const SHARED_STOPPING = `## Ending the run
 
 Two things about this. Saying a bug is severe in "confusion" does not stop anything; only "blocked" does, and a report that a run is unrecoverable followed by another attempt at the same refused line is worth less than stopping. And do not use it for a single refusal or an ordinary dead end: retry, try another way in, and reserve it for the case where you have run out of ways in.`;
 
-const AUTHOR_FRAMING = `## Your situation: early, unfinished content
+const READER_FRAMING = `## Your situation: early, unfinished content
 
 You are playtesting a zone that is still being written. Assume gaps are the normal state of things, not a sign you have done something wrong — an unfinished room is exactly what you are here to find. Be an eager, curious player rather than a cautious one: try the things a careful reader would skip, talk to everyone twice, open every screen that offers itself, attempt an action even when you are not sure it is meant to work yet. Your "expected" notes are the actual deliverable of this run — they become a work list for whoever is writing this content next, so favor being concrete and specific over being brief. If a room announces an object with no way to interact with it, or a character mentions something with no dialogue node behind it, that is exactly the kind of thing worth naming.`;
 
-const BUGHUNT_FRAMING = `## Your situation: a finished zone, under adversarial review
+const BUGHUNTER_FRAMING = `## Your situation: a finished zone, under adversarial review, that you may repair
 
-You are testing a zone the author considers done, looking specifically for what breaks it: dead ends with no way forward, a resource that can be spent to zero with no way to recover it, a modal that leaves no answerable option, a quest flag set by one path but read by a different one, an action that changes something the text never mentions changing. Play less like an eager explorer and more like someone trying to break the game on purpose — take the edge-case option, walk away from an unfinished conversation and see what state it leaves behind, spend a resource down before trying the thing that needs it. A softlock or an inconsistency is worth far more here than a smooth completion; if a turn goes exactly as expected, say so briefly and move on, but the moment something is inconsistent, unreachable, or leaves you stuck, that goes in "confusion" in as much diagnostic detail as you can give — what you did immediately before it happened matters as much as what happened.`;
+You are testing a zone the author considers done, looking specifically for what breaks it: dead ends with no way forward, a resource that can be spent to zero with no way to recover it, a modal that leaves no answerable option, a quest flag set by one path but read by a different one, an action that changes something the text never mentions changing. Play less like an eager explorer and more like someone trying to break the game on purpose — take the edge-case option, walk away from an unfinished conversation and see what state it leaves behind, spend a resource down before trying the thing that needs it. A softlock or an inconsistency is worth far more here than a smooth completion; if a turn goes exactly as expected, say so briefly and move on, but the moment something is inconsistent, unreachable, or leaves you stuck, that goes in "confusion" in as much diagnostic detail as you can give — what you did immediately before it happened matters as much as what happened.
+
+You may also fix what you find, with the authoring commands listed above. Reporting comes first and is not optional: a turn that edits is refused outright unless the turns behind it already carry a report in "expected" or "confusion". The report is the thing this run produces that nothing else can — a reader can work out the fix from the report, and cannot work out the report from the fix. So say what is wrong, in the turn you find it; then, if you can see the smallest edit that answers it, make it. Read before you write: /source shows you how a section like the one you are about to touch is already written, /grammar says what may stand in it, and /local show is what you have staged so far. Keep an edit to what your own report named.`;
+
+const BRIEFED_FRAMING = `## Your situation: a job to do inside the world
+
+You have been given a brief, printed below, and this run is for carrying it out. You are not sweeping the zone for whatever turns up: work on what the brief names, and let everything else past unless it stands in your way.
+
+Play the part of the world your brief is about before you change any of it — a section written against a room nobody walked reads like a section written against a room nobody walked. Reporting comes first and is not optional here either: a turn that edits is refused outright unless the turns behind it already carry a report in "expected" or "confusion", so say what you found missing or wrong before you write anything to answer it.
+
+Read before you write. /source shows how a section of the kind you are about to write is already written, and reading two or three of those teaches the language faster than anything else here; /grammar says what may stand under a kind, at the indentation it is written at; /local show is what you have staged so far, and /reload is what puts it into the world you are standing in. Write the smallest thing that answers the brief, reload it, and then go and walk it.`;
 
 const SHARED_EXAMPLE = `## A worked example
 
@@ -128,15 +150,42 @@ const SHARED_TAIL = `## A few standing rules
 
 - Answer only with the JSON object described above. Nothing before it, nothing after it, no markdown fence around it.
 - If the same modal or dead end reappears turn after turn with no way out, say so plainly in "confusion" rather than quietly repeating the same failed attempt — the run log needs to be able to tell a stuck loop from a slow, considered playthrough.
-- You are one player on one save. You cannot inspect the source, cannot see what an id "should" be, and cannot act outside a turn's own view — anything you cannot see this turn, you do not know this turn.`;
+- You are one player on one save, and anything you cannot see this turn you do not know this turn.`;
 
-const MODE_FRAMING: Record<PlaybotMode, string> = {
-  author: AUTHOR_FRAMING,
-  bughunt: BUGHUNT_FRAMING,
-};
+const READING_ONLY_TAIL = `- You cannot inspect the source and cannot see what an id "should" be: the view is the whole of what you have.`;
 
-export function systemPromptFor(mode: PlaybotMode): string {
-  return [SHARED_INTRO, SHARED_MECHANISM, SHARED_PRODUCT, SHARED_STOPPING, MODE_FRAMING[mode], SHARED_EXAMPLE, SHARED_TAIL].join('\n\n');
+const EDITING_TAIL = `- What you can see of the source is what /source and /grammar hand you, and nothing else — there is no file, no directory listing and no editor here.
+- An edit is staged the moment you type it and is in the world the moment you /reload. Walk what you wrote afterwards: a section that loads is not a section that plays.`;
+
+const tailFor = (mode: PlaybotModeSpec): string => [SHARED_TAIL, mode.audiences.includes('author') ? EDITING_TAIL : READING_ONLY_TAIL].join('\n');
+
+const briefBlock = (brief: string): string => `## Your brief\n\n${brief}`;
+
+export const PLAYBOT_MODES = {
+  reader: { framing: READER_FRAMING, audiences: ['player'], carriesBrief: false },
+  bughunter: { framing: BUGHUNTER_FRAMING, audiences: ['player', 'author'], carriesBrief: false },
+  briefed: { framing: BRIEFED_FRAMING, audiences: ['player', 'author'], carriesBrief: true },
+} as const satisfies Record<string, PlaybotModeSpec>;
+
+export type PlaybotMode = keyof typeof PLAYBOT_MODES;
+
+export const PLAYBOT_MODE_NAMES = Object.keys(PLAYBOT_MODES) as readonly PlaybotMode[];
+
+export const modeSpec = (mode: PlaybotMode): PlaybotModeSpec => PLAYBOT_MODES[mode];
+
+export function systemPromptFor(mode: PlaybotMode, brief = ''): string {
+  const spec = modeSpec(mode);
+  return [
+    SHARED_INTRO,
+    spec.audiences.includes('author') ? PLAYER_AND_AUTHOR : PLAYER_ONLY,
+    mechanismFor(spec),
+    SHARED_PRODUCT,
+    SHARED_STOPPING,
+    spec.framing,
+    ...(spec.carriesBrief ? [briefBlock(brief)] : []),
+    SHARED_EXAMPLE,
+    tailFor(spec),
+  ].join('\n\n');
 }
 
 export interface TurnReply extends RunNotes {
@@ -154,6 +203,7 @@ export interface TurnUsage {
   readonly input: number;
   readonly cacheRead: number;
   readonly cacheWrite: number;
+  readonly output: number;
 }
 
 export interface ModelClient {
@@ -273,18 +323,37 @@ function stringField(value: Record<string, unknown>, key: string): string | unde
   return typeof value[key] === 'string' ? (value[key] as string) : undefined;
 }
 
-// A command the audience field marks as anything but 'player' is not in the vocabulary this
-// prompt offered, so a line naming one is refused here rather than handed to runLine — the one
-// place that classification has to make a behavioural difference, not just a prompt-text one.
-function offMenuCommand(line: string): CommandSpec | undefined {
+export function commandIn(line: string): CommandSpec | undefined {
   const token = line.trim().split(/[ \t]+/)[0];
-  const spec = token === undefined ? undefined : findCommand(token);
-  return spec && spec.audience !== 'player' ? spec : undefined;
+  return token === undefined ? undefined : findCommand(token);
+}
+
+// A command whose audience this mode does not run is not in the vocabulary its prompt offered, so
+// a line naming one is refused here rather than handed to runLine — the one place that
+// classification has to make a behavioural difference, not just a prompt-text one.
+function offMenuCommand(mode: PlaybotModeSpec, line: string): CommandSpec | undefined {
+  const spec = commandIn(line);
+  return spec && !mode.audiences.includes(spec.audience) ? spec : undefined;
+}
+
+// The first read is the thing this run produces that nothing else can, and a bot that may edit will
+// answer a gap with a diff instead — the half that can be re-derived from the other. So an edit
+// waits on a report: it is refused until the window the model is already being shown carries one.
+// Read off the log the same way stoppedBy is, with nothing stored and no field on the reply.
+const REPORTING_FIELDS = NOTE_FIELDS.filter((field) => field.reports);
+
+export const reportedIn = (log: readonly RunLogEntry[]): boolean =>
+  journalWindow(log).some((entry) => REPORTING_FIELDS.some((field) => entry.notes[field.name] !== ''));
+
+function unreportedEdit(line: string, log: readonly RunLogEntry[]): string | null {
+  const spec = commandIn(line);
+  if (spec === undefined || !spec.edits || reportedIn(log)) return null;
+  return `${spec.name} edits the world, and nothing behind this turn reports anything: say what is wrong in ${REPORTING_FIELDS.map((field) => field.name).join(' or ')} before you write anything to answer it`;
 }
 
 const DEMANDED = ['line', ...NOTE_FIELDS.filter((field) => field.required).map((field) => field.name)];
 
-export function parseReply(raw: unknown): { ok: true; reply: TurnReply } | { ok: false; error: string } {
+export function parseReply(raw: unknown, mode: PlaybotModeSpec): { ok: true; reply: TurnReply } | { ok: false; error: string } {
   if (!isRecord(raw)) return { ok: false, error: 'reply is not a JSON object' };
   const line = stringField(raw, 'line');
   const notes = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, stringField(raw, field.name)]));
@@ -292,7 +361,7 @@ export function parseReply(raw: unknown): { ok: true; reply: TurnReply } | { ok:
     return { ok: false, error: `reply is missing one of ${DEMANDED.join(', ')} as a string` };
   }
   if (line.trim() === '') return { ok: false, error: 'reply.line is empty' };
-  const offMenu = offMenuCommand(line);
+  const offMenu = offMenuCommand(mode, line);
   if (offMenu) return { ok: false, error: `${offMenu.name} is not a command this player may run` };
   const said = Object.fromEntries(NOTE_FIELDS.map((field) => [field.name, notes[field.name] ?? ''])) as RunNotes;
   return { ok: true, reply: { ...said, line } };
@@ -340,7 +409,10 @@ export interface RunTurnDeps {
   readonly ctx: CommandContext;
   readonly read: ContentReader;
   readonly client: ModelClient;
-  readonly system: string;
+  // The mode, not the prompt it makes: the framing the model is shown and the lines its reply may
+  // carry are two readings of the one declaration, and passing them separately is how they drift.
+  readonly mode: PlaybotMode;
+  readonly brief: string;
   readonly log: readonly RunLogEntry[];
   readonly turn: number;
   // What an edit mid-run dropped out of this session. It goes to whoever is reading the run, not
@@ -356,7 +428,8 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   readRoom(deps.ctx.session);
   deps.ctx.view = view(deps.ctx.session);
   const localizer = sessionLocalizer(deps.ctx.session);
-  const request: TurnRequest = { system: deps.system, turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };
+  const mode = modeSpec(deps.mode);
+  const request: TurnRequest = { system: systemPromptFor(deps.mode, deps.brief), turn: deps.turn, journal: journalWindowText(deps.log), view: renderView(deps.ctx.view, localizer) };
 
   let raw: unknown;
   try {
@@ -365,8 +438,13 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
     return { turn: deps.turn, outcome: 'invalid-reply', detail: error instanceof Error ? error.message : String(error), notes: NO_NOTES };
   }
 
-  const parsed = parseReply(raw);
+  const parsed = parseReply(raw, mode);
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error, notes: NO_NOTES };
+
+  // Refused with the turn's own notes kept, not dropped: the player said something here, and what
+  // they said may be the report that lets the next turn through.
+  const unreported = unreportedEdit(parsed.reply.line, deps.log);
+  if (unreported !== null) return { turn: deps.turn, outcome: 'invalid-reply', detail: unreported, notes: parsed.reply };
 
   const result = runLine(deps.ctx, parsed.reply.line);
   return turnRecord(deps.turn, parsed.reply.line, outcomeOf(result), result.recorded, answerLines(result, sessionLocalizer(deps.ctx.session)), parsed.reply);
@@ -382,6 +460,24 @@ export interface PlaybotOptions {
   // When the run is played, which names the `# test` it comes back as. Passed in rather than read
   // off a clock here, so the caller owns the one instant the whole run is filed under.
   readonly at: string;
+  // Where an authoring command writes, for a mode that runs them. Without it the engine answers
+  // every one of them the same way it answers a terminal started without a local file.
+  readonly authoring?: AuthoringContext;
+  readonly brief?: string;
+  readonly now?: () => number;
+}
+
+const totalOf = (billed: readonly TurnUsage[], pick: (usage: TurnUsage) => number): number => billed.reduce((sum, usage) => sum + pick(usage), 0);
+
+// What the run cost, summed off the turns already logged rather than tallied a second time
+// alongside them. A client that does not know what it billed leaves the tokens unsaid rather than
+// reporting four zeroes, which reads like a run that was free.
+function costLine(turns: number, seconds: number, billed: readonly TurnUsage[]): string {
+  const tokens =
+    billed.length === 0
+      ? 'nothing billed'
+      : `${totalOf(billed, (usage) => usage.input)} in, ${totalOf(billed, (usage) => usage.cacheRead)} cached read, ${totalOf(billed, (usage) => usage.cacheWrite)} cached write, ${totalOf(billed, (usage) => usage.output)} out`;
+  return `run of ${turns} turn(s) in ${seconds.toFixed(1)}s: ${tokens}`;
 }
 
 // A player that says it is stuck is believed at once. A player that does not say so is still cut
@@ -400,22 +496,26 @@ function stoppedBy(log: readonly RunLogEntry[]): string | null {
 // The run and the save it started from, which is what the app's own recorder keeps too: a bot run
 // and an author's run are one kind of thing and come back written the same way.
 export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
-  const system = systemPromptFor(options.mode);
-  const ctx = newContext(options.session, view(options.session));
+  const clock = options.now ?? Date.now;
+  const started = clock();
+  const ctx = newContext(options.session, view(options.session), { authoring: options.authoring });
   const from = { bytes: serializeSession(options.session) };
   const id = runId(options.at);
   const log: RunLogEntry[] = [];
+  const billed: TurnUsage[] = [];
   for (let turn = 1; turn <= options.turns; turn++) {
-    const entry = await runTurn({ ctx, read: options.read, client: options.client, system, log, turn, report: options.write });
+    const entry = await runTurn({ ctx, read: options.read, client: options.client, mode: options.mode, brief: options.brief ?? '', log, turn, report: options.write });
     log.push(entry);
-    const billed = options.client.lastUsage?.() ?? null;
-    options.write(billed === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${billed.input} in, ${billed.cacheRead} cached read, ${billed.cacheWrite} cached write]`);
+    const usage = options.client.lastUsage?.() ?? null;
+    if (usage !== null) billed.push(usage);
+    options.write(usage === null ? describeEntry(entry) : `${describeEntry(entry)} [billed ${usage.input} in, ${usage.cacheRead} cached read, ${usage.cacheWrite} cached write, ${usage.output} out]`);
     const stopping = stoppedBy(log);
     if (stopping !== null) {
       options.write(`run ended after turn ${turn}: ${stopping}`);
-      return { run: { id, log }, from };
+      break;
     }
   }
+  options.write(costLine(log.length, (clock() - started) / 1000, billed));
   return { run: { id, log }, from };
 }
 
@@ -462,7 +562,7 @@ export function createSdkModelClient(cwd: string): ModelClient {
       for await (const message of stream) {
         if (message.type === 'result') {
           const billed = message.usage as unknown as Record<string, number> | undefined;
-          usage = billed === undefined ? null : { input: billed.input_tokens ?? 0, cacheRead: billed.cache_read_input_tokens ?? 0, cacheWrite: billed.cache_creation_input_tokens ?? 0 };
+          usage = billed === undefined ? null : { input: billed.input_tokens ?? 0, cacheRead: billed.cache_read_input_tokens ?? 0, cacheWrite: billed.cache_creation_input_tokens ?? 0, output: billed.output_tokens ?? 0 };
           if (message.subtype === 'success') return message.structured_output;
           throw new Error(`playbot turn did not complete: ${message.subtype}`);
         }
@@ -473,6 +573,10 @@ export function createSdkModelClient(cwd: string): ModelClient {
 }
 
 export const DEFAULT_SOURCES = [CORPUS_DIR];
+
+// The file the terminal stages into as well, so what a run writes is what `npm run
+// contribution:consolidate` picks up afterwards without being told where to look.
+export const DEFAULT_LOCAL_CHANGES = 'content/local-changes.dsl';
 const DEFAULT_TURNS = 100;
 
 // A directory is expanded on every read, not once at startup, so a module authored while the run
@@ -489,14 +593,22 @@ export function fileContentReader(sources: readonly string[]): ContentReader {
     );
 }
 
+export const DEFAULT_MODE: PlaybotMode = 'reader';
+
+const modeUsage = (mode: PlaybotMode): string =>
+  `             ${mode}${mode === DEFAULT_MODE ? ' (default)' : ''} — ${modeSpec(mode).audiences.join(' and ')} commands${modeSpec(mode).carriesBrief ? ', and wants --brief' : ''}`;
+
 const usage = [
-  'Usage: npm run playbot -- [<source>...] [--mode author|bughunt] [--turns <n>] [--save <id>]',
+  `Usage: npm run playbot -- [<source>...] [--mode ${PLAYBOT_MODE_NAMES.join('|')}] [--brief <text>] [--turns <n>] [--save <id>]`,
   '',
   '  <source>   a DSL file to load, or a directory standing for the .dsl files in',
   '             it; with none, the content/ directory — the shipped corpus',
-  '  --mode     author (default) or bughunt — which framing the system prompt uses',
+  '  --mode     which framing the run plays under, and what it may type:',
+  ...PLAYBOT_MODE_NAMES.map(modeUsage),
+  '  --brief    the job a briefed run is to carry out, in the operator\'s own words',
   '  --turns    how many turns to play, default 100',
   '  --save     open the run on a named # save fixture instead of a fresh session',
+  `  --local    where an editing run stages what it writes, default ${DEFAULT_LOCAL_CHANGES}`,
   '',
   'Plays the loaded content one turn at a time against a model client, logging',
   'each turn to stdout. Exits non-zero if no turn completed.',
@@ -505,14 +617,36 @@ const usage = [
 interface CliArgs {
   readonly sources: readonly string[];
   readonly mode: PlaybotMode;
+  readonly brief: string;
   readonly turns: number;
   readonly save: string | undefined;
+  readonly local: string;
 }
 
+// `author` named the exploratory framing and was also the only mode there was, so it now names two
+// things and neither of them is a mode. Saying so beats the general refusal below, which would
+// leave an operator to guess which of three replaced the one they typed.
+const RETIRED: Readonly<Record<string, string>> = {
+  author: '--mode author is retired: it framed a run that only reads and named the only run there was. The framing is --mode reader, and a run that may write is --mode bughunter (sweep and repair) or --mode briefed (carry out a job)',
+};
+
 function requireMode(value: string | undefined): PlaybotMode {
-  const found = PLAYBOT_MODES.find((mode) => mode === value);
+  const found = PLAYBOT_MODE_NAMES.find((mode) => mode === value);
   if (found !== undefined) return found;
-  throw new Error(`--mode must be one of ${PLAYBOT_MODES.join(', ')}, got ${JSON.stringify(value)}`);
+  if (value !== undefined && RETIRED[value] !== undefined) throw new Error(RETIRED[value]);
+  throw new Error(`--mode must be one of ${PLAYBOT_MODE_NAMES.join(', ')}, got ${JSON.stringify(value)}`);
+}
+
+function requireBrief(value: string | undefined): string {
+  if (value === undefined || value.trim() === '') throw new Error(`--brief wants the job to be done after it\n\n${usage}`);
+  return value;
+}
+
+// A brief is what a briefed run is for and is nothing to any other, so neither half of the pair is
+// allowed to go missing quietly: a run turned loose under a brief nobody reads is a wasted run.
+function requireBriefedPair(mode: PlaybotMode, brief: string): string {
+  if (modeSpec(mode).carriesBrief === (brief !== '')) return brief;
+  throw new Error(modeSpec(mode).carriesBrief ? `--mode ${mode} carries a brief and none was given: say what is to be done with --brief` : `--mode ${mode} carries no brief, and one was given. The mode that does is ${PLAYBOT_MODE_NAMES.filter((each) => modeSpec(each).carriesBrief).join(', ')}`);
 }
 
 function requireTurns(value: string | undefined): number {
@@ -526,10 +660,17 @@ function requireSave(value: string | undefined): string {
   return value;
 }
 
-function parseArgs(argv: readonly string[]): CliArgs {
-  let mode: PlaybotMode = 'author';
+function requireLocal(value: string | undefined): string {
+  if (value === undefined || value.startsWith('-')) throw new Error(`--local wants a file after it\n\n${usage}`);
+  return value;
+}
+
+export function parseArgs(argv: readonly string[]): CliArgs {
+  let mode: PlaybotMode = DEFAULT_MODE;
+  let brief = '';
   let turns = DEFAULT_TURNS;
   let save: string | undefined;
+  let local = DEFAULT_LOCAL_CHANGES;
   const sources: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -544,12 +685,28 @@ function parseArgs(argv: readonly string[]): CliArgs {
       mode = requireMode(arg.slice('--mode='.length));
       continue;
     }
+    if (arg === '--brief') {
+      brief = requireBrief(argv[++i]);
+      continue;
+    }
+    if (arg.startsWith('--brief=')) {
+      brief = requireBrief(arg.slice('--brief='.length));
+      continue;
+    }
     if (arg === '--turns') {
       turns = requireTurns(argv[++i]);
       continue;
     }
     if (arg.startsWith('--turns=')) {
       turns = requireTurns(arg.slice('--turns='.length));
+      continue;
+    }
+    if (arg === '--local') {
+      local = requireLocal(argv[++i]);
+      continue;
+    }
+    if (arg.startsWith('--local=')) {
+      local = requireLocal(arg.slice('--local='.length));
       continue;
     }
     if (arg === '--save') {
@@ -565,7 +722,7 @@ function parseArgs(argv: readonly string[]): CliArgs {
     }
     sources.push(arg);
   }
-  return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, turns, save };
+  return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, brief: requireBriefedPair(mode, brief), turns, save, local };
 }
 
 // The one place a save id becomes a fixture: read off registry.saves the same way the # test
@@ -616,7 +773,19 @@ async function main(): Promise<void> {
 
   const client = createSdkModelClient(isolatedCwd());
   const at = new Date().toISOString();
-  const kept = await runPlaybot({ session: opened.session, read, client, mode: args.mode, turns: args.turns, at, write: (line) => console.log(line) });
+  const kept = await runPlaybot({
+    session: opened.session,
+    read,
+    client,
+    mode: args.mode,
+    brief: args.brief,
+    turns: args.turns,
+    at,
+    // The same wiring the terminal authors through, over the same reader the turn loop reloads
+    // from, so a section this run stages is a section the next turn is standing in.
+    authoring: fileAuthoring(read, args.local),
+    write: (line) => console.log(line),
+  });
 
   // The lines above are the run happening; this is the run. Paste it into a module and it replays,
   // notes and refusals and all — which is the only reason to write a run down rather than read it.

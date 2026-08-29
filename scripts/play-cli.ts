@@ -290,13 +290,23 @@ export function fileSaves(dir: string, now: () => number = Date.now): SaveContex
   return createSaveContext(fileSlots(repoPath(dir)), now);
 }
 
-export function fileAuthoring(baseSources: ModuleSource[], dependencies: string[], localFile: string): AuthoringContext {
+// The sources are asked for rather than held, because a driver that re-expands a directory every
+// turn — the playbot — authors modules into that directory while it runs, and a snapshot taken at
+// startup would stage them against a dependency list that predates them.
+export function fileAuthoring(read: () => readonly ModuleSource[], localFile: string): AuthoringContext {
+  const dependencies = (): string[] => loadUniverseWithDiagnostics(read()).loadedModules;
   return {
-    baseSources,
-    dependencies,
-    localSource: { name: sourceName(localFile), text: readLocalChanges(localFile, dependencies) },
+    get baseSources() {
+      return [...read()];
+    },
+    get dependencies() {
+      return dependencies();
+    },
+    get localSource() {
+      return { name: sourceName(localFile), text: readLocalChanges(localFile, dependencies()) };
+    },
     writeLocalChanges: (text) => writeLocalChanges(localFile, text),
-    readLocalChanges: () => readLocalChanges(localFile, dependencies),
+    readLocalChanges: () => readLocalChanges(localFile, dependencies()),
   };
 }
 
@@ -343,9 +353,7 @@ async function main(): Promise<void> {
   const modportal = args.modportalDir ? loadModportalSources(args.modportalDir) : { sources: [], warnings: [] };
   for (const warning of modportal.warnings) console.error(warning);
   const baseSources = [...loadContent(files), ...modportal.sources];
-  const baseLoaded = loadUniverseWithDiagnostics(baseSources);
-  const dependencies = baseLoaded.loadedModules;
-  const authoring = fileAuthoring(baseSources, dependencies, args.localFile);
+  const authoring = fileAuthoring(() => baseSources, args.localFile);
   const sources = existsSync(localPath) ? [...baseSources, authoring.localSource] : baseSources;
 
   const repl = openRepl(sources, { authoring, save: args.savesDir ? fileSaves(args.savesDir) : undefined, driving: liveMode });

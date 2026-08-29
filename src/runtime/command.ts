@@ -10,7 +10,7 @@ import {
   listLocalSections,
   localSectionHeadings,
   renderLocalChangesModule,
-  sectionsIn,
+  sourceSections,
   upsertLocalSection,
   type LocalSection,
 } from '../content/localChanges';
@@ -233,6 +233,10 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly argHint: string;
   readonly summary: string;
   readonly audience: CommandAudience;
+  // Whether running this stages a change to the world's content. Declared here rather than counted
+  // anywhere else, so a driver that has something to say about editing — the playbot, which will
+  // not let a bot fix what it has not first reported — asks the command and not a list of names.
+  readonly edits: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }
@@ -245,10 +249,11 @@ function define<K extends ArgKind>(spec: {
   argHint?: string;
   summary: string;
   audience?: CommandAudience;
+  edits?: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }): CommandSpec {
-  return { aliases: [], match: 'name', argHint: '', audience: 'player', ...spec };
+  return { aliases: [], match: 'name', argHint: '', audience: 'player', edits: false, ...spec };
 }
 
 function isProblem(value: unknown): value is CommandProblem {
@@ -636,7 +641,7 @@ function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
   let found: { kind: string; text: string }[];
   try {
     found = [...authoring.baseSources, authoring.localSource].flatMap((module) =>
-      sectionsIn(module.text).filter((section) => section.id === at.id && (at.kind === null || section.kind === at.kind)),
+      sourceSections(module.text).filter((section) => section.id === at.id && (at.kind === null || section.kind === at.kind)),
     );
   } catch (error) {
     if (error instanceof DslError) return noted('error', error.message);
@@ -1112,6 +1117,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/dsl',
+    edits: true,
     arg: 'section',
     argHint: '<kind> <id> [body]',
     summary: 'stage or replace one local DSL section; use | for new lines',
@@ -1125,6 +1131,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/place',
+    edits: true,
     arg: 'placing',
     argHint: `<location> <x> <y> [<z>] | <location> ${relativeValue.forms[0]}`,
     audience: 'author',
@@ -1145,6 +1152,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/region',
+    edits: true,
     arg: 'gathering',
     argHint: '<region> +<location>... | -<location>... | by <x> <y>',
     audience: 'author',
@@ -1164,6 +1172,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/link',
+    edits: true,
     arg: 'joining',
     argHint: '<location> <location>',
     audience: 'author',
@@ -1173,6 +1182,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   }),
   define({
     name: '/unlink',
+    edits: true,
     arg: 'joining',
     argHint: '<location> <location>',
     audience: 'author',

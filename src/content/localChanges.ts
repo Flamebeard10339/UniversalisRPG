@@ -44,7 +44,7 @@ function sectionText(source: string, start: number, end: number): string {
 // typed, comments and `@@@` notes and all. That is what a section has to be read back as by anyone
 // learning the language off one, and what the printer cannot give: it prints the section the
 // registry holds, which has already dropped everything that was not content.
-export function sectionsIn(source: string): SourceSection[] {
+export function sourceSections(source: string): SourceSection[] {
   const text = normalized(source);
   return splitSections(text).map((section) => ({
     kind: section.kind,
@@ -55,7 +55,7 @@ export function sectionsIn(source: string): SourceSection[] {
 }
 
 function readSections(source: string): LocalSection[] {
-  return sectionsIn(source).map((section) => {
+  return sourceSections(source).map((section) => {
     if (!section.id) throw new DslError(`# ${section.kind} requires an id`, section.span);
     return { kind: section.kind, id: section.id, text: section.text };
   });
