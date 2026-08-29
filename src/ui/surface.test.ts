@@ -62,6 +62,7 @@ const DISPATCHES = [
   'BASE_LANGUAGE',
   'createTicker',
   'liveAgain',
+  'LINE_BREAK',
   'LIVE_TICK_MS',
   'localizerFor',
   'newContext',

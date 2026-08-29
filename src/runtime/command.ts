@@ -415,10 +415,17 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
   }
 }
 
+// A turn is one line, so a line stands for the lines it holds: `|` is where one of them ends. It is
+// read once, before any command sees its arguments, which is what makes it end a token as well as a
+// line — an id written up against a `|` is an id at the end of its line and nothing more.
+export const LINE_BREAK = '|';
+
+const lineBroken = (line: string): string => line.split(LINE_BREAK).join('\n');
+
 function commandBodyLines(body: string): string[] {
   if (body.trim() === '') return [];
   return body
-    .split('|')
+    .split('\n')
     .map((line) => line.replace(/^[ \t]/, '').trimEnd())
     .filter((line) => line.trim() !== '');
 }
@@ -935,6 +942,14 @@ function requireId(name: string): (rest: string) => string | CommandProblem {
   return (rest) => (rest === '' ? { problem: `${name} requires an id` } : rest);
 }
 
+// Restating the shape tells somebody whose line already looks like the shape nothing at all. The
+// word the line was actually read down to is the one thing they cannot see by looking at what they
+// typed, so a refusal hands that back.
+const readAs = (head: string, at: number): string => {
+  const word = head.split(/[ \t]+/).filter((each) => each !== '')[at];
+  return word === undefined ? 'nothing' : JSON.stringify(word);
+};
+
 function directiveFrom(name: string, text: (rest: string) => string): (rest: string, ctx: CommandContext) => Directive | CommandProblem {
   return (rest, ctx) => {
     const parsed = parseDirective(text(rest), ctx);
@@ -1199,12 +1214,13 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'stage or replace one local DSL section, under the module it belongs to; use | for new lines',
     audience: 'author',
     parse: (rest) => {
-      const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(rest)?.groups;
-      if (!match?.kind || !match.id) return { problem: '/dsl requires <kind> <module>.<id> [body]' };
+      const [head = '', ...more] = rest.split('\n');
+      const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(head)?.groups;
+      if (!match?.kind || !match.id) return { problem: `/dsl requires <kind> <module>.<id> [body]; it read ${readAs(head, 0)} as the kind and ${readAs(head, 1)} as the id` };
       // An id a module owns says which module, whether the section is one already there or one being written for the first time: that is the whole of how a section authored in a run has somewhere to go home to.
       const homeless = homelessId(match.kind, match.id);
       if (homeless !== null) return { problem: `/dsl ${match.kind} ${homeless}` };
-      return { kind: match.kind, id: match.id, body: match.body ?? '' };
+      return { kind: match.kind, id: match.id, body: [match.body ?? '', ...more].join('\n') };
     },
     run: runSectionEdit,
   }),
@@ -1466,14 +1482,14 @@ function against(spec: CommandSpec, rest: string, ctx: CommandContext): ParsedCo
 }
 
 export function parseLine(ctx: CommandContext, line: string): ParsedCommand | CommandProblem {
-  const trimmed = line.trim();
+  const trimmed = lineBroken(line).trim();
   if (trimmed === '') return against(BLANK, '', ctx);
 
   if (trimmed.startsWith('/')) {
     const token = /^\S+/.exec(trimmed)![0];
     const spec = findCommand(token);
     if (!spec) return { problem: `unknown command: ${trimmed}` };
-    const rest = trimmed.slice(token.length).trim();
+    const rest = trimmed.slice(token.length).replace(/^[ \t]+/, '').trimEnd();
     if (rest !== '' && spec.arg === 'none') return { problem: `unknown command: ${trimmed}` };
     return against(spec, rest, ctx);
   }

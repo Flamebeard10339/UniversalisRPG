@@ -23,6 +23,7 @@ import {
   findCommand,
   helpEntries,
   isChoiceLine,
+  LINE_BREAK,
   LIVE_TICK_MS,
   newContext,
   parseLine,
@@ -216,6 +217,18 @@ describe('the command table is the one definition of the command set', () => {
     }
     expect(sessionStatus(session).time).toBe(0);
     expect(runLine(ctx, '/quit').quit).toBe(true);
+  });
+
+  // A turn is one line and `|` is where one of its lines ends, so it ends the word before it too.
+  // Read once for the whole line, before any command sees its arguments, that holds for every
+  // command there is rather than for the one that needed it: nothing parsed can carry a `|`.
+  it('ends a word at | for every command, so no argument or refusal holds one', () => {
+    const { ctx } = fixture(SAVE_MODULE);
+    for (const spec of COMMANDS) {
+      if (spec.match !== 'name') continue;
+      const parsed = parseLine(ctx, `${spec.name} first|second`);
+      expect('problem' in parsed ? parsed.problem : JSON.stringify(parsed.arg), spec.name).not.toContain(LINE_BREAK);
+    }
   });
 
   it('takes a command to be a whole token, so no name can shadow a longer one', () => {
@@ -1500,12 +1513,31 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(runLine(ctx, '/load local-changes.blank').recorded).toEqual(['load: local-changes.blank']);
   });
 
-  it('reports the malformed and the unknown by name', () => {
+  // A refusal that only restates the shape is unreadable to somebody whose line already looks like
+  // the shape: what they cannot see is the word the line was read down to. So it is handed back.
+  it('reports the malformed and the unknown by name, saying what it read', () => {
     const { ctx } = authoringFixture();
-    expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <module>.<id> [body]']);
-    expect(errors(runLine(ctx, '/dsl item'))).toEqual(['/dsl requires <kind> <module>.<id> [body]']);
+    expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <module>.<id> [body]; it read nothing as the kind and nothing as the id']);
+    expect(errors(runLine(ctx, '/dsl item'))).toEqual(['/dsl requires <kind> <module>.<id> [body]; it read "item" as the kind and nothing as the id']);
+    expect(errors(runLine(ctx, '/dsl item BASE.Gem title: Gem'))).toEqual(['/dsl requires <kind> <module>.<id> [body]; it read "item" as the kind and "BASE.Gem" as the id']);
     expect(errors(runLine(ctx, '/local bogus'))).toEqual(['unknown /local command: bogus']);
     expect(errors(runLine(ctx, '/local delete item nosuch'))).toEqual(['no local # item nosuch is staged.']);
+  });
+
+  // `|` stands for a newline, so an id written up against one is an id at the end of its line and
+  // not an id with a `|` in it. The body it introduces reads the same whether a space precedes it.
+  it('takes | as the end of the id it follows', () => {
+    const { ctx } = authoringFixture();
+    expect(errors(runLine(ctx, '/dsl item base.gem|title: Gem|examine: Cut bright.'))).toEqual([]);
+    const staged = runLine(ctx, '/source base.gem').output[0];
+    expect(staged.kind === 'source' && staged.lines).toEqual(['# item base.gem', 'title: Gem', 'examine: Cut bright.']);
+  });
+
+  it('refuses an id that names no module the same whether a | or a space follows it', () => {
+    const { ctx } = authoringFixture();
+    const homeless = ['/dsl item gem title: Gem', '/dsl item gem|title: Gem'].map((line) => errors(runLine(ctx, line)));
+    expect(homeless[0]).toEqual(['/dsl item gem names no module: write it as <module>.gem, which is where the section belongs']);
+    expect(homeless[1]).toEqual(homeless[0]);
   });
 
   // Where a section goes home is written in its id and nowhere else, so an id that names no module
