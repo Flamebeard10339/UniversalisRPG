@@ -106,6 +106,38 @@ describe('a heading creates or edits by its shape alone', () => {
     expect(registry.items.get('mod.cable')).toBeUndefined();
   });
 
+  describe('and says which loaded id it is one edit off, because nothing refuses it any more', () => {
+    const world = [
+      module('base', '# item cable', 'title: Cable', '# item ore', '# entity lantern', 'title: Lantern'),
+      module('other', 'dependencies: base', '# item torch', 'title: Torch'),
+    ];
+    const near = (kind: string, id: string): string[] => loadUniverse(world).namespace.nearMisses(kind, id);
+
+    it('catches the four ways a hand mistypes a word', () => {
+      for (const written of ['base.cabel', 'base.cble', 'base.caable', 'base.coble', 'base.cables']) {
+        expect(near('item', written), written).toEqual(['base.cable']);
+      }
+    });
+
+    it('says nothing about an id that is loaded, which is an edit to it rather than a slip', () => {
+      expect(near('item', 'base.cable')).toEqual([]);
+    });
+
+    it('says nothing about a second name in the same module, which is what authoring a section looks like', () => {
+      expect(near('item', 'base.lockpick')).toEqual([]);
+    });
+
+    it('compares only within one kind and one module, because that is the shape of a typo', () => {
+      expect(near('item', 'base.lanterns')).toEqual([]);
+      expect(near('entity', 'base.lanterns')).toEqual(['base.lantern']);
+      expect(near('item', 'other.cabel')).toEqual([]);
+    });
+
+    it('leaves names of three characters alone, where one letter is a different word rather than a slip', () => {
+      expect(near('item', 'base.ire')).toEqual([]);
+    });
+  });
+
   it('refuses a path naming a module this one does not depend on', () => {
     expect(() => loadUniverse([BASE, module('mod', '# item base.cable', 'title: Cable')])).toThrow(/base is not this module or one of its dependencies/);
   });

@@ -1306,6 +1306,19 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(messages(runLine(ctx, '/local'))[0].text).toBe('No local changes staged.');
   });
 
+  it('/dsl stages an id one edit off a loaded one and says so, rather than refusing it', () => {
+    const { ctx, session } = authoringFixture();
+
+    const slip = runLine(ctx, '/dsl item base.cion title: Coin');
+    expect(messages(slip)[0].text).toBe(
+      'Staged # item base.cion in local-changes. Nothing declared item base.cion before this, and base.coin is one edit away: /local delete item base.cion takes it back.',
+    );
+    expect(session.registry.items.get('base.cion')?.title).toBe('Coin');
+
+    expect(messages(runLine(ctx, '/dsl item base.lockpick title: Lockpick'))[0].text).toBe('Staged # item base.lockpick in local-changes.');
+    expect(messages(runLine(ctx, '/dsl item base.cion title: Bent Coin'))[0].text).toBe('Replaced # item base.cion in local-changes.');
+  });
+
   it('writes nothing anywhere when the authoring context supplies no writer', () => {
     const { ctx, session, authoring } = authoringFixture();
     delete authoring.writeLocalChanges;
