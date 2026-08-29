@@ -55,3 +55,8 @@ about a dozen; standing in the castle it is two. Correct, and further from a pic
 than it needs to be.
 *Closes when:* a road that has to bend is drawn bending, or the lattice leaves a lane
 between columns for one to run down.
+
+The generic sentence this line reports — *local changes did not load* — is the same one that
+stopped a playbot authoring run on 2026-08-29 after four attempts. It is one missing diagnostic met
+in two places, and `docs/authoring-loop/open-agent.md` carries the measurement. Whichever lane
+takes it should close both.
