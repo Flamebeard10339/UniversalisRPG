@@ -16,19 +16,39 @@ export interface OfferFamily {
 export function headOf(offer: Offer): string {
   if (offer.kind !== undefined) return offer.module != null && offer.form.startsWith(`${offer.module}.`) ? offer.module : '';
   const head = literalOf(offer.form).trimEnd();
-  if (head !== '' && (offer.form.length === head.length || offer.form[head.length] === ' ')) return head;
-  // A shape that opens with a placeholder has no literal to gather under, and two of them that write the
-  // same keyword are still one keyword: `<weight>[ if <condition>]:` is what the rows of a `one of:` share,
-  // and gathering them under it is what lets the page say the row once with its shapes beside it.
-  const colon = offer.form.indexOf(':');
-  return colon === -1 || (colon + 1 < offer.form.length && offer.form[colon + 1] !== ' ') ? '' : offer.form.slice(0, colon + 1);
+  return offer.form.length === head.length || offer.form[head.length] === ' ' ? head : '';
+}
+
+// Every prefix of a shape that stops short of it and ends where a word does, longest first. What two
+// shapes have in common is a keyword written twice, wherever in the line it falls and whether or not it
+// is what the line opens with. A shape counts only what it writes *before* its last word, so a shape
+// that is the whole of another's opening is not swallowed by it: `<flag>` is a condition on its own as
+// well as the start of `<flag> <comparison> <number>`, and the page has to say so.
+function candidates(form: string): string[] {
+  const out: string[] = [];
+  for (let at = form.length - 1; at > 0; at--) if (form[at] === ' ') out.push(form.slice(0, at));
+  return out;
 }
 
 // A keyword gathers the shapes it takes wherever they were written, the way a part gathers its keywords.
 function gather(offers: readonly Offer[]): OfferGroup[] {
   const held: { head: string; offers: Offer[] }[] = [];
+  // What more than one shape here writes. A keyword only one of them writes is no keyword to gather
+  // under, so what is left is what the shapes have in common and nothing that merely looks like it.
+  const counted = new Map<string, number>();
   for (const offer of offers) {
-    const head = headOf(offer);
+    if (offer.kind !== undefined) continue;
+    for (const each of new Set(candidates(offer.form))) counted.set(each, (counted.get(each) ?? 0) + 1);
+  }
+  // A head has to be the whole of a keyword and not a word inside one. `on hit:` and `on success:` both
+  // open with `on`, and gathering them under it would put two keywords on one line as though they were
+  // two ways of writing one; what says so is the `:` left over, which no shape of one keyword carries.
+  const usable = (head: string, form: string): boolean => !form.slice(head.length).includes(':');
+  // A shape whose whole form is what others open with is the keyword they gather under, and opens the group.
+  const gatheredUnder = (offer: Offer): string =>
+    offer.kind !== undefined ? headOf(offer) : ([offer.form, ...candidates(offer.form)].find((each) => (counted.get(each) ?? 0) > 1 && usable(each, offer.form)) ?? headOf(offer));
+  for (const offer of offers) {
+    const head = gatheredUnder(offer);
     const last = head === '' ? undefined : held.find((group) => group.head === head);
     if (last !== undefined) last.offers.push(offer);
     else held.push({ head, offers: [offer] });

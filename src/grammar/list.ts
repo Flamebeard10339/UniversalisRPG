@@ -20,7 +20,9 @@ export function list<E>(element: Parser<E>): ListParser<E> {
   };
 
   const print = (values: readonly E[]): string => values.map((value) => element.print(value)).join(', ');
-  const examples = [...element.examples, element.examples.join(', ')];
+  // One example of a comma list, which is two values and not every value the element has: a list of
+  // nine shapes joined end to end is not a line anybody would write.
+  const examples = [...element.examples, element.examples.slice(0, 2).join(', ')];
   const forms = element.forms.map((form) => `${form}, …`);
   const line: Parser<E[]> = { parse: parseInline, print, forms, examples };
 

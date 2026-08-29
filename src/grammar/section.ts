@@ -15,6 +15,9 @@ export interface FieldPrinting extends Filled {
   // The section stands when what this field names is removed, and the field is cleared instead. A section written around a name it no longer has cannot stand; one that merely points at another does.
   standsWithout?: true;
   note?: string;
+  // One value of this field written out, where what the parser writes for any value of its shape would
+  // read as nonsense here: a `pack:` is an id and `rusty-sword` is an id, and neither is a pack.
+  example?: string;
   // What this line is for, said in the words an author is choosing between. Lines that share one are offered together, whether the kind declares them as fields, as keywords or in its own grammar.
   family?: string;
   printed?: PrintWhen;

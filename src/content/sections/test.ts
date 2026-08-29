@@ -1,6 +1,5 @@
-import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
-import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreenRefusal } from '../../grammar/actionResult';
+import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreen, modalScreenRefusal, place } from '../../grammar/actionResult';
 import { DslError, parseWhole } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { hasBlock } from '../../grammar/structure';
@@ -23,6 +22,9 @@ export interface NoteField {
   // What an author playing in the app is asked for it. The model is asked in the playbot's own
   // prompt, at the length a prompt wants; the two agree about the field and not about the wording.
   readonly asks: EngineKey;
+  // What the line records, said as the hole an author writes it in. It is the whole of what tells the
+  // four apart, so it is what the page says of them and nothing else needs saying.
+  readonly records: string;
   // Whether a reply that does not carry it as a string is refused, and whether a turn that left it
   // empty still says so where a run is read as prose.
   readonly required: boolean;
@@ -32,10 +34,10 @@ export interface NoteField {
 }
 
 export const NOTE_FIELDS: readonly NoteField[] = [
-  { name: 'note', asks: 'engine.playtest.note', required: true, reports: false },
-  { name: 'expected', asks: 'engine.playtest.expected', required: true, reports: true },
-  { name: 'confusion', asks: 'engine.playtest.confusion', required: true, reports: true },
-  { name: 'blocked', asks: 'engine.playtest.blocked', required: false, reports: false },
+  { name: 'note', asks: 'engine.playtest.note', records: 'what the player made of the turn above', required: true, reports: false },
+  { name: 'expected', asks: 'engine.playtest.expected', records: 'what the player expected that turn to do instead', required: true, reports: true },
+  { name: 'confusion', asks: 'engine.playtest.confusion', records: 'what the player could not follow', required: true, reports: true },
+  { name: 'blocked', asks: 'engine.playtest.blocked', records: 'what stopped the player getting on', required: false, reports: false },
 ];
 
 export type NoteName = NoteField['name'];
@@ -478,6 +480,9 @@ const USED = { names: { id: '<kind>', action: null } };
 // What the editing page says beside `refused` and what the engine refuses one for are the same
 // sentence, written once. Under a note, a page move or another `refused` the mark would be about
 // nothing at all, and a mark about nothing reads exactly like a mark about something.
+// The three shapes are one directive waited out three ways, so the page gathers them under it and says this once.
+const UNTIL_NOTE = 'performs the directive, then waits it out exactly as the matching `wait:` does';
+
 const REFUSED_STANDS_UNDER =
   'refused is about the line above it, which has to be a line the engine was asked to take';
 
@@ -515,8 +520,7 @@ export const test = section<Test>()({
     { form: 'use: <kind>.<id>.<action>', example: 'use: item.rusty-sword.swing', ...USED },
     { form: 'use: <action> on <entity>', example: 'use: chop on oak' },
     { form: 'travel: <location>', example: 'travel: camp' },
-    { form: 'goto: <location>', example: 'goto: camp' },
-    { form: `goto: ${STARTING_LOCATION}`, example: `goto: ${STARTING_LOCATION}` },
+    { form: 'goto: <place>', example: 'goto: camp', holds: () => ({ place }) },
     { form: 'craft: <recipe>', example: 'craft: plank' },
     { form: 'shop: <shop>', example: 'shop: general-store' },
     { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing', ...USED },
@@ -543,17 +547,17 @@ export const test = section<Test>()({
     {
       form: '<a directive that starts an action> until done',
       example: 'use: melee-combat on giant-rat until done',
-      note: 'performs the directive, then stands until whatever it started has finished, exactly as wait: done does',
+      note: UNTIL_NOTE,
     },
     {
       form: '<a directive that starts an action> until <n> times',
       example: 'use: melee-combat on giant-rat until 4 times',
-      note: 'performs the directive, then stands while what it started comes round n times, exactly as wait: <n> times does',
+      note: UNTIL_NOTE,
     },
     {
       form: '<a directive that starts an action> until <condition>',
       example: 'use: melee-combat on giant-rat until resource.health < 10',
-      note: 'performs the directive, then keeps stepping what it started, one cycle at a time, until the condition holds or nothing is left under way',
+      note: UNTIL_NOTE,
       holds: () => ({ condition }),
     },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
@@ -574,12 +578,11 @@ export const test = section<Test>()({
     },
     { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: slot cluster-jewel at 0,0 ne with small-jewel' },
-    ...MODAL_SCREENS.map((screen) => ({ form: `open-modal: ${screen}`, example: `open-modal: ${screen}` })),
+    { form: 'open-modal: <modal>', example: `open-modal: ${MODAL_SCREENS[0]}`, holds: () => ({ modal: modalScreen }) },
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },
     ...NOTE_FIELDS.map((field) => ({
-      form: `${field.name}: <what the player said about the turn above>`,
+      form: `${field.name}: <${field.records}>`,
       example: `${field.name}: the mirror answered, but nothing said what it cost`,
-      note: 'a recorded run says what its player thought at the turn they thought it; the engine does nothing with it',
     })),
     { form: 'refused', example: 'refused', note: REFUSED_STANDS_UNDER },
     {

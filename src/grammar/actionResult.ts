@@ -525,10 +525,10 @@ const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<st
 // Where a `relocate:` or a `discover:` puts the player: a location the world declares, or the one word
 // for wherever the world begins. The word is not a location anything declares, so it is said here, once,
 // rather than beside every keyword that takes a place.
-const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: { location: 'location' }, examples: ['camp', STARTING_LOCATION] });
+export const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: { location: 'location' }, examples: ['camp', STARTING_LOCATION] });
 
 // The screens the engine runs. `MODAL_SCREENS` is the one home for which they are; this is the same list read as a grammar, so a screen added there is offered here.
-const modalScreen = oneOf('modal', MODAL_SCREENS);
+export const modalScreen = oneOf('modal', MODAL_SCREENS);
 
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
