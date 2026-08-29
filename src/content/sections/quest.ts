@@ -30,6 +30,8 @@ export interface QuestStage {
 export interface Quest {
   id: string;
   title?: string;
+  // Declared by a quest with nowhere to finish, which is otherwise refused: `complete` is the only end a quest has, so one written without it reads exactly like one whose author forgot.
+  endless?: true;
   // What the journal reads before the quest has begun. A stage's own log says what has happened; these say what has not.
   log?: ActionResult;
   stages: QuestStage[];
@@ -44,6 +46,8 @@ const LOG = /^log:[ \t]?(?<said>.*)$/;
 const DONE = /^done when:[ \t]*(?<cond>.+)$/;
 const GOTO = /^goto[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
 const SAYS = /^(?<owner>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]+says:$/;
+
+const NEVER_ENDS = 'never ends';
 
 const spoken = (said: string): ActionResult => ({ kind: 'say', text: said });
 
@@ -181,15 +185,34 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, rea
 // Every dialogue a quest gives away. A stage's lines belong to the entity the stage names, so the entity says them without anything editing the entity or the dialogue it already had.
 export const questDialogues = (quest: Quest): Dialogue[] => quest.stages.flatMap((stage, at) => stage.speech.map((speech, said) => saidAt(quest, at, speech, said, whileOn(quest, at))));
 
+// Every stage this one names a way to: its own goto, and every goto a line of its writes or a choice under one takes.
+const leavesOf = (stage: QuestStage): string[] =>
+  [stage.goto, ...stage.speech.flatMap((each) => each.node.steps.flatMap((step) => (step.kind === 'goto' ? [step.target] : step.kind === 'menu' ? step.choices.map((choice) => choice.goto) : [])))].filter((each): each is string => each !== undefined);
+
 const stageProblem = (quest: Quest, stage: QuestStage): string | undefined => {
   const named = new Set(quest.stages.map((each) => each.name));
-  const leaves = [stage.goto, ...stage.speech.flatMap((each) => each.node.steps.flatMap((step) => (step.kind === 'goto' ? [step.target] : step.kind === 'menu' ? step.choices.map((choice) => choice.goto) : [])))].filter(
-    (each): each is string => each !== undefined,
-  );
+  const leaves = leavesOf(stage);
   for (const target of leaves) if (!named.has(target)) return `stage ${stage.name} goes to ${target}, which is no stage of this quest`;
   if (stage.doneWhen !== undefined && stage.goto === undefined) return `stage ${stage.name} says when it is done and not where that leaves the quest, so write a goto beside it`;
   if (stage.complete) return leaves.length === 0 ? undefined : `stage ${stage.name} completes the quest and also goes somewhere, and it cannot do both`;
   return leaves.length === 0 ? `nothing leaves stage ${stage.name}: give it a goto, a line that goes somewhere, or \`complete\`` : undefined;
+};
+
+// Where a quest can stand once it has left this stage. A quest stands on the last of its stages to have been reached, in the order they are written — that is `whileOn`, which holds a stage only while nothing written after it is reached — so a goto naming this stage or one written before it sets a flag and moves nothing. These are the moves the engine can make, and the two checks below are the two ways a quest can be left without one.
+const onwardFrom = (quest: Quest, at: number): number[] => leavesOf(quest.stages[at]!).map((target) => quest.stages.findIndex((each) => each.name === target)).filter((to) => to > at);
+
+// Which stages the quest can reach a `complete` from, answered from the last stage backwards: a move is always to a later stage, so by the time one is asked every stage it can move to has already answered, and no walk can go round.
+function finishableFrom(quest: Quest): boolean[] {
+  const can: boolean[] = [];
+  for (let at = quest.stages.length - 1; at >= 0; at -= 1) can[at] = quest.stages[at]!.complete === true || onwardFrom(quest, at).some((to) => can[to] === true);
+  return can;
+}
+
+// A goto the engine can never act on. A stage naming itself is how an author writes *stay here* and moves nothing on purpose; one naming a stage written earlier moves nothing either, and is a way on that the author meant to lead somewhere. Only the second is wrong, and what is wrong with it is the goto or the order the stages are written in.
+const stuckAt = (quest: Quest, at: number): string | undefined => {
+  const stage = quest.stages[at]!;
+  const target = leavesOf(stage).find((each) => quest.stages.findIndex((one) => one.name === each) < at);
+  return target === undefined ? undefined : `stage ${stage.name} goes back to ${target}, which is written before it, and a quest only ever moves on to a stage written after the one it stands on, so reaching ${target} would leave it standing on ${stage.name}. Write ${target} after ${stage.name}`;
 };
 
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
@@ -201,9 +224,19 @@ const SAYS_NOTE = `what that entity says while the quest stands here; where a st
 // A `done when:` is not a flag check with room for a comparison — it is the whole condition grammar, which the page writes out once under its own name rather than here.
 const DONE_WHEN_NOTE = 'the quest leaves this stage on its own once this holds';
 
+// A quest is a graph, and the two things wrong with one are a move that goes nowhere and a stage no `complete` can be reached from. Both are asked of every stage rather than of the ones a walk from the first can arrive at: a stage nothing reaches is dead either way, and answering for all of them is what makes this derived from the stages a quest has rather than from a route somebody traced.
 function questProblem(quest: Quest): string | undefined {
   if (quest.stages.length === 0) return 'a quest is its stages, and this one has none';
-  return quest.stages.map((stage) => stageProblem(quest, stage)).find((problem) => problem !== undefined);
+  const named = quest.stages.map((stage) => stageProblem(quest, stage)).find((problem) => problem !== undefined);
+  // Every goto names a stage of this quest before any of them is asked where it goes, since a goto naming nothing has no place in the order at all.
+  if (named !== undefined) return named;
+  const stuck = quest.stages.map((_, at) => stuckAt(quest, at)).find((problem) => problem !== undefined);
+  if (stuck !== undefined) return stuck;
+  const ends = quest.stages.filter((stage) => stage.complete);
+  if (quest.endless) return ends.length === 0 ? undefined : `the quest says it \`${NEVER_ENDS}\` and stage ${ends[0]!.name} completes it, and it cannot do both`;
+  const can = finishableFrom(quest);
+  const dead = quest.stages.find((_, at) => !can[at]);
+  return dead === undefined ? undefined : `the quest cannot be completed from stage ${dead.name}: nothing it goes on to reaches a \`complete\`. Write \`${NEVER_ENDS}\` on the quest if it is meant to stand forever`;
 }
 
 // A quest's stages are the names the rest of the world reads it by, so they are read off the stages a quest has rather than written down beside them.
@@ -222,7 +255,7 @@ function merged(into: Quest | undefined, from: Quest): Quest {
     if (at === -1) stages.push(stage);
     else stages[at] = overlay(stages[at] as unknown as Record<string, unknown>, stage as unknown as Record<string, unknown>) as unknown as QuestStage;
   }
-  return withFlags({ ...held, ...(from.title === undefined ? {} : { title: from.title }), ...(from.log === undefined ? {} : { log: from.log }), stages });
+  return withFlags({ ...held, ...(from.title === undefined ? {} : { title: from.title }), ...(from.log === undefined ? {} : { log: from.log }), ...(from.endless === undefined ? {} : { endless: from.endless }), stages });
 }
 
 export const quest = section<Quest>()({
@@ -238,6 +271,7 @@ export const quest = section<Quest>()({
   grammar: [
     { form: 'title: <text>', example: 'title: Finding Your Feet' },
     { form: 'log: <text>', example: 'log: They say a guide keeps this house, and takes newcomers in hand.', family: 'before it begins', note: 'what the journal reads before the quest has begun' },
+    { form: NEVER_ENDS, example: NEVER_ENDS, note: 'the quest has no `complete` because it is meant to stand open forever. A quest no stage completes is otherwise refused' },
     {
       form: 'stage <name>:',
       example: 'stage offered:',
@@ -261,7 +295,11 @@ export const quest = section<Quest>()({
       const title = TITLE.exec(line.text)?.groups;
       const stage = STAGE.exec(line.text)?.groups;
       const unstage = UNSTAGE.exec(line.text)?.groups;
-      if (title) parsed.title = parseWhole(text, title.said!, line.span.start, 'a quest title');
+      if (line.text === NEVER_ENDS) {
+        requireNoBlock(line);
+        parsed.endless = true;
+      }
+      else if (title) parsed.title = parseWhole(text, title.said!, line.span.start, 'a quest title');
       else if (stage) {
         // Across bodies a stage written again is laid over the one already there. Written twice in one body it would only overlay itself, silently, so the second is refused where it stands.
         if (parsed.stages.some((each) => each.removed === undefined && each.name === stage.name)) throw new DslError(`stage ${stage.name} is written twice`, line.span);
@@ -279,6 +317,7 @@ export const quest = section<Quest>()({
     `# quest ${moduleLocalId(moduleId, value.id)}`,
     ...(value.title === undefined ? [] : [`title: ${value.title}`]),
     ...(value.log === undefined ? [] : [`log: ${said(value.log)}`]),
+    ...(value.endless ? [NEVER_ENDS] : []),
     ...value.stages.flatMap((stage) => ['', ...stageLines(stage)]),
   ],
   visit: (value, where, visit: Visit) => {

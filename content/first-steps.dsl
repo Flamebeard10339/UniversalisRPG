@@ -101,15 +101,6 @@ stage clear-the-rats:
     Go on. Make some trouble worth telling stories about.
     goto sendoff
 
-stage sendoff:
-  log: Miki says he has nothing left to teach me, and that the way off is out the front door and up the road.
-  complete
-  first-steps.miki says:
-    always
-    sticky
-    ask: Anything else before I go?
-    Still here? Out the door and up the road. I've nothing else for you.
-
 stage snubbed:
   log: I turned Miki down. He took it badly, and the front door has not opened since.
   first-steps.miki says:
@@ -157,10 +148,21 @@ stage apologised:
     set: first-steps.front-door.unlocked
     goto sendoff
 
+// Last, because every other stage goes here and none goes on: a quest stands on
+// the last stage it has reached in the order they are written, so the stage that
+// ends one has to be written after every stage that reaches it.
+stage sendoff:
+  log: Miki says he has nothing left to teach me, and that the way off is out the front door and up the road.
+  complete
+  first-steps.miki says:
+    always
+    sticky
+    ask: Anything else before I go?
+    Still here? Out the door and up the road. I've nothing else for you.
+
 // Every route out of the house lands here, and the joke is that it never
-// leaves: no `complete` is ever reached, so the quest stands forever. Which
-// line plays back is the choice outliving the house — a flag no route sets on
-// purpose, only as a side effect of which way out it took.
+// leaves. Which line plays back is the choice outliving the house — a flag no
+// route sets on purpose, only as a side effect of which way out it took.
 //
 // The door route's trigger is market-square.touched rather than
 // front-door.unlocked itself: a quest's stage only ever advances when the
@@ -179,6 +181,7 @@ stage apologised:
 # quest leave-tutorial-island
 title: Leave Tutorial Island
 log: Up the road there is a town, and it goes on a while. Miki still calls this an island.
+never ends
 
 stage adrift:
   log: Miki says he will be here. Neither of us has moved since.
@@ -331,6 +334,7 @@ travel: market-square
 // instead, now that there is somewhere to have come back from.
 travel: guide-house
 talk: first-steps.miki
+choose: leave-tutorial-island.adrift.miki.0.said
 choose: continue
 assert: leave-tutorial-island.adrift
 travel: market-square

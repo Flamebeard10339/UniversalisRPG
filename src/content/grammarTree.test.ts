@@ -167,11 +167,12 @@ describe('the grammar tree', () => {
       expect(standingAt(written(`# ${kind} probe`, REFUSED, ''), 2).length).toBeGreaterThan(0);
     });
 
+    // Asked of the forms and not of the page, since a note may say the name of a form that stands elsewhere — the quest's own `never ends` says what it is instead of, and that is not the same as offering it.
+    const formsAt = (text: string, line: number): string[] => standingAt(text, line).map((each) => each.split('   — ')[0]!.trim());
+
     it('answers for the block a line sits in rather than the section it sits under', () => {
-      const inStage = standingAt(written('# quest a.b', 'title: T', 'stage one:', `  ${REFUSED}`, ''), 4);
-      const under = standingAt(written('# quest a.b', 'title: T', REFUSED, ''), 3);
-      expect(inStage.join('\n')).toContain('complete');
-      expect(under.join('\n')).not.toContain('complete');
+      expect(formsAt(written('# quest a.b', 'title: T', 'stage one:', `  ${REFUSED}`, ''), 4)).toContain('complete');
+      expect(formsAt(written('# quest a.b', 'title: T', REFUSED, ''), 3)).not.toContain('complete');
     });
   });
 });

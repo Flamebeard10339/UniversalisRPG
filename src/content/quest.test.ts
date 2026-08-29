@@ -101,6 +101,31 @@ describe('what a quest is refused for', () => {
     expect(refusing('stage one:', '  complete', '', 'stage one:', '  complete')).toThrow(/stage one is written twice/);
   });
 
+  // A quest is a graph, and the engine walks it one way: it stands on the last stage it has reached
+  // in the order they are written. So a goto to a stage written earlier sets a flag and moves nothing,
+  // which is how the tutorial's apology route reached its `complete` stage and stood on `apologised`
+  // forever. Named where the author is standing, since what is wrong is either the goto or the order.
+  it('a goto to a stage written before the one it is written in, which could never move the quest on', () => {
+    expect(refusing('stage one:', '  goto two', '', 'stage two:', '  goto one')).toThrow(/stage two goes back to one, which is written before it/);
+    expect(refusing('stage one:', '  complete', '', 'stage two:', '  goto one')).toThrow(/Write one after two/);
+  });
+
+  // The other half of the same walk: every goto goes forward and none of them arrives anywhere that ends.
+  it('a stage no `complete` can be reached from, however many stages lie between', () => {
+    expect(refusing('stage one:', '  goto two', '', 'stage two:', '  goto three', '', 'stage three:', '  goto three')).toThrow(/cannot be completed from stage one/);
+  });
+
+  // A stage naming itself is how *stay here* is written, so it is no move and no error either — but it
+  // cannot be the only way on, since a quest that can only stay where it is never reaches an end.
+  it('a stage whose only way on is itself, though a stage with another way on may name itself freely', () => {
+    expect(refusing('stage one:', '  goto one')).toThrow(/cannot be completed from stage one/);
+    expect(refusing('stage one:', '  miki says:', '    always', '    Well?', '    -> Stay here.', '      goto one', '    -> Move on.', '      goto two', '', 'stage two:', '  complete')).not.toThrow();
+  });
+
+  it('saying it never ends and completing anyway, which are two answers to one question', () => {
+    expect(refusing('never ends', 'stage one:', '  complete')).toThrow(/says it `never ends` and stage one completes it/);
+  });
+
   it('a quest with no stages at all', () => {
     expect(refusing('title: Nothing Doing')).toThrow(/a quest is its stages, and this one has none/);
   });
