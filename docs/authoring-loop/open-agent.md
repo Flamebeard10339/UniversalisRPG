@@ -173,58 +173,6 @@ thin for a tool whose whole purpose is that sheets stop being hand-maintained.
 *Closes when:* `sessionOver` is exported and `--record` compares `walked.length` to
 `testSteps().length`, refusing outright rather than printing a body it knows is short.
 
-## A quest edited from inside a run is silently thrown away
-
-This is the blocker under everything below, and it was measured rather than suspected.
-
-`define.ts` gives a kind that declares `fields` a merge built from them, and a kind that
-declares its own `parse` gets `into ?? from` — **the first module to write an id wins and
-every later module's section is discarded, whole, with no diagnostic**. Only `dialogue`
-declares a `merge` of its own, so this is `quest`, `droptable`, `action`, `save` and
-`test`.
-
-Measured on a copy of `content/` with one section appended to `local-changes.dsl`:
-
-- `# item tulsa.sewer-key` writing only `examine:` — merged; `title:` survived. Every
-  schema-driven kind behaves this way, which is why `/place` and `/link` work.
-- `# quest ball-of-a-boy.down-the-grate` rewritten **whole** — `probe --show` prints the
-  shipped quest, unchanged. `/dsl` answers `Staged # quest …` either way.
-
-So an author's session, the app's edit pane and a playbot handed `/dsl` can all stage a
-quest edit, watch `/reload` succeed, and change nothing.
-
-The field loss this looks like is real too, and lands one step later: `foldedHome`
-(`scripts/consolidate.ts:137`) returns the staged text **whole** when the kind has no
-schema, so a partial quest edit that did nothing in the session would replace the whole
-quest in `ball-of-a-boy.dsl` on consolidation. Both halves are the same missing fact —
-these kinds have no answer for *what a second body at one id means*.
-
-*Closes when:* every content kind that lands in a map answers that question in its own
-file, and a claim in `src/content/dsl.test.ts` derives its subjects from the section list
-rather than naming them — for each kind, a second body at a declared id either merges by a
-rule that kind states or is refused where it is written. Silently keeping the first is the
-one answer that must stop being available. `quest` is the one with a real design question
-in it (a stage list is closer to `entries` than to a field); the rest can likely refuse.
-
-## A section authored during a run has no way home
-
-Measured: `# quest brand-new-quest` staged in a copy of `local-changes.dsl` loads clean and
-lands in the registry as `local-changes.brand-new-quest`. `npm run contribution:consolidate`
-then answers `no file under content/ declares quest local-changes.brand-new-quest` and
-leaves it staged, because `declarations()` (`scripts/consolidate.ts:63`) only ever looks for
-a file that already declares the key.
-
-Home-derived-from-id is therefore true of **edits** and not of **new sections**, which is
-the whole deliverable of anything that plays content into existence rather than fixing it.
-
-*Closes when:* a staged section whose id nothing declares names its own destination, and
-the id it lands under stops being `local-changes.…`. The cheapest shape that does not add a
-second authority: the module a new section belongs to is written in its id the way every
-other address is — `# quest ball-of-a-boy.mouse-pays-the-toll` — and consolidation places a
-section whose namespace names a loaded module into that module's file, landing among the
-sections already of its kind, the way `npm run move-sections` already does it. Refusing a
-bare unqualified id at `/dsl` is what makes the rule legible at the point of writing.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ
@@ -265,18 +213,35 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## `localChanges` and `authoringSurface` each own a copy of *a section's verbatim text*
+## A typo in a patch heading now makes a section instead of being refused
 
-`readSections` (`src/content/localChanges.ts:36`) and `sectionsIn`
-(`src/ui/authoringSurface.ts:31`) both walk `splitSections` and slice
-`text.slice(span.start, span.end).trimEnd()`. What they do with it differs — one keeps the
-local id and throws on a missing one, the other re-heads with the qualified address and
-reports the module — but the slice is one fact written twice, and `content` is below both.
+Home-from-id was the trade: a staged `# item base.cabel` used to be refused as naming an
+unknown item, and now declares a new one under `base`. The lane that landed it said so
+plainly and rewrote the `resolve.test.ts` case that asserted the old refusal.
 
-This is small, and it is not what gates the editing work; it is worth doing because
-anything that prints a shipped section verbatim — a command, the pane, consolidation —
-becomes the third copy otherwise. Verbatim and never `printSectionOf`: a re-emitted
-canonical print drops the comments above a section on every edit.
+That is the right default for a run that authors — a bot writing a section nothing declares
+is the whole deliverable — but it means the language has stopped catching the commonest
+authoring mistake there is, and it catches it nowhere else either.
 
-*Closes when:* the slice lives once under `content/`, both callers read it, and whatever
-prints a shipped section to an author reads it too.
+*Closes when:* a staged section whose id is one edit away from a loaded one says so, and an
+author who meant the loaded one can take it. Not a refusal — the new section has to stay
+available — a report beside it, in the same place `/dsl` already answers.
+
+## A place the map draws still has nowhere to go home to
+
+`/dsl` now refuses an unqualified id, and a qualified one lands in the module its namespace
+names. The map pane was not brought over with it: a new place is written
+`# location local-changes.<id>`, and `contribution:consolidate` correctly answers that
+nothing declares that key, so map-drawn rooms stay staged for ever.
+
+*Closes when:* the map pane names a module the way `/dsl` now makes an author name one, and
+a place drawn on the map consolidates into that module's file.
+
+## `squash-local-changes` has not been told about a section nothing declares
+
+`npm run contribution:squash` prints one module's canonical source with the staged changes
+folded in. It was written when every staged section was an edit to a shipped one, and it was
+not taught about a brand-new section arriving under a module it does not yet declare.
+
+*Closes when:* squashing a module shows a section staged under its name that it does not yet
+hold, in the place consolidation would put it.
