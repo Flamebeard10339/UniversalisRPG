@@ -15,7 +15,7 @@ import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { readRoom, serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
-import { COMMANDS, NO_SAVES, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
+import { COMMANDS, NO_SAVES, NOT_LOADED, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
 import { AUTOSAVE_SLOT, DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT, type SaveContext } from '../src/runtime/saveSlots';
 import { driveRun, fileAuthoring, fileSaves, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
 
@@ -293,7 +293,8 @@ x: 1, y: 0
     const wait = COMMANDS.find((spec) => spec.name === '/wait')!;
     expect(lines).toContain(`  ${wait.name} ${wait.argHint}${' '.repeat(4)}${wait.summary}`);
     expect(lines).toContain('  /quit, /q    show final state and exit');
-    expect(lines).toContain('  /dsl <kind> <module>.<id> [body] stage or replace one local DSL section, under the module it belongs to; use | for new lines');
+    const dsl = COMMANDS.find((spec) => spec.name === '/dsl')!;
+    expect(lines).toContain(`  ${dsl.name} ${dsl.argHint} ${dsl.summary}`);
 
     const startup = lines.filter((line) => line.includes('at startup'));
     expect(lines).toHaveLength(1 + COMMANDS.length + startup.length);
@@ -625,7 +626,7 @@ describe('play-cli reaches its local module through the file rather than a remem
       writeFileSync(localFile, renderLocalChangesModule(['base'], [TOWER_SECTION, '# item gem\ngrows-into: nothing.at.all']), 'utf8');
 
       const lines = shown(runLine(ctx, '/reload'));
-      expect(lines[0]).toBe('✗ local changes did not load.');
+      expect(lines[0]).toBe(`✗ ${NOT_LOADED}`);
       expect(lines.some((line) => line.includes('nothing.at.all'))).toBe(true);
       expect(ctx.session.registry.locations.size).toBe(before);
       expect(shown(runLine(ctx, '/look')).length).toBeGreaterThan(0);

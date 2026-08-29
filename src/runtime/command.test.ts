@@ -30,6 +30,7 @@ import {
   parseLine,
   runCommand,
   runLine,
+  NOT_LOADED,
   UNAVAILABLE,
   type AuthoringContext,
   type Clock,
@@ -1482,11 +1483,25 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     const rejected = runLine(ctx, '/dsl entity base.chest open: |   give: missing-item');
     const failure = messages(rejected)[0];
     expect(failure.tone).toBe('error');
-    expect(failure.text).toBe('local changes did not load.');
+    expect(failure.text).toBe(NOT_LOADED);
     expect(failure.detail?.some((line) => line.includes('missing-item'))).toBe(true);
     expect(writes).toEqual([]);
     expect(authoring.localSource.text).toBe(before);
     expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.', key: 'base.entity.chest.say.0' }]);
+  });
+
+  // A line and a column into a file nobody at this command line can open is not something an author
+  // can write against, and a refusal they cannot write against costs them the turn and teaches
+  // nothing. This is what makes a draft cheaper to try than to read up on.
+  it('/dsl answers a refusal with the line it stopped on and what may stand there', () => {
+    const { ctx } = authoringFixture();
+
+    const refused = messages(runLine(ctx, '/dsl entity base.chest zzz-nothing-takes-this: x'));
+    expect(refused[0].tone).toBe('error');
+    const detail = refused[0].detail ?? [];
+    expect(detail.some((line) => line.endsWith('zzz-nothing-takes-this: x'))).toBe(true);
+    expect(detail.filter((line) => line.startsWith('    ')).length).toBeGreaterThan(0);
+    expect(detail.some((line) => line.trim().startsWith('title:'))).toBe(true);
   });
 
   it('/local clear reloads and prunes stale state from removed local content', () => {
@@ -1627,7 +1642,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     elsewhere(TOWER, BROKEN_CHEST);
     const refused = runLine(ctx, '/reload');
 
-    expect(errors(refused)).toEqual(['local changes did not load.']);
+    expect(errors(refused)).toEqual([NOT_LOADED]);
     expect(messages(refused)[0].detail?.some((line) => line.includes('missing-item'))).toBe(true);
     expect(snapshotOf(session)).toEqual(before);
     expect(session.registry.locations.has('local-changes.tower')).toBe(false);
@@ -1723,7 +1738,7 @@ describe('/reload adopts what another process wrote, or refuses the edit whole',
     const { ctx, writes, elsewhere } = authoringFixture();
     elsewhere(BROKEN_CHEST);
 
-    expect(errors(runLine(ctx, '/dsl item local-changes.gem title: Gem'))).toEqual(['local changes did not load.']);
+    expect(errors(runLine(ctx, '/dsl item local-changes.gem title: Gem'))).toEqual([NOT_LOADED]);
     expect(writes).toEqual([]);
   });
 

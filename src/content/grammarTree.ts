@@ -1,6 +1,6 @@
 import type { Written } from '../grammar/parser';
 import { NOTE_MARK } from '../grammar/note';
-import { namesKind, said } from './completion';
+import { namesKind, offeringAt, said, type Offer } from './completion';
 import { gathered, shownIn } from './offerGroups';
 import { EVERY_SECTION, sectionFor, sectionKinds } from './sections';
 
@@ -117,4 +117,32 @@ export function treeOf(kind: string, seen: Seen = freshly()): string[] {
 export function grammarLines(kinds: readonly string[] = sectionKinds()): string[] {
   const seen = freshly();
   return [...RULES, '', ...kinds.flatMap((kind) => [...treeOf(kind, seen), ''])];
+}
+
+// What may stand where somebody is standing, gathered under the parts and keywords it belongs to.
+// A blank line and a refused one put the same question — an author standing there wants the shapes
+// that would have been taken — so the oracle's walk and a refused edit both read it off here. What
+// names an id is left out: that is a list of ids and not a shape, and it has its own answer.
+export function standingLines(offers: readonly Offer[]): string[] {
+  const out: string[] = [];
+  for (const family of gathered(offers.filter((offer) => offer.kind === undefined))) {
+    out.push(family.name ?? '—');
+    for (const group of family.groups) {
+      if (group.head !== null) out.push(`  ${group.head}${group.opens === null ? '' : ' — opens a block'}`);
+      for (const offer of group.offers) out.push(`  ${group.head === null ? '' : '  '}${shownIn(group, offer)}${offer.note === undefined ? '' : `   — ${offer.note}`}`);
+    }
+  }
+  return out;
+}
+
+// The same answer for one line of a draft, asked at the indentation that line is written at rather
+// than at its start: a line inside a block is asking what its block takes, and a cursor left in
+// column zero would answer for the section instead. Nothing an id-bearing offer needs is read, so
+// this answers about a draft the engine has already refused, which is the only time it is asked.
+export function standingAt(text: string, line: number): string[] {
+  const written = text.split('\n');
+  const start = written.slice(0, line - 1).reduce((sum, each) => sum + each.length + 1, 0);
+  const at = written[line - 1];
+  if (at === undefined) return [];
+  return standingLines(offeringAt(text, start + at.length - at.trimStart().length, []).offers);
 }
