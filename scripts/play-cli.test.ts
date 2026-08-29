@@ -92,7 +92,10 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[0]).toBe('Guide House (first-steps.guide-house)');
     expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
     expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
-    expect(lines[3]).toBe('Health: ██████████ 31.3/31.3');
+    // A pool is drawn as its name, a bar and what it stands at over its ceiling. Nobody has been
+    // hurt yet, so the bar is full and the two figures read alike — which is the shape of the line
+    // rather than the figure the sheet of the day puts in it.
+    expect(lines[3]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
     expect(lines).toContain('  1) [Presence] Miki: Talk');
     expect(lines).toContain('  2) [Presence] Miki: Examine');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
@@ -183,11 +186,13 @@ describe('play-cli renders what a command result says happened', () => {
     // the same way with nothing edited here — and every skill they hold has to be on the line.
     expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
     for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
-    expect(state.slice(5, 8)).toEqual([
+    expect(state.slice(5, 7)).toEqual([
       'Equipped: {"Head (head)":null,"Main Hand (mainhand)":null,"Body (body)":null,"Off Hand (offhand)":null,"Gloves (gloves)":null,"Legs (legs)":null}',
       `stats: ${sheet}`,
-      'Health: ██████████ 31.3/31.3',
     ]);
+    // The readout draws a pool the same way the room does: nobody has been hurt, so the bar is full
+    // and the two figures read alike. What they come to is the sheet's business and not this one's.
+    expect(state[7]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
     expect(state[8]).toMatch(/^discovered: 1 of \d+ found; not yet found: /);
     expect(state[8]).toContain('tulsa.market-square');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
