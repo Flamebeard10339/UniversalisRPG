@@ -123,17 +123,3 @@ The bot does not refuse to edit. It never gets that far, for two reasons the log
 to try first, in this order: open the run on `--save` in finished content rather than in the
 tutorial, where every run so far spent its first ten to fifteen turns; and close the addressing
 line below, which is the one measured cost between a report and an edit.
-
-## A choice id is not an address `/source` accepts
-
-The view hands a player `entity.fishing.shrimp-shoal.net` and `/source` wants
-`entity fishing.shrimp-shoal`. Every id in the view is a thing the engine can already resolve, and
-the one command for reading how a thing is written will not take the form the view prints.
-
-Measured above: five of eleven `/source` attempts in 320 turns were refused for this, each costing
-two to four turns of triangulation, and it is the single most common refusal an authoring run hits.
-
-*Closes when:* an id the view printed is an id `/source` reads, deriving the section from whatever
-the engine already resolves that id to rather than by a second parse of the id's shape. A choice
-id names an action on an owner; the owner is the section, and the engine already knows that.
-
