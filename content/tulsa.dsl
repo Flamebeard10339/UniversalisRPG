@@ -81,10 +81,11 @@ one of:
 // short walk apart on the map because that is what they look like, not because
 // the engine charges less for it.
 //
-// `x` runs east and `y` runs south, which is how the map draws them. Every place
-// writes both, because a relative `north of` moves one unit and resolves through
-// whatever it names, and two rooms landing on one square load clean and draw
-// stacked.
+// `x` runs east and `y` runs south, which is how the map draws them, so north is
+// the smaller `y` and a place written `north of` another lands above it. Every
+// place writes both, because a relative step moves exactly one unit and resolves
+// through whatever it names, which walks a chain of them into an occupied square
+// easily — and the loader refuses two places on one square, naming both.
 
 // --- inside the wall ---
 
