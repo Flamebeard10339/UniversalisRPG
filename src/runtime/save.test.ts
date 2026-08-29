@@ -149,7 +149,7 @@ describe('loadSave', () => {
     expect(targetRest).toEqual(stateRest);
   });
 
-  it('clears stale fields not present in the loaded save', () => {
+  it('loads the state the world opens on from a save that says nothing, clearing what the target held', () => {
     const registry = loadInEnglish(MODULE);
     const state = createGameState();
     state.location = 'camp';
@@ -158,9 +158,9 @@ describe('loadSave', () => {
 
     loadSave(state, { version: SAVE_VERSION, diff: {} }, registry);
 
-    expect(state.location).toBe('camp');
-    expect(state.inventory).toEqual({});
-    expect(state.flags).toEqual({});
+    const { log: _loadedLog, carriedTold: _loadedTold, ...loaded } = state;
+    const { log: _openingLog, carriedTold: _openingTold, ...opening } = initialState(registry);
+    expect(loaded).toEqual(opening);
   });
 
   it('throws a clear error on a version mismatch', () => {
