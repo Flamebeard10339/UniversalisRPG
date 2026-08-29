@@ -76,7 +76,7 @@ stage bake-bread:
     Here - a sword and a shield. Better than your fists, and they're yours.
     give: core.iron-sword
     give: core.wooden-shield
-    Downstairs in the basement you'll find giant rats. Put them down and watch your stats work.
+    Downstairs in the basement you'll find giant rats. Put three of them down and watch your stats work, then come back up here and tell me it's done.
     One thing first: they do nothing sat in your pack. Open up what you're carrying, have a look at the pair of them, and put them on - your stats move the moment you do.
     // Last, so the screen lands under the conversation rather than over it: a
     // node's results run before what it says is put up, so the pack is what the
@@ -85,7 +85,7 @@ stage bake-bread:
     goto clear-the-rats
 
 stage clear-the-rats:
-  log: A sword and a shield, off Miki. He says there are giant rats under this house, and that three of them down would be proof enough.
+  log: A sword and a shield, off Miki. He says there are giant rats under this house, that three of them down would be proof enough, and that I am to climb back up and tell him when they are.
   first-steps.miki says:
     always
     sticky
