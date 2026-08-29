@@ -333,3 +333,29 @@ source wins is the rule and the tie-break goes. The first is a small exemption a
 working; the second is a deletion and a renamed test. A lane cannot pick, because both are
 defensible and one of them changes what an edit staged over a shipped section does.*
 
+## Whether the second quest may pick up while Miki is still mid-lesson
+
+`leave-tutorial-island.adrift` is gated only on `tulsa.market-square.touched`, and two things
+reach the market before Miki finishes teaching: the window, and the dresser lockpick through the
+front door. So a player who has found the town while a loaf is still unbaked gets Miki's leaving
+line standing beside the lesson he is in the middle of.
+
+The **words** are repaired: the dismissal and the "last word" journal line are gone, and a route
+proves both threads now stand together (`first-steps.the-town-is-found-before-the-lesson-is-over`).
+That was measured as a real guard — it reddens when the island thread is closed mid-lesson and
+nothing else does.
+
+The **structure** is yours. The obvious fix is
+`when: tulsa.market-square.touched and finding-your-feet.sendoff`. It was measured and not taken,
+because it breaks exactly one route — `the-apology-survives-going-out-of-the-window` — and commit
+`b07cdbdb` shows that route was written *because* both quests speak there, having already measured
+and rejected the alternative of removing `adrift` from the list.
+
+There is no third way with the flags as they stand: they cannot say *Miki is not waiting on you*
+without enumerating stages, since `snubbed` stays set after apologising.
+
+*Moves when: he says whether `leave-tutorial-island` may pick up at all while `finding-your-feet`
+is mid-lesson. If it may not, the gate is one line and the route that protects the overlap is
+deleted with its reasoning in the commit. If it may, this is deleted and the words already
+repaired are the whole of the answer.*
+
