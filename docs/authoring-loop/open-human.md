@@ -42,25 +42,8 @@ Measured on 2026-08-29 by walking the route: it ends holding eight rat pelts.
 *Moves on a ruling on what a broken promise costs a player here. Any of the three
 is a lane's work once it is named; guessing between them is the one thing that
 cannot be done, since it is the quest's whole point.*
-
-## One quest stands in the journal that nobody can begin
-
-A new game's journal lists eight quests. Seven are written through to their last
-beat; `birds-and-the-bees` is the one stub left, and nothing starts it.
-
-That is the journal working as written — `listedToPlayer` filters only `DEBUG`, and
-its own comment says a journal listing only what has been started would be a list of
-what the player already knows. So one dead hook on turn one is either the quest board
-doing its job or one dead end, and which one it is is a call about the game.
-
-The mechanism is not free either way. Holding a stub back means `DEBUG`, and a
-`DEBUG` section says nothing in any language, so it never reaches the locale that
-`npm run notes` walks — the note that is the whole point of the stub disappears with
-it. Measured both ways on 2026-08-25.
-
-*Moves on a ruling on whether an unwritten quest is visible to a player. If it must
-be held back, that is engine work a lane can take: some way for a section to ship
-its prose to `npm run notes` without shipping the quest to the journal.*
+RESPONSE: I don't understand this one. The solution is to make the celler rats have a different id (but the same title) and track the number of kills. If it is 0, the player killed none. Am I missing something?
+2) There are no hard failure states. Only alternate paths. The game should simply acknowledge the player's actions in the form of dialogue and reward. Oolga's quest completes when the player does what she asks. How the player achieves that determines rewards and dialogue. 
 
 ## Whether a quest may take an NPC's conversation for the whole of a stage
 
@@ -87,6 +70,8 @@ to disappear once she has hired someone, and tulsa's route is what is wrong.
 *Moves on which of those three is the game. All three are a lane's work once named;
 the third also means ruling that a corpus route may be rewritten because a quest
 superseded the path it walked, which nothing here has done before.*
+RESPONSE: The way kelsa's conversation has to go is that her dialogue in tulsa needs to be removed to be replaced by the quest. She is asking about the bees there as a preamble to the quest. 
+But the larger question here is more interesting. We need to support two quests that are using the same NPC while running in parallel. That is the only requirement I can think of. 
 
 ## Whether a section written over another module's may name its own module's ids
 
@@ -113,6 +98,7 @@ per quest and a quest cannot be lifted out cleanly.
 *Moves on a ruling on which of the two it is. If the rule stands it wants writing where
 an author meets it — nothing the oracle prints says it. If it is a defect, the fix is a
 lane's, and the five pieces pushed into tulsa come back to their own modules.*
+RESPONSE: No, this is a defect. All flags of a quest must be named inside of the quest. We want to keep a clean workspace. If Tulsa is loaded alone, it should read as if there is no hint of any quest inside of it (other than being strangely empty). In fact, the only time an entity or item should be taken out of a quest module is if another module needs it. Then it is put into a shared module both mods use (like tulsa). This is basic programming hygiene. Of course, Tulsa is not just a dummy module. It has the purpose of being a skilling location. Those genuinely do belong in tulsa and not in any quest. If it is a little bare, that means that there aren't enough skilling tasks in the city and is a useful metric. 
 
 ## Whether the view may declare two paths aliases of one fact
 
@@ -182,43 +168,6 @@ are the right ones when two paths share them.
 deleted, with the commit that deletes it naming the blind spot and naming B as its
 answer if it ever matters.*
 
-## Nobody has watched a replay back
-
-Everything the replay decides is proved (`src/ui/replay.test.ts`, and the cursor
-through the driver in `src/ui/playtest.test.ts`); what nobody has watched is the tick
-itself, the bar, and whether 0.3s is the right default once a run with a long stretch
-of `page:` moves is played back. There are two recorded runs standing in
-`.planning/yonatan-playtests/` to watch.
-
-*Moves when: he watches one and names the cadence. Nothing else answers it — and he
-has said explicitly that he will do it later.*
-
-## What the band under every page should carry
-
-The run under way is now drawn below whatever page you are on, which is what you asked
-for. What it carries is the question: today that is the label, the bar, the cancel button
-**and the pool meters** — your health and each foe's. During a fight on the character sheet
-that is roughly 150px of permanent furniture, and on the home page your own health meter is
-then drawn twice, once in the band and once in `StatusBanner`.
-
-*Moves when: he says whether the band is the whole sheet or just label, bar and cancel with
-the foe meters staying on the home page. Either is a small edit in `App.tsx`; the lane did
-not guess because both readings of "it should exist on lower banner" are defensible and one
-of them draws a number twice.*
-
-## Two stats were put on a tab by judgement rather than by the ruling
-
-The three tabs are Combat, Skilling and Other, and every stat names one. Two calls were
-not the ruling's to make and were made anyway: `regeneration` sits under Combat, because
-it refills the pool a fight empties, and `standard for: stat` sits on Combat, so a stat
-somebody forgot to group lands on the tab the sheet opens on rather than on one a player
-may never turn to. The other reading of that second one is that "everything related not
-fighting" is the complement and so the natural home for a stat nothing has classified.
-
-*Moves when: he opens the character sheet and either says nothing, or names the tab either
-one should sit on — one `group:` line and one `standard for:` line in `content/core.dsl`.*
-
-
 ## Whether a fishing spot is a thing you can use up
 
 Your reading of the corpus on 2026-08-26: *"fishing should be just like `# action
@@ -248,23 +197,7 @@ four waters with no shoal felled and no arm trained. It is engine work, not cont
 *Moves when: he says whether a water may be depleted, or whether the grammar should stop
 requiring it. The first is a content afternoon and changes what fishing means; the second is
 a small engine change and changes nothing about the game. A lane cannot pick between those.*
-
-## The thieving ladder now runs at one pace
-
-A townsman, a guardsman and a knight were tuned to 30, 20 and 15 attempts a minute so that a
-minute spent on each paid about the same. That is gone: a rate a debuff can reach has to be a
-stat, one stat is one number, and all three now run at 30. The knight is the best mark per
-minute, which is backwards.
-
-This was not a slip — it is the cost of what you asked for. *"It should work like a debuff
-that reduces your thieving rate to 0 for a few seconds"* requires the rate to be something a
-modifier can touch, and `rate: 30` written as a literal is not. The stall works; the ladder
-paid for it.
-
-*Moves when: he says whether the three payouts should be retuned to restore the ladder, or
-whether a per-mark rate is worth a language feature. Retuning is three numbers and no test
-pins them; the feature is a `rate:` that can read a number off the mark, which nothing in the
-grammar offers today.*
+RESPONSE: No, water cannot be depleted. I feel like we can bypass any engine changes for now by just setting the respawn time to instant. It is very important however that fishing doesn't drift from combat because that is a one-home violation. 
 
 ## Whether Market Square should read as crowded or as legible
 
@@ -277,20 +210,7 @@ read at a glance and a square that feels like a market are not obviously the sam
 
 *Moves when: he stands in it and says. If it should be thinned, the lever is which entities
 stand there rather than a number in the engine; if it should not, this is deleted.*
-
-## Whether one step out is the right radius for the sheet
-
-The home page and the terminal now offer what is here plus what is one leg away, and
-everything further is reached through the map. That closed a real complaint — the list was
-being swamped by travel — but the radius itself was a lane's choice, not a ruling, and it was
-made before the grid town existed.
-
-The grid town is the case that matters: crossing Tulsa is now three or four legs through lanes
-whose neighbours are houses, so "one step out" means something different there than it did in
-a loose graph of thirty-four rooms.
-
-*Moves when: he plays the walled town and says whether the sheet feels short or right. It is
-one comparison in `sheetOffers`; a radius of two is the same edit as a radius of one.*
+TODO: (don't move this to open-agents.md) Need to thin this out, will happen when we do another pass over the map once quests are roughly finished. 
 
 ## Whether a stalled bar should empty or hold where it stopped
 
@@ -305,6 +225,7 @@ the runtime keeps per attempt. The lane judged that out of scope rather than gue
 *Moves when: he sees a stall and says whether an emptied bar reads as "you are stopped" or as
 "you lost your progress". If the second, it is a field on `Cadence` and the publisher reading
 it.*
+RESPONSE: The stall should just reduce the recovery rate of the resource. The resource should therefore stall halfway complete. There should be no fancy flag or anything like that. It should be a timed (de)buff that reduces the thieving rate to 0. 
 
 ## Miki's lent net can be destroyed, and his line then points at nothing
 
@@ -319,47 +240,7 @@ softlock — it is a line of dialogue that becomes false.
 *Moves when: he says whether the tutorial's lent net should be exempt from parting, or whether
 Miki should have something to say to a player who broke it. The first is a condition on one
 droptable; the second is a dialogue node and is the better writing.*
-
-## The ruled combat numbers make the sewer unreachable
-
-Ruled, and **applied**: *"The rat needs to have 1-3 attack... The player at this point in
-the game should have 1 defense from their defense skill. We also nerf the rat's health to
-3, and the player's attack to 1-2 from their attack skill."* This came here from
-`open-agent.md` rather than closing, because taking it to the end turned up something a
-lane cannot decide.
-
-The edit is written and sitting on branch `worktree-agent-a44bebbff7348643a`, commit
-`08eb6511`, so nothing has to be re-done. It is **not merged**, because it reddens
-twenty-odd routes and one of them is not a stale sheet.
-
-**What it does to the tutorial is exactly what was asked for.** `giant-rat` at `attack 1-3`
-and `max-health 3` against a player at `attack 1-2` and `defense 1`: a rat falls in two or
-three swings and bites for one or two. That reads right.
-
-**What it does to everything past the tutorial is the problem.** The numbers are written on
-the base player line, and every enemy in Tulsa was tuned against the player they replace
-(`attack 8-12`, `defense 5`). `feral-rat` in the sewer outfall declares `attack 9`,
-`defense 1`, `max-health 24`. Derived from those declarations: the player now needs about
-**24 landed hits** to put one down and dies to about **four bites**, and the outfall stands
-two of them.
-
-So `tulsa.the-key-opens-the-barred-door` fails at `tulsa.barred-door.unlocked` — and it
-fails for a reason worth reading. `feral-rat` is `aggressive`, `pick lock:` is `time: 6`,
-and an aggressive foe now cancels what you are doing. A player who cannot clear the room
-can never pick the lock, so the puzzle is not merely hard, it is **unreachable**. That is
-the collision between this ruling and the aggression rule from the same playtest, and it is
-the sharper form of a question already standing in `docs/skills/open-human.md` — *whether
-the sewer should be able to kill a beginner*.
-
-*Moves when: he says whether the nerf is the tutorial's or the game's. If it is the
-tutorial's, the base line is the wrong home and a beginner wants a weaker start that grows
-back — a different mechanism, not a different number. If it is the game's, every enemy in
-Tulsa needs re-tiering against the new player and that is a content pass a lane can take
-once he says so. Either way the branch above holds the numbers.*
-
-*Beside it, and answerable in the same breath: `first-steps.two-eight-health-swings-leave-a-rat-up-and-the-third-puts-it-down` is a test whose **name** is a balance number. Under the
-ruling that a test may not pin one, it is wrong whatever is decided here — but what it
-should assert instead depends on what a first fight is supposed to feel like.*
+RESPONSE: No exemptions. It is a regular net. Miki should simply offer the player another net if they have none in their inventory. 
 
 ## A tie-break that decides which module's body wins is provably dead
 
@@ -378,6 +259,7 @@ override a shipped section breaks. Deleting the tie-break makes the code honest 
 source wins is the rule and the tie-break goes. The first is a small exemption and keeps staging
 working; the second is a deletion and a renamed test. A lane cannot pick, because both are
 defensible and one of them changes what an edit staged over a shipped section does.*
+RESPONSE: Load order determines everything. Any other heuristic we come up with will break under real world conditions. Mods can already control load order with their dependencies.
 
 ## Whether the second quest may pick up while Miki is still mid-lesson
 
@@ -404,4 +286,5 @@ without enumerating stages, since `snubbed` stays set after apologising.
 is mid-lesson. If it may not, the gate is one line and the route that protects the overlap is
 deleted with its reasoning in the commit. If it may, this is deleted and the words already
 repaired are the whole of the answer.*
+RESPONSE: Quests should have starting requirements (other quests, level requirements, etc), but that is a separate question. Miki's quest does not stop any other quest from starting. 
 
