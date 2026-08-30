@@ -127,6 +127,8 @@ only rate-to-zero in the whole corpus, so nothing else exercises the held path t
 *Moves on a ruling on whether a roll may interrupt the attempt it is rolled inside. That is
 a grammar question rather than a runtime or content one, and the shape it takes — a second
 kind of roll, a mid-attempt hook, something else — is a lane's work once named.*
+RESPONSE: This is faintly concerning. Is this also true mid fight if an enemy inflicts a debuff on the player? If so, that is a major problem. There has to be parity between a small dt and a large one. 
+To answer thieving once and for all. The player initiates the action. if they succeed they get a reward. If they fail, they take damage and stall for a few seconds. Then they repeat. 
 
 ## The tutorial now ends holding fifty-six shrimp
 
@@ -144,67 +146,6 @@ be asking on a route where the rats are already levelling attack.
 than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
 pick, because the choice is about what the tutorial is teaching.*
 
-## Miki's nets can be farmed at twenty coin a lap
-
-Your ruling was that the lent net is a regular net and Miki simply offers another to a player
-holding none. That is built and it walks. It also means that while the quest stands on
-`apologised`, a player who sells the net in town — nets carry `value: 20`, and the market is
-reachable from that stage through the lockpick or the window — can walk back and be given
-another, as often as they like.
-
-The loop is capped only by the walk and by the stage ending the moment they show Miki a second
-level. It follows directly from the ruling rather than working around it, and at twenty coin a
-lap it may be entirely fine.
-
-*Moves on whether that faucet is acceptable. If it is, this is deleted. If it is not, the
-levers are a once-only replacement, a net Miki's is worth nothing for, or a shorter stage —
-each a lane's work, and choosing between them is a question about how much a tutorial should
-protect a player from themselves.*
-
-## Whether the tackle economy is meant to survive levelling
-
-Two lanes measured this from opposite ends on 2026-08-30 and it is one question.
-
-Fishing is now one `# action cast` over four waters, which was your ruling and is right. But
-a **contest saturates where a weighted pick decays**: a well-levelled angler stops missing,
-so the line stops being spent, so tackle stops being a cost. Measured on the new shape — an
-anchovy run held its small net for **3.7 hours and 5,242 fish**; under the old weights it
-would have parted repeatedly. The emptied-line path still works: a fresh netter does lose the
-net, and `parted-tackle` rolls.
-
-From the other end, and on the pre-rewrite shape, a worn small net at the shrimp shoal took
-about **2.5 game-hours and 3,815 catches** to part — the pool hovering just above empty for
-hours rather than draining. That number is stale now, but it was already saying the same
-thing: parting is not the run of misses the tutorial's low water reads as.
-
-So the drain is a cost that only a beginner pays, and it disappears exactly as the player
-stops needing the lesson. That may be the whole point, or it may mean tackle should stay a
-running cost.
-
-*Moves on whether tackle is a beginner's tax or a permanent one. `npm run balance` reads the
-answer off a run rather than reckoning it, and either way it is numbers in `fishing.dsl`
-rather than a shape in the engine — but a saturating contest cannot be made to bite at every
-level by tuning alone, so if it should, the shape is the question and not the number.*
-
-## The hive wasp cannot be killed below a damage floor, which nothing else here does
-
-*Birds and the Bees* ships with the Korning Mind Wasp healing 4 health on every blow it lands.
-Measured with `npm run balance`: a bare starter — 30 health, hand-axe — is dead in 7.2 seconds,
-0 of 4 seeds finishing. A player in the full iron set, which `combat.dsl` gates at level 10
-attack and health, takes it in about 40 seconds and is close to immune, because defense here is
-flat subtraction.
-
-Sitting above everything else in the starting town is right for a five-thousand-coin quest, and
-that part is not in question. The shape is. The self-heal is a **hard floor rather than a
-slope**: below roughly 1.3 damage per second the wasp cannot be killed at all, however long you
-stand there. Nothing else in the corpus has a wall of that kind — every other fight in town gets
-slower as you get weaker, not impossible.
-
-*Moves on whether a fight may be flatly unwinnable below a threshold rather than merely long.
-It is the design's own ability and it was left standing for that reason. Flattening it is a
-number in `birds-and-the-bees.dsl` and a lane's afternoon; keeping it is a statement about what
-this game does to an underlevelled player, and that is his to make.*
-
 ## Whether the hives should reveal the boss last whatever order they are searched
 
 The brief for *Birds and the Bees* asked that no matter what order the player investigates the
@@ -218,3 +159,4 @@ written once per subject, which is the shape this repository spends its commits 
 *Moves on whether the ordering beat is wanted for real. If it is, it is a lane's work and the
 one-home question comes with it — the counter has to derive its three subjects rather than name
 them. If it is not, this is deleted and the geography is the answer.*
+RESPONSE: A single counter measuring how many hives have been searched, and then a single action to every hive that if hives-searched=3 then the travel action to the boss fight is available. We can use a multiplexed bitmask for this, can't we? Each hive adds its own number to the counter and the path is only available if all hives are searched (last three bits equal 111) and the last hive searched is this one (first three bits equal my bits.). Or... you know, we can just use two numbers. 
