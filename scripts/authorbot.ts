@@ -125,7 +125,10 @@ The tools you have:
                                          run one \`# test\` and report PASSED or FAILED
     npm run balance -- <save> [<word>]   what every offer in front of a player standing on that save
                                          pays an hour, and whether the loop it was asked for finished
-    npm run notes                        every \`@@@\` the corpus holds
+    npm run notes -- ${corpus}
+                                         every \`@@@\` held by the corpus you are writing into,
+                                         your own included. Bare, it reads the shipped corpus
+                                         instead and will not show you your own
 
 **Balance is not yours to settle.** Whether a number you wrote is a rat or a dragon is answered by
 running the world, in a pass of its own that is not this one. Write figures that read sensibly beside

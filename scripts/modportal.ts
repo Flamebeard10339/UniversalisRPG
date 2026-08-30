@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { sourceFiles } from './lib/dslSources';import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -8,7 +8,7 @@ import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
-import { sourceFiles } from './probe';
+
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');

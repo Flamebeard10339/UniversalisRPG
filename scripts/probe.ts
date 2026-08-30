@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { sourceFiles } from './lib/dslSources';
 import { formatVersion } from '../src/grammar/dependency';
 import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { mapOf } from '../src/content/registry';
@@ -328,12 +329,6 @@ export function splitDocuments(name: string, text: string): ModuleSource[] {
 }
 
 const asSource = (file: string): ModuleSource => ({ name: path.basename(file).replace(/\.[^.]*$/, ''), text: readFileSync(file, 'utf8') });
-
-// A directory stands for the .dsl files in it, so `content` names the corpus on a shell that expands no globs.
-export function sourceFiles(file: string): string[] {
-  if (!statSync(file).isDirectory()) return [file];
-  return readdirSync(file).filter((name) => name.endsWith('.dsl')).sort().map((name) => path.join(file, name));
-}
 
 function readSources(files: readonly string[]): ModuleSource[] {
   return files.flatMap((file) => (file === '-' ? splitDocuments('stdin', readFileSync(0, 'utf8')) : sourceFiles(file).map(asSource)));

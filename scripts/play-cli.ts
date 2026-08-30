@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { sourceFiles } from './lib/dslSources';import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
-import { sourceFiles } from './probe';
+
 import { initialLocalChangesModule } from '../src/content/localChanges';
 import { CORPUS_DIR } from '../src/content/shipped';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';

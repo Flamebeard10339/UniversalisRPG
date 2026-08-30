@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { sourceFiles } from './lib/dslSources';import { mkdtempSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,7 +16,7 @@ import { blocking, describeEntry, journalWindow, journalWindowText, NO_NOTES, NO
 import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, sheetOffers, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { fileAuthoring } from './play-cli';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
-import { sourceFiles } from './probe';
+
 
 // scripts/playbot.ts holds one live session and calls the model once per turn — see
 // docs/specs/a-turn-costs-what-the-last-turn-did.md, whose clauses this file exists to satisfy.

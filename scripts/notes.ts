@@ -6,11 +6,13 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
+import { sourceFiles } from './lib/dslSources';
 
 const usage = [
   'Usage: npm run notes [-- <source>...]',
   '',
-  `  <source>   a DSL file; with none, the shipped corpus in content/`,
+  `  <source>   a DSL file, or a directory standing for the .dsl files in it;
+             with none, the shipped corpus in content/`,
   '',
   `A ${NOTE_MARK} in any line the game says to a player opens a note that runs to the`,
   'end of it. The engine drops the note and says the rest, so what an author',
@@ -56,7 +58,7 @@ function main(): void {
     console.log(usage);
     return;
   }
-  const sources = args.length > 0 ? args.map((file) => ({ name: path.basename(file), text: readFileSync(file, 'utf8') })) : shipped();
+  const sources = args.length > 0 ? args.flatMap(sourceFiles).map((file) => ({ name: path.basename(file), text: readFileSync(file, 'utf8') })) : shipped();
   const { registry, diagnostics } = loadUniverseWithDiagnostics(sources);
   for (const diagnostic of diagnostics) console.error(formatModuleDiagnostic(diagnostic));
   console.log(noteLines(registry.locales).join('\n'));

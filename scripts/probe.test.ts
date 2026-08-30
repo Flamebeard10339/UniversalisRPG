@@ -7,7 +7,8 @@ import { CORPUS_DIR, moduleSource, shippedFiles, shippedSources } from '../src/c
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { parseProbeArgs, probe, recordedSheetId, sourceFiles, splitDocuments, type ProbeOptions } from './probe';
+import { sourceFiles } from './lib/dslSources';
+import { parseProbeArgs, probe, recordedSheetId, splitDocuments, type ProbeOptions } from './probe';
 
 const BASE: ModuleSource = {
   name: 'base',

@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { sourceFiles } from './lib/dslSources';import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -10,7 +10,7 @@ import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { MOD_PENDING_LABEL } from '../src/content/modportal';
 import { CORPUS_DIR } from '../src/content/shipped';
 import { ModuleSource } from '../src/content/universe';
-import { sourceFiles } from './probe';
+
 
 const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = CORPUS_DIR;
