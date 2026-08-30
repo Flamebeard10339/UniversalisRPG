@@ -134,13 +134,29 @@ stage apologised:
   // Not sticky: the node hands over a net, and sticky replays a node whole, so
   // a player who talked this through four times walked away with four nets.
   // `again:` is the other half of that pair — the offer is made once, and what
-  // every talk after it gets is Miki pointing at the net already in the pack.
+  // every talk after it gets is Miki pointing at the net in the pack. It may say
+  // the net is theirs already because it is only ever reached while it is: the
+  // node below stands in front of it for the whole of the time it is not.
   first-steps.miki says:
     always
     ask: About squaring it with you.
     again: The net's yours already. A second level in anything and we're square - the pond's still out the back.
     give: fishing.small-fishing-net
+    set: first-steps.miki.net-lent
     Take the net - there's a pond out the back, and shrimp in it. Get good enough at something to have a second level in it - fishing, or whatever else you find - and I'll call us square.
+  // The net he lends is a regular net, and a regular net parts. This is what he has
+  // to say to a player who comes back without one, and it is sticky for the same
+  // reason the node above is not: the thread stands only while there is no net in
+  // the pack, so it can lend again after a second parting and can never lend twice
+  // over. `net-lent` is what keeps it out of the way until the first offer is taken
+  // — before that, a player has no net either, and this is not the line for them.
+  first-steps.miki says:
+    when: first-steps.miki.net-lent and not has fishing.small-fishing-net
+    sticky
+    ask: Your net came apart on me.
+    Parted on you, did it? They do. Mesh is mesh, and that pond is deeper than it looks.
+    give: fishing.small-fishing-net
+    Here - another off the same box under the bench. The pond's not going anywhere, and neither is what I asked you for.
   first-steps.miki says:
     when: highest-level >= 2
     ask: I have a second level to show for myself.
@@ -317,6 +333,10 @@ choose: Actually - sorry. Show me the ropes after all.
 talk: first-steps.miki
 choose: continue
 assert: has fishing.small-fishing-net
+// The flag the save below stands on, earned here rather than written down: it is
+// what tells a talk after a parting from the talk that made the offer in the first
+// place, and without it Miki would be offering a net to a player he has never met.
+assert: first-steps.miki.net-lent
 // Talked through twice more before going fishing. The offer stands as long as
 // the catch is owed, so the line keeps being reachable; what it must not do is
 // keep paying out, which is what the count below is here for.
@@ -348,6 +368,33 @@ expect only: left-mikis-house
 // when this route's content changes on purpose. See apology-route-full-end for
 // why this isn't miki-route-end.
 expect only: apology-route-full-end
+
+// --- back in the front room with no net ---
+//
+// The route above ends holding the net, as every route through this house did until
+// this one: nothing was ever walked back to Miki empty-handed, which is how his
+// standing offer came to point at a net a player might not have.
+//
+// It opens on a save rather than fishing the net to pieces on the way. What a run of
+// misses costs is fishing's to decide and `tulsa.player`'s `on line-parted:` to carry
+// out, so a route that netted shrimp until the line gave would be this file passing
+// or failing on the shoal's odds — and it is a long wait besides. What belongs here
+// is the other end of it: the word Miki has for someone who comes back without one.
+# test miki-lends-another-net-to-a-player-who-has-none
+load: a-parted-net-and-a-level-still-owed
+assert: not has fishing.small-fishing-net
+// The standing offer has been said once and says nothing to a list, so with no net
+// in the pack the thread that lends one is the only word Miki has: a net arriving on
+// a bare `continue` is what says which of the two answered.
+talk: first-steps.miki
+choose: continue
+assert: has fishing.small-fishing-net
+// And now it is the other way round. The lending thread stands only while there is
+// no net to stand on, so taking the replacement closed it, and the standing offer is
+// what a talk falls back to — which is a line and not a second net.
+talk: first-steps.miki
+choose: continue
+assert: inventory.fishing.small-fishing-net = 1
 
 // bake-bread is left by a line Miki says and not by a `done when:`, so one
 // stage stands over two beats: bake the loaf, then carry it back. The two
@@ -400,7 +447,7 @@ use: entity.fishing.shrimp-shoal.net-the-shrimp until highest-level >= 2
 assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki
-choose: finding-your-feet.apologised.miki.1.said
+choose: finding-your-feet.apologised.miki.2.said
 choose: continue
 assert: finding-your-feet.sendoff and first-steps.front-door.unlocked
 
@@ -589,7 +636,14 @@ assert: first-steps.dummies-felled = 1
 
 // The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
-{"version":13,"inventory":{"fishing.small-fishing-net":1,"fishing.raw-shrimp":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.backyard.touched":true,"first-steps.backyard.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"fishing.fishing":18},"location":"tulsa.market-square","time":17000,"rng":582581775}
+{"version":13,"inventory":{"fishing.small-fishing-net":1,"fishing.raw-shrimp":56},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.miki.net-lent":true,"first-steps.backyard.touched":true,"first-steps.backyard.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.riverside.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.2.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"fishing.fishing":1008},"location":"tulsa.market-square","time":147000,"rng":2408650588}
+
+// Standing in the front room in the state a parted line leaves: Miki has lent the
+// net, the water has had it, and the second level he asked for is still owed. The
+// route above walks on from here; the walk up to here is the apology route's, which
+// earns every flag in this body rather than taking this file's word for it.
+# save a-parted-net-and-a-level-still-owed
+{"version":13,"location":"first-steps.guide-house","flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.miki.net-lent":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":1}}
 
 # save dresser-trinket-end
 {"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true},"location":"first-steps.guide-house-upstairs","time":3000,"rng":2617077404}
@@ -691,7 +745,7 @@ node greeting:
 # entity miki
 faction: player
 examine: A weathered man in patched leather, quick to smile.
-flags: angered
+flags: angered, net-lent
 
 # entity front-door
 examine: A heavy wooden door, bound in iron. The latch lifts from this side once whatever is holding it has stopped.
