@@ -16,6 +16,22 @@ describe('the grammar tree', () => {
     expect(tree.length).toBeLessThan(200);
   });
 
+  // A shape that writes a line into a body somewhere else is half a shape: the heading above it is what says
+  // which body, and no module in the corpus writes one, so the page is the only place an author can meet it.
+  // The subjects are read off the page — every shape whose hole is a whole line — so a second such shape is
+  // held to this for having been written.
+  it('shows a shape that writes over a body under the heading that says which body', () => {
+    const page = grammarLines();
+    const indent = (line: string): number => line.length - line.trimStart().length;
+    const over = page.flatMap((line, at) => (line.includes('<line>') ? [{ line, at }] : []));
+    expect(over.length).toBeGreaterThan(0);
+    for (const { line, at } of over) {
+      const heading = page.slice(0, at).reverse().find((earlier) => earlier.trimStart().startsWith('# '));
+      expect(heading, `nothing above ${JSON.stringify(line)} says which body it is written into`).toBeDefined();
+      expect(indent(line), `${JSON.stringify(line)} does not stand under ${JSON.stringify(heading)}`).toBeGreaterThan(indent(heading!));
+    }
+  });
+
   it.each(sectionKinds())('%s points only back at a block it has already written out', (kind) => {
     const tree = treeOf(kind);
     for (const [at, line] of tree.entries()) {
