@@ -1,4 +1,4 @@
-import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
@@ -12,18 +12,26 @@ import { CORPUS_DIR } from '../src/content/shipped';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
 
+export const DEFAULT_TURNS = 150;
+const DEFAULT_MODEL = 'claude-sonnet-5';
+
 const usage = [
-  'Usage: npm run authorbot -- --brief <file> [--target <module>] [--open] [--turns <n>] [--model <id>]',
+  'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--model <id>]',
+  '       npm run authorbot -- --watch [<brief>]',
   '',
-  '  --brief    the file saying what to write. A file rather than an argument: a brief that',
-  '             arrives as one line is indistinguishable from a brief that was one line',
+  '  <brief>    the file saying what to write, named as a loose word or after --brief.',
+  '             A file rather than an argument: a brief that arrives as one line is',
+  '             indistinguishable from a brief that was one line',
   '  --target   the module under content/ the run may write, which is the only file it may',
-  '             write anywhere (default: local-changes.dsl, made empty in the copy)',
+  '             write anywhere. With none, the brief\'s own name: a brief at',
+  '             planning/A Grand Blade.md writes a-grand-blade.dsl',
   '  --open     let the run read the engine and count every reach, rather than refusing it.',
   '             Without this, src/, scripts/, docs/ and every .ts are refused, and the refusal',
   '             says to ask the oracle',
-  '  --turns    how many replies before the run is cut off (default 80)',
+  `  --turns    how many replies before the run is cut off (default ${String(DEFAULT_TURNS)})`,
   '  --model    which model plays the author (default claude-sonnet-5)',
+  '  --watch    do not start anything: say where every authorbot run on this machine stands,',
+  '             and go on saying it until they have all ended. With a brief, just that one',
   '',
   'The run works on a copy of content/ in a directory of its own and writes nothing in this',
   'checkout, so it does not count as a second writer in it. It prints where that directory is,',
@@ -32,15 +40,25 @@ const usage = [
 
 export interface Asked {
   brief: string | null;
-  target: string;
+  target: string | null;
   open: boolean;
   turns: number;
   model: string;
+  watch: boolean;
 }
 
-const DEFAULT_TARGET = 'local-changes.dsl';
-const DEFAULT_TURNS = 80;
-const DEFAULT_MODEL = 'claude-sonnet-5';
+// The one reading of a brief's name: the module it writes, the directory it runs in and the name
+// the watch prints are all this, so pointing a run at a brief and finding its output are the same
+// word. It is how the shipped corpus is already named — `A Grand Blade.md` beside a-grand-blade.dsl.
+export const moduleNameFor = (brief: string): string =>
+  path
+    .basename(brief)
+    .replace(/\.[^.]*$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+export const targetFor = (brief: string): string => `${moduleNameFor(brief)}.dsl`;
 
 const requireValue = (flag: string, value: string | undefined): string => {
   if (value === undefined || value.startsWith('-')) throw new Error(`${flag} wants a value after it\n\n${usage}`);
@@ -54,17 +72,24 @@ const requireCount = (flag: string, value: string): number => {
 };
 
 export function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { brief: null, target: DEFAULT_TARGET, open: false, turns: DEFAULT_TURNS, model: DEFAULT_MODEL };
+  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, model: DEFAULT_MODEL, watch: false };
+  const named = (word: string): void => {
+    if (asked.brief !== null) throw new Error(`the brief is named once, and ${JSON.stringify(word)} is a second\n\n${usage}`);
+    asked.brief = word;
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === '--brief') asked.brief = requireValue(arg, argv[++i]);
+    if (arg === '--brief') named(requireValue(arg, argv[++i]));
     else if (arg === '--target') asked.target = requireValue(arg, argv[++i]);
     else if (arg === '--turns') asked.turns = requireCount(arg, requireValue(arg, argv[++i]));
     else if (arg === '--model') asked.model = requireValue(arg, argv[++i]);
     else if (arg === '--open') asked.open = true;
-    else throw new Error(`${arg.startsWith('-') ? `unknown flag ${arg}` : `nothing is read off a loose word here: ${JSON.stringify(arg)}`}\n\n${usage}`);
+    else if (arg === '--watch') asked.watch = true;
+    else if (arg.startsWith('-')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
+    else named(arg);
   }
-  if (asked.brief === null) throw new Error(`--brief names the file saying what to write, and is not optional\n\n${usage}`);
+  if (asked.brief === null && !asked.watch) throw new Error(`nothing was named to write from: the brief is a file, given as a loose word or after --brief\n\n${usage}`);
+  if (asked.brief !== null && asked.target === null) asked.target = targetFor(asked.brief);
   return asked;
 }
 
@@ -150,6 +175,7 @@ export interface Reach {
   tool: string;
   target: string;
   decision: 'allow' | 'deny' | 'engine';
+  at: number;
 }
 
 export interface Cost {
@@ -180,18 +206,125 @@ export function summaryLines(reaches: readonly Reach[], cost: Cost, workdir: str
   ];
 }
 
+const WORKDIR_PREFIX = 'universalis-authorbot-';
+const CALLS_FILE = 'calls.jsonl';
+const ENDED_FILE = 'ended';
+
+export const workdirFor = (brief: string): string => path.join(os.tmpdir(), `${WORKDIR_PREFIX}${moduleNameFor(brief)}`);
+
+// Two calls are the same call when they name the same tool and the same thing, which is what makes
+// a run hand-building one throwaway section over and over look different from a run getting on with
+// it: the first stops discovering new ones and the second does not.
+export const signatureOf = (reach: Reach): string => `${reach.tool} ${reach.target.replace(/\s+/g, ' ').trim().slice(0, 90)}`;
+
+export const CIRCLING_WINDOW = 40;
+export const CIRCLING_DISTINCT = 5;
+
+export interface RunStatus {
+  name: string;
+  reply: number;
+  calls: number;
+  quiet: number;
+  engine: number;
+  ended: boolean;
+  window: { distinct: number; top: string; count: number; circling: boolean } | null;
+}
+
+function windowOf(reaches: readonly Reach[]): RunStatus['window'] {
+  if (reaches.length === 0) return null;
+  const held = reaches.slice(-CIRCLING_WINDOW);
+  const counted = new Map<string, number>();
+  for (const reach of held) {
+    const key = signatureOf(reach);
+    counted.set(key, (counted.get(key) ?? 0) + 1);
+  }
+  const [top, count] = [...counted].sort((a, b) => b[1] - a[1])[0]!;
+  return { distinct: counted.size, top, count, circling: held.length === CIRCLING_WINDOW && counted.size <= CIRCLING_DISTINCT };
+}
+
+export function statusOf(name: string, reaches: readonly Reach[], ended: boolean, now: number): RunStatus {
+  const last = reaches[reaches.length - 1];
+  return {
+    name,
+    reply: last === undefined ? 0 : last.turn,
+    calls: reaches.length,
+    quiet: last === undefined ? 0 : Math.max(0, (now - last.at) / 1000),
+    engine: reaches.filter((each) => each.decision !== 'allow').length,
+    ended,
+    window: windowOf(reaches),
+  };
+}
+
+// The operator's question is whether a run is working or stuck, so the answer is one block: how far
+// it has got, how long since it last did anything, and whether what it is doing now is anything it
+// had not already done.
+export function statusLines(status: RunStatus): string[] {
+  const head = status.ended
+    ? `${status.name} — ended, ${status.reply} reply(s), ${status.calls} call(s)`
+    : `${status.name} — reply ${status.reply}, ${status.calls} call(s), last ${status.quiet.toFixed(0)}s ago`;
+  if (status.window === null) return [head, '  nothing yet: no tool call has been made'];
+  const { distinct, top, count, circling } = status.window;
+  return [
+    head,
+    ...(status.engine === 0 ? [] : [`  ${status.engine} reach(es) for the engine`]),
+    `  ${circling ? 'going in circles: ' : ''}${distinct} distinct call(s) in the last ${Math.min(status.calls, CIRCLING_WINDOW)}, most repeated ${count}× ${top}`,
+  ];
+}
+
+const reachesIn = (workdir: string): readonly Reach[] => {
+  const file = path.join(workdir, CALLS_FILE);
+  if (!existsSync(file)) return [];
+  return readFileSync(file, 'utf8')
+    .split('\n')
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as Reach];
+      } catch {
+        return [];
+      }
+    });
+};
+
+// Which runs there are is read off the directories they made, not off a list somebody keeps: a run
+// started from another terminal, or five started at once, are all here by having started.
+export const runsInFlight = (dir: string): readonly string[] =>
+  readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(WORKDIR_PREFIX))
+    .map((entry) => path.join(dir, entry.name));
+
+function statusNow(workdirs: readonly string[]): readonly RunStatus[] {
+  const now = Date.now();
+  return workdirs.map((workdir) => statusOf(path.basename(workdir).slice(WORKDIR_PREFIX.length), reachesIn(workdir), existsSync(path.join(workdir, ENDED_FILE)), now));
+}
+
+const WATCH_INTERVAL_MS = 15_000;
+
+async function watch(brief: string | null): Promise<number> {
+  const workdirs = brief === null ? runsInFlight(os.tmpdir()) : [workdirFor(brief)];
+  if (workdirs.length === 0 || !workdirs.some((each) => existsSync(each))) {
+    console.log('no authorbot run has left a directory on this machine');
+    return 1;
+  }
+  for (;;) {
+    const held = statusNow(workdirs.filter((each) => existsSync(each)));
+    console.log([new Date().toISOString(), ...held.flatMap(statusLines), ''].join('\n'));
+    if (held.every((each) => each.ended)) return 0;
+    await new Promise((resolve) => setTimeout(resolve, WATCH_INTERVAL_MS));
+  }
+}
+
 async function run(asked: Asked): Promise<number> {
   const brief = readFileSync(asked.brief!, 'utf8');
-  const workdir = path.join(os.tmpdir(), `universalis-authorbot-${path.basename(asked.brief!).replace(/\W+/g, '-')}`);
+  const workdir = workdirFor(asked.brief!);
   if (existsSync(workdir)) rmSync(workdir, { recursive: true, force: true });
   mkdirSync(workdir, { recursive: true });
   const corpus = path.join(workdir, 'content').replace(/\\/g, '/');
   cpSync(path.join(repoRoot, CORPUS_DIR), path.join(workdir, 'content'), { recursive: true });
-  const draft = path.join(corpus, asked.target).replace(/\\/g, '/');
+  const draft = path.join(corpus, asked.target!).replace(/\\/g, '/');
   if (!existsSync(draft)) writeFileSync(draft, '');
 
   const transcript = path.join(workdir, 'transcript.md');
-  const calls = path.join(workdir, 'calls.jsonl');
+  const calls = path.join(workdir, CALLS_FILE);
   const say = (line: string): void => {
     appendFileSync(transcript, `${line}\n`);
     console.log(line);
@@ -200,8 +333,9 @@ async function run(asked: Asked): Promise<number> {
   const reaches: Reach[] = [];
   let turn = 0;
   const seen = (tool: string, target: string, decision: Reach['decision']): void => {
-    reaches.push({ turn, tool, target, decision });
-    appendFileSync(calls, `${JSON.stringify({ turn, tool, target, decision })}\n`);
+    const reach: Reach = { turn, tool, target, decision, at: Date.now() };
+    reaches.push(reach);
+    appendFileSync(calls, `${JSON.stringify(reach)}\n`);
   };
 
   // Every call is gated here rather than through `canUseTool`: read-only tools are approved before
@@ -226,6 +360,8 @@ async function run(asked: Asked): Promise<number> {
 
   const system = systemFor(asked, corpus, draft);
   writeFileSync(transcript, `# authorbot\n\nmodel: ${asked.model}, turns: ${asked.turns}, engine ${asked.open ? 'open' : 'off limits'}\n\n## system\n\n${system}\n\n## brief\n\n${brief}\n\n## run\n\n`);
+  say(`authorbot ${asked.model}: ${asked.brief!} → ${draft}, up to ${asked.turns} replies`);
+  say(`while it runs: npm run authorbot -- --watch ${JSON.stringify(asked.brief!)}`);
 
   const options: Options = {
     systemPrompt: system,
@@ -258,6 +394,7 @@ async function run(asked: Asked): Promise<number> {
 
   say(`\n${ended}`);
   say(summaryLines(reaches, { turns: turn, seconds: (Date.now() - started) / 1000, calls: reaches.length, usage }, workdir).join('\n'));
+  writeFileSync(path.join(workdir, ENDED_FILE), '');
   return 0;
 }
 
@@ -275,7 +412,7 @@ async function main(): Promise<void> {
     process.exit(2);
     return;
   }
-  process.exit(await run(asked));
+  process.exit(asked.watch ? await watch(asked.brief) : await run(asked));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) void main();

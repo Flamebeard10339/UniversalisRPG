@@ -1,35 +1,89 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CORPUS_DIR, shippedFiles } from '../src/content/shipped';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
-import { parseArgs, refusalFor, summaryLines, systemFor, verdictOf, type Reach } from './authorbot';
+import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
 const WORK = path.resolve('/work');
-const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseArgs(['--brief', 'brief.md']), ...over });
+const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseArgs(['brief.md']), ...over });
 
 describe('what the run was asked for', () => {
-  it('takes the brief as a file, since a brief that arrives as one line cannot be told from one that was', () => {
-    expect(parseArgs(['--brief', 'quest.md'])).toEqual({ brief: 'quest.md', target: 'local-changes.dsl', open: false, turns: 80, model: 'claude-sonnet-5' });
+  it('is one loose word, since the brief and the module it writes were the same word twice', () => {
+    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, model: 'claude-sonnet-5', watch: false });
+    expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
+  });
+
+  // Not a convention this file invented: it is how the corpus is already named, so the module a
+  // brief writes is the one an author would have typed after --target.
+  it('names the module the way the shipped corpus is named', () => {
+    for (const file of shippedFiles()) expect(targetFor(path.join(CORPUS_DIR, `${path.basename(file, '.dsl')}.md`))).toBe(path.basename(file));
   });
 
   it('refuses to run without one, rather than inventing something to write', () => {
-    expect(() => parseArgs([])).toThrow(/--brief names the file/);
+    expect(() => parseArgs([])).toThrow(/the brief is a file/);
+    expect(() => parseArgs(['a.md', 'b.md'])).toThrow(/named once/);
   });
 
   it('will not read the next flag as the value of the one before it', () => {
     expect(() => parseArgs(['--brief', '--open'])).toThrow(/--brief wants a value/);
-    expect(() => parseArgs(['--brief', 'b.md', '--turns', '--open'])).toThrow(/--turns wants a value/);
+    expect(() => parseArgs(['b.md', '--turns', '--open'])).toThrow(/--turns wants a value/);
   });
 
   it('takes a count where a count is meant and says so where it is not', () => {
-    expect(parseArgs(['--brief', 'b.md', '--turns', '12']).turns).toBe(12);
-    expect(() => parseArgs(['--brief', 'b.md', '--turns', 'lots'])).toThrow(/takes a count/);
-    expect(() => parseArgs(['--brief', 'b.md', '--turns', '0'])).toThrow(/takes a count/);
+    expect(parseArgs(['b.md', '--turns', '12']).turns).toBe(12);
+    expect(() => parseArgs(['b.md', '--turns', 'lots'])).toThrow(/takes a count/);
+    expect(() => parseArgs(['b.md', '--turns', '0'])).toThrow(/takes a count/);
   });
 
-  it('reads the other flags, and refuses a loose word rather than guessing what it meant', () => {
-    expect(parseArgs(['--brief', 'b.md', '--open', '--target', 'tulsa.dsl', '--model', 'claude-opus-5'])).toMatchObject({ open: true, target: 'tulsa.dsl', model: 'claude-opus-5' });
-    expect(() => parseArgs(['--brief', 'b.md', 'tulsa'])).toThrow(/nothing is read off a loose word/);
+  it('reads the other flags, and refuses one it does not know rather than guessing what it meant', () => {
+    expect(parseArgs(['b.md', '--open', '--target', 'tulsa.dsl', '--model', 'claude-opus-5'])).toMatchObject({ open: true, target: 'tulsa.dsl', model: 'claude-opus-5' });
+    expect(() => parseArgs(['b.md', '--sideways'])).toThrow(/unknown flag/);
+  });
+
+  it('watches without a brief, since five runs at once are watched by asking after all of them', () => {
+    expect(parseArgs(['--watch'])).toMatchObject({ watch: true, brief: null, target: null });
+    expect(parseArgs(['--watch', 'b.md'])).toMatchObject({ watch: true, brief: 'b.md' });
+  });
+
+  it('runs a brief in the one place named by its own name, so watching it needs nothing kept beside it', () => {
+    expect(workdirFor('planning/A Grand Blade.md')).toBe(workdirFor('elsewhere/a-grand-blade.md'));
+  });
+});
+
+describe('where a run in flight stands', () => {
+  const at = 1_000_000;
+  const call = (turn: number, tool: string, target: string, over: Partial<Reach> = {}): Reach => ({ turn, tool, target, decision: 'allow', at, ...over });
+
+  it('says how far it has got and how long since it last did anything', () => {
+    const said = statusLines(statusOf('rats', [call(1, 'Bash', 'npm run oracle'), call(7, 'Read', 'content/tulsa.dsl')], false, at + 42_000)).join('\n');
+
+    expect(said).toContain('rats — reply 7, 2 call(s), last 42s ago');
+  });
+
+  it('says a run is going in circles when it stops making calls it has not already made', () => {
+    const looping = Array.from({ length: CIRCLING_WINDOW * 2 }, (_, i) => call(60 + i, i % 2 === 0 ? 'Edit' : 'Bash', i % 2 === 0 ? '/work/content/rats.dsl' : 'npm run probe -- content --test debug'));
+    const working = Array.from({ length: CIRCLING_WINDOW * 2 }, (_, i) => call(60 + i, 'Read', `/work/content/room-${i}.dsl`));
+
+    expect(statusLines(statusOf('rats', looping, false, at)).join('\n')).toContain('going in circles: 2 distinct call(s)');
+    expect(statusLines(statusOf('rats', working, false, at)).join('\n')).not.toContain('going in circles');
+  });
+
+  it('will not call a run circling before it has made enough calls to have repeated itself', () => {
+    const few = Array.from({ length: CIRCLING_DISTINCT }, (_, i) => call(i + 1, 'Edit', '/work/content/rats.dsl'));
+
+    expect(statusLines(statusOf('rats', few, false, at)).join('\n')).not.toContain('going in circles');
+  });
+
+  it('says plainly that a run has ended, so a finished run does not read as a hung one', () => {
+    expect(statusLines(statusOf('rats', [call(3, 'Read', 'a')], true, at + 900_000)).join('\n')).toContain('rats — ended, 3 reply(s)');
+    expect(statusLines(statusOf('rats', [], false, at))).toContain('  nothing yet: no tool call has been made');
+  });
+
+  it('counts the reaches for the engine while the run is still going, not only in its final report', () => {
+    const said = statusLines(statusOf('rats', [call(2, 'Read', 'src/runtime/session.ts', { decision: 'deny' }), call(3, 'Bash', 'npm run oracle')], false, at)).join('\n');
+
+    expect(said).toContain('1 reach(es) for the engine');
   });
 });
 
@@ -92,9 +146,9 @@ describe('what the run cost', () => {
 
   it('lists the reaches rather than counting them, since which question sent it into the engine is the answer', () => {
     const reaches: Reach[] = [
-      { turn: 1, tool: 'Bash', target: 'npm run oracle', decision: 'allow' },
-      { turn: 4, tool: 'Read', target: 'src/runtime/runtime.ts', decision: 'engine' },
-      { turn: 6, tool: 'Grep', target: 'src/content', decision: 'deny' },
+      { turn: 1, tool: 'Bash', target: 'npm run oracle', decision: 'allow', at: 0 },
+      { turn: 4, tool: 'Read', target: 'src/runtime/runtime.ts', decision: 'engine', at: 1 },
+      { turn: 6, tool: 'Grep', target: 'src/content', decision: 'deny', at: 2 },
     ];
     const said = summaryLines(reaches, cost, '/work').join('\n');
 
@@ -105,7 +159,7 @@ describe('what the run cost', () => {
   });
 
   it('says so plainly where it never reached at all, which is the answer the run is looking for', () => {
-    const said = summaryLines([{ turn: 1, tool: 'Bash', target: 'npm run oracle', decision: 'allow' }], cost, '/work').join('\n');
+    const said = summaryLines([{ turn: 1, tool: 'Bash', target: 'npm run oracle', decision: 'allow', at: 0 }], cost, '/work').join('\n');
 
     expect(said).toContain('it never reached for the engine');
   });
