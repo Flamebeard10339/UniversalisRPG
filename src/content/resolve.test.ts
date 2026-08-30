@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ACTION_MEMBER } from './namespace';
-import { loadModule, loadUniverse } from './load';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
+import { roundTripUniverse } from './serialize';
 import { ModuleSource } from './universe';
 
 const module = (id: string, ...lines: string[]): ModuleSource => ({
@@ -27,6 +28,52 @@ describe('a module declares into its own namespace', () => {
   it('leaves ids at the root when a lone module declares no # info, and refuses that in company', () => {
     expect([...loadModule('# item rope').items.keys()]).toEqual(['rope']);
     expect(() => loadUniverse([{ name: 'loose', text: '# item rope' }, BASE])).toThrow(/declares no # info, so its ids have no namespace/);
+  });
+});
+
+describe('a body written at another module address belongs to whoever wrote it', () => {
+  const TOWN = module('town', '# location square', 'x: 0, y: 0', 'starting', 'title: The Square', '# entity dog', 'title: Dog', 'examine: A dog.');
+  const errand = (...lines: string[]) => module('errand', 'dependencies: town', ...lines);
+
+  const printed = (...sources: ModuleSource[]): Map<string, string> => {
+    const loaded = loadUniverseWithDiagnostics(sources);
+    expect(loaded.diagnostics.map((each) => each.message)).toEqual([]);
+    const trip = roundTripUniverse(loaded.registry, loaded.parsed, (again) => loadUniverseWithDiagnostics(again));
+    expect(trip.diagnostics.map((each) => each.message)).toEqual([]);
+    expect(trip.differences).toEqual([]);
+    return new Map(trip.sources.map((source) => [source.name, source.text]));
+  };
+
+  it('goes home to the module that wrote it, so it may name that module own ids', () => {
+    const mire = errand('# entity toad', 'title: Toad', 'examine: A toad.', '# location town.mire', 'x: 1, y: 0', 'title: The Mire', 'entities:', '  toad');
+    const registry = loadUniverse([TOWN, mire]);
+    expect(registry.namespace.ownerOf('location', 'town.mire')).toBe('errand');
+    expect(registry.locations.get('town.mire')!.entities).toEqual([{ entity: 'errand.toad' }]);
+
+    const back = printed(TOWN, mire);
+    expect(back.get('errand')).toContain('# location town.mire');
+    expect(back.get('errand')).toContain('errand.toad');
+    expect(back.get('town')).not.toContain('mire');
+  });
+
+  // A body naming nothing but the addressed module's own reloads to the same world wherever it is
+  // printed, so where it lands is the only thing that says whose it is.
+  it('goes home there even when every name in it is the addressed module own', () => {
+    const owl = errand('# entity town.owl', 'title: Owl', 'examine: An owl.');
+    const back = printed(TOWN, owl);
+    expect(back.get('errand')).toContain('# entity town.owl');
+    expect(back.get('town')).not.toContain('owl');
+  });
+
+  it('leaves a section it only adds to standing where it was declared, so a patch is still a patch', () => {
+    const dressing = errand('# location town.square', '+entities: town.dog');
+    const registry = loadUniverse([TOWN, dressing]);
+    expect(registry.namespace.ownerOf('location', 'town.square')).toBe('town');
+    expect(registry.locations.get('town.square')!.entities).toEqual([{ entity: 'town.dog' }]);
+
+    const back = printed(TOWN, dressing);
+    expect(back.get('town')).toContain('# location square');
+    expect(back.get('errand')).not.toContain('# location');
   });
 });
 

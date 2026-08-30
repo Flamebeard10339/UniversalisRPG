@@ -8,6 +8,7 @@ import type {ModuleSource, ParsedModule} from './universe';
 import {ModuleInfo} from './sections/info';
 import {DEFAULT_LANGUAGE} from '../grammar/section';
 import {localeKey, moduleLocaleSections} from './locale';
+import {moduleNamed} from './resolve';
 import {mapOf} from './registry';
 
 type Lines = string[];
@@ -15,6 +16,10 @@ type Lines = string[];
 export interface SerializeModuleOptions {
   info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack' | 'language'>>;
   globals?: readonly string[];
+  // A module whose bodies are staged rather than shipped, printed here under the module each of
+  // their ids names. That is where consolidating them would put them, so this is what asks what
+  // this module's file would become.
+  absorbing?: string;
 }
 
 function infoLines(info: SerializeModuleOptions['info']): Lines {
@@ -27,10 +32,6 @@ function infoLines(info: SerializeModuleOptions['info']): Lines {
   return lines;
 }
 
-function inModule(moduleId: string, id: string): boolean {
-  return id.startsWith(`${moduleId}.`);
-}
-
 interface Printed {
   id: string;
   section: ModuleSection;
@@ -40,6 +41,10 @@ const tableOf = (registry: Registry, kind: SectionKind): ReadonlyMap<string, obj
 
 function printedSections(registry: Registry, options: SerializeModuleOptions): Printed[] {
   const moduleId = options.info.id;
+  const wroteHere = (kind: SectionKind, id: string): boolean => {
+    const owner = registry.namespace.ownerOf(kind, id);
+    return owner === moduleId || (options.absorbing !== undefined && owner === options.absorbing && moduleNamed(id) === moduleId);
+  };
   const printed: Printed[] = [];
   let globalsDone = false;
   for (const kind of sectionKinds()) {
@@ -64,8 +69,8 @@ function printedSections(registry: Registry, options: SerializeModuleOptions): P
       continue;
     }
     if (owner.map === null) continue;
-    // What a module wrote of this kind, which is not everything standing in this kind's map: a kind may land entries in another's — a quest gives dialogues away — and those are that kind's to write, not this one's. The namespace declared the written ones and not the given ones, and it is asked rather than guessed at.
-    for (const [id, value] of tableOf(registry, kind)) if (inModule(moduleId, id) && registry.namespace.has(kind, id)) printed.push({ id, section: sectionOf(kind, value) });
+    // What a module wrote of this kind, which is neither everything standing in this kind's map nor everything its ids are written under. A kind may land entries in another's — a quest gives dialogues away — and those are that kind's to write, not this one's; and a body written at an address another module names still belongs to whoever wrote it. Both are the namespace's answer, so it is asked rather than guessed at.
+    for (const [id, value] of tableOf(registry, kind)) if (wroteHere(kind, id)) printed.push({ id, section: sectionOf(kind, value) });
   }
   return printed;
 }

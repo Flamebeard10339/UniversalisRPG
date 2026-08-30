@@ -69,11 +69,18 @@ export class Namespace {
     throw new DslError(`# ${kind} ${key} is already minted by ${from}, which keys its own words under that name: give this section another id`);
   }
 
-  declare(kind: string, namespace: string | null, id: string): string {
-    const key = qualify(namespace, id);
+  // A section belongs to the module that wrote it, at the address it was written under: the two are
+  // separate answers, because an id naming another module addresses a section over there without
+  // moving this body into that module's file. Where two modules write at one address the first one
+  // to declare it owns it, and every later body is adding to what it declared.
+  declare(kind: string, owner: string | null, key: string): string {
     const from = this.minted.get(`${kind} ${key}`);
     if (from !== undefined) this.refuseSquat(kind, key, from);
-    return this.put(kind, namespace, key);
+    if (this.has(kind, key)) {
+      this.all.add(owner);
+      return key;
+    }
+    return this.put(kind, owner, key);
   }
 
   // A name the engine puts in a kind's id space on an author's behalf, minted the same way by every section that mints it and so held at the root rather than under any one of them. Nothing may be authored there: the two would file their words under one key and whichever loaded last would silently win.

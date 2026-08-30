@@ -116,7 +116,7 @@ const validationSources = parsedModules
   .filter((module) => module.info.id !== targetId)
   .map((module) => module.source)
   .filter((source) => source !== localSource);
-const trip = roundTripModule(loaded.registry, { info: target.info, globals: [...globals].sort() }, (printed) =>
+const trip = roundTripModule(loaded.registry, { info: target.info, globals: [...globals].sort(), absorbing: LOCAL_CHANGES_MODULE_ID }, (printed) =>
   loadUniverseWithDiagnostics([...validationSources, { ...target.source, text: printed }]),
 );
 if (trip.diagnostics.length > 0) {
