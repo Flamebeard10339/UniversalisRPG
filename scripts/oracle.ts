@@ -93,9 +93,7 @@ export function takenLines({ said, read, stood }: Reading): string[] {
   return [`the engine will not take this file into the world, ${read}.`, 'It stops at the first thing it cannot take, so fixing this may uncover another:', ...said.map((each) => `  ${formatModuleDiagnostic(each)}`), ''];
 }
 
-const NAMED = 24;
-
-// The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares.
+// The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares. An answer given once is pointed back at rather than written out again, so listing them whole costs one paragraph per kind however long a draft is — and a truncated list is the one thing that sends an author to read the corpus instead.
 const namesAt = (text: string, cursor: number, known: readonly Addressed[], already: Set<string>): string | undefined => {
   const offering = offeringAt(text, cursor, known);
   if (offering.filling === null) return undefined;
@@ -103,7 +101,7 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[], alre
   const kind = offering.filling.kind ?? [...new Set(offering.offers.flatMap((offer) => (offer.kind === undefined ? [] : [offer.kind])))][0];
   const ids = (of: string): string => {
     const named = known.filter((each) => each.kind === of).map((each) => each.address).sort();
-    return named.length === 0 ? 'none anywhere' : `${named.slice(0, NAMED).join(', ')}${named.length > NAMED ? `, … and ${named.length - NAMED} more, ${named.length} in all` : ''}`;
+    return named.length === 0 ? 'none anywhere' : `${named.join(', ')}${named.length === 1 ? '' : ` — ${named.length} in all`}`;
   };
   // A hole with a grammar of its own is broken into the words it is written with and the things it may name; a hole that only names something is that one list.
   const holds = offering.filling.holds;
