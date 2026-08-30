@@ -289,7 +289,7 @@ export const sideOf = (field: Sided, self: string, other: string): string => (fi
 
 export const isTwoSided = (action: Action): boolean => sidedFields(action).some((field) => field.value.side !== undefined);
 
-export function actionTableProblem(action: Action): string | undefined {
+export function assembledActionProblem(action: Action): string | undefined {
   const cadence = [action.time !== undefined && 'time:', action.rate !== undefined && 'rate:'].filter((written): written is string => written !== false);
   if (cadence.length > 1) return 'time: and rate: are the same axis written two ways; give one';
 
@@ -304,13 +304,6 @@ export function actionTableProblem(action: Action): string | undefined {
   if (!isTwoSided(action)) return undefined;
   const unmarked = sidedFields(action).find((field) => field.value.side === undefined);
   if (unmarked) return `${unmarked.written}: ${unmarked.value.id} names no side — write ${SIDES.map((side) => `${side} ${unmarked.value.id}`).join(' or ')}, because this action already names one`;
-  return undefined;
-}
-
-export function assembledActionProblem(action: Action): string | undefined {
-  const problem = actionTableProblem(action);
-  if (problem) return problem;
-  if (isTwoSided(action) && !action.depletes) return 'a side-naming action with nothing to deplete is not a contest — write `depletes: their <pool>`';
   return undefined;
 }
 
@@ -332,7 +325,7 @@ function resolveKind(action: Omit<Action, 'label'>, label: string, lines: RawLin
   const tagged = keywordsIn(action.tags ?? [], TAGGED_ACTION_KINDS).taken;
   if (tagged.length > 1) throw new DslError(actionProblem(label, `cannot be both ${tagged.join(' and ')}`), span);
 
-  const problem = actionTableProblem({ ...action, label, kind: tagged[0] });
+  const problem = assembledActionProblem({ ...action, label, kind: tagged[0] });
   if (problem) throw new DslError(actionProblem(label, problem), span);
   return tagged[0];
 }
@@ -347,7 +340,7 @@ const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => ({
   form: kind,
   example: kind,
   family: 'how long it takes',
-  note: actionTableProblem({ label: '', kind, results: [] }) ?? KEYWORDS[kind].does,
+  note: assembledActionProblem({ label: '', kind, results: [] }) ?? KEYWORDS[kind].does,
 }));
 
 // A bare clause on an action holds on whoever is performing it while it runs, which is what the part it stands under says. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.

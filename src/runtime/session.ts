@@ -260,8 +260,12 @@ type Actable = { actions?: Action[] };
 // What an entity, a place or a thing in the pack puts in front of the player. `hidden if:` is the
 // only field that takes an action off this list: one whose `requires:` does not stand is offered,
 // and turns the player away in words when they take it.
+//
+// A depleting contest is left out because `fightChoices` puts it up instead, off the player's own
+// `uses:`, and two lists offering one swing is one swing offered twice. A contest that depletes
+// nothing has no such second road, so this is the only place it can be offered from.
 function actionAvailable(action: Action, state: GameState, registry: Registry): boolean {
-  if (isTwoSided(action)) return false;
+  if (isTwoSided(action) && action.depletes) return false;
   return actionVisible(action, state, registry);
 }
 
