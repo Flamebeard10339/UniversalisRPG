@@ -99,18 +99,18 @@ stage cellar-cleared:
 // on anything this quest says. An axe because it is carried as a stack and
 // needs no instance written by hand.
 //
-// The experience is what it takes to live through the cellar and no more than
-// that: at level seventeen the wurm's own range kills the player in one swing,
-// and this route is here to say the quest can be walked, not what level walks
-// it. What the wurm should cost is a balance question and is not settled here.
+// Nothing else, and no experience: the route below walks godlike, so what level
+// lives through the cellar is not what it is asking. What the wurm should cost
+// is a balance question and is answered by running the world, not from here.
 # save sent-out-for-oolga
-{"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1,"core.royal-jelly":1,"core.mollusk-venom":1},"xp":{"combat.attack":300000,"combat.health":300000}}
+{"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1,"core.royal-jelly":1,"core.mollusk-venom":1}}
 
 // Start to finish: Oolga sets the task, Sunny names the three things and hands
 // over the vodka she keeps for herself, the three come together over Sunny's
 // own stove, the sacks in Oolga's cellar take the poison, the thing it draws
 // is put down, and Oolga has the truth out of the player.
 # test kill-it-with-fire-start-to-finish
+godmode
 load: sent-out-for-oolga
 equip: core.hand-axe
 travel: tavern-street

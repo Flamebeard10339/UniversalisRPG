@@ -81,6 +81,7 @@ export type Directive =
   | { kind: 'until'; inner: Directive; until: Terminator }
   | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'setting'; setting: string; value: string }
+  | { kind: 'godmode' }
   | { kind: 'submit-modal'; key: string; value: string }
   | { kind: 'note'; field: NoteName; text: string }
   | { kind: 'refused' }
@@ -137,6 +138,7 @@ const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const SETTING = /^setting:[ 	]*(?<setting>[a-z][a-z0-9-]*)[ 	]+(?<value>[a-z0-9][a-z0-9-]*)$/;
+const GODMODE = /^godmode$/;
 const CANCEL = /^cancel$/;
 const NOTE = new RegExp(`^(?<field>${NOTE_FIELDS.map((field) => field.name).join('|')}):[ \\t]*(?<text>.*)$`);
 const REFUSED = /^refused$/;
@@ -345,6 +347,8 @@ export function parseDirectiveLine(text: string): Directive | null {
   const setting = SETTING.exec(text)?.groups;
   if (setting) return { kind: 'setting', setting: setting.setting, value: setting.value };
 
+  if (GODMODE.test(text)) return { kind: 'godmode' };
+
   if (CANCEL.test(text)) return { kind: 'cancel' };
 
   const wait = WAIT.exec(text)?.groups;
@@ -438,6 +442,8 @@ export function printDirective(value: Directive): string {
       return `load: ${value.save}`;
     case 'setting':
       return `setting: ${value.setting} ${value.value}`;
+    case 'godmode':
+      return 'godmode';
     case 'cancel':
       return 'cancel';
     case 'wait':
@@ -536,6 +542,11 @@ export const test = section<Test>()({
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
     { form: 'setting: <setting> <value>', example: 'setting: hardcore on', note: 'plays the rest of the run by that preference, as the settings page and /settings do — a claim about what a setting changes starts by writing it' },
+    {
+      form: 'godmode',
+      example: 'godmode',
+      note: 'from this line on nothing comes off the player and one blow of theirs fells whatever they strike — for a route whose question is whether its path is walkable and not what the fights along it cost. An action that fells nothing is untouched, and loading a save does not put it back',
+    },
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
     { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
@@ -687,6 +698,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'page':
     case 'unequip':
     case 'setting':
+    case 'godmode':
     case 'open-modal':
     case 'submit-modal':
     case 'choose':

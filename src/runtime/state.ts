@@ -133,6 +133,10 @@ export interface GameState extends RngCursor {
   // felling something both push it forward, so a room is quiet for a beat before the next thing
   // finds you. Not saved: a world picked up again is one you have just walked back into.
   engagesAt: number;
+  // Whether the run is being walked rather than played: nothing comes off the player's pools and one
+  // blow of theirs empties whatever it lands on. Not saved and not cleared by loading one — a route
+  // asks to be walked this way once, and everything after that line is walked that way.
+  godmode: boolean;
   activeAction: ActiveAction | null;
   journey: Journey | null;
   readonly buffs: BuffTable;
@@ -171,7 +175,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, godmode: false, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

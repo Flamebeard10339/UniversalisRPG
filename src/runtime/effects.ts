@@ -465,6 +465,13 @@ export const spendable = (level: number): number => level - SPENT_BELOW + 1;
 export const isSpent = (level: number): boolean => spendable(level) <= 0;
 
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
+  // A blow, a hook, a drain and a rate all come to rest here, so a run walked godlike says once that
+  // nothing of the player's ever falls, and every way it could is covered. A max that has dropped out
+  // from under a full pool still brings it down: that is the pool shrinking, not something taking it.
+  if (segment.state.godmode && store.actorId === PLAYER && raw < current) {
+    store.levels[resource.id] = Math.min(current, max);
+    return 'clamped';
+  }
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
     store.levels[resource.id] = raw - fires * max;

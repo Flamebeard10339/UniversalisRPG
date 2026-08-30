@@ -128,6 +128,13 @@ uses: guarded
 guarded:
   requires: has token
 
+// Quicker off the mark than the player, so a blow of its lands before one of
+// theirs does.
+# entity gnat
+stats: max-health 8, attack 4, attack-rate 120
+uses: swing
+aggressive
+
 # location camp
 entities: 2 bandit-leader, boulder, ogre
 
@@ -138,6 +145,10 @@ entities: 3 crab
 # location reef
 x: 2, y: 0
 entities: urchin
+
+# location fen
+x: 3, y: 0
+entities: gnat
 `;
 
 function loaded(): Registry {
@@ -876,5 +887,29 @@ describe('the next one is found rather than already standing there', () => {
     resolve(state, registry, state.time + engagementDelay(registry));
 
     expect(state.activeAction?.actors?.['midge'], 'the second one was found and the fight went on').toBeDefined();
+  });
+});
+
+describe('a route walked godlike', () => {
+  it('leaves nothing to come off the player, whatever lands on them', () => {
+    const registry = loaded();
+    const state = standing(registry, 'fen');
+    state.godmode = true;
+
+    resolve(state, registry, secondsToMs(1));
+
+    expect(state.log.some((line) => /^The Gnat hits you for /.test(line)), 'the blows still land and are still said').toBe(true);
+    expect(state.resources['health']).toBe(toMilliUnits(1000));
+  });
+
+  it('empties whatever the player strikes, with the first blow', () => {
+    const registry = loaded();
+    const state = standing(registry, 'camp');
+    state.godmode = true;
+    armFightAction('swing', 'ogre', registry, state);
+
+    resolve(state, registry, secondsToMs(1));
+
+    expect(state.populations['camp']?.['ogre']?.down, 'one blow, and the thousand it stood on is gone').toBe(1);
   });
 });

@@ -1030,6 +1030,7 @@ describe('what the engine withholds', () => {
       endedBecause: 'withheld',
       carriedTold: 'withheld',
       engagesAt: 'withheld',
+      godmode: 'withheld',
       rng: 'withheld',
       visits: 'withheld',
       buffs: 'withheld',
