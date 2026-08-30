@@ -24,6 +24,15 @@ more writers — or anyone who must run the suite and believe the answer — tak
 worktree each, because a test run reads the whole tree and a disjoint file list
 does not make its result trustworthy.
 
+**File contents go through the file-writing tool, never through the shell.** This
+checkout is on Windows: PowerShell has no heredoc, and the Bash tool's is one more
+chance for a `$`, a backtick or a quote — which DSL bodies and TypeScript are made
+of — to be eaten before the file lands. *Heredoc tripped on the quoting; writing
+the file directly instead* is a sentence agents here write over and over, and it
+costs a call every time. The writing tool has no quoting layer to trip on. The same
+goes for a multi-line program handed to `node -e`: put it in a file under the
+scratchpad and pass the path.
+
 # The DSL
 
 Game content is written in a small line-based language. A file is a sequence of

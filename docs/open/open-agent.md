@@ -193,6 +193,7 @@ found by reading rather than by playing.
 *Closes when:* the tutorial says that a net is worn — a line of Miki's, most likely, since he
 is the one handing it over — and a route equips it, so the path a player is actually taught is
 the path the module proves.
+RESPONSE: This task is literally a single line edit to prose in the dsl. It should just be changed instead of adding several paragraphs to open-agent.md
 
 ## A negative weight in a `one of:` fires no branch at all
 
