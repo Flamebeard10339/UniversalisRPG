@@ -291,3 +291,26 @@ So the fact has two homes and one of them is dead for the path it was written fo
 left in place because the lane that found it did not own the file.
 
 *Closes when:* the check has one home that both paths reach, and the dead one is gone.
+
+## A comment explaining a workaround goes stale the day the workaround is unnecessary
+
+A workaround needs a mark at the site or the next reader re-introduces the shape it was
+avoiding — `the-swampy-menace.dsl`'s three identical `when:` lines carry a comment saying why
+they are three, and deleting it invites someone to "fix" the duplication. But the comment
+describes an open defect, and nothing brings the two back together: the defect closes, and the
+comment sits there saying something that stopped being true.
+
+What cannot go stale is a mark that says almost nothing. `@@@` already does this for the
+corpus and `npm run notes` reads them out; the same mark carrying only the id of an open line
+would say *there is a reason, and it is written down over there* — one home for the reason,
+and a mark whose only failure mode is being orphaned, which is detectable. The proof files in
+this folder are the same check with a different subject, so the machinery is written.
+
+This is second on purpose. The orphan check has to earn its keep on the proofs before a third
+subject is hung off it, and the expensive half is not the scanner — it is reading every
+workaround comment under `src/`, `scripts/` and `content/` and deciding which is a pointer,
+which is a fact the file owns, and which should just go.
+
+*Closes when:* `npm run handoff` reports a `@@@ <id>` under `src/`, `scripts/` or `content/`
+that no open line names, and every workaround comment in the tree is either such a mark or has
+been deleted.
