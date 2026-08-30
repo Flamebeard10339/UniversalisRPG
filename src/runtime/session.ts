@@ -3,7 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location, type Direction } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
-import { actionProgress, actionStalled, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionProgress, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems, packRows } from './itemInstance';
 import { swappedOrder } from './packOrder';
@@ -86,10 +86,10 @@ export interface PlayAction {
   // seat also carries addresses that are not one — a travel seats the road it is walking.
   of?: Answer;
   detail?: Localized;
+  // How far through its cycle it has got, as the fraction a bar draws. A pace taken to nothing holds
+  // this where it stood rather than emptying it: the bar is stopped, not lost, and it moves again
+  // when whatever stopped it wears off.
   progress: number;
-  // Whether it is standing still rather than advancing — something took its pace to nothing. The bar
-  // holds where it stood; it has not been lost, and it moves again when whatever did it wears off.
-  stalled: boolean;
   attempts: number;
   // How much of this cycle is still to be counted, or null when there is no such figure to give.
   // A renderer draws it when it is there and says nothing when it is not; deciding for itself what
@@ -715,7 +715,6 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
     label: actionUnderWay(localizer, obj, objId, action),
     ...(aimed === undefined ? {} : { of: aimed.of, detail: aimed.detail }),
     progress: actionProgress(state, registry),
-    stalled: actionStalled(state, registry),
     attempts: clock.attemptsMade,
     completion: stillToCount(action, active),
   };

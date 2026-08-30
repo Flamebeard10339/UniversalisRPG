@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { Action, isTwoSided, sideOf } from '../grammar/action';
-import { attemptDuration, hasPool, statValue } from './stats';
+import { attemptDuration, hasPool, stalledPace, statValue } from './stats';
 import { participants, performable, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { addDelta, getDelta, PoolDeltas, requireResource } from './effects';
@@ -18,6 +18,24 @@ export function newCadence(): Cadence {
 
 export function playerCadence(active: ActiveAction): Cadence {
   return (active.cadences[PLAYER] ??= newCadence());
+}
+
+// Where a clock stands, and the attempt it stands within — written together, because milliseconds
+// on their own are not a reading of anything. A clock at nothing has counted nothing against
+// anything, so it carries no span at all.
+export function standAt(cadence: Cadence, progress: number, span?: number): void {
+  cadence.progress = progress;
+  if (progress > 0 && span !== undefined) cadence.span = span;
+  else delete cadence.span;
+}
+
+// How far into its attempt a clock stands. A pace taken to nothing has no span to divide by, so the
+// span the clock stopped on is what it is read against and the fraction holds where it stood.
+export function attemptFraction(cadence: Cadence, duration: number): number {
+  const stopped = stalledPace(duration);
+  const span = stopped ? (cadence.span ?? 0) : duration;
+  if (!(span > 0)) return stopped ? 0 : 1;
+  return Math.min(1, Math.max(0, cadence.progress / span));
 }
 
 export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
@@ -99,10 +117,7 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
   const action = findActiveAction(active, registry);
   if (!action.depletes) return null;
 
-  const fractionOf = (cadence: Cadence, actorId: string, swing: Action): number => {
-    const duration = attemptDuration(swing, state, registry, actorId);
-    return duration > 0 ? Math.min(1, cadence.progress / duration) : 1;
-  };
+  const fractionOf = (cadence: Cadence, actorId: string, swing: Action): number => attemptFraction(cadence, attemptDuration(swing, state, registry, actorId));
   const resource = requireResource(registry, action.depletes.id);
   const swinging = new Map(participants(state, registry).map((each) => [each.self, each]));
   const here = registry.locations.get(state.location);
