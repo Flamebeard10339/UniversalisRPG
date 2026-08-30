@@ -1,4 +1,5 @@
 import { blockCalled, type Parser, type Written } from '../grammar/parser';
+import { holeNames } from '../grammar/form';
 import { writtenFrom } from '../grammar/codec';
 import { NOTE_MARK } from '../grammar/note';
 import { namesKind, offeringAt, said, type Offer } from './completion';
@@ -6,6 +7,14 @@ import { gathered, shownIn } from './offerGroups';
 import { EVERY_SECTION, sectionFor, sectionKinds } from './sections';
 
 const STEP = '  ';
+
+// A shape holding a whole line of a section says nothing on its own about which body that line joins: the
+// heading above it is what says, and the heading is the half an author cannot guess. So the page writes it,
+// and the shapes under it at the indentation they are written at.
+const HOLDS_A_LINE = 'line';
+const OVER_HEADING = '# <kind> <module>.<id>';
+const laidOver = (line: Written | undefined): boolean => line !== undefined && holeNames(line.form).includes(HOLDS_A_LINE);
+
 // No line of the language begins with this, so what is written out here can be told from what an author writes.
 export const PART = '· ';
 
@@ -95,6 +104,9 @@ function treeLines(written_: readonly Written[], pad: string, sitting: Sitting, 
     if (family.name !== null) out.push(`${pad}${PART}${family.name}${already === undefined ? '' : `, as under ${already}`}`);
     if (already !== undefined) continue;
     if (family.name !== null) holdNow(written, sign, label);
+    const over = own.some((line) => laidOver(line));
+    const writtenAt = over ? pad + STEP : pad;
+    if (over) out.push(`${pad}${OVER_HEADING}`);
     // The shapes a keyword takes stand on its own line, one or another of them; only a block it opens is indented, because only a block is indented in a file.
     for (const group of family.groups) {
       const spoken = (form: string | null): string => (form === null ? '' : saidOf(held.get(form)));
@@ -109,10 +121,10 @@ function treeLines(written_: readonly Written[], pad: string, sitting: Sitting, 
         const example = shown.find((each) => each !== undefined && /[<[]/.test(group.head === null ? shapes[0]! : `${group.head} ${shapes[0]!}`));
         return example === undefined ? '' : `   e.g. ${example}`;
       };
-      const inside = [...group.offers.map((offer) => under(held.get(offer.form), pad + STEP)), under(held.get(group.head ?? ''), pad + STEP, group.offers)];
+      const inside = [...group.offers.map((offer) => under(held.get(offer.form), writtenAt + STEP)), under(held.get(group.head ?? ''), writtenAt + STEP, group.offers)];
       // A pointer at a block already written out belongs on the line that opens it, and a keyword opening two such blocks points at both.
       const points = [...new Set(inside.flatMap((each) => (each.said === undefined ? [] : [each.said])))];
-      const shown = [...apart].map(([note, shapes]) => `${pad}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${like(shapes)}${note}`);
+      const shown = [...apart].map(([note, shapes]) => `${writtenAt}${group.head === null ? shapes.join(' | ') : `${group.head} ${shapes.join(' | ')}`.trimEnd()}${like(shapes)}${note}`);
       if (points.length > 0 && shown.length > 0) shown[0] = `${shown[0]}${shown[0]!.includes('   — ') ? '; ' : '   — '}${points.join('; ')}`;
       out.push(...shown, ...inside.flatMap((each) => each.lines));
     }
