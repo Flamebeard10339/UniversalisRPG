@@ -535,7 +535,7 @@ export const test = section<Test>()({
     {
       form: 'choose: <thread>',
       example: 'choose: sunny.the-stove',
-      note: 'the thread to pick out of the list, answerable by any tail of its name',
+      note: 'the thread to pick out of the list, answerable by any tail of its name that fits only one of them',
     },
     {
       form: 'choose: <position>',
