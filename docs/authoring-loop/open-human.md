@@ -175,3 +175,36 @@ regeneration is too generous there.
 than reckoned, and either way it is a number in `fishing.dsl` rather than a shape in the
 engine — but which number, and whether it moves at all, is a decision about what the tutorial
 pond is for.*
+
+## The hive wasp cannot be killed below a damage floor, which nothing else here does
+
+*Birds and the Bees* ships with the Korning Mind Wasp healing 4 health on every blow it lands.
+Measured with `npm run balance`: a bare starter — 30 health, hand-axe — is dead in 7.2 seconds,
+0 of 4 seeds finishing. A player in the full iron set, which `combat.dsl` gates at level 10
+attack and health, takes it in about 40 seconds and is close to immune, because defense here is
+flat subtraction.
+
+Sitting above everything else in the starting town is right for a five-thousand-coin quest, and
+that part is not in question. The shape is. The self-heal is a **hard floor rather than a
+slope**: below roughly 1.3 damage per second the wasp cannot be killed at all, however long you
+stand there. Nothing else in the corpus has a wall of that kind — every other fight in town gets
+slower as you get weaker, not impossible.
+
+*Moves on whether a fight may be flatly unwinnable below a threshold rather than merely long.
+It is the design's own ability and it was left standing for that reason. Flattening it is a
+number in `birds-and-the-bees.dsl` and a lane's afternoon; keeping it is a statement about what
+this game does to an underlevelled player, and that is his to make.*
+
+## Whether the hives should reveal the boss last whatever order they are searched
+
+The brief for *Birds and the Bees* asked that no matter what order the player investigates the
+three hives, the last one searched is always the one holding the fight. It is not mechanised.
+
+With three fixed props in a fixed room the reveal is geographic instead: George names all
+three, tulsa's own text tells them apart, and the door into the third opens once George has
+pointed at it. Doing what the brief asked would mean a counter over the three hives — a mechanic
+written once per subject, which is the shape this repository spends its commits undoing.
+
+*Moves on whether the ordering beat is wanted for real. If it is, it is a lane's work and the
+one-home question comes with it — the counter has to derive its three subjects rather than name
+them. If it is not, this is deleted and the geography is the answer.*

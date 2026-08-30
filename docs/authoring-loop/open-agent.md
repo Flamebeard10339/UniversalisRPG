@@ -28,64 +28,6 @@ and is the one place that rule is written.
 
 ---
 
-## Oolga's cellar rats are counted rather than protected
-
-Ruling on 2026-08-30: there are no hard failure states in this game, only alternate paths.
-*Kill it with Fire* completes when the player does what Oolga asked; **how** they did it
-picks the dialogue and the reward. Her one condition — clear the cellar and leave every rat
-breathing — is not a fail gate, it is a branch.
-
-The shape he named: the cellar's rats carry an id of their own, with the same title as
-`tulsa.feral-rat`, and the quest counts kills of that id. Zero kills is the clean path and
-she says so; anything above zero is the other path, and she says that instead and pays
-differently.
-
-Measured on 2026-08-29 and still true: the route that walks the quest end to end kills four
-of them — the melee action takes whatever in the room is aggressive, and the cellar's four
-feral rats are aggressive — and it ends holding eight rat pelts, after which she
-congratulates the player for not killing one.
-
-*Closes when:* the cellar holds its own rat id, both branches of her closing are written,
-and a route walks each — one that kills none and one that kills some — with the reward
-differing between them. If nothing in the language counts kills of an id, that is the
-finding and it is measured before anything is invented.
-
-## Two quests may want one NPC at once, and one of them takes her whole conversation
-
-Ruling on 2026-08-30, in two parts.
-
-The narrow part: Kelsa's own `blunt` node in `tulsa` — the one that says *if you are here
-about the bees, say so* — is a preamble to the quest and is **meant** to be replaced by it.
-It comes out of `tulsa` and the quest owns it. The corpus route
-`tulsa.kelsa-takes-the-answer-she-asks-for` walked that node, so it is rewritten with the
-reasoning in the commit: a route may be rewritten because a quest superseded the path it
-walked, and this is the first time that has been ruled.
-
-The wide part was **already true, and the line that said otherwise was wrong.** Two quests
-each opening a stage on one entity both stand, both are reachable, in either load order —
-built and walked on 2026-08-30. Miki already carries two quest threads at once in the shipped
-corpus, and breaking it reddens six routes in `integration.test.ts`. What gives way to a quest
-line is only the `always` fallback, which is what `always` means; an entity's own `ask:` and
-`when:` threads have always stood beside one. So the narrow part is not a workaround for a
-limitation, it is the ruling about where a preamble belongs — and a preamble that must survive
-a quest opening is written as a thread rather than as `always`.
-
-Two of the four earlier measurements do not survive either. `when: kelsa.the-third-hive.visits
->= 1` **does** read true once the node is entered, bare or module-qualified, including entry by
-a `->` choice's `goto`; only `dialogue.kelsa.hive.visits` is refused, and it is refused at load
-with the node named. Whatever failed in the corpus was local to it.
-
-**The real defect was next to it and is fixed.** A quest names the node it hands over
-`<quest>.<stage>.<entity>.<n>.said`, so two quests on one entity differ only in the first
-segment, and every tail short enough to drop the quest fitted both — `choose:` took the first
-match silently. That recording passes in English and takes the *other* thread under
-`translationSurvival`, which is the failure that was originally read as a takeover. `choose:`
-now refuses a tail that fits more than one thread and names both, mirroring `Namespace.resolve`;
-`spellings` in `dialogue-runtime.ts` was a second copy of `namesSection` and is gone.
-
-*Closes when:* Kelsa's preamble lives in `birds-and-the-bees` and `tulsa`'s route is rewritten
-to match. The engine half is done and its proof home was already taken.
-
 ## A section written over another module's belongs to the module that wrote it
 
 Ruling on 2026-08-30: the id rule is a **defect**, not the design. All of a quest's flags
@@ -142,6 +84,8 @@ tulsa section may name nothing but tulsa's:
 | `# flag herbs-collected` | 49 | `the-swampy-menace` | `# entity tulsa.herb-patch` |
 | `# item raw-blowfish` | 1350 | `the-bars-crawl` | `# location tulsa.deep-water` via the hole |
 | `# entity blowfish-hole` | 1355 | `the-bars-crawl` | same |
+| `# entity cellar-rat` | — | `kill-it-with-fire` | `# location tulsa.oolga-basement` `entities:` |
+| `# flag cellar-rats-killed` | — | `kill-it-with-fire` | that rat's `on death:` |
 
 Three flags stay put and are genuinely tulsa's under the ruling, because a second module needs
 each: `corners-slathered`, `wurm-defeated`, `sewer-toll-paid`. `ball-of-a-boy`'s two patches
@@ -194,21 +138,6 @@ Four duplicated casts are what not having this costs: one action per water.
 no cast trains an arm. If the last of those cannot be had without touching the grammar, the
 lane says so with the measurement rather than shipping a cast that pays combat xp — the
 ruling bypasses engine work, it does not license the leak.
-
-## Miki offers another net to a player who has none
-
-Ruling on 2026-08-30: **no exemptions** — the lent net is a regular net and parts like one.
-Miki simply offers another when the player is holding none.
-
-What is wrong today: `on line-parted:` takes the tackle when `line-health` empties, and
-Miki's `again:` line — the one a player gets on every talk after the offer — points at the
-net already in their pack. A player whose net has parted is told to use a thing they no
-longer hold. Remote rather than theoretical: the shrimp shoal drains 1 line-health per miss
-against the 6 the small net grants, so it takes a run of misses; the window is still an exit,
-so it is a false line rather than a softlock.
-
-*Closes when:* Miki's `again:` branches on whether the player holds a net and hands over
-another when they do not, and a route parts the net and takes the replacement.
 
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
@@ -313,6 +242,14 @@ waits on another: The Rat Conspiracy on Birds and the Bees, Reverse Infiltration
 and The Swampy Menace, Plague Matters on Reverse Infiltration. So they are written one
 wave at a time, each merged before the next starts.
 
+**Birds and the Bees landed on 2026-08-30, so The Rat Conspiracy is next and unblocked.**
+Kelsa's whole `# dialogue` is out of `tulsa` and the quest owns her; the fight at the hive
+is a room the quest declares below `tulsa.hive-mouth`, reached by a road written from the
+quest's end only and open only while the fight is on, so tulsa's third hive stays the
+ordinary dead end tulsa wrote and nothing of the quest sits in the town file. That is the
+shape a quest reaching into a shipped room has to take until the printer half below is
+fixed — a room of its own underneath, rather than an entity in someone else's.
+
 Five ran in parallel on 2026-08-30, one brief each, Sonnet 5, engine off limits:
 
 | quest | wall | replies | out tok | cost | reaches for the engine |
@@ -380,3 +317,25 @@ input everywhere else.
 
 *Closes when:* a weight the roll cannot use is refused at load with the line named, or the
 roll settles on a branch — either is fine, and the first is the language's usual answer.
+
+## George's word in tulsa is an `always`, so no quest may stand beside it
+
+Writing *Birds and the Bees* on 2026-08-30 hit this and could not take it. The brief wanted
+George to hint at the farm's troubles before the quest is picked up. Its first stage stands
+from the outset, so a `george says:` under it would take George's own tulsa node away from
+every player in every world, permanently — and that is not a defect. `always` is what an
+entity says when no thread is open, so a quest line replaces it, which is exactly what the
+sibling lane established the same day while proving that two quests otherwise stand side by
+side on one NPC perfectly well.
+
+The answer is therefore known and is one line of shape rather than a ruling: **a word that
+must survive a quest opening is written as a thread (`ask:`/`when:`), not as `always`.** Kelsa
+was the only person given a line under a first stage, and she is the one whose tulsa dialogue
+was deliberately removed; George's was not, and should not be.
+
+The same reasoning is why the quest's closing `settled` stage gives a line only to Kelsa.
+
+*Closes when:* George's tulsa word is a thread rather than his `always`, the pre-quest hint
+stands beside it under `hired`, and a route walks both — his own answer and the quest's — from
+one talk. Whether other tulsa entities want the same treatment is answered by looking, not by
+listing: a shipped `always` on anyone a quest will ever speak through is the same trap.
