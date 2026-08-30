@@ -161,20 +161,30 @@ levers are a once-only replacement, a net Miki's is worth nothing for, or a shor
 each a lane's work, and choosing between them is a question about how much a tutorial should
 protect a player from themselves.*
 
-## Whether a net is meant to part at all at the shrimp pond
+## Whether the tackle economy is meant to survive levelling
 
-Measured on 2026-08-30, on the shipped world: a **worn** small net at the shrimp shoal takes
-about **2.5 game-hours and 3,815 catches** to part, because line regeneration nearly keeps
-pace with the misses — the pool hovers just above empty for hours rather than draining.
+Two lanes measured this from opposite ends on 2026-08-30 and it is one question.
 
-That is not "a run of misses", which is how the tutorial's low water reads. Either parting is
-not meant to be a real event at the pond and the drain is decoration, or it is and the
-regeneration is too generous there.
+Fishing is now one `# action cast` over four waters, which was your ruling and is right. But
+a **contest saturates where a weighted pick decays**: a well-levelled angler stops missing,
+so the line stops being spent, so tackle stops being a cost. Measured on the new shape — an
+anchovy run held its small net for **3.7 hours and 5,242 fish**; under the old weights it
+would have parted repeatedly. The emptied-line path still works: a fresh netter does lose the
+net, and `parted-tackle` rolls.
 
-*Moves on which of the two. `npm run balance` is where the answer is read off a run rather
-than reckoned, and either way it is a number in `fishing.dsl` rather than a shape in the
-engine — but which number, and whether it moves at all, is a decision about what the tutorial
-pond is for.*
+From the other end, and on the pre-rewrite shape, a worn small net at the shrimp shoal took
+about **2.5 game-hours and 3,815 catches** to part — the pool hovering just above empty for
+hours rather than draining. That number is stale now, but it was already saying the same
+thing: parting is not the run of misses the tutorial's low water reads as.
+
+So the drain is a cost that only a beginner pays, and it disappears exactly as the player
+stops needing the lesson. That may be the whole point, or it may mean tackle should stay a
+running cost.
+
+*Moves on whether tackle is a beginner's tax or a permanent one. `npm run balance` reads the
+answer off a run rather than reckoning it, and either way it is numbers in `fishing.dsl`
+rather than a shape in the engine — but a saturating contest cannot be made to bite at every
+level by tuning alone, so if it should, the shape is the question and not the number.*
 
 ## The hive wasp cannot be killed below a damage floor, which nothing else here does
 

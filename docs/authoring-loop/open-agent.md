@@ -117,28 +117,6 @@ above move, and the three `@@@` guards in `the-swampy-menace.dsl` are written as
 they wanted to be. That is registry, merge and printer together — larger than the ownership
 half, which is why it was not half-landed alongside it.
 
-## A fishing water is never used up, and fishing must not drift from combat
-
-Ruling on 2026-08-30: **water cannot be depleted.** Engine changes are bypassed for now by
-giving a water an instant respawn, so nothing is ever felled. And the load-bearing half:
-fishing must not drift from combat, because that is a one-home violation — *"fishing should
-be just like `# action melee-combat`, just for fishing."*
-
-What stands in the way, measured: `src/grammar/action.ts:315` refuses a side-naming action
-that declares no `depletes:`, so `accuracy: my fishing vs their depth` is rejected at load.
-Adding `depletes:` loads, and a measured minute of netting then recorded the shoal felled by
-the first fish and not coming back — which the instant respawn answers — plus
-`combat.attack: 2` banked per landed cast, which it does not. That second one is what
-`content/fishing.dsl`'s own header exists to refuse, and it could not be scoped away:
-`damage-dealt` takes no `resource:` and the arity check refuses one.
-
-Four duplicated casts are what not having this costs: one action per water.
-
-*Closes when:* the four casts are one action over four waters, no water is ever felled, and
-no cast trains an arm. If the last of those cannot be had without touching the grammar, the
-lane says so with the measurement rather than shipping a cast that pays combat xp — the
-ruling bypasses engine work, it does not license the leak.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a
@@ -339,3 +317,46 @@ The same reasoning is why the quest's closing `settled` stage gives a line only 
 stands beside it under `hired`, and a route walks both — his own answer and the quest's — from
 one talk. Whether other tulsa entities want the same treatment is answered by looking, not by
 listing: a shipped `always` on anyone a quest will ever speak through is the same trap.
+
+## `rate: their <stat>` is live grammar that reads as nought
+
+Found on 2026-08-30 while rebuilding fishing as one cast over four waters. The oracle
+advertises a sided rate, and it does not work: `fightParams` (`src/runtime/runtime.ts:97`)
+and `firstUnitSpan` (`src/runtime/runtime.ts:696`) both call `attemptDuration` with no
+sides, so `other` falls back to the player and a `their` rate reads zero.
+
+The symptom is not an error. A route written `until 30 times` against a `their` rate walked
+**four hours of world instead of ninety seconds** — it looks like a balance problem, and
+the lane that hit it spent time there before finding the cause. It was worked around with
+plain numeric `rate:` lines, so nothing ships broken; the grammar is still offered.
+
+*Closes when:* a sided rate reads the side it names, or the grammar stops offering one —
+and whichever it is, `npm run oracle` says it without anyone having to keep the page in
+step by hand.
+
+## No route walks a deep-water cast, and the blowfish still uses the old shape
+
+Fishing is now one `# action cast` and four waters that overlay it. Two of the four are
+proved: the shrimp shoal, by `first-steps`' own routes. **The trout run and the salmon pool
+are walked by nothing**, because `content/fishing.dsl` holds no `# test` and no `# save` —
+fishing stands nowhere (`dependencies: core`), and a route needs somewhere to stand.
+
+Separately, `tulsa.blowfish-hole.cast-for-blowfish` in `the-bars-crawl` is still written in
+the old per-water shape rather than as an overlay of `cast`. It walks, so nothing is broken;
+it is the last copy of the thing the one-home pass removed.
+
+*Closes when:* a route standing in tulsa walks a rod-and-bait cast at the deep water, and
+the blowfish hole is an overlay of `cast` like every other water. Both want whoever owns
+`tulsa.dsl` next, since that is where a fishing route can stand.
+
+## Two homes for one check on an assembled action
+
+`src/content/sections/action.ts:78` runs a check `actionBody.parseBlock` already runs, and
+is now unreachable through the parser — noticed on 2026-08-30 while the two-sided refusal
+was being removed. Its live callers are `load.ts`, for assembled entity actions and for
+recipe actions that never pass the parser.
+
+So the fact has two homes and one of them is dead for the path it was written for. It was
+left in place because the lane that found it did not own the file.
+
+*Closes when:* the check has one home that both paths reach, and the dead one is gone.
