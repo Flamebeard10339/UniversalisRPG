@@ -389,8 +389,15 @@ describe('playbot', () => {
 
     it('will not run a briefed mode with no brief, nor a brief with no mode that reads one', () => {
       expect(() => parseArgs(['--mode', 'briefed'])).toThrow(/carries a brief and none was given/);
-      expect(() => parseArgs(['--mode', 'reader', '--brief', 'do a thing'])).toThrow(/carries no brief/);
-      expect(parseArgs(['--mode', 'briefed', '--brief', 'do a thing']).brief).toBe('do a thing');
+      expect(() => parseArgs(['--mode', 'reader', '--brief', 'job.md'])).toThrow(/carries no brief/);
+      expect(parseArgs(['--mode', 'briefed', '--brief', 'job.md']).briefFile).toBe('job.md');
+    });
+
+    // The same shape the authorbot takes it in, and the reason is the shape rather than a guard on
+    // it: a path holds no newline, so there is nothing for a shell to cut a brief in half at.
+    it('takes the brief as a file, so a multi-line one cannot arrive as its own first line', () => {
+      expect(() => parseArgs(['--mode', 'briefed', '--brief', '--turns'])).toThrow(/wants the file/);
+      expect(parseArgs(['--mode', 'briefed', '--brief', 'job.md', '--turns', '7'])).toMatchObject({ briefFile: 'job.md', turns: 7 });
     });
   });
 

@@ -15,6 +15,7 @@ import type { PruneWarning } from '../src/runtime/pruning';
 import { blocking, describeEntry, journalWindow, journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, turnRecord, type KeptRun, type RunLogEntry, type RunNotes } from '../src/runtime/runLog';
 import { adoptRegistry, loadSaved, readRoom, serializeSession, sessionLocalizer, sheetOffers, standingLine, startSession, view, type PlaySession, type PlayView } from '../src/runtime/session';
 import { fileAuthoring } from './play-cli';
+import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 
 
@@ -617,13 +618,14 @@ const modeUsage = (mode: PlaybotMode): string =>
   `             ${mode}${mode === DEFAULT_MODE ? ' (default)' : ''} — ${modeSpec(mode).audiences.join(' and ')} commands${modeSpec(mode).carriesBrief ? ', and wants --brief' : ''}`;
 
 const usage = [
-  `Usage: npm run playbot -- [<source>...] [--mode ${PLAYBOT_MODE_NAMES.join('|')}] [--brief <text>] [--turns <n>] [--save <id>]`,
+  `Usage: npm run playbot -- [<source>...] [--mode ${PLAYBOT_MODE_NAMES.join('|')}] [--brief <file>] [--turns <n>] [--save <id>]`,
   '',
   '  <source>   a DSL file to load, or a directory standing for the .dsl files in',
   '             it; with none, the content/ directory — the shipped corpus',
   '  --mode     which framing the run plays under, and what it may type:',
   ...PLAYBOT_MODE_NAMES.map(modeUsage),
-  '  --brief    the job a briefed run is to carry out, in the operator\'s own words',
+  '  --brief    the file saying what a briefed run is to carry out;',
+  ...BRIEF_IS_A_FILE.map((line) => `             ${line}`),
   '  --turns    how many turns to play, default 100',
   '  --save     open the run on a named # save fixture instead of a fresh session',
   '  --local    where an editing run stages what it writes; with none, a fresh',
@@ -636,7 +638,7 @@ const usage = [
 interface CliArgs {
   readonly sources: readonly string[];
   readonly mode: PlaybotMode;
-  readonly brief: string;
+  readonly briefFile: string | undefined;
   readonly turns: number;
   readonly save: string | undefined;
   readonly local: string | undefined;
@@ -657,15 +659,15 @@ function requireMode(value: string | undefined): PlaybotMode {
 }
 
 function requireBrief(value: string | undefined): string {
-  if (value === undefined || value.trim() === '') throw new Error(`--brief wants the job to be done after it\n\n${usage}`);
+  if (value === undefined || value.trim() === '' || value.startsWith('-')) throw new Error(`--brief wants the file saying what is to be done after it\n\n${usage}`);
   return value;
 }
 
 // A brief is what a briefed run is for and is nothing to any other, so neither half of the pair is
 // allowed to go missing quietly: a run turned loose under a brief nobody reads is a wasted run.
-function requireBriefedPair(mode: PlaybotMode, brief: string): string {
-  if (modeSpec(mode).carriesBrief === (brief !== '')) return brief;
-  throw new Error(modeSpec(mode).carriesBrief ? `--mode ${mode} carries a brief and none was given: say what is to be done with --brief` : `--mode ${mode} carries no brief, and one was given. The mode that does is ${PLAYBOT_MODE_NAMES.filter((each) => modeSpec(each).carriesBrief).join(', ')}`);
+function requireBriefedPair(mode: PlaybotMode, briefFile: string | undefined): string | undefined {
+  if (modeSpec(mode).carriesBrief === (briefFile !== undefined)) return briefFile;
+  throw new Error(modeSpec(mode).carriesBrief ? `--mode ${mode} carries a brief and none was given: name the file saying what is to be done with --brief` : `--mode ${mode} carries no brief, and one was given. The mode that does is ${PLAYBOT_MODE_NAMES.filter((each) => modeSpec(each).carriesBrief).join(', ')}`);
 }
 
 function requireTurns(value: string | undefined): number {
@@ -686,7 +688,7 @@ function requireLocal(value: string | undefined): string {
 
 export function parseArgs(argv: readonly string[]): CliArgs {
   let mode: PlaybotMode = DEFAULT_MODE;
-  let brief = '';
+  let briefFile: string | undefined;
   let turns = DEFAULT_TURNS;
   let save: string | undefined;
   let local: string | undefined;
@@ -705,11 +707,11 @@ export function parseArgs(argv: readonly string[]): CliArgs {
       continue;
     }
     if (arg === '--brief') {
-      brief = requireBrief(argv[++i]);
+      briefFile = requireBrief(argv[++i]);
       continue;
     }
     if (arg.startsWith('--brief=')) {
-      brief = requireBrief(arg.slice('--brief='.length));
+      briefFile = requireBrief(arg.slice('--brief='.length));
       continue;
     }
     if (arg === '--turns') {
@@ -741,7 +743,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
     }
     sources.push(arg);
   }
-  return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, brief: requireBriefedPair(mode, brief), turns, save, local };
+  return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, briefFile: requireBriefedPair(mode, briefFile), turns, save, local };
 }
 
 // The one place a save id becomes a fixture: read off registry.saves the same way the # test
@@ -770,8 +772,10 @@ export function openSession(registry: Registry, save: string | undefined): Opene
 
 async function main(): Promise<void> {
   let args: CliArgs;
+  let brief: string;
   try {
     args = parseArgs(process.argv.slice(2));
+    brief = args.briefFile === undefined ? '' : readBrief('--brief', args.briefFile);
   } catch (error) {
     console.error((error as Error).message);
     process.exit(2);
@@ -797,7 +801,7 @@ async function main(): Promise<void> {
     read,
     client,
     mode: args.mode,
-    brief: args.brief,
+    brief,
     turns: args.turns,
     at,
     // The same wiring the terminal authors through, over the same reader the turn loop reloads

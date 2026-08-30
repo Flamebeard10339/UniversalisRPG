@@ -4,6 +4,7 @@ import path from 'node:path';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { CORPUS_DIR } from '../src/content/shipped';
+import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
 // scripts/authorbot.ts hands one brief to a coding agent and counts what it reached for. The
 // playbot beside it plays the world through the game's own command line; this one writes the
@@ -19,9 +20,8 @@ const usage = [
   'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--model <id>]',
   '       npm run authorbot -- --watch [<brief>]',
   '',
-  '  <brief>    the file saying what to write, named as a loose word or after --brief.',
-  '             A file rather than an argument: a brief that arrives as one line is',
-  '             indistinguishable from a brief that was one line',
+  '  <brief>    the file saying what to write, named as a loose word or after --brief;',
+  ...BRIEF_IS_A_FILE.map((line) => `             ${line}`),
   '  --target   the module under content/ the run may write, which is the only file it may',
   '             write anywhere. With none, the brief\'s own name: a brief at',
   '             planning/A Grand Blade.md writes a-grand-blade.dsl',
@@ -314,7 +314,7 @@ async function watch(brief: string | null): Promise<number> {
 }
 
 async function run(asked: Asked): Promise<number> {
-  const brief = readFileSync(asked.brief!, 'utf8');
+  const brief = readBrief('--brief', asked.brief!);
   const workdir = workdirFor(asked.brief!);
   if (existsSync(workdir)) rmSync(workdir, { recursive: true, force: true });
   mkdirSync(workdir, { recursive: true });
@@ -404,15 +404,13 @@ async function main(): Promise<void> {
     console.log(usage);
     return;
   }
-  let asked: Asked;
   try {
-    asked = parseArgs(argv);
+    const asked = parseArgs(argv);
+    process.exit(asked.watch ? await watch(asked.brief) : await run(asked));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(2);
-    return;
   }
-  process.exit(asked.watch ? await watch(asked.brief) : await run(asked));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) void main();
