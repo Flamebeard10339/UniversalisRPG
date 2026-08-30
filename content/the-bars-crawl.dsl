@@ -3,7 +3,7 @@
 // bones of a fish that will kill you if the meat is cooked wrong.
 //
 // The fish is this module's own — nothing in fishing.dsl has a poisonous one,
-// so `tulsa.raw-blowfish` and the water it comes out of are declared here and hung
+// so `raw-blowfish` and the water it comes out of are declared here and hung
 // off `tulsa.deep-water` the way `ball-of-a-boy.dsl` hangs an action off
 // `tulsa.larry`: take this module out and the deep water goes back to trout
 // and salmon only. The cast itself is copied from `cast for salmon` line for
@@ -37,10 +37,29 @@ dependencies:
 // reaches further than a net does," so the same requirement and the same
 // bait-spend as trout and salmon apply here without restating why.
 
+# item raw-blowfish
+title: Raw Blowfish
+examine: Spined all over and still swelling in your hands. Everything past the fillet is poison, and there is not much fillet.
+value: 4
 
+# entity blowfish-hole
+title: The Blowfish Hole
+examine: A slack backwater off the main current, and whatever lives in it does not have to swim fast to eat.
+cast for blowfish:
+  continuous
+  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
+  rate: 15
+  roll: spend-bait
+  one of:
+    fishing:
+      give: 1 raw-blowfish
+      xp: fishing 50
+    170x:
+      drain: 3 line-health
+      say: It comes up spined-side first and you let go of the line rather than the rod.
 
 # location tulsa.deep-water
-+entities: tulsa.blowfish-hole
++entities: blowfish-hole
 
 // The cook and the brew. Two recipes rather than one, because the meat is
 // finished the moment the poison is out of it and the bones are not dissolved
@@ -58,7 +77,7 @@ examine: Cloudy, faintly bitter, and it does not smell like anything that used t
 
 # recipe cleaned-blowfish
 station: stove
-in: tulsa.raw-blowfish
+in: raw-blowfish
 out: blowfish-bones
 burnt: burnt-food
 accuracy: cooking
@@ -175,7 +194,7 @@ travel: tavern-street
 travel: market-square
 travel: riverside
 travel: deep-water
-use: entity.tulsa.blowfish-hole.cast-for-blowfish until inventory.raw-blowfish >= 3
+use: entity.blowfish-hole.cast-for-blowfish until inventory.raw-blowfish >= 3
 assert: inventory.raw-blowfish >= 3
 travel: riverside
 travel: market-square
@@ -184,7 +203,7 @@ travel: sha-dynastys
 craft: cleaned-blowfish
 craft: cleaned-blowfish
 craft: cleaned-blowfish
-assert: not has tulsa.raw-blowfish
+assert: not has raw-blowfish
 assert: inventory.blowfish-bones >= 1
 assert: sunnys-brew.dissolving
 craft: blowfish-brew

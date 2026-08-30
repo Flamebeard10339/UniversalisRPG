@@ -57,7 +57,7 @@ stage sent-to-oolga:
 
 stage errands:
   log: Oolga has me carrying and fetching and will not say what any of it is for.
-  done when: tulsa.oolga-struck
+  done when: oolga-struck
   goto swamp-bound
   oolga says:
     always
@@ -118,6 +118,14 @@ stage settled:
 
 // --- flags this quest owns ---
 
+// Set when the player finally swings at Oolga, which is what ends the errands
+// stage. Hers to read, this quest's to name.
+# flag oolga-struck
+
+// One count over the three herbs, so the finds buried past the patch arrive in
+// order however the player picks them.
+# flag herbs-collected
+
 // --- what this quest owes the world ---
 
 // Oolga hands out the loop, and reacts to being hit. She carries no evasion
@@ -145,43 +153,59 @@ when hit:
 pick thistle:
   time: 4
   if not has marsh-thistle:
-    add: tulsa.herbs-collected 1
-    if tulsa.herbs-collected = 1:
+    add: herbs-collected 1
+    if herbs-collected = 1:
       say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if tulsa.herbs-collected = 2:
+    if herbs-collected = 2:
       say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if tulsa.herbs-collected = 3:
+    if herbs-collected = 3:
       say: Something surges up out of the mud before your hand closes round the thistle — not a rat, though it was one once, and not a toad either.
   give: 1 marsh-thistle
   say: You take the head off a marsh thistle.
 pull root:
   time: 6
   if not has fen-root:
-    add: tulsa.herbs-collected 1
-    if tulsa.herbs-collected = 1:
+    add: herbs-collected 1
+    if herbs-collected = 1:
       say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if tulsa.herbs-collected = 2:
+    if herbs-collected = 2:
       say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if tulsa.herbs-collected = 3:
+    if herbs-collected = 3:
       say: Something surges up out of the mud before your hand closes round the root — not a rat, though it was one once, and not a toad either.
   give: 1 fen-root
   say: The root comes out of the mud with a sound you would rather not have heard.
 take the leaf:
   time: 12
   if not has adders-tongue:
-    add: tulsa.herbs-collected 1
-    if tulsa.herbs-collected = 1:
+    add: herbs-collected 1
+    if herbs-collected = 1:
       say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if tulsa.herbs-collected = 2:
+    if herbs-collected = 2:
       say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if tulsa.herbs-collected = 3:
+    if herbs-collected = 3:
       say: Something surges up out of the mud before your hand closes round the leaf — not a rat, though it was one once, and not a toad either.
   give: 1 adders-tongue
   say: One split leaf, taken whole.
 
+// A ratkin experiment, standing in the mire until the third herb is in the
+// pack. Aggressive, so it does the ambushing itself the moment it is no
+// longer hidden; fleeing is a plain `travel:` back to the marsh gate, the same
+// as leaving any other room something aggressive stands in.
+# entity rat-toad
+title: Rat-Toad
+examine: A rat's shape gone wrong in a toad's skin — too many teeth, and none of either animal's reasons to run from you.
+stats: attack 22, defense 6, max-health 80, attack-rate 22, accuracy 85, evasion 40
+uses: core.melee-combat
+faction: world
+aggressive
+hidden if: not herbs-collected >= 3
+respawn after: 10m
+on death:
+  credit:
+    roll: ratman-remains
 
 # location tulsa.swamp-mire
-+entities: tulsa.rat-toad
++entities: rat-toad
 
 // --- tests ---
 
@@ -216,8 +240,8 @@ choose: What needs doing now?
 talk: oolga
 choose: oolgas-errands.errands.oolga.0.said
 choose: What needs doing now?
-use: melee-combat on oolga until tulsa.oolga-struck
-assert: tulsa.oolga-struck
+use: melee-combat on oolga until oolga-struck
+assert: oolga-struck
 talk: oolga
 choose: oolgas-errands.swamp-bound.oolga.0.said
 choose: continue
@@ -228,7 +252,7 @@ travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pull-root
 assert: has fen-root
-assert: tulsa.herbs-collected = 1
+assert: herbs-collected = 1
 // Leaving and coming back between herbs is load-bearing and not tidy pacing:
 // bog lurkers stand in this mire, arriving buys one quiet beat, and the first
 // pull spends it — so a second herb started without going out and back in is
@@ -238,15 +262,15 @@ travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pick-thistle
 assert: has marsh-thistle
-assert: tulsa.herbs-collected = 2
+assert: herbs-collected = 2
 unkillable
 instant-kill
 travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.take-the-leaf
 assert: has adders-tongue
-assert: tulsa.herbs-collected = 3
-use: melee-combat on tulsa.rat-toad until done
+assert: herbs-collected = 3
+use: melee-combat on rat-toad until done
 assert: not fainted
 travel: swamp-edge
 travel: market-square

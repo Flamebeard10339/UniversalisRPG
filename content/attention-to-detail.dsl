@@ -28,7 +28,7 @@ log: Somebody in town pays for what can be learned about the duke, and the castl
 
 stage offered:
   log: The reporter wants whatever the duke's windows show. The market rooftops face them square on.
-  tulsa.reporter says:
+  reporter says:
     always
     ask: You're the one who climbs.
     Word's out that you go where you're not asked and nobody's caught you at it yet. I write for the broadsheet, and I've been trying to get something on the duke for a year. He hears everything and says nothing back, which is exactly the kind of man worth reading the mail of.
@@ -38,16 +38,16 @@ stage offered:
 
 stage watching:
   log: The reporter wants whatever the duke's windows show. The rooftops over the market face them square on, and being seen up there is the whole risk of it.
-  done when: tulsa.overheard-the-captain
+  done when: overheard-the-captain
   goto reporting
-  tulsa.reporter says:
-    when: not tulsa.overheard-the-captain
+  reporter says:
+    when: not overheard-the-captain
     ask: About the duke, still.
     again: Nothing yet? Keep at it. A man who leaves his shutters open on purpose is a man who wants to be read.
 
 stage reporting:
   log: I saw the guard captain climb to the duke's solar, and heard enough through the shutters to be worth something.
-  tulsa.reporter says:
+  reporter says:
     always
     ask: I've got something for you.
     You get a look on you when you've actually got something. Out with it, before you talk yourself out of it.
@@ -60,10 +60,25 @@ stage reporting:
 stage paid:
   log: The reporter has what they wanted off the duke's windows, and paid for it without asking how I got it.
   complete
-  tulsa.reporter says:
+  reporter says:
     always
     ask: About the duke, one more time.
     again: I've got what I needed off that one. Find me something else if you want the coin again.
+
+// --- flags this quest owns ---
+
+// Set the first time the watch on the rooftops pays off, which is the whole of
+// what the reporter is buying.
+# flag overheard-the-captain
+
+// --- what this quest owns ---
+
+// Nobody but this quest wanted a stranger with a notebook, so the reporter is
+// declared here and stood on Market Row by the line below.
+# entity reporter
+title: The Reporter
+faction: world
+examine: A stranger with a notebook, keeping half an eye on the castle and half on you.
 
 // --- what this quest owes the world ---
 
@@ -72,7 +87,7 @@ stage paid:
 // road from the climb up to the rooftops, which is the whole reason to loiter
 // there rather than in the square.
 # location tulsa.market-row
-+entities: tulsa.reporter
++entities: reporter
 
 // The watch itself is tulsa's, and this quest's business is only what it is
 // worth seeing from up there and what it costs to be caught looking — but a
@@ -88,12 +103,12 @@ stage paid:
 // grammar; `npm run notes` carries the rest of what it says.
 # location tulsa.market-rooftops
 watch the castle windows:
-  hidden if: tulsa.overheard-the-captain
+  hidden if: overheard-the-captain
   time: 8
   say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against.
   one of:
     thieving.thieving:
-      set: tulsa.overheard-the-captain
+      set: overheard-the-captain
       xp: thieving.thieving 40
       say: The captain crosses the yard below and takes the stairs to the solar without being announced. The shutters are open for her. "Not yet," the duke says, plain enough to carry. "Not until the last of them is finished." The shutters swing to before you hear finished what.
     100x:
@@ -127,15 +142,15 @@ value: 45
 # test attention-to-detail-start-to-finish
 lock-pools
 load: at-market-row
-talk: tulsa.reporter
+talk: reporter
 choose: I'll take a look.
 assert: watching-the-duke.watching
 travel: market-rooftops
 use: location.market-rooftops.watch-the-castle-windows
-assert: tulsa.overheard-the-captain
+assert: overheard-the-captain
 assert: watching-the-duke.reporting
 travel: market-row
-talk: tulsa.reporter
+talk: reporter
 choose: continue
 assert: watching-the-duke.paid
 assert: inventory.core.coin >= 40

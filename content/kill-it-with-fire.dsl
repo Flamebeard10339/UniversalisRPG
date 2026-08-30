@@ -2,13 +2,13 @@
 // Oolga wants her basement cleared without a rat killed, and what the repellent
 // draws instead is worse than what it drives off.
 //
-// The module is the quest and nothing else. The sacks in the cellar, the wurm
-// under it, the princess bee at the apiary, the poison and the recipe for it
-// are all tulsa's, because they are things standing in tulsa's rooms: take this
-// module out and the cellar still has something in the corner worth poisoning.
-// A second body laid over `# location tulsa.oolga-basement` from here would say
-// the same thing and does not survive being printed back, since the merged room
-// prints under tulsa and tulsa does not depend on this module.
+// The sacks in the cellar, the wurm under it, the princess bee at the apiary,
+// the poison and the recipe for it are all tulsa's, because they are things
+// standing in tulsa's rooms whatever this quest does: take this module out and
+// the cellar still has something in the corner worth poisoning. The rats are
+// this quest's own — nobody but Oolga ever asked for a rat to be left alive —
+// so they are declared here and stood in her cellar by a line written from
+// here over `# location tulsa.oolga-basement`.
 //
 // Reward is 1500 cooking xp and, on paper, "access to Oolga's potion shop" —
 // the shop itself is not written here. The grammar `npm run oracle -- shop
@@ -88,14 +88,14 @@ stage groundwurm-fight:
     when: wurm-defeated
     ask: It's dealt with.
     So that's what was keeping the rats off.
-    {tulsa.cellar-rats-killed = 0: You didn't kill a one of them, which is more sense than I gave you credit for — and a great deal less than whatever bred that thing under my floor deserves.}{tulsa.cellar-rats-killed >= 1: You went through a few of mine on the way to it, though. I count what is eating out of my sacks, and there is less eating out of them tonight than there was this morning. Don't tell me they were in the way. Everything is in somebody's way.}
-    "Repellent." She says the word like it has done something to personally annoy her. Chase off the small thing and something bigger fills the gap it left. That's not a recipe. That's how the whole world works, and I'd have thought somebody your age would know it by now.{tulsa.cellar-rats-killed >= 1:  And a cellar you empty with a blade fills again by spring, with whatever is nearest. You have dug me the same hole twice and noticed it the once.}
+    {cellar-rats-killed = 0: You didn't kill a one of them, which is more sense than I gave you credit for — and a great deal less than whatever bred that thing under my floor deserves.}{cellar-rats-killed >= 1: You went through a few of mine on the way to it, though. I count what is eating out of my sacks, and there is less eating out of them tonight than there was this morning. Don't tell me they were in the way. Everything is in somebody's way.}
+    "Repellent." She says the word like it has done something to personally annoy her. Chase off the small thing and something bigger fills the gap it left. That's not a recipe. That's how the whole world works, and I'd have thought somebody your age would know it by now.{cellar-rats-killed >= 1:  And a cellar you empty with a blade fills again by spring, with whatever is nearest. You have dug me the same hole twice and noticed it the once.}
     Somebody wanted my rats gone badly enough to plant a worm under them for it. That is not chance, and it is not my business to chase either, at my age.
-    if tulsa.cellar-rats-killed = 0:
+    if cellar-rats-killed = 0:
       xp: cooking.cooking 1500
-    if tulsa.cellar-rats-killed >= 1:
+    if cellar-rats-killed >= 1:
       xp: cooking.cooking 500
-    {tulsa.cellar-rats-killed = 0: Go on, then. Shelves are behind me. You've more than paid for the look.}{tulsa.cellar-rats-killed >= 1: Shelves are behind me. You did the work and you'll have the look for it. You'll not have my good opinion along with it, and you can keep the tails.}
+    {cellar-rats-killed = 0: Go on, then. Shelves are behind me. You've more than paid for the look.}{cellar-rats-killed >= 1: Shelves are behind me. You did the work and you'll have the look for it. You'll not have my good opinion along with it, and you can keep the tails.}
     goto cellar-cleared
 
 stage cellar-cleared:
@@ -105,6 +105,36 @@ stage cellar-cleared:
     always
     ask: About my shelves.
     again: Same as I said. They're behind me, same as they always were.
+
+// --- flags this quest owns ---
+
+// One count over the rats under Oolga's floor, which is what her closing word
+// reads to know whether the player took the errand at its word.
+# flag cellar-rats-killed
+
+// --- what this quest owes the world ---
+
+// The rats under Oolga's floor, which are the only ones in town anybody has
+// asked to be left alive: same title, same examine and same numbers as a feral
+// rat anywhere else, and a separate id so that a death down there can be
+// counted without counting every rat in the sewers. They go the moment the
+// corners are slathered, which is what the repellent was for.
+# entity cellar-rat
+title: Feral Rat
+examine: A rat the size of a cat, hairless in patches and weeping where it is not.
+stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
+uses: core.melee-combat
+faction: world
+aggressive
+hidden if: tulsa.corners-slathered
+respawn after: 40s
+on death:
+  add: cellar-rats-killed 1
+  credit:
+    roll: tulsa.feral-rat-remains
+
+# location tulsa.oolga-basement
++entities: 4 cellar-rat
 
 // --- tests ---
 
@@ -154,7 +184,7 @@ assert: oolgas-basement.groundwurm-fight
 use: core.melee-combat on groundwurm until done
 assert: not core.fainted
 assert: wurm-defeated
-assert: tulsa.cellar-rats-killed = 0
+assert: cellar-rats-killed = 0
 travel: oolga-house
 talk: oolga
 choose: continue
@@ -186,8 +216,8 @@ craft: sunnys-poison
 travel: tavern-street
 travel: oolga-house
 travel: tulsa.oolga-basement
-use: core.melee-combat on tulsa.cellar-rat until done
-assert: tulsa.cellar-rats-killed >= 1
+use: core.melee-combat on cellar-rat until done
+assert: cellar-rats-killed >= 1
 use: entity.oolgas-sacks.slather-with-poison
 assert: corners-slathered
 use: core.melee-combat on groundwurm until done
