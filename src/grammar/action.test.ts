@@ -125,9 +125,10 @@ describe('contests', () => {
     }
   });
 
-  it('refuses a side-naming action with nothing to deplete', () => {
-    expect(assembledActionProblem(parse('accuracy: my accuracy vs their evasion'))).toContain('nothing to deplete is not a contest');
-    expect(parse('accuracy: my accuracy vs their evasion').accuracy).toBeDefined();
+  it('takes a side-naming action with nothing to deplete, which counts down a whole of its own', () => {
+    expect(assembledActionProblem(parse('accuracy: my accuracy vs their evasion'))).toBeUndefined();
+    expect(assembledActionProblem(parse('damage: my felling vs their hardness'))).toBeUndefined();
+    expect(parse('accuracy: my accuracy vs their evasion').depletes).toBeUndefined();
   });
 });
 
@@ -172,13 +173,13 @@ describe('how an action ends', () => {
 });
 
 describe('the table over an assembled action', () => {
-  it('applies the marker and depletes: rules to an action nobody authored a block for', () => {
+  it('applies the marker rules to an action nobody authored a block for', () => {
     const compiled: Action = {
       label: 'Craft Bread',
       results: [],
       damage: { left: { side: 'my', id: 'attack' } },
     };
-    expect(assembledActionProblem(compiled)).toContain('nothing to deplete is not a contest');
+    expect(assembledActionProblem(compiled)).toBeUndefined();
     expect(assembledActionProblem({ ...compiled, depletes: { id: 'health' } })).toContain('depletes: health names no side');
     expect(
       assembledActionProblem({

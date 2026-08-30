@@ -214,8 +214,8 @@ describe('a half-written line', () => {
   });
 
   it('lays a complaint about the whole section on the line the engine points at, and on no other', () => {
-    const said = amissIn('# action core.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion', KNOWN);
-    expect(refused(said).map((each) => [each.line, each.refused!.includes('nothing to deplete')])).toEqual([[1, true]]);
+    const said = amissIn('# action\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion', KNOWN);
+    expect(refused(said).map((each) => [each.line, each.refused!.includes('requires an id')])).toEqual([[1, true]]);
   });
 
   const CHAT = ['# dialogue core.chat', 'node greet:', '  A traveller, out here?', '  goto NODE'].join('\n');
