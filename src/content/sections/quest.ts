@@ -98,20 +98,30 @@ const all = (held: Condition[]): Condition | undefined => (held.length === 0 ? u
 
 const any = (held: Condition[]): Condition | undefined => (held.length === 0 ? undefined : held.length === 1 ? held[0] : { kind: 'or', conditions: held });
 
-// When a stage has been reached: its flag is set, or a stage that leads to it on its own is reached and its `done when:` holds. The first stage is reached from the outset, which is what makes a quest readable before anything of it has happened, and is written here as no condition at all.
-function reachedWhen(quest: Quest, at: number, held: Map<number, Condition | undefined>): Condition | undefined {
-  if (at === 0) return undefined;
-  if (held.has(at)) return held.get(at);
-  held.set(at, names(flagOf(quest, quest.stages[at]!.name)));
+// The ways a quest arrives at a stage without anything having written its flag down: a stage that leads to it on its own is reached, and its `done when:` holds.
+function byItself(quest: Quest, at: number, held: Map<number, Condition | undefined>): Condition[] {
   const stage = quest.stages[at]!;
-  const byItself = quest.stages.flatMap((each, from) => {
+  return quest.stages.flatMap((each, from) => {
     if (each.goto !== stage.name || each.doneWhen === undefined) return [];
     const before = reachedWhen(quest, from, held);
     return [all([...(before === undefined ? [] : [before]), each.doneWhen])!];
   });
-  const answer = any([names(flagOf(quest, stage.name)), ...byItself]);
+}
+
+// When a stage has been reached: its flag is set, or it was arrived at by itself. The first stage is reached from the outset, which is what makes a quest readable before anything of it has happened, and is written here as no condition at all.
+function reachedWhen(quest: Quest, at: number, held: Map<number, Condition | undefined>): Condition | undefined {
+  if (at === 0) return undefined;
+  if (held.has(at)) return held.get(at);
+  held.set(at, names(flagOf(quest, quest.stages[at]!.name)));
+  const answer = any([names(flagOf(quest, quest.stages[at]!.name)), ...byItself(quest, at, held)]);
   held.set(at, answer);
   return answer;
+}
+
+// The same rule, asked of the flag a stage mints rather than compiled into a dialogue, for whatever reads that flag off the world. The flag's own disjunct is left out because whoever asks has already read it: an answer holding it would be the question again.
+export function reachedByItself(quest: Quest, stage: string): Condition | undefined {
+  const at = quest.stages.findIndex((each) => each.name === stage);
+  return at <= 0 ? undefined : any(byItself(quest, at, new Map()));
 }
 
 // When a stage is the one the player is standing on: it has been reached, it is not done, and nothing further along has been reached either.

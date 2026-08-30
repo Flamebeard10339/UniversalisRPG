@@ -25,23 +25,11 @@
 // unchanged by it. What the quest actually delivers is the schematic, and the
 // son's own word that the anvil is his to share now.
 //
-// One more thing this draft found rather than asked for, worth the engine's
-// own attention: a `# quest` stage's `done when:` never picked up a flag or
-// an item given by an action added to a foreign entity — here,
-// `# entity tulsa.anvil` extended from this module. Isolated with a two-line
-// repro (an instant action on `tulsa.hask` that only sets a flag, and a
-// throwaway quest whose one stage reads `done when:` on that same flag): the
-// flag reads true off a plain `assert:` right after `use:`, but the stage
-// never advances, no matter how many further directives (`wait:`, `talk:`,
-// `journal:`) come after it. The identical shape against a *native* entity's
-// own action — `tulsa.oolgas-sacks` in `kill-it-with-fire.dsl`, `set:`
-// inside a `use:`-driven action, watched by `done when: corners-slathered` —
-// advances the quest correctly. This route does not lean on `done when:` at
-// all because of it: the stage below turns on a second
-// `tulsa.bladesmiths-son says:` block, gated on `when: has tulsa.smiths-notes` and
-// only read on the next `talk:`, which evaluates state fresh rather than
-// watching for a change to it, and that path works over the same
-// foreign-extended action without trouble.
+// No stage here reads a `done when:`, and that is the quest rather than the
+// engine: finding the notebook is not what finishes the search, handing it to
+// the son is. The stage turns on a second `tulsa.bladesmiths-son says:` block
+// gated on `when: has tulsa.smiths-notes`, which is where he takes the notes
+// off the player and gives the schematic back.
 
 # info a-grand-blade
 version: 0.1.0

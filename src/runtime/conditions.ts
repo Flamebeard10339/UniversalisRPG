@@ -1,6 +1,7 @@
 import { Condition, type EngineRoot, holds, isEngineRoot, printCondition, Reference, visitedNode } from '../grammar/condition';
 import { TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
+import { reachedByItself } from '../content/sections/quest';
 import { GameState, PLAYER_SHEET, type PlayerField } from './state';
 import { isSettingName, settingStands } from './settings';
 import { highestSkillLevel, skillLevel } from './skills';
@@ -31,12 +32,32 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   stat: (id, state, registry) => ({ value: statValue(id, state, registry) }),
 };
 
+// A quest stage's flag stands for having reached it, and a stage left by a `done when:` is reached without anything setting one, so the flag alone is not the answer. The quest owns the rule and is asked for it here.
+function questReach(path: string[], registry: Registry): Condition | undefined {
+  if (path.length < 2) return undefined;
+  const quest = registry.quests.get(path.slice(0, -1).join('.'));
+  return quest === undefined ? undefined : reachedByItself(quest, path[path.length - 1]!);
+}
+
+// A stage the quest arrives at by itself may be waiting on a stage of a quest waiting on this one, which is a circle rather than an answer, so the second time round it reads as its flag alone.
+const deriving = new Set<string>();
+
 export function answerReference(reference: Reference, state: GameState, registry: Registry): Answered {
   const { path } = reference;
   if (isEngineRoot(path)) return ROOTED[path[0] as EngineRoot](path.slice(1).join('.'), state, registry);
   const node = visitedNode(path);
   if (node) return { value: state.visits[node.join('.')] ?? 0 };
-  return { value: state.flags[path.join('.')] };
+  const key = path.join('.');
+  const flag = state.flags[key];
+  if (truthy(flag) || deriving.has(key)) return { value: flag };
+  const reach = questReach(path, registry);
+  if (reach === undefined) return { value: flag };
+  deriving.add(key);
+  try {
+    return { value: evaluateCondition(reach, state, registry) || flag };
+  } finally {
+    deriving.delete(key);
+  }
 }
 
 export function resolveReference(reference: Reference, state: GameState, registry: Registry): boolean | number | string | undefined {

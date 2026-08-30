@@ -133,7 +133,7 @@ assert: watching-the-duke.watching
 travel: market-rooftops
 use: location.market-rooftops.watch-the-castle-windows
 assert: tulsa.overheard-the-captain
-journal: watching-the-duke says I saw the guard captain climb to the duke's solar, and heard enough through the shutters to be worth something.
+assert: watching-the-duke.reporting
 travel: market-row
 talk: tulsa.reporter
 choose: continue

@@ -16,6 +16,36 @@ const MODULE =
 
 const registry: Registry = loadInEnglish(MODULE);
 
+// Two quests left by nothing but a `done when:`, and a third pair each of which waits on the other.
+const QUESTS =
+  FIXTURE_WORLD +
+  `
+# flag struck
+
+# quest errand
+stage asked:
+  done when: struck
+  goto run
+stage run:
+  complete
+
+# quest circle-one
+stage waiting:
+  done when: circle-two.arrived
+  goto arrived
+stage arrived:
+  complete
+
+# quest circle-two
+stage waiting:
+  done when: circle-one.arrived
+  goto arrived
+stage arrived:
+  complete
+`;
+
+const quests: Registry = loadInEnglish(QUESTS);
+
 function at(experience: number): GameState {
   const state = createGameState('camp');
   state.xp.mining = experience;
@@ -65,5 +95,27 @@ describe('highest-level is a bound on any one skill', () => {
   // gains after the condition was written is one the condition already counts.
   it('counts a skill the module asking about it never named', () => {
     expect(holds('highest-level >= 2', practised({ 'a-skill-written-next-month': xpForLevel(2) }))).toBe(true);
+  });
+});
+
+describe('a quest stage flag reads as the stage having been reached', () => {
+  const asks = (written: string, state: GameState): boolean => evaluateCondition(parseWhole(condition, written, 0, 'a condition'), state, quests);
+
+  it('reads the stage a done when: leaves for, with nothing having set its flag', () => {
+    const state = createGameState('camp');
+    expect(asks('errand.run', state)).toBe(false);
+    state.flags.struck = true;
+    expect(asks('errand.run', state)).toBe(true);
+    expect(state.flags['errand.run']).toBeUndefined();
+  });
+
+  it('still reads a flag really set, whatever the done when: says', () => {
+    const state = createGameState('camp');
+    state.flags['errand.run'] = true;
+    expect(asks('errand.run', state)).toBe(true);
+  });
+
+  it('reads two quests each waiting on the other as neither of them arriving', () => {
+    expect(asks('circle-one.arrived', createGameState('camp'))).toBe(false);
   });
 });

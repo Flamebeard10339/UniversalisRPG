@@ -186,10 +186,10 @@ craft: cleaned-blowfish
 craft: cleaned-blowfish
 assert: not has tulsa.raw-blowfish
 assert: inventory.blowfish-bones >= 1
-journal: sunnys-brew says The bones are clean. Sunny wants them dissolved down over a flame before she calls it a brew.
+assert: sunnys-brew.dissolving
 craft: blowfish-brew
 assert: has blowfish-brew
-journal: sunnys-brew says The brew is mixed. Sunny is behind her own bar, same as she always is.
+assert: sunnys-brew.deliver
 talk: sunny
 choose: sunnys-brew.deliver.sunny.0.said
 choose: Give her the bottle.
