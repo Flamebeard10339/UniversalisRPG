@@ -61,21 +61,30 @@ It comes out of `tulsa` and the quest owns it. The corpus route
 reasoning in the commit: a route may be rewritten because a quest superseded the path it
 walked, and this is the first time that has been ruled.
 
-The wide part, and the one that is actually the work: **two quests must be able to use one
-NPC in parallel.** Today a quest's `<entity> says:` takes the whole of that entity's
-dialogue for as long as its stage stands, so the second quest to reach her is silent. That
-is the only requirement he could name, and the narrow part is a special case of it.
+The wide part was **already true, and the line that said otherwise was wrong.** Two quests
+each opening a stage on one entity both stand, both are reachable, in either load order —
+built and walked on 2026-08-30. Miki already carries two quest threads at once in the shipped
+corpus, and breaking it reddens six routes in `integration.test.ts`. What gives way to a quest
+line is only the `always` fallback, which is what `always` means; an entity's own `ask:` and
+`when:` threads have always stood beside one. So the narrow part is not a workaround for a
+limitation, it is the ruling about where a preamble belongs — and a preamble that must survive
+a quest opening is written as a thread rather than as `always`.
 
-Measured on 2026-08-30, four ways, none of which is a way out: a distinct `ask:` does not
-help, since the takeover is not about the ask text; gating the quest block on
-`when: kelsa.the-third-hive.visits >= 1` never reads true, qualified or bare; stepping
-tulsa's route past the quest opening first walks in English and fails under
-`translationSurvival`.
+Two of the four earlier measurements do not survive either. `when: kelsa.the-third-hive.visits
+>= 1` **does** read true once the node is entered, bare or module-qualified, including entry by
+a `->` choice's `goto`; only `dialogue.kelsa.hive.visits` is refused, and it is refused at load
+with the node named. Whatever failed in the corpus was local to it.
 
-*Closes when:* a quest's line sits **beside** an entity's own threads and beside another
-quest's rather than replacing them — proved by two quests opening on one entity at once
-with both reachable, and by Kelsa's preamble living in `birds-and-the-bees` with tulsa's
-route rewritten to match.
+**The real defect was next to it and is fixed.** A quest names the node it hands over
+`<quest>.<stage>.<entity>.<n>.said`, so two quests on one entity differ only in the first
+segment, and every tail short enough to drop the quest fitted both — `choose:` took the first
+match silently. That recording passes in English and takes the *other* thread under
+`translationSurvival`, which is the failure that was originally read as a takeover. `choose:`
+now refuses a tail that fits more than one thread and names both, mirroring `Namespace.resolve`;
+`spellings` in `dialogue-runtime.ts` was a second copy of `namesSection` and is gone.
+
+*Closes when:* Kelsa's preamble lives in `birds-and-the-bees` and `tulsa`'s route is rewritten
+to match. The engine half is done and its proof home was already taken.
 
 ## A section written over another module's belongs to the module that wrote it
 
@@ -95,15 +104,29 @@ module, and print-back sends the body home to the file that declared it. A
 and gated on that quest's own stage, loads clean and round-trips clean into
 `the-swampy-menace.dsl`. `src/content/resolve.test.ts` holds the proof.
 
-**A `+<line>` patch does not do that yet, and it is what every one of the five pieces uses.**
-A patch body still folds into the module it patches on print-back, because the printer prints
-from the merged built value and the base module cannot print its pre-patch self. Measured, not
-reasoned: moving `raw-blowfish` and `blowfish-hole` into `the-bars-crawl` and rewriting
-`+entities:` to name `the-bars-crawl.blowfish-hole` loads clean and then fails the round trip
-with *`tulsa resolve: # location tulsa.deep-water entities: names the-bars-crawl.blowfish-hole,
-but the-bars-crawl is not this module or one of its dependencies`*. Keeping the id as
-`tulsa.blowfish-hole` while the body lives in the quest's file does not dodge it either:
-visibility follows the owner, not the address prefix.
+**The other half is the printer, and it is not the `+` line — it is the merged list.** A
+location's `entities:` prints under whichever module **declares the location**, so tulsa's
+serialization names ids tulsa cannot see, however the entity was contributed. Three lanes hit
+it independently on 2026-08-30 and the third pinned it, having tried every shape:
+
+| what was tried | what the round trip said |
+|---|---|
+| `+entities: 4 cellar-rat`, rat declared in the quest | `tulsa … names kill-it-with-fire.cellar-rat, but kill-it-with-fire is not this module or one of its dependencies` |
+| the whole `# location tulsa.oolga-basement` body restated from the quest | identical |
+| `# entity tulsa.cellar-rat` declared from the quest — the shape the ownership half fixed | `tulsa … names an unknown entity: tulsa.cellar-rat` |
+
+So the ownership half does not half-help here; it does not help at all, and the third row is it
+working exactly as advertised and failing for that very reason. The same fold was measured on
+`the-bars-crawl` — moving `raw-blowfish` and `blowfish-hole` out and naming them from
+`+entities:` loads clean and fails the round trip — and keeping the id as `tulsa.blowfish-hole`
+while the body lives in the quest's file does not dodge it either, because visibility follows
+the owner rather than the address prefix.
+
+**No quest module in the corpus puts its own entity into a tulsa room, because the engine
+forbids it.** `attention-to-detail`, `the-bars-crawl` and `the-swampy-menace` each dodge it the
+same way — `tulsa.reporter`, `tulsa.blowfish-hole`, `tulsa.rat-toad` — and that dodge is the
+whole of why the list below exists. The fix is one sentence: **a foreign contribution to a body
+should print back as a patch under the contributing module rather than folded into the owner's.**
 
 So the migration is blocked, and this is what it moves the day it is not — out of
 `content/tulsa.dsl`, each carrying the comment above it that says it is tulsa's *because* a
@@ -123,6 +146,26 @@ tulsa section may name nothing but tulsa's:
 Three flags stay put and are genuinely tulsa's under the ruling, because a second module needs
 each: `corners-slathered`, `wurm-defeated`, `sewer-toll-paid`. `ball-of-a-boy`'s two patches
 have nothing parked in tulsa to bring home.
+
+**A third thing waits on the same half, and its fix is already measured.** `# entity
+tulsa.herb-patch` in `the-swampy-menace.dsl` writes the same nine-line *count the herb and
+narrate the find* block three times, once per herb — one-home shape 5 inside `content/`. Finds
+1 and 2 are byte-identical across all three; find 3 differs by one noun. The corpus already
+owns the idiom for saying it once: a `# droptable` is a named result list whose body runs in
+full, and `fishing.spend-bait` says so in its own comment. Both placements were built and both
+fail the round trip for this line's reason — a table declared in `the-swampy-menace` is refused
+because tulsa cannot depend on it, and a `# droptable tulsa.herb-find` declared *from* that
+file loads and resolves but does not survive printing, since the herb-patch override folds back
+into tulsa's file and tulsa then names a table it cannot see. The one placement that
+round-trips green is the table living in `tulsa.dsl` — which is quest furniture pushed into
+tulsa, exactly what the ruling above refuses, and `herbs-collected` is already on the list of
+things coming *out*. So it waits.
+
+*Once the patch half lands:* the table goes to `the-swampy-menace`, each of the three actions
+keeps only its own `time:`, `give:` and `say:` with the block replaced by one `roll:`, and a
+fourth herb is five lines in the quest and nothing in the table. That last part needs find 3's
+one herb-specific noun rewritten to name no herb, which is a line of prose to draft rather than
+a decision to take.
 
 *Closes when:* the registry keeps each module's own contribution at an address rather than only
 the merge, so a patch body prints back into the module that wrote it; then the eight sections
@@ -290,3 +333,20 @@ spent replies 59 through 124 hand-building throwaway `DEBUG` sections, all of it
 the stage-transition defect below.
 
 *Closes when:* the three are written and merge with the suite green.
+
+## A line that is nothing but a conditional fragment prints as a blank line
+
+`{<condition>: <words>}` inside a `say:` is how one speech says different things on different
+paths. Measured on 2026-08-30, writing Oolga's two closings: a line whose **whole** content is
+one fragment renders as an **empty line** when the condition is false, rather than as nothing.
+The speech comes out with a hole in it.
+
+That run was the corpus's first use of fragments — there were none before it — so nothing had
+met this. It was worked around by pairing the two acknowledgements on one line and the two
+farewells on another, so that between them one always holds, and by hanging the one-sided
+clause off a sentence said either way. That is a real technique and it is also the sort of
+thing an author should be told rather than made to discover.
+
+*Closes when:* a line left empty by its fragments is dropped rather than printed, or
+`npm run oracle` says under the fragment entry that it will not be — derived from whatever the
+printer actually does, so the page cannot drift from it.
