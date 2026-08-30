@@ -159,7 +159,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, rea
   const node = speech.node;
   const stage = quest.stages[at]!;
   const gone = (target: string | undefined): ActionResult[] => (target === undefined ? [] : [reaching(quest, target)]);
-  // The first stage stands before anything has happened, so nothing has set its flag; speaking its lines is what starts the quest, and that is where the journal gets its first entry.
+  // Nothing has set the first stage's flag, so its own lines set it as they are spoken, which is where the journal gets its first entry.
   const opening = at === 0 ? [{ kind: 'effect' as const, result: reaching(quest, stage.name) }] : [];
   return {
     // The place in the stage as well as who says it: one stage may give one entity more than one thing to say — a line for arriving and a line for coming back with the bread — and two dialogues under one id would be one dialogue.
@@ -216,7 +216,7 @@ const stuckAt = (quest: Quest, at: number): string | undefined => {
 };
 
 // A stage is a name the rest of the world can ask about, and the flag it mints is the one `flagOf` mints, written out of it rather than beside it.
-const STAGE_NOTE = `a step of the quest, which declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\``;
+const STAGE_NOTE = `a step of the quest, which declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`. The first stage written stands from the outset and nothing has to start the quest — speaking a line under that stage is what begins it. A quest only ever moves on to a stage written after the one it stands on, so write the stages in the order they happen`;
 
 // Said where a stage writes more than one line for one mouth.
 const SAYS_NOTE = `what that entity says while the quest stands here; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
