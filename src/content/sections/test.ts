@@ -42,6 +42,24 @@ export const NOTE_FIELDS: readonly NoteField[] = [
 
 export type NoteName = NoteField['name'];
 
+// What a route may switch off while it walks, and what each one says of itself where the grammar is
+// printed. Every one of them is a word on its own line, a flag on the run from that line to the end
+// of it, and one place in the engine that reads it — so a fourth is this line and that place, and
+// nothing between here and there has to be told about it. They are debug tools: a route reaching for
+// none of them is the ordinary case, and one that reaches for all three is asking about its path and
+// nothing else.
+export const DEBUG_SWITCHES = {
+  'lock-pools': "every pool of the player's stands where it is: what would have come off one comes off nothing, and what fills one still fills it",
+  unkillable: "no pool of the player's is ever spent: it can be worn down to the last of it and no further, so nothing that empties one ends the run",
+  'instant-kill': "a blow of the player's lands rather than missing, and empties whatever it lands on",
+} as const;
+
+export type DebugSwitch = keyof typeof DEBUG_SWITCHES;
+
+export const DEBUG_SWITCH_NAMES = Object.keys(DEBUG_SWITCHES) as DebugSwitch[];
+
+const DEBUG_NOTE = 'a debug switch: it stands from here to the end of the run, and says what the route is not asking about';
+
 export type Directive =
   | { kind: 'run'; test: string }
   | { kind: 'talk'; entity: string }
@@ -81,7 +99,7 @@ export type Directive =
   | { kind: 'until'; inner: Directive; until: Terminator }
   | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'setting'; setting: string; value: string }
-  | { kind: 'godmode' }
+  | { kind: 'debug'; which: DebugSwitch }
   | { kind: 'submit-modal'; key: string; value: string }
   | { kind: 'note'; field: NoteName; text: string }
   | { kind: 'refused' }
@@ -138,7 +156,7 @@ const EXPECT = new RegExp(`^expect:[ \\t]*(?<id>${PATH})$`);
 const EXPECT_ONLY = new RegExp(`^expect only:[ \\t]*(?<id>${PATH})$`);
 const LOAD = new RegExp(`^load:[ \\t]*(?<id>${PATH})$`);
 const SETTING = /^setting:[ 	]*(?<setting>[a-z][a-z0-9-]*)[ 	]+(?<value>[a-z0-9][a-z0-9-]*)$/;
-const GODMODE = /^godmode$/;
+const DEBUG = new RegExp(`^(?<which>${DEBUG_SWITCH_NAMES.join('|')})$`);
 const CANCEL = /^cancel$/;
 const NOTE = new RegExp(`^(?<field>${NOTE_FIELDS.map((field) => field.name).join('|')}):[ \\t]*(?<text>.*)$`);
 const REFUSED = /^refused$/;
@@ -347,7 +365,8 @@ export function parseDirectiveLine(text: string): Directive | null {
   const setting = SETTING.exec(text)?.groups;
   if (setting) return { kind: 'setting', setting: setting.setting, value: setting.value };
 
-  if (GODMODE.test(text)) return { kind: 'godmode' };
+  const switched = DEBUG.exec(text)?.groups;
+  if (switched) return { kind: 'debug', which: switched.which as DebugSwitch };
 
   if (CANCEL.test(text)) return { kind: 'cancel' };
 
@@ -442,8 +461,8 @@ export function printDirective(value: Directive): string {
       return `load: ${value.save}`;
     case 'setting':
       return `setting: ${value.setting} ${value.value}`;
-    case 'godmode':
-      return 'godmode';
+    case 'debug':
+      return value.which;
     case 'cancel':
       return 'cancel';
     case 'wait':
@@ -542,11 +561,7 @@ export const test = section<Test>()({
     { form: 'expect only: <save>', example: 'expect only: after-intro' },
     { form: 'load: <save>', example: 'load: after-intro' },
     { form: 'setting: <setting> <value>', example: 'setting: hardcore on', note: 'plays the rest of the run by that preference, as the settings page and /settings do — a claim about what a setting changes starts by writing it' },
-    {
-      form: 'godmode',
-      example: 'godmode',
-      note: 'from this line on nothing comes off the player and one blow of theirs fells whatever they strike — for a route whose question is whether its path is walkable and not what the fights along it cost. An action that fells nothing is untouched, and loading a save does not put it back',
-    },
+    ...DEBUG_SWITCH_NAMES.map((name) => ({ form: name, example: name, note: `${DEBUG_SWITCHES[name]} — ${DEBUG_NOTE}` })),
     { form: 'cancel', example: 'cancel' },
     { form: 'wait: <seconds>', example: 'wait: 1' },
     { form: 'wait: done', example: 'wait: done', note: 'stands until whatever is under way has finished, rather than a number of seconds guessed large enough to cover it' },
@@ -698,7 +713,7 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'page':
     case 'unequip':
     case 'setting':
-    case 'godmode':
+    case 'debug':
     case 'open-modal':
     case 'submit-modal':
     case 'choose':

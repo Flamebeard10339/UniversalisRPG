@@ -22,7 +22,7 @@ import { isSettingName, isSettingSheet, standingChoice, standingSettings, type S
 // Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 13;
 
-export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'godmode'>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'debug'>;
 
 export type SaveDiff = Partial<Pick<GameState, SaveField>>;
 

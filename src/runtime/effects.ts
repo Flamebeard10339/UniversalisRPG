@@ -19,7 +19,7 @@ import { nextRandom } from './rng';
 import { armedAction } from './roster';
 import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
-import { GameState, PLAYER } from './state';
+import { debugging, GameState, PLAYER } from './state';
 import { hitChance, statValue } from './stats';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
@@ -465,20 +465,25 @@ export const spendable = (level: number): number => level - SPENT_BELOW + 1;
 export const isSpent = (level: number): boolean => spendable(level) <= 0;
 
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
-  // A blow, a hook, a drain and a rate all come to rest here, so a run walked godlike says once that
-  // nothing of the player's ever falls, and every way it could is covered. A max that has dropped out
-  // from under a full pool still brings it down: that is the pool shrinking, not something taking it.
-  if (segment.state.godmode && store.actorId === PLAYER && raw < current) {
+  // A blow, a hook, a drain and a rate all come to rest here, so both switches that hold a pool of
+  // the player's up are read here and nowhere else, and every way one could fall is covered by
+  // saying it once. `lock-pools` holds it where it stands — a max that has dropped out from under a
+  // full pool still brings it down, because that is the pool shrinking rather than something taking
+  // from it. `unkillable` lets it be worn down to the last of it and no further, so nothing of
+  // theirs is ever spent and nothing bound to one emptying is ever reached.
+  const mine = store.actorId === PLAYER;
+  if (mine && debugging(segment.state, 'lock-pools') && raw < current) {
     store.levels[resource.id] = Math.min(current, max);
     return 'clamped';
   }
+  const floor = mine && debugging(segment.state, 'unkillable') ? SPENT_BELOW : 0;
   if (raw > current && max > 0 && eventsFor(segment.registry, resource.id, 'on full').length > 0) {
     const fires = Math.floor(raw / max);
     store.levels[resource.id] = raw - fires * max;
     if (fires > 0) fireEvents(segment, store.actorId, 'on full', resource.id, fires);
     return 'stored';
   }
-  const clamped = Math.min(max, Math.max(0, raw));
+  const clamped = Math.min(max, Math.max(floor, raw));
   store.levels[resource.id] = clamped;
   if (raw < current && !isSpent(current) && isSpent(clamped)) fireEvents(segment, store.actorId, 'on empty', resource.id);
   return clamped === raw ? 'stored' : 'clamped';

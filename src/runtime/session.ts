@@ -520,7 +520,7 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   const next = createGameState('', internals.state.language);
   // Carried over the way the language is: both are the sitting's word about how this run is being
   // read and walked, and neither is anything the world it loads has an opinion about.
-  next.godmode = internals.state.godmode;
+  next.debug = internals.state.debug;
   const warnings = loadSave(next, saved, registry);
   standWhereTheyAre(next, registry);
   standable(registry, next);
@@ -755,7 +755,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'unequip':
     case 'swap':
     case 'setting':
-    case 'godmode':
+    case 'debug':
     case 'slot':
     case 'allocate':
     case 'unallocate':
@@ -954,8 +954,8 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       state.settings = chosenSetting(state.settings, directive.setting, choice);
       return {};
     }
-    case 'godmode':
-      state.godmode = true;
+    case 'debug':
+      state.debug = { ...state.debug, [directive.which]: true };
       return {};
     case 'slot':
     case 'allocate':

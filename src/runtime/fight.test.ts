@@ -7,6 +7,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { logSwing } from './encounter';
+import { isSpent } from './effects';
 import { declaredId } from '../content/sections/entity';
 import { localizerOf } from './localized';
 import { isPopulations } from './population';
@@ -890,11 +891,11 @@ describe('the next one is found rather than already standing there', () => {
   });
 });
 
-describe('a route walked godlike', () => {
-  it('leaves nothing to come off the player, whatever lands on them', () => {
+describe('the debug switches a route may walk under', () => {
+  it('lock-pools leaves nothing to come off the player, whatever lands on them', () => {
     const registry = loaded();
     const state = standing(registry, 'fen');
-    state.godmode = true;
+    state.debug = { 'lock-pools': true };
 
     resolve(state, registry, secondsToMs(1));
 
@@ -902,10 +903,22 @@ describe('a route walked godlike', () => {
     expect(state.resources['health']).toBe(toMilliUnits(1000));
   });
 
-  it('empties whatever the player strikes, with the first blow', () => {
+  it('unkillable wears the player down to the last of it and no further', () => {
+    const registry = loaded();
+    const state = standing(registry, 'fen');
+    state.debug = { unkillable: true };
+    state.resources = { ...state.resources, health: toMilliUnits(5) };
+
+    resolve(state, registry, secondsToMs(1));
+
+    expect(state.resources['health'], 'the blows landed').toBeLessThan(toMilliUnits(5));
+    expect(isSpent(state.resources['health']), 'and there was still something there when they were done').toBe(false);
+  });
+
+  it('instant-kill empties whatever the player strikes, with the first blow', () => {
     const registry = loaded();
     const state = standing(registry, 'camp');
-    state.godmode = true;
+    state.debug = { 'instant-kill': true };
     armFightAction('swing', 'ogre', registry, state);
 
     resolve(state, registry, secondsToMs(1));

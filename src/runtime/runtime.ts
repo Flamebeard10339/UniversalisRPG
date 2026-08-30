@@ -40,7 +40,7 @@ import { BASE_LANGUAGE, Localized, localizerFor, localizerOf } from './localized
 import { nextRandom } from './rng';
 import { roadsFrom, routeTo } from './journey';
 import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs';
-import { type ActiveAction, advanceTime, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, templateOf } from './state';
+import { type ActiveAction, advanceTime, debugging, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, templateOf } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, stalledPace, statValue } from './stats';
 import { engagementDelay } from './tuning';
 import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
@@ -259,15 +259,15 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   const half = (field: { side?: 'my' | 'their'; id: string } | undefined, read: typeof statValue, fallback: number): number =>
     field === undefined ? fallback : read(field.id, state, registry, sideOf(field, self, other));
 
-  // A blow of the player's under godmode: it lands, and it takes everything the thing it lands on has.
-  // Read off who is struck rather than off who swings, so an action that depletes the player's own
-  // pool is left to the pool itself to refuse and two foes going at each other are left alone.
+  // A blow of the player's under `instant-kill`: it lands, and it takes everything the thing it lands
+  // on has. Read off who is struck rather than off who swings, so an action that depletes the
+  // player's own pool is left alone and so are two foes going at each other.
   const struck = action.depletes ? sideOf(action.depletes, self, other) : null;
-  const godlike = state.godmode && self === PLAYER && struck !== null && struck !== PLAYER;
+  const felling = self === PLAYER && struck !== null && struck !== PLAYER && debugging(state, 'instant-kill');
 
-  const hit = godlike || action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
+  const hit = felling || action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
 
-  const dealt = !hit ? null : godlike ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry);
+  const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry);
   if (dealt !== null) damageTarget(state, registry, action, self, other, dealt, segment.deltas);
   if (action.depletes) {
     logSwing(state, registry, self, other, dealt);

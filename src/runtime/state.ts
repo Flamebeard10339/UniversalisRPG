@@ -3,6 +3,7 @@ import { standingSettings, type SettingSheet } from './settings';
 import type { TagClause } from '../grammar/tagClause';
 import { RuntimeError } from './error';
 import type { EngineKey } from '../content/locale';
+import type { DebugSwitch } from '../content/sections/test';
 import type { Answer, Localized } from './localized';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
 import type { Said } from './said';
@@ -133,10 +134,9 @@ export interface GameState extends RngCursor {
   // felling something both push it forward, so a room is quiet for a beat before the next thing
   // finds you. Not saved: a world picked up again is one you have just walked back into.
   engagesAt: number;
-  // Whether the run is being walked rather than played: nothing comes off the player's pools and one
-  // blow of theirs empties whatever it lands on. Not saved and not cleared by loading one — a route
-  // asks to be walked this way once, and everything after that line is walked that way.
-  godmode: boolean;
+  // Which of the debug switches this route asked for. Not saved and not cleared by loading one: a
+  // route says the word once, and everything after it is walked that way.
+  debug: DebugSheet;
   activeAction: ActiveAction | null;
   journey: Journey | null;
   readonly buffs: BuffTable;
@@ -168,6 +168,12 @@ export type PlayerSheet = Record<PlayerField, string>;
 
 export const PLAYER_FIELDS = Object.keys(PLAYER_SHEET) as PlayerField[];
 
+// The switches a run has been asked to walk under. Sparse: a switch nobody asked for is a key that
+// is not there, so the standing run says nothing about debugging at all.
+export type DebugSheet = Partial<Record<DebugSwitch, true>>;
+
+export const debugging = (state: GameState, which: DebugSwitch): boolean => state.debug[which] === true;
+
 export function emptyPlayerSheet(): PlayerSheet {
   const sheet = {} as PlayerSheet;
   for (const field of PLAYER_FIELDS) sheet[field] = '';
@@ -175,7 +181,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, godmode: false, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

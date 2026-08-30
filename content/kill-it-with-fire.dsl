@@ -99,9 +99,10 @@ stage cellar-cleared:
 // on anything this quest says. An axe because it is carried as a stack and
 // needs no instance written by hand.
 //
-// Nothing else, and no experience: the route below walks godlike, so what level
-// lives through the cellar is not what it is asking. What the wurm should cost
-// is a balance question and is answered by running the world, not from here.
+// Nothing else, and no experience: the route below walks unkillable and strikes
+// to kill, so what level lives through the cellar is not what it is asking.
+// What the wurm should cost is a balance question and is answered by running
+// the world, not from here.
 # save sent-out-for-oolga
 {"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1,"core.royal-jelly":1,"core.mollusk-venom":1}}
 
@@ -110,7 +111,8 @@ stage cellar-cleared:
 // own stove, the sacks in Oolga's cellar take the poison, the thing it draws
 // is put down, and Oolga has the truth out of the player.
 # test kill-it-with-fire-start-to-finish
-godmode
+unkillable
+instant-kill
 load: sent-out-for-oolga
 equip: core.hand-axe
 travel: tavern-street
