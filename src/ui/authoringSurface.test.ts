@@ -113,7 +113,7 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
     expect(offeredBy(addressed, NOWHERE, 'global').length).toBe(offeredBy(addressed, GUIDE_HOUSE, 'global').length + local.length - 1);
   });
 
-  it('shadows a shipped section with the copy staged over it, rather than offering both', () => {
+  it('offers the body the last source wrote at an address, not the one it was written over', () => {
     const staged = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\n\n# location ${ELSEWHERE}\nx: 4, y: 0\n` };
     const withLocal = addressable([...SHIPPED_SOURCES, staged]);
     const shadowing = withLocal.filter((section) => section.address === ELSEWHERE);

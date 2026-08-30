@@ -1,6 +1,5 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { sameSection } from '../content/namespace';
-import { declaredKey } from '../content/resolve';
 import { addressedSections, HEADING_KIND, oneNewline, type WrittenModule } from '../content/sectionSource';
 import type { ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
@@ -51,21 +50,13 @@ export function sectionsIn(source: ModuleSource): Section[] {
 
 const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
 
-// One address is one thing to edit, and more than one module may write at it: the module that owns
-// the id declares it, and any other module writing there is adding to what it declared. The
-// declaring body is the one an author drags, types over and reads, so it is the one kept — asked of
-// the loader's own rule about which module an id belongs to rather than of the order the sources
-// happen to arrive in.
-const declares = (section: Section): boolean => (declaredKey(section.module, section.kind, section.address) ?? section.address) === section.address;
-
+// One address is one thing to edit, and more than one module may write at it. The body an author
+// drags, types over and reads is the one the last source wrote there, which is the same answer the
+// loader gives a player: load order decides, and a module controls where it lands by what it
+// depends on.
 export function addressable(sources: readonly ModuleSource[]): Section[] {
   const held = new Map<string, Section>();
-  for (const source of sources) {
-    for (const section of sectionsIn(source)) {
-      const standing = held.get(keyOf(section));
-      if (standing === undefined || declares(section)) held.set(keyOf(section), section);
-    }
-  }
+  for (const source of sources) for (const section of sectionsIn(source)) held.set(keyOf(section), section);
   return [...held.values()];
 }
 
