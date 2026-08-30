@@ -40,6 +40,10 @@ dependencies:
 
 # flag sewer-toll-paid
 
+# flag corners-slathered
+
+# flag wurm-defeated
+
 // --- items ---
 
 # item bottle-of-vodka
@@ -200,7 +204,7 @@ adjacent:
   oolga-house
   sewer-junction
 entities:
-  4 feral-rat, broken-wall
+  4 feral-rat, broken-wall, oolgas-sacks, groundwurm
 
 // --- the castle, at the top of the town ---
 
@@ -485,7 +489,7 @@ adjacent:
   bee-gate
   hive-mouth
 entities:
-  5 drone-bee, first-hive, second-hive
+  5 drone-bee, first-hive, second-hive, princess-bee
 
 # location hive-mouth
 x: 10, y: 4
@@ -1286,7 +1290,62 @@ on line-parted:
   restore: fishing.line-health
   roll: fishing.parted-tackle
 
+// The corner of the cellar the examine text already points at — "something
+// has been at the sacks in the corner" is tulsa.dsl's own line, and this is
+// what that something was doing there.
+# entity oolgas-sacks
+title: The Sacks
+examine: Feed sacks stacked in the corner, gnawed through in a dozen places, and a smell coming off them that is not doing Oolga any favours.
+slather with poison:
+  requires: has sunnys-poison
+  hidden if: corners-slathered
+  time: 6
+  take: 1 sunnys-poison
+  set: corners-slathered
+  say: You work the poison into every corner the rats have been at, thick as paint. For a moment the scrabbling in the walls stops dead, which is everything Sunny promised.
+  say: Then something a great deal larger than a rat starts moving in the earth behind the wall, and it is not leaving the way it came.
+
+// What the poison actually draws. Bigger than anything else written for this
+// basement, and it does not respawn — killed once is killed for good, which is
+// the whole of what "dealt with" means to Oolga.
+# entity groundwurm
+title: Groundwurm
+examine: A ridge of packed earth moving under the cellar floor, and something pale and segmented shouldering up through the middle of it.
+hidden if: not corners-slathered
+stats: attack 18-22, defense 5, max-health 80, attack-rate 16, accuracy 85, evasion 10
+uses: core.melee-combat
+faction: world
+aggressive
+on death:
+  set: wurm-defeated
+  say: The ground stops moving, and the cellar is quiet in a way it has not been since you came down here.
+
+// A princess bee is a fight rather than a harvest, unlike the two ordinary
+// hives at the front of the property — which is the whole reason Sunny sends
+// the player after this one and not after a slab of honeycomb.
+# entity princess-bee
+title: Princess Bee
+examine: Half again the size of a drone and it does not buzz so much as hum, a note that sits wrong in your teeth.
+stats: attack 10-14, defense 2, max-health 40, attack-rate 28, accuracy 75, evasion 55
+uses: core.melee-combat
+faction: world
+aggressive
+respawn after: 5m
+on death:
+  credit:
+    give: 1 royal-jelly
+
 // --- recipes ---
+
+// What Sunny mixes for Oolga's rats, over any stove in town rather than her own
+// — the bar is where the asking happens and not where the work has to be done.
+# recipe sunnys-poison
+station: stove
+in: royal-jelly, mollusk-venom, bottle-of-vodka
+out: sunnys-poison
+skill: cooking.cooking 2
+time: 4
+say: You mix the jelly, the venom and the vodka together over the heat. What comes off it is worse than any one of the three on its own, which is rather the point.
 
 // --- dialogue ---
 //
@@ -1550,6 +1609,13 @@ node over-the-barrel:
 DEBUG
 step-through:
   drain: 1000 core.health
+
+// The stuff itself. Sunny mixes it in her own bar and it works exactly as
+// advertised — rats want nothing to do with it. What it draws instead is not
+// hers to have known about.
+# item sunnys-poison
+title: Sunny's "Poison"
+examine: A jar of royal jelly, mollusk venom and good vodka, mixed until it stops smelling like any of the three. Nothing sane would go near it.
 
 // Every shape a holding takes: a stack, two things standing alone, a rolled
 // blade in a row of its own, and a second blade on the arm rather than in the
