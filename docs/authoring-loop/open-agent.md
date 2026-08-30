@@ -28,6 +28,169 @@ and is the one place that rule is written.
 
 ---
 
+## Oolga's cellar rats are counted rather than protected
+
+Ruling on 2026-08-30: there are no hard failure states in this game, only alternate paths.
+*Kill it with Fire* completes when the player does what Oolga asked; **how** they did it
+picks the dialogue and the reward. Her one condition — clear the cellar and leave every rat
+breathing — is not a fail gate, it is a branch.
+
+The shape he named: the cellar's rats carry an id of their own, with the same title as
+`tulsa.feral-rat`, and the quest counts kills of that id. Zero kills is the clean path and
+she says so; anything above zero is the other path, and she says that instead and pays
+differently.
+
+Measured on 2026-08-29 and still true: the route that walks the quest end to end kills four
+of them — the melee action takes whatever in the room is aggressive, and the cellar's four
+feral rats are aggressive — and it ends holding eight rat pelts, after which she
+congratulates the player for not killing one.
+
+*Closes when:* the cellar holds its own rat id, both branches of her closing are written,
+and a route walks each — one that kills none and one that kills some — with the reward
+differing between them. If nothing in the language counts kills of an id, that is the
+finding and it is measured before anything is invented.
+
+## Two quests may want one NPC at once, and one of them takes her whole conversation
+
+Ruling on 2026-08-30, in two parts.
+
+The narrow part: Kelsa's own `blunt` node in `tulsa` — the one that says *if you are here
+about the bees, say so* — is a preamble to the quest and is **meant** to be replaced by it.
+It comes out of `tulsa` and the quest owns it. The corpus route
+`tulsa.kelsa-takes-the-answer-she-asks-for` walked that node, so it is rewritten with the
+reasoning in the commit: a route may be rewritten because a quest superseded the path it
+walked, and this is the first time that has been ruled.
+
+The wide part, and the one that is actually the work: **two quests must be able to use one
+NPC in parallel.** Today a quest's `<entity> says:` takes the whole of that entity's
+dialogue for as long as its stage stands, so the second quest to reach her is silent. That
+is the only requirement he could name, and the narrow part is a special case of it.
+
+Measured on 2026-08-30, four ways, none of which is a way out: a distinct `ask:` does not
+help, since the takeover is not about the ask text; gating the quest block on
+`when: kelsa.the-third-hive.visits >= 1` never reads true, qualified or bare; stepping
+tulsa's route past the quest opening first walks in English and fails under
+`translationSurvival`.
+
+*Closes when:* a quest's line sits **beside** an entity's own threads and beside another
+quest's rather than replacing them — proved by two quests opening on one entity at once
+with both reachable, and by Kelsa's preamble living in `birds-and-the-bees` with tulsa's
+route rewritten to match.
+
+## A section written over another module's belongs to the module that wrote it
+
+Ruling on 2026-08-30: the id rule is a **defect**, not the design. All of a quest's flags
+are named inside the quest. Loading `tulsa` alone must read as if no quest touches it —
+strangely empty, with no hint of one. An entity or item leaves a quest module only when a
+*second* module needs it, and then it goes to the shared module both use. Tulsa is not a
+dummy: it is the skilling location, and skilling tasks genuinely belong there. If it reads
+bare, that is a real measurement — there are not enough skilling tasks in the city — and
+not a reason to push quest furniture into it.
+
+What is wrong today, found on 2026-08-30 when the first pass's five modules were merged: a
+`# entity tulsa.oolga`, a `# location tulsa.deep-water` or a `# dialogue tulsa.guardsman`
+written from a quest may name **nothing** of the quest's own. The corpus loads either way;
+only printing it and reading it back says so, which is why no authoring run could see it and
+why all five hit it. Under that rule the four merged quests pushed five pieces into `tulsa`
+— the bladesmith's notebook, the reporter, the mire's rat-toad, the blowfish and its hole —
+plus three flags, and it cost three guard lines that could not follow it, marked `@@@` in
+`the-swampy-menace.dsl` and listed by `npm run notes`.
+
+*Closes when:* an overriding section carries the id namespace of the module that wrote it
+through print-and-reload, the five pieces and three flags come back out of `tulsa` into the
+quests that declared them, and the three `@@@` guards in `the-swampy-menace.dsl` are written
+as the guards they wanted to be. The proof is print-back: the module that declared a body is
+the module that gets it back.
+
+## A fishing water is never used up, and fishing must not drift from combat
+
+Ruling on 2026-08-30: **water cannot be depleted.** Engine changes are bypassed for now by
+giving a water an instant respawn, so nothing is ever felled. And the load-bearing half:
+fishing must not drift from combat, because that is a one-home violation — *"fishing should
+be just like `# action melee-combat`, just for fishing."*
+
+What stands in the way, measured: `src/grammar/action.ts:315` refuses a side-naming action
+that declares no `depletes:`, so `accuracy: my fishing vs their depth` is rejected at load.
+Adding `depletes:` loads, and a measured minute of netting then recorded the shoal felled by
+the first fish and not coming back — which the instant respawn answers — plus
+`combat.attack: 2` banked per landed cast, which it does not. That second one is what
+`content/fishing.dsl`'s own header exists to refuse, and it could not be scoped away:
+`damage-dealt` takes no `resource:` and the arity check refuses one.
+
+Four duplicated casts are what not having this costs: one action per water.
+
+*Closes when:* the four casts are one action over four waters, no water is ever felled, and
+no cast trains an arm. If the last of those cannot be had without touching the grammar, the
+lane says so with the measurement rather than shipping a cast that pays combat xp — the
+ruling bypasses engine work, it does not license the leak.
+
+## A stalled run holds where it stopped, because the rate went to zero and not the bar
+
+Ruling on 2026-08-30: being caught pickpocketing is a **timed debuff that takes the thieving
+rate to 0**. The resource stalls wherever it had got to — halfway is halfway — and there is
+no flag for it. The published fraction reading `0` while a run is stalled is the defect, and
+the `stalled` flag a lane published beside it so a renderer could draw the bar stopped is the
+thing that goes.
+
+*Closes when:* the stall is a rate taken to zero by an ordinary timed debuff, the published
+fraction holds the value it stalled on, the `stalled` flag is gone from the view, and a test
+drives a caught hand and reads a held fraction rather than a zero.
+
+## Miki offers another net to a player who has none
+
+Ruling on 2026-08-30: **no exemptions** — the lent net is a regular net and parts like one.
+Miki simply offers another when the player is holding none.
+
+What is wrong today: `on line-parted:` takes the tackle when `line-health` empties, and
+Miki's `again:` line — the one a player gets on every talk after the offer — points at the
+net already in their pack. A player whose net has parted is told to use a thing they no
+longer hold. Remote rather than theoretical: the shrimp shoal drains 1 line-health per miss
+against the 6 the small net grants, so it takes a run of misses; the window is still an exit,
+so it is a false line rather than a softlock.
+
+*Closes when:* Miki's `again:` branches on whether the player holds a net and hands over
+another when they do not, and a route parts the net and takes the replacement.
+
+## Load order decides, and the tie-break that says otherwise goes
+
+Ruling on 2026-08-30: **load order determines everything.** Any other heuristic breaks under
+real conditions, and mods already control load order through their dependencies.
+
+`addressable`'s `declares` tie-break says in its own comment that when two modules write a
+section at one address the **declaring** module's body is kept. Measured while the naming
+rule was being folded into one place: **533 of 533 shipped sections take the true branch**,
+so it never decides anything and the behaviour already reduces to *last source wins*. It is a
+comment claiming a rule the code does not enforce.
+
+*Closes when:* the tie-break and its comment are deleted, last-source-wins is what the code
+says and what a renamed test names, and the shadowing rule that lets a staged edit override a
+shipped section still works — which it should, since a staged edit is loaded last, and the
+lane proves that rather than assuming it.
+
+## A quest may have starting requirements, and one of them the grammar cannot say
+
+Ruling on 2026-08-30, and it closes one question by dismissing it: **Miki's quest does not
+stop any other quest from starting.** So `leave-tutorial-island.adrift` picking up while
+`finding-your-feet` is mid-lesson is not a bug, no gate is added, and the words already
+repaired — the dismissal and the "last word" journal line gone, with
+`first-steps.the-town-is-found-before-the-lesson-is-over` proving both threads stand together
+— are the whole of the answer. The route `the-apology-survives-going-out-of-the-window`
+stays as it is.
+
+What he opened in the same breath is the real line: **quests should have starting
+requirements** — other quests, level requirements, and so on. Other quests they already have;
+`adrift` is gated on `tulsa.market-square.touched`. Level requirements they do not, and the
+corpus has asked twice: Miki's own offer wanted *"reach level 2 in any skill"* and got a
+plain item check instead, and the `@@@` on
+`dialogue.first-steps.finding-your-feet.apologised.miki.0.said.line.0` records the refusal —
+the condition grammar takes a flag optionally compared to a number and `has`/`not`/`and`/`or`
+over items and flags, and has no skill-level or xp predicate at all. No `# event` fires on
+levelling either.
+
+*Closes when:* a quest's start condition can name a skill level, the `@@@` on Miki's offer
+comes out because the thing it asked for is now sayable, and `npm run oracle` prints the
+predicate under the condition grammar without anyone listing it there.
+
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a
@@ -168,8 +331,7 @@ corpus carries the shape. The first is the smaller change and does not wait on c
 Plague Matters, Reverse Infiltration and The Rat Conspiracy. They are last because each
 waits on another: The Rat Conspiracy on Birds and the Bees, Reverse Infiltration on that
 and The Swampy Menace, Plague Matters on Reverse Infiltration. So they are written one
-wave at a time, each merged before the next starts, and the first of them is blocked
-behind the Kelsa ruling in `open-human.md`.
+wave at a time, each merged before the next starts.
 
 Five ran in parallel on 2026-08-30, one brief each, Sonnet 5, engine off limits:
 
@@ -242,4 +404,3 @@ a module of a different name.
 *Closes when:* a run refuses, or at least says out loud, that its brief arrived as a single line
 when the operator passed a file — or the brief is passed as a file rather than as an argument, which
 removes the shape of the trap rather than reporting it.
-
