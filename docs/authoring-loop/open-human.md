@@ -23,6 +23,26 @@ directions.
 
 ---
 
+## Oolga's one condition is the only thing she asks and nothing enforces it
+
+*Kill it with Fire* turns on her saying it: clear my cellar of rats and have every
+one of them still breathing when you are done. Nothing in the quest reads whether a
+rat died, and the route that walks it end to end kills four of them — the melee
+action takes whatever in the room is aggressive, and the cellar's four feral rats
+are aggressive. She then congratulates the player for not killing one.
+
+The mechanism to hold her to it exists: the rats are `tulsa.feral-rat`, and a stage
+can ask any condition. What is missing is the ruling. Failing the quest on a dead
+rat is a hard failure state this game has none of yet; letting it stand makes her
+closing line a lie in the common case; counting the kills and having her say a
+different thing is a third quest's worth of writing.
+
+Measured on 2026-08-29 by walking the route: it ends holding eight rat pelts.
+
+*Moves on a ruling on what a broken promise costs a player here. Any of the three
+is a lane's work once it is named; guessing between them is the one thing that
+cannot be done, since it is the quest's whole point.*
+
 ## Six quests stand in the journal that nobody can begin
 
 A new game's journal now lists eight quests, six of them stubs that nothing starts:
