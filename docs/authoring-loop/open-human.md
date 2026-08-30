@@ -43,22 +43,15 @@ Measured on 2026-08-29 by walking the route: it ends holding eight rat pelts.
 is a lane's work once it is named; guessing between them is the one thing that
 cannot be done, since it is the quest's whole point.*
 
-## Six quests stand in the journal that nobody can begin
+## One quest stands in the journal that nobody can begin
 
-A new game's journal now lists eight quests, six of them stubs that nothing starts:
-
-    unstarted  A Grand Blade — The forge in the market row is cold, and the young
-               smith at it does not look like a man who chose the work.
-    unstarted  Attention to Detail — Somebody in town pays for what can be learned…
-    unstarted  Ball of a Boy — There is a boy hunched over the sewer grate…
-    unstarted  Birds and the Bees — Kelsa's bees have turned on anything…
-    unstarted  Kill it with Fire — Grandma Oolga keeps her shelves behind her…
-    unstarted  The Swampy Menace — The guard captain has been asking after me…
+A new game's journal lists eight quests. Seven are written through to their last
+beat; `birds-and-the-bees` is the one stub left, and nothing starts it.
 
 That is the journal working as written — `listedToPlayer` filters only `DEBUG`, and
 its own comment says a journal listing only what has been started would be a list of
-what the player already knows. So six hooks on turn one is either the quest board
-doing its job or six dead ends, and which one it is is a call about the game.
+what the player already knows. So one dead hook on turn one is either the quest board
+doing its job or one dead end, and which one it is is a call about the game.
 
 The mechanism is not free either way. Holding a stub back means `DEBUG`, and a
 `DEBUG` section says nothing in any language, so it never reaches the locale that
@@ -69,24 +62,57 @@ it. Measured both ways on 2026-08-25.
 be held back, that is engine work a lane can take: some way for a section to ship
 its prose to `npm run notes` without shipping the quest to the journal.*
 
-## Four of the ten quest notes have no module, and nothing says which is written first
+## Whether a quest may take an NPC's conversation for the whole of a stage
 
-Six of the ten notes in `.planning/planning_quests/` became modules because Tulsa
-held a `@@@` naming them. Plague Matters, Reverse Infiltration, The Bar's Crawl and
-The Rat Conspiracy held none, so nothing moved for them and they have no file.
+`birds-and-the-bees` is written and walks its own route end to end, and it is not in
+the corpus. Its first stage puts an opening on Kelsa, and a quest's `<entity> says:`
+takes the **whole** of that entity's dialogue for as long as its stage stands — so
+tulsa's own `blunt` node, the one that says *if you are here about the bees, say so*,
+stops being reachable from a fresh game and `tulsa.kelsa-takes-the-answer-she-asks-for`
+stops walking.
 
-The ordering that used to sit here — the town finished first, then quests one by one
-— was overturned on 2026-08-25: *"the whole premise is wrong. We already have a
-quest."* First Steps is that quest and is now its own module. What the town still
-owes is in `open-agent.md` and is unchanged; it is no longer a gate on writing a
-quest.
+Measured on 2026-08-30, four ways. Giving the quest thread its own distinct `ask:`
+does not help — the takeover is not about the ask text. Gating the quest block on
+`when: kelsa.the-third-hive.visits >= 1` makes tulsa's route walk again and the quest
+unreachable: that condition never reads true, qualified or bare. Stepping tulsa's route
+past the quest's opening first makes both walk in English and fails under
+`translationSurvival`. The written module is not in the tree; it is rebuilt for about $4 by handing its brief
+back to `npm run authorbot`, which is cheaper than carrying it.
 
-The notes are uneven, which is why this waits. Ball of a Boy and Kill it with Fire
-are written through to their last beat; Attention to Detail is two lines and Plague
-Matters is a heading with seven empty numbers under it.
+Three shapes, and choosing between them is the ruling: a quest's line may sit
+**beside** an entity's own threads rather than replacing them; or tulsa's `blunt`
+stops being `always sticky` and yields; or Kelsa's stranger conversation is **meant**
+to disappear once she has hired someone, and tulsa's route is what is wrong.
 
-*Moves on naming the quest to author first, and on whether the four unstubbed notes
-get modules now or when they are levelled enough to author from.*
+*Moves on which of those three is the game. All three are a lane's work once named;
+the third also means ruling that a corpus route may be rewritten because a quest
+superseded the path it walked, which nothing here has done before.*
+
+## Whether a section written over another module's may name its own module's ids
+
+Nine of them, found on 2026-08-30 when the first pass's five modules were merged. A
+`# entity tulsa.oolga`, a `# location tulsa.deep-water` or a `# dialogue tulsa.guardsman`
+written from a quest may name **nothing** of the quest's own — not a flag, not an item,
+not an entity, not another quest's stage. The corpus loads either way; only printing it
+and reading it back says so, which is why no authoring run could see it and why all five
+hit it.
+
+The corpus already answers it one way: ball-of-a-boy's own comment says the toll flag is
+tulsa's, *set here because nothing else sets it*, and `corners-slathered` and
+`wurm-defeated` are kill-it-with-fire's flags declared in tulsa for the same reason. So
+the four merged quests were made to follow it — tulsa now holds the bladesmith's
+notebook, the reporter, the mire's rat-toad, the blowfish and its hole, and three flags.
+That cost three guard lines that could not follow it, marked `@@@` in
+`the-swampy-menace.dsl` and listed by `npm run notes`.
+
+The other way is that this is a printer defect: an overriding section belongs to the
+module that wrote it, and print-back is what loses that. Every quest wants its own
+monster in a shipped room, so the rule as it stands means the town file grows a section
+per quest and a quest cannot be lifted out cleanly.
+
+*Moves on a ruling on which of the two it is. If the rule stands it wants writing where
+an author meets it — nothing the oracle prints says it. If it is a defect, the fix is a
+lane's, and the five pieces pushed into tulsa come back to their own modules.*
 
 ## Whether the view may declare two paths aliases of one fact
 

@@ -163,6 +163,77 @@ Half of that was the id rule, which is fixed. What is left is that the shape has
 only the line — or a module that ought to be reaching into another one is written that way, so the
 corpus carries the shape. The first is the smaller change and does not wait on content.
 
+## Three of the ten quest notes still have no module, and what one costs is measured
+
+Plague Matters, Reverse Infiltration and The Rat Conspiracy. They are last because each
+waits on another: The Rat Conspiracy on Birds and the Bees, Reverse Infiltration on that
+and The Swampy Menace, Plague Matters on Reverse Infiltration. So they are written one
+wave at a time, each merged before the next starts, and the first of them is blocked
+behind the Kelsa ruling in `open-human.md`.
+
+Five ran in parallel on 2026-08-30, one brief each, Sonnet 5, engine off limits:
+
+| quest | wall | replies | out tok | cost | reaches for the engine |
+|---|---|---|---|---|---|
+| birds-and-the-bees | 16.3 min | 91 | 69,549 | $3.77 | 0 |
+| attention-to-detail | 17.4 min | 126 | 82,829 | $4.64 | 0 |
+| the-bars-crawl | 20.3 min | 120 | 92,014 | $4.31 | 0 |
+| the-swampy-menace | 25.6 min | 154 | 120,603 | $6.97 | 0 |
+| a-grand-blade | 22.7 min | 179 | 106,799 | $8.80 | 0 |
+| | **25.6 min wall** | 670 | | **$28.49** | **0** |
+
+**Not one of the five reached for the engine.** Every question all five had was answered
+by `npm run oracle` or by the corpus, which is the first time that has been true — and it
+is the measurement the harness exists to take.
+
+The spread is the finding. a-grand-blade cost two and a half times birds-and-the-bees and
+spent replies 59 through 124 hand-building throwaway `DEBUG` sections, all of it against
+the stage-transition defect below.
+
+*Closes when:* the three are written and merge with the suite green.
+
+## A stage does not leave on a flag an action set, and five runs lost time to it
+
+All five runs hit it independently and none could see why. `done when: <flag>` does not
+fire when the flag is set by an action, and `assert: <quest>.<stage>` immediately after
+reads stale — while a plain `assert: <flag>` on the same line reads true. The transition
+is correctly in effect a few directives later, once the route has travelled or talked.
+
+Four triggers were named: a `set:` inside a `one of:` branch, a `craft:`, an entity's
+`on death:`, and a location's `.touched`. The swampy run reduced it furthest and against a
+bare universe — `core` + `combat` + `tulsa`, none of its own module loaded — to *two
+differently-named actions on the same entity back to back silently drop the second
+action's `give:`*, cleared reliably by leaving the room and returning. The a-grand-blade
+run reduced it to a two-line repro and reported the narrower shape: a `done when:` never
+picks up a flag set by an action added to a **foreign** entity, while the identical shape
+against a native entity's own action advances correctly.
+
+Every one of the five wrote a workaround into its route rather than a fix, so the corpus
+now carries four different ways of stepping around the same thing.
+
+*Closes when:* the repro is run against the engine and the transition either fires when
+the flag is set or the oracle says plainly when it does not — and the four workarounds
+come back out of the routes.
+
+## An authoring run says nothing until it is over, and nothing shorter than this launches it
+
+The harness prints each tool call as it happens, but a run redirected to a log is silent
+for twenty-five minutes and there is no way to watch one. Five in parallel meant polling
+the log files by hand to tell a run that was working from a run that was stuck — which is
+how the a-grand-blade debug loop went unnoticed for sixty replies.
+
+The command is also this, every time:
+
+    npm run authorbot -- --brief <path>/<quest>.md --target <quest>.dsl --turns 150
+
+`--brief` and `--target` are the same word twice, `--turns 150` was needed by three of the
+five runs and the default is 80. There is a case for the flexibility — a brief and the
+module it writes are not always the same name — so this is not simply a flag to delete.
+
+*Closes when:* a run can be watched while it runs, and the common shape of the invocation
+is one word rather than three flags — without taking away the ability to point a brief at
+a module of a different name.
+
 ## Two traps that cost a run each, written down so they do not cost a third
 
 - **`npx` on Windows truncates a multi-line argument at its first newline and silently drops every argument after it.** A briefed run was launched with `--brief "$(cat brief.txt)" --save … --local … --turns 100`; `parseArgs` received five arguments, not nine. The bot ran with a one-paragraph brief, no `--save`, and staged into the shipped corpus. Nothing said so. **Use `node --import tsx scripts/playbot.ts`.**
