@@ -19,6 +19,11 @@ function identifies(pattern: unknown, candidate: unknown): boolean {
   return Object.entries(pattern).every(([key, value]) => identifies(value, (candidate as Fields)[key]));
 }
 
+// A run of list edits laid on whatever the field already holds. Over a body holding the list, the two
+// are resolved and the field becomes the list; over another run of edits — a patch written over a
+// patch — there is no list here to resolve against, so the two runs are said as one and stay edits.
+export const laidOver = (held: unknown, edits: FieldEdits): unknown => (isFieldEdits(held) ? composeEdits(held, edits) : applyEdits(held, edits));
+
 export function applyEdits(held: unknown, edits: FieldEdits): unknown[] {
   let values = Array.isArray(held) ? [...held] : [];
   for (const { op, values: operands } of edits.ops) {
@@ -65,7 +70,7 @@ export function mergeFields(into: Fields, from: Fields, schema: AnySchema): Fiel
   const merged = { ...into };
   for (const [key, value] of Object.entries(from)) {
     if (key === entries) merged[key] = mergeEntries((into[key] as Labelled[]) ?? [], value as Labelled[]);
-    else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = applyEdits(into[key], value);
+    else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = laidOver(into[key], value);
     else if (value !== undefined) merged[key] = value;
   }
   for (const key of clearedBy(schema, Object.keys(from).filter((key) => from[key] !== undefined))) delete merged[key];

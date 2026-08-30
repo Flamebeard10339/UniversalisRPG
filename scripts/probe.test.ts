@@ -159,9 +159,15 @@ describe('probe: --round-trip', () => {
   });
 
   it('asks the per-module question under --round-trip=module, and reports what publishing one alone would lose', () => {
-    const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true, roundTripMode: 'module' });
+    const result = report([BASE, patch('# remove item.base.bread')], { show: [], roundTrip: true, roundTripMode: 'module' });
     expect(result.ok).toBe(false);
-    expect(result.lines.join('\n')).toContain('items: changed base.bread');
+    expect(result.lines.join('\n')).toContain('items: added base.bread');
+  });
+
+  it('carries a body written over another module through publication, since that body goes home to whoever wrote it', () => {
+    const result = report([BASE, patch('# item base.bread', 'title: Toast')], { show: [], roundTrip: true, roundTripMode: 'module' });
+    expect(result.ok).toBe(true);
+    expect(result.lines.join('\n')).toContain('round-trips clean on its own');
   });
 
   it('does not blame the serializer for a source with no # info, in module mode either', () => {

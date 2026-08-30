@@ -65,7 +65,7 @@ describe('a body written at another module address belongs to whoever wrote it',
     expect(back.get('town')).not.toContain('owl');
   });
 
-  it('leaves a section it only adds to standing where it was declared, so a patch is still a patch', () => {
+  it('leaves the id where it was declared, and sends the addition home as the addition it is', () => {
     const dressing = errand('# location town.square', '+entities: town.dog');
     const registry = loadUniverse([TOWN, dressing]);
     expect(registry.namespace.ownerOf('location', 'town.square')).toBe('town');
@@ -73,7 +73,21 @@ describe('a body written at another module address belongs to whoever wrote it',
 
     const back = printed(TOWN, dressing);
     expect(back.get('town')).toContain('# location square');
-    expect(back.get('errand')).not.toContain('# location');
+    expect(back.get('town')).not.toContain('entities:');
+    expect(back.get('errand')).toContain('# location town.square\n+entities: town.dog');
+  });
+
+  // The whole of why an addition goes home rather than folding into the body it adds to: a room in
+  // the town file may name nothing but the town's, so a quest that stands its own creature in one
+  // has nowhere to print if its line is folded in there.
+  it('lets a body stand its own entity in another module room', () => {
+    const dressing = errand('# entity toad', 'title: Toad', 'examine: A toad.', '# location town.square', '+entities: toad');
+    const registry = loadUniverse([TOWN, dressing]);
+    expect(registry.locations.get('town.square')!.entities).toEqual([{ entity: 'errand.toad' }]);
+
+    const back = printed(TOWN, dressing);
+    expect(back.get('errand')).toContain('# location town.square\n+entities: errand.toad');
+    expect(back.get('town')).not.toContain('toad');
   });
 });
 

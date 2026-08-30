@@ -375,6 +375,10 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   const value = held[name];
   if (value === undefined) return [];
   if (spec.generated && !context.authored(name)) return [];
+  // A body that only adds to and takes from the list already there holds the run of edits rather than
+  // a list, and is written back as the run: resolving it would need the list, which is in another
+  // module's file and is exactly what this body is not saying.
+  if (isFieldEdits(value)) return writeEdits(schema, name, value);
 
   const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
   const positional = isPositionalField(schema, name);

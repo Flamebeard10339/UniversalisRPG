@@ -13,6 +13,17 @@ export interface Registry extends SectionMaps {
   namespace: Namespace;
   locales: Locales;
   roads: ReadonlyMap<string, readonly Edge[]>;
+  contributions: ReadonlyMap<string, readonly Contribution[]>;
+}
+
+// One module's own writing at one address, as the author wrote it rather than as the merge of every
+// module that wrote there. A registry map says what the world is; this says who wrote which part of
+// it, which is what lets a body go home to the file that wrote it rather than to the file that
+// happened to declare the id.
+export interface Contribution {
+  kind: string;
+  id: string;
+  value: object;
 }
 
 export function startingLocationId(registry: Registry): string | undefined {

@@ -16,7 +16,7 @@ import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
 import { ACTION_MEMBER, memberKey, namesSection, Namespace } from './namespace';
 import { isOwnedKind } from './sections';
-import { emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
+import { Contribution, emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
 import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
@@ -33,6 +33,7 @@ function emptyRegistry(): Registry {
     namespace: new Namespace(),
     locales: emptyLocales(),
     roads: new Map(),
+    contributions: new Map(),
   };
 }
 
@@ -269,6 +270,27 @@ class DanglingReference extends Error {}
 
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
 
+// A module writing twice at one address has written one thing, so what it contributed is the two laid
+// over each other — the world's own merge, run over one module's writing alone.
+function contribute(contributions: Map<string, readonly Contribution[]>, module: string, kind: string, id: string, value: object): void {
+  const written = [...(contributions.get(module) ?? [])];
+  const at = written.findIndex((each) => each.kind === kind && each.id === id);
+  // The first writing is kept as it was written rather than merged into an empty body: a body that
+  // only adds to a list is saying so about a list in another module's file, and merging it into
+  // nothing would resolve the addition into a list of its own and lose what it was.
+  const laid = { kind, id, value: at === -1 ? value : mergeSection(kind, written[at]!.value, value) };
+  if (at === -1) written.push(laid);
+  else written[at] = laid;
+  contributions.set(module, written);
+}
+
+// A section nothing holds any more is a section nobody wrote: whoever contributed to it has nothing
+// left to print, so it leaves every module's writing along with the value itself.
+function forgetContribution(held: ReadonlyMap<string, readonly Contribution[]>, kind: string, id: string): void {
+  const contributions = held as Map<string, readonly Contribution[]>;
+  for (const [module, written] of contributions) contributions.set(module, written.filter((each) => each.kind !== kind || each.id !== id));
+}
+
 function sectionOwner(owners: ReadonlyMap<string, ParsedModule>, kind: string, id: string): ParsedModule | undefined {
   return owners.get(ownerKey(kind, id));
 }
@@ -319,6 +341,7 @@ function validateActionTable(kind: string, id: string, owner: ActionOwner): void
 function dropContent(registry: Registry, kind: string, id: string, pruned: Set<string>): void {
   for (const name of Object.keys(sectionFor(kind)?.maps ?? {})) mapOf(registry, name).delete(id);
   registry.namespace.undeclare(kind, id);
+  forgetContribution(registry.contributions, kind, id);
   pruned.add(ownerKey(kind, id));
 }
 
@@ -672,6 +695,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
   const registry = emptyRegistry();
 
   const merged = new Map<SectionKind, Map<string, OwnedSection>>();
+  const contributions = new Map<string, readonly Contribution[]>();
   const declaredMembers = new Map<string, Member[]>();
   const owners = new Map<string, ParsedModule>();
   const namespace = registry.namespace;
@@ -701,6 +725,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
             const { kind, target, id } = section.value as Removal;
             if (!owns(kind)) continue;
             if (!isSectionKind(kind) || !merged.get(kind)?.delete(target)) throw new DslError(`# remove ${id} names nothing that is loaded`);
+            forgetContribution(contributions, kind, target);
             owners.delete(ownerKey(kind, target));
             namespace.undeclare(kind, target);
             continue;
@@ -714,6 +739,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
             value: mergeSection(section.kind, byId.get(id)?.value, section.value),
             module,
           });
+          contribute(contributions, module.info.id, section.kind, id, section.value);
           owners.set(ownerKey(section.kind, id), module);
           merged.set(section.kind, byId);
           const declared = declaredMembers.get(ownerKey(section.kind, id)) ?? [];
@@ -730,6 +756,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
 
   const mergeFailure = mergePass(() => true);
   if (mergeFailure) return { failure: mergeFailure };
+  registry.contributions = contributions;
   reconcileMembers(namespace, merged, declaredMembers);
   const languages = new Map<string | null, string>(modules.map((module) => [module.namespace, module.info.language]));
   for (const module of modules) {

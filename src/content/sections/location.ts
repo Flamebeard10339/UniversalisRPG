@@ -262,8 +262,9 @@ const COORDINATE = /^[xyz]: /;
 const printLocation = (value: Location, context: PrintContext): readonly string[] => {
   const lines = printSection(value, SCHEMA as unknown as AnySchema, context, actionLines);
   const [heading, ...rest] = lines.filter((line) => !COORDINATE.test(line));
-  if (value.relative) return [heading!, ...rest];
-  return [heading!, lines.filter((line) => COORDINATE.test(line)).join(', '), ...rest];
+  const coordinates = lines.filter((line) => COORDINATE.test(line));
+  if (value.relative || coordinates.length === 0) return [heading!, ...rest];
+  return [heading!, coordinates.join(', '), ...rest];
 };
 
 export const location = section<Location, 'starting', 'actions'>()({
