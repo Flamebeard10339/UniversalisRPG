@@ -221,7 +221,7 @@ assert: tulsa.oolga-struck
 talk: oolga
 choose: oolgas-errands.swamp-bound.oolga.0.said
 choose: continue
-journal: oolgas-errands says Oolga wants three things out of the mire past the marsh gate — marsh thistle, fen root, and a leaf off the same hummock — and will not say what for.
+assert: oolgas-errands.swamp-bound
 travel: tavern-street
 travel: market-square
 travel: swamp-edge
@@ -229,13 +229,11 @@ travel: swamp-mire
 use: entity.herb-patch.pull-root
 assert: has fen-root
 assert: tulsa.herbs-collected = 1
-// Leaving and coming back between two different actions on the same herb
-// patch is load-bearing here and not just tidy pacing: taking a second,
-// differently-named action on one entity without leaving the room first
-// drops that action's own `give:` even in unmodified tulsa content (proved
-// against a universe built from core, combat and tulsa alone, no module of
-// this quest's in it) — a defect worth reporting rather than working around
-// silently, since nothing in the oracle's own grammar explains it.
+// Leaving and coming back between herbs is load-bearing and not tidy pacing:
+// bog lurkers stand in this mire, arriving buys one quiet beat, and the first
+// pull spends it — so a second herb started without going out and back in is
+// cut short by a lurker before it hands anything over. Walking the marsh
+// three times for three herbs is what the room costs.
 travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pick-thistle

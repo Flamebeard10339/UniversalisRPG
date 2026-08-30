@@ -129,13 +129,13 @@ assert: oolgas-basement.gather-ingredients
 assert: has tulsa.bottle-of-vodka
 craft: sunnys-poison
 assert: has sunnys-poison
-journal: oolgas-basement says The poison is mixed. Oolga's cellar is through Tavern Street, and the corners of it want slathering before the rats get any further into her sacks.
+assert: oolgas-basement.apply-the-poison
 travel: tavern-street
 travel: oolga-house
 travel: tulsa.oolga-basement
 use: entity.oolgas-sacks.slather-with-poison
 assert: corners-slathered
-journal: oolgas-basement says The rats went quiet the moment the poison went into the corners. Something a great deal larger came up out of the ground in their place, and it is not leaving until it is dealt with.
+assert: oolgas-basement.groundwurm-fight
 use: core.melee-combat on groundwurm until done
 assert: not core.fainted
 assert: wurm-defeated

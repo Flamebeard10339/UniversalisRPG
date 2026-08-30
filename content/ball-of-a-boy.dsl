@@ -82,7 +82,7 @@ travel: sewer-outfall
 wait: done
 use: entity.barred-door.pick-lock
 assert: barred-door.unlocked
-journal: down-the-grate says The grate was empty and so was Mouse's spot beside it when I climbed back out of the sewers. I should tell a guard what is down there.
+assert: down-the-grate.back-up
 travel: sewer-locked-room
 use: entity.key-table.read-the-book
 use: entity.key-table.take-the-key
