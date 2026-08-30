@@ -44,6 +44,12 @@ dependencies:
 
 # flag wurm-defeated
 
+# flag oolga-struck
+
+# flag herbs-collected
+
+# flag overheard-the-captain
+
 // --- items ---
 
 # item bottle-of-vodka
@@ -685,6 +691,20 @@ title: George
 faction: world
 examine: Kelsa's helper, and the one who will actually answer the question you asked.
 
+// The notebook a-grand-blade's riddle turns up. It is tulsa's because tulsa's
+// own anvil is what gives it out, and a section of tulsa's may name nothing
+// but tulsa's.
+# item smiths-notes
+title: The Bladesmith's Notes
+examine: A notebook wrapped in oilcloth, the pages gone soft at the corners from being read standing up.
+
+// Stands on Market Row for attention-to-detail to hire from, for the same
+// reason: the road is tulsa's, and a road may only name its own.
+# entity reporter
+title: The Reporter
+faction: world
+examine: A stranger with a notebook, keeping half an eye on the castle and half on you.
+
 # entity bladesmiths-son
 title: The Bladesmith's Son
 faction: world
@@ -1308,6 +1328,46 @@ slather with poison:
 // What the poison actually draws. Bigger than anything else written for this
 // basement, and it does not respawn — killed once is killed for good, which is
 // the whole of what "dealt with" means to Oolga.
+// The mire's own ambush, which the-swampy-menace's third herb is what brings
+// out: it stands in a room of tulsa's, so it is declared where that room is.
+// A ratkin experiment, standing in the mire until the third herb is in the
+// pack. Aggressive, so it does the ambushing itself the moment it is no
+// longer hidden; fleeing is a plain `travel:` back to the marsh gate, the same
+// as leaving any other room something aggressive stands in.
+# entity rat-toad
+title: Rat-Toad
+examine: A rat's shape gone wrong in a toad's skin — too many teeth, and none of either animal's reasons to run from you.
+stats: attack 22, defense 6, max-health 80, attack-rate 22, accuracy 85, evasion 40
+uses: core.melee-combat
+faction: world
+aggressive
+hidden if: not tulsa.herbs-collected >= 3
+respawn after: 10m
+on death:
+  credit:
+    roll: ratman-remains
+
+# item raw-blowfish
+title: Raw Blowfish
+examine: Spined all over and still swelling in your hands. Everything past the fillet is poison, and there is not much fillet.
+value: 4
+
+# entity blowfish-hole
+title: The Blowfish Hole
+examine: A slack backwater off the main current, and whatever lives in it does not have to swim fast to eat.
+cast for blowfish:
+  continuous
+  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
+  rate: 15
+  roll: spend-bait
+  one of:
+    fishing:
+      give: 1 raw-blowfish
+      xp: fishing 50
+    170x:
+      drain: 3 line-health
+      say: It comes up spined-side first and you let go of the line rather than the rod.
+
 # entity groundwurm
 title: Groundwurm
 examine: A ridge of packed earth moving under the cellar floor, and something pale and segmented shouldering up through the middle of it.
