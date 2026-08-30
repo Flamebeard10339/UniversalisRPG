@@ -124,6 +124,45 @@ quest, these numbers are the before. If it still does not, the premise is answer
 is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
 came out of playbot reports, and no agent reading the corpus had found either.
 
+## `<keyword>` is the one hole on the page whose vocabulary the page does not name
+
+The page writes `<keyword>   e.g. sharp` and stops, and two keywords in that hole are load-bearing:
+an item tagged `food` that also carries a `stat-bonus` grants it when an action takes the item
+(`grantFoodBuff` in `src/runtime/runtime.ts`), and a buff source tagged `stacks` adds a stack rather
+than replacing the one already there (`grantBuff` in `src/runtime/buffs.ts`). Neither word is
+declared anywhere the grammar page can read, so neither is on it, and an author cannot tell a
+keyword the engine acts on from one that is decoration.
+
+`instant` and `continuous` are the same kind of word done right: declared in `src/grammar/action.ts`
+as `TAGGED_ACTION_KINDS`, turned into `Written` lines there, and printed under the action kind.
+
+Known from a run on 2026-08-29 that was allowed to read the engine: it grepped the corpus for
+`food`, found items tagged with it, could not tell whether the word meant anything, and read
+`src/runtime/runtime.ts` to find out. That was three of its nineteen reaches into `src/`.
+
+*Closes when:* `food` and `stacks` are declared where the page reads them, the way the two action
+kinds are, so `npm run oracle` names them under `<keyword>` — and the proof is that the page names
+every keyword the engine branches on, derived rather than listed.
+
+## The overlay is the one thing a quest needs first and the one thing nothing shows
+
+Writing over a section another module declared is how a quest reaches into a town: a second body at
+`# location tulsa.apiary-field` with `+entities:` under it. The page gives the two lines that do it
+one entry each under *writing over a body already there* — and **the shipped corpus writes neither,
+not once**, so there is no worked example of the whole shape anywhere in the world an author reads.
+
+Both arms of the 2026-08-29 run hit this before anything else and neither could get at it from the
+page. The arm that could read the engine went to `sections/location.ts` and then `merge.test.ts`;
+the arm that could not wrote a block into its own draft labelled *SCRATCH: probing cross-file
+patching, to be removed* and found the shape by experiment. It cost the second arm about
+twenty-five turns, most of them cycling `--at`.
+
+Half of that was the id rule, which is fixed. What is left is that the shape has no example.
+
+*Closes when:* the example on the `+<line>` entry shows the heading it is written under and not
+only the line — or a module that ought to be reaching into another one is written that way, so the
+corpus carries the shape. The first is the smaller change and does not wait on content.
+
 ## Two traps that cost a run each, written down so they do not cost a third
 
 - **`npx` on Windows truncates a multi-line argument at its first newline and silently drops every argument after it.** A briefed run was launched with `--brief "$(cat brief.txt)" --save … --local … --turns 100`; `parseArgs` received five arguments, not nine. The bot ran with a one-paragraph brief, no `--save`, and staged into the shipped corpus. Nothing said so. **Use `node --import tsx scripts/playbot.ts`.**
