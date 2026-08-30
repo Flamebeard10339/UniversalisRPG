@@ -88,39 +88,6 @@ read and discarded. Two staged sections at one id are k candidate implementation
 diffs are the argument; two staged sections at different ids for one gap is the one-home
 call, and the only judgement the loop owes a human.
 
-## A bot cannot see why what it wrote did not load
-
-**This is the last blocker, and it is the whole of what stopped the final run.**
-
-Measured 2026-08-29 against `4bcdb1f1`, with the stage-merge landed and a quest editable one stage
-at a time. 117 turns, 24 minutes, $3.17. The bot typed four `/dsl` lines. **All four were refused,
-and every one got the same sentence:**
-
-    local changes did not load, so nothing was written and the world is as it was.
-
-That is the generic module-load failure. It does not say which line, which section, or what was
-wrong. The bot wrote a plausible quest body, was told nothing, guessed the indentation, was told
-the same nothing, guessed again — and stopped itself: *"Out of turns to iteratively fix DSL syntax
-errors ... rather than repeat guesses."*
-
-Turns 107 and 108 differ **only in the indentation of the line after `stage asked:`** — one space
-against two. Turns 116 and 117 are the same pair again on a renamed stage. That is a bot doing
-binary search on whitespace because nothing will tell it what it got wrong.
-
-A refusal that quotes the head line and names the shapes that could stand there already exists — it
-answers the *shape* refusal at `/dsl`'s own head. This is a different path: the section parsed, was
-staged, and then **the module failed to load**, and that path has no diagnostic at all. The loader
-knows exactly what is wrong: `loadUniverseWithDiagnostics` produces it and `formatModuleDiagnostic`
-renders it, and `scripts/playbot.ts` already imports both. It is not reaching the author.
-
-**The same sentence is the reported symptom of the map-editor line in `docs/map/open-agent.md`**,
-which is the second place an author meets it. One fix serves both.
-
-*Closes when:* a staged edit that will not load says what the loader said — the line and what was
-wrong with it — wherever an author meets it, reading the diagnostic the load path already produces
-rather than a second copy of it. **This is the highest-value line open**: every other affordance for
-authoring inside a run now exists and is proved, and this is the one that makes them unusable.
-
 ## What the two arms cost, and what each landed
 
 Both arms ran the same brief over the same world on 2026-08-29. The playbot is Sonnet 5 at
@@ -138,12 +105,21 @@ So: **five times the money, forty percent more wall time, and nothing shipped.**
 playbot is cheap — 2.7 cents — and per completed task it has no figure at all, because it has never
 completed one.
 
-**This does not settle the premise, and the reason is the line above.** The final run failed on a
-missing diagnostic, not on the bot's judgement or its grasp of the language: it had read the corpus,
-found the right id, chosen the right stage, and written a body whose only visible defect was
-whitespace. What is measured here is a loop with one broken link, not a bot that cannot author.
+**This does not settle the premise, and the two reasons it did not have both been closed since.** The
+final run failed on a missing diagnostic, not on the bot's judgement or its grasp of the language: it
+had read the corpus, found the right id, chosen the right stage, and written a body whose only
+visible defect was whitespace. A staged edit that will not load now says what the loader said — the
+line it stopped on and what may stand there instead. What is measured here is a loop with one broken
+link, not a bot that cannot author.
 
-*Closes when:* the diagnostic line above is closed and this run is repeated. If the bot then lands a
+**The reading both arms did was also being forced, and that is the second.** Every id list the oracle
+and the grammar panel offered was cut off at 24. An author standing in a hole saw 24 of 86 entities,
+24 of 220 flags and 24 of 112 items — not one flag in `tulsa`, which is the town both arms were
+writing in, and not one `core` item, so neither `core.coin` nor `core.bread` could be found without
+opening the corpus. The lists are written whole now, which is why a quest can be authored against
+`npm run oracle` alone.
+
+*Closes when:* this run is repeated against the world as it now stands. If the bot then lands a
 quest, these numbers are the before. If it still does not, the premise is answered and the playbot
 is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
 came out of playbot reports, and no agent reading the corpus had found either.
