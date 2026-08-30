@@ -78,6 +78,10 @@ const engineUnder = (repo: string, written: string): boolean => {
   return ENGINE_DIRS.some((dir) => rel === dir || rel.startsWith(`${dir}/`));
 };
 
+// The tools that change a file rather than read one, held in the case a host is free to hand them
+// over in: what a tool is called is that host's word and not this one's.
+const WRITES = new Set(['write', 'edit', 'notebookedit']);
+
 export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | { reaching: true; why: 'elsewhere' };
 
 // Whether a call is reaching for the engine, or writing somewhere it may not. A tool that runs a
@@ -85,7 +89,7 @@ export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | 
 // only ways in and a `grep` over `src/` is the same reach as a `Read` of one file in it.
 export function verdictOf(tool: string, input: Record<string, unknown>, repo: string, workdir: string): Verdict {
   const written = input.file_path;
-  if ((tool === 'Write' || tool === 'Edit' || tool === 'NotebookEdit') && typeof written === 'string') {
+  if (WRITES.has(tool.toLowerCase()) && typeof written === 'string') {
     const inside = path.resolve(written).toLowerCase().startsWith(path.resolve(workdir).toLowerCase());
     if (!inside) return { reaching: true, why: 'elsewhere' };
   }
