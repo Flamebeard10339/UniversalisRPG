@@ -29,6 +29,20 @@ does not make its result trustworthy.
 Game content is written in a small line-based language. A file is a sequence of
 sections, each headed `# <kind> <id>`, and every kind is one file.
 
+**Writing content reads none of what follows.** Every line that may be written,
+under every kind, and every id the world declares, is printed by `npm run oracle`;
+`npm run oracle -- --at <draft>` reads a draft back and says what the engine will
+not take. That is the whole reference an author needs, it is derived from the
+declarations rather than written out beside them, and nothing under `src/` has to
+be opened to write a quest, an item or a town.
+
+**Never rewrite a file under `content/` without reading it first.** These carry
+`# save` bodies and `# test` sections that read like noise to anyone who has not
+met them, and they are the proof the rest of the module still works. Add to a
+module; replace one only having read what you are replacing.
+
+The rest of this section is about changing the language rather than writing in it.
+
 **One kind, one file: `src/content/sections/<kind>.ts`.** That file holds
 everything anyone asks about the kind — its type, its fields (or its own
 parser), its printer, its validation, its reference sites, which registry maps
@@ -54,11 +68,6 @@ Read `sections/item.ts` (fields, entries, validation, references),
 A module that a section file imports may not read the section list — that closes
 a cycle and yields a list with an undefined in it. `scripts/lib/acyclic.test.ts`
 is the guard.
-
-**Never rewrite a file under `content/` without reading it first.** These carry
-`# save` bodies and `# test` sections that read like noise to anyone who has not
-met them, and they are the proof the rest of the module still works. Add to a
-module; replace one only having read what you are replacing.
 
 # Work that outlives a session
 
@@ -173,7 +182,7 @@ Tools, none of which are gates:
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
 - `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
 - `npm run balance -- <save> [<action-spec>]` — what every offer the engine puts in front of a player standing on that save pays an hour, and whether the loop it was asked for finished. Every figure is read off a run rather than reckoned: it writes a `# test` per offer, walks it under several seeds, and prints cycles, game time, xp and items an hour, and the engine's own sentence wherever a run stopped short. A second loose word narrows the sweep; `--at`, `--seeds`, `--cycles` and `--all` narrow or widen it further, and `--help` prints the rest. Reach for this before changing any stat, drop or rate: it is a run per offer per seed, so it is called when there is a balance question and is never a gate
-- `npm run oracle [-- <kind>... | --at <draft.dsl>]` — print the grammar the editing page offers, as a tree per kind; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world, then line by line what may be written where
+- `npm run oracle [-- <kind>... | --at <draft.dsl> [--walk [<line>]]]` — print the grammar the editing page offers, as a tree per kind, short enough with no kind named to read whole; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world. `--walk <line>` goes on to say, of one line, where it sits, what it is read as and what may stand there, which is what to reach for when one line has you stuck; `--help` prints the rest. Reach for this before writing anything under `content/`, and again after each pass
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
