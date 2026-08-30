@@ -20,7 +20,7 @@ import {
   settlePools,
   spendable,
 } from './effects';
-import { actorTitle, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, targetLevel } from './encounter';
+import { actorTitle, attemptFraction, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, standAt, targetLevel } from './encounter';
 import { armedAction, Participant, participants, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
@@ -220,11 +220,11 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
     }
     player.attemptsMade = remainder;
     active.implicitTarget = IMPLICIT_TARGET_FULL - remainder * milliHealthPerHit;
-    player.progress = newProgress;
+    standAt(player, newProgress, attemptMs);
   } else {
     player.attemptsMade = Math.min(player.attemptsMade + attemptsThisSegment, attemptsToResolve);
     active.implicitTarget = IMPLICIT_TARGET_FULL - player.attemptsMade * milliHealthPerHit;
-    player.progress = newProgress;
+    standAt(player, newProgress, attemptMs);
   }
 }
 
@@ -253,7 +253,7 @@ function felledBy(segment: Segment, action: Action, self: string, other: string,
 function resolveAttempt(participant: Participant, segment: Segment): SwingOutcome {
   const { state, registry } = segment;
   const { self, other, action, cadence } = participant;
-  cadence.progress = 0;
+  standAt(cadence, 0);
   cadence.attemptsMade++;
 
   const half = (field: { side?: 'my' | 'their'; id: string } | undefined, read: typeof statValue, fallback: number): number =>
@@ -367,7 +367,7 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     // Whoever has been slowed to a standstill is counted no time at all: their bar holds where it
     // stood and picks up again when whatever stopped them wears off.
-    const ticking = paced.filter((each) => !stalledPace(each.duration)).map((each) => each.participant);
+    const ticking = paced.filter((each) => !stalledPace(each.duration));
 
     if (paced.length === 0 && !searching) {
       endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
@@ -380,24 +380,24 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
     const foundAt = looking === undefined ? Infinity : Math.max(state.time, state.engagesAt);
     if (foundAt <= segEnd && foundAt <= nextAt) {
       const elapsed = foundAt - state.time;
-      for (const participant of ticking) participant.cadence.progress += elapsed;
+      for (const { participant, duration } of ticking) standAt(participant.cadence, participant.cadence.progress + elapsed, duration);
       advanceTime(state, elapsed);
       clearActorDeltas(segment.deltas, looking!);
       enterEncounter(active, looking!, state, registry, PLAYER);
       playerCadence(active).attemptsMade = 0;
-      playerCadence(active).progress = 0;
+      standAt(playerCadence(active), 0);
       continue;
     }
 
     if (!next || nextAt > segEnd) {
       const elapsed = segEnd - state.time;
-      for (const participant of ticking) participant.cadence.progress += elapsed;
+      for (const { participant, duration } of ticking) standAt(participant.cadence, participant.cadence.progress + elapsed, duration);
       advanceTime(state, elapsed);
       return;
     }
 
     const elapsed = nextAt - state.time;
-    for (const participant of ticking) participant.cadence.progress += elapsed;
+    for (const { participant, duration } of ticking) standAt(participant.cadence, participant.cadence.progress + elapsed, duration);
     advanceTime(state, elapsed);
 
     const outcome = resolveAttempt(next, segment);
@@ -824,22 +824,14 @@ export function actionProgress(state: GameState, registry: Registry): number {
   const action = armedAction(state, registry);
   const clock = playerCadence(active);
   const attemptMs = attemptDuration(action, state, registry);
-  if (stalledPace(attemptMs)) return 0;
   if (!(attemptMs > 0)) return 1;
+  const within = attemptFraction(clock, attemptMs);
   // A contested action resolves one swing at a time and its cycle is that swing, so the attempts
   // behind it are a tally of the fight rather than a share of anything being drawn.
-  if (resolvesPerAttempt(action)) return Math.min(1, Math.max(0, clock.progress / attemptMs));
+  if (resolvesPerAttempt(action)) return within;
   const attempts = fightPlan(action, state, registry).attemptsToResolve;
   if (!(attempts > 0)) return 1;
-  const counted = Math.min(attempts, clock.attemptsMade) * attemptMs + clock.progress;
-  return Math.min(1, Math.max(0, counted / (attempts * attemptMs)));
-}
-
-// Whether what is under way is standing still rather than advancing: something has taken its pace to
-// nothing, and it picks up where it stood when that wears off.
-export function actionStalled(state: GameState, registry: Registry): boolean {
-  if (!state.activeAction) return false;
-  return stalledPace(attemptDuration(armedAction(state, registry), state, registry));
+  return Math.min(1, Math.max(0, (Math.min(attempts, clock.attemptsMade) + within) / attempts));
 }
 
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {

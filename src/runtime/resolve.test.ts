@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { describe, expect, it } from 'vitest';
-import { ActiveAction, actionProgress, actionStalled, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statValue, useAction } from './runtime';
+import { ActiveAction, actionProgress, armAction, buffsOf, craft, createGameState, GameState, grantBuff, initResources, PLAYER, resolve, statValue, useAction } from './runtime';
 import { actionAddress } from '../content/sections/action';
 import { Boundary, BoundarySource, boundarySourceName, requireBoundaryNotPast, requireForwardProgress, STALL_BOUND } from './forwardProgress';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
@@ -472,7 +472,6 @@ describe('useAction/craft integration: repeating actions, eating grants a live b
 
     useAction('entity', 'shrine', 'chant', registry, state);
 
-    expect(actionStalled(state, registry)).toBe(true);
     expect(state.activeAction).not.toBeNull();
 
     resolve(state, registry, secondsToMs(30));

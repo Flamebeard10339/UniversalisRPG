@@ -61,14 +61,14 @@ function everyValue(value: unknown, holds: (held: unknown) => boolean): boolean 
 
 const isActor = (value: unknown): boolean => at(value, 'resources', (held) => everyValue(held, isNumber)) && at(value, 'rateRemainders', (held) => everyValue(held, isNumber));
 
-const isCadence = (value: unknown): boolean => at(value, 'progress', isNumber) && at(value, 'attemptsMade', isInteger);
-
-const isSeat = (value: unknown): boolean => at(value, 'ownerRef', isText) && at(value, 'actionSlug', isText) && at(value, 'target', isText);
-
 const optional = (value: unknown, field: string, holds: (held: unknown) => boolean): boolean => {
   const held = (value as Record<string, unknown>)[field];
   return held === undefined || holds(held);
 };
+
+const isCadence = (value: unknown): boolean => at(value, 'progress', isNumber) && at(value, 'attemptsMade', isInteger) && optional(value, 'span', isNumber);
+
+const isSeat = (value: unknown): boolean => at(value, 'ownerRef', isText) && at(value, 'actionSlug', isText) && at(value, 'target', isText);
 
 const isActiveAction = (value: unknown): boolean =>
   at(value, 'ownerRef', isText) &&

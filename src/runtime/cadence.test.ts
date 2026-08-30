@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
-import { actionProgress, actionStalled, armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
+import { actionProgress, armAction, armFightAction, createGameState, GameState, grantBuff, initResources, PLAYER, resolve } from './runtime';
 import { Registry } from '../content/registry';
 import { loadModule } from '../content/load';
 import { startSession, view } from './session';
@@ -311,25 +311,26 @@ describe('the bar draws the cycle it is a bar for', () => {
 });
 
 describe('a pace taken to nothing stops the run rather than losing it', () => {
-  it('counts no time against it while it stands still, and picks it up where it stood', () => {
+  it('holds the bar where it stood, counts no time against it, and picks it up from there', () => {
     const registry = loaded();
     const state = fighting(registry);
     resolve(state, registry, secondsToMs(1));
 
     const held = playerClock(state).progress;
+    const drawn = actionProgress(state, registry);
     expect(held).toBeGreaterThan(0);
+    expect(drawn, 'a bar part-way through is what a stall has anything to hold').toBeGreaterThan(0);
 
     grantBuff(state, PLAYER, registry.items.get('cold-iron')!, secondsToMs(20));
-    expect(actionStalled(state, registry)).toBe(true);
-    expect(actionProgress(state, registry), 'a stopped bar is stopped rather than crawling').toBe(0);
+    expect(actionProgress(state, registry), 'a stopped bar holds where it stood rather than emptying').toBe(drawn);
 
     resolve(state, registry, secondsToMs(15));
     expect(playerClock(state).progress, 'nothing is counted against a run standing still').toBe(held);
+    expect(actionProgress(state, registry), 'and it is still where it stopped, all that time later').toBe(drawn);
     expect(state.activeAction, 'standing still is not being over').not.toBeNull();
     expect(playerClock(state).attemptsMade, 'and no attempt was made in all that time').toBe(0);
 
     resolve(state, registry, secondsToMs(25));
-    expect(actionStalled(state, registry)).toBe(false);
     expect(playerClock(state).attemptsMade, 'the run picked back up once it wore off').toBeGreaterThan(0);
   });
 });

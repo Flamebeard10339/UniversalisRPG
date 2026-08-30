@@ -34,6 +34,10 @@ export interface Seat {
 export interface Cadence {
   progress: number;
   attemptsMade: number;
+  // The attempt these milliseconds were counted against, which is not always the attempt the actor
+  // would make now: a pace taken to nothing leaves no live span to divide by, and this is the one
+  // the clock stopped on. A clock that has counted nothing has none.
+  span?: number;
 }
 
 export interface ActorState {
