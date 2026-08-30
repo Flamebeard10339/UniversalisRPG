@@ -51,21 +51,27 @@ export function declaredKey(namespace: string | null, kind: string, id: string):
 // takes the module apart the same way the loader puts it together.
 export const moduleNamed = (id: string): string | null => (id.includes('.') ? id.slice(0, id.indexOf('.')) : null);
 
-// Where a section goes home is written in its id and nowhere else, so a kind a module owns cannot be
-// made under a name that says no module: there would be no file to take it back to. Said here beside
-// the rule it is the refusal for, and read by every command that makes a section rather than by the
-// one that was written first.
+// A section made during a run is staged rather than shipped, and its id is the only thing saying
+// which file it goes home to, so a kind a module owns cannot be made under a name that says no
+// module: there would be no file to take it back to. Said here beside the rule it is the refusal
+// for, and read by every command that makes a section rather than by the one that was written first.
 export const homelessId = (kind: string, id: string): string | null =>
   isOwnedKind(kind) && !id.includes('.') ? `${id} names no module: write it as <module>.${id}, which is where the section belongs` : null;
+
+// The module a body is written over is the one its address names, and not whoever wrote at that
+// address first: under a ~ dependency which of the two came first is the very thing in doubt.
+function refuseUnorderedEdit(module: ParsedModule, key: string, where: string): void {
+  const edited = moduleNamed(key);
+  if (edited !== null && edited !== module.namespace && unorderedDependencies(module).has(edited)) {
+    throw new DslError(`${where} edits ${edited}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
+  }
+}
 
 function targetKey(module: ParsedModule, kind: string, id: string, namespace: Namespace, visible: ReadonlySet<string | null>): string {
   const own = declaredKey(module.namespace, kind, id);
   if (own !== null) return own;
   const resolved = namespace.resolve(kind, id, module.namespace, visible, `# ${kind} ${id}`);
-  const owner = namespace.ownerOf(kind, resolved);
-  if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
-    throw new DslError(`# ${kind} ${id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
-  }
+  refuseUnorderedEdit(module, resolved, `# ${kind} ${id}`);
   return resolved;
 }
 
@@ -152,15 +158,13 @@ type Created = { kind: string; value: MemberOwner };
 
 const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
 
-// A qualified id names the module the section belongs to, so a section nothing has declared yet is
-// declared there rather than under the module the writing arrived in. That is the whole of how a
-// section authored during a run — where every edit is staged in one module of its own — becomes a
-// section of the module it names. An id naming a module this one cannot see is left to `resolve`,
-// which says so in the words an author reads everywhere else.
-function writtenUnder(id: string, loaded: ReadonlySet<string>, visible: ReadonlySet<string | null>): { namespace: string; local: string } | null {
+// The name inside the module a qualified id addresses, where that module is one this one can see.
+// An id naming a module this one cannot see is left to `resolve`, which says so in the words an
+// author reads everywhere else.
+function addressedIn(id: string, loaded: ReadonlySet<string>, visible: ReadonlySet<string | null>): string | null {
   const named = moduleNamed(id);
   if (named === null) return null;
-  return loaded.has(named) && visible.has(named) ? { namespace: named, local: id.slice(named.length + 1) } : null;
+  return loaded.has(named) && visible.has(named) ? id.slice(named.length + 1) : null;
 }
 
 function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
@@ -180,12 +184,16 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
     }
     const scope = idScopeOf(kind);
     if (scope === 'none' || value.id === undefined) continue;
-    const written = scope === 'owned' ? writtenUnder(value.id, loaded, visible) : null;
-    if (written === null && value.id.includes('.')) continue;
-    const own = written?.local ?? value.id;
-    if (kind === 'flag' && own === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
     // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
-    namespace.declare(kind, scope === 'owned' ? (written?.namespace ?? module.namespace) : null, own);
+    if (scope !== 'owned') {
+      namespace.declare(kind, null, value.id);
+      continue;
+    }
+    const addressed = addressedIn(value.id, loaded, visible);
+    if (addressed === null && value.id.includes('.')) continue;
+    const own = addressed ?? value.id;
+    if (kind === 'flag' && own === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
+    namespace.declare(kind, module.namespace, addressed === null ? qualify(module.namespace, own) : value.id);
   }
 }
 
@@ -207,10 +215,7 @@ function resolveReferences(module: ParsedModule, namespace: Namespace, loaded: R
       const removal = section.value as Removal;
       if (!isOwnedKind(removal.kind)) throw new DslError(`# remove ${removal.id}: ${removal.kind} is not a kind a module owns`);
       removal.target = namespace.resolve(removal.kind, removal.target, self, visible, `# remove ${removal.id}`);
-      const owner = namespace.ownerOf(removal.kind, removal.target);
-      if (owner !== null && owner !== undefined && unorderedDependencies(module).has(owner)) {
-        throw new DslError(`# remove ${removal.id} edits ${owner}, but ~ dependencies do not load before this module. Use a load-order dependency for patches.`);
-      }
+      refuseUnorderedEdit(module, removal.target, `# remove ${removal.id}`);
       continue;
     }
     const { id } = section.value as { id: string };

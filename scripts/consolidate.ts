@@ -5,7 +5,7 @@ import { moduleLocalId } from '../src/grammar/section';
 import { splitSections } from '../src/grammar/structure';
 import { gap, landing } from './lib/sectionPlacement';
 import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type LocalSection } from '../src/content/localChanges';
-import { declaredKey } from '../src/content/resolve';
+import { declaredKey, moduleNamed } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { patchedInto, writesEntries } from '../src/content/patch';
@@ -157,12 +157,14 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
   const declared = declarations(base, namespaces);
   const files = new Map(base.flatMap((source) => (namespaces.get(source.name) == null ? [] : [[namespaces.get(source.name)!, source] as const])));
 
-  // Where a section nothing declares yet goes home: the module its id is under, asked of the
-  // namespace that settled that id rather than read back out of the words in it.
+  // Where a section nothing declares yet goes home: the module its id names, read off the id the
+  // loader settled rather than off the words an author typed. Which module a staged body belongs to
+  // is not the same question — a staged section belongs to the staging module until it is placed,
+  // and placing it is what this is.
   const newIn = (target: Target): ModuleSource | undefined => {
     if (target.remove) return undefined;
-    const owner = before.registry.namespace.ownerOf(target.kind, target.id);
-    return owner == null ? undefined : files.get(owner);
+    const named = moduleNamed(target.id);
+    return named === null ? undefined : files.get(named);
   };
 
   const resolved: { section: LocalSection; target: Target; declaration: Declaration | null; fresh: ModuleSource | null; refused: string }[] = sections.map(({ section, target }) => {
