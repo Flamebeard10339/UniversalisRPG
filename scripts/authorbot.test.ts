@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { parseArgs, refusalFor, summaryLines, systemFor, verdictOf, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
@@ -71,6 +72,13 @@ describe('what the run is told', () => {
     expect(said).toContain('npm run oracle');
     expect(said).toContain('npm run probe');
     expect(said).toContain('npm run balance');
+  });
+
+  it('hands over every debug switch the kind offers, so a route the engine grows one for is not written past it', () => {
+    const said = systemFor(asked(), '/work/content', '/work/content/x.dsl');
+
+    for (const name of DEBUG_SWITCH_NAMES) expect(said).toContain(name);
+    expect(said).toContain('Balance is not yours to settle');
   });
 
   it('says the engine is off limits, or that it is not, and never both', () => {

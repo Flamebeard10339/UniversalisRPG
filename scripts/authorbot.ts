@@ -2,6 +2,7 @@ import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, wr
 import os from 'node:os';
 import path from 'node:path';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
+import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { CORPUS_DIR } from '../src/content/shipped';
 
 // scripts/authorbot.ts hands one brief to a coding agent and counts what it reached for. The
@@ -123,10 +124,18 @@ The tools you have:
     npm run probe -- ${corpus} --test <id>
                                          run one \`# test\` and report PASSED or FAILED
     npm run balance -- <save> [<word>]   what every offer in front of a player standing on that save
-                                         pays an hour, and whether the loop it was asked for finished.
-                                         This is the only answer to whether a number you wrote is
-                                         a rat or a dragon
+                                         pays an hour, and whether the loop it was asked for finished
     npm run notes                        every \`@@@\` the corpus holds
+
+**Balance is not yours to settle.** Whether a number you wrote is a rat or a dragon is answered by
+running the world, in a pass of its own that is not this one. Write figures that read sensibly beside
+what the corpus already holds and go on; nobody will hold you to them, and no test may assert one.
+
+What your \`# test\` proves instead is that the path is walkable: that this sequence of actions, taken
+in order, reaches the end it names. So a route that would otherwise stand or fall on a fight says so
+in one word — ${DEBUG_SWITCH_NAMES.map((name) => `\`${name}\``).join(', ')}, each on a line of its own in a \`# test\`, described where the rest of the
+kind is by \`npm run oracle -- test\`. Reach for those rather than buying past a fight with a \`# save\`
+full of experience, and use as many of them as the route needs.
 
 You are done when the engine takes your file and a \`# test\` you wrote in it walks the thing you were
 asked for from end to end, and you have shown the output of both. If you get stuck, say exactly what
