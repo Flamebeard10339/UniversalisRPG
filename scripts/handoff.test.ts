@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { citedIn, complaintsIn, declaredIn, featureFolders, folderLines, proofComplaints } from './handoff';
+import { besideThem, citedIn, complaintsIn, declaredIn, featureFolders, folderLines, handoffLines, proofComplaints } from './handoff';
 
 const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', open: ['open-agent.md', 'open-human.md'], proofs: [], missing: [], strays: [], items: 4, complaints: [], passing: [], ran: false, since: 0, lastWrote: 'abc1234 something', ...over });
 
@@ -91,6 +91,11 @@ describe('a line that hands its evidence over as a proof rather than a paragraph
 
     expect(lines).toContain('a-roll-settles-on-a-branch passes now');
     expect(lines).toContain('1 of them passing');
+  });
+
+  it('names anything in docs/ that hands nothing over, since a folder nobody is handed grows quietly', () => {
+    expect(besideThem('docs')).toEqual([]);
+    expect(handoffLines([path.join('docs', 'open')], false, ['audits']).join('\n')).toContain('docs/audits hands nothing over');
   });
 
   it('leaves a proof file out of the third-file complaint, and nothing else', () => {

@@ -228,13 +228,23 @@ export function folderLines(folder: Folder): string[] {
   return lines;
 }
 
-export function handoffLines(dirs: readonly string[], run = true): string[] {
+// docs/ is the folders that hand over and nothing beside them. A spec tree, a folder of dated
+// audits and two jsonl logs stood here — 135 files of what was already in the code — and this is
+// the line that says so the next time one starts, since a folder nobody is handed grows quietly.
+export const besideThem = (root = 'docs', dirs: readonly string[] = featureFolders(root)): string[] => {
+  const handing = new Set(dirs.map((dir) => path.basename(dir)));
+  return readdirSync(root).filter((name) => !handing.has(name));
+};
+
+export function handoffLines(dirs: readonly string[], run = true, strays: readonly string[] = []): string[] {
   if (dirs.length === 0) return ['no docs/<feature>/ folder keeps an open-*.md, so nothing here is handed over between sessions'];
   const folders = dirs.map((dir) => reviewFolder(dir, run));
-  const wrong = folders.reduce((count, folder) => count + wrongIn(folder), 0);
+  const wrong = folders.reduce((count, folder) => count + wrongIn(folder), 0) + strays.length;
   const stale = folders.filter((folder) => folder.since > 8).length;
   return [
     ...folders.flatMap((folder) => [...folderLines(folder), '']),
+    ...strays.map((name) => `-- docs/${name} hands nothing over, and docs/ is the folders that do — what is already true belongs in the code, in CLAUDE.md, in a memory, or in git`),
+    ...(strays.length === 0 ? [] : ['']),
     wrong === 0 && stale === 0 ? 'nothing to hand over that is not already written down.' : `${wrong} thing(s) to put right${stale === 0 ? '' : `, and ${stale} folder(s) whose docs are behind the work`}.`,
   ];
 }
@@ -250,7 +260,8 @@ function main(): void {
     console.log(usage);
     return;
   }
-  console.log(handoffLines(featureFolders(), !process.argv.includes('--quick')).join('\n'));
+  const folders = featureFolders();
+  console.log(handoffLines(folders, !process.argv.includes('--quick'), besideThem('docs', folders)).join('\n'));
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
