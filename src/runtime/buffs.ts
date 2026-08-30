@@ -1,14 +1,12 @@
 import type { Registry } from '../content/registry';
 import type { Item } from '../content/sections/item';
-import { isTagClause, type TagClause } from '../grammar/tagClause';
+import { carries, isTagClause, type TagClause } from '../grammar/tagClause';
 import { localizerOf } from './localized';
 import type { PruneWarning } from './pruning';
 import { type BuffInstance, type GameState } from './state';
 import { secondsToMs } from './units';
 
 export type BuffSource = Item;
-
-export const STACKS = 'stacks';
 
 function writable(state: GameState): { [actorId: string]: readonly BuffInstance[] } {
   return state.buffs as { [actorId: string]: readonly BuffInstance[] };
@@ -41,7 +39,7 @@ export function applyDeclared(state: GameState, actorId: string, source: BuffSou
 }
 
 export function grantBuff(state: GameState, actorId: string, source: BuffSource, expiresAt: number): void {
-  const stacks = source.tags.some((tag) => tag.kind === 'keyword' && tag.value === STACKS);
+  const stacks = carries(source.tags, 'stacks');
   const held = stacks ? buffsOf(state, actorId) : buffsOf(state, actorId).filter((buff) => buff.source !== source.id);
   set(state, actorId, [...held, { source: source.id, tags: source.tags, expiresAt }]);
 }

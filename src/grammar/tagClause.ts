@@ -15,6 +15,39 @@ export const COUNTERS: Readonly<Record<Counter['kind'], { names: string; written
 
 export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
 
+// A keyword the engine reads rather than carries: what it does, and what it is written on — the action
+// itself, which writes it out under its own heading, or the thing that carries the tag. Every word the
+// engine acts on stands here and nowhere else, so the page prints all of them and a word that is not here
+// is decoration the engine never looks at.
+export const KEYWORDS = {
+  instant: { on: 'action', does: 'over the moment it is taken, so it fills no time and is never under way' },
+  continuous: { on: 'action', does: 'begins its next cycle as soon as one ends, until something stops it' },
+  food: { on: 'carrier', does: 'an item carrying this and a stat bonus grants that bonus when an action takes the item, for whatever `<duration>` stands beside it' },
+  stacks: { on: 'carrier', does: 'a second grant of this buff stands beside the one already held rather than replacing it' },
+} as const;
+
+export type Keyword = keyof typeof KEYWORDS;
+
+// The keywords written on one thing, as a type, so a site that reads them names no word of its own.
+export type KeywordOn<Where extends string> = { [K in Keyword]: (typeof KEYWORDS)[K]['on'] extends Where ? K : never }[Keyword];
+
+export const keywordsOn = <Where extends string>(where: Where): readonly KeywordOn<Where>[] => (Object.keys(KEYWORDS) as Keyword[]).filter((word) => KEYWORDS[word].on === where) as KeywordOn<Where>[];
+
+// Which of the keywords a site reads stand among these tags, in the order the site named them, and the words standing beside them that it does not read.
+export function keywordsIn<Read extends Keyword>(tags: readonly TagClause[], read: readonly Read[]): { taken: Read[]; beyond: string[] } {
+  const written = tags.flatMap((tag) => (tag.kind === 'keyword' ? [tag.value] : []));
+  const asked: readonly string[] = read;
+  return { taken: read.filter((word) => written.includes(word)), beyond: written.filter((word) => !asked.includes(word)) };
+}
+
+export const carries = (tags: readonly TagClause[], keyword: Keyword): boolean => keywordsIn(tags, [keyword]).taken.length > 0;
+
+// The tags left once the keywords a site has already written out are taken away, which is what a printer lifting one onto a line of its own writes after it.
+export function withoutKeywords(tags: readonly TagClause[], read: readonly Keyword[]): TagClause[] {
+  const lifted: readonly string[] = read;
+  return tags.filter((tag) => tag.kind !== 'keyword' || !lifted.includes(tag.value));
+}
+
 const CLAUSE_HOLDS: {
   [K in TagClause['kind']]: (clause: Record<string, unknown>) => boolean;
 } = {
@@ -104,6 +137,9 @@ function printAmount(value: BonusAmount): string {
 
 const printCounter = (value: Counter): string => COUNTERS[value.kind].written(value.id);
 
+// The keywords written on whatever carries the tag, which are the ones this grammar shows: a word read off the action is written under `# action` and is no shape a carrier takes.
+const CARRIED_KEYWORDS = keywordsOn('carrier');
+
 export const tagClause: Parser<TagClause> = {
   called: 'tag',
   parse(cursor) {
@@ -128,8 +164,12 @@ export const tagClause: Parser<TagClause> = {
       }
     }
   },
-  forms: ['<keyword>', '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'],
-  examples: ['sharp', '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+1 attack per level of melee'],
+  forms: ['<keyword>', ...CARRIED_KEYWORDS, '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'],
+  examples: ['sharp', ...CARRIED_KEYWORDS, '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+1 attack per level of melee'],
+  notes: {
+    '<keyword>': 'a word of your own, carried and never read: the engine acts on the words below and on no other',
+    ...Object.fromEntries(CARRIED_KEYWORDS.map((word) => [word, KEYWORDS[word].does])),
+  },
 };
 
 // A bonus written as a range has to be rolled, and a carrier that is only ever held has no moment to roll it in. The carrier says why it has none.

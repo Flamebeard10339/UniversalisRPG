@@ -1,3 +1,4 @@
+import { carries } from '../grammar/tagClause';
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, leavesHere, outcomeResults, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
@@ -662,7 +663,7 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
 }
 
 function grantFoodBuff(item: Item, state: GameState): void {
-  if (!item.tags.some((tag) => tag.kind === 'keyword' && tag.value === 'food')) return;
+  if (!carries(item.tags, 'food')) return;
   if (!item.tags.some((tag) => tag.kind === 'stat-bonus')) return;
 
   applyDeclared(state, PLAYER, item, state.time);

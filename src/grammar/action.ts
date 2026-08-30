@@ -7,10 +7,10 @@ import { list, ListParser } from './list';
 import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './parser';
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
-import { TagClause, tagClause } from './tagClause';
+import { KEYWORDS, keywordsIn, keywordsOn, TagClause, tagClause, withoutKeywords, type KeywordOn } from './tagClause';
 import { decimal, DECIMAL, id, refuseRange } from './values';
 
-export type ActionKind = 'instant' | 'duration' | 'continuous';
+export type ActionKind = 'duration' | KeywordOn<'action'>;
 
 export type Side = 'my' | 'their';
 
@@ -48,9 +48,7 @@ export interface Action {
 const results = resultList;
 const tagClauses = list(tagClause);
 
-const TAGGED_ACTION_KINDS = ['instant', 'continuous'] as const;
-
-const ACTION_KEYWORD_TAGS: ReadonlySet<string> = new Set<string>(TAGGED_ACTION_KINDS);
+const TAGGED_ACTION_KINDS = keywordsOn('action');
 
 const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
   once: 'tag "once" was never implemented — gate the action with `hidden if: <flag>` and `set:` that flag among its results',
@@ -321,16 +319,17 @@ export const actionProblem = (label: string, problem: string): string => `action
 function checkTags(action: Omit<Action, 'label'>, label: string, span: RawLine['span'] | undefined): void {
   for (const tag of action.tags ?? []) {
     if (tag.kind === 'duration') throw new DslError(actionProblem(label, 'a duration clause paces nothing on an action — write `time: <seconds>` or `rate: <per minute>`'), span);
-    if (tag.kind !== 'keyword' || ACTION_KEYWORD_TAGS.has(tag.value)) continue;
-    const retired = RETIRED_ACTION_TAGS[tag.value];
-    throw new DslError(actionProblem(label, retired ?? `unknown tag ${JSON.stringify(tag.value)} — an action's bare tags are ${[...ACTION_KEYWORD_TAGS].join(', ')}`), span);
+  }
+  for (const word of keywordsIn(action.tags ?? [], TAGGED_ACTION_KINDS).beyond) {
+    const retired = RETIRED_ACTION_TAGS[word];
+    throw new DslError(actionProblem(label, retired ?? `unknown tag ${JSON.stringify(word)} — an action's bare tags are ${TAGGED_ACTION_KINDS.join(', ')}`), span);
   }
 }
 
 function resolveKind(action: Omit<Action, 'label'>, label: string, lines: RawLine[]): ActionKind | undefined {
   const span = lines[0]?.span;
   checkTags(action, label, span);
-  const tagged = TAGGED_ACTION_KINDS.filter((kind) => (action.tags ?? []).some((tag) => tag.kind === 'keyword' && tag.value === kind));
+  const tagged = keywordsIn(action.tags ?? [], TAGGED_ACTION_KINDS).taken;
   if (tagged.length > 1) throw new DslError(actionProblem(label, `cannot be both ${tagged.join(' and ')}`), span);
 
   const problem = actionTableProblem({ ...action, label, kind: tagged[0] });
@@ -343,11 +342,13 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
   if (problem !== undefined) throw new DslError(problem, span);
 }
 
-// A pace an action may be written at, and where the engine takes that word only alongside another line, its own refusal is what the page says beside it. Filtering the word out instead left `continuous` in the corpus three times and on no page an author could read it off.
-const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => {
-  const caveat = actionTableProblem({ label: '', kind, results: [] });
-  return { form: kind, example: kind, family: 'how long it takes', ...(caveat === undefined ? {} : { note: caveat }) };
-});
+// A pace an action may be written at. Where the engine takes that word only alongside another line, its own refusal is what the page says beside it, and where it takes the word alone the page says what the word does. Filtering the word out instead left `continuous` in the corpus three times and on no page an author could read it off.
+const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => ({
+  form: kind,
+  example: kind,
+  family: 'how long it takes',
+  note: actionTableProblem({ label: '', kind, results: [] }) ?? KEYWORDS[kind].does,
+}));
 
 // A bare clause on an action holds on whoever is performing it while it runs, which is what the part it stands under says. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
 const CLAUSES = 'what it is worth to whoever performs it, while it is under way';
@@ -359,7 +360,9 @@ const untaken = (): string[] => paired(tagClause.forms, tagClause.examples).flat
 
 const CLAUSE_NOTE = (): string | undefined => {
   const refused = untaken();
-  return refused.length === 0 ? undefined : `in every shape but ${refused.join(' and ')}, which an action has no moment to roll`;
+  if (refused.length === 0) return undefined;
+  const shapes = refused.length === 1 ? refused[0]! : `${refused.slice(0, -1).join(', ')} and ${refused[refused.length - 1]!}`;
+  return `in every shape but ${shapes}, none of which an action reads: a bare word on an action is one of the paces above and nothing else, and it has no moment to roll a duration`;
 };
 
 const firstTaken = (): number => paired(tagClause.forms, tagClause.examples).findIndex((example) => example !== undefined && takesClause(example));
@@ -456,8 +459,7 @@ export function actionLines(action: Action): string[] {
   if (action.requires) lines.push(`${at('requires')}requires: ${condition.print(action.requires)}`);
   if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition.print(action.hiddenIf)}`);
   if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
-  const lifted = new Set(['instant', 'continuous']);
-  const tags = (action.tags ?? []).filter((each) => each.kind !== 'keyword' || !lifted.has(each.value));
+  const tags = withoutKeywords(action.tags ?? [], TAGGED_ACTION_KINDS);
   if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);
   if (action.time !== undefined) lines.push(`  time: ${action.time}`);
   if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? action.rate : printSided(action.rate)}`);
