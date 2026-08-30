@@ -130,10 +130,7 @@ function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | und
   return party;
 }
 
-// `restore: <resource>` with no amount before it fills the pool to whatever its ceiling is at the
-// moment it runs, which is the one thing a number cannot say: a ceiling a race, an item or a buff
-// has moved is not a figure anybody could have written down. There is deliberately no emptying form
-// until something needs one.
+// There is deliberately no emptying form until something needs one.
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
   if (sign > 0 && cursor.peek(/[0-9.]/) === null) {
     const resource = id.parse(cursor);
@@ -283,26 +280,65 @@ function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span
   return null;
 }
 
+// One result an author writes on a line: the word that opens it and tells it from every other, every
+// shape it takes, a line of each shape written out, and how the rest of it is read. The dispatch
+// below, the page an author reads, and the test for whether a line starts a result at all are every
+// one of them read off this, so a result written here once is parsed, offered and recognised with no
+// second list anywhere left to remember it.
+interface Leaf {
+  opens: RegExp;
+  forms: readonly string[];
+  examples: readonly string[];
+  read: (cursor: Cursor) => ActionResult;
+  // What is said beside one of this result's shapes where its letters do not carry it, under the shape itself.
+  notes?: Readonly<Record<string, string>>;
+}
+
+const LEAVES: readonly Leaf[] = [
+  { opens: /say:[ \t]*/, forms: ['say: <text>'], examples: ['say: the door is stuck'], read: (cursor) => ({ kind: 'say', text: cursor.take(/[^\n]*/) ?? '' }) },
+  { opens: /set[: \t][ \t]*/, forms: ['set: <flag>'], examples: ['set: found-key'], read: (cursor) => ({ kind: 'set', variable: parseVariable(cursor) }) },
+  { opens: /unset[: \t][ \t]*/, forms: ['unset: <flag>'], examples: ['unset: found-key'], read: (cursor) => ({ kind: 'unset', variable: parseVariable(cursor) }) },
+  { opens: /add:[ \t]*/, forms: ['add: <variable> <number>'], examples: ['add: gold 5', 'add: gold -3'], read: parseAdd },
+  {
+    opens: /give:[ \t]*/,
+    forms: ['give: <item>', 'give: <count> <item>', 'give: <least>-<most> <item>'],
+    examples: ['give: plank', 'give: 5 arrow', 'give: 5-10 arrow'],
+    read: (cursor) => parseGive(produced.parse(cursor)),
+  },
+  {
+    opens: /take:[ \t]*/,
+    forms: ['take: <count> <item>', `take: ${EVERYTHING}`],
+    examples: ['take: 3 plank', `take: ${EVERYTHING}`],
+    read: (cursor) => (cursor.take(EVERYTHING_TAKEN) !== null ? { kind: 'strip' } : { kind: 'take', ...quantified.parse(cursor) }),
+  },
+  {
+    opens: /xp:[ \t]*/,
+    forms: ['xp: <skill> <amount>'],
+    examples: ['xp: mining 4-7'],
+    read: (cursor) => {
+      const skill = id.parse(cursor);
+      cursor.take(/[ \t]+/);
+      return { kind: 'xp', skill, amount: countRange(cursor, 'an xp amount') };
+    },
+  },
+  { opens: /relocate:[ \t]*/, forms: ['relocate: <place>'], examples: ['relocate: camp'], read: (cursor) => ({ kind: 'relocate', location: id.parse(cursor) }) },
+  { opens: /discover:[ \t]*/, forms: ['discover: <place>'], examples: ['discover: camp'], read: (cursor) => ({ kind: 'discover', location: id.parse(cursor) }) },
+  { opens: /open modal:[ \t]*/, forms: ['open modal: <modal>'], examples: [`open modal: ${MODAL_SCREENS[0]}`], read: parseOpenModal },
+  { opens: /drain:[ \t]*/, forms: ['drain: <amount> <resource>[ from <me or them>]'], examples: ['drain: 5 health'], read: (cursor) => parsePool(-1, cursor) },
+  {
+    opens: /restore:[ \t]*/,
+    forms: ['restore: <amount> <resource>[ to <me or them>]', 'restore: <resource>[ to <me or them>]'],
+    examples: ['restore: 1-2 health', 'restore: health'],
+    read: (cursor) => parsePool(1, cursor),
+    notes: { 'restore: <resource>[ to <me or them>]': 'with no amount before it the pool is filled to whatever its ceiling stands at when this runs, which is the one thing a number cannot say: a race, an item or a buff may have moved it' },
+  },
+  { opens: /inflict:[ \t]*/, forms: ['inflict: <buff item>[ on <me or them>]'], examples: ['inflict: dazzled'], read: parseInflict },
+  { opens: /roll:[ \t]*/, forms: ['roll: <droptable>'], examples: ['roll: common-drops'], read: (cursor) => ({ kind: 'roll', table: id.parse(cursor) }) },
+  { opens: /stop(?![\w-])/, forms: ['stop'], examples: ['stop'], read: () => ({ kind: 'stop' }) },
+];
+
 function parseResult(cursor: Cursor): ActionResult {
-  if (cursor.take(/say:[ \t]*/) !== null) return { kind: 'say', text: cursor.take(/[^\n]*/) ?? '' };
-  if (cursor.take(/set[: \t][ \t]*/) !== null) return { kind: 'set', variable: parseVariable(cursor) };
-  if (cursor.take(/unset[: \t][ \t]*/) !== null) return { kind: 'unset', variable: parseVariable(cursor) };
-  if (cursor.take(/add:[ \t]*/) !== null) return parseAdd(cursor);
-  if (cursor.take(/give:[ \t]*/) !== null) return parseGive(produced.parse(cursor));
-  if (cursor.take(/take:[ \t]*/) !== null) return cursor.take(EVERYTHING_TAKEN) !== null ? { kind: 'strip' } : { kind: 'take', ...quantified.parse(cursor) };
-  if (cursor.take(/roll:[ \t]*/) !== null) return { kind: 'roll', table: id.parse(cursor) };
-  if (cursor.take(/inflict:[ \t]*/) !== null) return parseInflict(cursor);
-  if (cursor.take(/xp:[ \t]*/) !== null) {
-    const skill = id.parse(cursor);
-    cursor.take(/[ \t]+/);
-    return { kind: 'xp', skill, amount: countRange(cursor, 'an xp amount') };
-  }
-  if (cursor.take(/drain:[ \t]*/) !== null) return parsePool(-1, cursor);
-  if (cursor.take(/restore:[ \t]*/) !== null) return parsePool(1, cursor);
-  if (cursor.take(/relocate:[ \t]*/) !== null) return { kind: 'relocate', location: id.parse(cursor) };
-  if (cursor.take(/discover:[ \t]*/) !== null) return { kind: 'discover', location: id.parse(cursor) };
-  if (cursor.take(/open modal:[ \t]*/) !== null) return parseOpenModal(cursor);
-  if (cursor.take(/stop(?![\w-])/) !== null) return { kind: 'stop' };
+  for (const leaf of LEAVES) if (cursor.take(leaf.opens) !== null) return leaf.read(cursor);
   throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
 }
 
@@ -338,7 +374,8 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
   return results;
 }
 
-const LEAF_RESULT = /(?:say|add|give|take|xp|roll|inflict|drain|restore|relocate|discover|open modal):|(?:set|unset)[: \t]|stop(?![\w-])/;
+// Whether a line opens a result at all, which is a question only `LEAVES` can answer.
+const LEAF_RESULT = new RegExp(LEAVES.map((leaf) => leaf.opens.source).join('|'));
 
 export function startsResult(cursor: Cursor): boolean {
   return cursor.peek(LEAF_RESULT) !== null || cursor.peek(RANGED_SELECTOR) !== null || wrapperAt(cursor) !== null;
@@ -467,50 +504,13 @@ export const spansLines = (values: readonly ActionResult[] | undefined): boolean
 
 const printResults = (values: readonly ActionResult[]): string => values.map(printResult).join(', ');
 
-const LEAF_EXAMPLES: readonly string[] = [
-  'say: the door is stuck',
-  'set: found-key',
-  'unset: found-key',
-  'add: gold 5',
-  'add: gold -3',
-  'give: plank',
-  'give: 5 arrow',
-  'give: 5-10 arrow',
-  'take: 3 plank',
-  `take: ${EVERYTHING}`,
-  'xp: mining 4-7',
-  'relocate: camp',
-  'discover: camp',
-  `open modal: ${MODAL_SCREENS[0]}`,
-  'drain: 5 health',
-  'restore: 1-2 health',
-  'restore: health',
-  'inflict: dazzled',
-  'roll: common-drops',
-  'stop',
-];
+// The shapes and the lines, in the order `LEAVES` writes them, so a result added there reaches the
+// page an author reads by having been written down at all.
+const LEAF_FORMS: readonly string[] = LEAVES.flatMap((leaf) => leaf.forms);
 
-const LEAF_FORMS: readonly string[] = [
-  'say: <text>',
-  'set: <flag>',
-  'unset: <flag>',
-  'add: <variable> <number>',
-  'give: <item>',
-  'give: <count> <item>',
-  'give: <least>-<most> <item>',
-  'take: <count> <item>',
-  `take: ${EVERYTHING}`,
-  'xp: <skill> <amount>',
-  'relocate: <place>',
-  'discover: <place>',
-  'open modal: <modal>',
-  'drain: <amount> <resource>[ from <me or them>]',
-  'restore: <amount> <resource>[ to <me or them>]',
-  'restore: <resource>[ to <me or them>]',
-  'inflict: <buff item>[ on <me or them>]',
-  'roll: <droptable>',
-  'stop',
-];
+const LEAF_EXAMPLES: readonly string[] = LEAVES.flatMap((leaf) => leaf.examples);
+
+const LEAF_NOTES: Readonly<Record<string, string>> = Object.assign({}, ...LEAVES.map((leaf) => leaf.notes ?? {}));
 
 // A word standing for itself: it parses as the id it is written as, and its shapes are the whole of what may be written there.
 const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<string>> = {}): Parser<string> => ({
@@ -537,6 +537,7 @@ export const actionResult: Parser<ActionResult> = {
   holds: () => ({ place, modal: modalScreen }),
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,
+  notes: LEAF_NOTES,
 };
 
 // The parser behind a `<result>`, which is the same wherever one stands.
