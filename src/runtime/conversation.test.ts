@@ -127,6 +127,25 @@ describe('picking an entry out of a list', () => {
     expect(() => choose('more', cursor, registry, state)).toThrow(new RuntimeError('no choice matches "more": this list offers 0 "Tell me more", 1 "Nothing."'));
   });
 
+  // Two quests speaking through one entity name their threads apart only by the quest, so every tail
+  // short enough to leave the quest out fits both. Taking the first would take whichever the list drew
+  // first, and the list is drawn in the order of the words a player reads — so the same recording would
+  // take the other thread in another language and still pass.
+  it('refuses a name that fits two threads rather than taking whichever the language put first', () => {
+    const asking = (id: string, said: string) => [`# quest ${id}`, `title: ${id}`, '', 'stage opening:', `  log: ${id}.`, '  miki says:', `    ${said}`, '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
+    const registry = loaded(asking('an-errand', 'There is a thing I need.'), asking('a-favour', 'And a favour, while you are here.'));
+    const state = createGameState();
+
+    expect(() => choose('opening.miki.0.said', talk('miki', registry, state)!, registry, state)).toThrow(
+      new RuntimeError(
+        '"opening.miki.0.said" names more than one of this list: 0 "And a favour, while you are here." (a-favour.opening.miki.0.said), 1 "There is a thing I need." (an-errand.opening.miki.0.said). Write more of the one you mean',
+      ),
+    );
+
+    choose('an-errand.opening.miki.0.said', talk('miki', registry, state)!, registry, state);
+    expect(Object.keys(state.visits)).toEqual(['an-errand.opening.miki.0.said']);
+  });
+
   it('names a thread by the node and not by the phrase it is picked with, since the phrase is what moves', () => {
     const state = createGameState();
     const registry = loaded(own, both);
