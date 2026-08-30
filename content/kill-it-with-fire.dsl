@@ -73,14 +73,29 @@ stage groundwurm-fight:
     ask: About the noise under your house.
     again: Still under there, is it. Best you finish what you started before you come telling me about it.
     Whatever's under there now, it isn't rats. That much I'll grant you.
+  // Oolga asked for every rat breathing and the quest closes either way: what
+  // the player did to them is answered in what she says and what she pays, not
+  // in a door shut on the way out. One speech rather than two, because the
+  // middle of it — her thesis, and the hook under it — is the same whichever
+  // way the cellar was cleared, and a second copy of those two paragraphs is a
+  // second place to edit them.
+  // A line that is nothing but a fragment is said as a blank line when the
+  // fragment does not hold, so the two acknowledgements share one line and the
+  // two farewells share another: between them they always hold, so the line
+  // always has words in it. The one-sided fragment hangs off a sentence that
+  // is said either way.
   oolga says:
     when: wurm-defeated
     ask: It's dealt with.
-    So that's what was keeping the rats off. You didn't kill a one of them, which is more sense than I gave you credit for — and a great deal less than whatever bred that thing under my floor deserves.
-    "Repellent." She says the word like it has done something to personally annoy her. Chase off the small thing and something bigger fills the gap it left. That's not a recipe. That's how the whole world works, and I'd have thought somebody your age would know it by now.
+    So that's what was keeping the rats off.
+    {tulsa.cellar-rats-killed = 0: You didn't kill a one of them, which is more sense than I gave you credit for — and a great deal less than whatever bred that thing under my floor deserves.}{tulsa.cellar-rats-killed >= 1: You went through a few of mine on the way to it, though. I count what is eating out of my sacks, and there is less eating out of them tonight than there was this morning. Don't tell me they were in the way. Everything is in somebody's way.}
+    "Repellent." She says the word like it has done something to personally annoy her. Chase off the small thing and something bigger fills the gap it left. That's not a recipe. That's how the whole world works, and I'd have thought somebody your age would know it by now.{tulsa.cellar-rats-killed >= 1:  And a cellar you empty with a blade fills again by spring, with whatever is nearest. You have dug me the same hole twice and noticed it the once.}
     Somebody wanted my rats gone badly enough to plant a worm under them for it. That is not chance, and it is not my business to chase either, at my age.
-    xp: cooking.cooking 1500
-    Go on, then. Shelves are behind me. You've more than paid for the look.
+    if tulsa.cellar-rats-killed = 0:
+      xp: cooking.cooking 1500
+    if tulsa.cellar-rats-killed >= 1:
+      xp: cooking.cooking 500
+    {tulsa.cellar-rats-killed = 0: Go on, then. Shelves are behind me. You've more than paid for the look.}{tulsa.cellar-rats-killed >= 1: Shelves are behind me. You did the work and you'll have the look for it. You'll not have my good opinion along with it, and you can keep the tails.}
     goto cellar-cleared
 
 stage cellar-cleared:
@@ -136,6 +151,45 @@ travel: tulsa.oolga-basement
 use: entity.oolgas-sacks.slather-with-poison
 assert: corners-slathered
 assert: oolgas-basement.groundwurm-fight
+use: core.melee-combat on groundwurm until done
+assert: not core.fainted
+assert: wurm-defeated
+assert: tulsa.cellar-rats-killed = 0
+travel: oolga-house
+talk: oolga
+choose: continue
+assert: oolgas-basement.cellar-cleared
+
+// The other way through, which the route above cannot walk and no other route
+// in the module reaches: the player puts the rats down first and Oolga's task
+// is still finished, because there is no failure state here and never was. It
+// asks the two things the clean walk cannot ask — that a rat under this floor
+// is a rat the quest counts, and that a counted one still ends at
+// `cellar-cleared` — and the front of it is a fixture rather than a second
+// proof of the errands, which is why it says nothing about the vodka or the
+// stove that the walk above has already said.
+# test kill-it-with-fire-rats-put-down
+unkillable
+instant-kill
+load: sent-out-for-oolga
+equip: core.hand-axe
+travel: tavern-street
+travel: oolga-house
+talk: oolga
+choose: continue
+travel: tavern-street
+travel: sha-dynastys
+talk: sunny
+choose: oolgas-basement.seek-sunny.sunny.0.said
+choose: continue
+craft: sunnys-poison
+travel: tavern-street
+travel: oolga-house
+travel: tulsa.oolga-basement
+use: core.melee-combat on tulsa.cellar-rat until done
+assert: tulsa.cellar-rats-killed >= 1
+use: entity.oolgas-sacks.slather-with-poison
+assert: corners-slathered
 use: core.melee-combat on groundwurm until done
 assert: not core.fainted
 assert: wurm-defeated

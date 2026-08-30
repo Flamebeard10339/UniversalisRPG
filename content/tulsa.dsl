@@ -49,6 +49,8 @@ dependencies:
 
 # flag herbs-collected
 
+# flag cellar-rats-killed
+
 # flag overheard-the-captain
 
 // --- items ---
@@ -211,7 +213,7 @@ adjacent:
   oolga-house
   sewer-junction
 entities:
-  4 feral-rat, broken-wall, oolgas-sacks, groundwurm
+  4 cellar-rat, broken-wall, oolgas-sacks, groundwurm
 
 // --- the castle, at the top of the town ---
 
@@ -1168,6 +1170,25 @@ faction: world
 aggressive
 respawn after: 40s
 on death:
+  credit:
+    roll: feral-rat-remains
+
+// The rats under Oolga's floor, which are the only ones in town anybody has
+// asked to be left alive: same title, same examine and same numbers as a feral
+// rat anywhere else, and a separate id so that a death down there can be
+// counted without counting every rat in the sewers. They go the moment the
+// corners are slathered, which is what the repellent was for.
+# entity cellar-rat
+title: Feral Rat
+examine: A rat the size of a cat, hairless in patches and weeping where it is not.
+stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
+uses: core.melee-combat
+faction: world
+aggressive
+hidden if: corners-slathered
+respawn after: 40s
+on death:
+  add: cellar-rats-killed 1
   credit:
     roll: feral-rat-remains
 
