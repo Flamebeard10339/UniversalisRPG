@@ -28,95 +28,6 @@ and is the one place that rule is written.
 
 ---
 
-## A section written over another module's belongs to the module that wrote it
-
-Ruling on 2026-08-30: the id rule is a **defect**, not the design. All of a quest's flags
-are named inside the quest. Loading `tulsa` alone must read as if no quest touches it —
-strangely empty, with no hint of one. An entity or item leaves a quest module only when a
-*second* module needs it, and then it goes to the shared module both use. Tulsa is not a
-dummy: it is the skilling location, and skilling tasks genuinely belong there. If it reads
-bare, that is a real measurement — there are not enough skilling tasks in the city — and
-not a reason to push quest furniture into it.
-
-**Half of it landed on 2026-08-30 and this is the other half.** A **whole section** written
-at another module's address now belongs to whoever wrote it: the address stays as written, so
-`tulsa.mire` is still `tulsa.mire` to everything that names it, but the owner is the writing
-module, and print-back sends the body home to the file that declared it. A
-`# dialogue tulsa.guard-points` written from `the-swampy-menace`, owned by `tulsa.castle-guard`
-and gated on that quest's own stage, loads clean and round-trips clean into
-`the-swampy-menace.dsl`. `src/content/resolve.test.ts` holds the proof.
-
-**The other half is the printer, and it is not the `+` line — it is the merged list.** A
-location's `entities:` prints under whichever module **declares the location**, so tulsa's
-serialization names ids tulsa cannot see, however the entity was contributed. Three lanes hit
-it independently on 2026-08-30 and the third pinned it, having tried every shape:
-
-| what was tried | what the round trip said |
-|---|---|
-| `+entities: 4 cellar-rat`, rat declared in the quest | `tulsa … names kill-it-with-fire.cellar-rat, but kill-it-with-fire is not this module or one of its dependencies` |
-| the whole `# location tulsa.oolga-basement` body restated from the quest | identical |
-| `# entity tulsa.cellar-rat` declared from the quest — the shape the ownership half fixed | `tulsa … names an unknown entity: tulsa.cellar-rat` |
-
-So the ownership half does not half-help here; it does not help at all, and the third row is it
-working exactly as advertised and failing for that very reason. The same fold was measured on
-`the-bars-crawl` — moving `raw-blowfish` and `blowfish-hole` out and naming them from
-`+entities:` loads clean and fails the round trip — and keeping the id as `tulsa.blowfish-hole`
-while the body lives in the quest's file does not dodge it either, because visibility follows
-the owner rather than the address prefix.
-
-**No quest module in the corpus puts its own entity into a tulsa room, because the engine
-forbids it.** `attention-to-detail`, `the-bars-crawl` and `the-swampy-menace` each dodge it the
-same way — `tulsa.reporter`, `tulsa.blowfish-hole`, `tulsa.rat-toad` — and that dodge is the
-whole of why the list below exists. The fix is one sentence: **a foreign contribution to a body
-should print back as a patch under the contributing module rather than folded into the owner's.**
-
-So the migration is blocked, and this is what it moves the day it is not — out of
-`content/tulsa.dsl`, each carrying the comment above it that says it is tulsa's *because* a
-tulsa section may name nothing but tulsa's:
-
-| section | line | goes to | reaches tulsa through |
-|---|---|---|---|
-| `# item smiths-notes` | 697 | `a-grand-blade` | `# entity tulsa.anvil` `give: 1 smiths-notes` |
-| `# entity reporter` | 703 | `attention-to-detail` | `# location tulsa.market-row` `+entities:` |
-| `# flag overheard-the-captain` | 51 | `attention-to-detail` | `# location tulsa.market-rooftops` |
-| `# entity rat-toad` | 1337 | `the-swampy-menace` | `# location tulsa.swamp-mire` `+entities:` |
-| `# flag oolga-struck` | 47 | `the-swampy-menace` | `# entity tulsa.oolga` |
-| `# flag herbs-collected` | 49 | `the-swampy-menace` | `# entity tulsa.herb-patch` |
-| `# item raw-blowfish` | 1350 | `the-bars-crawl` | `# location tulsa.deep-water` via the hole |
-| `# entity blowfish-hole` | 1355 | `the-bars-crawl` | same |
-| `# entity cellar-rat` | — | `kill-it-with-fire` | `# location tulsa.oolga-basement` `entities:` |
-| `# flag cellar-rats-killed` | — | `kill-it-with-fire` | that rat's `on death:` |
-
-Three flags stay put and are genuinely tulsa's under the ruling, because a second module needs
-each: `corners-slathered`, `wurm-defeated`, `sewer-toll-paid`. `ball-of-a-boy`'s two patches
-have nothing parked in tulsa to bring home.
-
-**A third thing waits on the same half, and its fix is already measured.** `# entity
-tulsa.herb-patch` in `the-swampy-menace.dsl` writes the same nine-line *count the herb and
-narrate the find* block three times, once per herb — one-home shape 5 inside `content/`. Finds
-1 and 2 are byte-identical across all three; find 3 differs by one noun. The corpus already
-owns the idiom for saying it once: a `# droptable` is a named result list whose body runs in
-full, and `fishing.spend-bait` says so in its own comment. Both placements were built and both
-fail the round trip for this line's reason — a table declared in `the-swampy-menace` is refused
-because tulsa cannot depend on it, and a `# droptable tulsa.herb-find` declared *from* that
-file loads and resolves but does not survive printing, since the herb-patch override folds back
-into tulsa's file and tulsa then names a table it cannot see. The one placement that
-round-trips green is the table living in `tulsa.dsl` — which is quest furniture pushed into
-tulsa, exactly what the ruling above refuses, and `herbs-collected` is already on the list of
-things coming *out*. So it waits.
-
-*Once the patch half lands:* the table goes to `the-swampy-menace`, each of the three actions
-keeps only its own `time:`, `give:` and `say:` with the block replaced by one `roll:`, and a
-fourth herb is five lines in the quest and nothing in the table. That last part needs find 3's
-one herb-specific noun rewritten to name no herb, which is a line of prose to draft rather than
-a decision to take.
-
-*Closes when:* the registry keeps each module's own contribution at an address rather than only
-the merge, so a patch body prints back into the module that wrote it; then the eight sections
-above move, and the three `@@@` guards in `the-swampy-menace.dsl` are written as the guards
-they wanted to be. That is registry, merge and printer together — larger than the ownership
-half, which is why it was not half-landed alongside it.
-
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a
@@ -341,13 +252,30 @@ proved: the shrimp shoal, by `first-steps`' own routes. **The trout run and the 
 are walked by nothing**, because `content/fishing.dsl` holds no `# test` and no `# save` —
 fishing stands nowhere (`dependencies: core`), and a route needs somewhere to stand.
 
-Separately, `tulsa.blowfish-hole.cast-for-blowfish` in `the-bars-crawl` is still written in
-the old per-water shape rather than as an overlay of `cast`. It walks, so nothing is broken;
-it is the last copy of the thing the one-home pass removed.
+Separately, `the-bars-crawl.blowfish-hole`'s `cast for blowfish` is still written in the old
+per-water shape rather than as an overlay of `cast`. It walks, so nothing is broken; it is the
+last copy of the thing the one-home pass removed.
 
 *Closes when:* a route standing in tulsa walks a rod-and-bait cast at the deep water, and
 the blowfish hole is an overlay of `cast` like every other water. Both want whoever owns
 `tulsa.dsl` next, since that is where a fishing route can stand.
+
+## A condition wanted in several places is written out in each of them
+
+The three guard threads in `the-swampy-menace.dsl` — the gate guard, the guardsman and Larry,
+each pointing at the captain while the quest is on offer and untaken — carry the same
+`when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported
+and not oolgas-errands.errands` written out three times. One fact about when the pointer is live,
+in three places, which is the shape this repository spends its commits undoing.
+
+There is nothing to reach for. `npm run oracle -- dialogue` offers `when: <condition>` and
+nothing that names a condition and points at it; a `# flag` holds a fact somebody sets rather
+than a standing test, and a `# variable` holds a number. So the duplication is the language's
+rather than the author's, and it will recur the moment a fourth speaker joins them.
+
+*Closes when:* a condition can be declared once under a name and named wherever one is taken,
+with `npm run oracle` saying so off the declaration; then those three lines are one, and the
+comment above them that explains why they are three is deleted.
 
 ## Two homes for one check on an assembled action
 

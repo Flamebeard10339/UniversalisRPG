@@ -139,51 +139,73 @@ when hit:
     set: oolga-struck
     say: Oolga's mouth snaps shut around whatever she was about to say next.
 
-// @@@ the design wants every guard to point at the captain while the quest is
-// available and unstarted. Those three lines were written and taken back out: a
-// `# dialogue` added to an entity another module declares may name nothing but
-// that module's, and the condition they want is two other quests' stages. The
-// captain is found by walking to the barracks instead.
+// The guards point at the captain while the quest is on offer and not yet taken
+// up, which is the one window in which a player has no other reason to walk to
+// the barracks. Three threads rather than one line said three times: a guard on
+// the gate, a guard on the road and the guard sat on the hatch have different
+// reasons to have heard, and the words are each of theirs. The border guard is
+// Yanodonin's and hears nothing of Tulsa's captain, so he is not one of them.
+// Each is a thread rather than an `always`, so what each guard already says
+// stands beside it rather than being taken away. The window itself is written
+// out three times because the language has no way to name a condition once and
+// point at it; that is a gap in the grammar rather than a shape chosen here.
+# dialogue tulsa.castle-guard
+node the-captain-wants-you:
+  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  ask: Anything for me, then?
+  again: Round the side, and do not make her ask a third time.
+  For once, yes. Captain's been down to this gate twice asking after you by name, and she does not come down to this gate.
+  Round the side. Same place I always tell you she is, only this time she wants you in it.
 
-// The herb patch pays out the same three herbs it always did; what this adds
-// is the count and the two finds buried past it, keyed to how many distinct
-// herbs are in the pack rather than to which one it was — the order of
-// collection is what changes which is found when, and not which herb it was.
+# dialogue tulsa.guardsman
+node the-captain-wants-you:
+  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  ask: Anything doing?
+  again: Barracks. Captain. Today, if it is all the same to you.
+  Nothing up here, same as ever. Something at the barracks, though. Captain has had your name written down since the sewers, and she does not write names down for the pleasure of it.
+
+# dialogue tulsa.larry
+node the-captain-wants-you:
+  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  ask: Has anyone been asking after me?
+  again: She is still asking, and I am still no help to her.
+  The captain has, round this very hatch, and I told her I could not say where you were on account of not knowing. She looked at me as though that were my doing as well.
+  Go and see her before she comes back and makes it my doing twice.
+
+// What a first herb out of the patch turns up, said once for however many herbs
+// there are to pick. A `# droptable` body runs in full, so this is a named
+// result list rather than a roll with odds on it; keying the finds to how many
+// distinct herbs are in the pack rather than to which one it was is what lets
+// one list answer for all three, and lets a fourth herb be five lines here and
+// nothing at all in the list. The third find names no herb for the same reason.
+# droptable herb-find
+add: herbs-collected 1
+if herbs-collected = 1:
+  say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
+if herbs-collected = 2:
+  say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
+if herbs-collected = 3:
+  say: Something surges up out of the mud before your hand closes round it — not a rat, though it was one once, and not a toad either.
+
+// The herb patch pays out the same three herbs it always did; what this adds is
+// the count and the two finds buried past it, one `roll:` per herb.
 # entity tulsa.herb-patch
 pick thistle:
   time: 4
   if not has marsh-thistle:
-    add: herbs-collected 1
-    if herbs-collected = 1:
-      say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if herbs-collected = 2:
-      say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if herbs-collected = 3:
-      say: Something surges up out of the mud before your hand closes round the thistle — not a rat, though it was one once, and not a toad either.
+    roll: herb-find
   give: 1 marsh-thistle
   say: You take the head off a marsh thistle.
 pull root:
   time: 6
   if not has fen-root:
-    add: herbs-collected 1
-    if herbs-collected = 1:
-      say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if herbs-collected = 2:
-      say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if herbs-collected = 3:
-      say: Something surges up out of the mud before your hand closes round the root — not a rat, though it was one once, and not a toad either.
+    roll: herb-find
   give: 1 fen-root
   say: The root comes out of the mud with a sound you would rather not have heard.
 take the leaf:
   time: 12
   if not has adders-tongue:
-    add: herbs-collected 1
-    if herbs-collected = 1:
-      say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-    if herbs-collected = 2:
-      say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-    if herbs-collected = 3:
-      say: Something surges up out of the mud before your hand closes round the leaf — not a rat, though it was one once, and not a toad either.
+    roll: herb-find
   give: 1 adders-tongue
   say: One split leaf, taken whole.
 
@@ -226,6 +248,12 @@ on death:
 load: both-prior-quests-done
 equip: core.hand-axe
 travel: castle-gate
+// The gate guard's own pointer to the barracks, which stands only while the
+// quest is on offer and untaken: walked here so the way a player is actually
+// told where to go is the way this route goes.
+talk: castle-guard
+choose: continue
+assert: castle-guard.the-captain-wants-you.visits = 1
 travel: guard-barracks
 talk: guard-captain
 choose: continue
