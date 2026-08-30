@@ -350,3 +350,33 @@ thing an author should be told rather than made to discover.
 *Closes when:* a line left empty by its fragments is dropped rather than printed, or
 `npm run oracle` says under the fragment entry that it will not be — derived from whatever the
 printer actually does, so the page cannot drift from it.
+
+## Nothing tells a player to wear the net, so the lent net can never part
+
+Miki now offers another net to a player holding none, and a route walks it. But the thing that
+takes the first one away cannot happen on the shipped path, measured on 2026-08-30: **a net
+that is carried and not worn grants no `line-health` pool at all**, because `max-line-health`
+comes from the tackle. Ten game-minutes and 248 catches leave no pool in the save.
+`apology-route-full` never equips the net and nothing in the tutorial says to.
+
+So the repair is right and its trigger is unreachable. The tutorial teaches netting without
+teaching that tackle is worn, which is also why the false line survived long enough to be
+found by reading rather than by playing.
+
+*Closes when:* the tutorial says that a net is worn — a line of Miki's, most likely, since he
+is the one handing it over — and a route equips it, so the path a player is actually taught is
+the path the module proves.
+
+## A negative weight in a `one of:` fires no branch at all
+
+Found on 2026-08-30 while measuring how long a net takes to part: an item granting `-1000
+fishing` produced 300 casts with **no catch, no experience and no drain** — neither branch of
+the roll appeared to fire, rather than the roll settling on the other one.
+
+The input was invented rather than found in the corpus, so nothing ships in this state and it
+costs nobody anything today. It is here because a roll that silently does nothing is the
+shape a later author would lose an afternoon to, and because the language refuses malformed
+input everywhere else.
+
+*Closes when:* a weight the roll cannot use is refused at load with the line named, or the
+roll settles on a branch — either is fine, and the first is the language's usual answer.

@@ -143,3 +143,35 @@ be asking on a route where the rats are already levelling attack.
 *Moves on which of the three it is. `npm run balance` is where the answer is read rather
 than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
 pick, because the choice is about what the tutorial is teaching.*
+
+## Miki's nets can be farmed at twenty coin a lap
+
+Your ruling was that the lent net is a regular net and Miki simply offers another to a player
+holding none. That is built and it walks. It also means that while the quest stands on
+`apologised`, a player who sells the net in town — nets carry `value: 20`, and the market is
+reachable from that stage through the lockpick or the window — can walk back and be given
+another, as often as they like.
+
+The loop is capped only by the walk and by the stage ending the moment they show Miki a second
+level. It follows directly from the ruling rather than working around it, and at twenty coin a
+lap it may be entirely fine.
+
+*Moves on whether that faucet is acceptable. If it is, this is deleted. If it is not, the
+levers are a once-only replacement, a net Miki's is worth nothing for, or a shorter stage —
+each a lane's work, and choosing between them is a question about how much a tutorial should
+protect a player from themselves.*
+
+## Whether a net is meant to part at all at the shrimp pond
+
+Measured on 2026-08-30, on the shipped world: a **worn** small net at the shrimp shoal takes
+about **2.5 game-hours and 3,815 catches** to part, because line regeneration nearly keeps
+pace with the misses — the pool hovers just above empty for hours rather than draining.
+
+That is not "a run of misses", which is how the tutorial's low water reads. Either parting is
+not meant to be a real event at the pond and the drain is decoration, or it is and the
+regeneration is too generous there.
+
+*Moves on which of the two. `npm run balance` is where the answer is read off a run rather
+than reckoned, and either way it is a number in `fishing.dsl` rather than a shape in the
+engine — but which number, and whether it moves at all, is a decision about what the tutorial
+pond is for.*
