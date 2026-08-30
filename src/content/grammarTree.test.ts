@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
-import { offeringAt, type Offer } from './completion';
-import { headOf, shownIn } from './offerGroups';
+import { offeringAt } from './completion';
+import { gathered, shownIn } from './offerGroups';
 import { sectionFor, sectionKinds } from './sections';
 import { grammarLines, headingOf, namedGrammars, PART, RULES, standingAt, treeOf } from './grammarTree';
 
@@ -29,14 +29,16 @@ describe('the grammar tree', () => {
   it.each(sectionKinds())('%s shows every shape the page offers at the top of it', (kind) => {
     const opening = `# ${kind} probe\n`;
     const tree = grammarLines([kind]).join('\n');
-    // How the page gathers a shape under a keyword is the page's own rule, so it is asked rather than
-    // worked out again here: a second copy of it passes while the page shows nothing.
-    const shown = (form: string): boolean => {
-      if (tree.includes(form)) return true;
-      const head = headOf({ form } as Offer);
-      return head !== '' && tree.includes(head) && tree.includes(shownIn({ head, opens: null, offers: [] }, { form } as Offer));
-    };
-    for (const offer of offeringAt(opening, opening.length, []).offers) expect(shown(offer.form), `# ${kind} offers ${offer.form}, and its tree does not show it`).toBe(true);
+    // How the page gathers a shape under a keyword is the page's own rule, so the offers are put through
+    // it rather than through a second copy of it here — a copy passes while the page shows nothing.
+    for (const family of gathered(offeringAt(opening, opening.length, []).offers)) {
+      for (const group of family.groups) {
+        if (group.head !== null) expect(tree.includes(group.head), `# ${kind} gathers under ${group.head}, and its tree does not show it`).toBe(true);
+        for (const offer of [...(group.opens === null ? [] : [group.opens]), ...group.offers]) {
+          expect(tree.includes(shownIn(group, offer)), `# ${kind} offers ${offer.form}, and its tree does not show it`).toBe(true);
+        }
+      }
+    }
   });
 
   it('says so where no such kind is named', () => {

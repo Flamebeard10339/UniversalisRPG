@@ -1,5 +1,7 @@
 import { DslError, Parser } from './parser';
 
+export const PREFIX_MEANINGS = (): string => Object.entries(PREFIXES).map(([symbol, prefix]) => `${symbol} ${prefix}`).join(', ');
+
 export type DependencyPrefix = 'required' | 'incompatible' | 'unordered' | 'optional' | 'recommended';
 
 const PREFIXES: Record<string, DependencyPrefix> = {
@@ -86,6 +88,7 @@ export const dependency: Parser<Dependency> = {
     return { prefix, module, operator, version: version.parse(cursor) };
   },
   print: (value) => formatDependency(value),
-  forms: ['<module>', '! <module>', '~ <module>', '? <module>', '+ <module>', '<module> <comparison> <version>'],
-  examples: ['core', '! oldmod', '~ other', '? extras', '+ nice', '? extras >= 1.2.0', 'core = 2.0.0'],
+  forms: ['<module>', ...Object.keys(PREFIXES).map((symbol) => `${symbol} <module>`), '<module> <comparison> <version>'],
+  // The example is what says which sigil means what, so it is written out of `PREFIXES` and a sigil added there arrives here saying its own name.
+  examples: ['core', ...Object.entries(PREFIXES).map(([symbol, prefix]) => `${symbol} some-${prefix}-module`), 'core >= 1.2.0'],
 };

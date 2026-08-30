@@ -142,8 +142,8 @@ const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefine
 const valueOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
 
 // Every shape the parser takes, written out where it stands.
-const spelled = (parser: Parser<unknown>, written: (value: string) => string, said: object): Written[] =>
-  paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(example), ...said }]));
+const spelled = (parser: Parser<unknown>, written: (value: string) => string, said: object, shown?: string): Written[] =>
+  paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(shown ?? example), ...said }]));
 
 // A grammar with a name of its own is pointed at rather than written out: the field takes `<name>`,
 // and what a `<name>` is written with is said once, wherever the page says it. What the hole holds is
@@ -171,7 +171,7 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   // A family says what a line is for. Whether it was declared as a field, as a positional one or as a keyword is how the engine holds it, not what an author is choosing between, so a schema line joins no family unless its kind says which one it is in.
   const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }), ...filled };
   const named = pointedAt(parser, written, said);
-  const shapes = named === undefined ? spelled(parser, written, said) : [named];
+  const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];
   if (shapes.length === 0) return [];
   // A block's lines are a grammar of their own and already say what they hold; only what the field says over its parser is laid on them.
   const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...filledBy(spec) }));
