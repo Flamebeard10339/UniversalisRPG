@@ -203,7 +203,8 @@ export const produced: Parser<Produced> = {
   examples: ['arrow', '5 arrow', '5-10 arrow'],
 };
 
-const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
+// What a `{…}` a call site fills looks like. Exported because the runtime substitutes into the same shape, and two readings of it would drift the moment either widened.
+export const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
 // The parameters a pattern names, in the order it names them. A `{…}` is filled by whatever hands the pattern over, so a string nothing hands over names nothing it will get.
 export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(PARAM)].map((match) => match[1]!);

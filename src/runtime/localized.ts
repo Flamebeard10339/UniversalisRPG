@@ -5,7 +5,7 @@ import { EngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { withoutNote } from '../grammar/note';
-import { mintedName } from '../grammar/values';
+import { mintedName, PARAM } from '../grammar/values';
 
 declare const LOCALIZED: unique symbol;
 
@@ -17,7 +17,6 @@ export type AnswerTable<V extends Answer | number | boolean> = Readonly<Record<A
 
 export type Params = Readonly<Record<string, Localized | number>>;
 
-const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
 function substitute(pattern: string, key: string, params: Params): string {
   return pattern.replace(PARAM, (_whole, name: string) => {
