@@ -5,6 +5,7 @@ import { evaluateCondition, renderSegments } from './conditions';
 import { Choice, Dialogue, DialogueNode, givenByQuest, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
+import { namesSection } from '../content/namespace';
 import { Registry } from '../content/registry';
 import { withoutNote } from '../grammar/note';
 import { printSegments } from '../grammar/segment';
@@ -183,10 +184,8 @@ export interface MenuEntry {
   readonly named: boolean;
 }
 
-// An id is answerable whole or by any tail of itself, the way an id is written everywhere else here; authored words are answerable only whole.
-const spellings = (entry: MenuEntry): string[] => (entry.named ? entry.name.split('.').map((_, at, all) => all.slice(at).join('.')) : [entry.name]);
-
-const picks = (answer: string, entry: MenuEntry): boolean => answer === String(entry.index) || spellings(entry).includes(answer);
+// An id is answerable whole or by any tail of itself, under the same rule that says which section an id written short names; authored words are answerable only whole.
+const picks = (answer: string, entry: MenuEntry): boolean => answer === String(entry.index) || (entry.named ? namesSection(entry.name, answer) : answer === entry.name);
 
 // What the .dsl writes on the line, which is what an author reading their own file has in front of them — not what the locale table now says, and without a note the engine drops anyway.
 const authoredWords = (line: Spoken): string => withoutNote(printSegments(line.segments)).trim();
@@ -201,15 +200,24 @@ export function menuChoices(cursor: DialogueCursor, registry: Registry, state: G
   return offered(cursor, registry, state).map((entry) => ({ index: entry.index, display: spokenLine(registry, state, entry.choice), name: authoredWords(entry.choice), named: false }));
 }
 
+const shownAs = (entry: MenuEntry): string => `${entry.index} ${JSON.stringify(entry.display)}${entry.name === entry.display ? '' : ` (${entry.name})`}`;
+
 function noneMatches(answer: string, entries: readonly MenuEntry[]): RuntimeError {
-  const offering = entries.map((entry) => `${entry.index} ${JSON.stringify(entry.display)}${entry.name === entry.display ? '' : ` (${entry.name})`}`);
+  const offering = entries.map(shownAs);
   return new RuntimeError(`no choice matches ${JSON.stringify(answer)}: this list offers ${offering.length === 0 ? 'nothing' : offering.join(', ')}`);
+}
+
+// Two quests speaking through one entity name their threads apart only by the quest, so a tail short enough to leave the quest out fits both of them. Whichever it took would be whichever the list drew first, and the list is drawn in the order of words a player reads, so the answer would move with the language. It takes neither.
+function fitsMore(answer: string, matched: readonly MenuEntry[]): RuntimeError {
+  return new RuntimeError(`${JSON.stringify(answer)} names more than one of this list: ${matched.map(shownAs).join(', ')}. Write more of the one you mean`);
 }
 
 export function choose(answer: string, cursor: DialogueCursor, registry: Registry, state: GameState): DialogueCursor | null {
   const entries = menuChoices(cursor, registry, state);
-  const at = entries.findIndex((entry) => picks(answer, entry));
-  if (at === -1) throw noneMatches(answer, entries);
+  const matched = entries.filter((entry) => picks(answer, entry));
+  if (matched.length > 1) throw fitsMore(answer, matched);
+  if (matched.length === 0) throw noneMatches(answer, entries);
+  const at = entries.indexOf(matched[0]!);
 
   // Reading what was said is the whole of answering it, and what it leaves behind is the conversation over.
   if (standsAtWords(cursor)) return null;
