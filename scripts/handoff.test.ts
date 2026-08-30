@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { complaintsIn, featureFolders, folderLines } from './handoff';
+import { citedIn, complaintsIn, declaredIn, featureFolders, folderLines, proofComplaints } from './handoff';
 
-const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', open: ['open-agent.md', 'open-human.md'], missing: [], strays: [], items: 4, complaints: [], since: 0, lastWrote: 'abc1234 something', ...over });
+const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', open: ['open-agent.md', 'open-human.md'], proofs: [], missing: [], strays: [], items: 4, complaints: [], passing: [], ran: false, since: 0, lastWrote: 'abc1234 something', ...over });
 
 const item = (...body: string[]) => ['## The region wall', '', ...body].join('\n');
 
@@ -50,6 +50,51 @@ describe('what a folder has to say before a session hands it over', () => {
   });
 
   it('finds the folders that hand over, from the tree rather than from a list here', () => {
-    expect(featureFolders()).toContain(path.join('docs', 'authoring-loop'));
+    expect(featureFolders()).toContain(path.join('docs', 'open'));
+  });
+});
+
+describe('a line that hands its evidence over as a proof rather than a paragraph', () => {
+  const agent = ['## The roll fires no branch', '', '*Closes when:* `a-roll-settles-on-a-branch` passes.'].join('\n');
+
+  it('reads what a proof file declares out of the file, whichever half it is', () => {
+    expect(declaredIn('open-tests.dsl', ['# info open-tests', '', '# test a-roll-settles-on-a-branch', 'goto: camp'].join('\n'))).toEqual(['a-roll-settles-on-a-branch']);
+    expect(declaredIn('open-tests.test.ts', ["describe('a-roll-settles-on-a-branch', () => {", "  it('does', () => {});"].join('\n'))).toEqual(['a-roll-settles-on-a-branch']);
+  });
+
+  // Only what a line closes on: a proof mentioned in passing is prose about the work, and the citation has to be the clause or the two drift.
+  it('reads the citation off the closing clause and nowhere else', () => {
+    expect(citedIn(agent)).toEqual(['a-roll-settles-on-a-branch']);
+    expect(citedIn('The route in `a-roll-settles-on-a-branch` is worth a read.')).toEqual([]);
+  });
+
+  it('says nothing when a proof and the line closing on it name each other', () => {
+    expect(proofComplaints([['open-tests.dsl', '# test a-roll-settles-on-a-branch']], [['open-agent.md', agent]])).toEqual([]);
+  });
+
+  // A proof outliving the line it was written under is the stale comment this replaced, wearing a test's clothes.
+  it('names a proof no open line stands on', () => {
+    expect(proofComplaints([['open-tests.dsl', '# test a-roll-nobody-mentions']], [['open-agent.md', agent]]).map((each) => each.says)).toEqual(['a-roll-nobody-mentions stands under no open line — a proof is cited by the line it closes', expect.stringContaining('and no proof declares it')]);
+  });
+
+  it('names a line closing on a proof that is not there', () => {
+    expect(proofComplaints([], [['open-agent.md', agent]])).toEqual([{ file: 'open-agent.md', says: 'closes on a-roll-settles-on-a-branch passing, and no proof declares it' }]);
+  });
+
+  it('names a proof file holding nothing, since the two files are the whole format otherwise', () => {
+    expect(proofComplaints([['open-tests.dsl', '# info open-tests']], []).map((each) => each.says)).toEqual([expect.stringContaining('declares no proof')]);
+  });
+
+  // The whole point of running them: red is the ordinary state here, and green is the finding.
+  it('reports a proof that has gone green as a line that may already be closed', () => {
+    const lines = folder({ proofs: ['open-tests.dsl'], ran: true, passing: [{ file: 'open-tests.dsl', id: 'a-roll-settles-on-a-branch', passes: true }] }).join('\n');
+
+    expect(lines).toContain('a-roll-settles-on-a-branch passes now');
+    expect(lines).toContain('1 of them passing');
+  });
+
+  it('leaves a proof file out of the third-file complaint, and nothing else', () => {
+    expect(folder({ strays: ['settled.md'] }).join('\n')).toContain('settled.md stands beside them');
+    expect(folder({ proofs: ['open-tests.dsl'] }).join('\n')).not.toContain('stands beside them');
   });
 });

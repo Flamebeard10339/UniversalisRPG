@@ -232,7 +232,7 @@ describe('playbot', () => {
   });
 
 
-  // c6, narrowed for free text (see docs/specs' ## Decisions for 2026-08-22): the loop builds no
+  // Narrowed for free text: the loop builds no
   // selector of its own. It forwards exactly the line a well-behaved reply drew from the live
   // view to the same runLine every driver shares, and none of them come back refused as
   // unrecognised — walking a real session across many turns, not two hand-picked ones.

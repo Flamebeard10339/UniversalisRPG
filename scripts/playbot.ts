@@ -18,10 +18,6 @@ import { fileAuthoring } from './play-cli';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 
-
-// scripts/playbot.ts holds one live session and calls the model once per turn — see
-// docs/specs/a-turn-costs-what-the-last-turn-did.md, whose clauses this file exists to satisfy.
-
 export const repoRoot = path.join(import.meta.dirname, '..');
 
 // A mode is one declaration and nothing else: the framing it plays under, which of the command

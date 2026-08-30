@@ -63,6 +63,14 @@ export default defineConfig({
         extends: true,
         test: { name: 'tools', include: ['scripts/**/*.test.ts'], exclude },
       },
+      // The proofs standing under an open line in docs/<feature>/, which are red
+      // on purpose: each pins the behaviour that line asks for, so it goes green
+      // the day the line closes and is migrated by being moved. `npm test` names
+      // every project but this one, so a red here reddens nothing that gates.
+      {
+        extends: true,
+        test: { name: 'open', include: ['docs/**/*.test.ts'], exclude },
+      },
     ],
   },
 });

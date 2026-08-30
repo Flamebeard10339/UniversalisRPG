@@ -72,10 +72,10 @@ is the guard.
 # Work that outlives a session
 
 A feature that runs longer than one sitting hands over through **two** files in
-`docs/<feature>/` and nothing else: `open-agent.md` is what is still wrong that a
-lane can close on its own, and `open-human.md` is what is still wrong that waits on
-the author. **Read both before touching that work, and keep them current as you
-go.** A finding left only in a session transcript is lost.
+`docs/<feature>/`: `open-agent.md` is what is still wrong that a lane can close on
+its own, and `open-human.md` is what is still wrong that waits on the author.
+**Read both before touching that work, and keep them current as you go.** A finding
+left only in a session transcript is lost.
 
 Nothing is struck through in either — **done means deleted**, and the commit that
 closed a line is where its reasoning lives. An open line that changes hands
@@ -83,6 +83,19 @@ closed a line is where its reasoning lives. An open line that changes hands
 Every line names the thing that would close it, and `npm run handoff` reports one
 that names none: a reader who cannot tell an open question from a decision already
 taken invents work rather than doing it.
+
+**A line about behaviour may name a proof instead of describing one.** Two more
+files may stand in the folder, and no others: `open-tests.dsl` holds a route with
+nowhere yet to stand, and `open-tests.test.ts` holds everything a route cannot say —
+a refusal, the words a screen says. Each is named for the line it belongs to, each
+pins the behaviour that line **asks for** rather than the behaviour it has, and each
+is therefore red until the line closes. Nothing gates them: `npm test` names every
+vitest project but that one. So the line closes on its proof passing and says
+nothing the proof already says, `npm run handoff` runs them and reports a green one
+as a line that may already be closed, and closing the line migrates the proof into
+the suite by **moving** it. Not every line wants one — a judgement, a cost, a GUI
+beat has nothing to pin — and a proof no line stands on is reported like a third
+file.
 
 **What is already settled is not written down here.** A third file was tried — a
 `settled.md` that reached 1463 lines — and every fact in it was already in the code.
@@ -124,7 +137,10 @@ drifting toward heavy commenting is a design signal: it needs a seam.
 
 # Testing
 
-`npm test` runs the whole suite in about twenty seconds. Keep it there.
+`npm test` runs the whole suite in about twenty seconds. Keep it there. It names
+every vitest project but `open`, which is the proofs standing under an open line in
+`docs/<feature>/` — red on purpose, and described under *Work that outlives a
+session*.
 
 **Run the one file you are editing; that costs about a second.** `npm test` is the
 gate, not the loop — the twenty seconds are import and transform, a function of how
@@ -185,7 +201,7 @@ Tools, none of which are gates:
 - `npm run oracle [-- <kind>... | --at <draft.dsl> [--walk [<line>]]]` — print the grammar the editing page offers, as a tree per kind, short enough with no kind named to read whole; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world. `--walk <line>` goes on to say, of one line, where it sits, what it is read as and what may stand there, which is what to reach for when one line has you stuck; `--help` prints the rest. Reach for this before writing anything under `content/`, and again after each pass
 - `npm run authorbot -- --brief <file>` — hand one brief to a coding agent over a copy of `content/` and count what it reached for. The engine is refused unless `--open`, and every reach for it is a question the oracle did not answer, which is what the run is for. It writes nothing in this checkout
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
-- `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written
+- `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written. It also runs the proofs standing under their open lines and says which have gone green; `--quick` reports on the files without running them. `npm run open-tests` runs the `.test.ts` half alone, and `npm run probe -- content docs/<feature>/open-tests.dsl --test <id>` walks one route
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
 - `npm run review` — the next twenty sections still wanting a read, and `--read-next` signs off the same twenty. `--sheet` is the whole unbounded sheet, under the section that says it, in the order its module writes them; `[-- <module>...]` narrows either. The sheet a human reads to review the writing. Nothing has to be marked to appear on it, and a line someone rewrites after it was read comes back
 - `npm run probe -- content --record <test-id>` — runs a `# test` and prints the state it ends on as the `# save` body that test closes on, to paste back over the stale one

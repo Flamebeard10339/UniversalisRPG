@@ -1,12 +1,12 @@
 ---
 name: hand-over
-description: Use when a session is being closed out, wrapped up, ended for the day, or handed to whoever picks the branch up next — and whenever the user asks to write up, tidy, or catch up the docs for a long-running piece of work. Also use before clearing or recycling a session that has been running a while, and when starting a feature that will outlive one sitting and needs somewhere to hand over through. Writes and maintains docs/<feature>/ — open-agent.md and open-human.md, and nothing else.
+description: Use when a session is being closed out, wrapped up, ended for the day, or handed to whoever picks the branch up next — and whenever the user asks to write up, tidy, or catch up the docs for a long-running piece of work. Also use before clearing or recycling a session that has been running a while, and when starting a feature that will outlive one sitting and needs somewhere to hand over through. Writes and maintains docs/<feature>/ — open-agent.md, open-human.md, and the optional proofs standing under their lines.
 ---
 
 # Hand over
 
 A feature that outlives one session hands over through **two** files in
-`docs/<feature>/`, and nothing else:
+`docs/<feature>/`:
 
 | file | answers | when a line leaves |
 |---|---|---|
@@ -16,6 +16,58 @@ A feature that outlives one session hands over through **two** files in
 `npm run handoff` reads the folder off the tree, so there is no index to keep in
 step. **A third `.md` beside these two is reported as wrong**, whatever it is
 called.
+
+Two more files may stand there, and no others. They are optional, they hold proofs
+rather than prose, and the next section is how they work.
+
+| file | holds |
+|---|---|
+| `open-tests.dsl` | a `# test` route with nowhere yet to stand |
+| `open-tests.test.ts` | everything a route cannot say — a refusal, the words a screen says |
+
+## A line about behaviour names a proof instead of describing one
+
+A paragraph reproducing a bug has to be read and rebuilt before a lane can start,
+and it is paid for again every time the line changes hands. A proof is that
+paragraph kept as the artefact.
+
+**It pins the behaviour the line asks for, never the behaviour it has.** A test
+asserting the bug goes red when someone fixes it, outside a suite where nobody is
+watching, and is then a stale comment wearing a test's clothes. A test asserting
+the intent goes **green** the day the line closes, and its red output — the
+expectation beside the actual, or the step the route stopped on — is the
+reproduction, free.
+
+    *Closes when:* `a-line-of-only-a-false-fragment-is-dropped` passes.
+
+**That clause is the whole citation, and the prose says nothing the proof says.**
+The id in backticks followed by `passes` is what `npm run handoff` matches, in both
+directions: a proof no line closes on is reported like a third file, and a line
+closing on a proof that is not there is reported too. What the prose keeps is what
+the proof cannot hold — how it was found, what it cost, what was worked around so
+that nothing ships broken, and what a reader would otherwise get wrong.
+
+- **In `.dsl`:** one `# test <id>` per line. The module declares its own `# info`
+  and depends on whatever it stands in; `npm run handoff` walks it beside the
+  shipped corpus. A section the loader will not take stops the whole file, which is
+  why a refusal is never proved here.
+- **In `.test.ts`:** one top-level `describe('<id>', …)` per line. It is the `open`
+  vitest project, which `npm test` does not name, so red costs nothing — but `tsc`
+  does see it, so it has to compile.
+
+**Not every line wants one.** A judgement, a cost measured once, a GUI beat, a
+piece of writing to be read — none of those has behaviour to pin, and forcing a
+proof under them is the ceremony this format exists to avoid. Reach for one when
+the line is a defect and a lane will otherwise have to rebuild the repro.
+
+**Closing the line migrates the proof by moving it** — a `# test` into the module
+that now owns the route, a `describe` into the `.ts` beside the code — and the
+prose and the open line are deleted. Nothing is rewritten, which is the point of
+having pinned the intent.
+
+    npm run handoff              # runs them; --quick to skip
+    npm run open-tests           # the .test.ts half alone
+    npm run probe -- content docs/<feature>/open-tests.dsl --test <id>
 
 ## Everything already true is somewhere else, and none of those places is a doc
 
@@ -117,7 +169,7 @@ Then confirm `git status` is clean and the gates are green. Commit the docs with
 work, not after it.
 
 **Say in your closing summary that you wrote the handoff, and name the folder** —
-one line, e.g. *"Handoff written: `docs/authoring-loop/`."* Checking whether these
+one line, e.g. *"Handoff written: `docs/open/`."* Checking whether these
 files are current is the one thing the author does by hand, and that line is what
 they look for. Its absence is the signal to go and check, so never write it for a
 session that did not update them.

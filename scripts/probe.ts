@@ -330,7 +330,7 @@ export function splitDocuments(name: string, text: string): ModuleSource[] {
 
 const asSource = (file: string): ModuleSource => ({ name: path.basename(file).replace(/\.[^.]*$/, ''), text: readFileSync(file, 'utf8') });
 
-function readSources(files: readonly string[]): ModuleSource[] {
+export function readSources(files: readonly string[]): ModuleSource[] {
   return files.flatMap((file) => (file === '-' ? splitDocuments('stdin', readFileSync(0, 'utf8')) : sourceFiles(file).map(asSource)));
 }
 

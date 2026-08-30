@@ -9,6 +9,12 @@ agent could get wrong is a test, and a test is where they will meet it.
 Each line says what is wrong, how it is known, and what would close it. A line
 without evidence is a hunch and does not belong here yet.
 
+**A line about behaviour may hand its evidence over as a proof instead of a
+paragraph** — a route in `open-tests.dsl`, or a `describe` in `open-tests.test.ts`,
+named for the line and red until it closes. Then the line closes on the proof
+passing and says nothing the proof already says. `npm run handoff` runs them, so
+*does this still fail?* is answered rather than guessed.
+
 Everything here is proved headlessly — `npm test`, `npm run probe`,
 `npm run oracle`, `tsc --noEmit` — and the shape is already settled, so a lane can
 take one to the end without asking. What waits on the owner's play, his reading of
@@ -162,20 +168,15 @@ the stage-transition defect below.
 
 ## A line that is nothing but a conditional fragment prints as a blank line
 
-`{<condition>: <words>}` inside a `say:` is how one speech says different things on different
-paths. Measured on 2026-08-30, writing Oolga's two closings: a line whose **whole** content is
-one fragment renders as an **empty line** when the condition is false, rather than as nothing.
-The speech comes out with a hole in it.
+Met on 2026-08-30 writing Oolga's two closings, which was the corpus's first use of fragments
+— there were none before it, so nothing had met this. It was worked around by pairing the two
+acknowledgements on one line and the two farewells on another, so that between them one always
+holds, and by hanging the one-sided clause off a sentence said either way. That is a real
+technique and it is also the sort of thing an author should be told rather than made to
+discover, so whichever way this is answered the fragment entry in `npm run oracle` should say
+it off what the printer does.
 
-That run was the corpus's first use of fragments — there were none before it — so nothing had
-met this. It was worked around by pairing the two acknowledgements on one line and the two
-farewells on another, so that between them one always holds, and by hanging the one-sided
-clause off a sentence said either way. That is a real technique and it is also the sort of
-thing an author should be told rather than made to discover.
-
-*Closes when:* a line left empty by its fragments is dropped rather than printed, or
-`npm run oracle` says under the fragment entry that it will not be — derived from whatever the
-printer actually does, so the page cannot drift from it.
+*Closes when:* `a-line-of-only-a-false-fragment-is-dropped` passes.
 
 ## Nothing tells a player to wear the net, so the lent net can never part
 
@@ -224,10 +225,12 @@ was deliberately removed; George's was not, and should not be.
 
 The same reasoning is why the quest's closing `settled` stage gives a line only to Kelsa.
 
-*Closes when:* George's tulsa word is a thread rather than his `always`, the pre-quest hint
-stands beside it under `hired`, and a route walks both — his own answer and the quest's — from
-one talk. Whether other tulsa entities want the same treatment is answered by looking, not by
-listing: a shipped `always` on anyone a quest will ever speak through is the same trap.
+Whether other tulsa entities want the same treatment is answered by looking, not by listing: a
+shipped `always` on anyone a quest will ever speak through is the same trap. The route names
+the two threads it picks; whoever closes this owns those names and should rewrite them rather
+than work around them.
+
+*Closes when:* `george-answers-for-himself-while-the-quest-stands-beside-him` passes.
 
 ## `rate: their <stat>` is live grammar that reads as nought
 
