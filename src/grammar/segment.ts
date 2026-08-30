@@ -1,5 +1,5 @@
 import { Condition, condition, printReference, Reference } from './condition';
-import { DslError, parseWhole } from './parser';
+import { Cursor, DslError, Parser, parseWhole } from './parser';
 import { REFERENCE } from './values';
 
 export type TextSegment = { kind: 'literal'; text: string } | { kind: 'interpolate'; reference: Reference } | { kind: 'conditional'; condition: Condition; text: string };
@@ -56,3 +56,27 @@ export function printSegments(values: readonly TextSegment[] | undefined): strin
     })
     .join('');
 }
+
+const FRAGMENT = /\{[^}]*\}/;
+
+// What a line the game says to a player may hold besides its words. Every spoken line takes the same
+// one — a line of dialogue, an `again:`, the label on a `->` choice — so it is written here once and
+// every site that takes one points at it. What a `{…}` names is what a condition names, and what is
+// held there is put into the line in the player's own language.
+export const fragment: Parser<TextSegment> = {
+  parse: (cursor: Cursor) => {
+    const at = cursor.pos;
+    const raw = cursor.take(FRAGMENT);
+    if (raw === null) throw new DslError('a fragment is written {…}', { start: cursor.abs(at), end: cursor.abs(cursor.pos) });
+    return parseFragment(raw.slice(1, -1), cursor.abs(at) + 1);
+  },
+  print: (value) => printSegments([value]),
+  called: 'fragment',
+  holds: () => ({ condition }),
+  forms: ['{<held>}', '{<condition>: <words>}'],
+  examples: ['{player.name}', '{has-key: The key is heavy in my pocket.}'],
+  notes: {
+    '{<held>}': 'whatever the run holds under that name is put into the line here — an `<engine state>` path, a # flag or a # variable — and a thing the world declares arrives as its title',
+    '{<condition>: <words>}': 'those words are said only while the condition holds, and nothing stands in their place while it does not',
+  },
+};

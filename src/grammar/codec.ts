@@ -36,7 +36,12 @@ export function formFailures(name: string, forms: readonly string[], examples: r
 
 export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
 
-export const writtenFrom = (parser: Parser<unknown>): Written[] => paired(parser.forms, parser.examples).map((example, at) => ({ form: parser.forms[at]!, example: example ?? parser.forms[at]!, ...filledBy(parser) }));
+export const writtenFrom = (parser: Parser<unknown>): Written[] =>
+  paired(parser.forms, parser.examples).map((example, at) => {
+    const form = parser.forms[at]!;
+    const note = parser.notes?.[form];
+    return { form, example: example ?? form, ...filledBy(parser), ...(note === undefined ? {} : { note }) };
+  });
 
 export function roundTripFailures(name: string, parser: Parser<unknown>): string[] {
   if (parser.examples.length === 0) return [`${name} carries no examples`];

@@ -2,7 +2,7 @@ import { ActionResult, itemCost, parseResultLine, resultGrammar, resultLines, st
 import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, calledBlock, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { parseSegments, printSegments, TextSegment } from '../../grammar/segment';
+import { fragment, parseSegments, printSegments, TextSegment } from '../../grammar/segment';
 import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
 import { overlay } from '../merge';
 import { DIALOGUE_NODE } from '../namespace';
@@ -98,10 +98,10 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread; a thread with no `ask:` is named in the list by the first line it says' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
-  { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', note: 'what a node without `sticky` says on a visit after its first, instead of the silence it would fall to' },
-  { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said' },
+  { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', holds: () => ({ text: fragment }), note: 'what a node without `sticky` says on a visit after its first, instead of the silence it would fall to' },
+  { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said', note: 'the words as the player hears them. A bare line is read as this wherever it is no other shape, so it holds no grammar of its own — but any number of `<fragment>` may stand in it' },
   GOES(goes),
-  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition }), block: () => [{ ...GOES(goes), note: 'where picking this choice leads' }, ...resultGrammar()] },
+  { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition, choice: fragment }), block: () => [{ ...GOES(goes), note: 'where picking this choice leads' }, ...resultGrammar()] },
   ...resultGrammar(),
   ]);
 

@@ -18,6 +18,10 @@ export interface Parser<T> extends Filled {
   examples: readonly string[];
   // What an author calls this grammar where a line points at it rather than writing its shapes out. A grammar that has one is written out once under that name, and every line taking a value of it says `<name>`; one without is short enough to read where it stands.
   called?: string;
+  // What is said beside one of this parser's shapes, under the shape itself. A shape whose meaning a
+  // reader cannot get off its own letters says so here, where the shape is declared, rather than at
+  // each of the sites that take one.
+  notes?: Readonly<Record<string, string>>;
 }
 
 // A block of lines that is one grammar wherever it is written, under the name an author calls it. Laid
