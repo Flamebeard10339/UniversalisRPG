@@ -8,7 +8,8 @@
 // above it is what marks a # location starting. Every quest named in the notes
 // gets a module of its own that gives these entities more to say — take those
 // modules away and Tulsa still loads, and everyone here still has a word for a
-// traveller.
+// traveller. Kelsa is the one exception and is meant to be: the only thing she
+// ever said was the preamble to being hired, so it went where the hiring is.
 //
 // It depends on core for that furniture: the stat bases, the health pool, the
 // death event, the factions, the player, and melee-combat.
@@ -1532,25 +1533,6 @@ node complaining:
   again: Still was. Still wouldn't.
   It was better before. All of it. You would not remember.
 
-# dialogue kelsa
-owner = kelsa
-
-node blunt:
-  always
-  sticky
-  If you are here about the bees, say so. If you are not, there is the door and it is a nice one.
-  -> I am here about the bees.
-    goto the-third-hive
-  -> Not the bees.
-    goto the-door
-
-node the-third-hive:
-  Third hive, end of the row. Something has been in it that was never a bee, and I have not been down to look at what.
-  Ask George. He has the patience for the whole of it and I have not.
-
-node the-door:
-  Then there it is, and mind the step on your way through it.
-
 # dialogue george
 owner = george
 
@@ -1851,18 +1833,24 @@ assert: inventory.coin = 28
 assert: not has core.iron-sword
 assert: not has core.wooden-shield
 
-// Kelsa asks a question and the player can answer it, which is the whole of
-// this: the answer is a choice on her own line, and where it lands is George,
-// who her line says has the patience she has not. The answer is named by the
-// words it is written with here, so it stays the same answer in a language
-// that has moved every word she says.
-# test kelsa-takes-the-answer-she-asks-for
+// Kelsa's corner of the wall, and what is the town's about it rather than a
+// quest's. Her own word about the bees was a preamble to being hired and left
+// with the hiring; what stays here is George, who answers where she would not,
+// and the apiary past the postern — two hives working and handing over comb to
+// anybody who walks up to them. Unkillable because the drones in that field are
+// aggressive and what they cost is not what this is asking.
+# test kelsas-corner-is-the-towns-rather-than-a-quests
+unkillable
 load: in-town
 travel: kelsa-farmhouse
-talk: kelsa
-choose: I am here about the bees.
+talk: george
 choose: continue
-assert: kelsa.the-third-hive.visits = 1
+assert: george.helpful.visits = 1
+travel: bee-gate
+travel: apiary-field
+use: entity.first-hive.harvest-comb
+use: entity.second-hive.harvest-comb
+assert: has core.honeycomb
 
 // A kitchen on a lane is a kitchen. What makes a room somewhere a player can
 // cook is a thing standing in it that opens a station, and nothing about which
