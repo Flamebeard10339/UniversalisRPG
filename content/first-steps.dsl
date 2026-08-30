@@ -306,7 +306,7 @@ expect only: thieving-route-full-end
 //
 // The net and the water are both the world's own, so this route is also the claim
 // that the tackle Miki lends works on the shoals the rest of the game is built
-// out of: `net the shrimp` refuses anyone without one of the two nets, and it is
+// out of: the shoal's `cast` refuses anyone without one of the two nets, and it is
 // Miki's that answers for it here.
 
 # test apology-route-full
@@ -326,7 +326,7 @@ talk: first-steps.miki
 choose: continue
 assert: inventory.fishing.small-fishing-net = 1
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.net-the-shrimp until highest-level >= 2
+use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
 assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki
@@ -396,7 +396,7 @@ choose: finding-your-feet.apologised.miki.0.said
 choose: continue
 assert: has fishing.small-fishing-net
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.net-the-shrimp until highest-level >= 2
+use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
 assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki

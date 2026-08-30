@@ -1,17 +1,23 @@
-// Fishing — the skill, the water it is practised on, the tackle it is practised with, and the one
-// pool in the game that only exists while you are wearing something.
+// Fishing — the skill, the one cast, the waters it is practised on, the tackle it is practised
+// with, and the one pool in the game that only exists while you are wearing something.
 //
-// A cast is one roll weighed between two things: your `fishing` on one side and how hard the water
-// is on the other, written as a plain number beside it. Winning it puts the fish in your pack;
-// losing it costs the line. `line-health` is a real pool with a bar of
-// its own, and it is there only because the tackle you are wearing grants `max-line-health` — take
-// the tackle off and the pool is not there at all. When it empties, the tackle parts and is gone,
-// which is what `on line-parted:` below is.
+// The cast is `# action cast` and every water hangs off it, the way every foe in the game hangs off
+// `# action melee-combat`: `my` reads off the angler and `their` off the water, so one block is the
+// shrimp shoal and the salmon pool both. A water declares its own sheet — how deep it is — and, in
+// the block it overlays on the cast, what tackle reaches it, how often it gives you a chance,
+// what comes out of it, and what it says when it beats you. Nothing else is a water's business, and
+// a fifth water is those lines and no others.
 //
-// The fish are not fought and nothing here `depletes:` anybody's pool, deliberately: the engine
-// reports damage dealt and damage taken off any action that does, and combat pays its two skills on
-// exactly those two moments. A cast that depleted a pool would quietly train a player's arm every
-// time they went to the water.
+// `line-health` is a real pool with a bar of its own, and it is there only because the tackle you
+// are wearing grants `max-line-health` — take the tackle off and the pool is not there at all. When
+// it empties, the tackle parts and is gone, which is what `# droptable parted-tackle` below is.
+//
+// Nothing here `depletes:` anybody's pool, deliberately, and that is two facts rather than one. The
+// engine reports damage dealt and damage taken off any action that depletes, and combat pays its
+// two skills on exactly those two moments — so a cast that depleted a pool would train a player's
+// arm every time they went to the water. And a water that could be depleted could be felled, which
+// no water ever is: there is no pool on it to empty. A cast is contested rather than depleting, and
+// what a landed cast finishes is a whole of its own.
 
 # info fishing
 version: 1.0.0
@@ -34,6 +40,11 @@ group: core.skilling
 title: Line
 group: core.skilling
 
+// The other side of every cast, and no player ever carries it: how far down what you are after is.
+# stat depth
+title: Depth
+group: core.other
+
 # resource line-health
 title: Line
 rate: core.regeneration
@@ -47,6 +58,18 @@ trigger: on empty
 # skill fishing
 title: Fishing
 stat: fishing
+
+
+// --- the cast ---
+
+# action cast
+title: Fish
+continuous
+attempts: 1
+rate: 30
+accuracy: my fishing vs their depth
+on unfinished:
+  drain: 1 line-health
 
 
 // --- the tackle ---
@@ -137,8 +160,8 @@ take: 1 horsehair-line
 take: 1 steel-line
 
 // The one thing two waters both do, and the only part of a cast that is neither the fish nor the
-// water: a rod eats a strip every time the deep water wins. Both `cast for` blocks below roll this
-// rather than restating it.
+// water: a rod eats a strip every time it goes out. The two deep waters roll this rather than
+// restating it, and the two net waters do not roll it at all.
 # droptable spend-bait
 if has wrigglers:
   3 in 4:
@@ -172,73 +195,65 @@ value: 26
 //
 // Four kinds of water and a ladder up them. The two nets take the low water, where nothing is baited
 // and nothing is lost but the net; the rod takes the deep, where every cast eats a strip of bait and
-// the line is what pays for a miss. What a spot is worth by the minute is its cast rate times what
-// it lands times what it pays, and the three are on one line each below.
+// the line is what pays for a miss. A water's `fishing` is nought because a water fishes nothing:
+// it is the angler's half of the contest, and a water carries it only to stand on the other side.
 
 # entity shrimp-shoal
 title: Shrimp Shoal
 examine: A dark shifting patch a foot under, moving the way one thing moves.
-net the shrimp:
-  continuous
+stats: fishing 0, depth 8
+uses: cast
+cast:
   requires: has small-fishing-net or has large-fishing-net
-  rate: 30
-  one of:
-    fishing:
-      give: 1 raw-shrimp
-      xp: fishing 18
-    18x:
-      drain: 1 line-health
-      say: The net comes up heavy with nothing in it, and something in the mesh gives.
+  give: 1 raw-shrimp
+  xp: fishing 18
+  +on unfinished:
+    say: The net comes up heavy with nothing in it, and something in the mesh gives.
 
 # entity anchovy-shoal
 title: Anchovy Shoal
 examine: A shoal turning over on itself, all of it silver on one beat and gone on the next.
-net the anchovies:
-  continuous
+stats: fishing 0, depth 48
+uses: cast
+cast:
   requires: has small-fishing-net or has large-fishing-net
-  rate: 30
-  one of:
-    fishing:
-      give: 1 raw-anchovies
-      xp: fishing 24
-    45x:
-      drain: 1 line-health
-      say: They go under the net as one animal, and a strand parts as you haul it back.
+  give: 1 raw-anchovies
+  xp: fishing 24
+  +on unfinished:
+    say: They go under the net as one animal, and a strand parts as you haul it back.
 
 # entity trout-run
 title: Trout Run
 examine: Fast water over stones, and every so often something turns in it.
-cast for trout:
-  continuous
+stats: fishing 0, depth 80
+uses: cast
+cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 20
   roll: spend-bait
-  one of:
-    fishing:
-      give: 1 raw-trout
-      xp: fishing 44
-    90x:
-      drain: 2 line-health
-      say: It takes the bait, turns once, and the line sings and then stops singing.
+  give: 1 raw-trout
+  xp: fishing 44
+  +on unfinished:
+    roll: spend-bait
+    say: It takes the bait, turns once, and the line sings and then stops singing.
 
 # entity salmon-pool
 title: Salmon Pool
 examine: Slow black water under the far bank, deep enough that you cannot see the bottom of it in summer.
-cast for salmon:
-  continuous
+stats: fishing 0, depth 102
+uses: cast
+cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 20
   roll: spend-bait
-  one of:
-    fishing:
-      give: 1 raw-salmon
-      xp: fishing 55
-      1 in 200:
-        give: 1 anglers-knot-jewel
-        say: There is something wound into the gill plate that was not put there by a fish.
-    150x:
-      drain: 3 line-health
-      say: Something enormous takes it and simply keeps going.
+  give: 1 raw-salmon
+  xp: fishing 55
+  1 in 200:
+    give: 1 anglers-knot-jewel
+    say: There is something wound into the gill plate that was not put there by a fish.
+  +on unfinished:
+    roll: spend-bait
+    say: Something enormous takes it and simply keeps going.
 
 // --- what a line can be grown into ---
 //
