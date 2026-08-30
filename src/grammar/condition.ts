@@ -9,7 +9,11 @@ export const TIME = 'time';
 export const PLAYER = 'player';
 export const SETTING = 'setting';
 
-// A root the engine holds itself, in one of the two shapes it can take: one that names a kind reads the rest of the path as an id of that kind and is weighed against a number, and one that only stands for something reads a name of its own and is read as it is. Either way the one line standing for it wherever the shapes are shown is derived from it.
+// A root the engine holds itself, in one of the three shapes it can take: one that names a kind reads
+// the rest of the path as an id of that kind and is weighed against a number, one that only stands for
+// something reads a name of its own and is read as it is, and one that stands for a figure of its own is
+// written alone, weighed against a number, and says in `means` what its letters cannot. Either way the
+// one line standing for it wherever the shapes are shown is derived from it.
 interface Rooted {
   kind: string;
   stands: string;
@@ -20,39 +24,48 @@ interface Named {
   stands: string;
 }
 
+interface Bare {
+  means: string;
+  against: number;
+}
+
 // What the engine holds itself, rather than a flag an author declares. A root paired with a kind reads the rest of the path as an id of that kind, so `xp.thieving` is the writing module's own skill and a name nothing declares is refused where it is written.
 export const ENGINE_ROOTS = {
-  [TIME]: null,
+  [TIME]: { means: 'seconds of game time this run has taken', against: 30 },
   [PLAYER]: { stands: 'race' },
   [SETTING]: { stands: 'hardcore' },
   xp: { kind: 'skill', stands: 'thieving', against: 4 },
   level: { kind: 'skill', stands: 'mining', against: 2 },
+  'highest-level': { means: 'the level of whichever skill stands highest, so a bound on it is a bound on any one skill', against: 2 },
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
   stat: { kind: 'stat', stands: 'attack', against: 1.5 },
-} as const satisfies Readonly<Record<string, Rooted | Named | null>>;
+} as const satisfies Readonly<Record<string, Rooted | Named | Bare>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
 
 export const ENGINE_ROOT_NAMES = Object.keys(ENGINE_ROOTS) as EngineRoot[];
 
-const rooted = (root: EngineRoot): Rooted | Named | null => ENGINE_ROOTS[root];
+const rooted = (root: EngineRoot): Rooted | Named | Bare => ENGINE_ROOTS[root];
 
-const named = (held: Rooted | Named | null): held is Rooted => held !== null && 'kind' in held;
+const named = (held: Rooted | Named | Bare): held is Rooted => 'kind' in held;
+
+const bare = (held: Rooted | Named | Bare): held is Bare => 'means' in held;
 
 export const isEngineRoot = (path: readonly string[]): boolean => path.length > 0 && path[0] in ENGINE_ROOTS;
 
 export const rootedKind = (root: string): string | null => {
-  const held = root in ENGINE_ROOTS ? rooted(root as EngineRoot) : null;
+  if (!(root in ENGINE_ROOTS)) return null;
+  const held = rooted(root as EngineRoot);
   return named(held) ? held.kind : null;
 };
 
 // The shapes an author is shown for the roots are the roots themselves, so one added above reaches the page with no second list to remember.
-const ROOTED_LINES = ENGINE_ROOT_NAMES.flatMap((root) => {
+const ROOTED_LINES = ENGINE_ROOT_NAMES.map((root): { form: string; example: string; note?: string } => {
   const held = rooted(root);
-  if (held === null) return [];
-  if (!named(held)) return [{ form: `${root}.<name>`, example: `${root}.${held.stands}` }];
-  return [{ form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` }];
+  if (bare(held)) return { form: `${root} <comparison> <number>`, example: `${root} >= ${held.against}`, note: held.means };
+  if (!named(held)) return { form: `${root}.<name>`, example: `${root}.${held.stands}` };
+  return { form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` };
 });
 
 // Everything the engine keeps about a run that a condition may weigh, said in one place because it is
@@ -64,6 +77,7 @@ export const engineState: Parser<string> = {
   called: 'engine state',
   forms: ROOTED_LINES.map((line) => line.form),
   examples: ROOTED_LINES.map((line) => line.example),
+  notes: Object.fromEntries(ROOTED_LINES.flatMap((line) => (line.note === undefined ? [] : [[line.form, line.note] as const]))),
 };
 
 export const VISITS = 'visits';

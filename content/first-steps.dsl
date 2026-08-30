@@ -130,7 +130,7 @@ stage snubbed:
       goto snubbed
 
 stage apologised:
-  log: I went back and apologised. Miki took it, and put a price on it: one catch out of the pond behind his house, in a net he lent me.
+  log: I went back and apologised. Miki took it, and put a price on it: a second level in something, anything at all. He lent me a net and pointed at the pond behind his house.
   // Not sticky: the node hands over a net, and sticky replays a node whole, so
   // a player who talked this through four times walked away with four nets.
   // `again:` is the other half of that pair — the offer is made once, and what
@@ -138,13 +138,13 @@ stage apologised:
   first-steps.miki says:
     always
     ask: About squaring it with you.
-    again: The net's yours already. One shrimp out of the pond and we're square.
+    again: The net's yours already. A second level in anything and we're square - the pond's still out the back.
     give: fishing.small-fishing-net
-    Take the net - there's a pond out the back, and shrimp in it. Bring me one and I'll call us square. @@@ asked for "reach level 2 in any skill" as the unlock condition; the condition grammar (npm run oracle: a flag optionally compared to a number, has/not/and/or over items and flags declared by a # flag or an entity/location's own flags: field) has no skill-level or xp-threshold predicate, and no # event fires on a skill levelling up (its triggers are only on empty/on full/damage-dealt/damage-taken/missed/evaded/completed/unfinished) — nearest playable thing: Miki asks for one shrimp netted out of the pond behind the house instead, a plain item check
+    Take the net - there's a pond out the back, and shrimp in it. Get good enough at something to have a second level in it - fishing, or whatever else you find - and I'll call us square.
   first-steps.miki says:
-    when: has fishing.raw-shrimp
-    ask: I netted you your shrimp.
-    Shrimp. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
+    when: highest-level >= 2
+    ask: I have a second level to show for myself.
+    Level two in something. Right, then - you'll do. Door's open. Get yourself off this island, and that's the last of me you get.
     set: first-steps.front-door.unlocked
     goto sendoff
 
@@ -295,9 +295,14 @@ expect only: left-mikis-house
 // why this isn't miki-route-end.
 expect only: thieving-route-full-end
 
-// --- apology route: snub Miki, apologise, take the net, net a shrimp out of the
-// pond behind the house, and the door opens the ordinary way. Converges on Miki's
-// usual sendoff, since that line no longer says which route earned it.
+// --- apology route: snub Miki, apologise, take the net, work the pond behind the
+// house until a skill has a second level in it, and the door opens the ordinary
+// way. Converges on Miki's usual sendoff, since that line no longer says which
+// route earned it.
+//
+// Miki asks for a level and not for a catch, so the pond is one answer and not the
+// answer: this route walks the one the net is handed over for, and the door would
+// open the same for a player who levelled anything else.
 //
 // The net and the water are both the world's own, so this route is also the claim
 // that the tackle Miki lends works on the shoals the rest of the game is built
@@ -321,8 +326,8 @@ talk: first-steps.miki
 choose: continue
 assert: inventory.fishing.small-fishing-net = 1
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.net-the-shrimp until has fishing.raw-shrimp
-assert: has fishing.raw-shrimp
+use: entity.fishing.shrimp-shoal.net-the-shrimp until highest-level >= 2
+assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki
 choose: continue
@@ -391,8 +396,8 @@ choose: finding-your-feet.apologised.miki.0.said
 choose: continue
 assert: has fishing.small-fishing-net
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.net-the-shrimp until has fishing.raw-shrimp
-assert: has fishing.raw-shrimp
+use: entity.fishing.shrimp-shoal.net-the-shrimp until highest-level >= 2
+assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki
 choose: finding-your-feet.apologised.miki.1.said
