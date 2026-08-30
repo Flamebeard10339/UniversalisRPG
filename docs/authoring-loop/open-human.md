@@ -106,3 +106,40 @@ the lever is still which entities stand there rather than a number in the engine
 
 *Moves when: the map pass he named is opened — not before, and not by a lane deciding on its
 own that the quests are finished enough. He says when.*
+
+## A caught hand stalls at nothing, not halfway
+
+Your ruling was that a stall is a timed debuff taking the rate to zero and the resource
+holds where it stood. The engine now does exactly that: a `-100%` rate granted part-way
+through a reach leaves the drawn fraction where it was and picks back up when it wears
+off. Measured — `before 0.5 → stalled 0.5 → 0.75`, clock `{ progress: 1500, span: 2000 }`.
+
+**A real caught hand never sees it.** Driven against the shipped corpus at step sizes 50,
+137, 200 and 1000 ms, the catch always lands with `progress: 0`: the `one of:` roll
+resolves at the **end** of a reach, so `dazed` arrives with the clock already back at
+nothing. The player still watches an empty bar sit still for three seconds, which is the
+thing you were ruling against.
+
+For a bar frozen half-full off a catch, the catch has to **interrupt** a reach rather than
+conclude one, and `continuous` plus `one of:` has no way to say that. `dazed` is also the
+only rate-to-zero in the whole corpus, so nothing else exercises the held path today.
+
+*Moves on a ruling on whether a roll may interrupt the attempt it is rolled inside. That is
+a grammar question rather than a runtime or content one, and the shape it takes — a second
+kind of roll, a mid-attempt hook, something else — is a lane's work once named.*
+
+## The tutorial now ends holding fifty-six shrimp
+
+Miki's unlock asks for what he always meant to ask for — reach a second level in any skill
+— now that the condition grammar can say it. Walked: fishing pays 18 xp a shrimp against
+1000 for the first level, so the route takes **56 catches and 147 seconds of game time**,
+and the apology route ends with 56 raw shrimp in the pack.
+
+It walks fine and fast, and nothing is broken. But a tutorial beat that hands a player
+fifty-six of one item is a shape someone should look at, and there are three different
+answers — the first level is expensive for a tutorial, or netting is cheap, or Miki should
+be asking on a route where the rats are already levelling attack.
+
+*Moves on which of the three it is. `npm run balance` is where the answer is read rather
+than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
+pick, because the choice is about what the tutorial is teaching.*

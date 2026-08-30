@@ -87,20 +87,48 @@ dummy: it is the skilling location, and skilling tasks genuinely belong there. I
 bare, that is a real measurement — there are not enough skilling tasks in the city — and
 not a reason to push quest furniture into it.
 
-What is wrong today, found on 2026-08-30 when the first pass's five modules were merged: a
-`# entity tulsa.oolga`, a `# location tulsa.deep-water` or a `# dialogue tulsa.guardsman`
-written from a quest may name **nothing** of the quest's own. The corpus loads either way;
-only printing it and reading it back says so, which is why no authoring run could see it and
-why all five hit it. Under that rule the four merged quests pushed five pieces into `tulsa`
-— the bladesmith's notebook, the reporter, the mire's rat-toad, the blowfish and its hole —
-plus three flags, and it cost three guard lines that could not follow it, marked `@@@` in
-`the-swampy-menace.dsl` and listed by `npm run notes`.
+**Half of it landed on 2026-08-30 and this is the other half.** A **whole section** written
+at another module's address now belongs to whoever wrote it: the address stays as written, so
+`tulsa.mire` is still `tulsa.mire` to everything that names it, but the owner is the writing
+module, and print-back sends the body home to the file that declared it. A
+`# dialogue tulsa.guard-points` written from `the-swampy-menace`, owned by `tulsa.castle-guard`
+and gated on that quest's own stage, loads clean and round-trips clean into
+`the-swampy-menace.dsl`. `src/content/resolve.test.ts` holds the proof.
 
-*Closes when:* an overriding section carries the id namespace of the module that wrote it
-through print-and-reload, the five pieces and three flags come back out of `tulsa` into the
-quests that declared them, and the three `@@@` guards in `the-swampy-menace.dsl` are written
-as the guards they wanted to be. The proof is print-back: the module that declared a body is
-the module that gets it back.
+**A `+<line>` patch does not do that yet, and it is what every one of the five pieces uses.**
+A patch body still folds into the module it patches on print-back, because the printer prints
+from the merged built value and the base module cannot print its pre-patch self. Measured, not
+reasoned: moving `raw-blowfish` and `blowfish-hole` into `the-bars-crawl` and rewriting
+`+entities:` to name `the-bars-crawl.blowfish-hole` loads clean and then fails the round trip
+with *`tulsa resolve: # location tulsa.deep-water entities: names the-bars-crawl.blowfish-hole,
+but the-bars-crawl is not this module or one of its dependencies`*. Keeping the id as
+`tulsa.blowfish-hole` while the body lives in the quest's file does not dodge it either:
+visibility follows the owner, not the address prefix.
+
+So the migration is blocked, and this is what it moves the day it is not — out of
+`content/tulsa.dsl`, each carrying the comment above it that says it is tulsa's *because* a
+tulsa section may name nothing but tulsa's:
+
+| section | line | goes to | reaches tulsa through |
+|---|---|---|---|
+| `# item smiths-notes` | 697 | `a-grand-blade` | `# entity tulsa.anvil` `give: 1 smiths-notes` |
+| `# entity reporter` | 703 | `attention-to-detail` | `# location tulsa.market-row` `+entities:` |
+| `# flag overheard-the-captain` | 51 | `attention-to-detail` | `# location tulsa.market-rooftops` |
+| `# entity rat-toad` | 1337 | `the-swampy-menace` | `# location tulsa.swamp-mire` `+entities:` |
+| `# flag oolga-struck` | 47 | `the-swampy-menace` | `# entity tulsa.oolga` |
+| `# flag herbs-collected` | 49 | `the-swampy-menace` | `# entity tulsa.herb-patch` |
+| `# item raw-blowfish` | 1350 | `the-bars-crawl` | `# location tulsa.deep-water` via the hole |
+| `# entity blowfish-hole` | 1355 | `the-bars-crawl` | same |
+
+Three flags stay put and are genuinely tulsa's under the ruling, because a second module needs
+each: `corners-slathered`, `wurm-defeated`, `sewer-toll-paid`. `ball-of-a-boy`'s two patches
+have nothing parked in tulsa to bring home.
+
+*Closes when:* the registry keeps each module's own contribution at an address rather than only
+the merge, so a patch body prints back into the module that wrote it; then the eight sections
+above move, and the three `@@@` guards in `the-swampy-menace.dsl` are written as the guards
+they wanted to be. That is registry, merge and printer together — larger than the ownership
+half, which is why it was not half-landed alongside it.
 
 ## A fishing water is never used up, and fishing must not drift from combat
 
@@ -124,18 +152,6 @@ no cast trains an arm. If the last of those cannot be had without touching the g
 lane says so with the measurement rather than shipping a cast that pays combat xp — the
 ruling bypasses engine work, it does not license the leak.
 
-## A stalled run holds where it stopped, because the rate went to zero and not the bar
-
-Ruling on 2026-08-30: being caught pickpocketing is a **timed debuff that takes the thieving
-rate to 0**. The resource stalls wherever it had got to — halfway is halfway — and there is
-no flag for it. The published fraction reading `0` while a run is stalled is the defect, and
-the `stalled` flag a lane published beside it so a renderer could draw the bar stopped is the
-thing that goes.
-
-*Closes when:* the stall is a rate taken to zero by an ordinary timed debuff, the published
-fraction holds the value it stalled on, the `stalled` flag is gone from the view, and a test
-drives a caught hand and reads a held fraction rather than a zero.
-
 ## Miki offers another net to a player who has none
 
 Ruling on 2026-08-30: **no exemptions** — the lent net is a regular net and parts like one.
@@ -150,46 +166,6 @@ so it is a false line rather than a softlock.
 
 *Closes when:* Miki's `again:` branches on whether the player holds a net and hands over
 another when they do not, and a route parts the net and takes the replacement.
-
-## Load order decides, and the tie-break that says otherwise goes
-
-Ruling on 2026-08-30: **load order determines everything.** Any other heuristic breaks under
-real conditions, and mods already control load order through their dependencies.
-
-`addressable`'s `declares` tie-break says in its own comment that when two modules write a
-section at one address the **declaring** module's body is kept. Measured while the naming
-rule was being folded into one place: **533 of 533 shipped sections take the true branch**,
-so it never decides anything and the behaviour already reduces to *last source wins*. It is a
-comment claiming a rule the code does not enforce.
-
-*Closes when:* the tie-break and its comment are deleted, last-source-wins is what the code
-says and what a renamed test names, and the shadowing rule that lets a staged edit override a
-shipped section still works — which it should, since a staged edit is loaded last, and the
-lane proves that rather than assuming it.
-
-## A quest may have starting requirements, and one of them the grammar cannot say
-
-Ruling on 2026-08-30, and it closes one question by dismissing it: **Miki's quest does not
-stop any other quest from starting.** So `leave-tutorial-island.adrift` picking up while
-`finding-your-feet` is mid-lesson is not a bug, no gate is added, and the words already
-repaired — the dismissal and the "last word" journal line gone, with
-`first-steps.the-town-is-found-before-the-lesson-is-over` proving both threads stand together
-— are the whole of the answer. The route `the-apology-survives-going-out-of-the-window`
-stays as it is.
-
-What he opened in the same breath is the real line: **quests should have starting
-requirements** — other quests, level requirements, and so on. Other quests they already have;
-`adrift` is gated on `tulsa.market-square.touched`. Level requirements they do not, and the
-corpus has asked twice: Miki's own offer wanted *"reach level 2 in any skill"* and got a
-plain item check instead, and the `@@@` on
-`dialogue.first-steps.finding-your-feet.apologised.miki.0.said.line.0` records the refusal —
-the condition grammar takes a flag optionally compared to a number and `has`/`not`/`and`/`or`
-over items and flags, and has no skill-level or xp predicate at all. No `# event` fires on
-levelling either.
-
-*Closes when:* a quest's start condition can name a skill level, the `@@@` on Miki's offer
-comes out because the thing it asked for is now sayable, and `npm run oracle` prints the
-predicate under the condition grammar without anyone listing it there.
 
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
@@ -287,45 +263,6 @@ quest, these numbers are the before. If it still does not, the premise is answer
 is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
 came out of playbot reports, and no agent reading the corpus had found either.
 
-## `<keyword>` is the one hole on the page whose vocabulary the page does not name
-
-The page writes `<keyword>   e.g. sharp` and stops, and two keywords in that hole are load-bearing:
-an item tagged `food` that also carries a `stat-bonus` grants it when an action takes the item
-(`grantFoodBuff` in `src/runtime/runtime.ts`), and a buff source tagged `stacks` adds a stack rather
-than replacing the one already there (`grantBuff` in `src/runtime/buffs.ts`). Neither word is
-declared anywhere the grammar page can read, so neither is on it, and an author cannot tell a
-keyword the engine acts on from one that is decoration.
-
-`instant` and `continuous` are the same kind of word done right: declared in `src/grammar/action.ts`
-as `TAGGED_ACTION_KINDS`, turned into `Written` lines there, and printed under the action kind.
-
-Known from a run on 2026-08-29 that was allowed to read the engine: it grepped the corpus for
-`food`, found items tagged with it, could not tell whether the word meant anything, and read
-`src/runtime/runtime.ts` to find out. That was three of its nineteen reaches into `src/`.
-
-*Closes when:* `food` and `stacks` are declared where the page reads them, the way the two action
-kinds are, so `npm run oracle` names them under `<keyword>` — and the proof is that the page names
-every keyword the engine branches on, derived rather than listed.
-
-## The overlay is the one thing a quest needs first and the one thing nothing shows
-
-Writing over a section another module declared is how a quest reaches into a town: a second body at
-`# location tulsa.apiary-field` with `+entities:` under it. The page gives the two lines that do it
-one entry each under *writing over a body already there* — and **the shipped corpus writes neither,
-not once**, so there is no worked example of the whole shape anywhere in the world an author reads.
-
-Both arms of the 2026-08-29 run hit this before anything else and neither could get at it from the
-page. The arm that could read the engine went to `sections/location.ts` and then `merge.test.ts`;
-the arm that could not wrote a block into its own draft labelled *SCRATCH: probing cross-file
-patching, to be removed* and found the shape by experiment. It cost the second arm about
-twenty-five turns, most of them cycling `--at`.
-
-Half of that was the id rule, which is fixed. What is left is that the shape has no example.
-
-*Closes when:* the example on the `+<line>` entry shows the heading it is written under and not
-only the line — or a module that ought to be reaching into another one is written that way, so the
-corpus carries the shape. The first is the smaller change and does not wait on content.
-
 ## Three of the ten quest notes still have no module, and what one costs is measured
 
 Plague Matters, Reverse Infiltration and The Rat Conspiracy. They are last because each
@@ -353,54 +290,3 @@ spent replies 59 through 124 hand-building throwaway `DEBUG` sections, all of it
 the stage-transition defect below.
 
 *Closes when:* the three are written and merge with the suite green.
-
-## A stage does not leave on a flag an action set, and five runs lost time to it
-
-All five runs hit it independently and none could see why. `done when: <flag>` does not
-fire when the flag is set by an action, and `assert: <quest>.<stage>` immediately after
-reads stale — while a plain `assert: <flag>` on the same line reads true. The transition
-is correctly in effect a few directives later, once the route has travelled or talked.
-
-Four triggers were named: a `set:` inside a `one of:` branch, a `craft:`, an entity's
-`on death:`, and a location's `.touched`. The swampy run reduced it furthest and against a
-bare universe — `core` + `combat` + `tulsa`, none of its own module loaded — to *two
-differently-named actions on the same entity back to back silently drop the second
-action's `give:`*, cleared reliably by leaving the room and returning. The a-grand-blade
-run reduced it to a two-line repro and reported the narrower shape: a `done when:` never
-picks up a flag set by an action added to a **foreign** entity, while the identical shape
-against a native entity's own action advances correctly.
-
-Every one of the five wrote a workaround into its route rather than a fix, so the corpus
-now carries four different ways of stepping around the same thing.
-
-*Closes when:* the repro is run against the engine and the transition either fires when
-the flag is set or the oracle says plainly when it does not — and the four workarounds
-come back out of the routes.
-
-## An authoring run says nothing until it is over, and nothing shorter than this launches it
-
-The harness prints each tool call as it happens, but a run redirected to a log is silent
-for twenty-five minutes and there is no way to watch one. Five in parallel meant polling
-the log files by hand to tell a run that was working from a run that was stuck — which is
-how the a-grand-blade debug loop went unnoticed for sixty replies.
-
-The command is also this, every time:
-
-    npm run authorbot -- --brief <path>/<quest>.md --target <quest>.dsl --turns 150
-
-`--brief` and `--target` are the same word twice, `--turns 150` was needed by three of the
-five runs and the default is 80. There is a case for the flexibility — a brief and the
-module it writes are not always the same name — so this is not simply a flag to delete.
-
-*Closes when:* a run can be watched while it runs, and the common shape of the invocation
-is one word rather than three flags — without taking away the ability to point a brief at
-a module of a different name.
-
-## Two traps that cost a run each, written down so they do not cost a third
-
-- **`npx` on Windows truncates a multi-line argument at its first newline and silently drops every argument after it.** A briefed run was launched with `--brief "$(cat brief.txt)" --save … --local … --turns 100`; `parseArgs` received five arguments, not nine. The bot ran with a one-paragraph brief, no `--save`, and staged into the shipped corpus. Nothing said so. **Use `node --import tsx scripts/playbot.ts`.**
-- **Nothing detects a truncated brief.** The run above was read as evidence for two hours before the cause was found. A brief that arrives as one line is indistinguishable from a brief that was one line.
-
-*Closes when:* a run refuses, or at least says out loud, that its brief arrived as a single line
-when the operator passed a file — or the brief is passed as a file rather than as an argument, which
-removes the shape of the trap rather than reporting it.
