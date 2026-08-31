@@ -8,9 +8,15 @@ import type { ModuleSource } from '../src/content/universe';
 import { TIME, type Condition } from '../src/grammar/condition';
 import { roadDepths } from '../src/runtime/journey';
 import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
-import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession } from '../src/runtime/session';
+import { nextBoundary } from '../src/runtime/runtime';
+import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession, type PlaySession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
 import { MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
+
+// The state a run is walked against, taken off the thing that makes one. Naming the type instead
+// would put the whole of the engine's state on the surface `published.test.ts` audits, and a sweep
+// reaches for none of it: what it reads is a clock, a place and two tallies.
+type Walked = ReturnType<typeof createGameState>;
 
 export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
@@ -33,8 +39,13 @@ const usage = [
   'buff, a proc, an on-kill effect, a pack of two, or retaliation is priced in by having happened.',
   '',
   'Every run is given the same window of game time, and that window is the only denominator any',
-  'rate here has. A run whose offer stops before the window closes — a room emptied, a pack filled,',
-  'the player killed — spends what is left of it standing wherever the world put them, and is',
+  'rate here has. An offer that stops inside the window is taken up again where the player is left',
+  'standing, waiting out anything the world puts right on its own — a fallen thing back on its feet,',
+  'a daze worn off. What ends a run is the player having to go and do something else: buy bait, mend',
+  'a line, walk back to where the target was. Nothing here knows those apart, and none of them is',
+  'named: the engine is asked whether the offer is on the sheet, and the answer is the whole rule.',
+  '',
+  'What is left of the window after that is spent standing where the world left them, and the run is',
   'divided by the whole window all the same. So dying at seven seconds costs the rest of the hour,',
   'and an offer that pays for four minutes and nothing for the next fifty-six reads as the hour it',
   'was rather than as the four minutes.',
@@ -44,9 +55,11 @@ const usage = [
   'with no edit here. A fight the world picks is measured with it: the run does not have to',
   'take the offer to be killed by what made it.',
   '',
-  '`worked` is how much of the window the offer itself ran for, and where it is short of the window',
-  "the engine's own sentence says why, death included. There is no death flag to read: dying is",
-  'authored in the corpus rather than known to the engine, so the tool quotes rather than classifies.',
+  '`worked` is how much of the window the offer itself ran for, across every time it was taken up,',
+  "and where it is short of the window the engine's own sentence for the last attempt says why, death",
+  'included. There is no death flag to read: dying is authored in the corpus rather than known to the',
+  'engine, so the tool quotes rather than classifies. Where `worked` is short, the pace inside it is',
+  'printed beside the rate — that one is a ceiling carried out to an hour, not an hour anything held.',
   '',
   'A fight something aggressive started is named where one happened. It is an annotation and not a',
   'suppression: whoever swung, the window is the one the player lived through, and what they came out',
@@ -232,26 +245,72 @@ function since(was: Tallies, now: Tallies): Gain[] {
 
 const snapshot = (state: { xp: Counts; inventory: Counts }): Tallies => Object.fromEntries(Object.entries(tallies(state)).map(([kind, counts]) => [kind, { ...counts }]));
 
-function walk(registry: Registry, index: number, seed: number, endMs: number): Run {
+// Whether the line being measured can be taken up again exactly where it is being measured, by a
+// player holding what they are now holding. The place is half the question because it is half the
+// subject: a sweep asks what an offer pays *there*, and a run carried off somewhere else — by a
+// faint, by anything — would have to walk back, which is a different action and another row's
+// measurement. What is left is the engine's to answer: the offer is on the sheet the room hands
+// back or it is not, and what would put it back there is the world's business rather than a shape
+// this file knows.
+function standsHere(session: PlaySession, state: Walked, subject: Subject): boolean {
+  if (state.location !== subject.at) return false;
+  readRoom(session);
+  return sessionStatus(session).choices.some((choice) => choice.kind === 'action' && printDirective(choiceToDirective(choice)) === subject.use);
+}
+
+// Wait out whatever the world will put right on its own — a fallen thing back on its feet, a daze
+// worn off — one due moment at a time, until the offer is on the sheet again. A moment the world has
+// nothing due at is the world being done with it, and what is left needs the player to go and do
+// something else: buy bait, mend a line, walk back to where the target was. That is where a run ends.
+function waitForOffer(session: PlaySession, state: Walked, registry: Registry, subject: Subject, endMs: number): boolean {
+  for (;;) {
+    if (standsHere(session, state, subject)) return true;
+    if (state.time >= endMs) return false;
+    const at = Math.min(Math.ceil(nextBoundary(state, registry, endMs).at), endMs);
+    if (at <= state.time) return false;
+    applyDirective(session, { kind: 'wait', seconds: msToSeconds(at - state.time) });
+  }
+}
+
+function walk(registry: Registry, index: number, subject: Subject, seed: number, endMs: number): Run {
   const state = createGameState();
   const blank: Run = { seed, cycles: 0, worked: 0, gains: [] };
   try {
     const stood = runTest(standTest(index), registry, state);
     if (!stood.passed) return { ...blank, stoppedBy: `could not stand there: ${stood.failure ?? 'no reason given'}` };
     state.rng = seed;
-    const wasTime = state.time;
     const wasCycles = state.cyclesDone;
     const was = snapshot(state);
-    const result = runTest(runTestId(index), registry, state);
-    const worked = state.time - wasTime;
-    // The rest of the window, whatever ended the offer. A player who is killed lands wherever the
-    // corpus lands them and the hour goes on around them, so the world keeps running here and
-    // whatever it does to them in what is left is part of what standing there paid.
-    if (state.time < endMs) applyDirective(sessionOver(registry, state), { kind: 'wait', seconds: msToSeconds(endMs - state.time) });
+    const session = sessionOver(registry, state);
+    let worked = 0;
+    let stoppedBy: string | undefined;
+    // The state forgets who came at the player each time a span opens, and a window holds as many
+    // spans as the offer was taken up. The question the sheet asks is about the whole window, so it
+    // is kept here — read at every seam a span is about to open at, and once more at the end.
+    let engagedBy: string | undefined;
+    const noteAggression = (): void => {
+      engagedBy ??= state.engagedBy ?? undefined;
+    };
+    for (;;) {
+      noteAggression();
+      const from = state.time;
+      stoppedBy = runTest(runTestId(index), registry, state).failure;
+      worked += state.time - from;
+      if (stoppedBy === undefined || state.time >= endMs) break;
+      // An attempt that spent no time at all would spend none again, and there is no waiting out a
+      // run that never started.
+      if (state.time === from) break;
+      if (!waitForOffer(session, state, registry, subject, endMs)) break;
+    }
+    // The rest of the window, once nothing the player could keep doing is left. A player who is
+    // killed lands wherever the corpus lands them and the hour goes on around them, so the world
+    // keeps running here and what it does to them in what is left is part of what standing there paid.
+    if (state.time < endMs) applyDirective(session, { kind: 'wait', seconds: msToSeconds(endMs - state.time) });
+    noteAggression();
     return {
       seed,
-      stoppedBy: result.failure,
-      engagedBy: state.engagedBy ?? undefined,
+      stoppedBy,
+      engagedBy,
       cycles: state.cyclesDone - wasCycles,
       worked,
       gains: since(was, tallies(state)),
@@ -262,7 +321,7 @@ function walk(registry: Registry, index: number, seed: number, endMs: number): R
 }
 
 export function measure(registry: Registry, subjects: readonly Subject[], seeds: readonly number[], endMs: number): Measured[] {
-  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, seed, endMs)) }));
+  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, subject, seed, endMs)) }));
 }
 
 // An offer that put nothing in anybody's hands under any seed. It is hidden by default because a
@@ -290,16 +349,21 @@ const address = ({ kind, id }: Gain): string => `${kind} ${id}`;
 
 const amountIn = (run: Run, of: string): number => run.gains.find((gain) => address(gain) === of)?.amount ?? 0;
 
+export const WHILE_IT_RAN = 'while it ran';
+
 // Every seed answers, because every seed was given the same window and every seed spent all of it.
 // The window is the divisor whatever the run did with it, so there is nothing here to say about
-// which seeds counted.
-function paidLines(runs: readonly Run[], hours: number): string[] {
+// which seeds counted. Beside it, wherever the offer did not last the window out, the pace inside
+// the time it did last — the two are the same figure where it lasted, and only one is printed then.
+function paidLines(runs: readonly Run[], windowMs: number): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
+  const hours = windowMs / MS_PER_HOUR;
+  const cut = runs.filter((run) => run.worked > 0 && run.worked < windowMs);
   return paid
-    .map((of) => ({ of, rates: runs.map((run) => amountIn(run, of) / hours) }))
+    .map((of) => ({ of, rates: runs.map((run) => amountIn(run, of) / hours), paced: cut.map((run) => amountIn(run, of) / (run.worked / MS_PER_HOUR)) }))
     .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates))
-    .map(({ of, rates }) => `      ${of}: ${spread(rates)}/h`);
+    .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}`);
 }
 
 function measuredLines({ subject, runs }: Measured, windowMs: number): string[] {
@@ -319,8 +383,12 @@ function measuredLines({ subject, runs }: Measured, windowMs: number): string[] 
       `      stopped short in ${String(short.length)}/${String(runs.length)} seeds: ${short[0]!.stoppedBy!}${endings.size > 1 ? ` (and ${String(endings.size - 1)} other ending(s) across the seeds)` : ''}`,
     );
   }
-  return [...lines, ...paidLines(runs, windowMs / MS_PER_HOUR)];
+  return [...lines, ...paidLines(runs, windowMs)];
 }
+
+// Said once, above everything it is about, because the two figures on a line are not equally solid
+// and a reader who takes them for one another has the error the window was put there to remove.
+const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
 export function balanceLines(measured: readonly Measured[], args: Pick<BalanceArgs, 'save' | 'seeds' | 'window' | 'all'>): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
@@ -328,15 +396,16 @@ export function balanceLines(measured: readonly Measured[], args: Pick<BalanceAr
   const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time`];
   if (shown.length === 0) return [...head, 'nothing on offer paid anything under any seed. --all lists what was tried.'];
 
-  const lines: string[] = head;
+  const body: string[] = [];
   let place: string | null = null;
   for (const each of shown) {
     if (each.subject.at !== place) {
       place = each.subject.at;
-      lines.push('', `  ${place}${each.subject.depth === undefined ? ' (no road reaches here)' : ` (${String(each.subject.depth)} roads out)`}`);
+      body.push('', `  ${place}${each.subject.depth === undefined ? ' (no road reaches here)' : ` (${String(each.subject.depth)} roads out)`}`);
     }
-    lines.push(...measuredLines(each, windowMs));
+    body.push(...measuredLines(each, windowMs));
   }
+  const lines = [...head, ...(body.some((line) => line.includes(WHILE_IT_RAN)) ? [CEILING] : []), ...body];
   if (!args.all) lines.push('', `${String(measured.length - shown.length)} offer(s) paid nothing at all and are not listed; --all shows them.`);
   return lines;
 }

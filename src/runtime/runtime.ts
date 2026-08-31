@@ -157,7 +157,11 @@ function completionsBeforeDrain(action: Action, state: GameState, registry: Regi
   return completions;
 }
 
-function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
+// The first instant between now and `toTime` at which the world has something of its own due — a
+// buff wearing off, what is under way coming round, a pool running dry, a fallen thing back on its
+// feet — or `toTime` where it has nothing. Whatever may put a stopped run back on its feet is on
+// this one list, so nothing that waits for the world has to hold a list of its own.
+export function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
   let boundary: Boundary = { at: toTime, source: { kind: 'requested' } };
   const expiry = nextBuffExpiry(state);
   if (expiry && expiry.at < boundary.at) boundary = { at: expiry.at, source: { kind: 'buff', actorId: expiry.actorId, source: expiry.source } };
