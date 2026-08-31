@@ -590,12 +590,13 @@ describe('a # save body is checked past its version', () => {
 });
 
 describe('a # save written over others', () => {
-  // A copy under an id no kind claims: what is being asked is which layer minted it, and a payload
-  // any instance kind would repair is one more thing between the question and the answer.
-  const copy = (id: string) => ({ next: Number(id) + 1, byId: { [id]: { kind: 'trinket', template: 'bread', payload: {} } } });
+  // A real item copy, because the ids are being followed through a load and pruning throws away a
+  // copy of a kind nothing claims before there is anything left to look at.
+  const plane = { '0,0': { jewel: null, entry: null, roll: 0.5, allocatedPositions: [], allocatedSlots: [], effects: [] } };
+  const copy = (id: string, template = 'helm') => ({ next: Number(id) + 1, byId: { [id]: { kind: 'item', template, payload: { roll: 0.5, plane } } } });
 
-  const laid = (saves: Record<string, ParsedSave>): Registry => {
-    const registry = loadInEnglish(PRUNE_MODULE);
+  const laid = (saves: Record<string, ParsedSave>, source = PRUNE_MODULE): Registry => {
+    const registry = loadInEnglish(source);
     for (const [id, saved] of Object.entries(saves)) registry.saves.set(id, saved);
     return registry;
   };
@@ -610,9 +611,37 @@ describe('a # save written over others', () => {
     expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['nowhere'], diff: {} }, registry)).toThrow(/written over nowhere, which nothing declares/);
   });
 
-  it('refuses two layers that each carry item copies, since both mint from the one counter', () => {
-    const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('1') } } });
-    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['grown'], diff: { instances: copy('1') } }, registry)).toThrow(/grown and its own body each carry instances/);
+  // Both layers were written by runs that minted from the same counter, so both call their own copy
+  // `1`. What is asked here is that the second one is dealt a fresh id and that every way its body
+  // names the copy follows it -- worn, in the pack, and under way -- while the first keeps the id it
+  // was written with.
+  it('renumbers the second of two layers that each minted copies, and takes its references with it', () => {
+    // A second helm with an action of its own, because what is under way is pruned off a save that
+    // names an action nothing declares. It is aimed at the copy rather than owned by one: an
+    // `item.<copy>` owner is pruned on every load, which is a fault of its own and not this one's.
+    const swinging = `${PRUNE_MODULE}\n# item swung-helm\nslot: head\nswing:\n  say: Thump.\n`;
+    const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('1'), equipped: { head: '1' } } } }, swinging);
+    const state = createGameState();
+    loadSave(
+      state,
+      { version: SAVE_VERSION, over: ['grown'], diff: { instances: copy('1', 'swung-helm'), packOrder: ['1'], activeAction: { ownerRef: 'item.swung-helm', actionSlug: 'swing', repeating: false, implicitTarget: 0, cadences: {}, roster: { player: { ownerRef: 'item.swung-helm', actionSlug: 'swing', target: '1' } } } } },
+      registry,
+    );
+
+    expect(Object.keys(state.instances.byId).sort()).toEqual(['1', '2']);
+    expect(state.instances.next).toBe(3);
+    expect(state.equipped).toEqual({ head: '1' });
+    expect(state.packOrder).toEqual(['2']);
+    expect(state.activeAction?.roster?.['player']).toMatchObject({ target: '2' });
+  });
+
+  it('leaves the ids of a lone minting layer exactly as they were written, whichever layer it is', () => {
+    const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('4'), equipped: { head: '4' } } } });
+    const state = createGameState();
+    loadSave(state, { version: SAVE_VERSION, over: ['grown'], diff: { flags: { known: true } } }, registry);
+
+    expect(Object.keys(state.instances.byId)).toEqual(['4']);
+    expect(state.equipped).toEqual({ head: '4' });
   });
 
   it('takes a layer that carries copies where it is the only one that does', () => {

@@ -1673,6 +1673,15 @@ node over-the-barrel:
 over: in-town-with-a-sword-and-a-shield, at-the-sewer-junction
 {"version":13}
 
+// A build somebody grew and a state a run of theirs was left standing in, laid
+// down together — which is the pairing a tier build and a progress state make,
+// and the one this could not do. Both were minted by runs whose counters started
+// at one, so both call a copy `1`. The upper layer is dealt fresh ids and every
+// way its body names the copy goes with them, the blade in its hand included.
+# save the-grown-blades-and-the-one-in-hand
+over: growing-a-heartwood-blade-end, rage-rises-as-swings-land-end
+{"version":13}
+
 // --- the player, proved ---
 
 # item deaths-door
@@ -2045,6 +2054,17 @@ assert: inventory.core.wooden-shield = 1
 assert: inventory.core.lockpick = 1
 assert: heard-of-the-back-way
 travel: sewer-outfall
+
+// The same, where both layers grew something. Taking the blade off is what asks
+// the question: if the upper layer's `equipped` were still calling its copy `1`
+// it would be naming the lower layer's heartwood blade, and the wrong thing —
+// or nothing at all — would come off the arm.
+# test a-build-and-a-run-that-each-grew-something-keep-both
+load: the-grown-blades-and-the-one-in-hand
+unequip: mainhand
+assert: inventory.combat-expansion.proving-blade = 1
+assert: inventory.core.heartwood-blade = 1
+assert: inventory.core.iron-sword = 1
 
 // --- growing an item ---
 //

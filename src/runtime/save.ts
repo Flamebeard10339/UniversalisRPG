@@ -3,7 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { createGameState, GameState, parseOwnerRef } from './state';
+import { createGameState, GameState, ownerRef, parseOwnerRef, type ActiveAction, type InstanceTable, type Seat } from './state';
 import type { PruneWarning } from './pruning';
 import { initResources } from './effects';
 import { Registry, startingLocationId } from '../content/registry';
@@ -33,11 +33,24 @@ interface RecordPrune {
 
 type Prune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
 
+// Rewriting every minted id this field names, given what each is now called. A composition whose
+// layers each minted copies renumbers all but the first of them, and these answers are the whole of
+// where that renumbering reaches.
+type Renaming = (id: string) => string;
+
+// Where a copy the engine minted can be named in this field. There is no shape that says which
+// fields those are: `equipped` and `packOrder` hold a bare id, `activeAction` holds one inside an
+// `item.<id>` reference, and `inventory` — which is also keyed by item — never holds one at all,
+// because a grown copy is a row of its own. So the field answers for itself and `tsc` makes a field
+// added next month answer too.
+type Minted = 'the table the ids are keys of' | 'names no minted copy' | { rename(value: unknown, renamed: Renaming): unknown };
+
 interface SaveFieldRule {
   shape: 'record' | 'scalar';
   holds(value: unknown): boolean;
   sparsest: unknown;
   prune: Prune;
+  minted: Minted;
   // Whether a `# test`'s `expect:` compares this field. A corpus test asks whether a path is still
   // walkable and nothing else, so what the player did is compared and what the numbers came to is
   // not: a balance pass moves xp, pools, the clock, the rng cursor, what the loot rolled and how
@@ -83,27 +96,52 @@ const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(val
 
 const isPlayer = (value: unknown): boolean => PLAYER_FIELDS.every((field) => at(value, field, isText));
 
+// A reference is either the id itself or the `<obj>.<id>` an action's owner and its roster seats are
+// written as, and `parseOwnerRef` is what reads the second — so this asks the same question of both
+// halves rather than knowing which half it was handed.
+const renamedRef = (ref: string, renamed: Renaming): string => {
+  const { obj, objId } = parseOwnerRef(ref);
+  return obj === '' ? renamed(ref) : ownerRef(obj, renamed(objId));
+};
+
+const renamedValues = (value: unknown, renamed: Renaming): unknown =>
+  Object.fromEntries(Object.entries(value as Record<string, string>).map(([key, held]) => [key, renamed(held)]));
+
+const renamedSeat = (seat: Seat, renamed: Renaming): Seat => ({ ...seat, ownerRef: renamedRef(seat.ownerRef, renamed), target: renamed(seat.target) });
+
+const renamedActiveAction = (value: unknown, renamed: Renaming): unknown => {
+  if (value === null) return value;
+  const active = value as ActiveAction;
+  return {
+    ...active,
+    ownerRef: renamedRef(active.ownerRef, renamed),
+    ...(active.roster ? { roster: Object.fromEntries(Object.entries(active.roster).map(([seat, held]) => [renamed(seat), renamedSeat(held, renamed)])) } : {}),
+    ...(active.actors ? { actors: Object.fromEntries(Object.entries(active.actors).map(([actor, held]) => [renamed(actor), held])) } : {}),
+    ...(active.cadences ? { cadences: Object.fromEntries(Object.entries(active.cadences).map(([actor, held]) => [renamed(actor), held])) } : {}),
+  };
+};
+
 export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
-  location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true },
-  inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } , walked: false },
-  packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' , walked: true },
-  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } , walked: true },
-  visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } , walked: true },
-  xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } , walked: false },
-  resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false },
-  resourceRateRemainders: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false },
-  equipped: { shape: 'record', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true },
-  buffs: { shape: 'record', holds: isBuffList, sparsest: [], prune: 'pruned by a rule of its own' , walked: false },
-  activeAction: { shape: 'scalar', holds: (value) => value === null || isActiveAction(value), sparsest: { ownerRef: '', actionSlug: '', repeating: false, implicitTarget: 0, cadences: {} }, prune: 'pruned by a rule of its own' , walked: false },
-  journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' , walked: true },
-  instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' , walked: false },
-  populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' , walked: false },
-  shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } , walked: false },
-  time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false },
-  rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false },
-  player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' , walked: true },
-  settings: { shape: 'scalar', holds: isSettingSheet, sparsest: standingSettings(), prune: 'pruned by a rule of its own' , walked: true },
-  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' , walked: true },
+  location: { shape: 'scalar', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true, minted: 'names no minted copy' },
+  inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } , walked: false, minted: 'names no minted copy' },
+  packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' , walked: true, minted: { rename: (value, renamed) => (value as string[]).map(renamed) } },
+  flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } , walked: true, minted: 'names no minted copy' },
+  visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } , walked: true, minted: 'names no minted copy' },
+  xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } , walked: false, minted: 'names no minted copy' },
+  resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false, minted: 'names no minted copy' },
+  resourceRateRemainders: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false, minted: 'names no minted copy' },
+  equipped: { shape: 'record', holds: isText, sparsest: '', prune: 'pruned by a rule of its own' , walked: true, minted: { rename: renamedValues } },
+  buffs: { shape: 'record', holds: isBuffList, sparsest: [], prune: 'pruned by a rule of its own' , walked: false, minted: 'names no minted copy' },
+  activeAction: { shape: 'scalar', holds: (value) => value === null || isActiveAction(value), sparsest: { ownerRef: '', actionSlug: '', repeating: false, implicitTarget: 0, cadences: {} }, prune: 'pruned by a rule of its own' , walked: false, minted: { rename: renamedActiveAction } },
+  journey: { shape: 'scalar', holds: (value) => value === null || isJourney(value), sparsest: { to: '', legs: [] }, prune: 'pruned by a rule of its own' , walked: true, minted: 'names no minted copy' },
+  instances: { shape: 'scalar', holds: isInstanceTable, sparsest: { next: 1, byId: {} }, prune: 'pruned by a rule of its own' , walked: false, minted: 'the table the ids are keys of' },
+  populations: { shape: 'scalar', holds: isPopulations, sparsest: {}, prune: 'pruned by a rule of its own' , walked: false, minted: 'names no minted copy' },
+  shops: { shape: 'record', holds: (value) => value === null || isShopStock(value), sparsest: null, prune: { of: 'shop', loaded: (registry, id) => registry.shops.has(id) } , walked: false, minted: 'names no minted copy' },
+  time: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false, minted: 'names no minted copy' },
+  rng: { shape: 'scalar', holds: isInteger, sparsest: 0, prune: 'holds no registry id' , walked: false, minted: 'names no minted copy' },
+  player: { shape: 'scalar', holds: isPlayer, sparsest: emptyPlayerSheet(), prune: 'pruned by a rule of its own' , walked: true, minted: 'names no minted copy' },
+  settings: { shape: 'scalar', holds: isSettingSheet, sparsest: standingSettings(), prune: 'pruned by a rule of its own' , walked: true, minted: 'names no minted copy' },
+  modals: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isModalFrame), sparsest: [], prune: 'pruned by a rule of its own' , walked: true, minted: 'names no minted copy' },
 };
 
 export const SAVE_FIELD_NAMES = Object.keys(SAVE_FIELDS) as SaveField[];
@@ -319,11 +357,60 @@ function checkSave(saved: ParsedSave): void {
 }
 
 // The one field a save writes whose keys the engine mints rather than an author writing them, and
-// which the rest of a save points into: `equipped` and `packOrder` hold the ids in it. Every run
-// mints from the same counter, so a copy in one layer and a copy in another are the same id.
+// which the rest of a save points into. Every run mints from the same counter, so a copy in one
+// layer and a copy in another are the same id, and a composition of two such layers renumbers all
+// but the first — reaching wherever each field's `minted:` says it names one.
 const MINTS_IDS: SaveField = 'instances';
 
-const mintsCopies = (diff: Record<string, unknown>): boolean => Object.keys(((diff[MINTS_IDS] ?? {}) as { byId?: object }).byId ?? {}).length > 0;
+const tableIn = (diff: Record<string, unknown>): InstanceTable | undefined => diff[MINTS_IDS] as InstanceTable | undefined;
+
+const copyIdsIn = (diff: Record<string, unknown>): string[] => Object.keys(tableIn(diff)?.byId ?? {});
+
+const mintsCopies = (diff: Record<string, unknown>): boolean => copyIdsIn(diff).length > 0;
+
+// Ascending as numbers rather than as text, so ten follows nine and the ids a layer keeps read in
+// the order they were minted in.
+const inMintedOrder = (ids: readonly string[]): string[] => [...ids].sort((a, b) => Number(a) - Number(b));
+
+function renamedDiff(diff: Record<string, unknown>, renamed: Renaming): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...diff };
+  for (const field of SAVE_FIELD_NAMES) {
+    const { minted } = SAVE_FIELDS[field];
+    if (typeof minted === 'string' || !(field in diff)) continue;
+    out[field] = minted.rename(diff[field], renamed);
+  }
+  const table = tableIn(diff);
+  if (table) {
+    out[MINTS_IDS] = { next: table.next, byId: Object.fromEntries(Object.entries(table.byId).map(([id, held]) => [renamed(id), held])) };
+  }
+  return out;
+}
+
+// Every layer that minted copies after the first is dealt fresh ids continuing from the ones already
+// handed out, and its own body is rewritten to call them by their new names. The first keeps the ids
+// it was written with, so a composition of one minting layer -- which every save in the corpus is --
+// is left exactly as it was.
+function renumbered(layers: readonly SaveLayer[]): SaveLayer[] {
+  if (layers.filter((layer) => mintsCopies(layer.saved.diff)).length < 2) return [...layers];
+  let next = 1;
+  return layers.map((layer) => {
+    if (!mintsCopies(layer.saved.diff)) return layer;
+    const renaming = new Map(inMintedOrder(copyIdsIn(layer.saved.diff)).map((id) => [id, String(next++)] as const));
+    const renamed: Renaming = (id) => renaming.get(id) ?? id;
+    return { name: layer.name, saved: { ...layer.saved, diff: renamedDiff(layer.saved.diff, renamed) } };
+  });
+}
+
+// The table itself is the one field composed by neither of the two rules below: it is written as a
+// scalar and a last-writer-wins would drop the copies every layer beneath the top one holds. So the
+// tables are merged, which renumbering has already made safe by leaving their keys disjoint, and the
+// counter stands one past the highest id handed out.
+function composedTable(layers: readonly SaveLayer[]): InstanceTable | undefined {
+  const tables = layers.flatMap((layer) => { const table = tableIn(layer.saved.diff); return table ? [table] : []; });
+  if (tables.length === 0) return undefined;
+  const byId = Object.assign({}, ...tables.map((table) => table.byId)) as InstanceTable['byId'];
+  return { next: Math.max(...tables.map((table) => table.next), ...Object.keys(byId).map((id) => Number(id) + 1)), byId };
+}
 
 // The name a layer is reported under where a composition is refused. The save being loaded may have
 // come off a slot or a byte stream rather than out of the registry, so it answers for itself.
@@ -350,14 +437,8 @@ function layersOf(saved: ParsedSave, registry: Registry, name: string, under: re
 // a record takes the keys every layer writes, and anything else is taken from the last layer that
 // writes it. The fields come off SAVE_FIELDS, so a field declared next month layers by its own shape
 // with nothing here to remember.
-function composedDiff(layers: readonly SaveLayer[]): Record<string, unknown> {
-  const minting = layers.filter((layer) => mintsCopies(layer.saved.diff));
-  if (minting.length > 1) {
-    throw new RuntimeError(
-      `${minting.map((layer) => layer.name).join(' and ')} each carry ${MINTS_IDS}, and one composition mints them in one layer only: both mint from the same counter, so a copy each of them holds is the same id and whichever is laid on top takes the other's place`,
-    );
-  }
-
+function composedDiff(under: readonly SaveLayer[]): Record<string, unknown> {
+  const layers = renumbered(under);
   const diff: Record<string, unknown> = {};
   for (const field of RECORD_FIELDS) {
     const written = layers.flatMap((layer) => (field in layer.saved.diff ? [layer.saved.diff[field] as object] : []));
@@ -366,6 +447,8 @@ function composedDiff(layers: readonly SaveLayer[]): Record<string, unknown> {
   for (const field of SCALAR_FIELDS) {
     for (const layer of layers) if (field in layer.saved.diff) diff[field] = layer.saved.diff[field];
   }
+  const table = composedTable(layers);
+  if (table) diff[MINTS_IDS] = table;
   return diff;
 }
 
