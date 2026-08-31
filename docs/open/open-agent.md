@@ -13,7 +13,8 @@ without evidence is a hunch and does not belong here yet.
 paragraph** — a route in `open-tests.dsl`, or a `describe` in `open-tests.test.ts`,
 named for the line and red until it closes. Then the line closes on the proof
 passing and says nothing the proof already says. `npm run handoff` runs them, so
-*does this still fail?* is answered rather than guessed.
+*does this still fail?* is answered rather than guessed. Neither file stands in this
+folder today; whoever writes the first one writes the file with it.
 
 Everything here is proved headlessly — `npm test`, `npm run probe`,
 `npm run oracle`, `tsc --noEmit` — and the shape is already settled, so a lane can
@@ -24,7 +25,7 @@ the writing, or a ruling nobody has taken is in `open-human.md`.
 in a `.ts` beside the component and is tested there; the wiring is built, `tsc` and
 the suite are run, and it is handed to the author in one line. A lane that cannot
 find a pure decision under a GUI line says so rather than reaching for a screenshot
-loop. Half of what is below is GUI, because it came out of a playtest.
+loop.
 
 **A line here that turns out to need his judgement does not stay here flagged — it
 moves, carrying what you measured.** Guessing the ruling and abandoning the lane
@@ -130,22 +131,15 @@ quest, these numbers are the before. If it still does not, the premise is answer
 is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
 came out of playbot reports, and no agent reading the corpus had found either.
 
-## Three of the ten quest notes still have no module, and what one costs is measured
+## Two of the ten quest notes still have no module
 
-Plague Matters, Reverse Infiltration and The Rat Conspiracy. They are last because each
-waits on another: The Rat Conspiracy on Birds and the Bees, Reverse Infiltration on that
-and The Swampy Menace, Plague Matters on Reverse Infiltration. So they are written one
-wave at a time, each merged before the next starts.
+Reverse Infiltration and Plague Matters. Plague Matters waits on Reverse Infiltration;
+Reverse Infiltration waited on The Rat Conspiracy and The Swampy Menace, **and both of
+those now stand, so it is next and unblocked.** They are written one wave at a time,
+each merged before the next starts.
 
-**Birds and the Bees landed on 2026-08-30, so The Rat Conspiracy is next and unblocked.**
-Kelsa's whole `# dialogue` is out of `tulsa` and the quest owns her; the fight at the hive
-is a room the quest declares below `tulsa.hive-mouth`, reached by a road written from the
-quest's end only and open only while the fight is on, so tulsa's third hive stays the
-ordinary dead end tulsa wrote and nothing of the quest sits in the town file. That is the
-shape a quest reaching into a shipped room has to take until the printer half below is
-fixed — a room of its own underneath, rather than an entity in someone else's.
-
-Five ran in parallel on 2026-08-30, one brief each, Sonnet 5, engine off limits:
+Two waves have been measured. Five ran in parallel on 2026-08-30, one brief each,
+Sonnet 5, engine off limits:
 
 | quest | wall | replies | out tok | cost | reaches for the engine |
 |---|---|---|---|---|---|
@@ -154,115 +148,93 @@ Five ran in parallel on 2026-08-30, one brief each, Sonnet 5, engine off limits:
 | the-bars-crawl | 20.3 min | 120 | 92,014 | $4.31 | 0 |
 | the-swampy-menace | 25.6 min | 154 | 120,603 | $6.97 | 0 |
 | a-grand-blade | 22.7 min | 179 | 106,799 | $8.80 | 0 |
-| | **25.6 min wall** | 670 | | **$28.49** | **0** |
+| the-rat-conspiracy | 12.7 min | 127 | 62,765 | — | 0 |
 
-**Not one of the five reached for the engine.** Every question all five had was answered
-by `npm run oracle` or by the corpus, which is the first time that has been true — and it
-is the measurement the harness exists to take.
+**Not one of the six reached for the engine.** Every question all six had was answered
+by `npm run oracle` or by the corpus, which is the measurement the harness exists to
+take. The spread is the finding: a-grand-blade cost two and a half times
+birds-and-the-bees and spent replies 59 through 124 hand-building throwaway `DEBUG`
+sections, all of it against a stage-transition defect that has since closed.
 
-The spread is the finding. a-grand-blade cost two and a half times birds-and-the-bees and
-spent replies 59 through 124 hand-building throwaway `DEBUG` sections, all of it against
-the stage-transition defect below.
+The Rat Conspiracy is the first run to come in under fifteen minutes, and it is also the
+first written against a world whose oracle prints its id lists whole. It hung the errand
+off the `tunnel-mouth` / `tunnels` / `ratkin-border` chain tulsa had already declared
+rather than bringing a parallel geography of its own.
 
-*Closes when:* the three are written and merge with the suite green.
+*Closes when:* the two are written and merge with the suite green.
 
-## A line that is nothing but a conditional fragment prints as a blank line
+## The resolver names `self` as the fix and the loader does not take it
 
-Met on 2026-08-30 writing Oolga's two closings, which was the corpus's first use of fragments
-— there were none before it, so nothing had met this. It was worked around by pairing the two
-acknowledgements on one line and the two farewells on another, so that between them one always
-holds, and by hanging the one-sided clause off a sentence said either way. That is a real
-technique and it is also the sort of thing an author should be told rather than made to
-discover, so whichever way this is answered the fragment entry in `npm run oracle` should say
-it off what the printer does.
+Found on 2026-08-30 giving Kelsa's three hives a `searched` flag each. An
+unqualified `assert: searched` in another module is now ambiguous, and the refusal
+reads *"Name the module, or use self."* — but `self.searched` comes back *"names an
+unknown flag"*, and `npm run oracle` never prints `self` under any kind. So the
+message advertises a form the language does not have, which is worse than naming no
+fix at all: the author tries it, is refused a second time in different words, and has
+learned nothing about which of the two refusals is the real rule.
 
-*Closes when:* `a-line-of-only-a-false-fragment-is-dropped` passes.
+Either half is a fix and they are different sizes. Whichever it is, it has to come off
+the same declaration the oracle reads, or the message and the page drift the moment
+one of them moves.
 
-## Nothing tells a player to wear the net, so the lent net can never part
+*Closes when:* `self` resolves to the section it is written in, or the refusal names
+the qualified form instead — and `npm run oracle` says which without anyone keeping
+the page in step.
 
-Miki now offers another net to a player holding none, and a route walks it. But the thing that
-takes the first one away cannot happen on the shipped path, measured on 2026-08-30: **a net
-that is carried and not worn grants no `line-health` pool at all**, because `max-line-health`
-comes from the tackle. Ten game-minutes and 248 catches leave no pool in the save.
-`apology-route-full` never equips the net and nothing in the tutorial says to.
+## A refused line in a `# test` is reported against the next section header
 
-So the repair is right and its trigger is unreachable. The tutorial teaches netting without
-teaching that tackle is worn, which is also why the false line survived long enough to be
-found by reading rather than by playing.
+Met by the authoring run that wrote The Rat Conspiracy, and it cost that run real
+time: `assert: location = X` is not an engine state, and the refusal did not point at
+that line. The whole file's error collapsed onto the header of the section *after* the
+one holding the bad line, so the run bisected by hand to find which line it was about.
 
-*Closes when:* the tutorial says that a net is worn — a line of Miki's, most likely, since he
-is the one handing it over — and a route equips it, so the path a player is actually taught is
-the path the module proves.
-RESPONSE: This task is literally a single line edit to prose in the dsl. It should just be changed instead of adding several paragraphs to open-agent.md
+This is the diagnostic half of what makes a world writable from the oracle alone. The
+same run's other stumble was the reverse — a form that exists and is not printed: the
+`<quest>.<stage>.<entity>.<n>.said` thread id a `talk:` needs when a quest thread is
+open beside a townsman's own is nowhere in `npm run oracle`, and was found by
+pattern-matching `kill-it-with-fire.dsl`. Both are the same cost paid two ways.
 
-## A negative weight in a `one of:` fires no branch at all
+*Closes when:* a refusal inside a `# test` body names the line it is about, and the
+thread-id form is printed off whatever declares it.
 
-Found on 2026-08-30 while measuring how long a net takes to part: an item granting `-1000
-fishing` produced 300 casts with **no catch, no experience and no drain** — neither branch of
-the roll appeared to fire, rather than the roll settling on the other one.
+## Nothing can prove that a searched hive hides itself
 
-The input was invented rather than found in the corpus, so nothing ships in this state and it
-costs nobody anything today. It is here because a roll that silently does nothing is the
-shape a later author would lose an afternoon to, and because the language refuses malformed
-input everywhere else.
+`hidden if: searched` is what stops one of Kelsa's three hives standing for all three —
+without it a player searches the same hive three times and the count reaches three.
+It works, and **no route can ask whether it works**, because what a route would assert
+is that an action is *not offered*: `refuse:` takes `slot`, `allocate`, `unallocate`
+and `apply`, and no `use:`.
 
-*Closes when:* a weight the roll cannot use is refused at load with the line named, or the
-roll settles on a branch — either is fine, and the first is the language's usual answer.
+So the mechanism the whole hive beat rests on is unproved, and a later edit that drops
+the `hidden if:` reddens nothing. The comment on the tulsa route says so, which is a
+mark rather than a proof.
 
-## George's word in tulsa is an `always`, so no quest may stand beside it
+*Closes when:* `refuse: use <action>` is a thing a route may write, or a `describe` in
+this folder's `open-tests.test.ts` pins it off the offering the engine puts up — the
+second is much the smaller and does not wait on the language.
 
-Writing *Birds and the Bees* on 2026-08-30 hit this and could not take it. The brief wanted
-George to hint at the farm's troubles before the quest is picked up. Its first stage stands
-from the outset, so a `george says:` under it would take George's own tulsa node away from
-every player in every world, permanently — and that is not a defect. `always` is what an
-entity says when no thread is open, so a quest line replaces it, which is exactly what the
-sibling lane established the same day while proving that two quests otherwise stand side by
-side on one NPC perfectly well.
+## A long step still nets what a short step would have clamped
 
-The answer is therefore known and is one line of shape rather than a ruling: **a word that
-must survive a quest opening is written as a thread (`ask:`/`when:`), not as `always`.** Kelsa
-was the only person given a line under a first stage, and she is the one whose tulsa dialogue
-was deliberately removed; George's was not, and should not be.
+The parity the owner ruled for holds for buffs now, and the clamped-remainder half is
+fixed: 27 of 42 shipped fights diverged between a small dt and a large one and 23 do.
+What is left is two structural things, measured on 2026-08-30 and not fixed because
+neither is a bug in the sense the first two were.
 
-The same reasoning is why the quest's closing `settled` stage gives a line only to Kelsa.
+A segment nets a whole span's damage against a whole span's regeneration before it
+clamps, so a long segment never notices the pool sat at its ceiling for part of it —
+60s, regen 30/min, 16 incoming hits: 64.150 at dt=50, 64.500 at dt=1000, 66.000 in one
+step. And `captureResourceRates` snapshots at segment start, so a debuff that changes a
+*resource* rate mid-segment is ignored for the rest of it — health 0 at dt≤1000 against
+10.375 in one 60s step.
 
-Whether other tulsa entities want the same treatment is answered by looking, not by listing: a
-shipped `always` on anyone a quest will ever speak through is the same trap. The route names
-the two threads it picks; whoever closes this owns those names and should rewrite them rather
-than work around them.
+Exposure is bounded: the engine normally steps one attempt-cycle at a time, and nothing
+in the corpus changes a resource rate mid-fight. The one caller that takes a whole span
+in one go is `session.ts:933`, which turns a `wait: <seconds>` directive into a single
+`resolve`. So this is reachable from a `# test` and from nowhere a player stands.
 
-*Closes when:* `george-answers-for-himself-while-the-quest-stands-beside-him` passes.
-
-## `rate: their <stat>` is live grammar that reads as nought
-
-Found on 2026-08-30 while rebuilding fishing as one cast over four waters. The oracle
-advertises a sided rate, and it does not work: `fightParams` (`src/runtime/runtime.ts:97`)
-and `firstUnitSpan` (`src/runtime/runtime.ts:696`) both call `attemptDuration` with no
-sides, so `other` falls back to the player and a `their` rate reads zero.
-
-The symptom is not an error. A route written `until 30 times` against a `their` rate walked
-**four hours of world instead of ninety seconds** — it looks like a balance problem, and
-the lane that hit it spent time there before finding the cause. It was worked around with
-plain numeric `rate:` lines, so nothing ships broken; the grammar is still offered.
-
-*Closes when:* a sided rate reads the side it names, or the grammar stops offering one —
-and whichever it is, `npm run oracle` says it without anyone having to keep the page in
-step by hand.
-
-## No route walks a deep-water cast, and the blowfish still uses the old shape
-
-Fishing is now one `# action cast` and four waters that overlay it. Two of the four are
-proved: the shrimp shoal, by `first-steps`' own routes. **The trout run and the salmon pool
-are walked by nothing**, because `content/fishing.dsl` holds no `# test` and no `# save` —
-fishing stands nowhere (`dependencies: core`), and a route needs somewhere to stand.
-
-Separately, `the-bars-crawl.blowfish-hole`'s `cast for blowfish` is still written in the old
-per-water shape rather than as an overlay of `cast`. It walks, so nothing is broken; it is the
-last copy of the thing the one-home pass removed.
-
-*Closes when:* a route standing in tulsa walks a rod-and-bait cast at the deep water, and
-the blowfish hole is an overlay of `cast` like every other water. Both want whoever owns
-`tulsa.dsl` next, since that is where a fishing route can stand.
+*Closes when:* a span is cut at the moment a pool would reach its ceiling, or `wait:`
+steps the way the loop does and the two structural cases are then unreachable — and
+whichever it is, the parity claim in `runtime.test.ts` grows the case it did not cover.
 
 ## A condition wanted in several places is written out in each of them
 
@@ -281,18 +253,6 @@ rather than the author's, and it will recur the moment a fourth speaker joins th
 with `npm run oracle` saying so off the declaration; then those three lines are one, and the
 comment above them that explains why they are three is deleted.
 
-## Two homes for one check on an assembled action
-
-`src/content/sections/action.ts:78` runs a check `actionBody.parseBlock` already runs, and
-is now unreachable through the parser — noticed on 2026-08-30 while the two-sided refusal
-was being removed. Its live callers are `load.ts`, for assembled entity actions and for
-recipe actions that never pass the parser.
-
-So the fact has two homes and one of them is dead for the path it was written for. It was
-left in place because the lane that found it did not own the file.
-
-*Closes when:* the check has one home that both paths reach, and the dead one is gone.
-
 ## A comment explaining a workaround goes stale the day the workaround is unnecessary
 
 A workaround needs a mark at the site or the next reader re-introduces the shape it was
@@ -301,16 +261,20 @@ they are three, and deleting it invites someone to "fix" the duplication. But th
 describes an open defect, and nothing brings the two back together: the defect closes, and the
 comment sits there saying something that stopped being true.
 
+**This session produced two more of them**, which is why the line is still here: the tulsa
+hive route carries a comment about a refusal no route can write, and `content/fishing.dsl`'s
+`parted-tackle` comment had to be rewritten because the argument it made stopped being true
+the day a test took the list's subjects over.
+
 What cannot go stale is a mark that says almost nothing. `@@@` already does this for the
 corpus and `npm run notes` reads them out; the same mark carrying only the id of an open line
 would say *there is a reason, and it is written down over there* — one home for the reason,
-and a mark whose only failure mode is being orphaned, which is detectable. The proof files in
-this folder are the same check with a different subject, so the machinery is written.
+and a mark whose only failure mode is being orphaned, which is detectable. `npm run handoff`
+already reports a proof no line stands on, which is the same check with a different subject.
 
-This is second on purpose. The orphan check has to earn its keep on the proofs before a third
-subject is hung off it, and the expensive half is not the scanner — it is reading every
-workaround comment under `src/`, `scripts/` and `content/` and deciding which is a pointer,
-which is a fact the file owns, and which should just go.
+The expensive half is not the scanner — it is reading every workaround comment under `src/`,
+`scripts/` and `content/` and deciding which is a pointer, which is a fact the file owns, and
+which should just go.
 
 *Closes when:* `npm run handoff` reports a `@@@ <id>` under `src/`, `scripts/` or `content/`
 that no open line names, and every workaround comment in the tree is either such a mark or has

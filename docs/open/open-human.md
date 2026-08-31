@@ -107,29 +107,6 @@ the lever is still which entities stand there rather than a number in the engine
 *Moves when: the map pass he named is opened — not before, and not by a lane deciding on its
 own that the quests are finished enough. He says when.*
 
-## A caught hand stalls at nothing, not halfway
-
-Your ruling was that a stall is a timed debuff taking the rate to zero and the resource
-holds where it stood. The engine now does exactly that: a `-100%` rate granted part-way
-through a reach leaves the drawn fraction where it was and picks back up when it wears
-off. Measured — `before 0.5 → stalled 0.5 → 0.75`, clock `{ progress: 1500, span: 2000 }`.
-
-**A real caught hand never sees it.** Driven against the shipped corpus at step sizes 50,
-137, 200 and 1000 ms, the catch always lands with `progress: 0`: the `one of:` roll
-resolves at the **end** of a reach, so `dazed` arrives with the clock already back at
-nothing. The player still watches an empty bar sit still for three seconds, which is the
-thing you were ruling against.
-
-For a bar frozen half-full off a catch, the catch has to **interrupt** a reach rather than
-conclude one, and `continuous` plus `one of:` has no way to say that. `dazed` is also the
-only rate-to-zero in the whole corpus, so nothing else exercises the held path today.
-
-*Moves on a ruling on whether a roll may interrupt the attempt it is rolled inside. That is
-a grammar question rather than a runtime or content one, and the shape it takes — a second
-kind of roll, a mid-attempt hook, something else — is a lane's work once named.*
-RESPONSE: This is faintly concerning. Is this also true mid fight if an enemy inflicts a debuff on the player? If so, that is a major problem. There has to be parity between a small dt and a large one. 
-To answer thieving once and for all. The player initiates the action. if they succeed they get a reward. If they fail, they take damage and stall for a few seconds. Then they repeat. 
-
 ## The tutorial now ends holding fifty-six shrimp
 
 Miki's unlock asks for what he always meant to ask for — reach a second level in any skill
@@ -145,18 +122,3 @@ be asking on a route where the rats are already levelling attack.
 *Moves on which of the three it is. `npm run balance` is where the answer is read rather
 than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
 pick, because the choice is about what the tutorial is teaching.*
-
-## Whether the hives should reveal the boss last whatever order they are searched
-
-The brief for *Birds and the Bees* asked that no matter what order the player investigates the
-three hives, the last one searched is always the one holding the fight. It is not mechanised.
-
-With three fixed props in a fixed room the reveal is geographic instead: George names all
-three, tulsa's own text tells them apart, and the door into the third opens once George has
-pointed at it. Doing what the brief asked would mean a counter over the three hives — a mechanic
-written once per subject, which is the shape this repository spends its commits undoing.
-
-*Moves on whether the ordering beat is wanted for real. If it is, it is a lane's work and the
-one-home question comes with it — the counter has to derive its three subjects rather than name
-them. If it is not, this is deleted and the geography is the answer.*
-RESPONSE: A single counter measuring how many hives have been searched, and then a single action to every hive that if hives-searched=3 then the travel action to the boss fight is available. We can use a multiplexed bitmask for this, can't we? Each hive adds its own number to the counter and the path is only available if all hives are searched (last three bits equal 111) and the last hive searched is this one (first three bits equal my bits.). Or... you know, we can just use two numbers. The point is, the engine should already support this. 

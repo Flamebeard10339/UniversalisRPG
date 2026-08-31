@@ -1807,6 +1807,19 @@ assert: has core.hand-axe
 assert: market-row.axe-taken
 assert: xp.thieving.thieving = 15
 
+// A hand going out over and over at the same pocket, which is the whole shape of thieving: the
+// player starts it, a lift pays, a catch costs health and stands them still for three seconds, and
+// then it goes again. The two lifts above are one-shot props and prove none of that — this is the
+// only route that walks the loop, and it walks it far enough that a catch has certainly happened
+// along the way. What a catch costs is not asserted, because that is stochastic and a number; that
+// the loop keeps going through one is what the last line is for.
+# test a-hand-goes-out-again-after-it-is-caught
+load: in-town
+use: entity.civilian.pick-their-pocket until xp.thieving.thieving >= 200
+assert: xp.thieving.thieving >= 200
+assert: has core.coin
+assert: not core.fainted
+
 // The tutorial's own route through a counter and a stove. What it holds now that it did not before
 // is the other half of a contested recipe: the herring is either dinner or it is a lump of charcoal,
 // and the fish is gone either way.

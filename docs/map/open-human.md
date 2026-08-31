@@ -1,18 +1,5 @@
 # Map — open, for the author
 
-## `content/local-changes.dsl` is committed, and two tests say so
-
-`ba6b2990` put the REPL's own working file into the repo. It holds nothing but its
-`# info` header, and `probe.test.ts` and `playbot.test.ts` both fail on it, because
-the shipped corpus is not supposed to have a local-changes module in it. Nothing in
-this branch's work touches those two; they were red before it started. It is a git
-index change, which a worker in this checkout does not make.
-*Closes when:* you run
-
-```bash
-git rm --cached content/local-changes.dsl && printf '\ncontent/local-changes.dsl\n' >> .gitignore
-```
-
 ## Blob or box?
 
 `# setting regions` takes `blob` — a shape that follows the rooms — or `box`, one

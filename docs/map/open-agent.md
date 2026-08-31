@@ -36,22 +36,36 @@ here cannot be tapped at all, and neither can one no region has opened.
 *Closes when:* the second tap can name a place the map is not drawing, or the floor
 selector can be held open while the map is worked on.
 
-## An entry cannot travel as a patch
+## An entry restating one the file already writes still travels whole
 
-`patchedInto` places fields by where they are written; an entry — an action, an
-event — goes home by the label it carries, and `fieldSites` says nothing about
-labels. `foldedHome` in `scripts/consolidate.ts` therefore sends any staged section
-holding an entry home whole, which is what every staged section did before patches
-existed. Nothing regressed, but a partial edit that adds one action to a location
-still overwrites the rest of it.
-*Closes when:* entry sites carry their labels and `patchedInto` matches an entry home
-by label, or the fallback is proved unnecessary because nothing stages one.
+Entry sites carry their labels now, so an entry added to a location goes home under
+the lines around it, and one written as a removal strikes the entry at home. The
+harm the old line named — a partial edit overwriting the rest of the section — is
+gone. One shape is left: an entry whose label the home already writes. `mergeEntries`
+lays such a body over the declaration key by key, so a base `peck:` with `time: 7`
+keeps its `time: 7` under a patch that restates only `give:`; an entry body is parsed
+by `EntryBody`, which keeps no field sites, so there is nothing inside one to write
+between and replacing its text would silently drop what it did not restate.
 
-## The text map gives up on a road it cannot draw straight
+That is no longer a predicate each caller asks beforehand — `patchedInto` decides it
+where the shape is known and marks the patch — so it is one home rather than three.
+It is still a shape that cannot be patched.
+*Closes when:* `EntryBody` carries sites of its own, which means `action.ts` and
+`entity.ts` reporting where inside an entry each field was written. That is a larger
+job than the fallback it removes, and nothing is broken while it waits.
 
-`drawnMap` draws a road along a row, up a column, or across one corner, and says the
-rest in words under the map. Standing in the market square that is one road out of
-about a dozen; standing in the castle it is two. Correct, and further from a picture
-than it needs to be.
-*Closes when:* a road that has to bend is drawn bending, or the lattice leaves a lane
-between columns for one to run down.
+## The text map still gives up on a road whose rows do not touch
+
+A road between rows that touch and columns that do not is drawn bending now, down
+the line of paper the lattice leaves between rows, and the corner slope checks its
+clearance rather than claiming a road it does not show. Measured over all 104
+standings of the shipped world: about eighty fewer aside lines.
+
+What is left is roads more than one row apart — 237 of 2841 over every standing.
+They have no line of paper to bend along, because the labels of the rows between
+them are in the way, so they are still said in words. Letting a bend cross a vertical
+was tried and reverted: the blockers on those rows are slopes, not verticals, so it
+measured zero.
+*Closes when:* the lattice leaves a vertical lane beside each column — offset 15 of
+17 is free of every label, slope and vertical — for a road to run down past the rows
+between its two ends.
