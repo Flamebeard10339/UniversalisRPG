@@ -6,30 +6,44 @@ what is below is what that plan does not already say to do next.
 
 ---
 
-## The world pays about fifty times what the curve asks
+## The rebalance, which the sheet is now specific enough to aim
 
-`R(1)` — the rate the frontier has to pay at level 1 for `T(L) = 3L + 2` minutes a
-level — is **1,200 xp/h**. Measured the day the curve landed,
-`npm run simulate-activity -- tulsa.in-town --seeds 2`, the best offer a level-1
-character can reach is `core.melee-combat on tulsa.civilian` at Market Square, at
-**62,476–62,861 xp/h** over a full hour without dying or running dry. Fifty-two
-times.
+The ratio sheet reads, per activity per tier — `npm run simulate-activity --
+tiers.<activity>-tier-<level> --seeds 2`, the frontier's ratio to `R(L)`:
 
-Nothing about that is a surprise — §4.1 of the plan ruled that the awards move
-rather than the time function, and §2 that every `xp:` line, drop rate, stat and
-timer is in scope. It is written down because the world ships in this state until
-the ratio sheet exists to move it with, and because a lane that measures one offer
-and finds it wild should know the whole level is.
+| | tier 1 | tier 10 | tier 20 |
+|---|---|---|---|
+| `combat.attack` | 88× | 272× | 240× |
+| `combat.health` | 1.1× | 3× | 2.1× |
+| `fishing.fishing` | 34× | 95× | 72× |
+| `thieving.thieving` | 23× | — | 44× |
 
-One thing the curve settles that the world does not yet obey, and it is a shape
-rather than a number: `R(L)` troughs at L ≈ 9.4 and then climbs 57× to level 70, so
-**later rooms have to pay more by the minute**. Every hunting ground in
-`content/combat.dsl` is sized to hand over roughly the same health a minute, which
-is flat. That was an open choice while the pace target was open; it is not one now,
-and the line it stood on in `docs/skills/open-human.md` was deleted with the ruling.
+**Health is the one skill in the world that is tuned, and it is tuned by
+accident.** It is paid per point of damage *taken*, which the player's own pool
+and the death that ends the run both bound. Attack is paid per point *dealt*,
+which nothing bounds. That asymmetry is the whole finding: the two halves of one
+fight are two orders of magnitude apart, and no `xp:` line was ever wrong — the
+two lines are `gain 2 * amount experience on damage-dealt` and `gain 15 * ... on
+damage-taken` at `content/combat.dsl:42` and `:52`, and they are the only awards
+that matter, because they dwarf all 25 authored `xp:` lines together.
 
-*Closes when:* the ratio sheet (§7) reads near 1 at the frontier for the levels the
-starter town covers.
+It gets worse with level, not better, because `R(L)` troughs at L ≈ 9.4 while the
+player's damage only climbs. `R(L)` then rises 57× to level 70, so **later rooms
+have to pay more by the minute** — every hunting ground in `content/combat.dsl`
+is sized to hand over roughly the same health a minute, which is flat. That was
+an open choice while the pace target was open; it is not one now, and the line it
+stood on in `docs/skills/open-human.md` was deleted with the ruling.
+
+Two rows are the room and not the offer, and the sheet says so by putting the
+runners-up underneath. `entity.tulsa.civilian.pick-their-pocket` reads 23× at
+Market Square and 3.1× at all six other places it is offered: the square is the
+free-death room, where a run that dies wakes where it fell and so fills the hour
+that every other row loses at the death. And the level-1 combat frontier is
+`core.melee-combat on combat.chicken` at `tulsa.pasture` — the chicken tops the
+world because it does not fight back, so the run never stops.
+
+*Closes when:* the sheet reads near 1 at the frontier for each activity at each
+shipped tier.
 
 ## The measurement accelerates itself, and now by how much
 
@@ -76,3 +90,40 @@ world, not a tool failure.
 
 *Closes when:* the matrix (§6.2) exists and is checked for non-monotone rows, and
 either none are found or the ones found are named.
+
+## Nobody has searched the build space, and what that would cost is now known
+
+The nine reference builds in `content/tiers.dsl` spend their pool evenly and wear
+the best of each slot the level allows. That is a floor, not an answer: the pool
+is a real degree of freedom, and whether the best tier-20 combat build pours
+everything into attack is unasked. Nothing carries a cluster jewel at all, so
+§6.3's fifteen-rows-per-tier reading does not exist.
+
+What it costs is measured rather than guessed. A whole-town sweep is ~19s at one
+seed — ~2.3s of module load and ~0.153s per offer per seed — so a fitness read
+over all 242 offers is ~19s and over one activity's 84 combat offers is ~13s. A
+greedy pass over six slots at ~6 candidates each is ~36 evaluations, so one
+(activity, tier) is minutes and one carrying each of fifteen jewels is hours.
+Running the search in-process against one loaded registry, and reading fitness
+over one activity's offers rather than the world's, are what make it affordable;
+neither is built.
+
+*Closes when:* a seeded, reproducible search improves on a shipped tier build and
+says by how much — or is shown not to, which makes the hand-authored floor the
+answer and is worth the same finding.
+
+## A stored build can become a different character with no diff
+
+`allocatedPositions` holds position *indices* and a `roll`, and the passive at a
+position is looked up at read time (`src/runtime/clusterEffect.ts:31`, `:47-49`).
+So editing a jewel's position list, or a passive's bonus range, changes what every
+stored build grants with no error and no change on disk. Nine corpus saves carry
+cluster planes today and the reference builds will once they carry jewels.
+
+Two claims in `scripts/tier-build.test.ts` already catch the two ways a tier goes
+stale that *are* visible — its level, and a slot it left empty — and neither
+reaches this one.
+
+*Closes when:* a tier artifact stores a hash of its resolved contribution set,
+recomputed and compared on read, so a difference is reported rather than absorbed.
+

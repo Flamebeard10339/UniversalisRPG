@@ -279,3 +279,21 @@ which should just go.
 *Closes when:* `npm run handoff` reports a `@@@ <id>` under `src/`, `scripts/` or `content/`
 that no open line names, and every workaround comment in the tree is either such a mark or has
 been deleted.
+
+## An action a grown copy owns cannot survive being saved
+
+`activeActionProblem` (`src/runtime/save.ts:203-221`) resolves an `activeAction`'s
+owner with `findActionOwner(obj, objId, registry)`, and that reads the registry
+alone (`src/runtime/actionLookup.ts:17-18`). A grown copy's id is minted into the
+state's instance table and is in no registry map, so `item.<copy>` resolves to
+nothing and the action is pruned off every load with `engine.action.stale.owner`.
+
+Found while proving that composing two saves renumbers a copy everywhere it is
+named: the route had to aim an action *at* the copy rather than hang it off one,
+because hanging it off one is thrown away before anything can be asked about it.
+Whether any shipped item that grows also carries an action is not the point —
+`item-level:` and an action block are independent, and nothing refuses the pair.
+
+*Closes when:* an action owned by a grown copy survives a save and a load, or the
+pair is refused at load time so an author is told rather than quietly losing it.
+
