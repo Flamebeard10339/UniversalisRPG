@@ -416,10 +416,19 @@ is to measure again rather than to trust anything written here.
    gates were unprovable; fixed, and one is now pinned.
 5. **Instance-id remapping** (§5) — done, `803eab3c`. Where a minted id can be named is declared on
    `SaveFieldRule` beside `walked`, so `tsc` makes a new field answer.
-6. **The matrix** — the search, the fingerprinted tier artifacts, the outcome matrix, the derived
-   readings.
-7. **The ratio sheet** — the ratio column quoted against a named build (§7.1), under §7.2's rule,
-   beside the within-2× count (§7.3).
+6. **The matrix** — partly done. §6.1's tier pool is landed and derives itself: an activity is a
+   module that declares skills, which reads combat as two and fishing as one with nothing written
+   down. Nine reference builds stand in `content/tiers.dsl`, authored by `npm run tier-build`
+   through the engine's own doors, so what a tier wears is the world's `requires:` lines answered
+   rather than a decision. **Not built**: §6.3's per-jewel rows, §6.4's search — a build's fitness
+   over one activity's offers costs ~13s, so a greedy pass is minutes per tier and hours per jewel
+   set — and §6.5's fingerprint. All three are lines in `docs/balance/open-agent.md`.
+7. **The ratio sheet** — done, `fb901bce`. The ratio column is quoted against the build the sweep
+   ran from (§7.1), under §7.2's mean-over-seeds-then-max-over-offers rule, beside §7.3's
+   within-2× count. It reads at any tier by being pointed at that tier's save.
+
+The rebalance itself is the work all of this was for and is not started; what the sheet says about
+where the world stands is the first line of `docs/balance/open-agent.md`.
 
 ---
 
