@@ -4,7 +4,7 @@ import { devLine, RATES, speedLine } from './devMode';
 import type { Localizer } from '../runtime/localized';
 import type { FiledRun } from '../runtime/runFiling';
 import type { SettingRow } from '../runtime/session';
-import { packTurnsTo, type PortalPack } from './modPortal';
+import { packTurnsTo, type PortalPack } from '../content/packs';
 import { settingLine, standsAt } from './settingLines';
 import type { Words } from './words';
 

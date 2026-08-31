@@ -18,7 +18,7 @@ import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../../runtime/runL
 import { emptyNotes, feedbackOn } from '../playtest';
 import type { PlaytestControls, ReplayControls, ReplaySnapshot } from '../driver';
 import { replayLines } from '../replay';
-import { modulesOff, packTurnsTo, refused, type PortalPack } from '../modPortal';
+import { modulesOff, packTurnsTo, refused, type PortalPack } from '../../content/packs';
 
 export function layerNamed(value: unknown): number {
   const at = LAYERS.findIndex((layer) => layer.id === value);

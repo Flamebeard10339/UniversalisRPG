@@ -19,7 +19,7 @@ import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } from './levelling';
-import { modulesOff, turned } from './modPortal';
+import { modulesOff, turned } from '../content/packs';
 import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { Notices } from './Notices';

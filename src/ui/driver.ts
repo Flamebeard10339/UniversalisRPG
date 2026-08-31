@@ -17,7 +17,7 @@ import { createSaveContext, modulesTurnedOff, turnModulesOff, type SaveContext }
 import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
-import { packsOf, type PortalPack } from './modPortal';
+import { packsOf, type PortalPack } from '../content/packs';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createRecorder } from './playtest';
 import { createTransientChannel, type TransientChannel } from './transient';

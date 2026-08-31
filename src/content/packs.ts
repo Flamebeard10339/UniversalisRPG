@@ -1,4 +1,4 @@
-import type { ModuleStatus } from '../content/registry';
+import type { ModuleStatus } from './registry';
 
 // One module as the portal offers it. `name` is what a toggle sends, because a source is named
 // before it is parsed and the name is the only handle a stored set can hold it by; `id` is what a
@@ -48,6 +48,23 @@ export function packsOf(statuses: readonly ModuleStatus[]): readonly PortalPack[
       const sorted = [...modules].sort((left, right) => left.id.localeCompare(right.id));
       return { pack, modules: sorted, standing: standingOf(sorted) };
     });
+}
+
+// The modules a name turns off, where the name is a pack or a single module. A tool takes the same
+// word a player clicks, so `--off quests` on the command line and the quests row on the settings
+// page mean one thing and there is nowhere for the two to drift apart. A name nothing answers to is
+// refused rather than ignored: on a page it could only be a stale stored choice, but on a command
+// line it is a typo, and silently measuring the wrong world is the worst answer available.
+export function modulesNamed(statuses: readonly ModuleStatus[], names: readonly string[]): string[] {
+  const packs = packsOf(statuses);
+  const found = names.flatMap((name) => {
+    const pack = packs.find((each) => each.pack === name);
+    if (pack) return pack.modules.map((module) => module.name);
+    const module = packs.flatMap((each) => each.modules).find((each) => each.name === name || each.id === name);
+    if (module) return [module.name];
+    throw new Error(`no pack or module is called ${name}. There is ${packs.map((each) => each.pack).join(', ')}`);
+  });
+  return [...new Set(found)].sort();
 }
 
 // The set the page is standing on, read back off the rows it is drawing rather than kept beside

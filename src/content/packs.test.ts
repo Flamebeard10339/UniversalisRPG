@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverseWithDiagnostics } from '../content/load';
-import { shippedSources } from '../content/shipped';
-import { withModulesOff } from '../content/universe';
-import { packsOf, packTurnsTo, refused, turned } from './modPortal';
-import type { ModuleStatus } from '../content/registry';
+import { loadUniverseWithDiagnostics } from './load';
+import { shippedSources } from './shipped';
+import { withModulesOff } from './universe';
+import { packsOf, packTurnsTo, refused, turned } from './packs';
+import type { ModuleStatus } from './registry';
 
 const status = (over: Partial<ModuleStatus> & { moduleId: string }): ModuleStatus => ({
   sourceName: over.moduleId,

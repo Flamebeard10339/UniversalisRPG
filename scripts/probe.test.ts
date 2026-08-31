@@ -287,7 +287,7 @@ describe('probe: running a # test from a shell', () => {
 describe('probe: arguments', () => {
   it('reads sources, --show and --round-trip', () => {
     const args = parseProbeArgs(['a.dsl', 'b.dsl', '--show', 'entity.base.rat', '--round-trip']);
-    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], show: ['entity.base.rat'], test: [], roundTrip: true, roundTripMode: 'universe', each: false });
+    expect(args).toEqual({ sources: ['a.dsl', 'b.dsl'], off: [], show: ['entity.base.rat'], test: [], roundTrip: true, roundTripMode: 'universe', each: false });
   });
 
   it('takes --show more than once', () => {

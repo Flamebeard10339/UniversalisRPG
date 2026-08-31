@@ -8,7 +8,8 @@ import { localId } from '../src/content/locale';
 import { contentSectionMaps } from '../src/content/sections';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { canSerialize, declaredGlobalIds, roundTripModule, roundTripUniverse } from '../src/content/serialize';
-import { type ModuleSource, type ParsedModule } from '../src/content/universe';
+import { withModulesOff, type ModuleSource, type ParsedModule } from '../src/content/universe';
+import { modulesNamed } from '../src/content/packs';
 import { createGameState } from '../src/runtime/state';
 import { replayTest, runTest, type TestRun } from '../src/runtime/session';
 import { serializeSave } from '../src/runtime/save';
@@ -28,6 +29,7 @@ export interface ProbeOptions {
 
 export interface ProbeArgs extends ProbeOptions {
   sources: string[];
+  off: string[];
 }
 
 export interface ProbeReport {
@@ -40,9 +42,12 @@ const SHOWABLE = new Map<string, string>(contentSectionMaps());
 export const DOCUMENT_SEPARATOR = '---';
 
 const usage = [
-  'Usage: npm run probe -- <source>... [--show <kind>.<id>] [--test <id>] [--record <id>] [--round-trip] [--each]',
+  'Usage: npm run probe -- <source>... [--off <pack>] [--show <kind>.<id>] [--test <id>] [--record <id>] [--round-trip] [--each]',
   '',
   '  <source>       a DSL file, a directory of them, or - to read from stdin',
+  '  --off          turn a pack or a module off before loading, by the name the',
+  '                 settings page offers it under; repeatable. `--off quests` is',
+  '                 the town with no quest in it',
   '  --show         print one registry record as JSON; repeatable',
   '  --record       run one # test and print the state it ends on as the # save section',
   '                 its own closing expect: names, so the printed section replaces that',
@@ -76,7 +81,7 @@ const usage = [
 ].join('\n');
 
 export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
-  const args: ProbeArgs = { sources: [], show: [], test: [], roundTrip: false, roundTripMode: 'universe', each: false };
+  const args: ProbeArgs = { sources: [], off: [], show: [], test: [], roundTrip: false, roundTripMode: 'universe', each: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') {
@@ -88,6 +93,10 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
       const mode = arg.startsWith('--round-trip=') ? arg.slice('--round-trip='.length) : 'universe';
       if (mode !== 'universe' && mode !== 'module') throw new Error(`--round-trip takes universe or module, not ${mode}`);
       args.roundTripMode = mode;
+    } else if (arg === '--off') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--off wants a pack or module name after it');
+      args.off.push(spec);
     } else if (arg === '--show') {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--show wants a <kind>.<id> after it');
@@ -351,6 +360,7 @@ function main(): void {
   try {
     args = parseProbeArgs(process.argv.slice(2));
     sources = readSources(args.sources);
+    if (args.off.length > 0) sources = withModulesOff(sources, modulesNamed(loadUniverseWithDiagnostics(sources).modules, args.off));
   } catch (error) {
     console.error((error as Error).message);
     process.exit(2);

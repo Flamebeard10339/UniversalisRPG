@@ -4,7 +4,8 @@ import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { DEBUG_MARK } from '../src/content/sections/define';
 import { printDirective, printTerminator } from '../src/content/sections/test';
 import { shippedSources } from '../src/content/shipped';
-import type { ModuleSource } from '../src/content/universe';
+import { modulesNamed } from '../src/content/packs';
+import { withModulesOff, type ModuleSource } from '../src/content/universe';
 import { TIME, type Condition } from '../src/grammar/condition';
 import { roadDepths } from '../src/runtime/journey';
 import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
@@ -23,13 +24,15 @@ export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
-  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
+  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
   '',
   '  <save>          a # save id to start every run from, as `load:` names one',
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
   '                  so `highwayman` and `core.melee-combat on combat.highwayman` both name',
   '                  something. With none, everything on offer anywhere is measured',
   '  --at            narrows the sweep to one location',
+  '  --off           turn a pack or a module off before measuring, by the name the settings',
+  '                  page offers it under; repeatable. `--off quests` measures the town alone',
   `  --seeds         how many rng seeds each offer is run under (default ${String(DEFAULT_SEEDS)})`,
   `  --window        how many minutes of game time every run is given (default ${String(DEFAULT_WINDOW_MINUTES)})`,
   '  --all           list every offer, including the ones that paid nothing at all',
@@ -87,6 +90,7 @@ const usage = [
 
 export interface SimulationArgs {
   save: string;
+  off?: string[];
   holds?: string;
   at?: string;
   seeds: number;
@@ -111,6 +115,10 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
       const at = raw[++i];
       if (at === undefined) throw new Error('--at wants a location id after it');
       args.at = at;
+    } else if (arg === '--off') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--off wants a pack or module name after it');
+      (args.off ??= []).push(spec);
     } else if (arg === '--seeds') args.seeds = counted('--seeds', raw[++i]);
     else if (arg === '--window') args.window = counted('--window', raw[++i]);
     else if (arg.startsWith('--')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
@@ -501,6 +509,14 @@ export interface SimulationReport {
   ok: boolean;
 }
 
+// The shipped world with the named packs and modules turned off, which is how an hour is measured
+// in a town that has no quests in it. The names are the settings page's own.
+export function worldOff(names: readonly string[]): readonly ModuleSource[] {
+  const shipped = shippedSources();
+  if (names.length === 0) return shipped;
+  return withModulesOff(shipped, modulesNamed(loadUniverseWithDiagnostics(shipped).modules, names));
+}
+
 export function simulate(sources: readonly ModuleSource[], args: SimulationArgs): SimulationReport {
   const base = loadUniverseWithDiagnostics(sources);
   if (base.diagnostics.length > 0) return { lines: base.diagnostics.map(formatModuleDiagnostic), ok: false };
@@ -532,7 +548,7 @@ function main(): void {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const report = simulate(shippedSources(), args);
+  const report = simulate(worldOff(args.off ?? []), args);
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
 }
