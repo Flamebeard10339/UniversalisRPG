@@ -125,7 +125,7 @@ describe('what the run is told', () => {
 
     expect(said).toContain('npm run oracle');
     expect(said).toContain('npm run probe');
-    expect(said).toContain('npm run balance');
+    expect(said).toContain('npm run simulate-activity');
   });
 
   it('hands over every debug switch the kind offers, so a route the engine grows one for is not written past it', () => {

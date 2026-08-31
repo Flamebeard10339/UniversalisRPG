@@ -22,7 +22,7 @@ export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
-  'Usage: npm run balance -- <save> [<action-spec>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
+  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
   '',
   '  <save>          a # save id to start every run from, as `load:` names one',
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
@@ -69,7 +69,7 @@ const usage = [
   'unless the arguments or the corpus are refused.',
 ].join('\n');
 
-export interface BalanceArgs {
+export interface SimulationArgs {
   save: string;
   holds?: string;
   at?: string;
@@ -84,9 +84,9 @@ const counted = (flag: string, raw: string | undefined): number => {
   return value;
 };
 
-export function parseBalanceArgs(raw: readonly string[]): BalanceArgs {
+export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
   const loose: string[] = [];
-  const args: BalanceArgs = { save: '', seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false };
+  const args: SimulationArgs = { save: '', seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') throw new Error(usage);
@@ -125,7 +125,7 @@ const byReach = (one: Subject, other: Subject): number =>
 // Everything a player who loaded this save could take, anywhere. The engine is asked rather than the
 // registry read: a room's offers are what `sessionStatus` says they are, and a thing standing there
 // unlooked-at is looked at first, because an unread foe offers nothing but a look.
-export function subjectsFrom(registry: Registry, save: string, narrow: Pick<BalanceArgs, 'holds' | 'at'> = {}): Subject[] {
+export function subjectsFrom(registry: Registry, save: string, narrow: Pick<SimulationArgs, 'holds' | 'at'> = {}): Subject[] {
   const depths = roadDepths(registry);
   const found: Subject[] = [];
   for (const at of registry.locations.keys()) {
@@ -162,7 +162,7 @@ function windowTerminator(endMs: number): Condition {
   return { kind: 'comparison', left: { path: [TIME] }, operator: '>=', right: { value: seconds, places: decimalsOf(seconds) } };
 }
 
-export const PROBE_MODULE = 'balance-probe';
+export const PROBE_MODULE = 'simulation-probe';
 
 export const standTest = (index: number): string => `${PROBE_MODULE}.stand-${index}`;
 export const runTestId = (index: number): string => `${PROBE_MODULE}.run-${index}`;
@@ -390,7 +390,7 @@ function measuredLines({ subject, runs }: Measured, windowMs: number): string[] 
 // and a reader who takes them for one another has the error the window was put there to remove.
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
-export function balanceLines(measured: readonly Measured[], args: Pick<BalanceArgs, 'save' | 'seeds' | 'window' | 'all'>): string[] {
+export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'>): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
   const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time`];
@@ -410,12 +410,12 @@ export function balanceLines(measured: readonly Measured[], args: Pick<BalanceAr
   return lines;
 }
 
-export interface BalanceReport {
+export interface SimulationReport {
   lines: string[];
   ok: boolean;
 }
 
-export function balance(sources: readonly ModuleSource[], args: BalanceArgs): BalanceReport {
+export function simulate(sources: readonly ModuleSource[], args: SimulationArgs): SimulationReport {
   const base = loadUniverseWithDiagnostics(sources);
   if (base.diagnostics.length > 0) return { lines: base.diagnostics.map(formatModuleDiagnostic), ok: false };
   if (!base.registry.saves.has(args.save)) {
@@ -435,18 +435,18 @@ export function balance(sources: readonly ModuleSource[], args: BalanceArgs): Ba
   const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  return { lines: balanceLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args), ok: true };
+  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args), ok: true };
 }
 
 function main(): void {
-  let args: BalanceArgs;
+  let args: SimulationArgs;
   try {
-    args = parseBalanceArgs(process.argv.slice(2));
+    args = parseSimulationArgs(process.argv.slice(2));
   } catch (error) {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const report = balance(shippedSources(), args);
+  const report = simulate(shippedSources(), args);
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
 }

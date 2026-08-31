@@ -119,6 +119,6 @@ fifty-six of one item is a shape someone should look at, and there are three dif
 answers — the first level is expensive for a tutorial, or netting is cheap, or Miki should
 be asking on a route where the rats are already levelling attack.
 
-*Moves on which of the three it is. `npm run balance` is where the answer is read rather
+*Moves on which of the three it is. `npm run simulate-activity` is where the answer is read rather
 than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
 pick, because the choice is about what the tutorial is teaching.*

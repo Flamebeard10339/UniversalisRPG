@@ -3,7 +3,7 @@ import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
-import { balance, balanceLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, measure, parseBalanceArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './balance';
+import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, measure, parseSimulationArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
 // One island with somewhere to stand, somewhere to walk to, a bush that pays for as long as anyone
 // picks it, and one wasp, which comes back a minute after it falls. Everything the tool answers is a
@@ -125,7 +125,7 @@ const island = (): ReturnType<typeof loadModule> => loadModule(ISLAND);
 
 // The world with a sweep's own module beside it, which is how the tool loads what it wrote.
 const beside = (probe: string): ReturnType<typeof loadModule> => {
-  const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ISLAND }, { name: 'balance-probe', text: probe }]);
+  const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ISLAND }, { name: 'simulation-probe', text: probe }]);
   expect(loaded.diagnostics).toEqual([]);
   return loaded.registry;
 };
@@ -139,32 +139,32 @@ const SAVE = 'island.on-the-shore';
 
 describe('what the arguments ask for', () => {
   it('takes a save on its own and falls back to its own defaults', () => {
-    expect(parseBalanceArgs([SAVE])).toEqual({ save: SAVE, seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false });
+    expect(parseSimulationArgs([SAVE])).toEqual({ save: SAVE, seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false });
   });
 
   it('reads a second loose argument as the text an offer has to hold', () => {
-    expect(parseBalanceArgs([SAVE, 'wasp']).holds).toBe('wasp');
+    expect(parseSimulationArgs([SAVE, 'wasp']).holds).toBe('wasp');
   });
 
   it('takes a place, a seed count and a window off the flags', () => {
-    expect(parseBalanceArgs(['s', '--at', 'island.thicket', '--seeds', '2', '--window', '3', '--all'])).toEqual({ save: 's', at: 'island.thicket', seeds: 2, window: 3, all: true });
+    expect(parseSimulationArgs(['s', '--at', 'island.thicket', '--seeds', '2', '--window', '3', '--all'])).toEqual({ save: 's', at: 'island.thicket', seeds: 2, window: 3, all: true });
   });
 
   it('refuses a run with no save to start from', () => {
-    expect(() => parseBalanceArgs([])).toThrow(/name a # save/);
+    expect(() => parseSimulationArgs([])).toThrow(/name a # save/);
   });
 
   it('refuses a third loose argument rather than guessing which one was meant', () => {
-    expect(() => parseBalanceArgs(['a', 'b', 'c'])).toThrow(/one save and at most one action-spec/);
+    expect(() => parseSimulationArgs(['a', 'b', 'c'])).toThrow(/one save and at most one action-spec/);
   });
 
   it('refuses a count that is not a whole number of at least one', () => {
-    expect(() => parseBalanceArgs(['s', '--seeds', '0'])).toThrow(/--seeds wants a whole number/);
-    expect(() => parseBalanceArgs(['s', '--window', 'ages'])).toThrow(/--window wants a whole number/);
+    expect(() => parseSimulationArgs(['s', '--seeds', '0'])).toThrow(/--seeds wants a whole number/);
+    expect(() => parseSimulationArgs(['s', '--window', 'ages'])).toThrow(/--window wants a whole number/);
   });
 
   it('refuses a flag it does not know instead of reading it as a save', () => {
-    expect(() => parseBalanceArgs(['s', '--threat'])).toThrow(/unknown flag --threat/);
+    expect(() => parseSimulationArgs(['s', '--threat'])).toThrow(/unknown flag --threat/);
   });
 });
 
@@ -257,7 +257,7 @@ describe('what a run reports', () => {
   it('says a run stopped short in the words the engine stopped it with', () => {
     const [stung] = swept('wasp');
     expect(stung.runs.every((run) => run.stoppedBy !== undefined)).toBe(true);
-    expect(balanceLines([stung], { save: 's', seeds: 2, window: 1, all: true }).join('\n')).toMatch(/stopped short in 2\/2 seeds: until time >= /);
+    expect(simulationLines([stung], { save: 's', seeds: 2, window: 1, all: true }).join('\n')).toMatch(/stopped short in 2\/2 seeds: until time >= /);
   });
 
   // The wasp is back on its feet a minute after it falls, and a run at it is over in seconds. A
@@ -300,7 +300,7 @@ describe('what a run reports', () => {
     expect(found.some((each) => each.runs.some((run) => run.stoppedBy !== undefined && run.gains.length > 0)), 'nothing on this island stops short holding anything').toBe(true);
     for (const each of found) {
       const paid = each.runs.some((run) => run.gains.length > 0);
-      expect(balanceLines([each], { save: 's', seeds: 2, window: 1, all: true }).join('\n').includes('/h'), each.subject.use).toBe(paid);
+      expect(simulationLines([each], { save: 's', seeds: 2, window: 1, all: true }).join('\n').includes('/h'), each.subject.use).toBe(paid);
     }
   });
 
@@ -308,7 +308,7 @@ describe('what a run reports', () => {
     const use = 'use: entity.island.bush.pick';
     const rate = (worked: number, window: number): string => {
       const runs: Run[] = [{ seed: 1, stoppedBy: 'it was finished', cycles: 1, worked, gains: [{ kind: 'item', id: 'island.berry', amount: 6 }] }];
-      const line = balanceLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window, all: true }).find((each) => each.includes('/h'));
+      const line = simulationLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window, all: true }).find((each) => each.includes('/h'));
       return line!.split(',')[0]!;
     };
     expect(rate(1_000, 60)).toContain('/h');
@@ -322,7 +322,7 @@ describe('what a run reports', () => {
     const use = 'use: entity.island.bush.pick';
     const printed = (worked: number): string => {
       const runs: Run[] = [{ seed: 1, cycles: 1, worked, gains: [{ kind: 'item', id: 'island.berry', amount: 6 }] }];
-      return balanceLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window: 60, all: true }).join('\n');
+      return simulationLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window: 60, all: true }).join('\n');
     };
     expect(printed(secondsToMs(36))).toContain('/h while it ran');
     expect(printed(secondsToMs(3600))).not.toContain('while it ran');
@@ -337,27 +337,27 @@ describe('what a run reports', () => {
     const [stung] = swept('wasp');
     expect(thorned.runs.every((run) => run.engagedBy === 'island.wasp')).toBe(true);
     expect(stung.runs.every((run) => run.engagedBy === undefined)).toBe(true);
-    const lines = balanceLines([thorned], { save: 's', seeds: 2, window: 1, all: true }).join('\n');
+    const lines = simulationLines([thorned], { save: 's', seeds: 2, window: 1, all: true }).join('\n');
     expect(lines).toContain('island.wasp took a fight inside the window');
     expect(lines).toContain('xp island.fighting');
   });
 
   it('lists an offer nothing could be measured at even where it came back empty-handed', () => {
     const runs: Run[] = [{ seed: 1, stoppedBy: 'stung', engagedBy: 'island.wasp', cycles: 0, worked: 10, gains: [] }];
-    const lines = balanceLines([{ subject: { at: 'island.thicket', depth: 1, use: 'use: entity.island.bramble.pick' }, runs }], { save: 's', seeds: 1, window: 1, all: false }).join('\n');
+    const lines = simulationLines([{ subject: { at: 'island.thicket', depth: 1, use: 'use: entity.island.bramble.pick' }, runs }], { save: 's', seeds: 1, window: 1, all: false }).join('\n');
     expect(lines).toContain('island.wasp took a fight inside the window');
   });
 
   it('leaves out an offer nothing came of, and lists it when asked to', () => {
     const nothing: Measured[] = [{ subject: { at: 'island.shore', depth: 0, use: 'use: entity.island.bush.examine' }, runs: [{ seed: 1, cycles: 1, worked: 0, gains: [] }] }];
-    expect(balanceLines(nothing, { save: 's', seeds: 1, window: 1, all: false }).join('\n')).not.toContain('bush.examine');
-    expect(balanceLines(nothing, { save: 's', seeds: 1, window: 1, all: true }).join('\n')).toContain('bush.examine');
+    expect(simulationLines(nothing, { save: 's', seeds: 1, window: 1, all: false }).join('\n')).not.toContain('bush.examine');
+    expect(simulationLines(nothing, { save: 's', seeds: 1, window: 1, all: true }).join('\n')).toContain('bush.examine');
   });
 
   it('heads each place with how far out it is, and says so where no road reaches it', () => {
     const use = 'use: entity.island.crab.pinch';
     const runs: Run[] = [{ seed: 1, cycles: 1, worked: 1000, gains: [{ kind: 'item', id: 'island.berry', amount: 2 }] }];
-    const lines = balanceLines([{ subject: { at: 'island.cove', depth: 4, use }, runs }, { subject: { at: 'island.reef', use }, runs }], { save: 's', seeds: 1, window: 1, all: true }).join('\n');
+    const lines = simulationLines([{ subject: { at: 'island.cove', depth: 4, use }, runs }, { subject: { at: 'island.reef', use }, runs }], { save: 's', seeds: 1, window: 1, all: true }).join('\n');
     expect(lines).toContain('island.cove (4 roads out)');
     expect(lines).toContain('island.reef (no road reaches here)');
   });
@@ -367,17 +367,17 @@ describe('what the tool refuses before it runs anything', () => {
   const source = [{ name: 'island', text: ISLAND }];
 
   it('names what is defined when the save is not', () => {
-    const report = balance(source, { save: 'island.on-the-reef', seeds: 1, window: 1, all: false });
+    const report = simulate(source, { save: 'island.on-the-reef', seeds: 1, window: 1, all: false });
     expect(report.ok).toBe(false);
     expect(report.lines.join('\n')).toContain(SAVE);
   });
 
   it('refuses a place the world does not have', () => {
-    expect(balance(source, { save: SAVE, at: 'island.reef', seeds: 1, window: 1, all: false }).ok).toBe(false);
+    expect(simulate(source, { save: SAVE, at: 'island.reef', seeds: 1, window: 1, all: false }).ok).toBe(false);
   });
 
   it('says so plainly when the narrowing matched nothing, and does not call that a failure', () => {
-    const report = balance(source, { save: SAVE, holds: 'kraken', seeds: 1, window: 1, all: false });
+    const report = simulate(source, { save: SAVE, holds: 'kraken', seeds: 1, window: 1, all: false });
     expect(report.ok).toBe(true);
     expect(report.lines.join('\n')).toContain('nothing is on offer anywhere that matches');
   });

@@ -19,7 +19,7 @@
     "authorbot": "tsx scripts/authorbot.ts",
     "probe": "tsx scripts/probe.ts",
     "oracle": "tsx scripts/oracle.ts",
-    "balance": "tsx scripts/balance.ts",
+    "simulate-activity": "tsx scripts/simulate-activity.ts",
     "handoff": "tsx scripts/handoff.ts",
     "notes": "tsx scripts/notes.ts",
     "review": "tsx scripts/review.ts",
