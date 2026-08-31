@@ -1,4 +1,4 @@
-import { COMPASS, compassOf, type Sheet, type Way } from '../../src/runtime/map';
+import { COMPASS, compassOf, type Road, type Sheet, type Way } from '../../src/runtime/map';
 
 // The map drawn as characters. Every fact in here comes off the sheet the engine built — which
 // places, on which floor, joined by which roads, and which way each way out lies — so a terminal and
@@ -65,6 +65,47 @@ const clear = (canvas: string[][], row: number, from: number, to: number): boole
   return true;
 };
 
+// A road drawn as one line: along the row two places share, down the column they share, or across the
+// corner between two a step apart each way. Nothing is written over anything already on the paper, so
+// a road with a place in its way is left for the writing underneath.
+function straight(canvas: string[][], road: Road, from: Cell, to: Cell): boolean {
+  if (from.row === to.row) {
+    const [left, right] = from.column < to.column ? [from, to] : [to, from];
+    const span: [number, number] = [left.column * COLUMN + left.label.length, right.column * COLUMN];
+    if (!clear(canvas, left.row * 2, span[0], span[1])) return false;
+    write(canvas, left.row * 2, span[0], (road.open ? '─' : SHUT).repeat(span[1] - span[0]));
+    return true;
+  }
+  const [top, low] = from.row < to.row ? [from, to] : [to, from];
+  if (from.column === to.column) {
+    const line = middleOf(top.column);
+    if (!canvas.slice(top.row * 2 + 1, low.row * 2).every((row) => row[line] === ' ')) return false;
+    for (let row = top.row * 2 + 1; row < low.row * 2; row += 1) write(canvas, row, line, road.open ? '│' : SHUT);
+    return true;
+  }
+  if (low.row - top.row !== 1 || Math.abs(low.column - top.column) !== 1) return false;
+  const corner = Math.min(top.column, low.column) * COLUMN + LABEL;
+  if (!clear(canvas, top.row * 2 + 1, corner, corner + 1)) return false;
+  write(canvas, top.row * 2 + 1, corner, road.open ? (low.column > top.column ? '\\' : '/') : SHUT);
+  return true;
+}
+
+// A road between two rows that touch and columns that do not, drawn bending: out of the place above,
+// along the line of paper the lattice leaves between the two rows, and into the place below. It is
+// tried only once every road that can be drawn straight has been, so a bend never takes the paper a
+// straight line wanted.
+function bent(canvas: string[][], road: Road, from: Cell, to: Cell): boolean {
+  const [top, low] = from.row < to.row ? [from, to] : [to, from];
+  if (low.row - top.row !== 1 || top.column === low.column) return false;
+  const row = top.row * 2 + 1;
+  const [start, end] = [middleOf(top.column), middleOf(low.column)];
+  const [left, right] = start < end ? [start, end] : [end, start];
+  if (!clear(canvas, row, left, right + 1)) return false;
+  const [opening, closing] = start < end ? ['└', '┐'] : ['┌', '┘'];
+  write(canvas, row, left, road.open ? `${opening}${'─'.repeat(right - left - 1)}${closing}` : SHUT.repeat(right - left + 1));
+  return true;
+}
+
 export function drawnMap(sheet: Sheet): string[] {
   if (sheet.nodes.length === 0) return [];
   const { cells, columns, rows, crowded } = lattice(sheet);
@@ -72,39 +113,17 @@ export function drawnMap(sheet: Sheet): string[] {
   for (const cell of cells.values()) write(canvas, cell.row * 2, cell.column * COLUMN, cell.label);
 
   const aside: string[] = [...crowded];
+  const named = (road: Road): string =>
+    `${cells.get(road.from)?.label ?? road.from} ${road.mutual ? '—' : '->'} ${cells.get(road.to)?.label ?? road.to}${road.open ? '' : ' (shut)'}`;
+
+  const bending: { road: Road; from: Cell; to: Cell }[] = [];
   for (const road of sheet.roads) {
     const from = cells.get(road.from);
     const to = cells.get(road.to);
-    const named = `${cells.get(road.from)?.label ?? road.from} ${road.mutual ? '—' : '->'} ${cells.get(road.to)?.label ?? road.to}${road.open ? '' : ' (shut)'}`;
-    if (!from || !to) {
-      aside.push(named);
-      continue;
-    }
-    const drawn = road.open ? '─' : SHUT;
-    if (from.row === to.row) {
-      const [left, right] = from.column < to.column ? [from, to] : [to, from];
-      const span: [number, number] = [left.column * COLUMN + left.label.length, right.column * COLUMN];
-      if (clear(canvas, left.row * 2, span[0], span[1])) write(canvas, left.row * 2, span[0], drawn.repeat(span[1] - span[0]));
-      else aside.push(named);
-      continue;
-    }
-    if (from.column === to.column) {
-      const [top, low] = from.row < to.row ? [from, to] : [to, from];
-      const line = middleOf(top.column);
-      if (canvas.slice(top.row * 2 + 1, low.row * 2).every((row) => row[line] === ' ')) {
-        for (let row = top.row * 2 + 1; row < low.row * 2; row += 1) write(canvas, row, line, road.open ? '│' : SHUT);
-      } else aside.push(named);
-      continue;
-    }
-    const [top, low] = from.row < to.row ? [from, to] : [to, from];
-    if (low.row - top.row === 1 && Math.abs(low.column - top.column) === 1) {
-      const slope = low.column > top.column ? '\\' : '/';
-      const at = low.column > top.column ? top.column * COLUMN + LABEL : low.column * COLUMN + LABEL;
-      write(canvas, top.row * 2 + 1, at, road.open ? slope : SHUT);
-      continue;
-    }
-    aside.push(named);
+    if (!from || !to) aside.push(named(road));
+    else if (!straight(canvas, road, from, to)) bending.push({ road, from, to });
   }
+  for (const { road, from, to } of bending) if (!bent(canvas, road, from, to)) aside.push(named(road));
 
   const drawing = canvas.map((row) => row.join('').replace(/\s+$/, '')).filter((row, at, all) => row !== '' || all.slice(at + 1).some((rest) => rest !== ''));
   // The one line of legend, and only where it is needed: a dotted road is a road nobody can walk

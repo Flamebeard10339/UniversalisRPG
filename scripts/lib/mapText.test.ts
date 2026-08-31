@@ -59,6 +59,30 @@ describe('the map drawn as characters', () => {
     expect(drawn(corner, 'low')).toMatch(/[\\/]/);
   });
 
+  it('draws a road bending where it cannot be drawn straight', () => {
+    const bending = [place('west', 0, 0, 0, 'east'), place('middle', 1, 0), place('east', 2, 1, 0, 'west')];
+
+    const text = drawn(bending, 'west');
+
+    expect(text).toContain('└');
+    expect(text).toContain('┐');
+    expect(text).not.toContain('also:');
+  });
+
+  // A bend takes the one line of paper the lattice leaves between two rows, and a road drawn straight
+  // wants that line too, so the straight one has it whichever order the sheet lists them in.
+  it('leaves the paper to a road that can be drawn straight, and says the bend it then cannot draw', () => {
+    const crossed = [place('west', 0, 0, 0, 'south-east'), place('north', 1, 0, 0, 'south'), place('south', 1, 2, 0, 'north'), place('south-east', 2, 1, 0, 'west')];
+
+    const text = drawn(crossed, 'west');
+    const said = text.split('\n').filter((line) => line.startsWith('also:')).join('\n');
+
+    expect(text).toContain('│');
+    expect(text).not.toContain('└');
+    expect(said).toMatch(/West/);
+    expect(said).toMatch(/South East/);
+  });
+
   // The one thing an ASCII map must not do is claim a road it cannot draw. A road blocked by a place
   // standing in its way is said in words instead, and never left off.
   it('says in words the roads it could not draw, rather than dropping them', () => {
