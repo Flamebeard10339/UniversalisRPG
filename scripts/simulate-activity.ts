@@ -12,6 +12,7 @@ import { nextBoundary } from '../src/runtime/runtime';
 import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession, type PlaySession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
 import { MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
+import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
 // The state a run is walked against, taken off the thing that makes one. Naming the type instead
 // would put the whole of the engine's state on the surface `published.test.ts` audits, and a sweep
@@ -64,6 +65,21 @@ const usage = [
   'A fight something aggressive started is named where one happened. It is an annotation and not a',
   'suppression: whoever swung, the window is the one the player lived through, and what they came out',
   'of it holding is what standing there paid.',
+  '',
+  'Beside every experience rate is what the curve asks for at that level: the cost of the level over',
+  'the time the level is meant to take. The level is the one the save stands at in that skill, never',
+  "the run's highest, and the save is named in the first line — a ratio is quoted for a build and is",
+  'not a property of the world on its own.',
+  '',
+  'Two readings close the sheet. The pace target binds on the frontier and nowhere else, so the first',
+  'is the best-paying offer within reach and how far off target it is: an offer under target is what',
+  'makes one activity worth half of another rather than a defect. That alone would be satisfied by a',
+  'world with one good thing to do and two hundred worthless ones, so the second is how many offers',
+  'come within twice the frontier. A count of one is a level with one thing to do.',
+  '',
+  "An offer's own figure is the mean across its seeds and not the best of them, because a maximum",
+  'over seeds climbs as seeds are added — so --seeds alone would move every ratio here with nothing',
+  'in the world having changed.',
   '',
   'This is a tool and not a gate. It runs on demand, it asserts nothing, and it always exits 0',
   'unless the arguments or the corpus are refused.',
@@ -151,6 +167,15 @@ export function clockOn(registry: Registry, save: string): number {
   const session = startSession(registry);
   applyDirective(session, { kind: 'load', save });
   return secondsToMs(sessionStatus(session).time);
+}
+
+// What the character every run starts from stands at. A rate is read against the level of the skill
+// it paid into, so this is the whole of what the sheet's ratio column is quoted for — and it is a
+// property of the save rather than of the world, which is why the column names the build.
+export function levelsOn(registry: Registry, save: string): Levels {
+  const state = createGameState();
+  applyDirective(sessionOver(registry, state), { kind: 'load', save });
+  return levelsIn(state.xp);
 }
 
 const decimalsOf = (value: number): number => String(value).split('.')[1]?.length ?? 0;
@@ -345,17 +370,43 @@ const spread = (values: readonly number[]): string => {
   return low === high ? round(low) : `${round(low)}–${round(high)}`;
 };
 
+// A ratio is read across four orders of magnitude on one sheet, so it is printed to the precision it
+// has rather than to a fixed one: `0` where a row pays a four-hundredth of target says the row paid
+// nothing, which is a different finding.
+const times = (ratio: number): string => {
+  if (!Number.isFinite(ratio)) return '—';
+  if (ratio >= 10) return String(Math.round(ratio));
+  if (ratio >= 1) return String(Math.round(ratio * 10) / 10);
+  if (ratio >= 0.01) return String(Math.round(ratio * 100) / 100);
+  return ratio === 0 ? '0' : '<0.01';
+};
+
 const address = ({ kind, id }: Gain): string => `${kind} ${id}`;
 
 const amountIn = (run: Run, of: string): number => run.gains.find((gain) => address(gain) === of)?.amount ?? 0;
 
 export const WHILE_IT_RAN = 'while it ran';
 
+const XP = 'xp';
+
+// The skill an `xp <id>` tally is for, and nothing for a tally that is not one. Items have no curve
+// to be read against — what a drop is worth is a question about a shop and not about the climb.
+const skillIn = (of: string): string | undefined => (of.startsWith(`${XP} `) ? of.slice(XP.length + 1) : undefined);
+
+// What one offer paid into one skill, meant against the level the build stands at in it. The mean
+// across seeds and not the best of them, for the reason `meanRate` gives.
+const againstTheCurve = (of: string, rates: readonly number[], levels: Levels): string => {
+  const skill = skillIn(of);
+  if (skill === undefined) return '';
+  const against = ratioFor(skill, meanRate(rates), levels);
+  return ` · ${times(ratioOf(against))}× the level-${String(against.level)} target`;
+};
+
 // Every seed answers, because every seed was given the same window and every seed spent all of it.
 // The window is the divisor whatever the run did with it, so there is nothing here to say about
 // which seeds counted. Beside it, wherever the offer did not last the window out, the pace inside
 // the time it did last — the two are the same figure where it lasted, and only one is printed then.
-function paidLines(runs: readonly Run[], windowMs: number): string[] {
+function paidLines(runs: readonly Run[], windowMs: number, levels: Levels): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
   const hours = windowMs / MS_PER_HOUR;
@@ -363,10 +414,43 @@ function paidLines(runs: readonly Run[], windowMs: number): string[] {
   return paid
     .map((of) => ({ of, rates: runs.map((run) => amountIn(run, of) / hours), paced: cut.map((run) => amountIn(run, of) / (run.worked / MS_PER_HOUR)) }))
     .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates))
-    .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}`);
+    .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}${againstTheCurve(of, rates, levels)}`);
 }
 
-function measuredLines({ subject, runs }: Measured, windowMs: number): string[] {
+// Every offer's pace into every skill it paid, which is what the two readings below the sheet are
+// taken over. One offer paying two skills is on both their sheets, because it is two answers.
+export function paidInto(measured: readonly Measured[], windowMs: number): Paid[] {
+  const hours = windowMs / MS_PER_HOUR;
+  const paid: Paid[] = [];
+  for (const { subject, runs } of measured) {
+    for (const of of new Set(runs.flatMap((run) => run.gains.map(address)))) {
+      const skill = skillIn(of);
+      if (skill === undefined) continue;
+      paid.push({ skill, use: subject.use, at: subject.at, rate: meanRate(runs.map((run) => amountIn(run, of) / hours)) });
+    }
+  }
+  return paid;
+}
+
+// The two readings the frontier ruling needs. The first is what the pace target actually binds on:
+// the best offer within reach, and how far off target it is. The second is there because the first
+// permits a dead world — a level with one good thing to do and two hundred worthless ones satisfies
+// the frontier completely, and "the city feels alive" is why the ruling was made.
+export function curveLines(measured: readonly Measured[], windowMs: number, levels: Levels): string[] {
+  const found = frontiers(paidInto(measured, windowMs), levels);
+  if (found.length === 0) return [];
+  return [
+    '',
+    'against the curve, for the build every run here started from:',
+    ...found.flatMap((frontier) => [
+      `  ${frontier.skill} at level ${String(frontier.level)} — the curve asks ${round(frontier.target)}/h, and the best within reach pays ${round(frontier.paid)}/h: ${times(frontier.paid / frontier.target)}× target`,
+      `    ${frontier.at} — ${frontier.best}`,
+      `    ${String(frontier.within)} of ${String(frontier.offers)} offers paying into it come within ${String(WITHIN)}× of that`,
+    ]),
+  ];
+}
+
+function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Levels): string[] {
   const lines = [
     `    ${subject.use}`,
     `      cycles ${spread(runs.map((run) => run.cycles))} · worked ${spread(runs.map((run) => msToSeconds(run.worked)))}s of the ${round(msToSeconds(windowMs))}s window`,
@@ -383,14 +467,14 @@ function measuredLines({ subject, runs }: Measured, windowMs: number): string[] 
       `      stopped short in ${String(short.length)}/${String(runs.length)} seeds: ${short[0]!.stoppedBy!}${endings.size > 1 ? ` (and ${String(endings.size - 1)} other ending(s) across the seeds)` : ''}`,
     );
   }
-  return [...lines, ...paidLines(runs, windowMs)];
+  return [...lines, ...paidLines(runs, windowMs, levels)];
 }
 
 // Said once, above everything it is about, because the two figures on a line are not equally solid
 // and a reader who takes them for one another has the error the window was put there to remove.
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
-export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'>): string[] {
+export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'>, levels: Levels = {}): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
   const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time`];
@@ -403,11 +487,13 @@ export function simulationLines(measured: readonly Measured[], args: Pick<Simula
       place = each.subject.at;
       body.push('', `  ${place}${each.subject.depth === undefined ? ' (no road reaches here)' : ` (${String(each.subject.depth)} roads out)`}`);
     }
-    body.push(...measuredLines(each, windowMs));
+    body.push(...measuredLines(each, windowMs, levels));
   }
   const lines = [...head, ...(body.some((line) => line.includes(WHILE_IT_RAN)) ? [CEILING] : []), ...body];
   if (!args.all) lines.push('', `${String(measured.length - shown.length)} offer(s) paid nothing at all and are not listed; --all shows them.`);
-  return lines;
+  // Taken over everything measured rather than over what is shown: an offer hidden for paying
+  // nothing pays nothing into the count either way, and one hidden by --all's absence still paid.
+  return [...lines, ...curveLines(measured, windowMs, levels)];
 }
 
 export interface SimulationReport {
@@ -435,7 +521,7 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
   const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args), ok: true };
+  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args, levelsOn(base.registry, args.save)), ok: true };
 }
 
 function main(): void {
