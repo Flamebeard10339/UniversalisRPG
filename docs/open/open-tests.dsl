@@ -9,13 +9,3 @@
 version: 0.0.0
 dependencies:
   tulsa
-
-# test george-answers-for-himself-while-the-quest-stands-beside-him
-load: in-town
-travel: kelsa-farmhouse
-talk: george
-choose: helpful
-choose: continue
-talk: george
-choose: birds-and-the-bees
-choose: continue

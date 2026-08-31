@@ -143,7 +143,7 @@ stage apologised:
     again: The net's yours already. A second level in anything and we're square - the pond's still out the back.
     give: fishing.small-fishing-net
     set: first-steps.miki.net-lent
-    Take the net - there's a pond out the back, and shrimp in it. Get good enough at something to have a second level in it - fishing, or whatever else you find - and I'll call us square.
+    Take the net and get it on your hand - it does nothing rolled up in your pack. There's a pond out the back, and shrimp in it. Get good enough at something to have a second level in it - fishing, or whatever else you find - and I'll call us square.
   // The net he lends is a regular net, and a regular net parts. This is what he has
   // to say to a player who comes back without one, and it is sticky for the same
   // reason the node above is not: the thread stands only while there is no net in
@@ -345,6 +345,11 @@ choose: continue
 talk: first-steps.miki
 choose: continue
 assert: inventory.fishing.small-fishing-net = 1
+// Miki says to put it on, so the route puts it on. A net in the pack grants no
+// line at all, so this is also what says the pool the shoal wears down is there
+// to be worn down on the path the tutorial actually teaches.
+equip: fishing.small-fishing-net
+assert: stat.max-line-health >= 1
 use: entity.back-door.step-out-back
 use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
 assert: highest-level >= 2
@@ -442,6 +447,7 @@ talk: first-steps.miki
 choose: finding-your-feet.apologised.miki.0.said
 choose: continue
 assert: has fishing.small-fishing-net
+equip: fishing.small-fishing-net
 use: entity.back-door.step-out-back
 use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
 assert: highest-level >= 2
@@ -505,7 +511,7 @@ assert: player.name and player.race
 use: entity.stairs.ascend
 use: entity.dresser.search-drawer
 assert: has lockpick
-assert: searched
+assert: dresser.searched
 expect: dresser-trinket-end
 
 // The two words for a place, told apart on the one line where the engine

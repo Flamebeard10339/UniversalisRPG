@@ -256,6 +256,7 @@ choose: continue
 assert: castle-guard.the-captain-wants-you.visits = 1
 travel: guard-barracks
 talk: guard-captain
+choose: oolgas-errands.sent-to-oolga.guard-captain.0.said
 choose: continue
 assert: oolgas-errands.errands
 travel: castle-gate

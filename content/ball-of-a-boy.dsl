@@ -69,6 +69,7 @@ read the book:
 # test the-ball-is-never-coming-back
 load: at-the-grate
 talk: tulsa.mouse
+choose: down-the-grate.asked.mouse.0.said
 choose: I'll get it back for you.
 assert: down-the-grate.down-below
 travel: castle-gate
@@ -91,4 +92,5 @@ travel: sewer-junction
 travel: sewer-entrance
 travel: castle-yard
 talk: tulsa.larry
+choose: down-the-grate.back-up.larry.0.said
 assert: down-the-grate.reported

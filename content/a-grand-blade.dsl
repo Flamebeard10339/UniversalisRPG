@@ -149,11 +149,13 @@ say: You work from the pattern rather than around it, and the blade that comes o
 load: outside-the-forge
 travel: forge
 talk: tulsa.bladesmiths-son
+choose: finding-the-notes.taken-up.bladesmiths-son.0.said
 choose: I'll find them for you.
 assert: finding-the-notes.searching
 use: entity.anvil.search-under-the-anvil
 assert: has smiths-notes
 talk: tulsa.bladesmiths-son
+choose: finding-the-notes.searching.bladesmiths-son.1.said
 choose: continue
 assert: not has smiths-notes
 assert: has grand-blade-schematic

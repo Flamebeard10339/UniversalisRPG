@@ -45,6 +45,19 @@ dependencies:
 
 # flag wurm-defeated
 
+// How many of Kelsa's hives have been gone through, and on which of her two hive
+// grounds the third one was. Every hive adds to the count and hides itself
+// afterwards, so three is all three; whichever one takes the count to three
+// marks the ground it stands on, and only ever one of them does, so nothing here
+// has to be cleared. A hive on a third ground is a fourth marker beside these
+// and a line on that hive, and neither of the two below has to be read to write
+// it.
+# flag hives-searched
+
+# flag the-third-search-was-in-the-field
+
+# flag the-third-search-was-at-the-mouth
+
 // --- items ---
 
 # item bottle-of-vodka
@@ -495,12 +508,11 @@ entities:
 # location hive-mouth
 x: 10, y: 4
 title: The Third Hive
-examine: The last hive, and the comb at its mouth is chewed through by something that was not a bee.
+examine: The end of the row, far enough from the other two that the noise off them arrives late. The comb at the mouth of the hive standing here is chewed through by something that was not a bee.
 adjacent:
   apiary-field
-look into the comb:
-  time: 6
-  say: You put your face to the gap. The comb is chewed out to the depth of your arm and the cut edges of it are still wet. Whatever did it is not in there now, and it did not leave the way you came in.
+entities:
+  chewed-hive
 
 # location pasture
 x: 9, y: 3
@@ -965,9 +977,31 @@ work it open:
   give: 1 cooking.a-cooks-hands-jewel
   say: The drawer comes out crooked and almost entirely empty. What is in it is a ring of blackened iron, and it is warm.
 
+// Going through a hive frame by frame, and the one action all three of Kelsa's
+// hives hang off. What a hive adds to it is its own: the words for what is in
+// that one, and which ground it stands on if it turns out to be the third gone
+// through. The count and the sentence for the third are here so that no hive has
+// to know how many others there are.
+# action search-the-comb
+title: Search The Comb
+time: 8
+on success:
+  add: hives-searched 1
+  if hives-searched >= 3:
+    say: Three hives gone through, and the humming behind you drops a whole tone. There is a gallery cut down through this comb that was not in it when you started, and the edges of it are wet.
+
 # entity first-hive
 title: The First Hive
 examine: A hive, working. The comb is whole and the bees ignore you.
+flags: searched
+uses: search-the-comb
+search-the-comb:
+  hidden if: searched
+  +on success:
+    set: searched
+    say: You lift the frames out one at a time. Comb, brood, bees, and nothing between them that is not a bee's.
+    if hives-searched >= 3:
+      set: the-third-search-was-in-the-field
 harvest comb:
   time: 8
   give: 1 honeycomb
@@ -976,10 +1010,35 @@ harvest comb:
 # entity second-hive
 title: The Second Hive
 examine: A hive, working, and louder than the first. The comb is whole.
+flags: searched
+uses: search-the-comb
+search-the-comb:
+  hidden if: searched
+  +on success:
+    set: searched
+    say: This one goes the same way and takes longer about it. Whatever has been at these hives is not sitting in the comb waiting to be found.
+    if hives-searched >= 3:
+      set: the-third-search-was-in-the-field
 harvest comb:
   time: 8
   give: 1 honeycomb
   say: You cut what you came for and step back before they mind.
+
+// The one at the end of the row, standing in its own room because that is where
+// the row ends. Nothing about the search knows that: it is a hive like the two
+// above and it marks its own ground like they mark theirs.
+# entity chewed-hive
+title: The Chewed Hive
+examine: The comb at the mouth of this one is cut through in galleries no bee cut, and the edges of them are still wet.
+flags: searched
+uses: search-the-comb
+search-the-comb:
+  hidden if: searched
+  +on success:
+    set: searched
+    say: You put your face to the gap and go through what is left of the comb. It is chewed out to the depth of your arm. Whatever did it is not in there now, and it did not leave the way you came in.
+    if hives-searched >= 3:
+      set: the-third-search-was-at-the-mouth
 
 // The one thing in town that takes more than one swing and is not a fight.
 // `damage:` with no `depletes:` counts down a whole of the action's own, so a
@@ -1350,8 +1409,14 @@ say: You mix the jelly, the venom and the vodka together over the heat. What com
 
 // --- dialogue ---
 //
-// One node each, reached whenever nothing further along is. A quest that wants
-// more of somebody gives them more; this is what is left when none does.
+// One node each, and the town's own word rather than any quest's. An unnamed
+// node is what somebody says when no thread of theirs is open, so the first
+// quest to give them a line takes it away — permanently, in every world that
+// loads that quest. Anybody a quest is ever going to speak through is therefore
+// written with an `ask:` here: a named thread stands in the list beside whatever
+// the quest opens instead of being replaced by it. Whoever is left bare is
+// nobody a quest has ever wanted, and giving them one is the first line of
+// giving them a quest.
 
 // The three the town is made of. None of them is anybody in particular, so none of them has a name
 // or a second thing to say — what they are for is that a player can talk to a townsman, rob a
@@ -1386,6 +1451,7 @@ owner = mouse
 
 node forlorn:
   always
+  ask: What is the matter?
   again: It is still down there. He does not look up.
   I lost it. It went down there.
   He does not say what, and he does not look up.
@@ -1395,6 +1461,7 @@ owner = town-crier
 
 node holding-forth:
   always
+  ask: What is the news?
   again: Same offer. I am still right about everything, and still free.
   You want to know a thing? Ask me. I am right about everything and I am free.
 
@@ -1437,6 +1504,7 @@ owner = larry
 
 node on-the-hatch:
   always
+  ask: About the hatch.
   again: Still nobody goes down. Still the duke's word, not mine.
   Nobody goes down. Duke's word, not mine.
   He shifts his weight and does not sound especially certain about the duke.
@@ -1454,6 +1522,7 @@ owner = guard-captain
 
 node reading:
   always
+  ask: Anything for me?
   again: Still nothing. I would have sent for you.
   If I have not sent for you, I have not got anything for you. Come back when I have.
 
@@ -1470,6 +1539,7 @@ owner = oolga
 
 node complaining:
   always
+  ask: About the old days.
   again: Still was. Still wouldn't.
   It was better before. All of it. You would not remember.
 
@@ -1478,6 +1548,7 @@ owner = george
 
 node helpful:
   always
+  ask: About Kelsa.
   again: Still like that. Still right, mostly.
   Do not mind her. She is like that with everyone, and she is right about most of it.
 
@@ -1486,6 +1557,7 @@ owner = bladesmiths-son
 
 node at-the-cold-forge:
   always
+  ask: About your father's forge.
   again: Still just the noise. Nothing's changed that.
   My father made blades. I make a noise like somebody making blades.
 
@@ -1575,6 +1647,13 @@ node over-the-barrel:
 // walking up that lane is carrying.
 # save a-netful-on-well-lane
 {"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}
+
+// Down past the wall with the rod the stall sells, the bait it sells by the
+// hundred and a line to lose, and enough water behind them to be standing here
+// rather than at the shingle. What the shop stocks is what this holds: the deep
+// water is reached by buying tackle, not by being given any.
+# save rodded-up-at-the-deep-water
+{"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":5000},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":40,"fishing.braided-fiber-line":1}}
 
 # save growing-a-heartwood-blade-start
 {"version":13}
@@ -1775,22 +1854,32 @@ assert: not has core.wooden-shield
 
 // Kelsa's corner of the wall, and what is the town's about it rather than a
 // quest's. Her own word about the bees was a preamble to being hired and left
-// with the hiring; what stays here is George, who answers where she would not,
-// and the apiary past the postern — two hives working and handing over comb to
-// anybody who walks up to them. Unkillable because the drones in that field are
-// aggressive and what they cost is not what this is asking.
+// with the hiring; what stays here is the apiary past the postern — two hives
+// working and handing over comb to anybody who walks up to them, and all three
+// there to be gone through by anybody who wants to.
+//
+// George is not walked here, though he is the town's too. How many threads he
+// has open is a count of the quests loaded beside him, so a route that picks one
+// out of his list is a route about those quests; the one that does it stands in
+// the module that opens the second thread.
+//
+// Unkillable because the drones in that field are aggressive and what they cost
+// is not what this is asking.
 # test kelsas-corner-is-the-towns-rather-than-a-quests
 unkillable
 load: in-town
 travel: kelsa-farmhouse
-talk: george
-choose: continue
-assert: george.helpful.visits = 1
 travel: bee-gate
 travel: apiary-field
-use: entity.first-hive.harvest-comb
-use: entity.second-hive.harvest-comb
+use: entity.first-hive.harvest-comb until done
+use: entity.second-hive.harvest-comb until done
 assert: has core.honeycomb
+// The count is the town's and moves without anybody having been hired. That a
+// hive gone through hides itself afterwards — so that one of them cannot stand
+// for all three — is a refusal, and `refuse:` takes slot, allocate, unallocate
+// and apply and no `use:`, so no route can ask for it.
+use: entity.first-hive.search-the-comb until done
+assert: hives-searched = 1
 
 // A kitchen on a lane is a kitchen. What makes a room somewhere a player can
 // cook is a thing standing in it that opens a station, and nothing about which
@@ -1820,6 +1909,22 @@ use: entity.the-well.draw-water
 assert: inventory.core.jug-of-water = 1
 use: entity.the-well.draw-water
 assert: inventory.core.jug-of-water = 2
+
+// The water below the wall, and the half of fishing a net never reaches. Both
+// waters are walked because they are two waters and the town owns both — the
+// shingle inside the gate is nets and no bait, and this is a rod and a strip
+// spent every cast whether the fish comes up or not, which is what the last
+// line is for.
+# test the-deep-water-is-fished-with-a-rod-and-bait
+load: rodded-up-at-the-deep-water
+equip: fishing.fishing-rod
+equip: fishing.dried-fish-bait
+equip: fishing.braided-fiber-line
+use: entity.fishing.trout-run.cast until has fishing.raw-trout
+assert: has fishing.raw-trout
+use: entity.fishing.salmon-pool.cast until has fishing.raw-salmon
+assert: has fishing.raw-salmon
+assert: inventory.fishing.dried-fish-bait < 40
 
 // Charlie's back way. The wall in Oolga's cellar is the second entrance the
 // notes say several people know about, and it puts you in among the rats

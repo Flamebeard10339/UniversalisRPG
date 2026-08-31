@@ -163,6 +163,7 @@ equip: core.hand-axe
 travel: tavern-street
 travel: oolga-house
 talk: oolga
+choose: oolgas-basement.set-a-task.oolga.0.said
 choose: continue
 assert: oolgas-basement.seek-sunny
 travel: tavern-street
@@ -187,6 +188,7 @@ assert: wurm-defeated
 assert: cellar-rats-killed = 0
 travel: oolga-house
 talk: oolga
+choose: oolgas-basement.groundwurm-fight.oolga.1.said
 choose: continue
 assert: oolgas-basement.cellar-cleared
 
@@ -206,6 +208,7 @@ equip: core.hand-axe
 travel: tavern-street
 travel: oolga-house
 talk: oolga
+choose: oolgas-basement.set-a-task.oolga.0.said
 choose: continue
 travel: tavern-street
 travel: sha-dynastys
@@ -225,5 +228,6 @@ assert: not core.fainted
 assert: wurm-defeated
 travel: oolga-house
 talk: oolga
+choose: oolgas-basement.groundwurm-fight.oolga.1.said
 choose: continue
 assert: oolgas-basement.cellar-cleared

@@ -146,11 +146,10 @@ slot: gloves
 value: 60
 tackle, +5 max-line-health, +100% max-line-health, -6 fishing
 
-// What an emptied line takes with it, which is every piece of tackle above that grants a line to
-// empty. Nothing in the language selects an item by the keyword it carries, so this is a list — but
-// it is a list six lines under its own subjects, so a seventh net is a section here and a line here
-// and nothing in another module has to be remembered. `tulsa.player`'s `on line-parted:` rolls it,
-// because a pool going empty is the player's and what it costs is fishing's.
+// Every piece of tackle above that grants a line to empty. Nothing in the language selects an item
+// by the keyword it carries, so the subjects are written out — and what holds them to the tackle
+// above is a claim in the suite that derives its own subjects off the corpus, so a seventh net left
+// out of this list reddens `npm test` rather than working never.
 # droptable parted-tackle
 take: 1 small-fishing-net
 take: 1 large-fishing-net

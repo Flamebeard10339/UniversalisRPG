@@ -6,8 +6,8 @@
 // so `raw-blowfish` and the water it comes out of are declared here and hung
 // off `tulsa.deep-water` the way `ball-of-a-boy.dsl` hangs an action off
 // `tulsa.larry`: take this module out and the deep water goes back to trout
-// and salmon only. The cast itself is copied from `cast for salmon` line for
-// line, because that is what a cast on that water already looks like.
+// and salmon only. The water is a fifth water and nothing else — it declares
+// how deep it is and overlays `fishing.cast`, same as the four in fishing.dsl.
 //
 // The poison is the cooking system already in this world: `accuracy: cooking`
 // against a `burnt:` fallback is exactly "cook it right or ruin it and try
@@ -36,6 +36,12 @@ dependencies:
 // The water and what comes out of it. Deep water already means "the rod
 // reaches further than a net does," so the same requirement and the same
 // bait-spend as trout and salmon apply here without restating why.
+//
+// The one thing this water asks that depth does not: a landed cast still has a
+// blowfish on the end of it, and getting a swelling ball of spines off a hook is
+// its own question. So the catch is a row weighed against the angler's own
+// fishing rather than a second contest — a hand that knows the fish gets it off
+// the hook, and one that does not lets go of the line.
 
 # item raw-blowfish
 title: Raw Blowfish
@@ -45,8 +51,9 @@ value: 4
 # entity blowfish-hole
 title: The Blowfish Hole
 examine: A slack backwater off the main current, and whatever lives in it does not have to swim fast to eat.
-cast for blowfish:
-  continuous
+stats: fishing 0, depth 86
+uses: fishing.cast
+cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 15
   roll: spend-bait
@@ -54,9 +61,12 @@ cast for blowfish:
     fishing:
       give: 1 raw-blowfish
       xp: fishing 50
-    170x:
+    12x:
       drain: 3 line-health
       say: It comes up spined-side first and you let go of the line rather than the rod.
+  +on unfinished:
+    roll: spend-bait
+    say: Something down there takes the bait off the hook and does not take the hook.
 
 # location tulsa.deep-water
 +entities: blowfish-hole
@@ -194,7 +204,7 @@ travel: tavern-street
 travel: market-square
 travel: riverside
 travel: deep-water
-use: entity.blowfish-hole.cast-for-blowfish until inventory.raw-blowfish >= 3
+use: entity.blowfish-hole.cast until inventory.raw-blowfish >= 3
 assert: inventory.raw-blowfish >= 3
 travel: riverside
 travel: market-square
