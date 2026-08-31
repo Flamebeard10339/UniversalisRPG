@@ -942,11 +942,9 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       return started.failure ? started : waitedOut(state, registry, directive.until, start);
     }
     case 'equip':
-      equip(state, registry, directive.item);
-      return {};
+      return { failure: equip(state, registry, directive.item) };
     case 'unequip':
-      unequip(state, registry, directive.slot);
-      return {};
+      return { failure: unequip(state, registry, directive.slot) };
     case 'swap':
       state.packOrder = swappedOrder(packRows(state), state.packOrder, directive.one, directive.other);
       return {};

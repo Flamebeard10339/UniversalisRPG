@@ -282,3 +282,21 @@ passives: 1 keen-line, 2 drawn-out, 3 sure-hand, 4 unbreaking, 5 keen-line, 6 dr
 title: Angler's Knot
 examine: Six turns of something that is not quite line, and it does not come undone. @@@ It should also carry a chance not to spend the bait, which nothing in the language can say: what a cast consumes is written in the cast rather than read off a stat.
 cluster-jewel: anglers-knot
+
+// --- tests ---
+
+// The two nets are one slot and one difference: the large one names a level and
+// the small one names none. So a run that has fished nothing is handed both and
+// gets exactly one of them on, which says the refusal is the gate rather than the
+// slot being full or the net being absent. Level 1 is the floor every skill starts
+// on, so this route says nothing about where the gate is set and does not move
+// when it moves.
+# save both-nets-and-no-fishing-behind-them
+{"version":13,"inventory":{"fishing.small-fishing-net":1,"fishing.large-fishing-net":1}}
+
+# test a-net-that-names-a-level-is-refused-to-somebody-who-has-not-got-it
+load: both-nets-and-no-fishing-behind-them
+equip: fishing.large-fishing-net
+refused
+equip: fishing.small-fishing-net
+assert: stat.fishing > 60

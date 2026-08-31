@@ -134,7 +134,7 @@ describe('how many things the pack holds', () => {
     receiveItem(state, registry, 'pebble', 1);
     expect(packRows(state).length).toBe(2);
 
-    expect(equip(state, registry, '1')).toBe(true);
+    expect(equip(state, registry, '1')).toBeUndefined();
     expect(packRows(state).length).toBe(1);
     expect(shown(state, registry)).toEqual(['pebble x1', 'Modified blade (Mainhand)']);
   });
@@ -160,7 +160,7 @@ describe('something arriving at a pack with no room', () => {
     receiveItem(state, registry, 'pebble', 1);
     receiveItem(state, registry, 'twig', 1);
 
-    expect(unequip(state, registry, 'mainhand')).toBe(false);
+    expect(String(unequip(state, registry, 'mainhand'))).toBe('Your pack is full, so the blade stays where it is.');
     expect(state.equipped).toEqual({ mainhand: '1' });
     expect(packRows(state).length).toBe(2);
   });
@@ -229,7 +229,7 @@ describe('something arriving at a pack with no room', () => {
     expect(state.log.map(String)).toContain('Your pack is full, so the blade stays where it is.');
 
     const [first] = packRows(state).flatMap((row) => (row.kind === 'grown' ? [row.id] : []));
-    expect(equip(state, registry, first!)).toBe(true);
+    expect(equip(state, registry, first!)).toBeUndefined();
     expect(packRows(state).length).toBe(1);
 
     expect(receiveItem(state, registry, 'blade', 1)).toBe(1);

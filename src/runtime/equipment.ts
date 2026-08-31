@@ -2,7 +2,7 @@ import { RuntimeError } from './error';
 import { GameState } from './state';
 import { Registry } from '../content/registry';
 import { evaluateCondition } from './conditions';
-import { localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
 import { carriesItem, handOver, HandOver, isGrownCopy, itemTemplate, packFull, receiveItem, roomToPack } from './itemInstance';
 
 // A grown copy is a row of its own and is worn out of that row, so only a plain one moves the stack.
@@ -27,38 +27,38 @@ export function wearable(state: GameState, registry: Registry, itemId: string): 
   return item.requires === undefined || evaluateCondition(item.requires, state, registry);
 }
 
-export function tooGreenToWear(state: GameState, registry: Registry, itemId: string): void {
+export function tooGreenToWear(state: GameState, registry: Registry, itemId: string): Localized {
   const say = localizerOf(registry, state);
-  state.log.push(say.engine('engine.equip.requires', { item: say.title('item', itemTemplate(state, itemId)) }));
+  const refused = say.engine('engine.equip.requires', { item: say.title('item', itemTemplate(state, itemId)) });
+  state.log.push(refused);
+  return refused;
 }
 
-// Putting something on takes it out of the pack, so it is never refused. Taking something off puts
-// it back in, which is an arrival like any other and wants a row the pack may not have — including
-// the swap an equip does when the slot is already filled, which is why this answers whether it
-// happened rather than assuming it did.
-export function equip(state: GameState, registry: Registry, itemId: string): boolean {
+// Both answer with what the player was told, the way `walkTo` does, and with nothing where it
+// happened. Putting something on can be refused for being too green for it and for the pack having
+// no row for whatever comes off to make space; taking something off, for that second reason alone.
+// A caller that only wants to know whether it happened reads the answer as the falsy it is, and one
+// that has to say why -- a route claiming `refused`, a screen -- has the sentence itself.
+export function equip(state: GameState, registry: Registry, itemId: string): Localized | undefined {
   const item = registry.items.get(itemTemplate(state, itemId));
   if (!item) throw new RuntimeError(`equip: unknown item: ${itemId}`);
   if (!item.slot) throw new RuntimeError(`equip: item ${itemId} has no slot`);
   if (!carriesItem(state, itemId)) throw new RuntimeError(`equip: player does not carry item ${itemId}`);
-  if (!wearable(state, registry, itemId)) {
-    tooGreenToWear(state, registry, itemId);
-    return false;
+  if (!wearable(state, registry, itemId)) return tooGreenToWear(state, registry, itemId);
+  if (state.equipped[item.slot] !== undefined) {
+    const inTheWay = unequip(state, registry, item.slot);
+    if (inTheWay) return inTheWay;
   }
-  if (state.equipped[item.slot] !== undefined && !unequip(state, registry, item.slot)) return false;
-  if (!outOfPack(state, itemId)) return false;
+  if (!outOfPack(state, itemId)) throw new RuntimeError(`equip: ${itemId} is carried and could not be parted with`);
   state.equipped[item.slot] = itemId;
-  return true;
+  return undefined;
 }
 
-export function unequip(state: GameState, registry: Registry, slot: string): boolean {
+export function unequip(state: GameState, registry: Registry, slot: string): Localized | undefined {
   const worn = state.equipped[slot];
   if (worn === undefined) throw new RuntimeError(`unequip: nothing is equipped in slot ${slot}`);
-  if (!roomToPack(state, registry, worn)) {
-    packFull(state, registry, worn);
-    return false;
-  }
+  if (!roomToPack(state, registry, worn)) return packFull(state, registry, worn);
   delete state.equipped[slot];
   intoPack(state, registry, worn);
-  return true;
+  return undefined;
 }

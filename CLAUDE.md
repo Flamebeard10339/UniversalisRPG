@@ -172,7 +172,7 @@ assertion, not nowhere at all.
 
 This is why `expect:` compares only what a path is made of. The state a route ends on is
 filtered before it is compared, in one place, so a sheet **cannot** pin a balance-derived
-field however it was recorded — see `WALKED` in `src/runtime/session.ts`. The filter is
+field however it was recorded — see `WALKED_FIELDS` in `src/runtime/save.ts`. The filter is
 the rule's proof: there is nothing to keep in sync, and a sheet written next month is
 covered by having been written at all.
 

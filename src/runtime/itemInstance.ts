@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { sampleCount } from '../grammar/range';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane, unallocateNode } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
-import { localizerOf } from './localized';
+import { Localized, localizerOf } from './localized';
 import { inPlayerOrder, type PackRow } from './packOrder';
 import { isRoll, nextRandom } from './rng';
 import { anId, says, type Said } from './said';
@@ -166,9 +166,11 @@ export function roomToPack(state: GameState, registry: Registry, id: string): bo
   return packHasRoom(state, registry);
 }
 
-export function packFull(state: GameState, registry: Registry, itemId: string): void {
+export function packFull(state: GameState, registry: Registry, itemId: string): Localized {
   const say = localizerOf(registry, state);
-  state.log.push(say.engine('engine.pack.full', { item: say.title('item', itemTemplate(state, itemId)) }));
+  const refused = say.engine('engine.pack.full', { item: say.title('item', itemTemplate(state, itemId)) });
+  state.log.push(refused);
+  return refused;
 }
 
 // The one writer of the stack. Neither door below reaches it without having answered for what it

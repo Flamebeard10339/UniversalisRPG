@@ -216,7 +216,7 @@ describe('a grown copy sells for what its base is worth', () => {
   it('leaves the copy on the arm off the counter and refuses it there, worn and whole after', () => {
     const state = withGrownBlades(1);
     const [copy] = grownCopies(state);
-    expect(equip(state, registry, copy)).toBe(true);
+    expect(equip(state, registry, copy)).toBeUndefined();
     expect(wanted(shopOf('stall'), state, registry)).toEqual([]);
     expect(sell(shopOf('stall'), state, registry, copy, 1)).toBe('not-carried');
     expect(state.inventory.coin ?? 0).toBe(0);
