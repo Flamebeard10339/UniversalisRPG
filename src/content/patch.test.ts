@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverse } from './load';
-import { patchedInto, refused } from './patch';
+import { patchedInto, refused, travelsWhole } from './patch';
 import { sectionFor } from './sections';
 import type { AnySchema } from '../grammar/section';
 
@@ -9,6 +9,9 @@ const schemaOf = (kind: string): AnySchema => sectionFor(kind)!.schema!;
 const folded = (declared: string, patch: string, kind = 'location'): string => {
   const patched = patchedInto(declared, patch, schemaOf(kind));
   if (refused(patched)) throw new Error(patched.refused);
+  // Every claim below is about a fold. Handing the patch straight back is the other answer, and one
+  // that says nothing about where a line went, so no claim here may pass by being given it.
+  if (travelsWhole(patched)) throw new Error(`expected a fold, got the patch whole:\n${patched.text}`);
   return patched.text;
 };
 
@@ -59,6 +62,18 @@ describe('a patch folded into the section that declared the id', () => {
       'adjacent:',
       '  market-row',
     ]);
+  });
+
+  // A line's own span stops at the words on it, so a block was sited through its last direct child and
+  // a child holding a block of its own was cut off at its first line. Folded home, the tail of what an
+  // author wrote went missing, and the file they never touched was the one refused for it.
+  it('takes a block in whole, down under a line that opens a block of its own', () => {
+    const struck = ['# entity oolga', 'when hit:', '  if not oolga-struck:', '    set: oolga-struck', '    say: Snap.'];
+    const declared = ['# entity oolga', 'title: Grandma Oolga', 'stats: attack 1, defense 1, max-health 10'];
+
+    const text = folded(declared.join('\n'), struck.join('\n'), 'entity');
+
+    expect(text.split('\n').sort()).toEqual([...declared, ...struck.slice(1)].sort());
   });
 
   it('is not fooled by a word that only looks like a field inside a value', () => {
@@ -122,6 +137,49 @@ describe('a patch means the same folded home as it does staged', () => {
       expect(seen(asHome)).toEqual(seen(asModule));
     });
   }
+});
+
+// An entry goes home by the label it carries and not by where it is written, which is the one thing a
+// field site could not say. What a label matches is settled by `mergeEntries`, and these are the three
+// answers it gives, asked of the patcher instead.
+describe('an entry folded home by the label it carries', () => {
+  const GATE = ['# location gate', 'x: 1, y: 2', 'title: The Gate', 'push it open:', '  time: 4', '  say: It gives.'];
+  const KNOCK = ['knock twice:', '  time: 2', '  say: Nobody answers.'];
+
+  it('writes in an entry nothing at home holds, under every line that does', () => {
+    expect(folded(GATE.join('\n'), ['# location gate', ...KNOCK].join('\n')).split('\n')).toEqual([...GATE, ...KNOCK]);
+  });
+
+  it('takes an entry away by striking the one at home, block and all', () => {
+    expect(folded(GATE.join('\n'), '# location gate\n-push it open:').split('\n')).toEqual(['# location gate', 'x: 1, y: 2', 'title: The Gate']);
+  });
+
+  it('unwrites nothing where it takes away a label nothing at home holds', () => {
+    expect(folded(GATE.join('\n'), '# location gate\n-knock twice:')).toBe(GATE.join('\n'));
+  });
+
+  // The shape a patch cannot say: an entry written over one of the same label is laid over it key by
+  // key from inside a body grammar that keeps no sites, so `time: 4` here survives a patch that writes
+  // only `say:`. There is nowhere in the declaration to write that, so the patch stands for the section.
+  it('hands the patch back whole where an entry is laid over one already standing', () => {
+    const patched = patchedInto(GATE.join('\n'), '# location gate\npush it open:\n  say: It sticks.', schemaOf('location'));
+
+    expect(refused(patched)).toBe(false);
+    expect(travelsWhole(patched)).toBe(true);
+    expect((patched as { text: string }).text).toBe('# location gate\npush it open:\n  say: It sticks.');
+  });
+
+  // A body heading may join its words with dots, so a label can name another module's event. It is one
+  // label either way, and matches its home by being the same one and not by being spelt without a dot.
+  const ANGLER = ['# entity angler', 'title: Angler', 'stats: attack 1, defense 1, max-health 10', 'on fishing.line-parted:', '  say: The line goes slack.'];
+
+  it('matches a dotted label to its home the way an undotted one matches', () => {
+    const same = patchedInto(ANGLER.join('\n'), '# entity angler\non fishing.line-parted:\n  say: Again.', schemaOf('entity'));
+
+    expect(travelsWhole(same)).toBe(true);
+    expect(folded(ANGLER.join('\n'), '# entity angler\non fishing.rod-snapped:\n  say: Snap.', 'entity').split('\n')).toEqual([...ANGLER, 'on fishing.rod-snapped:', '  say: Snap.']);
+    expect(folded(ANGLER.join('\n'), '# entity angler\n-on fishing.line-parted:', 'entity').split('\n')).toEqual(ANGLER.slice(0, 3));
+  });
 });
 
 describe('a patch written over a patch', () => {

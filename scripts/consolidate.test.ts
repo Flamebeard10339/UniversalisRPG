@@ -129,6 +129,31 @@ describe('a section staged as only part of itself goes home as only that part', 
     expect(written(result, 'base')).toBe(BASE);
   });
 
+  // An entry is placed by the label it carries and not by where it is written, so an edit that adds
+  // one action leaves every other line of the location standing. Before entry sites, any staged
+  // section holding an entry travelled whole and wrote itself over the rest of what was there.
+  it('adds an action to a location without writing over the lines around it', () => {
+    const result = consolidate(base(), local('# location base.camp', 'kick a stone:', '  time: 1', '  say: It skitters.'));
+
+    expect(writable(result)).toBe(true);
+    expect(result.differences).toEqual([]);
+    expect(written(result, 'base')).toBe(BASE.replace('starting', ['starting', 'kick a stone:', '  time: 1', '  say: It skitters.'].join('\n')));
+  });
+
+  // The other answer, and the one the editing page leans on: an entry written where one of the same
+  // label already stands is merged with it key by key rather than replacing it, and no patcher can say
+  // that line by line — so the body goes home whole, which is what a body restating a whole section is.
+  it('sends a body restating an entry the file already writes home whole', () => {
+    const acting = ['# location camp', 'x: 0, y: 0', 'starting', 'kick a stone:', '  time: 1', '  say: It skitters.'].join('\n');
+    const before = [{ name: 'base', text: BASE.replace('# location camp\nx: 0, y: 0\nstarting', acting) }];
+
+    const result = consolidate(before, local('# location base.camp', 'x: 0, y: 0', 'starting', 'kick a stone:', '  time: 1', '  say: It rolls.'));
+
+    expect(writable(result)).toBe(true);
+    expect(result.differences).toEqual([]);
+    expect(written(result, 'base')).toBe(before[0].text.replace('It skitters.', 'It rolls.'));
+  });
+
   it('adds and takes away one member of a list without restating the rest', () => {
     const roads = { name: 'base', text: BASE.replace('starting\n', 'starting\nadjacent:\n  shore\n  ridge\n') + '\n# location shore\nx: 1, y: 0\n\n# location ridge\nx: 0, y: 1\n' };
     const added = consolidate([roads], local('# location base.camp', '+adjacent: ridge', '-adjacent: shore'));

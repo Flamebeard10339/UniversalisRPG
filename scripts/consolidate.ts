@@ -8,7 +8,7 @@ import { deleteLocalSection, listLocalSections, LOCAL_CHANGES_MODULE_ID, type Lo
 import { declaredKey, moduleNamed } from '../src/content/resolve';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { patchedInto, writesEntries } from '../src/content/patch';
+import { patchedInto, type Patching } from '../src/content/patch';
 import { registryDiff } from '../src/content/registryDiff';
 import { sectionFor } from '../src/content/sections';
 import { CORPUS_DIR } from '../src/content/shipped';
@@ -134,13 +134,13 @@ const rehead = (heading: string, section: string): string => [heading, ...sectio
 
 // A staged section is a patch over the one that declares the id, however much of it it happens to
 // write: the fields it names go home where that file writes them and every other line is left
-// standing. Two staged sections cannot travel that way and go home whole instead, as every one of
-// them did before — a kind that reads its own body, which has no fields to name, and a section
-// holding an entry, which goes home by its label rather than by where it is written.
-function foldedHome(base: readonly ModuleSource[], declaration: Declaration, section: LocalSection): { text: string } | { refused: string } {
+// standing. A kind that reads its own body has no fields to name and goes home whole, as every staged
+// section did before patches existed; so does one the patcher cannot lay in line by line, which it
+// answers for by handing the body straight back.
+function foldedHome(base: readonly ModuleSource[], declaration: Declaration, section: LocalSection): Patching {
   const written = rehead(declaration.heading, section.text);
   const schema = sectionFor(section.kind)?.schema;
-  if (schema === undefined || writesEntries(written, schema)) return { text: written };
+  if (schema === undefined) return { text: written };
   const source = base.find((each) => each.name === declaration.source);
   if (source === undefined) return { refused: `${declaration.source} is not among the files being consolidated into` };
   return patchedInto(source.text.slice(declaration.start, declaration.end).replace(/\r\n?/g, '\n'), written, schema);

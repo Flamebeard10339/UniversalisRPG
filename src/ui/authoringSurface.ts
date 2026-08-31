@@ -1,7 +1,9 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { sameSection } from '../content/namespace';
+import { patchedInto, refused, travelsWhole } from '../content/patch';
 import { addressedSections, HEADING_KIND, oneNewline, type WrittenModule } from '../content/sectionSource';
-import type { ModuleSource } from '../content/universe';
+import { sectionFor } from '../content/sections';
+import { parseUniverse, type ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
@@ -50,13 +52,43 @@ export function sectionsIn(source: ModuleSource): Section[] {
 
 const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
 
-// One address is one thing to edit, and more than one module may write at it. The body an author
-// drags, types over and reads is the one the last source wrote there, which is the same answer the
-// loader gives a player: load order decides, and a module controls where it lands by what it
-// depends on.
+// The order the loader will merge these in, which is the order two modules writing at one address
+// have to be folded in. A source that will not parse says nothing about what depends on what, so the
+// order they were handed in stands.
+function inLoadOrder(sources: readonly ModuleSource[]): readonly ModuleSource[] {
+  try {
+    const ordered = parseUniverse(sources).map((module) => module.source);
+    return ordered.length === sources.length ? ordered : sources;
+  } catch {
+    return sources;
+  }
+}
+
+// A second module writing at an address already written at, folded into what stands there the way the
+// loader folds it, so an author handed the address back is handed what the world plays at it. What
+// cannot travel as a patch is the last word on its own, as it was before: a kind that reads its own
+// body, one the patcher hands straight back rather than laying in, and one whose fold the engine will
+// not read back — this page offers no body the engine refuses, least of all one it wrote itself.
+function foldedOver(standing: Section, over: Section): Section {
+  const schema = sectionFor(over.kind)?.schema;
+  if (schema === undefined) return over;
+  const patched = patchedInto(standing.text, over.text, schema);
+  if (refused(patched) || travelsWhole(patched) || refusalOf(patched.text) !== null) return over;
+  return { ...over, text: patched.text };
+}
+
+// One address is one thing to edit, and more than one module may write at it. Which of them has the
+// last word is the same answer the loader gives a player — load order decides, and a module controls
+// where it lands by what it depends on — and the words the ones before it wrote stand under that,
+// so staging the body back does not quietly take away what another module added to it.
 export function addressable(sources: readonly ModuleSource[]): Section[] {
   const held = new Map<string, Section>();
-  for (const source of sources) for (const section of sectionsIn(source)) held.set(keyOf(section), section);
+  for (const source of inLoadOrder(sources)) {
+    for (const section of sectionsIn(source)) {
+      const standing = held.get(keyOf(section));
+      held.set(keyOf(section), standing === undefined ? section : foldedOver(standing, section));
+    }
+  }
   return [...held.values()];
 }
 

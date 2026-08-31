@@ -5,7 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { engineLocale } from '../content/engineLocale';
 import { contentSectionMaps, sectionFor, sectionKinds } from '../content/sections';
 import type { ModuleSource } from '../content/universe';
-import { mapOf } from '../content/registry';
+import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
+import { registryDiff } from '../content/registryDiff';
+import { addressedSections } from '../content/sectionSource';
+import { formatModuleDiagnostic, mapOf } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { COMMANDS } from '../runtime/command';
 import {
@@ -17,6 +20,7 @@ import {
   offeredBy,
   removeLine,
   searching,
+  sectionsIn,
   shadowed,
   SHOW_LINE,
   stage,
@@ -39,6 +43,13 @@ const SPARE: ModuleSource = {
 const spoken = (driver: ReturnType<typeof createDriver>): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
 const sectionKeyOf = (section: Section): string => `${section.kind} ${section.address}`;
+
+// What the driver puts in front of the loader when an author stages something: the local-changes
+// module, headed and made to depend on everything shipped, so it has the last word the way it does in
+// the game. Written by the module that owns that file rather than spelt out again here.
+const MODULE_IDS = SHIPPED_SOURCES.map((source) => addressedSections(source).module);
+
+const stagedModule = (...sections: string[]): ModuleSource => ({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule(MODULE_IDS, sections) });
 
 const REGISTRY = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
 
@@ -113,15 +124,44 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
     expect(offeredBy(addressed, NOWHERE, 'global').length).toBe(offeredBy(addressed, GUIDE_HOUSE, 'global').length + local.length - 1);
   });
 
-  it('offers the body the last source wrote at an address, not the one it was written over', () => {
-    const staged = { name: 'local-changes', text: `# info local-changes\nversion: 0.0.0\n\n# location ${ELSEWHERE}\nx: 4, y: 0\n` };
-    const withLocal = addressable([...SHIPPED_SOURCES, staged]);
+  it('offers the last source’s word at an address, over everything written there before it', () => {
+    const withLocal = addressable([...SHIPPED_SOURCES, stagedModule([`# location ${ELSEWHERE}`, 'x: 4, y: 0'].join('\n'))]);
     const shadowing = withLocal.filter((section) => section.address === ELSEWHERE);
+    const written = addressed.find((section) => section.address === ELSEWHERE)!;
 
     expect(shadowing).toHaveLength(1);
     expect(shadowing[0].staged).toBe(true);
     expect(shadowing[0].text).toContain('x: 4, y: 0');
+    expect(shadowing[0].text.split('\n').length).toBeGreaterThan(2);
+    expect(shadowing[0].text).toContain(written.text.split('\n').find((line) => line.startsWith('title:')));
     expect(withLocal).toHaveLength(addressed.length);
+  });
+});
+
+// The addresses more than one shipped module writes at, read off the corpus rather than named: a
+// quest that adds a face to a room next month is covered by having been written.
+const WRITTEN_TWICE = (() => {
+  const writers = new Map<string, Section[]>();
+  for (const source of SHIPPED_SOURCES) for (const section of sectionsIn(source)) writers.set(sectionKeyOf(section), [...(writers.get(sectionKeyOf(section)) ?? []), section]);
+  return [...writers.values()].filter((written) => written.length > 1);
+})();
+
+describe('a body offered at an address several modules write at (c3)', () => {
+  it('reads the corpus it is a rule about', () => {
+    expect(WRITTEN_TWICE.length).toBeGreaterThan(0);
+    for (const written of WRITTEN_TWICE) expect(new Set(written.map((section) => section.module)).size).toBe(written.length);
+  });
+
+  // The claim the editing page stands on: what an author is handed at an address is what the world
+  // plays there, so staging it back is a no-op. Handed one module's half of it, staging silently took
+  // away what the other module had added — no diagnostic, no diff, just a room short of a face.
+  it('is what the whole world plays there, so staging it back leaves the same universe', () => {
+    const offered = addressable(SHIPPED_SOURCES);
+    const local = stagedModule(...WRITTEN_TWICE.map((written) => offered.find((section) => sectionKeyOf(section) === sectionKeyOf(written[0]))!.text));
+    const after = loadUniverseWithDiagnostics([...SHIPPED_SOURCES, local]);
+
+    expect(after.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
+    expect(registryDiff(REGISTRY, after.registry)).toEqual([]);
   });
 });
 

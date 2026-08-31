@@ -130,7 +130,7 @@ type AnyFields = Record<
 >;
 type EntryConfig = { into: string; body: EntryBody };
 
-const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*?):/;
+const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*(?:\.[a-z][a-z0-9 -]*)*?):/;
 const WORD = /[a-z][a-z0-9-]*/;
 
 function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): unknown {
@@ -151,6 +151,10 @@ export interface FieldSite {
   field: string;
   start: number;
   end: number;
+  // The label a site that is an entry carries. Every entry a kind has lands in the one field its
+  // declaration names, so where it is written says which field but never which entry; the label is
+  // what tells two of them apart, and what an entry goes home by.
+  label?: string;
 }
 
 export function fieldSites(section: RawSection, schema: AnySchema): FieldSite[] {
@@ -205,6 +209,11 @@ export function typoOf(key: string, known: readonly string[]): string | undefine
 
 const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
+// Where the block written under a line ends. A line's own span covers the words on it and never what
+// is indented beneath, so the end of a block is the end of its last line at whatever depth that lies:
+// a block whose last line opens a block of its own carries that one too.
+const blockEnd = (line: RawLine): number => (hasBlock(line) ? blockEnd(line.children[line.children.length - 1]!) : line.span.end);
+
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>, sites: FieldSite[] | undefined): void {
   const cursor = new Cursor(line.text, 0, line.span.start);
 
@@ -235,7 +244,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const inline = !cursor.done;
         const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
-        sites?.push({ field: name, start: keySpan.start, end: !inline && hasBlock(line) ? line.children[line.children.length - 1]!.span.end : cursor.abs(cursor.pos) });
+        sites?.push({ field: name, start: keySpan.start, end: !inline && hasBlock(line) ? blockEnd(line) : cursor.abs(cursor.pos) });
         // A key written with nothing after it is a line the author has begun and the engine reads no value from. It holds none, and it is still written, which is what a rule about the lines a section has is asked.
         if (value === undefined) {
           if (!(name in authored)) authored[name] = undefined;
@@ -252,6 +261,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
       } else if (op === '+') {
         throw new DslError(`a bare ${key}: already adds ${key} when it is not there, so + means nothing here`, keySpan);
       } else if (op === '-') {
+        sites?.push({ field: entries!.into, label: key, start: keySpan.start, end: cursor.abs(cursor.pos) });
         ((authored[entries!.into] ??= []) as object[]).push({
           label: key,
           removed: true,
@@ -260,6 +270,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const inline = !cursor.done;
         const body = inline ? entries!.body.parse(cursor, key) : entries!.body.parseBlock(takeBlock(line), key);
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} ${key}: is written inline and as a block; give it one`, keySpan);
+        sites?.push({ field: entries!.into, label: key, start: keySpan.start, end: inline ? cursor.abs(cursor.pos) : blockEnd(line) });
         ((authored[entries!.into] ??= []) as object[]).push({
           label: key,
           ...body,
