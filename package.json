@@ -20,6 +20,7 @@
     "probe": "tsx scripts/probe.ts",
     "oracle": "tsx scripts/oracle.ts",
     "simulate-activity": "tsx scripts/simulate-activity.ts",
+    "tier-build": "tsx scripts/tier-build.ts",
     "handoff": "tsx scripts/handoff.ts",
     "notes": "tsx scripts/notes.ts",
     "review": "tsx scripts/review.ts",
