@@ -92,7 +92,9 @@ function Mods({ packs, words, localizer, onTurn }: { packs: readonly PortalPack[
               <span aria-hidden="true">{showing(pack.pack) ? '▾' : '▸'}</span>
             </button>
             <label className="flex flex-1 items-center justify-between gap-3">
-              <span className={pack.standing === 'none' ? 'text-text-subtle' : undefined}>{localizer.identifier(pack.pack)}</span>
+              <span className={pack.standing === 'none' ? 'text-text-subtle' : undefined}>
+                {localizer.identifier(pack.pack)} <span className="tabular-nums text-text-subtle">{`(${pack.modules.length})`}</span>
+              </span>
               <input
                 data-drive="mods.pack"
                 data-pack={pack.pack}
