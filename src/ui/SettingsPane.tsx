@@ -65,33 +65,54 @@ function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: 
 // a control over the modules under it rather than a second thing to agree with them, so a pack that
 // is half on says so and the next click takes it the rest of the way on.
 function Mods({ packs, words, localizer, onTurn }: { packs: readonly PortalPack[]; words: Words; localizer: Localizer; onTurn: (names: readonly string[], on: boolean) => void }): JSX.Element {
+  // Which packs are showing what is under them. Page state and nothing else — every module is on the
+  // harness surface whether it is drawn or not, and what a pack is standing at is on its own row, so
+  // a shut pack hides no answer. Held by pack name rather than as a count, so a pack that appears or
+  // is renamed is shut rather than inheriting whatever was open at its position.
+  const [open, setOpen] = useState<readonly string[]>([]);
+  const showing = (pack: string): boolean => open.includes(pack);
+
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
       <span className="text-xs uppercase tracking-wide text-text-subtle">{words('mods')}</span>
       <span className="text-xs text-text-subtle">{words('mods-hint')}</span>
       {packs.map((pack) => (
         <div key={pack.pack} className="flex flex-col gap-1 pt-1">
-          <label className="flex items-center justify-between gap-3">
-            <span className={pack.standing === 'none' ? 'text-text-subtle' : undefined}>{localizer.identifier(pack.pack)}</span>
-            <input
-              data-drive="mods.pack"
+          <div className="flex items-center gap-2">
+            <button
+              data-drive="none: showing a pack's modules is this page's own state, and every module is on the surface whether it is drawn or not"
               data-pack={pack.pack}
-              data-standing={pack.standing}
-              type="checkbox"
-              checked={pack.standing !== 'none'}
-              ref={(box) => {
-                if (box) box.indeterminate = pack.standing === 'some';
-              }}
-              onChange={() =>
-                onTurn(
-                  pack.modules.map((module) => module.name),
-                  packTurnsTo(pack),
-                )
-              }
-              className="accent-accent"
-            />
-          </label>
-          {pack.modules.map((module) => (
+              data-showing={showing(pack.pack) ? 'yes' : undefined}
+              type="button"
+              aria-expanded={showing(pack.pack)}
+              aria-label={localizer.identifier(pack.pack)}
+              onClick={() => setOpen(showing(pack.pack) ? open.filter((each) => each !== pack.pack) : [...open, pack.pack])}
+              className="shrink-0 rounded-xl px-2 text-text-subtle transition-transform duration-75 active:scale-[0.97]"
+            >
+              <span aria-hidden="true">{showing(pack.pack) ? '▾' : '▸'}</span>
+            </button>
+            <label className="flex flex-1 items-center justify-between gap-3">
+              <span className={pack.standing === 'none' ? 'text-text-subtle' : undefined}>{localizer.identifier(pack.pack)}</span>
+              <input
+                data-drive="mods.pack"
+                data-pack={pack.pack}
+                data-standing={pack.standing}
+                type="checkbox"
+                checked={pack.standing !== 'none'}
+                ref={(box) => {
+                  if (box) box.indeterminate = pack.standing === 'some';
+                }}
+                onChange={() =>
+                  onTurn(
+                    pack.modules.map((module) => module.name),
+                    packTurnsTo(pack),
+                  )
+                }
+                className="accent-accent"
+              />
+            </label>
+          </div>
+          {(showing(pack.pack) ? pack.modules : []).map((module) => (
             <label key={module.name} className="flex items-center justify-between gap-3 pl-3 text-xs text-text-subtle">
               <span className="min-w-0 truncate">
                 {localizer.identifier(module.id)}
