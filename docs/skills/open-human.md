@@ -9,28 +9,6 @@ answer rather than a defect.
 
 ---
 
-## Whether the ladder is cut at the right pace
-
-The ask was thirty minutes to level 10 and about an hour more to level 20. Attack is paid
-**2 experience per point of damage dealt** and Health **15 per point taken**, and a room's
-worth by the minute is its enemies' health times how many stand there over how long they
-take to come back — the only lever, and it is written where the counts are.
-
-Measured, not guessed: `tulsa.a-minute-at-the-post-is-what-the-ladder-is-cut-from` runs a
-minute against the one thing that takes a swing without moving or hitting back and comes
-to **499 experience**. Against the curve that is level 10 in 24 minutes and level 20 in 76
-— a little fast, and the post is the ceiling: it has no defence, no evasion, and no gap
-between one and the next. A real room is slower by however much of it the player wastes.
-
-Every hunting ground is sized to hand over roughly the same health a minute, so what
-changes with tier is what it drops and whether the player can stand there at all, not how
-fast the bar moves. That is a choice, and the other one — later rooms paying more by the
-minute — is equally available.
-
-*Moves when: he plays one tier and says whether a minute feels like a minute's progress.
-Every number is one word in the module that declares it, and the two tests above move with
-them; a lane cannot judge this from a stopwatch.*
-
 ## Whether the sewer should be able to kill a beginner
 
 Six feral rats in the junction on a forty-second respawn is what makes it about 216 health
