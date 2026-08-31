@@ -1,5 +1,5 @@
 import { actionResultLists } from '../../grammar/action';
-import { Action, actionBody, actionLines, actionLinesWritten, actionProblem, assembledActionProblem } from '../../grammar/action';
+import { Action, actionBody, actionLines, actionLinesWritten } from '../../grammar/action';
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { humanizeEn, lastSegment } from '../../grammar/values';
@@ -19,8 +19,8 @@ export function actionAddress(action: Action): string {
 }
 
 // The words a player reads off an action, and whether anybody wrote them. An action written as an
-// entry key is addressed by that key, and a key is `[a-z0-9 -]` and nothing else — so it is an
-// address rather than writing, and what it reads as is what `humanizeEn` makes of it. That is what
+// entry key is addressed by that key, which makes the key an address rather than writing, and what
+// it reads as is what `humanizeEn` makes of it. That is what
 // an unauthored `# action` title already is, so both answer here and a driver reading the table
 // cannot tell one from the other. Only a `title:` an author wrote reaches a player as written.
 export function actionWords(action: Action): { text: string; generated: boolean } {
@@ -69,15 +69,12 @@ export const action = section<ActionDeclaration>()({
     const label = titles[0] ? titles[0].text.replace(TITLE, '') : raw.id;
     const body = raw.body.filter((line) => !TITLE.test(line.text));
     const generated = titles[0] ? {} : { generatedLabel: true as const };
-    const declared = {
+    return {
       id: raw.id,
       ...actionBody.parseBlock(body, label),
       label,
       ...generated,
     } as ActionDeclaration;
-    const problem = assembledActionProblem(declared);
-    if (problem) throw new DslError(`# action ${raw.id}: ${actionProblem(label, problem)}`, raw.span);
-    return declared;
   },
   print: (declared, { moduleId }) => {
     const [, ...body] = actionLines(declared);

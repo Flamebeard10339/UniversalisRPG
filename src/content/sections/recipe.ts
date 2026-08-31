@@ -32,8 +32,8 @@ export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
     return { skill, amount: number.parse(cursor) };
   },
   print: (value) => `${id.print(value.skill)} ${number.print(value.amount)}`,
-  forms: ['<skill> <level>'],
-  examples: ['smithing 5'],
+  forms: ['<skill> <xp>'],
+  examples: ['smithing 40'],
 };
 
 function compile(recipe: Recipe): ActionDeclaration {
@@ -114,7 +114,7 @@ export const recipe = section<Recipe>()({
     requiresCapability: { parser: id, keyword: 'station', names: { id: 'station' } },
     in: { parser: list(quantified), default: () => [], block: true },
     out: { parser: list(produced), default: () => [], block: true },
-    skill: { parser: recipeSkillValue },
+    skill: { parser: recipeSkillValue, note: 'the experience one craft pays into that skill' },
     say: { parser: text },
     time: { parser: decimal },
     rate: { parser: numberOrStat },

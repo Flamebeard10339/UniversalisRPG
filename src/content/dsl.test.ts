@@ -5,6 +5,7 @@ import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
 import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
+import { nestedResults, type ActionResult } from '../grammar/actionResult';
 import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
 import { DslError, type Written } from '../grammar/parser';
 import { humanizeEn, text } from '../grammar/values';
@@ -679,6 +680,42 @@ describe('a stat the corpus contests as a one of: row weight', () => {
     );
 
     expect(multiplied).toEqual([]);
+  });
+});
+
+// A ceiling nobody is born with — no base of its own, and no entity writing it into `stats:` — makes
+// a pool a player has only while carrying what grants it, so emptying one costs them that thing.
+// Nothing in the language picks an item out by a stat it carries, so the table rolled when the pool
+// empties has to write those items out, and this is what holds the written list to them both ways.
+// Its subjects are the world's own wiring: the event says which pool ran out, the pool says which
+// stat is its ceiling, whatever handles the event says which table pays, and every item carrying
+// that stat is a subject — so a seventh piece of tackle is a section and a line in the module that
+// owns them, and nothing here is edited.
+describe('a pool a player only has while carrying what grants it', () => {
+  const registry = loadUniverseWithDiagnostics(CORPUS).registry;
+  const everyResult = (results: readonly ActionResult[]): ActionResult[] => results.flatMap((result) => [result, ...nestedResults(result).flatMap(everyResult)]);
+
+  const born = new Set([...registry.entities.values()].flatMap((entity) => Object.keys(entity.stats)));
+  const worn = (statId: string): boolean => !born.has(statId) && registry.stats.get(statId)?.base.max === 0;
+
+  const EMPTIED = [...registry.events.values()].flatMap((event) => {
+    if (event.trigger !== 'on empty' || event.resource === undefined) return [];
+    const ceiling = registry.resources.get(event.resource)!.max;
+    if (!worn(ceiling)) return [];
+    return [...registry.entities.values()]
+      .flatMap((entity) => entity.handlers.filter((handler) => handler.event === event.id))
+      .flatMap((handler) => everyResult(handler.results).flatMap((result) => (result.kind === 'roll' ? [{ ceiling, table: result.table }] : [])));
+  });
+
+  it('is written by the corpus, and pays for its own emptying out of a table, so nothing below is vacuous', () => {
+    expect(EMPTIED.length).toBeGreaterThan(0);
+  });
+
+  it.each(EMPTIED)('is taken back through $table, which names every item granting $ceiling and nothing else', ({ ceiling, table }) => {
+    const granting = [...registry.items.values()].filter((item) => item.tags.some((tag) => tag.kind === 'stat-bonus' && tag.statId === ceiling)).map((item) => item.id);
+    expect(granting.length).toBeGreaterThan(1);
+    const taken = everyResult(registry.dropTables.get(table)!.results).flatMap((result) => (result.kind === 'take' ? [result.item] : []));
+    expect([...new Set(taken)].sort()).toEqual([...new Set(granting)].sort());
   });
 });
 
