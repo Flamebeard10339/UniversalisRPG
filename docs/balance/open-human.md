@@ -23,6 +23,43 @@ balance number sitting in a `# test`, and it is the clearest case to decide agai
 *Moves when: he states the rule, or rules that the candidate is it. Then the sweep
 over all 41 is a lane's afternoon.*
 
+## Whether the five packs are the five packs
+
+Every shipped module now declares one: `engine` (core, engine-en), `skills` (the
+seven), `tulsa`, `quests` (the nine), `balance` (tiers). They were picked to make
+*turn every quest off* one click, which is what was asked for, and nothing else
+about them was decided by anything. A player who wants the town without thieving
+can reach in and turn thieving off under `skills`; whether that is a thing anyone
+should be offered is a judgement, not a fact.
+
+*Moves when: he reads the settings page and says whether the grouping is right. It
+is one `pack:` line per module and no code, so regrouping is an afternoon.*
+
+## What a player loses by turning a pack off mid-game
+
+Turning quests off reopens the world, and reopening prunes a save of everything it
+can no longer name. So a player mid-quest who turns quests off and back on has the
+quest gone rather than paused. That is the honest behaviour of the machinery and it
+is not obviously the right one to put in front of a player, as against refusing the
+toggle while a save is standing, or warning first.
+
+*Moves when: he says whether a portal toggle is a playtest lever that may eat a save,
+or a player-facing setting that may not. The first is what is built.*
+
+## Whether `-<line>` should work on a field that holds one value
+
+The grammar page offers `-<line>` on every line of every section. It now works on
+lists, on entries and on keywords. It is still refused on a field holding a single
+value — `-examine:` says *examine is not a list, so it cannot take -* — so the page
+promises more than the engine does by exactly that much.
+
+Both answers are defensible: unwriting a scalar is meaningful over another module's
+body, and a refusal with a clear message is not a bug. What is not defensible is the
+page and the parser disagreeing, which is what a reader is left with today.
+
+*Moves when: he says whether taking a scalar back is a thing the language should do.
+If yes it is a small parser change; if no it is a sentence in `EVERY_SECTION`.*
+
 ## What a tier's experience pool is worth, per activity
 
 §6.1 sets a tier at level L to **N × the xp needed to bring one skill to L**, N

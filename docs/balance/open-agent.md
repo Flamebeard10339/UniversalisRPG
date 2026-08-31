@@ -45,6 +45,36 @@ world because it does not fight back, so the run never stops.
 *Closes when:* the sheet reads near 1 at the frontier for each activity at each
 shipped tier.
 
+## The portal is built and nothing has been played through it
+
+`--off quests` is real on both `npm run probe` and `npm run simulate-activity`, and
+the settings page offers the same names. What nobody has done is *play* the town
+that comes out: 107 of 202 offers stand at the market square with no quest in the
+world, and whether the first hour of that is a game is the question this branch
+exists to answer.
+
+The measurement is already pointed at it. `npm run simulate-activity --
+tiers.fishing-tier-1 --off quests --seeds 1` reads 52x the level-1 target for
+combat at the square and 23x for pickpocketing, which is the same finding the
+ratio table above holds — turning the quests off changed neither, which is worth
+knowing and is the only thing measured about the questless world so far.
+
+*Closes when:* a `# test` walks the questless town from the market square through
+one activity of each of the five skills, and the sheet above is re-read with
+`--off quests` so the frontier is the town's rather than the world's.
+
+## A route through the portal itself is not proved
+
+The harness offers `mods.pack` and `mods.module`, and `src/content/packs.test.ts`
+holds the reading and the arithmetic. What no test does is turn a pack off through
+the driver and open the world again: the save is pruned on the way through
+(`loadSaved` returns `PruneWarning`s), and nothing pins what a player loses.
+
+*Closes when:* a driver test turns the quests pack off, reopens, and says what
+became of a save that was standing in a quest — either it survives with the quest
+pruned, or it is kept and the player is told, which is what `Resumption` already
+distinguishes.
+
 ## The measurement accelerates itself, and now by how much
 
 Attack xp is paid per point of damage dealt (`combat.dsl:42`), a level grants `+1`
