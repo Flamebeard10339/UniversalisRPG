@@ -41,6 +41,12 @@ const usage = [
   'is authored in the corpus rather than known to the engine, so the tool quotes rather than',
   'classifies.',
   '',
+  'Only a run that came round pays a rate. What a run that stopped short put in the player\'s',
+  'hands is real and is printed, but the time it took is an interruption rather than a duration,',
+  'and dividing by it prices dying as the best-paid hour in the world. And an offer something',
+  'aggressive took the fight from is reported as unmeasurable there, named by what took it: the',
+  'run measured that fight, whatever the line at the top of it says.',
+  '',
   'This is a tool and not a gate. It runs on demand, it asserts nothing, and it always exits 0',
   'unless the arguments or the corpus are refused.',
 ].join('\n');
@@ -154,6 +160,9 @@ export interface Run {
   // are told apart, in the words a player would have read.
   finished: boolean;
   stoppedBy?: string;
+  // What came at the player of its own accord while the run was under way, if anything did. Whatever
+  // the run went on to hold is that fight's, so an offer one of these reached is not measured at all.
+  engagedBy?: string;
   cycles: number;
   milliseconds: number;
   gains: Gain[];
@@ -209,7 +218,15 @@ function walk(registry: Registry, index: number, seed: number): Run {
     const wasCycles = state.cyclesDone;
     const was = snapshot(state);
     const result = runTest(runTestId(index), registry, state);
-    return { seed, finished: result.passed, stoppedBy: result.failure, cycles: state.cyclesDone - wasCycles, milliseconds: state.time - wasTime, gains: since(was, tallies(state)) };
+    return {
+      seed,
+      finished: result.passed,
+      stoppedBy: result.failure,
+      engagedBy: state.engagedBy ?? undefined,
+      cycles: state.cyclesDone - wasCycles,
+      milliseconds: state.time - wasTime,
+      gains: since(was, tallies(state)),
+    };
   } catch (error) {
     return { ...blank, stoppedBy: error instanceof Error ? error.message : String(error) };
   }
@@ -221,8 +238,10 @@ export function measure(registry: Registry, subjects: readonly Subject[], seeds:
 
 // An offer that put nothing in anybody's hands under any seed. It is hidden by default because a
 // sweep of a whole world is mostly doors and benches, and it is a measurement rather than a
-// judgement about which mechanics count — a door that turns out to pay appears.
-export const paidNothing = ({ runs }: Measured): boolean => runs.every((run) => run.gains.length === 0);
+// judgement about which mechanics count — a door that turns out to pay appears. An offer nothing
+// could be measured at is not one of these however empty it came back: that is a finding about the
+// place, and hiding it would hide the reason its neighbours read the way they do.
+export const paidNothing = ({ runs }: Measured): boolean => runs.every((run) => run.gains.length === 0 && run.engagedBy === undefined);
 
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
 
@@ -242,16 +261,27 @@ const address = ({ kind, id }: Gain): string => `${kind} ${id}`;
 
 const amountIn = (run: Run, of: string): number => run.gains.find((gain) => address(gain) === of)?.amount ?? 0;
 
+// Amounts off every seed, because a run that stopped short really did put that much in the player's
+// hands; a rate off the seeds that came round and off no others, because what stopped the rest is an
+// interruption and dividing by one prices dying above every honest hour in the world. The line says
+// which seeds answered wherever those are not the same seeds.
 function paidLines(runs: readonly Run[]): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
+  const timed = runs.filter((run) => run.finished);
+  const whose = timed.length === runs.length ? '' : ` (from the ${String(timed.length)}/${String(runs.length)} seeds that finished)`;
   return paid
-    .map((of) => ({ of, amounts: runs.map((run) => amountIn(run, of)), rates: runs.map((run) => amountIn(run, of) / (run.milliseconds / MS_PER_HOUR)) }))
-    .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates))
-    .map(({ of, amounts, rates }) => `      ${of}: ${spread(amounts)}, ${spread(rates)}/h`);
+    .map((of) => ({ of, amounts: runs.map((run) => amountIn(run, of)), rates: timed.map((run) => amountIn(run, of) / (run.milliseconds / MS_PER_HOUR)) }))
+    .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates) || Math.max(...other.amounts) - Math.max(...one.amounts))
+    .map(({ of, amounts, rates }) => `      ${of}: ${spread(amounts)}${rates.length === 0 ? ', no rate: no seed finished' : `, ${spread(rates)}/h${whose}`}`);
 }
 
 function measuredLines({ subject, runs }: Measured): string[] {
+  // Nothing under a line something took the fight from belongs to that line, so nothing under it is
+  // printed: the gains, the clock and the cycles are all the fight's, whatever the offer was called.
+  const took = runs.map((run) => run.engagedBy).find((by) => by !== undefined);
+  if (took !== undefined) return [`    ${subject.use}`, `      unmeasurable here: ${took} took the fight`];
+
   const finished = runs.filter((run) => run.finished).length;
   const seconds = runs.map((run) => run.milliseconds / 1000);
   const lines = [

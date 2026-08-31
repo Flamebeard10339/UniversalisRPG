@@ -13,6 +13,7 @@ export interface SpanStart {
 // Opening a span forgets why the last one ended: what stopped this one is what this one is told by.
 export function spanStart(state: GameState): SpanStart {
   state.endedBecause = null;
+  state.engagedBy = null;
   return { at: state.time, state: structuredClone({ ...state, log: [] }) };
 }
 

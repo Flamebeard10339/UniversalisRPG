@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
-import { balance, balanceLines, DEFAULT_CYCLES, DEFAULT_SEEDS, measure, parseBalanceArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Subject } from './balance';
+import { balance, balanceLines, DEFAULT_CYCLES, DEFAULT_SEEDS, measure, parseBalanceArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './balance';
 
 // One island with somewhere to stand, somewhere to walk to, a bush that pays for as long as anyone
 // picks it, and one wasp, which is fewer wasps than a run asking for three of them needs. Everything
 // the tool answers is a reading of a run through this, so a claim below moves one line and watches
-// the answer change.
+// the answer change. The bramble grows where the wasp is, so an offer nobody gets to take is one a
+// sweep of this island finds on its own.
 const ISLAND = `# info island
 version: 1.0.0
 
@@ -25,8 +26,15 @@ base: 60
 # resource life
 max: max-life
 
+# faction world
+
+# faction islander
+
 # skill gathering
 title: Gathering
+
+# skill fighting
+title: Fighting
 
 # item berry
 title: Berry
@@ -37,6 +45,7 @@ continuous
 rate: my swing-rate
 damage: my attack vs their defence
 depletes: their life
+xp: fighting 3
 
 # action pick
 title: Pick a berry
@@ -58,19 +67,26 @@ x: 1, y: 0
 adjacent:
   shore
 entities:
+  bramble
   wasp
 
 # entity player
 stats: max-life 100, attack 10, swing-rate 60
+faction: islander
 uses: strike
 
 # entity bush
 title: Bush
 uses: pick
 
+# entity bramble
+title: Bramble
+uses: pick
+
 # entity wasp
 title: Wasp
 stats: max-life 60, attack 1, swing-rate 60
+faction: world
 aggressive
 uses: strike
 
@@ -122,12 +138,13 @@ describe('what the arguments ask for', () => {
 
 describe('what a sweep finds to measure', () => {
   it('takes what a player standing there is offered, anywhere the world has a place', () => {
-    expect(uses(subjectsFrom(island(), 'island.on-the-shore'))).toEqual(['use: entity.island.bush.pick', 'use: island.strike on island.wasp']);
+    expect(uses(subjectsFrom(island(), 'island.on-the-shore'))).toEqual(['use: entity.island.bush.pick', 'use: entity.island.bramble.pick', 'use: island.strike on island.wasp']);
   });
 
   it('orders the places by how far the roads put them from where a game begins', () => {
     expect(subjectsFrom(island(), 'island.on-the-shore').map((subject) => [subject.at, subject.depth])).toEqual([
       ['island.shore', 0],
+      ['island.thicket', 1],
       ['island.thicket', 1],
     ]);
   });
@@ -137,7 +154,7 @@ describe('what a sweep finds to measure', () => {
   });
 
   it('narrows to one place when one is named', () => {
-    expect(subjectsFrom(island(), 'island.on-the-shore', { at: 'island.thicket' }).map((subject) => subject.at)).toEqual(['island.thicket']);
+    expect(subjectsFrom(island(), 'island.on-the-shore', { at: 'island.thicket' }).map((subject) => subject.at)).toEqual(['island.thicket', 'island.thicket']);
   });
 });
 
@@ -155,8 +172,8 @@ describe('the module a sweep writes to run itself', () => {
   });
 
   it('writes a pair per offer and loads beside the world it measures', () => {
-    expect(written.text.match(/^# test /gm)).toHaveLength(4);
-    expect(beside(written.text).tests.size).toBe(4);
+    expect(written.text.match(/^# test /gm)).toHaveLength(6);
+    expect(beside(written.text).tests.size).toBe(6);
   });
 });
 
@@ -189,6 +206,46 @@ describe('what a run reports', () => {
     const [stung] = swept('wasp');
     expect(stung.runs.every((run) => run.finished)).toBe(false);
     expect(balanceLines([stung], { save: 's', seeds: 2, cycles: 3, all: true }).join('\n')).toContain('stopped short: until 3 times —');
+  });
+
+  // Every offer the island has, so an offer added to it answers this without an edit here. A run that
+  // stopped short was divided by an interruption rather than by a duration, and one nothing let start
+  // was not this offer's run at all — neither is an hour of anything.
+  it('gives an hourly rate to no offer that did not come round, whatever it came back holding', () => {
+    const found = swept();
+    expect(found.some((each) => each.runs.some((run) => !run.finished && run.gains.length > 0)), 'nothing on this island stops short holding anything').toBe(true);
+    for (const each of found) {
+      const earned = each.runs.some((run) => run.finished) && each.runs.every((run) => run.engagedBy === undefined);
+      expect(balanceLines([each], { save: 's', seeds: 2, cycles: 3, all: true }).join('\n').includes('/h'), each.subject.use).toBe(earned);
+    }
+  });
+
+  it('says which seeds a rate came from wherever they are not all of them', () => {
+    const use = 'use: entity.island.bush.pick';
+    const seeded = (seed: number, finished: boolean): Run => ({ seed, finished, cycles: 1, milliseconds: 1000, gains: [{ kind: 'item', id: 'island.berry', amount: 2 }] });
+    const printed = (...runs: Run[]): string => balanceLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: runs.length, cycles: 3, all: true }).join('\n');
+    expect(printed(seeded(1, true), seeded(2, true))).not.toContain('seeds that finished');
+    expect(printed(seeded(1, true), seeded(2, false))).toContain('/h (from the 1/2 seeds that finished)');
+    expect(printed(seeded(1, false), seeded(2, false))).toContain('no rate: no seed finished');
+  });
+
+  // The bramble grows where the wasp is, so a run at it measures the wasp; the wasp's own offer is
+  // that fight and measures itself. One aggressor, two offers, and the tool has to tell them apart.
+  it('reports an offer something took the fight from as unmeasurable, named by what took it', () => {
+    const [thorned] = swept('bramble');
+    const [stung] = swept('wasp');
+    expect(thorned.runs.every((run) => run.engagedBy === 'island.wasp')).toBe(true);
+    expect(stung.runs.every((run) => run.engagedBy === undefined)).toBe(true);
+    const lines = balanceLines([thorned], { save: 's', seeds: 2, cycles: 3, all: true }).join('\n');
+    expect(lines).toContain('unmeasurable here: island.wasp');
+    expect(lines).not.toContain('xp island.');
+    expect(lines).not.toContain('item island.');
+  });
+
+  it('lists an offer nothing could be measured at even where it came back empty-handed', () => {
+    const runs = [{ seed: 1, finished: false, engagedBy: 'island.wasp', cycles: 0, milliseconds: 10, gains: [] }];
+    const lines = balanceLines([{ subject: { at: 'island.thicket', depth: 1, use: 'use: entity.island.bramble.pick' }, runs }], { save: 's', seeds: 1, cycles: 3, all: false }).join('\n');
+    expect(lines).toContain('unmeasurable here: island.wasp');
   });
 
   it('leaves out an offer nothing came of, and lists it when asked to', () => {

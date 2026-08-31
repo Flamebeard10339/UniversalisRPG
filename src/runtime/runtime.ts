@@ -559,6 +559,7 @@ function openAggression(state: GameState, registry: Registry): void {
     if (leavesHere(armedAction(state, registry))) return;
     endAction(state, localizerOf(registry, state).engine('engine.stopped.engaged', { attacker: actorTitle(coming.entity, registry, state) }));
   }
+  state.engagedBy = coming.entity;
   armFight(state, registry, coming.id, coming.action, coming.entity);
 }
 

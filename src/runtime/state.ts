@@ -125,6 +125,10 @@ export interface GameState extends RngCursor {
   log: Localized[];
   // Why what was last under way stopped, in the words the player reads, written by whoever ends it.
   endedBecause: Localized | null;
+  // What took the fight to the player of its own accord since the span opened, or null where nothing
+  // did. `endedBecause` cannot answer this: the fight that follows an aggressor ends the span in turn
+  // and writes its own reason over the interruption's. Not saved: a span is a sitting, not a world.
+  engagedBy: string | null;
   // What the player was last told they are holding. Not saved and not compared: it is what makes a
   // change news exactly once, and coming back to a save is not news.
   carriedTold: string | null;
@@ -185,7 +189,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, engagedBy: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

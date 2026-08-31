@@ -1028,6 +1028,7 @@ describe('what the engine withholds', () => {
       journey: 'published',
       log: 'withheld',
       endedBecause: 'withheld',
+      engagedBy: 'withheld',
       carriedTold: 'withheld',
       engagesAt: 'withheld',
       debug: 'withheld',
