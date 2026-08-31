@@ -1086,3 +1086,28 @@ describe('a block-form line carrying more than its parser read', () => {
     expect(bay('adjacent:', '  beach whille unlocked')).toThrow(DslError);
   });
 });
+
+// `-<line>` is offered on every line of every section — the grammar page says so under *writing over
+// a body already there* — and a keyword is a line. What a keyword takes back is the word itself, so
+// the only thing left to pin is the refusal, which no body in the corpus can be written to provoke.
+describe('a keyword written over a body already there', () => {
+  const bay =
+    (...lines: string[]) =>
+    () =>
+      parseModule(['# location bay', ...lines].join('\n'))[0]!.value as { starting?: boolean };
+
+  it('is taken back by -, and written by the bare word', () => {
+    expect(bay('-starting')().starting).toBe(false);
+    expect(bay('starting')().starting).toBe(true);
+    expect(bay('x: 1')().starting).toBeUndefined();
+  });
+
+  it('refuses +, because a bare word already writes one that is not there', () => {
+    expect(bay('+starting')).toThrow(/a bare starting already writes starting when it is not there/);
+  });
+
+  it('leaves a bare field alone that only begins the way a taken-back keyword does', () => {
+    expect(bay('-startling')).toThrow(DslError);
+    expect(() => parseModule('# stat pull\nbase: -5')).not.toThrow();
+  });
+});

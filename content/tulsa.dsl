@@ -114,6 +114,10 @@ one of:
 x: 7, y: 0
 title: Market Square
 examine: Four roads meet under the awnings, and you can see three of the town's gates from where you are standing. There is a sewer grate set into the cobbles with a boy hunched over it.
+// The town has to be able to open on its own, so the square is where a player
+// arrives when nothing else says otherwise. A tutorial takes this line back and
+// puts `starting` on its own front room; see `first-steps`.
+starting
 adjacent:
   market-row
   tavern-street

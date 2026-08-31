@@ -10,7 +10,7 @@ import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
 import { MEMBER_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/load';
-import { moduleSource, shippedSources, standingSources } from '../content/shipped';
+import { moduleSource, shippedSources, worldFor } from '../content/shipped';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
@@ -18,7 +18,7 @@ import { secondsToMs, toMilliUnits } from './units';
 const source = moduleSource('core').text;
 // The smallest shipped world with somewhere to stand, derived rather than listed, with core's own
 // text swapped for whatever a caller is perturbing: a module split moves with no edit here.
-const island = (text: string) => loadUniverse([engineLocale(), ...standingSources().map((each) => (each.name === 'core' ? { name: 'core', text } : each))]);
+const island = (text: string) => loadUniverse([engineLocale(), ...worldFor('first-steps').map((each) => (each.name === 'core' ? { name: 'core', text } : each))]);
 const registry = island(source);
 
 const shipped = loadUniverse(withEngineLocale(shippedSources()));

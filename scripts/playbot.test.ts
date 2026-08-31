@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
-import { moduleSource, shippedFiles, standingSources } from '../src/content/shipped';
+import { moduleSource, shippedFiles, worldFor } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, type RunLogEntry } from '../src/runtime/runLog';
@@ -43,7 +43,7 @@ import { fileAuthoring } from './play-cli';
 // whole shipped corpus, so the archetype pack Tulsa names optionally is absent and a run here never
 // meets a jewel. Read off the corpus rather than listed, so a module the tutorial comes to lean on
 // is played here the day it does.
-const PLAYED_MODULES = standingSources().map((source) => source.name);
+const PLAYED_MODULES = worldFor('first-steps').map((source) => source.name);
 
 // The island and quest actually played, same corpus session.test.ts drives.
 const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), ...PLAYED_MODULES.map(moduleSource)];

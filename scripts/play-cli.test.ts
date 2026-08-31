@@ -8,7 +8,7 @@ import { ENGINE_KEYS } from '../src/content/locale';
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverse } from '../src/content/load';
-import { standingSources } from '../src/content/shipped';
+import { worldFor } from '../src/content/shipped';
 import { FIXTURE_WORLD } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
@@ -27,7 +27,7 @@ const drawn = (output: Parameters<typeof formatOutput>[0]): string[] => asPrinte
 const live = (progress: Parameters<typeof formatLive>[0]): string => printed(formatLive(progress, localizer));
 const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
-const TUTORIAL: readonly ModuleSource[] = standingSources();
+const TUTORIAL: readonly ModuleSource[] = worldFor('first-steps');
 
 const PLANE_SOURCE =
   FIXTURE_WORLD +

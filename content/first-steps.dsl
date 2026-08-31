@@ -875,6 +875,12 @@ on death:
     1 in 3:
       roll: trinket
 
+// Tulsa opens on its own square, and a player who has this module has the
+// tutorial to walk out of first. Both lines are here so that turning the module
+// off leaves exactly one place marked starting rather than none.
+# location tulsa.market-square
+-starting
+
 # location guide-house
 x: 6, y: 0
 starting

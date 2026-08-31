@@ -67,7 +67,10 @@ const takesAway = (read: Read, schema: AnySchema, label: string): boolean =>
 function insertAt(declared: Read, text: string, schema: AnySchema, site: FieldSite): number {
   if (site.label !== undefined) return declared.raw.span.end;
   const order = Object.keys(schema.fields);
-  const before = order.slice(0, order.indexOf(site.field));
+  const at = order.indexOf(site.field);
+  // A keyword is not one of the kind's fields and so is nowhere in that order. Where its kind writes
+  // it is the field it says it comes after, which is the same answer its printer gives.
+  const before = at < 0 ? order.slice(0, order.indexOf(schema.keywordsAfter ?? '') + 1) : order.slice(0, at);
   const ends = declared.sites.filter((each) => before.includes(each.field)).map((each) => each.end);
   const after = ends.length > 0 ? Math.max(...ends) : declared.raw.span.start;
   const line = text.indexOf(NEWLINE, after);
@@ -144,10 +147,14 @@ export function patchedInto(declared: string, patch: string, schema: AnySchema):
 
   const edits: Edit[] = [];
   const struckAt = new Set<number>();
+  const keywords = (schema.keywords ?? []) as readonly string[];
+  // A keyword the patch took back, which goes home the way a removed entry does: as the unwriting of
+  // the word at home, and as nothing at all where home never wrote it.
+  const takenBack = (site: FieldSite): boolean => site.label === undefined && keywords.includes(site.field) && from.authored[site.field] === false;
   for (const group of byLine(from)) {
     // An entry the patch takes away leaves nothing of itself behind: what goes home is the unwriting
     // of the entry at home, and a label nothing at home holds unwrites nothing.
-    const away = group.filter((site) => site.label !== undefined && takesAway(from, schema, site.label));
+    const away = group.filter((site) => (site.label !== undefined && takesAway(from, schema, site.label)) || takenBack(site));
     for (const site of away) {
       for (const home of sitesOf(into, site)) {
         if (struckAt.has(home.start)) continue;

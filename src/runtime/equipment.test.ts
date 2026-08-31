@@ -4,7 +4,7 @@ import { Registry } from '../content/registry';
 import { withEngineLocale } from '../content/engineLocale';
 import { loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
-import { standingSources } from '../content/shipped';
+import { worldFor } from '../content/shipped';
 import { parseSaveSection } from '../content/sections/save';
 import { allocate, carriesItem, packedCount, receiveItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
@@ -135,7 +135,7 @@ describe('equipment', () => {
   });
 
   it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
-    const tutorial = loadUniverse(withEngineLocale(standingSources()));
+    const tutorial = loadUniverse(withEngineLocale(worldFor('first-steps')));
     const sword = 'core.iron-sword';
     const shield = 'core.wooden-shield';
 

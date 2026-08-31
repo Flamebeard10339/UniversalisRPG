@@ -7,7 +7,7 @@ import { everyActionTable, mapOf, type Registry } from './registry';
 import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
 import { sameValue } from './registryDiff';
 import { roundTripModule } from './serialize';
-import { standingSources } from './shipped';
+import { worldFor } from './shipped';
 import type { ModuleSource } from './universe';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', 'examine: Shingle and a drawn-up boat.', 'entities:', '  crab', '', '# entity crab', 'title: Giant Crab', 'pick up:', '  instant', '  say: It pinches.', '', '# item rope', 'title: Rope'].join('\n');
@@ -155,7 +155,7 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
 });
 
 describe('an action declared once carries one key, however many owners perform it (c7)', () => {
-  const island = loadUniverse(standingSources());
+  const island = loadUniverse(worldFor('first-steps'));
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
   const declarationKey = (action: Action): string => localeKey(island.namespace.ownerOf('action', declaredId(action)!) ?? null, 'action', declaredId(action)!, actionAddress(action));
 

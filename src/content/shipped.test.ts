@@ -36,6 +36,24 @@ describe('what content/ holds and what ships', () => {
   });
 });
 
+// A module and everything the loader would refuse to start it without, read off the corpus's own
+// `dependencies:` lines. Written here as well as in `shipped.ts` on purpose: this file's whole job
+// is to check that reading against one that owes it nothing.
+function leansOn(id: string): string[] {
+  const required = (each: string): string[] =>
+    parseModuleSource(moduleSource(each))
+      .info.dependencies.filter((dependency) => dependency.prefix !== 'optional' && dependency.prefix !== 'recommended' && dependency.prefix !== 'incompatible')
+      .map((dependency) => dependency.module);
+  const held = new Set<string>();
+  const visit = (each: string): void => {
+    if (held.has(each)) return;
+    held.add(each);
+    for (const dependency of required(each)) visit(dependency);
+  };
+  visit(id);
+  return [...held];
+}
+
 function hasSomewhereToStand(subset: readonly string[]): boolean {
   const { registry, diagnostics } = loadUniverseWithDiagnostics(subset.map(moduleSource));
   return diagnostics.length === 0 && [...registry.locations.values()].some((location) => location.starting);
@@ -68,10 +86,16 @@ describe('the standing world is derived, not listed', () => {
     }
   });
 
-  it('is the only place a starting # location is declared, which is what makes the reading above exhaustive', () => {
+  // What makes the reading above exhaustive now that a module may take the keyword back and put it
+  // on a place of its own: every module that marks one stands on the standing world, so the standing
+  // world is under all of them and no smaller world has anywhere to stand.
+  it('is under every module that declares a starting # location, so no shipped world begins outside it', () => {
     const starters = ids().filter((id) => parseModuleSource(moduleSource(id)).sections.some((section) => section.kind === 'location' && (section.value as { starting?: boolean }).starting === true));
-    expect(starters).toHaveLength(1);
-    expect(standing()).toContain(starters[0]);
+    expect(starters.length).toBeGreaterThan(0);
+    for (const starter of starters) {
+      expect(leansOn(starter), `${starter} leans on`).toEqual(expect.arrayContaining(standing()));
+      expect(hasSomewhereToStand(leansOn(starter)), `${starter} alone`).toBe(true);
+    }
   });
 });
 

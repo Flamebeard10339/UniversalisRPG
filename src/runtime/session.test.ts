@@ -10,7 +10,7 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
-import { shippedSources, standingSources } from '../content/shipped';
+import { shippedSources, worldFor } from '../content/shipped';
 import { isMintedAction } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
@@ -22,7 +22,7 @@ import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } fr
 import { actionLinesWritten } from '../grammar/action';
 
 // The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
-const tutorial = (): Registry => loadUniverse(withEngineLocale(standingSources()));
+const tutorial = (): Registry => loadUniverse(withEngineLocale(worldFor('first-steps')));
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });

@@ -132,6 +132,7 @@ type EntryConfig = { into: string; body: EntryBody };
 
 const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*(?:\.[a-z][a-z0-9 -]*)*?):/;
 const WORD = /[a-z][a-z0-9-]*/;
+const MARKED_WORD = /(?<op>[+-][ \t]*)(?<word>[a-z][a-z0-9-]*)/;
 
 function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): unknown {
   if (!('parseBlock' in parser)) throw new DslError('this field cannot be written as a block', span);
@@ -287,10 +288,14 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         end: cursor.abs(cursor.pos + key.length),
       });
     } else {
-      const word = cursor.peek(WORD)?.[0];
+      const marked = cursor.peek(MARKED_WORD)?.groups;
+      const word = marked?.word ?? cursor.peek(WORD)?.[0];
       if (word !== undefined && keywords.includes(word)) {
-        cursor.take(WORD);
-        authored[word] = true;
+        const span = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos + (marked === undefined ? word.length : cursor.peek(MARKED_WORD)![0].length)) };
+        if (marked?.op?.trim() === '+') throw new DslError(`a bare ${word} already writes ${word} when it is not there, so + means nothing here`, span);
+        cursor.take(marked === undefined ? WORD : MARKED_WORD);
+        authored[word] = marked === undefined;
+        sites?.push({ field: word, start: span.start, end: span.end });
       } else if (clauses !== undefined) {
         const element = (fields[clauses].parser as ListParser<unknown>).element;
         ((authored[clauses] ??= []) as unknown[]).push(element.parse(cursor));
@@ -426,7 +431,9 @@ export function printSection(value: object, schema: AnySchema, context: PrintCon
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];
   for (const [name, spec] of Object.entries(schema.fields)) {
     lines.push(...fieldLines(schema, name, spec, held, context));
-    if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => held[word] === true));
+    // A keyword the body took back is written as it was written, not left out: a body saying nothing
+    // about a keyword and a body taking one away are different lines over whatever is already there.
+    if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => typeof held[word] === 'boolean').map((word) => (held[word] === true ? word : `-${word}`)));
   }
   const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);
   for (const entry of entries) lines.push(...entryLines(entry));
