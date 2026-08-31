@@ -282,9 +282,10 @@ export function diffState(state: GameState, baseline: GameState): SaveDiff {
   return diff as SaveDiff;
 }
 
-export function serializeSave(state: GameState, registry: Registry): string {
-  const diff = diffState(state, initialState(registry));
-  return JSON.stringify({ version: SAVE_VERSION, ...diff });
+export function serializeSave(state: GameState, registry: Registry, over: readonly string[] = []): string {
+  const base = initialState(registry);
+  if (over.length > 0) loadSave(base, { version: SAVE_VERSION, over: [...over], diff: {} }, registry);
+  return JSON.stringify({ version: SAVE_VERSION, ...diffState(state, base) });
 }
 
 export function savedGameFromSerialized(serialized: string): ParsedSave | null {
@@ -317,6 +318,65 @@ function checkSave(saved: ParsedSave): void {
   }
 }
 
+// The one field a save writes whose keys the engine mints rather than an author writing them, and
+// which the rest of a save points into: `equipped` and `packOrder` hold the ids in it. Every run
+// mints from the same counter, so a copy in one layer and a copy in another are the same id.
+const MINTS_IDS: SaveField = 'instances';
+
+const mintsCopies = (diff: Record<string, unknown>): boolean => Object.keys(((diff[MINTS_IDS] ?? {}) as { byId?: object }).byId ?? {}).length > 0;
+
+// The name a layer is reported under where a composition is refused. The save being loaded may have
+// come off a slot or a byte stream rather than out of the registry, so it answers for itself.
+const OWN_BODY = 'its own body';
+
+interface SaveLayer {
+  name: string;
+  saved: ParsedSave;
+}
+
+function layersOf(saved: ParsedSave, registry: Registry, name: string, under: readonly string[]): SaveLayer[] {
+  const layers: SaveLayer[] = [];
+  for (const id of saved.over ?? []) {
+    if (under.includes(id)) throw new RuntimeError(`save ${id} is written over itself: ${[...under, id].join(' over ')}`);
+    const beneath = registry.saves.get(id);
+    if (!beneath) throw new RuntimeError(`${name} is written over ${id}, which nothing declares`);
+    layers.push(...layersOf(beneath, registry, id, [...under, id]));
+  }
+  layers.push({ name, saved });
+  return layers;
+}
+
+// One diff out of the layers, by the rules `loadSave` lays a single diff over the initial state with:
+// a record takes the keys every layer writes, and anything else is taken from the last layer that
+// writes it. The fields come off SAVE_FIELDS, so a field declared next month layers by its own shape
+// with nothing here to remember.
+function composedDiff(layers: readonly SaveLayer[]): Record<string, unknown> {
+  const minting = layers.filter((layer) => mintsCopies(layer.saved.diff));
+  if (minting.length > 1) {
+    throw new RuntimeError(
+      `${minting.map((layer) => layer.name).join(' and ')} each carry ${MINTS_IDS}, and one composition mints them in one layer only: both mint from the same counter, so a copy each of them holds is the same id and whichever is laid on top takes the other's place`,
+    );
+  }
+
+  const diff: Record<string, unknown> = {};
+  for (const field of RECORD_FIELDS) {
+    const written = layers.flatMap((layer) => (field in layer.saved.diff ? [layer.saved.diff[field] as object] : []));
+    if (written.length > 0) diff[field] = Object.assign({}, ...written);
+  }
+  for (const field of SCALAR_FIELDS) {
+    for (const layer of layers) if (field in layer.saved.diff) diff[field] = layer.saved.diff[field];
+  }
+  return diff;
+}
+
+// What a save says once the ones it is written over are laid down beneath it. Every layer answers to
+// `checkSave` on its own, so the field a body got wrong is named where it was written.
+function resolveSave(saved: ParsedSave, registry: Registry, name = OWN_BODY): ParsedSave {
+  const layers = layersOf(saved, registry, name, [name]);
+  for (const layer of layers) checkSave(layer.saved);
+  return layers.length === 1 ? saved : { version: saved.version, diff: composedDiff(layers) };
+}
+
 function pruned(state: GameState, registry: Registry): PruneWarning[] {
   try {
     return pruneStateForRegistry(state, registry);
@@ -327,9 +387,8 @@ function pruned(state: GameState, registry: Registry): PruneWarning[] {
 }
 
 export function loadSave(state: GameState, saved: ParsedSave, registry: Registry): PruneWarning[] {
-  checkSave(saved);
   const base = initialState(registry);
-  const diff = structuredClone(saved.diff);
+  const diff = structuredClone(resolveSave(saved, registry).diff);
   const target = state as unknown as Record<string, unknown>;
   const baseline = base as unknown as Record<string, unknown>;
 
@@ -352,9 +411,8 @@ function describeValue(value: unknown): string {
 }
 
 export function compareSave(state: GameState, saved: ParsedSave, registry: Registry): string[] {
-  checkSave(saved);
   const current = diffState(state, initialState(registry));
-  const expected = saved.diff;
+  const expected = resolveSave(saved, registry).diff;
   const diffs: string[] = [];
 
   for (const field of RECORD_FIELDS) {
@@ -376,9 +434,8 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
 }
 
 // Only the keys a save names are compared: a field or record key the save is silent on holds whatever the live state gives it, unchecked.
-export function compareSaveOnly(state: GameState, saved: ParsedSave): string[] {
-  checkSave(saved);
-  const expected = saved.diff;
+export function compareSaveOnly(state: GameState, saved: ParsedSave, registry: Registry): string[] {
+  const expected = resolveSave(saved, registry).diff;
   const diffs: string[] = [];
 
   for (const field of RECORD_FIELDS) {

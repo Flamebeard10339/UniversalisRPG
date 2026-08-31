@@ -417,6 +417,48 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     expect(rerun.ok).toBe(true);
   });
 
+  // A sheet written over other saves is re-recorded as a sheet written over them: the layers are laid
+  // down again and what is printed is the difference. Recording it whole would read back the same and
+  // quietly copy every layer into it, which is the one home going twice.
+  it('keeps the layers of a sheet written over others, and prints only what stands over them', () => {
+    const body = (save: readonly string[]): string =>
+      [
+        '# info m',
+        'version: 1.0.0',
+        '',
+        '# location shore',
+        'x: 0, y: 0',
+        'starting',
+        '',
+        '# location cave',
+        'x: 1, y: 0',
+        '',
+        '# item rope',
+        'title: Rope',
+        '',
+        '# save armed',
+        '{"version":13,"inventory":{"m.rope":1}}',
+        '',
+        '# save walked-end',
+        ...save,
+        '',
+        '# test walked',
+        'load: armed',
+        'goto: cave',
+        'expect only: walked-end',
+      ].join('\n');
+    const stale = report([{ name: 'm', text: body(['over: armed', '{"version":13}']) }], { show: [], roundTrip: false, record: ['m.walked'] });
+    const at = stale.lines.indexOf('# save walked-end');
+    const printed = stale.lines.slice(at + 1, at + 3);
+
+    expect(printed[0]).toBe('over: m.armed');
+    expect(printed[1]).not.toContain('rope');
+
+    const rerun = report([{ name: 'm', text: body(printed) }], { show: [], roundTrip: false, test: ['m.walked'] });
+    expect(rerun.lines.join('\n')).toContain('m.walked: PASSED');
+    expect(rerun.ok).toBe(true);
+  });
+
   // The stale sheet a re-recording exists to replace fails on the route's last directive, so failing
   // is not what tells a short walk apart — how far it got is. A route stopped before its end left the
   // world somewhere the route does not end, and printing that body is the one thing this tool must

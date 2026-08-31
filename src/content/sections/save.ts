@@ -1,10 +1,12 @@
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { RawSection, sectionParser } from '../../grammar/structure';
+import { RawLine, RawSection, sectionParser, takeBlock } from '../../grammar/structure';
+import { strings, type Loose } from '../refs';
 import { section, writtenWhole } from './define';
 
 export interface ParsedSave {
   version: number;
+  over?: string[];
   diff: Record<string, unknown>;
 }
 
@@ -12,10 +14,51 @@ export interface SaveSection extends ParsedSave {
   id: string;
 }
 
+// What `over:` does, said once: the page prints it beside the line and the engine refuses a section
+// that writes one and no saved game with it, so what an author is offered and what they are told
+// cannot come apart.
+const OVER_LAYERS =
+  'the saves this one is written over, laid down left to right with this body on top. A field holding ids — what is carried, which flags are set — takes the ids every layer writes, and every other field is taken from the last layer that writes it. Only one layer may carry item copies, since two layers mint the same copy ids';
+
+const OVER_VERB = /^over:/;
+const OVER = /^over:[ \t]*(?<ids>.*)$/;
+const SAVE_ID = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
+
+export const isOverLine = (text: string): boolean => OVER_VERB.test(text);
+
+export const overLines = (over: readonly string[] | undefined): string[] => (over?.length ? [`over: ${over.join(', ')}`] : []);
+
+const overIds = (line: RawLine): string[] => [
+  ...OVER.exec(line.text)!
+    .groups!.ids.split(',')
+    .map((each) => each.trim())
+    .filter((each) => each !== ''),
+  ...takeBlock(line).map((child) => child.text.trim()),
+];
+
 export const parseSaveSection = sectionParser((raw: RawSection): SaveSection => {
   if (!raw.id) throw new DslError('# save requires an id', raw.span);
 
-  const written = raw.body.map((line) => line.text).join('');
+  const over: string[] = [];
+  const body: string[] = [];
+  for (const line of raw.body) {
+    if (!isOverLine(line.text)) {
+      body.push(line.text);
+      continue;
+    }
+    if (body.length > 0) throw new DslError(`# save ${raw.id}: over: stands above the saved game, not below it`, line.span);
+    for (const child of line.children) if (child.children.length > 0) throw new DslError(`# save ${raw.id}: over: names one save to a line`, child.span);
+    const named = overIds(line);
+    if (named.length === 0) throw new DslError(`# save ${raw.id}: over: names no save`, line.span);
+    for (const id of named) {
+      if (!SAVE_ID.test(id)) throw new DslError(`# save ${raw.id}: over: names ${JSON.stringify(id)}, which is no save id`, line.span);
+      over.push(id);
+    }
+  }
+
+  const written = body.join('');
+  if (written === '' && over.length > 0) throw new DslError(`# save ${raw.id}: over: names ${OVER_LAYERS}, and the saved game laid on top is written under it`, raw.span);
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(written);
@@ -27,7 +70,7 @@ export const parseSaveSection = sectionParser((raw: RawSection): SaveSection => 
   const { version, ...diff } = parsed as { version?: unknown } & Record<string, unknown>;
   if (typeof version !== 'number') throw new DslError(`# save ${raw.id}: requires a numeric version`, raw.span);
 
-  return { id: raw.id, version, diff };
+  return { id: raw.id, version, ...(over.length > 0 ? { over } : {}), diff };
 });
 
 export const save = section<SaveSection>()({
@@ -39,7 +82,15 @@ export const save = section<SaveSection>()({
     // The section itself, rather than the two fields read off it: a mark laid on a section travels with the section, and one copied field at a time is one mark left behind.
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, value]],
   },
-  grammar: [{ form: '{"version": <number>[, <the rest of a saved game>]}', example: '{"version": 1}' }],
+  grammar: [
+    {
+      form: 'over: <save>, …',
+      example: 'over: in-town',
+      note: OVER_LAYERS,
+    },
+    { form: '{"version": <number>[, <the rest of a saved game>]}', example: '{"version": 1}' },
+  ],
   parse: parseSaveSection,
-  print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, JSON.stringify({ version: value.version, ...value.diff })],
+  print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, ...overLines(value.over), JSON.stringify({ version: value.version, ...value.diff })],
+  visit: (value, where, visit) => strings(value as unknown as Loose, 'over', 'save', `${where} over:`, visit),
 });

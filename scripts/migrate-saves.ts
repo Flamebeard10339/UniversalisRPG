@@ -4,7 +4,7 @@ import path from 'node:path';
 import { qualify } from '../src/content/namespace';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { parseSaveSection } from '../src/content/sections/save';
+import { isOverLine, parseSaveSection } from '../src/content/sections/save';
 import { DEBUG_MARK } from '../src/content/sections';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
@@ -70,6 +70,7 @@ type Classification = 'recording' | 'input' | 'unreferenced';
 interface Rewrite {
   fixture: Fixture;
   span: Span;
+  over?: string[];
   text: string;
 }
 
@@ -114,7 +115,7 @@ function validationProblems(rewrites: readonly Rewrite[], registry: Registry): s
     let warnings: PruneWarning[];
     try {
       const { version, ...diff } = JSON.parse(rewrite.text) as { version: number } & SaveBody;
-      warnings = loadSave(createGameState(), { version, diff }, registry);
+      warnings = loadSave(createGameState(), { version, over: rewrite.over, diff }, registry);
     } catch (error) {
       problems.push(`${rewrite.fixture.id}: ${(error as Error).message}`);
       continue;
@@ -149,9 +150,9 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
     const namespace = namespaces.get(sources[index]) ?? null;
     for (const section of splitSections(file.text)) {
       if (section.kind !== 'save') continue;
-      // The saved game itself, which is what is rewritten in place; a mark the section wears is none of it and stays where it is written.
-      const written = section.body.filter((line) => line.text !== DEBUG_MARK);
-      const saved = parseSaveSection({ ...section, body: written });
+      // The saved game itself, which is what is rewritten in place; a mark the section wears and the saves it is written over are none of it and stay where they are written.
+      const written = section.body.filter((line) => line.text !== DEBUG_MARK && !isOverLine(line.text));
+      const saved = parseSaveSection({ ...section, body: section.body.filter((line) => line.text !== DEBUG_MARK) });
       const fixture: Fixture = { id: qualify(namespace, saved.id), file: file.path, version: saved.version };
       fixtures.push(fixture);
       if (saved.version === SAVE_VERSION) {
@@ -163,7 +164,7 @@ export function migrate(files: readonly ContentFile[], change: ShapeChange | nul
         continue;
       }
       const body = change.moved(saved.diff, fixture);
-      rewrites.push({ fixture, span: written[0].span, text: JSON.stringify({ version: SAVE_VERSION, ...body }) });
+      rewrites.push({ fixture, span: written[0].span, over: saved.over, text: JSON.stringify({ version: SAVE_VERSION, ...body }) });
     }
   }
 

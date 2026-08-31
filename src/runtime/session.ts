@@ -917,7 +917,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'expect-only': {
       const saved = registry.saves.get(directive.save);
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
-      const diffs = directive.kind === 'expect' ? compareSave(state, saved, registry) : compareSaveOnly(state, saved);
+      const diffs = directive.kind === 'expect' ? compareSave(state, saved, registry) : compareSaveOnly(state, saved, registry);
       if (diffs.length > 0) return { failure: `save mismatch ${directive.save}: ${diffs.join('; ')}` };
       return {};
     }

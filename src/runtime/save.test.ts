@@ -7,7 +7,7 @@ import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { openModalNamed } from './modalStack';
 import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
-import { parseSaveSection } from '../content/sections/save';
+import { parseSaveSection, type ParsedSave } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actionLookup';
 import { actionAddress, actionWords } from '../content/sections/action';
@@ -392,7 +392,7 @@ describe('compareSave', () => {
     state.time = 12345;
     const saved = { version: SAVE_VERSION, diff: { inventory: { bread: 1 }, xp: { 'tutorial.baking': 3 }, time: 7 } };
     expect(compareSave(state, saved, registry)).toEqual([]);
-    expect(compareSaveOnly(state, saved)).toEqual([]);
+    expect(compareSaveOnly(state, saved, registry)).toEqual([]);
   });
 
   it('reports a flag present in the save but absent from the state', () => {
@@ -416,7 +416,7 @@ describe('compareSaveOnly', () => {
     state.flags['named'] = true;
     state.flags['side-quest'] = true;
     const saved = { version: SAVE_VERSION, diff: { flags: { named: true } } };
-    expect(compareSaveOnly(state, saved)).toEqual([]);
+    expect(compareSaveOnly(state, saved, registry)).toEqual([]);
   });
 
   it('reports a human-readable mismatch on a key the save does name', () => {
@@ -424,14 +424,14 @@ describe('compareSaveOnly', () => {
     const state = initialState(registry);
     state.flags['side-quest'] = true;
     const saved = { version: SAVE_VERSION, diff: { flags: { 'side-quest': false } } };
-    expect(compareSaveOnly(state, saved)).toEqual(['flags.side-quest: true vs false']);
+    expect(compareSaveOnly(state, saved, registry)).toEqual(['flags.side-quest: true vs false']);
   });
 
   it('reads through to the field default for a key the live state never touched', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
     const saved = { version: SAVE_VERSION, diff: { flags: { 'tutorial.quest-given': true } } };
-    expect(compareSaveOnly(state, saved)).toEqual(['flags.tutorial.quest-given: false vs true']);
+    expect(compareSaveOnly(state, saved, registry)).toEqual(['flags.tutorial.quest-given: false vs true']);
   });
 
   it('ignores a scalar field the save does not mention, however far the live state has drifted', () => {
@@ -440,13 +440,13 @@ describe('compareSaveOnly', () => {
     state.time = 5000;
     state.location = 'elsewhere';
     const saved = { version: SAVE_VERSION, diff: {} };
-    expect(compareSaveOnly(state, saved)).toEqual([]);
+    expect(compareSaveOnly(state, saved, registry)).toEqual([]);
   });
 
   it('throws a clear error on a version mismatch', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
-    expect(() => compareSaveOnly(state, { version: SAVE_VERSION + 1, diff: {} })).toThrow(/version/);
+    expect(() => compareSaveOnly(state, { version: SAVE_VERSION + 1, diff: {} }, registry)).toThrow(/version/);
   });
 });
 
@@ -586,6 +586,55 @@ describe('a # save body is checked past its version', () => {
   it('requires each equipped slot to hold an item id', () => {
     expect(load({ equipped: { head: 'helm' } })).not.toThrow();
     expect(load({ equipped: { head: 7 } })).toThrow(/save field equipped.head holds 7/);
+  });
+});
+
+describe('a # save written over others', () => {
+  // A copy under an id no kind claims: what is being asked is which layer minted it, and a payload
+  // any instance kind would repair is one more thing between the question and the answer.
+  const copy = (id: string) => ({ next: Number(id) + 1, byId: { [id]: { kind: 'trinket', template: 'bread', payload: {} } } });
+
+  const laid = (saves: Record<string, ParsedSave>): Registry => {
+    const registry = loadInEnglish(PRUNE_MODULE);
+    for (const [id, saved] of Object.entries(saves)) registry.saves.set(id, saved);
+    return registry;
+  };
+
+  it('refuses a chain that comes back to where it started, and says the way round', () => {
+    const registry = laid({ here: { version: SAVE_VERSION, over: ['there'], diff: {} }, there: { version: SAVE_VERSION, over: ['here'], diff: {} } });
+    expect(() => loadSave(createGameState(), registry.saves.get('here')!, registry)).toThrow(/written over itself: .*there.*here/);
+  });
+
+  it('refuses a layer nothing declares', () => {
+    const registry = laid({});
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['nowhere'], diff: {} }, registry)).toThrow(/written over nowhere, which nothing declares/);
+  });
+
+  it('refuses two layers that each carry item copies, since both mint from the one counter', () => {
+    const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('1') } } });
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['grown'], diff: { instances: copy('1') } }, registry)).toThrow(/grown and its own body each carry instances/);
+  });
+
+  it('takes a layer that carries copies where it is the only one that does', () => {
+    const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('1') } } });
+    const state = createGameState();
+    expect(() => loadSave(state, { version: SAVE_VERSION, over: ['grown'], diff: { flags: { known: true } } }, registry)).not.toThrow();
+    expect(state.flags['known']).toBe(true);
+  });
+
+  it('checks a layer against its own version, so a stale one beneath is refused too', () => {
+    const registry = laid({ stale: { version: SAVE_VERSION - 1, diff: {} } });
+    expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['stale'], diff: {} }, registry)).toThrow(/version mismatch/);
+  });
+
+  it('serializes to what is left over its layers, so a body records what the layers do not already hold', () => {
+    const registry = laid({ beneath: { version: SAVE_VERSION, diff: { inventory: { bread: 2 }, location: 'camp' } } });
+    const state = createGameState();
+    loadSave(state, { version: SAVE_VERSION, over: ['beneath'], diff: {} }, registry);
+    state.inventory['bread'] = 5;
+    const { version, ...residual } = JSON.parse(serializeSave(state, registry, ['beneath'])) as { version: number } & Record<string, unknown>;
+    expect(version).toBe(SAVE_VERSION);
+    expect(residual).toEqual({ inventory: { bread: 5 } });
   });
 });
 

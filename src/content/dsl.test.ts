@@ -530,6 +530,20 @@ describe('the shipped corpus', () => {
     expect(stacked).toEqual([]);
   });
 
+  // The subjects are every # save the corpus holds that is written over another, and every field each
+  // of them writes, so a composition written next month is held to this with no edit here.
+  it('says nothing in a save that the save it is written over already says, since a layer restated is a layer that goes stale where it stands', () => {
+    const { registry } = loadUniverseWithDiagnostics(CORPUS);
+    const restated = [...registry.saves.entries()].flatMap(([id, saved]) =>
+      (saved.over ?? []).flatMap((beneath) =>
+        Object.entries(saved.diff)
+          .filter(([field, value]) => JSON.stringify(registry.saves.get(beneath)?.diff[field]) === JSON.stringify(value))
+          .map(([field]) => `# save ${id} writes ${JSON.stringify(field)}, which ${beneath} — the save it is written over — already writes to the letter. Take it out: what a layer says is what this one gets.`),
+      ),
+    );
+    expect(restated).toEqual([]);
+  });
+
   it('counts every counter in a coin that declares no value of its own, which is what a shop would otherwise sell itself', () => {
     const { registry } = loadUniverseWithDiagnostics(CORPUS);
     expect([...registry.shops.values()].filter((shop) => registry.items.get(shop.coin)?.value !== undefined).map((shop) => shop.id)).toEqual([]);
@@ -566,6 +580,28 @@ describe('the shipped corpus', () => {
       const intruded = [written, 'nonsense-nobody-declares:', ...indentLines(['nonsense-nobody-reads'])].join('\n');
       expect(() => owner.parse(splitSections(intruded)[0]!), `# ${section.kind} ${section.id ?? ''}`).toThrow();
     }
+  });
+});
+
+// The corpus writes `over:` correctly, so what an author is told when they do not is only sayable here.
+describe('what # save refuses an over: line for', () => {
+  const read = (body: string): (() => unknown) => () => sectionFor('save')!.parse(splitSections(`# save probe\n${body}`)[0]!);
+
+  it('takes it above the saved game, and refuses it below', () => {
+    expect(read('over: in-town\n{"version":1}')).not.toThrow();
+    expect(read('{"version":1}\nover: in-town')).toThrow(/stands above the saved game/);
+  });
+
+  it('refuses a word that is no save id, rather than reading it as one', () => {
+    expect(read('over: In Town\n{"version":1}')).toThrow(/which is no save id/);
+  });
+
+  it('refuses a line naming no save at all', () => {
+    expect(read('over:\n{"version":1}')).toThrow(/names no save/);
+  });
+
+  it('takes them a save to a line, indented, as every other list is written', () => {
+    expect(read('over:\n  in-town\n  at-the-forge\n{"version":1}')).not.toThrow();
   });
 });
 

@@ -12,6 +12,7 @@ import { type ModuleSource, type ParsedModule } from '../src/content/universe';
 import { createGameState } from '../src/runtime/state';
 import { replayTest, runTest, type TestRun } from '../src/runtime/session';
 import { serializeSave } from '../src/runtime/save';
+import { overLines } from '../src/content/sections/save';
 import { endSaveId } from '../src/runtime/runLog';
 
 export type RoundTripMode = 'universe' | 'module';
@@ -177,11 +178,16 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
 // off the directive rather than minted again from the test id, so the printed section lands under
 // the name the file already writes. Its own directives and not `testSteps`' — a test that opens with
 // `run:` inherits the sheet that one closes on, and pasting over that would rewrite another route's.
-export function recordedSheetId(registry: Registry, testId: string): string | undefined {
+function closingSaveId(registry: Registry, testId: string): string | undefined {
   let closing: string | undefined;
   for (const directive of registry.tests.get(testId)?.directives ?? []) {
     if (directive.kind === 'expect' || directive.kind === 'expect-only') closing = directive.save;
   }
+  return closing;
+}
+
+export function recordedSheetId(registry: Registry, testId: string): string | undefined {
+  const closing = closingSaveId(registry, testId);
   return closing === undefined ? undefined : localId(registry.namespace.ownerOf('save', closing) ?? null, closing);
 }
 
@@ -221,10 +227,15 @@ function recordTests(registry: Registry, specs: readonly string[]): { lines: str
         ok = false;
         continue;
       }
+      const closing = closingSaveId(registry, id);
       const sheet = recordedSheetId(registry, id);
+      // A sheet written over other saves keeps standing on them: the layers are laid down again here
+      // and what is printed is what is left over them, so pasting it back replaces a body and not a
+      // composition. Recording one whole would drop the `over:` line and copy its layers into it.
+      const over = (closing === undefined ? undefined : registry.saves.get(closing))?.over ?? [];
       lines.push(verdict === null ? `${id}: PASSED, so this sheet says what the one in the file already says` : `${id}: FAILED — ${verdict}`);
       if (sheet === undefined) lines.push(`${id}: closes on no expect:, so this replaces nothing and is named the way a recorded run names its end`);
-      lines.push(`# save ${sheet ?? endSaveId(id.split('.').pop()!)}`, serializeSave(state, registry), '');
+      lines.push(`# save ${sheet ?? endSaveId(id.split('.').pop()!)}`, ...overLines(over), serializeSave(state, registry, over), '');
     }
   }
   return { lines, ok };

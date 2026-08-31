@@ -1664,6 +1664,15 @@ node over-the-barrel:
 # save growing-through-the-inventory-screen-end
 {"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
 
+// What somebody arrived carrying and where the world has got to, named together
+// and written neither place: the sword and shield a new arrival walks in with,
+// and the junction the back way leaves them standing at with a lockpick. Both
+// halves are the saves that already say them, so a third of these costs a line
+// rather than a body, and moving either half moves it here too.
+# save armed-at-the-sewer-junction
+over: in-town-with-a-sword-and-a-shield, at-the-sewer-junction
+{"version":13}
+
 // --- the player, proved ---
 
 # item deaths-door
@@ -2023,6 +2032,19 @@ assert: barred-door.unlocked
 travel: sewer-locked-room
 use: entity.key-table.take-the-key
 assert: has sewer-key
+
+// A build and a place, laid down in that order. What the arrival was carrying
+// survives being stood somewhere else — the sword is a rolled copy and the
+// shield a stack, and neither layer says a word about the other's. Where the run
+// stands is the last layer's, since only one of the two can be answered: no
+// condition names where the player is, so the walk off the junction says it.
+# test what-two-layers-of-a-save-each-keep
+load: armed-at-the-sewer-junction
+assert: inventory.core.iron-sword = 1
+assert: inventory.core.wooden-shield = 1
+assert: inventory.core.lockpick = 1
+assert: heard-of-the-back-way
+travel: sewer-outfall
 
 // --- growing an item ---
 //
