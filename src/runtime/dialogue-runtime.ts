@@ -16,6 +16,15 @@ function spokenLine(registry: Registry, state: GameState, line: Spoken): Localiz
   return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state, registry));
 }
 
+// A line is what is left of it once its fragments have been weighed, and a line whose fragments all
+// fall away has nothing left to say — so it is not said, rather than said blank. One home, because
+// `standingAfter` reads the log to decide whether the player is owed a screen, and a node that came
+// to nothing would otherwise put up a beat with an empty line in it.
+function speak(registry: Registry, state: GameState, line: Spoken): void {
+  const words = spokenLine(registry, state, line);
+  if (words.trim() !== '') state.log.push(words);
+}
+
 function findNode(dialogue: Dialogue, name: string): DialogueNode {
   const node = dialogue.nodes.find((n) => n.name === name);
   if (!node) throw new RuntimeError(`goto target not found: ${name} in dialogue ${dialogue.id}`);
@@ -75,7 +84,7 @@ function runSteps(dialogue: Dialogue, node: DialogueNode, registry: Registry, st
     const kept = replay || WHEN_SPENT[step.kind];
     switch (step.kind) {
       case 'say':
-        if (kept) state.log.push(spokenLine(registry, state, step));
+        if (kept) speak(registry, state, step);
         break;
       case 'effect':
         if (kept) applyResultsNow(state, registry, [step.result]);
@@ -102,7 +111,7 @@ function enterNode(dialogue: Dialogue, node: DialogueNode, registry: Registry, s
   const counter = visitCounter(dialogue, node);
   const visit = (state.visits[counter] = (state.visits[counter] ?? 0) + 1);
   const replay = replaying(node, visit);
-  if (!replay && node.again) state.log.push(spokenLine(registry, state, node.again));
+  if (!replay && node.again) speak(registry, state, node.again);
   return runSteps(dialogue, node, registry, state, 0, replay);
 }
 

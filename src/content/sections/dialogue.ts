@@ -99,7 +99,7 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread; a thread with no `ask:` is named in the list by the first line it says' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
   { form: 'again: <text>', example: 'again: We have spoken already.', family: 'what is said', holds: () => ({ text: fragment }), note: 'what a node without `sticky` says on a visit after its first, instead of the silence it would fall to' },
-  { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said', note: 'the words as the player hears them. A bare line is read as this wherever it is no other shape, so it holds no grammar of its own — but any number of `<fragment>` may stand in it' },
+  { form: '<what is said>', example: 'A traveller, out here?', family: 'what is said', note: 'the words as the player hears them. A bare line is read as this wherever it is no other shape, so it holds no grammar of its own — but any number of `<fragment>` may stand in it, and a line left with nothing once they are weighed is not said at all rather than said blank: a clause only sometimes true can stand alone on its own line' },
   GOES(goes),
   { form: '-> <choice>[ (when <condition>)]', example: '-> Tell me more', family: 'where it goes', holds: () => ({ condition, choice: fragment }), block: () => [{ ...GOES(goes), note: 'where picking this choice leads' }, ...resultGrammar()] },
   ...resultGrammar(),

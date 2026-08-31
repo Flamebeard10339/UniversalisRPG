@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { offering, spokenBy } from '../content/sections/dialogue';
 import { shippedSources } from '../content/shipped';
+import { FIXTURE_WORLD } from '../content/worldFixture';
 import { initialState } from './save';
 import { menuChoices, openersNow, reachedNow, talk } from './dialogue-runtime';
 
@@ -57,5 +58,42 @@ describe('everyone the corpus writes a word for', () => {
 
     expect(unnamed).toEqual([]);
     expect(owners.flatMap((owner) => openersNow(registry, state, owner)).length).toBeGreaterThan(5);
+  });
+});
+
+// Written out rather than drawn from the corpus, because the corpus holds no such line: the author
+// who met this paired their one-sided clauses so that one of each pair always stands, which is the
+// technique the fragment's own entry now points at.
+describe('a line that is nothing but a fragment that does not hold', () => {
+  const world = `
+# info base
+version: 1.0.0
+${FIXTURE_WORLD}
+# location tent
+x: 1, y: 0
+entities: oolga
+
+# entity oolga
+title: Oolga
+
+# dialogue oolga
+owner = oolga
+
+node closing:
+  always
+  {snubbed: You came back, then.}
+  Mind how you go.
+
+# flag snubbed
+`;
+
+  it('is not said at all, rather than said blank', () => {
+    const { registry } = loadUniverseWithDiagnostics([{ name: 'base', text: world }]);
+    const state = initialState(registry);
+
+    talk('base.oolga', registry, state);
+
+    expect(state.log.filter((said) => said.trim() === '')).toEqual([]);
+    expect(state.log).toHaveLength(1);
   });
 });
