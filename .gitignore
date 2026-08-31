@@ -27,3 +27,7 @@ tsconfig.node.tsbuildinfo
 
 # One file per save slot, written by whoever is playing.
 .saves/
+
+# The REPL's own working file. Whoever is playing stages edits into it, and the
+# shipped corpus is not supposed to have a local-changes module in it.
+content/local-changes.dsl
