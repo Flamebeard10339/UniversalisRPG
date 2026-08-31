@@ -410,10 +410,12 @@ is to measure again rather than to trust anything written here.
 1. **Composable saves** — done, `f592becc`.
 2. **Fixed-window denominator, and the resume rule** — done, `c72e9737` and `ac6268ef`.
 3. **Rename to `simulate-activity`** — done, `6a10ae1c`.
-4. **Land the curve** — re-measure first (§4.1), then the two constants, the blast radius in
-   §4.2, then the assertion sweep. It regenerates nine save bodies, so it wants to land before
-   anything else rewrites them.
-5. **Instance-id remapping** (§5) — prerequisite for composing a tier build with a progress state.
+4. **Land the curve** — done, `64173326`, `3a1529a7`, `71e6a885`, `2940045e`. The assertion sweep
+   over the 41 is the one part not done: it waits on the ruling in `docs/balance/open-human.md`.
+   The nine saves are regenerated. `equip:` was throwing away its own refusal, so the twelve level
+   gates were unprovable; fixed, and one is now pinned.
+5. **Instance-id remapping** (§5) — done, `803eab3c`. Where a minted id can be named is declared on
+   `SaveFieldRule` beside `walked`, so `tsc` makes a new field answer.
 6. **The matrix** — the search, the fingerprinted tier artifacts, the outcome matrix, the derived
    readings.
 7. **The ratio sheet** — the ratio column quoted against a named build (§7.1), under §7.2's rule,
