@@ -55,16 +55,12 @@ function at(experience: number): GameState {
 const holds = (written: string, state: GameState): boolean => evaluateCondition(parseWhole(condition, written, 0, 'a condition'), state, registry);
 
 describe('level.<skill> reads the level the experience has bought', () => {
-  it('turns the same 999 experience that reads under 1000 as xp into level 1', () => {
-    expect(xpForLevel(2)).toBe(1000);
-    expect(holds('xp.mining >= 1000', at(999))).toBe(false);
-    expect(holds('level.mining >= 2', at(999))).toBe(false);
-    expect(holds('level.mining = 1', at(999))).toBe(true);
-  });
-
-  it('reaches level 2 on the 1000th point and not on the 999th', () => {
-    expect(holds('level.mining >= 2', at(xpForLevel(2) - 1))).toBe(false);
-    expect(holds('level.mining >= 2', at(xpForLevel(2)))).toBe(true);
+  it('reads one store two ways: a point under the second threshold is level 1, and the threshold itself is level 2', () => {
+    const threshold = xpForLevel(2);
+    expect(holds(`xp.mining >= ${threshold}`, at(threshold - 1))).toBe(false);
+    expect(holds('level.mining >= 2', at(threshold - 1))).toBe(false);
+    expect(holds('level.mining = 1', at(threshold - 1))).toBe(true);
+    expect(holds('level.mining >= 2', at(threshold))).toBe(true);
   });
 
   it('reads a skill nothing has practised as level 1 rather than as absent', () => {

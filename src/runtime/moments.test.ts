@@ -6,6 +6,10 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import { Registry } from '../content/registry';
 import { TRIGGER_NAMES } from '../content/sections/event';
 import { secondsToMs } from './units';
+import { skillLevel } from './skills';
+
+const TRAIN_XP = 1000;
+const TRAIN_SECONDS = 5;
 
 interface Moment {
   by: string;
@@ -83,7 +87,7 @@ time: 1
 title: train
 continuous
 time: 1
-xp: lore 1000
+xp: lore ${TRAIN_XP}
 
 # action gather
 title: gather
@@ -150,11 +154,11 @@ const MOMENTS: Record<string, Moment[]> = {
   unfinished: [{ by: 'a repeating fight running out of attempts', content: event('unfinished'), arm: fights('skirmish', 'rat', true), seconds: 12, times: 6 }],
   'level-up': [
     {
-      by: 'a skill crossing four thresholds as five payouts of 1000 land on it',
+      by: `a skill crossing every threshold under ${TRAIN_SECONDS} payouts of ${TRAIN_XP}`,
       content: event('level-up'),
       arm: (state, registry) => armAction('action', 'train', 'train', registry, state),
-      seconds: 5,
-      times: 4,
+      seconds: TRAIN_SECONDS,
+      times: skillLevel(TRAIN_SECONDS * TRAIN_XP) - 1,
     },
   ],
   'inventory-changed': [

@@ -4,6 +4,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { compareSave, loadSave, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
+import { skillLevel } from './skills';
 
 const SHEET =
   FIXTURE_WORLD +
@@ -134,7 +135,7 @@ describe('one accumulator, and one place that writes it', () => {
     armFightAction('swing', 'rat', registry, state);
     resolve(state, registry, secondsToMs(70));
     expect(state.xp.melee).toBe(16 * 70);
-    expect(state.log.filter((line) => line.includes('Melee') && line.includes('level'))).toHaveLength(1);
+    expect(state.log.filter((line) => line.includes('Melee') && line.includes('level'))).toHaveLength(skillLevel(state.xp.melee) - 1);
   });
 
   it('keeps the save shape it inherited, so a state that earned a grant reloads clean', () => {

@@ -5,6 +5,10 @@ import { Directive, Terminator } from '../content/sections/test';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor } from './localized';
 import { applyDirective, startSession, view } from './session';
 import { FIXTURE_WORLD } from '../content/worldFixture';
+import { xpForLevel } from './skills';
+
+const CASTS = 11;
+const CAST_XP = Math.ceil(xpForLevel(4) / CASTS);
 
 const WORLD =
   FIXTURE_WORLD +
@@ -41,7 +45,7 @@ continuous
 time: 2
 on success:
   give: 1 cod
-  xp: fishing 400
+  xp: fishing ${CAST_XP}
   drain: 2 health
 
 # action chop
@@ -56,7 +60,7 @@ continuous
 time: 1
 stops on: a-level
 on success:
-  xp: lore 1000
+  xp: lore ${xpForLevel(2)}
 
 # action prime
 title: Prime
@@ -141,8 +145,8 @@ describe('a span the engine runs unattended is summarised, and one the player st
       say().engine('engine.skill.levelled', { skill: say().title('skill', 'fishing'), level: 3 }),
       say().engine('engine.skill.levelled', { skill: say().title('skill', 'fishing'), level: 4 }),
       ran(22, say().engine('engine.stopped.condition', { condition: say().identifier('resource.health < 10') })),
-      say().engine('engine.span.gained', { item: say().title('item', 'cod'), count: 11 }),
-      say().engine('engine.span.levelled', { skill: say().title('skill', 'fishing'), gained: 4400, level: 4 }),
+      say().engine('engine.span.gained', { item: say().title('item', 'cod'), count: CASTS }),
+      say().engine('engine.span.levelled', { skill: say().title('skill', 'fishing'), gained: CASTS * CAST_XP, level: 4 }),
       say().engine('engine.span.pool', { resource: say().title('resource', 'health'), before: 30, after: 8 }),
     ]);
   });

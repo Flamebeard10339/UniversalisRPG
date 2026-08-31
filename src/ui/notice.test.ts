@@ -81,8 +81,11 @@ describe('a notification already on screen', () => {
 
 describe('what raises one', () => {
   it('is experience earned, one line to the skill that earned it', () => {
-    expect(said(viewOf({ xp: [row('attack', 100)] }), viewOf({ xp: [row('attack', 220)] }))).toEqual(['+120 Attack']);
-    expect(said(viewOf({}), viewOf({ xp: [row('thieving', 25)] }))).toEqual(['+25 Thieving']);
+    const from = xpForLevel(20);
+    const to = xpForLevel(21) - 1;
+    expect(said(viewOf({ xp: [row('attack', from)] }), viewOf({ xp: [row('attack', to)] }))).toEqual([`+${to - from} Attack`]);
+    const under = xpForLevel(2) - 1;
+    expect(said(viewOf({}), viewOf({ xp: [row('thieving', under)] }))).toEqual([`+${under} Thieving`]);
   });
 
   it('is an item arriving, and never one being spent', () => {
