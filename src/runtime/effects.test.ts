@@ -8,10 +8,10 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { shippedSources } from '../content/shipped';
 import { roadsFrom } from './journey';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
-import { applyResultsNow, createGameState, GameState, initResources, PLAYER } from './runtime';
+import { applyResultsNow, createGameState, GameState, grantBuff, initResources, PLAYER } from './runtime';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
-import { toMilliUnits } from './units';
+import { secondsToMs, toMilliUnits } from './units';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { mintedName } from '../grammar/values';
 
@@ -304,5 +304,56 @@ describe('standing in a place the corpus declares', () => {
     const heardOnly = everywhere.filter((id) => flagged(stood(id), DISCOVERED).length > flagged(stood(id), TOUCHED).length);
     expect(heardOnly).toEqual(everywhere.filter((id) => openOut(id).length > 0));
     expect(heardOnly.length).toBeGreaterThan(20);
+  });
+});
+
+// A row weighed by a stat is the only weight the load path cannot read, so this is where a weight
+// that is no quantity is met. Nothing is refused for reading nothing: a row held at zero is how a
+// stat turns one off, and a table every row of which is off draws nothing, exactly as one every row
+// of which is gated off does.
+describe('a one of: row weighed by a stat', () => {
+  const CHEST = `
+# stat luck
+base: 5
+
+# item coin
+examine: A coin.
+
+# item gem
+examine: A gem.
+
+# item cursed-charm
+examine: It is not lucky.
+-1000% luck, 600s
+
+# entity chest
+open:
+  one of:
+    luck: give: 1 gem
+    2x: give: 1 coin
+`;
+
+  const opening = (cursed: boolean): { state: GameState; open: () => void } => {
+    const registry = loadInEnglish(CHEST);
+    const state = createGameState();
+    state.rng = 7;
+    if (cursed) grantBuff(state, PLAYER, registry.items.get('cursed-charm')!, secondsToMs(600));
+    const results = registry.entities.get('chest')!.actions.find((each) => each.label === 'open')!.results;
+    return { state, open: () => applyResultsNow(state, registry, results) };
+  };
+
+  it('draws on both rows while the stat reads a quantity', () => {
+    const { state, open } = opening(false);
+    for (let i = 0; i < 50; i++) open();
+
+    expect(state.inventory['gem'] ?? 0).toBeGreaterThan(0);
+    expect(state.inventory['coin'] ?? 0).toBeGreaterThan(0);
+  });
+
+  it('refuses a stat that has been carried below nothing, naming the row, rather than never firing it', () => {
+    const { state, open } = opening(true);
+
+    expect(open).toThrow(/one of: row luck weighs -\d/);
+    expect(state.inventory['gem'] ?? 0, 'and nothing was handed out on the way to saying so').toBe(0);
   });
 });

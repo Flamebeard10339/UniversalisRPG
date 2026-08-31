@@ -91,16 +91,21 @@ interface DeterministicFightPlan extends FightParams {
   outcome: FightOutcome;
 }
 
-function fightParams(action: Action, state: GameState, registry: Registry): FightParams {
+// The `their` of every sided field on the player's own action: whoever it is aimed at. Both ways
+// into arming write that down in the seat the player holds, so a fight and a gather are read the
+// same way and the answer is never reckoned a second time.
+const aimedAt = (state: GameState): string => state.activeAction?.roster?.[PLAYER]?.target ?? PLAYER;
+
+function fightParams(action: Action, state: GameState, registry: Registry, other: string): FightParams {
   return {
-    attemptMs: attemptDuration(action, state, registry),
-    milliHealthPerHit: hitDamage(action.damage ? statValue(action.damage.left.id, state, registry) : 1, 0, registry),
+    attemptMs: attemptDuration(action, state, registry, PLAYER, other),
+    milliHealthPerHit: hitDamage(action.damage ? statValue(action.damage.left.id, state, registry, sideOf(action.damage.left, PLAYER, other)) : 1, 0, registry),
     attempts: action.attempts ?? Infinity,
   };
 }
 
-function fightPlan(action: Action, state: GameState, registry: Registry): DeterministicFightPlan {
-  const params = fightParams(action, state, registry);
+function fightPlan(action: Action, state: GameState, registry: Registry, other: string): DeterministicFightPlan {
+  const params = fightParams(action, state, registry, other);
   const neededForCompletion = Math.ceil(IMPLICIT_TARGET_FULL / params.milliHealthPerHit);
   return {
     ...params,
@@ -161,7 +166,7 @@ function nextBoundary(state: GameState, registry: Registry, toTime: number): Bou
     const source: BoundarySource = { kind: 'action', ownerRef: active.ownerRef, actionSlug: active.actionSlug };
     const action = armedAction(state, registry);
     if (!resolvesPerAttempt(action)) {
-      const { attemptMs, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+      const { attemptMs, attemptsToResolve, outcome } = fightPlan(action, state, registry, aimedAt(state));
       const player = playerCadence(active);
       const inFlight = (attemptsToResolve - player.attemptsMade) * attemptMs - player.progress;
       const completions = active.repeating
@@ -197,7 +202,7 @@ function resolveDeterministicSegment(segment: Segment, action: Action, segEnd: n
   const { state, registry } = segment;
   const active = state.activeAction!;
   const segLen = segEnd - state.time;
-  const { attemptMs, milliHealthPerHit, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+  const { attemptMs, milliHealthPerHit, attemptsToResolve, outcome } = fightPlan(action, state, registry, aimedAt(state));
 
   if (stalledPace(attemptMs)) return;
 
@@ -329,6 +334,15 @@ function searchingForAFoe(state: GameState, action: Action): boolean {
   return target !== undefined && active.actors?.[target] === undefined;
 }
 
+// How far this pass of the loop may carry the paces it has just read. A buff landing inside the
+// segment puts a moment in it that the boundary the segment was opened to was read too early to
+// know about, and everyone's pace is read again on the far side of it — so a run held at a
+// standstill starts again where it wore off rather than where the caller happened to stop asking.
+function goodUntil(state: GameState, segEnd: number): number {
+  const expiry = nextBuffExpiry(state);
+  return expiry !== undefined && expiry.at > state.time && expiry.at < segEnd ? expiry.at : segEnd;
+}
+
 function resolveStochasticSegment(segment: Segment, action: Action, segEnd: number): void {
   const { state, registry } = segment;
   const active = state.activeAction!;
@@ -339,12 +353,14 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       return;
     }
 
+    const until = goodUntil(state, segEnd);
+
     const searching = searchingForAFoe(state, action);
     const looking = searching ? active.roster![PLAYER]!.target : undefined;
     if (looking !== undefined && !standsAgain(state, registry, action, looking)) {
       grantActionFoodBuff(state, registry);
       endAction(state, outcomeReached(state, registry, 'completion'));
-      advanceTime(state, Math.max(0, segEnd - state.time));
+      advanceTime(state, Math.max(0, until - state.time));
       return;
     }
 
@@ -372,14 +388,14 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
 
     if (paced.length === 0 && !searching) {
       endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
-      advanceTime(state, segEnd - state.time);
+      advanceTime(state, until - state.time);
       return;
     }
 
     // Finding the next one is an event on the clock like a swing, and the first of the two to come
     // round is what the segment steps to.
     const foundAt = looking === undefined ? Infinity : Math.max(state.time, state.engagesAt);
-    if (foundAt <= segEnd && foundAt <= nextAt) {
+    if (foundAt <= until && foundAt <= nextAt) {
       const elapsed = foundAt - state.time;
       for (const { participant, duration } of ticking) standAt(participant.cadence, participant.cadence.progress + elapsed, duration);
       advanceTime(state, elapsed);
@@ -390,8 +406,8 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       continue;
     }
 
-    if (!next || nextAt > segEnd) {
-      const elapsed = segEnd - state.time;
+    if (!next || nextAt > until) {
+      const elapsed = until - state.time;
       for (const { participant, duration } of ticking) standAt(participant.cadence, participant.cadence.progress + elapsed, duration);
       advanceTime(state, elapsed);
       return;
@@ -482,7 +498,7 @@ function applyDueBoundaries(state: GameState, registry: Registry, at: number): v
         changed = true;
       } else if (!resolvesPerAttempt(action)) {
         if (!state.activeAction.repeating) {
-          const { attemptMs, attemptsToResolve, outcome } = fightPlan(action, state, registry);
+          const { attemptMs, attemptsToResolve, outcome } = fightPlan(action, state, registry, aimedAt(state));
           if (playerCadence(state.activeAction).attemptsMade >= attemptsToResolve || attemptMs <= 0) {
             const segment = newSegment(state, registry);
             applyOutcome(segment, action, outcome, 1);
@@ -602,7 +618,7 @@ const underWayUnit = (state: GameState, registry: Registry): number => {
   const active = state.activeAction;
   if (!active) return 0;
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  return actionFirstUnit(obj, objId, active.actionSlug, registry, state);
+  return actionFirstUnit(obj, objId, active.actionSlug, registry, state, aimedAt(state));
 };
 
 // One cycle of whatever is under way, or — where it is standing still and has no cycle to step —
@@ -692,9 +708,9 @@ function resolveFirstUnit(state: GameState, registry: Registry, firstUnit: numbe
   resolve(state, registry, state.time + (Number.isFinite(firstUnit) ? Math.ceil(firstUnit) : 0));
 }
 
-function firstUnitSpan(action: Action, state: GameState, registry: Registry): number {
-  const duration = attemptDuration(action, state, registry);
-  return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry).attemptsToResolve * duration;
+function firstUnitSpan(action: Action, state: GameState, registry: Registry, other: string): number {
+  const duration = attemptDuration(action, state, registry, PLAYER, other);
+  return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry, other).attemptsToResolve * duration;
 }
 
 // A free action is one that costs the player no time — looking at something, eating what they are
@@ -702,7 +718,7 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry): nu
 // that does, so these run where they stand and leave the fight or the gather under way alone. What is
 // free is read off the action's own pace, so an action that starts or stops declaring one moves side
 // with no list anywhere to follow it.
-const isFree = (action: Action, state: GameState, registry: Registry): boolean => attemptDuration(action, state, registry) <= 0;
+const isFree = (action: Action, state: GameState, registry: Registry, other: string): boolean => attemptDuration(action, state, registry, PLAYER, other) <= 0;
 
 // Everything an action does when it completes, done at once and with nothing armed. A `stop` among
 // its results still stops what was under way: the author asked for that in so many words.
@@ -789,12 +805,12 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   if (refused) return refused;
 
   const repeating = actionKind(action) === 'continuous';
-  const duration = attemptDuration(action, state, registry);
+  const duration = attemptDuration(action, state, registry, PLAYER, objId);
   if (repeating && duration <= 0) {
     throw new RuntimeError(`continuous action ${obj}.${objId}.${actionId} resolved a non-positive cadence (${duration}ms)`);
   }
 
-  if (state.activeAction && isFree(action, state, registry)) {
+  if (state.activeAction && isFree(action, state, registry, objId)) {
     runFreely(state, registry, ownerRef(obj, objId), action);
     return { armed: false };
   }
@@ -808,7 +824,7 @@ export function armAction(obj: string, objId: string, actionId: string, registry
     roster: { [PLAYER]: { ownerRef: ownerRef(obj, objId), actionSlug: actionId, target: objId } },
   };
   state.activeAction = active;
-  return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
+  return { armed: true, firstUnit: firstUnitSpan(action, state, registry, objId) };
 }
 
 // How far through its cycle what is under way has got, as the fraction a bar draws.
@@ -824,22 +840,22 @@ export function actionProgress(state: GameState, registry: Registry): number {
   if (!active) return 0;
   const action = armedAction(state, registry);
   const clock = playerCadence(active);
-  const attemptMs = attemptDuration(action, state, registry);
+  const attemptMs = attemptDuration(action, state, registry, PLAYER, aimedAt(state));
   if (!(attemptMs > 0)) return 1;
   const within = attemptFraction(clock, attemptMs);
   // A contested action resolves one swing at a time and its cycle is that swing, so the attempts
   // behind it are a tally of the fight rather than a share of anything being drawn.
   if (resolvesPerAttempt(action)) return within;
-  const attempts = fightPlan(action, state, registry).attemptsToResolve;
+  const attempts = fightPlan(action, state, registry, aimedAt(state)).attemptsToResolve;
   if (!(attempts > 0)) return 1;
   return Math.min(1, Math.max(0, (Math.min(attempts, clock.attemptsMade) + within) / attempts));
 }
 
-export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): number {
+export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState, other: string = objId): number {
   const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
   const action = target?.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) return 0;
-  return firstUnitSpan(action, state, registry);
+  return firstUnitSpan(action, state, registry, other);
 }
 
 export function armFightAction(actionId: string, targetId: string, registry: Registry, state: GameState): ArmResult {
@@ -852,7 +868,7 @@ export function armFightAction(actionId: string, targetId: string, registry: Reg
   if (refused) return refused;
 
   armFight(state, registry, actionId, action, targetId);
-  return { armed: true, firstUnit: firstUnitSpan(action, state, registry) };
+  return { armed: true, firstUnit: firstUnitSpan(action, state, registry, targetId) };
 }
 
 export function useFight(actionId: string, targetId: string, registry: Registry, state: GameState): void {

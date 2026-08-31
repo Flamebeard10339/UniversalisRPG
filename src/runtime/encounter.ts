@@ -117,7 +117,7 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
   const action = findActiveAction(active, registry);
   if (!action.depletes) return null;
 
-  const fractionOf = (cadence: Cadence, actorId: string, swing: Action): number => attemptFraction(cadence, attemptDuration(swing, state, registry, actorId));
+  const fractionOf = (cadence: Cadence, actorId: string, swing: Action, other: string): number => attemptFraction(cadence, attemptDuration(swing, state, registry, actorId, other));
   const resource = requireResource(registry, action.depletes.id);
   const swinging = new Map(participants(state, registry).map((each) => [each.self, each]));
   const here = registry.locations.get(state.location);
@@ -137,11 +137,11 @@ export function encounterView(state: GameState, registry: Registry): EncounterVi
       resource: resource.id,
       current: fromMilliUnits(actor.resources[resource.id] ?? 0),
       max: statValue(resource.max, state, registry, actorId),
-      cadence: swing ? fractionOf(swing.cadence, actorId, swing.action) : null,
+      cadence: swing ? fractionOf(swing.cadence, actorId, swing.action, swing.other) : null,
       remaining: stillHere(actorId),
     });
   }
-  return { cadence: fractionOf(playerCadence(active), PLAYER, action), foes };
+  return { cadence: fractionOf(playerCadence(active), PLAYER, action, swinging.get(PLAYER)?.other ?? PLAYER), foes };
 }
 
 export function targetLevel(state: GameState, registry: Registry, action: Action, self: string, other: string): number {

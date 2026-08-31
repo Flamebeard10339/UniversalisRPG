@@ -838,14 +838,24 @@ food, stacks, +50 seep-rate, 7s
     }
   });
 
-  it('discards the remainder of a segment that clamped, so time spent at the ceiling earns no credit', () => {
+  it('carries the remainder through a segment that clamped, so a pool sitting at its ceiling does not make the cut observable', () => {
     const registry = loadModule(poolModule(7, 4, 4));
-    const state = createGameState();
-    initResources(state, registry);
 
-    resolve(state, registry, secondsToMs(60));
-    expect(state.resources['seep']).toBe(toMilliUnits(4));
-    expect(state.resourceRateRemainders['seep']).toBe(0);
+    function fresh(): GameState {
+      const state = createGameState();
+      initResources(state, registry);
+      return state;
+    }
+
+    const oneShot = fresh();
+    resolve(oneShot, registry, secondsToMs(60));
+    expect(oneShot.resources['seep']).toBe(toMilliUnits(4));
+
+    const stepped = fresh();
+    for (let t = secondsToMs(1); t <= secondsToMs(60); t += secondsToMs(1)) resolve(stepped, registry, t);
+
+    expect(stepped.resources['seep']).toBe(oneShot.resources['seep']);
+    expect(stepped.resourceRateRemainders).toEqual(oneShot.resourceRateRemainders);
   });
 
   it('accumulates exactly across the four-hour offline cap, an order of magnitude inside the safe-integer range', () => {

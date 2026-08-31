@@ -120,9 +120,17 @@ function statSide(value: number | string, state: GameState, registry: Registry):
   return typeof value === 'number' ? value : statValue(value, state, registry);
 }
 
+function rowWeight(row: DropRow, state: GameState, registry: Registry): number {
+  const weight = statSide(row.weight, state, registry);
+  if (weight < 0) {
+    throw new RuntimeError(`one of: row ${row.weight} weighs ${weight} — a weight is a quantity, so weigh the row by something that cannot read below nothing`);
+  }
+  return weight;
+}
+
 function selectRow(rows: readonly DropRow[], state: GameState, registry: Registry): DropRow | undefined {
   const live = rows.filter((row) => row.requires === undefined || evaluateCondition(row.requires, state, registry));
-  const weights = live.map((row) => Math.max(0, statSide(row.weight, state, registry)));
+  const weights = live.map((row) => rowWeight(row, state, registry));
   const total = weights.reduce((sum, weight) => sum + weight, 0);
   if (total <= 0) return undefined;
   let picked = nextRandom(state) * total;
@@ -510,8 +518,8 @@ export function settlePools(state: GameState, registry: Registry, snapshots: Res
       const raw = current + delta + rate.units;
       const max = snapshot?.max ?? toMilliUnits(statValue(resource.max, state, registry, store.actorId));
       segment.credit = credit?.get(store.actorId);
-      const result = setPoolLevel(segment, store, resource, current, raw, max);
-      if (snapshot) store.remainders[resource.id] = result === 'clamped' ? 0 : rate.remainder;
+      setPoolLevel(segment, store, resource, current, raw, max);
+      if (snapshot) store.remainders[resource.id] = rate.remainder;
     }
   }
   settleHandlerDeltas(state, registry, segment);

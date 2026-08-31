@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { Condition, ENGINE_ROOT_NAMES } from '../grammar/condition';
 import {
-  actionFirstUnit, applyResultsNow, armAction, armCraft, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSeconds, useAction } from './runtime';
+  actionFirstUnit, applyResultsNow, armAction, armCraft, armFightAction, craft, craftFirstUnit, createGameState, evaluateCondition, GameState, initResources, renderSegments, resolve, travelSeconds, useAction } from './runtime';
 import { travelAction } from './actionLookup';
 import { IMPLICIT_TARGET_FULL } from './encounter';
 import { restorePools } from './effects';
@@ -705,5 +705,158 @@ describe('what an engine root reads', () => {
     state.flags[path.join('.')] = 99;
 
     expect(renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry)).toBe(before);
+  });
+});
+
+describe('a rate that names a side is paced by the side it names', () => {
+  const WATERS = `
+# stat depth
+base: 0
+
+# item fish
+examine: A fish.
+
+# entity shallow-water
+stats: depth 60
+cast:
+  continuous
+  rate: their depth
+  give: 1 fish
+
+# entity deep-water
+stats: depth 6
+cast:
+  continuous
+  rate: their depth
+  give: 1 fish
+`;
+
+  const casting = (registry: Registry, water: string, forMs: number): GameState => {
+    const state = createGameState();
+    armAction('entity', water, 'cast', registry, state);
+    resolve(state, registry, forMs);
+    return state;
+  };
+
+  it('reads the stat off what the action is aimed at rather than off the player, who declares none of it', () => {
+    const registry = loadInEnglish(WATERS);
+    const state = createGameState();
+
+    expect(actionFirstUnit('entity', 'shallow-water', 'cast', registry, state)).toBe(secondsToMs(1));
+    expect(actionFirstUnit('entity', 'deep-water', 'cast', registry, state)).toBe(secondsToMs(10));
+  });
+
+  it('runs the world at that pace, so the two waters pay out at rates of their own', () => {
+    const registry = loadInEnglish(WATERS);
+    const shallow = casting(registry, 'shallow-water', secondsToMs(30));
+    const deep = casting(registry, 'deep-water', secondsToMs(30));
+
+    expect(shallow.inventory['fish'] ?? 0, 'a water the player cannot pace reels in nothing at all').toBeGreaterThan(0);
+    expect(shallow.inventory['fish']!).toBeGreaterThan(deep.inventory['fish'] ?? 0);
+  });
+});
+
+// The world runs on whatever step the caller happens to take — a frame, a cycle of what is under
+// way, one `wait:` of a minute — and what it settles on may not depend on which. A pace taken to
+// nothing is where that is hardest: whoever is held still is counted no time, so the moment the
+// hold wears off has to be reached whether or not the caller stopped there.
+describe('a debuff an enemy lands mid-fight leaves every step size in the same place', () => {
+  const DEN = `
+# stat attack
+base: 10
+
+# stat accuracy
+base: 50
+
+# stat evasion
+base: 10
+
+# stat defense
+
+# stat attack-rate
+base: 25
+
+# stat max-health
+base: 200
+
+# resource health
+max: max-health
+
+# event death
+resource: health
+trigger: on empty
+
+# item cold-iron
+examine: Your arms will not do what you tell them.
+-100% attack-rate, 3s
+
+# item rat-tail
+examine: Still twitching.
+
+# location den
+x: 0, y: 0
+starting
+entities: giant-rat
+
+# action fight
+title: fight
+continuous
+rate: my attack-rate
+accuracy: my accuracy vs their evasion
+damage: my attack vs their defense
+depletes: their health
+
+# entity player
+stats: attack 10, accuracy 50, evasion 10, defense 0, max-health 200, attack-rate 25
+uses: fight
+
+# entity giant-rat
+stats: attack 4, accuracy 50, evasion 10, defense 2, max-health 30, attack-rate 16
+uses: fight
+on hit: inflict: cold-iron on them
+on death:
+  give: 1 rat-tail
+`;
+
+  const SPAN = secondsToMs(120);
+
+  // Everything the run settled on but the words it said, so a field that starts moving is covered
+  // by this having been written at all.
+  const settledOn = (registry: Registry, seed: number, step: number): string => {
+    const state = createGameState('den');
+    initResources(state, registry);
+    state.rng = seed;
+    armFightAction('fight', 'giant-rat', registry, state);
+    for (let at = step; at < SPAN; at += step) resolve(state, registry, at);
+    resolve(state, registry, SPAN);
+    const { log, ...rest } = state;
+    return JSON.stringify(rest);
+  };
+
+  it.each([1, 12345, 999])('walks the same fight to the same state at every step, on seed %i', (seed) => {
+    const registry = loadInEnglish(DEN);
+    const oneStep = settledOn(registry, seed, SPAN);
+
+    for (const step of [50, 137, 200, 1000, 7000]) {
+      expect(settledOn(registry, seed, step), `stepped every ${step}ms`).toBe(oneStep);
+    }
+  });
+
+  it('is a fight the stall actually decides, so the claim above is about the debuff', () => {
+    const registry = loadInEnglish(DEN);
+    const stalled = createGameState('den');
+    initResources(stalled, registry);
+    stalled.rng = 12345;
+    armFightAction('fight', 'giant-rat', registry, stalled);
+    resolve(stalled, registry, SPAN);
+
+    const unhindered = loadInEnglish(DEN.replace('on hit: inflict: cold-iron on them', ''));
+    const free = createGameState('den');
+    initResources(free, unhindered);
+    free.rng = 12345;
+    armFightAction('fight', 'giant-rat', unhindered, free);
+    resolve(free, unhindered, SPAN);
+
+    expect(free.resources['health']!, 'a player held still takes far more of the fight than one who is not').toBeGreaterThan(stalled.resources['health']!);
   });
 });
