@@ -247,7 +247,7 @@ function stateOf(session: PlaySession): GameState {
 // so the pools a state plays with are filled here rather than by each caller remembering to. A
 // state that reaches play with empty resources reads as a player at zero health, which is what a
 // # test drained by a plain action saw where the same script under the REPL did not.
-function sessionOver(registry: Registry, state: GameState): PlaySession {
+export function sessionOver(registry: Registry, state: GameState): PlaySession {
   initResources(state, registry);
   const internals: SessionInternals = { registry, state, logCursor: state.log.length };
   const session: PlaySession = { get registry() { return internals.registry; } };

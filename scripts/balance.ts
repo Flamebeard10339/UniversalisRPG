@@ -2,20 +2,21 @@ import path from 'node:path';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { DEBUG_MARK } from '../src/content/sections/define';
-import { printDirective } from '../src/content/sections/test';
+import { printDirective, printTerminator } from '../src/content/sections/test';
 import { shippedSources } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
+import { TIME, type Condition } from '../src/grammar/condition';
 import { roadDepths } from '../src/runtime/journey';
 import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
-import { applyDirective, choiceToDirective, readRoom, runTest, sessionStatus, startSession } from '../src/runtime/session';
+import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
-import { MS_PER_MINUTE } from '../src/runtime/units';
+import { MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
 
 export const DEFAULT_SEEDS = 4;
-export const DEFAULT_CYCLES = 20;
+export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
-  'Usage: npm run balance -- <save> [<action-spec>] [--at <location>] [--seeds <n>] [--cycles <n>] [--all]',
+  'Usage: npm run balance -- <save> [<action-spec>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
   '',
   '  <save>          a # save id to start every run from, as `load:` names one',
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
@@ -23,29 +24,33 @@ const usage = [
   '                  something. With none, everything on offer anywhere is measured',
   '  --at            narrows the sweep to one location',
   `  --seeds         how many rng seeds each offer is run under (default ${String(DEFAULT_SEEDS)})`,
-  `  --cycles        how many times each run asks the loop to come round (default ${String(DEFAULT_CYCLES)})`,
+  `  --window        how many minutes of game time every run is given (default ${String(DEFAULT_WINDOW_MINUTES)})`,
   '  --all           list every offer, including the ones that paid nothing at all',
   '',
   'Nothing here is computed: every figure is read off a run. The tool builds a # test per',
-  'offer — `load:` the save, `goto:` the place, then that offer `until <n> times` — walks it',
-  'against a state of its own, and reports what the state ended holding. So a buff, a proc,',
-  'an on-kill effect, a pack of two, or retaliation is priced in by having happened.',
+  'offer — `load:` the save, `goto:` the place, then that offer `until time >= <the far end of the',
+  'window>` — walks it against a state of its own, and reports what the state ended holding. So a',
+  'buff, a proc, an on-kill effect, a pack of two, or retaliation is priced in by having happened.',
+  '',
+  'Every run is given the same window of game time, and that window is the only denominator any',
+  'rate here has. A run whose offer stops before the window closes — a room emptied, a pack filled,',
+  'the player killed — spends what is left of it standing wherever the world put them, and is',
+  'divided by the whole window all the same. So dying at seven seconds costs the rest of the hour,',
+  'and an offer that pays for four minutes and nothing for the next fifty-six reads as the hour it',
+  'was rather than as the four minutes.',
   '',
   'The offers are the ones the engine itself puts in front of a player standing there, so a',
   'fishing cast and an encounter are one measurement and a mechanic added next month is swept',
   'with no edit here. A fight the world picks is measured with it: the run does not have to',
   'take the offer to be killed by what made it.',
   '',
-  'A run either came round the number of times it was asked for, or it stopped short — and',
-  'the engine\'s own sentence says why, death included. There is no death flag to read: dying',
-  'is authored in the corpus rather than known to the engine, so the tool quotes rather than',
-  'classifies.',
+  '`worked` is how much of the window the offer itself ran for, and where it is short of the window',
+  "the engine's own sentence says why, death included. There is no death flag to read: dying is",
+  'authored in the corpus rather than known to the engine, so the tool quotes rather than classifies.',
   '',
-  'Only a run that came round pays a rate. What a run that stopped short put in the player\'s',
-  'hands is real and is printed, but the time it took is an interruption rather than a duration,',
-  'and dividing by it prices dying as the best-paid hour in the world. And an offer something',
-  'aggressive took the fight from is reported as unmeasurable there, named by what took it: the',
-  'run measured that fight, whatever the line at the top of it says.',
+  'A fight something aggressive started is named where one happened. It is an annotation and not a',
+  'suppression: whoever swung, the window is the one the player lived through, and what they came out',
+  'of it holding is what standing there paid.',
   '',
   'This is a tool and not a gate. It runs on demand, it asserts nothing, and it always exits 0',
   'unless the arguments or the corpus are refused.',
@@ -56,7 +61,7 @@ export interface BalanceArgs {
   holds?: string;
   at?: string;
   seeds: number;
-  cycles: number;
+  window: number;
   all: boolean;
 }
 
@@ -68,7 +73,7 @@ const counted = (flag: string, raw: string | undefined): number => {
 
 export function parseBalanceArgs(raw: readonly string[]): BalanceArgs {
   const loose: string[] = [];
-  const args: BalanceArgs = { save: '', seeds: DEFAULT_SEEDS, cycles: DEFAULT_CYCLES, all: false };
+  const args: BalanceArgs = { save: '', seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') throw new Error(usage);
@@ -78,7 +83,7 @@ export function parseBalanceArgs(raw: readonly string[]): BalanceArgs {
       if (at === undefined) throw new Error('--at wants a location id after it');
       args.at = at;
     } else if (arg === '--seeds') args.seeds = counted('--seeds', raw[++i]);
-    else if (arg === '--cycles') args.cycles = counted('--cycles', raw[++i]);
+    else if (arg === '--window') args.window = counted('--window', raw[++i]);
     else if (arg.startsWith('--')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
     else loose.push(arg);
   }
@@ -126,6 +131,24 @@ export function subjectsFrom(registry: Registry, save: string, narrow: Pick<Bala
   return found.sort(byReach);
 }
 
+// Where the world's clock stands on the save every run of a sweep starts from. The window runs from
+// there, so the far end of it is one number for the whole sweep and every offer is walked between
+// the same two readings of the clock.
+export function clockOn(registry: Registry, save: string): number {
+  const session = startSession(registry);
+  applyDirective(session, { kind: 'load', save });
+  return secondsToMs(sessionStatus(session).time);
+}
+
+const decimalsOf = (value: number): number => String(value).split('.')[1]?.length ?? 0;
+
+// The window said the way a `# test` line says it. What stops the loop is the world's own clock
+// reaching the far end, so the terminator is the denominator rather than a count this tool picked.
+function windowTerminator(endMs: number): Condition {
+  const seconds = msToSeconds(endMs);
+  return { kind: 'comparison', left: { path: [TIME] }, operator: '>=', right: { value: seconds, places: decimalsOf(seconds) } };
+}
+
 export const PROBE_MODULE = 'balance-probe';
 
 export const standTest = (index: number): string => `${PROBE_MODULE}.stand-${index}`;
@@ -136,11 +159,12 @@ export const runTestId = (index: number): string => `${PROBE_MODULE}.run-${index
 // one the save was written with, and a seed set before it would be the save's seed and not the
 // one asked for. Both are marked DEBUG, which is what lets the sweep stand somewhere no player is
 // meant to find: measuring a place is not putting a player in it.
-export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, cycles: number): ModuleSource {
+export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number): ModuleSource {
   const lines = [`# info ${PROBE_MODULE}`, 'version: 1.0.0', 'dependencies:', ...dependencies.map((id) => `  ${id}`)];
+  const until = printTerminator(windowTerminator(endMs));
   subjects.forEach((subject, index) => {
     lines.push('', `# test stand-${index}`, DEBUG_MARK, `load: ${save}`, `goto: ${subject.at}`);
-    lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${cycles} times`);
+    lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${until}`);
   });
   return { name: PROBE_MODULE, text: `${lines.join('\n')}\n` };
 }
@@ -155,16 +179,17 @@ export interface Gain {
 
 export interface Run {
   seed: number;
-  // Whether the loop came round the number of times it was asked for. It did not, and `stoppedBy`
-  // is the engine's own sentence about why — which is where death, a full pack and an empty room
-  // are told apart, in the words a player would have read.
-  finished: boolean;
+  // The engine's own sentence about why the offer stopped before the window closed, or nothing where
+  // it was still going when the window closed. Death, a full pack and an empty room are told apart
+  // here, in the words a player would have read.
   stoppedBy?: string;
-  // What came at the player of its own accord while the run was under way, if anything did. Whatever
-  // the run went on to hold is that fight's, so an offer one of these reached is not measured at all.
+  // What came at the player of its own accord while the window was open, if anything did. The window
+  // is the one they lived through whoever swung in it, so this names the fight and hides nothing.
   engagedBy?: string;
   cycles: number;
-  milliseconds: number;
+  // How much of the window the offer itself ran for. What is left of the window was spent standing
+  // wherever the world put them, and counts against every figure here just the same.
+  worked: number;
   gains: Gain[];
 }
 
@@ -207,9 +232,9 @@ function since(was: Tallies, now: Tallies): Gain[] {
 
 const snapshot = (state: { xp: Counts; inventory: Counts }): Tallies => Object.fromEntries(Object.entries(tallies(state)).map(([kind, counts]) => [kind, { ...counts }]));
 
-function walk(registry: Registry, index: number, seed: number): Run {
+function walk(registry: Registry, index: number, seed: number, endMs: number): Run {
   const state = createGameState();
-  const blank: Run = { seed, finished: false, cycles: 0, milliseconds: 0, gains: [] };
+  const blank: Run = { seed, cycles: 0, worked: 0, gains: [] };
   try {
     const stood = runTest(standTest(index), registry, state);
     if (!stood.passed) return { ...blank, stoppedBy: `could not stand there: ${stood.failure ?? 'no reason given'}` };
@@ -218,13 +243,17 @@ function walk(registry: Registry, index: number, seed: number): Run {
     const wasCycles = state.cyclesDone;
     const was = snapshot(state);
     const result = runTest(runTestId(index), registry, state);
+    const worked = state.time - wasTime;
+    // The rest of the window, whatever ended the offer. A player who is killed lands wherever the
+    // corpus lands them and the hour goes on around them, so the world keeps running here and
+    // whatever it does to them in what is left is part of what standing there paid.
+    if (state.time < endMs) applyDirective(sessionOver(registry, state), { kind: 'wait', seconds: msToSeconds(endMs - state.time) });
     return {
       seed,
-      finished: result.passed,
       stoppedBy: result.failure,
       engagedBy: state.engagedBy ?? undefined,
       cycles: state.cyclesDone - wasCycles,
-      milliseconds: state.time - wasTime,
+      worked,
       gains: since(was, tallies(state)),
     };
   } catch (error) {
@@ -232,8 +261,8 @@ function walk(registry: Registry, index: number, seed: number): Run {
   }
 }
 
-export function measure(registry: Registry, subjects: readonly Subject[], seeds: readonly number[]): Measured[] {
-  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, seed)) }));
+export function measure(registry: Registry, subjects: readonly Subject[], seeds: readonly number[], endMs: number): Measured[] {
+  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, seed, endMs)) }));
 }
 
 // An offer that put nothing in anybody's hands under any seed. It is hidden by default because a
@@ -261,47 +290,42 @@ const address = ({ kind, id }: Gain): string => `${kind} ${id}`;
 
 const amountIn = (run: Run, of: string): number => run.gains.find((gain) => address(gain) === of)?.amount ?? 0;
 
-// Amounts off every seed, because a run that stopped short really did put that much in the player's
-// hands; a rate off the seeds that came round and off no others, because what stopped the rest is an
-// interruption and dividing by one prices dying above every honest hour in the world. The line says
-// which seeds answered wherever those are not the same seeds.
-function paidLines(runs: readonly Run[]): string[] {
+// Every seed answers, because every seed was given the same window and every seed spent all of it.
+// The window is the divisor whatever the run did with it, so there is nothing here to say about
+// which seeds counted.
+function paidLines(runs: readonly Run[], hours: number): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
-  const timed = runs.filter((run) => run.finished);
-  const whose = timed.length === runs.length ? '' : ` (from the ${String(timed.length)}/${String(runs.length)} seeds that finished)`;
   return paid
-    .map((of) => ({ of, amounts: runs.map((run) => amountIn(run, of)), rates: timed.map((run) => amountIn(run, of) / (run.milliseconds / MS_PER_HOUR)) }))
-    .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates) || Math.max(...other.amounts) - Math.max(...one.amounts))
-    .map(({ of, amounts, rates }) => `      ${of}: ${spread(amounts)}${rates.length === 0 ? ', no rate: no seed finished' : `, ${spread(rates)}/h${whose}`}`);
+    .map((of) => ({ of, rates: runs.map((run) => amountIn(run, of) / hours) }))
+    .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates))
+    .map(({ of, rates }) => `      ${of}: ${spread(rates)}/h`);
 }
 
-function measuredLines({ subject, runs }: Measured): string[] {
-  // Nothing under a line something took the fight from belongs to that line, so nothing under it is
-  // printed: the gains, the clock and the cycles are all the fight's, whatever the offer was called.
-  const took = runs.map((run) => run.engagedBy).find((by) => by !== undefined);
-  if (took !== undefined) return [`    ${subject.use}`, `      unmeasurable here: ${took} took the fight`];
-
-  const finished = runs.filter((run) => run.finished).length;
-  const seconds = runs.map((run) => run.milliseconds / 1000);
+function measuredLines({ subject, runs }: Measured, windowMs: number): string[] {
   const lines = [
     `    ${subject.use}`,
-    `      cycles ${spread(runs.map((run) => run.cycles))} · finished ${String(finished)}/${String(runs.length)} seeds · ${spread(seconds)}s of game time`,
+    `      cycles ${spread(runs.map((run) => run.cycles))} · worked ${spread(runs.map((run) => msToSeconds(run.worked)))}s of the ${round(msToSeconds(windowMs))}s window`,
   ];
+  const took = runs.map((run) => run.engagedBy).find((by) => by !== undefined);
+  if (took !== undefined) lines.push(`      ${took} took a fight inside the window`);
   // The shortest run's ending, because that is the one an author has to answer for. How many other
   // endings there were is said rather than listed: the same death told twice with a different tally
   // in it is one finding, and reading it as two is what sends someone looking for a second bug.
-  const short = runs.filter((run) => run.stoppedBy !== undefined).sort((one, other) => one.cycles - other.cycles);
+  const short = runs.filter((run) => run.stoppedBy !== undefined).sort((one, other) => one.worked - other.worked);
   const endings = new Set(short.map((run) => run.stoppedBy));
-  if (short.length > 0) lines.push(`      stopped short: ${short[0]!.stoppedBy!}${endings.size > 1 ? ` (and ${String(endings.size - 1)} other ending(s) across the seeds)` : ''}`);
-  return [...lines, ...paidLines(runs)];
+  if (short.length > 0) {
+    lines.push(
+      `      stopped short in ${String(short.length)}/${String(runs.length)} seeds: ${short[0]!.stoppedBy!}${endings.size > 1 ? ` (and ${String(endings.size - 1)} other ending(s) across the seeds)` : ''}`,
+    );
+  }
+  return [...lines, ...paidLines(runs, windowMs / MS_PER_HOUR)];
 }
 
-export function balanceLines(measured: readonly Measured[], args: Pick<BalanceArgs, 'save' | 'seeds' | 'cycles' | 'all'>): string[] {
+export function balanceLines(measured: readonly Measured[], args: Pick<BalanceArgs, 'save' | 'seeds' | 'window' | 'all'>): string[] {
+  const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
-  const head = [
-    `${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, asked for ${String(args.cycles)} times round`,
-  ];
+  const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time`];
   if (shown.length === 0) return [...head, 'nothing on offer paid anything under any seed. --all lists what was tried.'];
 
   const lines: string[] = head;
@@ -311,7 +335,7 @@ export function balanceLines(measured: readonly Measured[], args: Pick<BalanceAr
       place = each.subject.at;
       lines.push('', `  ${place}${each.subject.depth === undefined ? ' (no road reaches here)' : ` (${String(each.subject.depth)} roads out)`}`);
     }
-    lines.push(...measuredLines(each));
+    lines.push(...measuredLines(each, windowMs));
   }
   if (!args.all) lines.push('', `${String(measured.length - shown.length)} offer(s) paid nothing at all and are not listed; --all shows them.`);
   return lines;
@@ -337,11 +361,12 @@ export function balance(sources: readonly ModuleSource[], args: BalanceArgs): Ba
     return { lines: [`${args.save}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
   }
 
+  const endMs = clockOn(base.registry, args.save) + args.window * MS_PER_MINUTE;
   const dependencies = base.parsed.map((module) => module.info.id);
-  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, args.cycles)]);
+  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  return { lines: balanceLines(measure(loaded.registry, subjects, seedsFrom(args.seeds)), args), ok: true };
+  return { lines: balanceLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args), ok: true };
 }
 
 function main(): void {
