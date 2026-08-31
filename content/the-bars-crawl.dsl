@@ -187,7 +187,7 @@ stage poured:
 // not stall the route — that headroom is a balance question for a pass of
 // its own, not for this file.
 # save fresh-for-the-brew
-{"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":50000,"cooking.cooking":50000},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":30,"fishing.braided-fiber-line":1}}
+{"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":30,"fishing.braided-fiber-line":1}}
 
 # test the-bars-crawl-start-to-finish
 load: fresh-for-the-brew
