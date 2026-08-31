@@ -25,6 +25,7 @@
 
 # info the-rat-conspiracy
 version: 0.1.0
+pack: quests
 dependencies:
   core
   tulsa

@@ -18,6 +18,7 @@
 
 # info tiers
 version: 1.0.0
+pack: balance
 dependencies:
   core
   combat

@@ -18,6 +18,7 @@ import { NOTE_FIELDS, type RecordedRun, type RunNotes } from '../../runtime/runL
 import { emptyNotes, feedbackOn } from '../playtest';
 import type { PlaytestControls, ReplayControls, ReplaySnapshot } from '../driver';
 import { replayLines } from '../replay';
+import { modulesOff, packTurnsTo, refused, type PortalPack } from '../modPortal';
 
 export function layerNamed(value: unknown): number {
   const at = LAYERS.findIndex((layer) => layer.id === value);
@@ -58,6 +59,39 @@ function notesFrom(value: unknown): RunNotes {
     notes[field.name] = said;
   }
   return notes as RunNotes;
+}
+
+// The mod portal, said the way the page says it: the packs, what each is standing at, and the two
+// things a click can be. Turning a pack is turning its modules, so the surface offers no third verb.
+export function modsSurface(held: AgentSurfaces['mods']): TestSurface {
+  const { packs, controls } = held;
+  const named = (pack: string): PortalPack | undefined => packs.find((each) => each.pack === pack);
+  return {
+    state: () => ({
+      packs: packs.map((pack) => ({
+        pack: pack.pack,
+        standing: pack.standing,
+        modules: pack.modules.map((module) => ({ name: module.name, id: module.id, on: module.on, loaded: module.loaded })),
+      })),
+      off: modulesOff(packs),
+      refused: refused(packs).map((module) => module.id),
+    }),
+    actions: {
+      pack: (value) => {
+        const pack = named(String(value));
+        if (pack === undefined) throw new Error(`no pack called ${String(value)}`);
+        controls.turn(
+          pack.modules.map((module) => module.name),
+          packTurnsTo(pack),
+        );
+      },
+      module: (value) => {
+        const { module, on } = (value ?? {}) as { module?: unknown; on?: unknown };
+        if (typeof module !== 'string' || typeof on !== 'boolean') throw new Error('a module is a { module, on } of a name and whether it is wanted');
+        controls.turn([module], on);
+      },
+    },
+  };
 }
 
 export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
@@ -451,6 +485,7 @@ export interface AgentSurfaces {
   playtest: { run: RecordedRun | null; controls: PlaytestControls };
   replay: { replay: ReplaySnapshot | null; controls: ReplayControls };
   edit: EditHeld;
+  mods: { packs: readonly PortalPack[]; controls: { turn(names: readonly string[], on: boolean): void } };
 }
 
 export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurfaces[K]) => TestSurface } = {
@@ -466,4 +501,5 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   playtest: (held) => playtestSurface(held),
   replay: (held) => replaySurface(held),
   edit: (held) => editSurface(held),
+  mods: (held) => modsSurface(held),
 };

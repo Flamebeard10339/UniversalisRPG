@@ -35,6 +35,7 @@
 
 # info the-swampy-menace
 version: 0.1.0
+pack: quests
 dependencies:
   core
   tulsa

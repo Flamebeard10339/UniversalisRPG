@@ -33,6 +33,7 @@
 
 # info a-grand-blade
 version: 0.1.0
+pack: quests
 dependencies:
   core
   tulsa

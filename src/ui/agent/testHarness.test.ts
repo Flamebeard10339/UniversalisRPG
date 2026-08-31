@@ -11,6 +11,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
   return {
     problems: [],
     remedies: [],
+    mods: [],
     dev: false,
     speed: 1,
     live: null,
@@ -58,6 +59,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     snapshot: () => current,
     transient,
     send: (line) => void calls.push(`send:${line}`),
+    turnModulesOff: (names) => void calls.push(`turnModulesOff:${names.join(',')}`),
     replay: {
       watching: (test) => void calls.push(`replay:watching:${String(test)}`),
       at: (step) => void calls.push(`replay:at:${step}`),

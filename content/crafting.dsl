@@ -12,6 +12,7 @@
 
 # info crafting
 version: 1.0.0
+pack: skills
 dependencies:
   core
   combat

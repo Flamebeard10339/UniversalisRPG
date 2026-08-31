@@ -22,6 +22,7 @@
 
 # info birds-and-the-bees
 version: 0.1.0
+pack: quests
 dependencies:
   core
   tulsa

@@ -1,5 +1,6 @@
 # info first-steps
 version: 1.0.0
+pack: quests
 dependencies:
   core
   tulsa

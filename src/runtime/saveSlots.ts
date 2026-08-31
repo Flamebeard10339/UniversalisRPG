@@ -8,6 +8,8 @@ export const DEV_SNAPSHOT_SLOT = 'dev-snapshot';
 
 export const AUTOSAVE_SLOT = 'autosave';
 
+export const MODULES_OFF_SLOT = 'modules-off';
+
 // A cadence is the least time to leave between autosaves, in seconds. Zero is not *never*: it is no
 // minimum at all, which is what writing after every action is. Never is a word of its own, because
 // a quantity of nothing and the absence of one are different answers.
@@ -70,6 +72,25 @@ export function cadenceOrUnreadable(save: SaveContext): Cadence | null {
   if (state.slot.payload === NEVER) return NEVER;
   const seconds = Number(state.slot.payload);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
+
+// The modules the player has turned off, by the name each source is loaded under. A slot nobody has
+// written turns nothing off, and one holding bytes this cannot read is read the same way: a world
+// that will not open is a worse answer to an unreadable preference than a world with everything in
+// it, and the portal is on the settings page either way so the choice can be made again.
+export function modulesTurnedOff(save: SaveContext): ReadonlySet<string> {
+  const state = stateOf(save.store, MODULES_OFF_SLOT);
+  if (state.kind !== 'held') return new Set();
+  return new Set(
+    state.slot.payload
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line !== ''),
+  );
+}
+
+export function turnModulesOff(save: SaveContext, names: Iterable<string>): void {
+  save.store.write(MODULES_OFF_SLOT, [...new Set(names)].sort().join('\n'));
 }
 
 export function setAutosaveCadence(save: SaveContext, cadence: Cadence): void {

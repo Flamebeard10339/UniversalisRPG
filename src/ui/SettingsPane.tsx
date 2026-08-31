@@ -4,6 +4,7 @@ import { devLine, RATES, speedLine } from './devMode';
 import type { Localizer } from '../runtime/localized';
 import type { FiledRun } from '../runtime/runFiling';
 import type { SettingRow } from '../runtime/session';
+import { packTurnsTo, type PortalPack } from './modPortal';
 import { settingLine, standsAt } from './settingLines';
 import type { Words } from './words';
 
@@ -55,6 +56,60 @@ function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: 
         >
           {`${rate}\u00d7`}
         </button>
+      ))}
+    </div>
+  );
+}
+
+// The packs the world was opened with, and what turning one on or off leaves behind. A pack row is
+// a control over the modules under it rather than a second thing to agree with them, so a pack that
+// is half on says so and the next click takes it the rest of the way on.
+function Mods({ packs, words, localizer, onTurn }: { packs: readonly PortalPack[]; words: Words; localizer: Localizer; onTurn: (names: readonly string[], on: boolean) => void }): JSX.Element {
+  return (
+    <div className="flex flex-col gap-1 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
+      <span className="text-xs uppercase tracking-wide text-text-subtle">{words('mods')}</span>
+      <span className="text-xs text-text-subtle">{words('mods-hint')}</span>
+      {packs.map((pack) => (
+        <div key={pack.pack} className="flex flex-col gap-1 pt-1">
+          <label className="flex items-center justify-between gap-3">
+            <span className={pack.standing === 'none' ? 'text-text-subtle' : undefined}>{localizer.identifier(pack.pack)}</span>
+            <input
+              data-drive="mods.pack"
+              data-pack={pack.pack}
+              data-standing={pack.standing}
+              type="checkbox"
+              checked={pack.standing !== 'none'}
+              ref={(box) => {
+                if (box) box.indeterminate = pack.standing === 'some';
+              }}
+              onChange={() =>
+                onTurn(
+                  pack.modules.map((module) => module.name),
+                  packTurnsTo(pack),
+                )
+              }
+              className="accent-accent"
+            />
+          </label>
+          {pack.modules.map((module) => (
+            <label key={module.name} className="flex items-center justify-between gap-3 pl-3 text-xs text-text-subtle">
+              <span className="min-w-0 truncate">
+                {localizer.identifier(module.id)}
+                {module.on && !module.loaded ? ` — ${String(words('mods-refused'))}` : ''}
+              </span>
+              <input
+                data-drive="mods.module"
+                data-module={module.name}
+                data-on={module.on ? 'yes' : undefined}
+                data-loaded={module.loaded ? 'yes' : undefined}
+                type="checkbox"
+                checked={module.on}
+                onChange={() => onTurn([module.name], !module.on)}
+                className="accent-accent"
+              />
+            </label>
+          ))}
+        </div>
       ))}
     </div>
   );
@@ -148,6 +203,8 @@ export function SettingsPane({
   onReplayRun,
   onRenameRun,
   onDropRun,
+  mods,
+  onTurnMods,
 }: {
   dev: boolean;
   speed: number;
@@ -163,6 +220,8 @@ export function SettingsPane({
   onReplayRun: (run: string) => void;
   onRenameRun: (run: string, to: string) => void;
   onDropRun: (run: string) => void;
+  mods: readonly PortalPack[];
+  onTurnMods: (names: readonly string[], on: boolean) => void;
 }): JSX.Element {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
@@ -196,6 +255,8 @@ export function SettingsPane({
           className="accent-accent"
         />
       </label>
+
+      <Mods packs={mods} words={words} localizer={localizer} onTurn={onTurnMods} />
 
       <Runs runs={runs} words={words} localizer={localizer} onReplay={onReplayRun} onRename={onRenameRun} onDrop={onDropRun} />
 

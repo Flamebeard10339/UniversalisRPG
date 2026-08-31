@@ -78,6 +78,8 @@ const DISPATCHES = [
   'standingLine',
   'view',
   'createSaveContext',
+  'modulesTurnedOff',
+  'turnModulesOff',
   'memoryDriver',
   'RuntimeError',
   'devTokenIn',

@@ -87,6 +87,11 @@ const authored = (driver: Driver): string[] => addressable(sourcesOf(driver)).ma
 
 const addressesOf = (driver: Driver): ReadonlySet<string> => new Set(addressable(sourcesOf(driver)).map((section) => section.address));
 
+// The names the mod portal draws, which the load path published and the driver carries. Read off the
+// snapshot rather than listed, so a pack minted in the corpus next month is accounted for by having
+// been declared — the same way a section address is.
+const packed = (driver: Driver): string[] => driver.snapshot().mods.flatMap((pack) => [pack.pack, ...pack.modules.map((module) => module.id)]);
+
 const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
 
 function whatStoppingSays(): string[] {
@@ -270,7 +275,7 @@ describe('what the shell puts on the screen', () => {
       const runs = readable(html);
       seen += runs.length;
       for (const run of runs) {
-        expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+        expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver), ...packed(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
       }
     };
 
@@ -302,7 +307,7 @@ describe('what the shell puts on the screen', () => {
 
     const engine = new Set<string>(published(view, addressesOf(driver)));
     for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
-      expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
+      expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver), ...packed(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }
   });
 

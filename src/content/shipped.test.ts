@@ -30,9 +30,14 @@ describe('what content/ holds and what ships', () => {
     for (const id of inCorpus().filter((id) => !shipped.has(id))) expect(packOf(id)).toBe('local');
   });
 
-  it('are told apart by a pack: the local-changes file writes about itself and no shipped module writes', () => {
-    expect(parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule([]) }).info.pack).toBe('local');
-    expect(ids().map(packOf)).toEqual(ids().map(() => undefined));
+  // A shipped module declares the pack it is turned on and off as, so the pack is no longer the
+  // empty field it once was. What still tells the local-changes file apart is which pack it writes:
+  // the one it names for itself, which is read off the file it renders rather than spelled again.
+  it('are told apart by a pack: the local-changes file writes its own, and no shipped module writes that one', () => {
+    const local = parseModuleSource({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule([]) }).info.pack;
+    expect(local).toBeDefined();
+    expect(ids().filter((id) => packOf(id) === local)).toEqual([]);
+    expect(ids().filter((id) => packOf(id) === undefined)).toEqual([]);
   });
 });
 

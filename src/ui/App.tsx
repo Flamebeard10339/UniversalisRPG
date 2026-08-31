@@ -19,6 +19,7 @@ import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } from './levelling';
+import { modulesOff, turned } from './modPortal';
 import { markOf, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { Notices } from './Notices';
@@ -225,6 +226,11 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   };
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
+  // Turning a row is turning the set the rows were drawn from, read back off those rows so the page
+  // and the harness are asking the same question of the same answer.
+  const turnMods = (names: readonly string[], on: boolean): void => driver.turnModulesOff(turned(modulesOff(snapshot.mods), names, on));
+
+  useTestSurface('mods', { packs: snapshot.mods, controls: { turn: turnMods } });
   useTestSurface('playtest', { run: snapshot.playtest, controls: driver.playtest });
   useTestSurface('replay', { replay: snapshot.replay, controls: driver.replay });
   const wide = useWide();
@@ -250,6 +256,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           onReplayRun={driver.replay.watching}
           onRenameRun={driver.playtest.rename}
           onDropRun={driver.playtest.drop}
+          mods={snapshot.mods}
+          onTurnMods={turnMods}
         />
       ) : null;
     }

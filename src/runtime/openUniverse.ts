@@ -1,5 +1,5 @@
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
-import { formatModuleDiagnostic, startingLocationId, type Registry } from '../content/registry';
+import { formatModuleDiagnostic, startingLocationId, type ModuleStatus, type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
@@ -61,6 +61,9 @@ export type Resumption =
 export interface OpenedUniverse {
   session: PlaySession;
   modules: readonly Answer[];
+  // Every module the load path was handed, whether it loaded or not, and why. What the mod portal
+  // draws its rows off, so a module added or a pack renamed reaches the page with nothing edited.
+  statuses: readonly ModuleStatus[];
   problems: readonly UniverseProblem[];
   unmet: readonly RequirementId[];
   resumed: Resumption;
@@ -92,6 +95,7 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
     return {
       session: startSession(loadUniverseWithDiagnostics([FALLBACK_SOURCE]).registry),
       modules: loaded.loadedModules,
+      statuses: loaded.modules,
       problems: [...disabled, ...unmet.map((requirement): UniverseProblem => ({ modules: [], words: 'tool', message: requirement.unmet }))],
       unmet: unmet.map((requirement) => requirement.id),
       resumed: { kind: 'new' },
@@ -101,7 +105,7 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
   const session = startSession(loaded.registry);
   const resumed: Resumption = options.save ? resume(session, options.save) : { kind: 'new' };
   if (options.save) options.save.synced = resumed.kind === 'kept' ? null : liveSlot(options.save);
-  return { session, modules: loaded.loadedModules, problems: disabled, unmet: [], resumed };
+  return { session, modules: loaded.loadedModules, statuses: loaded.modules, problems: disabled, unmet: [], resumed };
 }
 
 export function openWithLocalCleared(sources: readonly ModuleSource[], dependencies: readonly Answer[]): OpenedUniverse | null {

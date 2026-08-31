@@ -2,7 +2,7 @@ import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
 import type { Addressed } from '../content/completion';
 import { declaredBy } from '../content/references';
-import type { ModuleSource } from '../content/universe';
+import { withModulesOff, type ModuleSource } from '../content/universe';
 import { shadowed } from './authoringSurface';
 import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, liveAgain, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type CommandResult, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
@@ -13,10 +13,11 @@ import type { Answer } from '../runtime/localized';
 import type { Directive } from '../content/sections/test';
 import { advances, clamped, REPLAY_SPEED } from './replay';
 import { type RecordedRun, type RunHeader, type RunNotes } from '../runtime/runLog';
-import { createSaveContext, type SaveContext } from '../runtime/saveSlots';
+import { createSaveContext, modulesTurnedOff, turnModulesOff, type SaveContext } from '../runtime/saveSlots';
 import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
+import { packsOf, type PortalPack } from './modPortal';
 import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
 import { createRecorder } from './playtest';
 import { createTransientChannel, type TransientChannel } from './transient';
@@ -72,6 +73,9 @@ export interface DriverSnapshot {
   playtest: RecordedRun | null;
   // The run being watched, or null when none is.
   replay: ReplaySnapshot | null;
+  // Every module the world was opened with, under the pack each declares. What the settings page
+  // draws the mod portal off, so a module or a pack added to the corpus reaches it with no edit.
+  mods: readonly PortalPack[];
 }
 
 export interface PlaytestControls {
@@ -115,6 +119,9 @@ export interface Driver {
   editorMemory: { read(): string | null; write(text: string): void };
   note(text: string): void;
   reopen(): void;
+  // Turn a set of modules off and open the world again. The names are source names, which is what a
+  // row on the page carries; a name matching nothing loaded turns nothing off.
+  turnModulesOff(names: readonly string[]): void;
   clearLocalChanges(): void;
   playtest: PlaytestControls;
   replay: ReplayControls;
@@ -188,7 +195,10 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   const openOnce = (before: Transcript): void => {
     const local = readLocal();
     const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local.text };
-    const sources = local.text.trim() === '' ? shipped : [...shipped, localSource];
+    const held = local.text.trim() === '' ? shipped : [...shipped, localSource];
+    // The player's own set is laid on every open, so reopening after a toggle is the whole of what a
+    // toggle does and nothing carries the choice around separately.
+    const sources = withModulesOff(held, modulesTurnedOff(save));
     const opened = openUniverse(sources, { save });
 
     authoring = {
@@ -208,6 +218,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       live: null,
       problems: opened.problems,
       remedies: remediesFor(opened.problems, () => openWithLocalCleared(sources, authoring.dependencies)?.problems ?? null),
+      mods: packsOf(opened.statuses),
     });
   };
 
@@ -464,6 +475,15 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       rename: (run, to) => filing(renameRun(context, run, to)),
     },
     reopen,
+    turnModulesOff: (names) => {
+      try {
+        turnModulesOff(save, names);
+      } catch (error) {
+        complain(`which modules are turned off could not be kept: ${because(error)}`);
+        return;
+      }
+      reopen();
+    },
     clearLocalChanges: () => {
       send(`/local clear`);
       reopen();

@@ -22,6 +22,7 @@
 
 # info tulsa
 version: 1.0.0
+pack: tulsa
 dependencies:
   core
   combat

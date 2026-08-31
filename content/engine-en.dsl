@@ -8,6 +8,7 @@
 
 # info engine-en
 version: 1.0.0
+pack: engine
 language: en
 
 # locale en
@@ -219,6 +220,9 @@ engine.shell.pin-hint: tap a place, then the one it hangs off
 engine.shell.dev: Dev mode
 engine.shell.speed: Speed
 engine.shell.clear: Clear local changes
+engine.shell.mods: Mods
+engine.shell.mods-hint: turn a pack off to play the world without it
+engine.shell.mods-refused: on, but the world would not open with it
 engine.shell.reopen: Open again
 engine.playtest: Record a playtest
 engine.playtest.turn: Turn {turn}

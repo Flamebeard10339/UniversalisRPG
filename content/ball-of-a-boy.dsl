@@ -9,6 +9,7 @@
 
 # info ball-of-a-boy
 version: 0.1.0
+pack: quests
 dependencies:
   core
   tulsa
