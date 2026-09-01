@@ -206,8 +206,7 @@ is that an action is *not offered*: `refuse:` takes `slot`, `allocate`, `unalloc
 and `apply`, and no `use:`.
 
 So the mechanism the whole hive beat rests on is unproved, and a later edit that drops
-the `hidden if:` reddens nothing. The comment on the tulsa route says so, which is a
-mark rather than a proof.
+the `hidden if:` reddens nothing. This line is the only place that says so.
 
 *Closes when:* `refuse: use <action>` is a thing a route may write, or a `describe` in
 this folder's `open-tests.test.ts` pins it off the offering the engine puts up — the
@@ -250,21 +249,15 @@ than a standing test, and a `# variable` holds a number. So the duplication is t
 rather than the author's, and it will recur the moment a fourth speaker joins them.
 
 *Closes when:* a condition can be declared once under a name and named wherever one is taken,
-with `npm run oracle` saying so off the declaration; then those three lines are one, and the
-comment above them that explains why they are three is deleted.
+with `npm run oracle` saying so off the declaration; then those three lines are one.
 
-## A comment explaining a workaround goes stale the day the workaround is unnecessary
+## A workaround has no mark at its site
 
-A workaround needs a mark at the site or the next reader re-introduces the shape it was
-avoiding — `the-swampy-menace.dsl`'s three identical `when:` lines carry a comment saying why
-they are three, and deleting it invites someone to "fix" the duplication. But the comment
-describes an open defect, and nothing brings the two back together: the defect closes, and the
-comment sits there saying something that stopped being true.
-
-**This session produced two more of them**, which is why the line is still here: the tulsa
-hive route carries a comment about a refusal no route can write, and `content/fishing.dsl`'s
-`parted-tackle` comment had to be rewritten because the argument it made stopped being true
-the day a test took the list's subjects over.
+Comments are banned and `npm run comment-check` is the gate, so a workaround can no longer
+carry a note saying why it is written the way it is — the three identical `when:` lines in
+`the-swampy-menace.dsl` are the standing example, and the next reader is invited to "fix" the
+duplication. The reason has a home: the line above this one. What is missing is a mark at the
+site pointing at it.
 
 What cannot go stale is a mark that says almost nothing. `@@@` already does this for the
 corpus and `npm run notes` reads them out; the same mark carrying only the id of an open line
@@ -272,13 +265,7 @@ would say *there is a reason, and it is written down over there* — one home fo
 and a mark whose only failure mode is being orphaned, which is detectable. `npm run handoff`
 already reports a proof no line stands on, which is the same check with a different subject.
 
-The expensive half is not the scanner — it is reading every workaround comment under `src/`,
-`scripts/` and `content/` and deciding which is a pointer, which is a fact the file owns, and
-which should just go.
-
-*Closes when:* `npm run handoff` reports a `@@@ <id>` under `src/`, `scripts/` or `content/`
-that no open line names, and every workaround comment in the tree is either such a mark or has
-been deleted.
+*Closes when:* `npm run handoff` reports a `@@@ <id>` in the corpus that no open line names.
 
 ## An action a grown copy owns cannot survive being saved
 

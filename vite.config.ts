@@ -25,6 +25,8 @@ const exclude = [
   '**/.claude/worktrees/**',
 ];
 
+const DOM_TESTS = 'src/**/*.dom.test.tsx';
+
 export default defineConfig({
   // Relative, so the same bundle works under itch.io's subdirectory hosting and
   // inside the Capacitor WebView. An absolute /assets/... 404s under both.
@@ -57,7 +59,14 @@ export default defineConfig({
     projects: [
       {
         extends: true,
-        test: { name: 'app', include: ['src/**/*.test.{ts,tsx}'], exclude },
+        test: { name: 'app', include: ['src/**/*.test.{ts,tsx}'], exclude: [...exclude, DOM_TESTS] },
+      },
+      // A test that mounts into a document says so in its own name, and is given
+      // one. The name decides, so no file has to carry a directive about how it
+      // is run and no list of DOM tests can fall out of step with the tests.
+      {
+        extends: true,
+        test: { name: 'dom', include: [DOM_TESTS], environment: 'jsdom', exclude },
       },
       {
         extends: true,

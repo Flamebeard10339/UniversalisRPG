@@ -20,15 +20,17 @@ const SPANISH = { name: 'island-es', text: ['# info island-es', 'version: 1.0.0'
 const english = () => localizerFor(loadInEnglish(ISLAND), 'en');
 const spanish = () => localizerFor(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, SPANISH]), 'es');
 
-function unkeyedEngineTextDoesNotCompile(): void {
-  const localizer = english();
-  // @ts-expect-error c2: an engine string with no key
-  localizer.engine('You have died.');
-  // @ts-expect-error c2: a key one letter out
-  localizer.engine('engine.travel.too');
-}
+type EngineArgument = Parameters<ReturnType<typeof english>['engine']>[0];
+type RefusedByEngine<Candidate extends string> = Candidate extends EngineArgument ? false : true;
+
+const refusesAnEngineStringWithNoKey: RefusedByEngine<'You have died.'> = true;
+const refusesAKeyOneLetterOut: RefusedByEngine<'engine.travel.too'> = true;
 
 describe('the engine speaks in keys (c2)', () => {
+  it('takes a key, and no engine string that is not one', () => {
+    expect([refusesAnEngineStringWithNoKey, refusesAKeyOneLetterOut]).toEqual([true, true]);
+  });
+
   it('ships an English pattern for every key the union holds, and no other key', () => {
     const shipped = loadInEnglish('').locales.declared.get('en');
 
@@ -96,8 +98,6 @@ island.item.apple.examine: Verde, y sonrojada por un lado.`,
     expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBeUndefined();
   });
 });
-
-void unkeyedEngineTextDoesNotCompile;
 
 describe('an id survives translation, and prose does not', () => {
   const ISLAND_WITH_GHOSTS = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n');

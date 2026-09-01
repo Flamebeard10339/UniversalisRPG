@@ -8,7 +8,7 @@ import * as shipped from '../src/content/shipped';
 const swept = sweptFiles(trackedFiles());
 // A comment saying the words `content/` is prose about the rule, not a reach through it — every
 // file that explains why it stays out of the corpus would otherwise read as a door into it.
-const codeOf = (file: string): string => stripComments(readFileSync(file, 'utf8')).join('\n');
+const codeOf = (file: string): string => stripComments(readFileSync(file, 'utf8'), file).join('\n');
 
 // Every file the `app` and `tools` projects run — this file among them. Their includes are `src/**`
 // and `scripts/**`, which is what `SOURCE_TREES` already names, so the subjects are derived rather

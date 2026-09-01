@@ -66,8 +66,8 @@ The arithmetic is unusually clean: ~4x target at 7% uptime, so **~25% uptime lan
 health on the curve** and nothing about any enemy, drop, rate or piece of gear has to
 change.
 
-*Moves when: he says what a faint costs. The comment there notes content can name only
-a location and not "where you fell", so the shapes are: no relocate at all for a plain
+*Moves when: he says what a faint costs. Content can name only a location and not
+"where you fell", so the shapes are: no relocate at all for a plain
 faint (dying costs the health bar and the interruption, nothing more); a respawn point
 per region; or leaving it and accepting health as a slow skill with its own curve.*
 

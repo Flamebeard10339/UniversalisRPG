@@ -60,7 +60,7 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
 describe('one function cases a name for a player (c1, c2)', () => {
   const CASES_A_LETTER = /\.to(?:Locale)?UpperCase\s*\(/;
   const HOME = 'src/grammar/values.ts';
-  const stripped = (file: string): string => stripComments(readFileSync(file, 'utf8')).join('\n');
+  const stripped = (file: string): string => stripComments(readFileSync(file, 'utf8'), file).join('\n');
 
   it('is declared where the sweep exempts, and cases a letter there, so nothing below is vacuous', () => {
     expect(modules).toContain(HOME);

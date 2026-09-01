@@ -23,7 +23,7 @@ describe('the keywords the engine acts on', () => {
   });
 
   it('are read in one place, so no module can branch on a word the page never printed', () => {
-    const reading = modules().filter((file) => file !== OWNER && NAMES_A_KEYWORD_CLAUSE.test(stripComments(readFileSync(file, 'utf8')).join('\n')));
+    const reading = modules().filter((file) => file !== OWNER && NAMES_A_KEYWORD_CLAUSE.test(stripComments(readFileSync(file, 'utf8'), file).join('\n')));
     expect(reading).toEqual([]);
   });
 
