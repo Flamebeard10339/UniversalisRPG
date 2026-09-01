@@ -329,6 +329,44 @@ value: 24
 weapon, +2 attack
 item-level: 3-8
 
+// --- comfortable clothes ---
+//
+// Four slots of nothing at all, and that is the whole design. Every other thing a player can put on
+// carries a stat, which means every slot on a skiller's sheet is either armour they have no use for
+// or empty — and an empty slot is a plane they never get to spend. These grant no bonus to anything,
+// so what they are worth is exactly the points they drop with and the jewel that goes in them.
+//
+// They live here rather than in a skill because they belong to none of them: carrying no stat is
+// what lets core declare them, and a fifth skill written next month is dressed by having been.
+
+# item unassuming-cap
+title: Unassuming Cap
+examine: Soft, shapeless, and the colour of whatever it was before. Nobody has ever looked twice at it.
+slot: head
+value: 14
+item-level: 2-5
+
+# item linen-shirt
+title: Linen Shirt
+examine: Plain, worn thin at the elbows, and cool to work in.
+slot: body
+value: 18
+item-level: 3-6
+
+# item linen-pants
+title: Linen Pants
+examine: Loose at the knee, tied at the waist, and mended twice on one side.
+slot: legs
+value: 16
+item-level: 2-5
+
+# item simple-boots
+title: Simple Boots
+examine: Low, unlined, and broken in by somebody with the same size feet as you.
+slot: boots
+value: 20
+item-level: 2-4
+
 # item wooden-shield
 examine: A sturdy shield of banded oak.
 slot: offhand

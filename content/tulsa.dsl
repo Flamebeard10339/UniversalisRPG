@@ -815,6 +815,10 @@ coin: coin
 stocks:
   6 core.pot-of-flour
   10 core.jug-of-water
+  4 core.unassuming-cap
+  4 core.linen-shirt
+  4 core.linen-pants
+  4 core.simple-boots
 
 # entity general-store
 title: General Store
@@ -1199,6 +1203,16 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 // so a minute at any of them comes to about the same and what changes is whether you can stand there
 // at all.
 
+// One piece of somebody's washing, and never the same piece twice running. The store sells the
+// whole set to anybody with the coin; this is the other way, and it is the way a thief who has not
+// got the coin yet gets dressed.
+# droptable townsmans-wardrobe
+one of:
+  1x: give: 1 core.unassuming-cap
+  1x: give: 1 core.linen-shirt
+  1x: give: 1 core.linen-pants
+  1x: give: 1 core.simple-boots
+
 # entity civilian
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
@@ -1215,6 +1229,11 @@ pick-their-pocket:
   1 in 400:
     give: 1 thieving.a-light-touch-jewel
     say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
+  // What a townsman is carrying that a skiller wants is what a townsman is wearing, so the clothes
+  // come off the same pocket the coin does.
+  1 in 14:
+    roll: townsmans-wardrobe
+    say: They are carrying it rather than wearing it, which is somebody's washing and now it is yours.
   +on unfinished:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
     drain: 1 health
