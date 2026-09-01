@@ -419,12 +419,13 @@ one of:
 
 // --- what a light hand takes off a room rather than off a person ---
 //
-// Six one-offs the town already writes: the prop, the words and the flag that hides it once it is
-// gone are Tulsa's, and what the doing of it is worth in a skill is this file's. A line written into
-// an action already standing replaces the field it names and leaves every other field alone, so the
-// experience goes into whichever of the two the town left empty — the top of the body where the town
-// wrote its `set:` and `give:` under `on success:`, and `+on success:` where the town wrote them at
-// the top. Either way nothing below holds a second copy of a line the town owns.
+// One-offs the town already writes: the prop, the words and the flag that hides it once it is gone
+// are Tulsa's, and what the doing of it is worth in a skill is this file's. A line written into an
+// action already standing replaces the field it names and leaves every other field alone, so the
+// experience goes wherever the town left room for it — at the top of the body where the town wrote
+// its own results under `on success:`, and under `+on success:` where it wrote them at the top.
+// Which of the two is read off the action rather than agreed with it, and either way nothing here
+// holds a second copy of a line the town owns.
 
 # location tulsa.market-row
 lift an axe off the rack:
@@ -432,10 +433,8 @@ lift an axe off the rack:
     xp: thieving 12
 
 // Paid once, because there is one thing up here to notice and noticing it twice is not a second
-// thing. The whole action is thieving's rather than the town's: a roof with nothing to see from it
-// is a roof, and the looking is the skill. `attention-to-detail` writes its own gated watch over
-// this one — a same-named action does not deep-merge, so that quest's version stands whole in place
-// of this and the flag below goes unset in any world holding it.
+// thing. The whole action is written here rather than layered onto one of the town's: a roof with
+// nothing to see from it is a roof, and the looking is the skill.
 # flag castle-watched
 
 # location tulsa.market-rooftops
