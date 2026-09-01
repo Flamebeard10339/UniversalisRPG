@@ -1,7 +1,9 @@
-import { isDebug } from './sections';
-import { isBase } from './sections/item';
-import type { Registry } from './registry';
-import type { Directive } from './sections/test';
+import { isDebug } from '../content/sections';
+import { isBase } from '../content/sections/item';
+import type { Registry } from '../content/registry';
+import type { ModuleSource } from '../content/universe';
+import type { Directive } from '../content/sections/test';
+import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
 
 // What is wrong with a world that the loader will still take. A refusal stops the game; these do
 // not, because every one of them is a thing an author is halfway through — a quarter with no road
@@ -102,6 +104,30 @@ function unspoken(registry: Registry): Remark[] {
     });
 }
 
-const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken];
+// Prose a world writes that nothing in the game ever says. A field is asked about rather than one
+// value of it, because whether the engine has a surface for `# entity examine:` at all is what one
+// value settles — a line behind a flag nobody has set is not something this can see. What it does
+// catch is words written into a kind the game has no screen for, which is writing thrown away.
+function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] {
+  const written = proseWritten(registry);
+  const excused = new Map(NOT_SAID.map((each) => [each.field, each.why]));
+  const held = new Set(written.map((prose) => `${prose.kind}.${prose.field}`));
+  return [
+    ...unsaidFields(written, publishedSurfaces(sources, registry)).flatMap((field) =>
+      excused.has(field) ? [] : [{ where: `# ${field.split('.')[0]}`, says: `writes ${field.split('.').slice(1).join('.')}: and nothing in the game ever says it, so those words reach nobody.` }],
+    ),
+    // An excuse for a field this world does not write is an excuse for nothing, and goes stale where
+    // it stands. It is reported the same way, so the list cannot rot quietly.
+    ...[...excused.keys()].filter((field) => !held.has(field)).map((field) => ({ where: `NOT_SAID in src/runtime/proseSaid.ts`, says: `excuses ${field}, which nothing in this world writes. Take the entry out.` })),
+  ];
+}
 
-export const remarksOn = (registry: Registry): readonly Remark[] => RULES.flatMap((rule) => rule(registry));
+// A rule that only wants the registry, and one that has to run the world to answer. Both are asked
+// of every world the oracle is pointed at, and each derives its own subjects.
+const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken];
+const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread];
+
+export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => [
+  ...RULES.flatMap((rule) => rule(registry)),
+  ...WALKING_RULES.flatMap((rule) => rule(sources, registry)),
+];

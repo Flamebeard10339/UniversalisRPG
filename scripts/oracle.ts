@@ -2,7 +2,7 @@ import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { probe, readSources } from './probe';
 import { withEngineLocale } from '../src/content/engineLocale';
-import { remarksOn } from '../src/content/worldRemarks';
+import { remarksOn } from '../src/runtime/worldRemarks';
 import { align, type Hole } from '../src/grammar/form';
 import { amissIn, fillingWords, offeringAt, type Addressed, type Amiss } from '../src/content/completion';
 import { grammarLines, standingLines } from '../src/content/grammarTree';
@@ -311,7 +311,7 @@ export function corpusLines(sources: readonly ModuleSource[]): { lines: string[]
   // What the loader takes and an author still meant otherwise. They stop nothing loading, which is
   // why they are said here and nowhere else: `src/content/worldRemarks.ts` owns the rules, and each
   // derives its own subjects, so a section written next month is held to them with no edit.
-  const remarks = stood ? remarksOn(loaded.registry) : [];
+  const remarks = stood ? remarksOn(world, loaded.registry) : [];
   const remarked = remarks.length === 0 ? [] : [`${remarks.length} thing(s) the engine takes and an author probably did not mean:`, ...remarks.map((each) => `  ${each.where} ${each.says}`), ''];
   const verdict = probe(world, { show: [], roundTrip: true, test: [...loaded.registry.tests.keys()] });
   const read = `${sources.length} module(s) read`;

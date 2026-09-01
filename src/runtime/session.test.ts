@@ -423,7 +423,7 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(tutorial(), { inventory: { 'core.rat-tail': 6 } });
+    const session = primed(tutorial(), { inventory: { 'core.rat-tail': 6, 'core.twine': 6 } });
     readRoom(session);
 
     beginAction(session, 'craft:core.rope-from-tails');
@@ -434,7 +434,7 @@ describe('cancelAction', () => {
     const v = cancelAction(session);
     expect(v.action).toBeNull();
     expect(v.inventory['core.rope']).toBe(1);
-    expect(v.inventory['core.rat-tail']).toBe(3);
+    expect(v.inventory['core.rat-tail']).toBe(5);
     expect(v.choices.length).toBeGreaterThan(0);
   });
 

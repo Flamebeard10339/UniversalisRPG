@@ -254,7 +254,7 @@ cluster-jewel: stout-heart
 
 # recipe rope-from-tails
 station: bench
-in: 3 rat-tail
+in: 1 rat-tail, 1 twine
 out: 1 rope
 say: The tails twist up into something that will hold.
 skill: scavenging 10
