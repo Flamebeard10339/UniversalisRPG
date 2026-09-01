@@ -31,9 +31,14 @@ group: core.skilling
 // so that something can take it away. A rate that resolves to zero stalls the run
 // outright — the bar stops rather than crawls — and that is the whole of what
 // being caught is meant to feel like.
+//
+// Ten seconds to a hand. Thirty a minute was a hand in a pocket every two seconds,
+// which is not a thing anybody does to a crowd that is standing right there, and it
+// is half of what put the skill twenty-three times over what the curve asks; the
+// `xp:` on each mark is the other half.
 # stat thieving-rate
 title: Thieving Speed
-base: 30
+base: 6
 group: core.skilling
 
 # skill thieving

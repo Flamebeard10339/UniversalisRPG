@@ -63,11 +63,14 @@ stat: fishing
 
 // --- the cast ---
 
+// Ten seconds to a throw of the net, and the two deep waters slow it to fifteen for a rod. The pace
+// is half of what brings the water onto the curve and the `xp:` on each water is the other half:
+// thirty a minute was an idle game's pace rather than a river's.
 # action cast
 title: Fish
 continuous
 attempts: 1
-rate: 30
+rate: 6
 accuracy: my fishing vs their depth
 on unfinished:
   drain: 1 line-health
@@ -84,7 +87,7 @@ title: Small Fishing Net
 examine: A hand net on a short pole, mended twice.
 slot: mainhand
 value: 20
-tackle, +3 fishing, +6 max-line-health
+tackle, +3 fishing, +40 max-line-health
 
 # item large-fishing-net
 title: Large Fishing Net
@@ -92,7 +95,7 @@ examine: A throw net wide enough to need both arms and a running start.
 slot: mainhand
 requires: level.fishing >= 10
 value: 70
-tackle, +7 fishing, +12 max-line-health
+tackle, +7 fishing, +60 max-line-health
 
 # item fishing-rod
 title: Fishing Rod
@@ -120,14 +123,14 @@ title: Gut Line
 examine: Twisted gut, and it smells like it.
 slot: gloves
 value: 12
-tackle, +3 max-line-health
+tackle, +15 max-line-health
 
 # item braided-fiber-line
 title: Braided Fibre Line
 examine: Four strands laid against each other so that no one of them ever takes the whole pull.
 slot: gloves
 value: 40
-tackle, +7 max-line-health
+tackle, +35 max-line-health
 
 # item horsehair-line
 title: Horsehair Line
@@ -136,7 +139,7 @@ slot: gloves
 requires: level.fishing >= 15
 value: 120
 item-level: 8-14
-tackle, +12 max-line-health
+tackle, +60 max-line-health
 
 // The one piece of tackle that is a trade rather than an upgrade: twice the line to lose and six
 // off what you land with. A player who cannot afford to keep replacing line buys this instead.
@@ -145,7 +148,7 @@ title: Steel Line
 examine: Wire, honestly. It will outlast the fish and it will spook every one of them first.
 slot: gloves
 value: 60
-tackle, +5 max-line-health, +100% max-line-health, -6 fishing
+tackle, +25 max-line-health, +100% max-line-health, -6 fishing
 
 // Every piece of tackle above that grants a line to empty. Nothing in the language selects an item
 // by the keyword it carries, so the subjects are written out — and what holds them to the tackle
@@ -206,7 +209,7 @@ uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
   give: 1 raw-shrimp
-  xp: fishing 18
+  xp: fishing 3
   +on unfinished:
     say: The net comes up heavy with nothing in it, and something in the mesh gives.
 
@@ -218,7 +221,7 @@ uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
   give: 1 raw-anchovies
-  xp: fishing 24
+  xp: fishing 4
   +on unfinished:
     say: They go under the net as one animal, and a strand parts as you haul it back.
 
@@ -229,10 +232,10 @@ stats: fishing 0, depth 80
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
-  rate: 20
+  rate: 4
   roll: spend-bait
   give: 1 raw-trout
-  xp: fishing 44
+  xp: fishing 9
   +on unfinished:
     roll: spend-bait
     say: It takes the bait, turns once, and the line sings and then stops singing.
@@ -244,10 +247,10 @@ stats: fishing 0, depth 102
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
-  rate: 20
+  rate: 4
   roll: spend-bait
   give: 1 raw-salmon
-  xp: fishing 55
+  xp: fishing 11
   1 in 200:
     give: 1 anglers-knot-jewel
     say: There is something wound into the gill plate that was not put there by a fish.

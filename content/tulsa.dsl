@@ -46,6 +46,10 @@ dependencies:
 
 # flag wurm-defeated
 
+// Set by the rooftop watch the town keeps for itself, so what is up there is worth
+// noticing once rather than by the hour.
+# flag castle-watched
+
 // How many of Kelsa's hives have been gone through, and on which of her two hive
 // grounds the third one was. Every hive adds to the count and hides itself
 // afterwards, so three is all three; whichever one takes the count to three
@@ -158,9 +162,16 @@ title: Market Rooftops
 examine: Tile and thatch over the stalls, the wall-walk one roof away, and the castle's upper windows across the town.
 adjacent:
   market-row
+// Paid once, because there is one thing up here to notice and noticing it twice is not a
+// second thing. Without the guard the view is eight seconds and five experience forever, and
+// with no quest in the world it was the best thieving in Tulsa — `attention-to-detail` writes
+// its own gated watch over this one, so the hole only ever showed with the quests turned off.
+// The roof itself stays: a player may lie on the tile and look as often as they like.
 watch the castle windows:
   time: 8
-  xp: thieving.thieving 5
+  if not castle-watched:
+    set: castle-watched
+    xp: thieving.thieving 5
   say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against. It means something to somebody. It does not yet mean anything to you.
 
 # location forge
@@ -1113,7 +1124,7 @@ pick their pocket:
   one of:
     thieving:
       give: 3 coin
-      xp: thieving.thieving 20
+      xp: thieving.thieving 4
     25x:
       say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
       drain: 1 health
@@ -1136,7 +1147,7 @@ pick their pocket:
   one of:
     thieving:
       give: 7 coin
-      xp: thieving.thieving 35
+      xp: thieving.thieving 7
     55x:
       say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do.
       drain: 3 health
@@ -1159,7 +1170,7 @@ pick their pocket:
   one of:
     thieving:
       give: 12 coin
-      xp: thieving.thieving 55
+      xp: thieving.thieving 11
     90x:
       say: There is a great deal of iron in the way and then a great deal of iron coming the other way.
       drain: 6 health
@@ -1179,7 +1190,7 @@ pick the lock:
   one of:
     thieving.thieving:
       roll: thieving.house-chest-contents
-      xp: thieving.thieving 85
+      xp: thieving.thieving 20
       say: The lock gives with a sound like a knuckle cracking.
     60x:
       say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
@@ -1194,7 +1205,7 @@ pick the lock:
   one of:
     thieving.thieving:
       roll: thieving.treasure-chest-contents
-      xp: thieving.thieving 230
+      xp: thieving.thieving 55
       say: The last ward turns over and the lid comes up on its own.
     200x:
       say: The runes light one after another and the cellar goes out from under you.

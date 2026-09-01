@@ -1,4 +1,5 @@
 import { RuntimeError } from './error';
+import { initResources } from './effects';
 import { GameState } from './state';
 import { Registry } from '../content/registry';
 import { evaluateCondition } from './conditions';
@@ -51,6 +52,10 @@ export function equip(state: GameState, registry: Registry, itemId: string): Loc
   }
   if (!outOfPack(state, itemId)) throw new RuntimeError(`equip: ${itemId} is carried and could not be parted with`);
   state.equipped[item.slot] = itemId;
+  // Worn gear is what grants a pool its ceiling, so putting a piece on is one of the two moments a
+  // pool the player did not hold can arrive -- full, rather than at the nothing it stood at while
+  // there was no ceiling over it.
+  initResources(state, registry);
   return undefined;
 }
 
@@ -60,5 +65,6 @@ export function unequip(state: GameState, registry: Registry, slot: string): Loc
   if (!roomToPack(state, registry, worn)) return packFull(state, registry, worn);
   delete state.equipped[slot];
   intoPack(state, registry, worn);
+  initResources(state, registry);
   return undefined;
 }

@@ -333,11 +333,20 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
   if (segment.stopped) endAction(state, segment.stopped);
 }
 
+// A pool is held only while something grants it a ceiling — a line is not a fisherman's until there
+// is tackle on to lose it with, which is what `fishing.max-line-health` declares no base for. So a
+// pool whose ceiling stands at nothing is not recorded at all, and the moment a ceiling appears it
+// arrives full rather than at the nothing it would have been pinned to since the run began. A
+// resource writing its own `start:` has said what it holds and is left alone.
 export function initResources(state: GameState, registry: Registry): void {
   for (const resource of registry.resources.values()) {
-    if (state.resources[resource.id] === undefined) {
-      levels(state)[resource.id] = toMilliUnits(resource.start ?? statValue(resource.max, state, registry));
+    const held = state.resources[resource.id] !== undefined;
+    const ceiling = statValue(resource.max, state, registry);
+    if (resource.start === undefined && ceiling <= 0) {
+      if (held) delete levels(state)[resource.id];
+      continue;
     }
+    if (!held) levels(state)[resource.id] = toMilliUnits(resource.start ?? ceiling);
   }
 }
 
