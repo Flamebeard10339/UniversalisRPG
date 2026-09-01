@@ -60,26 +60,46 @@ world, not a tool failure.
 *Closes when:* the matrix (§6.2) exists and is checked for non-monotone rows, and
 either none are found or the ones found are named.
 
-## Nobody has searched the build space, and what that would cost is now known
+## The build space has been walked greedily and not searched
 
-The nine reference builds in `content/tiers.dsl` spend their pool evenly and wear
-the best of each slot the level allows. That is a floor, not an answer: the pool
-is a real degree of freedom, and whether the best tier-20 combat build pours
-everything into attack is unasked. Nothing carries a cluster jewel at all, so
-§6.3's fifteen-rows-per-tier reading does not exist.
+`npm run tier-build -- <activity> <level> [<item>...] --grow <stat>...` spends every
+point every worn piece dropped with, scoring each move by applying it and reading
+`statValue` back off the engine. All twelve reference builds in `content/tiers.dsl`
+now wear what they spend — 0 points unreached in all twelve — and the greedy pass is
+~1.5s per build rather than the hours a slot-by-slot sweep was costed at.
 
-What it costs is measured rather than guessed. A whole-town sweep is ~19s at one
-seed — ~2.3s of module load and ~0.153s per offer per seed — so a fitness read
-over all 242 offers is ~19s and over one activity's 84 combat offers is ~13s. A
-greedy pass over six slots at ~6 candidates each is ~36 evaluations, so one
-(activity, tier) is minutes and one carrying each of fifteen jewels is hours.
-Running the search in-process against one loaded registry, and reading fitness
-over one activity's offers rather than the world's, are what make it affordable;
-neither is built.
+Greedy is a floor in exactly the way the even experience split is. It takes the next
+move whose played-out plane reads highest, one piece at a time and in the order they
+went on, so a piece that goes on first takes the jewels it likes and a corridor that
+would have paid three nodes later is never crossed. Whether pouring everything into
+attack is right is still unasked.
 
-*Closes when:* a seeded, reproducible search improves on a shipped tier build and
-says by how much — or is shown not to, which makes the hand-authored floor the
-answer and is worth the same finding.
+`combat-expansion`'s six jewels are not offered to the combat tiers, because `tiers`
+does not declare it as a dependency. Adding it is an authored decision.
+
+*Closes when:* a seeded, reproducible search improves on the greedy answer and says
+by how much — or is shown not to, which makes greedy the answer and is worth the
+same finding.
+
+## Sixteen hand-written saves describe a character the engine cannot mint
+
+`npm run test` is red on one claim in `src/content/dsl.test.ts`, carrying sixteen
+findings of one shape: *"# save X carries core.hand-axe under `inventory`, which no
+route through the world reaches: receiveItem mints a base as an instance."* Subjects
+are `tulsa` (×3), `birds-and-the-bees` (×3), `the-bars-crawl` (×2), `fishing`,
+`first-steps`, `kill-it-with-fire`, `the-rat-conspiracy`, `the-swampy-menace`.
+
+The cause is this branch giving `item-level:` to thirty-one bases that had a slot and
+none. A base with a plane arrives as a minted copy, so a fixture listing one as a bare
+inventory count is now describing something no player could be holding — the same
+class of error as a reference build wearing an empty plane, and the derived claim
+caught it without being asked to. The twelve `tiers` saves were in this set and are
+clean.
+
+`npm run migrate-saves` will not do it: these are already at `SAVE_VERSION`, and the
+shape did not change — the world did.
+
+*Closes when:* the sixteen carry their bases under `instances` and the claim is green.
 
 ## A stored build can become a different character with no diff
 
@@ -87,11 +107,11 @@ answer and is worth the same finding.
 position is looked up at read time (`src/runtime/clusterEffect.ts:31`, `:47-49`).
 So editing a jewel's position list, or a passive's bonus range, changes what every
 stored build grants with no error and no change on disk. Nine corpus saves carry
-cluster planes today and the reference builds will once they carry jewels.
+cluster planes today and all twelve reference builds now do too.
 
-Two claims in `scripts/tier-build.test.ts` already catch the two ways a tier goes
-stale that *are* visible — its level, and a slot it left empty — and neither
-reaches this one.
+Three claims in `scripts/tier-build.test.ts` already catch the ways a tier goes
+stale that *are* visible — its level, a slot it left empty, and a piece standing on
+less than the whole of the points it dropped with — and none reaches this one.
 
 *Closes when:* a tier artifact stores a hash of its resolved contribution set,
 recomputed and compared on read, so a difference is reported rather than absorbed.

@@ -34,11 +34,29 @@ long fight and the world half-builds all three: **gear** (jewels, now reachable 
 grants regeneration for a couple of minutes, which is what cooking is for), and **dying
 cheaply** (the market square, today, by accident of where a faint puts you).
 
-*Moves when: he says which of the three carries it. If gear, the numbers above are the
-budget and the jewel drops need pricing against it. If food, the fight rooms are fine
-as they are and cooking is load-bearing for combat, which nothing currently says. If
-dying cheaply, a faint should put you somewhere near where you fell rather than always
-in the market square, and that is a real change to what dying costs.*
+**Since this was written the tiers have been dressed, and it answers half the question
+and sharpens the other half.** With every point its gear dropped with spent, combat
+attack at twenty goes 0.55× → **1.3×** of the curve and the frontier moves off the
+market-square townsman onto the ratkin-warrior at the muster — a fight the undressed
+build could not hold. So gear does carry the attack half, and the muster is a room
+after all.
+
+Health went the other way: 0.24× → **0.14×**. That is structural rather than a number.
+`combat.dsl:49-58` pays health on *damage taken*, and says so deliberately — "armour
+that stops a tier hurting you is armour that stops it training you, which is the whole
+reason to walk further out". Walking further out did not compensate, and it cannot,
+because what bounds damage-taken-per-hour is regeneration, and **regeneration has one
+passive and one orb in the entire game**: `mending` (+2), which appears in `stout-heart`
+at position 6 and in the DEBUG-only `heartwood-core`; and `orb-of-renewal` (+25%), at
+1-in-25 off the ratkin-warrior. Sitting is +10 and a cooked dish up to +16, so every
+temporary source dwarfs everything a build can permanently carry.
+
+*Moves when: he says which of the three carries it — knowing now that gear carries
+attack on its own, that health cannot be levelled by fighting better, and that the
+sustain layer a long fight needs is the least reachable thing in the world. If gear,
+`mending` needs more homes than one jewel position. If food, cooking is load-bearing
+for combat and nothing says so. If dying cheaply, a faint should put you near where you
+fell, and that is a real change to what dying costs.*
 
 ## Whether the sheet is allowed to eat
 
