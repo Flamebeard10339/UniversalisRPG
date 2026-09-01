@@ -180,20 +180,10 @@ function asHookOutput(root: string): string {
   const lines = report(reading, path.basename(chosen, '.jsonl'));
   const probes = reading.scratchWrites.length + reading.rerunsOf.size + reading.helpAfterUse.length;
 
-  return JSON.stringify({
-    systemMessage: `${lines[0]}${probes > 0 ? ` — ${probes} thing(s) it had to work out for itself` : ''}`,
-    hookSpecificOutput: {
-      hookEventName: 'SubagentStop',
-      additionalContext: [
-        'What that subagent had to work out before it could start. Experimentation is not by itself waste — a lane whose',
-        'brief was engine work reads engine source because that is the job. It is a signal: each line is a question the',
-        'docs did not answer, and a scratch world built by a lane that was told to ask the oracle names a hole that will',
-        'cost the next lane the same time. Judge it, and say so; if it names a hole, that is worth fixing at the source.',
-        '',
-        ...lines,
-      ].join('\n'),
-    },
-  });
+  const name = path.basename(chosen, '.jsonl');
+  const signal = probes > 0 ? `${probes} thing(s) it worked out for itself — npm run friction -- ${name.replace('agent-', '')}` : 'nothing it had to work out first';
+
+  return JSON.stringify({ systemMessage: `${lines[0]}; ${signal}`, suppressOutput: true });
 }
 
 const usage = [
