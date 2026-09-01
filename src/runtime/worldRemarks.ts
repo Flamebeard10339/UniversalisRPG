@@ -186,12 +186,23 @@ function lopsided(registry: Registry): Remark[] {
   });
 }
 
-// A rule that only wants the registry, and one that has to run the world to answer. Both are asked
-// of every world the oracle is pointed at, and each derives its own subjects.
-const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken, stale, lopsided];
-const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread, (sources) => unpacked(sources), (sources) => rootless(sources)];
+// One list, and every rule takes the same two things: the modules as written and the world they
+// made. Most read only the second — a rule is free to ignore what it does not want — and splitting
+// them by which they happened to use made a rule's shape decide where it was written down.
+type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
-export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => [
-  ...RULES.flatMap((rule) => rule(registry)),
-  ...WALKING_RULES.flatMap((rule) => rule(sources, registry)),
+const RULES: readonly Rule[] = [
+  (_sources, registry) => stranded(registry),
+  (_sources, registry) => unkept(registry),
+  (_sources, registry) => pricedCoin(registry),
+  (_sources, registry) => stackedBases(registry),
+  (_sources, registry) => restated(registry),
+  (_sources, registry) => unspoken(registry),
+  (_sources, registry) => stale(registry),
+  (_sources, registry) => lopsided(registry),
+  (sources) => unpacked(sources),
+  (sources) => rootless(sources),
+  unread,
 ];
+
+export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => RULES.flatMap((rule) => rule(sources, registry));

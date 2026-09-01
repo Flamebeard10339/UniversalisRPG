@@ -4,7 +4,9 @@ import { stageNow } from '../content/sections/quest';
 import { evaluateCondition } from './conditions';
 import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
-import { journal, standingLine, STANDING_GROUP, type QuestStanding } from './journal';
+import { journal, standingLine } from './journal';
+import { QUEST_STANDINGS } from '../content/sections/quest';
+import { standingGroup } from '../content/sections/group';
 import { createGameState } from './runtime';
 import { runTest } from './session';
 import type { GameState } from './state';
@@ -180,25 +182,35 @@ describe('a quest played through', () => {
 // other three. What tells them apart is a colour a world authored, which is what makes this a claim
 // about the corpus rather than about whatever draws the journal.
 describe('where a quest stands reaches a surface as a group', () => {
-  const shipped = loadUniverse(fixtureSources());
-  const STANDINGS = Object.keys(STANDING_GROUP) as QuestStanding[];
+  const world = loadUniverse(fixtureSources());
+  const STANDINGS = [...QUEST_STANDINGS];
 
-  it('names a group the world declares, and a colour for each', () => {
-    expect(STANDINGS.flatMap((each) => (shipped.groups.get(STANDING_GROUP[each])?.colour ? [] : [`${each} is coloured by ${STANDING_GROUP[each]}, which the world declares no colour for`]))).toEqual([]);
+  it('finds a group the world says it stands for, and a colour for each', () => {
+    expect(STANDINGS.flatMap((each) => (standingGroup(world.groups, each)?.colour ? [] : [`nothing in the world says it stands for ${each}, or what says so declares no colour`]))).toEqual([]);
   });
 
   it('is a different colour for every one of them, so no two standings read alike', () => {
-    const colours = STANDINGS.map((each) => shipped.groups.get(STANDING_GROUP[each])!.colour);
+    const colours = STANDINGS.map((each) => standingGroup(world.groups, each)!.colour);
 
     expect(new Set(colours).size).toBe(STANDINGS.length);
   });
 
-  it('publishes it on every entry the shipped journal carries', () => {
+  it('publishes it on every entry the journal carries', () => {
     const state = createGameState();
-    state.location = [...shipped.locations.values()].find((each) => each.starting)!.id;
-    const entries = journal(shipped, state);
+    state.location = [...world.locations.values()].find((each) => each.starting)!.id;
+    const entries = journal(world, state);
 
     expect(entries.length).toBeGreaterThan(0);
-    expect(entries.map((entry) => entry.group?.colour)).toEqual(entries.map((entry) => shipped.groups.get(STANDING_GROUP[entry.standing])!.colour));
+    expect(entries.map((entry) => entry.group?.colour)).toEqual(entries.map((entry) => standingGroup(world.groups, entry.standing)!.colour));
+  });
+
+  // The engine names no group of its own, so a world that says nothing draws no colour rather than
+  // reaching for one that is not there.
+  it('draws nothing where a world says which group means nothing', () => {
+    const silent = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace(/^stands for: .*$/gm, '') })));
+    const state = createGameState();
+    state.location = [...silent.locations.values()].find((each) => each.starting)!.id;
+
+    expect(journal(silent, state).map((entry) => entry.group)).toEqual(journal(silent, state).map(() => undefined));
   });
 });

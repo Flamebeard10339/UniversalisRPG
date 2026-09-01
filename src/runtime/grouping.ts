@@ -1,6 +1,7 @@
 import { mapOf, type Registry } from '../content/registry';
 import { registryMapOf } from '../content/sections';
-import { groupOf, type Group } from '../content/sections/group';
+import { groupOf, standingGroup, type Group } from '../content/sections/group';
+import type { QuestStanding } from '../content/sections/quest';
 import { ownerRef } from './state';
 import type { Answer, Localized, Localizer } from './localized';
 
@@ -30,6 +31,10 @@ export function grouping(registry: Registry, localizer: Localizer, kind: string,
 // section — where a quest stands is one such, and is coloured and named off a `# group` like the
 // rest rather than out of whatever draws it.
 export const groupNamed = (registry: Registry, localizer: Localizer, id: string): GroupRow | undefined => row(localizer, registry.groups.get(id));
+
+// The group a world says means this standing of a quest. The engine names no group of its own for
+// them: a world declares which of its own each standing is, with `stands for:` on the group.
+export const groupStandingFor = (registry: Registry, localizer: Localizer, standing: QuestStanding): GroupRow | undefined => row(localizer, standingGroup(registry.groups, standing));
 
 // A colour is not a word, so a driver that cannot fill anything says the group instead. The words are
 // the group's own `title:`, which is the same string a screen fills a cell for, rather than a second

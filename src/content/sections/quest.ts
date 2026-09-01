@@ -9,6 +9,13 @@ import { condition as visitCondition, put, results, type Visit } from '../refs';
 import { Dialogue, DialogueNode, nodeBody, nodeGrammar, parseNode, visitDialogue } from './dialogue';
 import { section } from './define';
 
+// A quest nobody has touched, one under way, and one finished, which is the whole of what a journal
+// tells them apart by. It is a closed word here and an authored one on a `# group`, which is how a
+// world says which of its groups means which — see `standsFor` in `group.ts`.
+export const QUEST_STANDINGS = ['unstarted', 'started', 'complete'] as const;
+
+export type QuestStanding = (typeof QUEST_STANDINGS)[number];
+
 // What one NPC is given to say while a stage is the one the player is on.
 export interface QuestSpeech {
   owner: string;

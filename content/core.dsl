@@ -176,14 +176,17 @@ colour: #fbbf24
 
 # group quest-unstarted
 title: Not started
+stands for: unstarted
 colour: #e5e7eb
 
 # group quest-started
 title: Under way
+stands for: started
 colour: #fbbf24
 
 # group quest-complete
 title: Done
+stands for: complete
 colour: #34d399
 
 // What kind of measure a stat is. The character sheet keeps a tab per group and

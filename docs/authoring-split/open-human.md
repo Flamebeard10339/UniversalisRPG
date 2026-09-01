@@ -1,39 +1,5 @@
 # Authoring and the engine, split apart — open, for the author
 
-## The engine's English has left `content/`
-
-`engine-en.dsl` is now `src/content/engine/engine-en.dsl`. It still ships, still bundles, still
-loads as an ordinary module, and a translator still overrides any of its keys by writing their own
-`# locale` — none of that moved. What moved is who owns the file: it is the engine speaking on its
-own behalf, so it sits with the engine, and `content/` now holds only what an author writes.
-
-The cost is that its English is no longer in the folder the authoring surface treats as editable, so
-retouching an engine string is a code change rather than an in-game one.
-*Closes when:* you have wanted to reword an engine string in the game and said whether that wanting
-is worth putting the file back within an author's reach.
-
-## What the editing page tells a contributor after an edit
-
-The rule this branch is built on is that no author's edit can redden `npm test`, and that the
-corpus's verdict is `npm run oracle`'s alone. That settles what an agent runs. It does not settle
-what the game says to a person who has just edited a section in it — whether the page runs the same
-checks and shows the same sentences, including the six warnings above, or something shorter.
-*Closes when:* you say what the page shows after an edit, and whether it is the oracle's own words
-or a shorter reading of them.
-
-## Authoring is dispatched now, not typed
-
-`npm run authorbot -- <brief>` was already the tool and was not reachable from a session; the
-`authoring` skill is the way in, and `CLAUDE.md` opens with the line the two jobs sit either side
-of. An agent asked to write a quest should now hand it to the harness rather than typing DSL.
-
-What is not settled is how far the line goes the other way. Nothing stops a session editing
-`content/` by hand — a balance pass, a reword, a fix while you watch — and blocking that would be
-wrong. But it means "authoring goes through authorbot" is a rule an agent follows rather than one
-the machine keeps.
-*Closes when:* you say whether hand-editing `content/` from a session should be warned about, or
-left alone as the ordinary way you and an agent work together on a module.
-
 ## Are ten warnings the right ten
 
 `src/runtime/worldRemarks.ts` holds what the engine takes and an author probably did not mean: a
@@ -52,3 +18,16 @@ non-zero. What is unsettled is whether the list is the right list — a rule you
 noise in front of every author who runs the gate.
 *Closes when:* you have run `npm run oracle -- --at content` over a draft of your own and said which
 of them you would want louder, quieter, or gone.
+
+## The fixture world is five modules now, and nothing says when it is too big
+
+`src/content/fixture/` is core, town, combat and quests under two packs: nine places, a region, two
+activities, four cluster jewels, a shop, a chest, four speakers, a recipe, five sheets and seventeen
+routes. Every piece of it went in because a claim had nothing to fire on without it, which is the
+right reason — and *keep it small* has only its second half enforced, by the claims themselves going
+vacuous when a shape is missing.
+
+Nothing says a piece has stopped earning its place. A shape no claim reaches any more is filler, and
+filler is what stops a fixture being readable whole.
+*Closes when:* you say whether that wants reporting — a sweep for a section no test and no route
+reaches — or whether a world small enough to read in one sitting does not need one.

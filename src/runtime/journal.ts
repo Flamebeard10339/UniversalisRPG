@@ -1,22 +1,15 @@
 import type { ActionResult } from '../grammar/actionResult';
 import type { Condition } from '../grammar/condition';
 import type { Registry } from '../content/registry';
-import { begun, stageNow, stagesReached, type Quest, type QuestStage } from '../content/sections/quest';
+import { begun, stageNow, stagesReached, type Quest, type QuestStage, type QuestStanding } from '../content/sections/quest';
 import { listedToPlayer } from '../content/sections';
 import { evaluateCondition, renderSegments } from './conditions';
-import { groupNamed, type GroupRow } from './grouping';
+import { groupStandingFor, type GroupRow } from './grouping';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import { withoutNote } from '../grammar/note';
 import type { GameState } from './state';
 
-// A quest nobody has touched, one under way, and one finished, which is the whole of what a journal tells them apart by. Each is a kind of thing a quest currently is, and the `# group` named beside it is where both its colour and its word are read off — so what tells them apart is authored, one surface fills with it and another says it, and a standing added here cannot reach a player as nothing.
-export const STANDING_GROUP = {
-  unstarted: 'core.quest-unstarted',
-  started: 'core.quest-started',
-  complete: 'core.quest-complete',
-} as const;
-
-export type QuestStanding = keyof typeof STANDING_GROUP;
+export type { QuestStanding };
 
 export interface JournalLine {
   stage: Answer;
@@ -72,7 +65,7 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
           const line = spoken(localizer, state, registry, stage.log);
           return line === null ? [] : [{ stage: stage.name as Answer, ...line, struck: standing === 'complete' || stage !== at }];
         });
-  const group = groupNamed(registry, localizer, STANDING_GROUP[standing]);
+  const group = groupStandingFor(registry, localizer, standing);
   return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, ...(group === undefined ? {} : { group }), lines };
 }
 
