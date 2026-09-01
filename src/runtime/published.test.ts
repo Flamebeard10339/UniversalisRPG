@@ -49,6 +49,18 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     why: "one walk of a `# test`: the verdict, and how far along the route the walk got before it stopped. Probe reads the second before it will print the sheet a route ends on. Like `RecordedTurn` above it is addressed to whoever reads the run afterwards and never to a player, which is why the reason it carries is one flat English string in every language",
   },
   {
+    type: 'src/runtime/state.ts#GameState',
+    why: 'the saved game itself, reached now that scripts/tier-build.ts grows a reference build by driving the engine over one rather than by modelling one. It draws nothing off the state: the state goes into `serializeSave` and comes back as the `# save` body a build is pasted into, which is bytes rather than words. What a player reads off a state reaches this walk through the view that draws it — the log as `PlayView`\'s `said` — which is what `EN_ROUTE` below says about it',
+  },
+  {
+    type: 'src/runtime/itemInstance.ts#ItemInstance',
+    why: 'one grown copy as the engine holds it: the roll it dropped with, and the plane that roll is spent on. scripts/tier-build.ts names it to try a move on a plane and put it back when the move paid nothing. Nothing in it is words — a roll is a number and the plane below is machine names — and what a player reads about a copy is drawn from the item and jewel declarations those names stand for',
+  },
+  {
+    type: 'src/runtime/clusterPlane.ts#Plane',
+    why: 'a copy\'s plane as the engine holds it, keyed by hex: which jewel sits in each, what it rolled, and which of its points and sockets are paid for. scripts/tier-build.ts names it to ask what moves are still open before trying one. Every id in it is a machine name — a jewel, a passive, a direction — and the words for each are its own declaration\'s, fetched from the registry wherever a screen draws one',
+  },
+  {
     type: 'src/runtime/session.ts#PlaySession',
     why: 'the live session a driver threads through `apply`/`applyDirective`/`view`. Everything it publishes reaches this walk on its own — the view as `PlayView`, the status as `PlayStatus` — and its own `registry` field is content the walk is not about, for the same reason `OpenedUniverse.session` is passed over',
   },
