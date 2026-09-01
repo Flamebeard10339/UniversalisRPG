@@ -1005,6 +1005,12 @@ const OPS = ['', '+', '-'];
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
   const fields = schemaFields();
   const blockCapable = fields.filter(takesABlock);
+  // The claim below is that a block is the field's own line written again, one value to a line, so it
+  // is asked of the fields whose block is exactly that: a list, whose element is what a block line
+  // holds. A field whose block is a grammar of its own — a body under a keyword rather than a list
+  // under it — is not the same text written twice, and answering for it here would be answering for
+  // a question nobody asked of it.
+  const oneToALine = blockCapable.filter((field) => 'element' in field.parser);
 
   it('derives its subjects by the predicate the section engine decides a block by', () => {
     const addressable = fields.filter((field) => !field.positional);
@@ -1021,13 +1027,13 @@ describe('a field that takes a block reads one exactly where it reads the same t
   });
 
   it('reads a block line and the same text handed to the whole parser identically', () => {
-    expect(blockCapable.length).toBeGreaterThan(0);
-    const disagreements = blockCapable.flatMap((field) => AUTHORED.filter((authored) => disagree(inlineField(field, authored), blockField(field, authored))).map((authored) => `${fieldName(field)}: ${JSON.stringify(authored)}`));
+    expect(oneToALine.length).toBeGreaterThan(0);
+    const disagreements = oneToALine.flatMap((field) => AUTHORED.filter((authored) => disagree(inlineField(field, authored), blockField(field, authored))).map((authored) => `${fieldName(field)}: ${JSON.stringify(authored)}`));
     expect(disagreements).toEqual([]);
   });
 
   it('never reads through a section a block that section refuses inline, in the bare, + and - forms', () => {
-    const readOnlyAsABlock = blockCapable.flatMap((field) =>
+    const readOnlyAsABlock = oneToALine.flatMap((field) =>
       OPS.flatMap((op) =>
         AUTHORED.filter((authored) => {
           const inline = inlineSection(field, op, authored);
@@ -1040,12 +1046,12 @@ describe('a field that takes a block reads one exactly where it reads the same t
   });
 
   it('reads inline past the field parser only where the section absorbs a clause', () => {
-    const inlineReadsMore = blockCapable.flatMap((field) => OPS.flatMap((op) => AUTHORED.filter((authored) => inlineSection(field, op, authored).read && !blockSection(field, op, authored).read).map(() => field)));
+    const inlineReadsMore = oneToALine.flatMap((field) => OPS.flatMap((op) => AUTHORED.filter((authored) => inlineSection(field, op, authored).read && !blockSection(field, op, authored).read).map(() => field)));
     expect(inlineReadsMore.filter((field) => !field.sectionTakesClauses).map(fieldName)).toEqual([]);
   });
 
   it('refuses a block line carrying an indented block of its own, on every field a block can address', () => {
-    const swallowed = blockCapable
+    const swallowed = oneToALine
       .filter((field) => !field.positional)
       .filter((field) => {
         const accepted = AUTHORED.find((authored) => blockSection(field, '', authored).read);
@@ -1063,7 +1069,7 @@ ${field.keyword}:
   });
 
   it('reads at least one authored text on every field a block can address', () => {
-    const silent = blockCapable.filter((field) => !field.positional && !AUTHORED.some((authored) => blockSection(field, '', authored).read)).map(fieldName);
+    const silent = oneToALine.filter((field) => !field.positional && !AUTHORED.some((authored) => blockSection(field, '', authored).read)).map(fieldName);
     expect(silent).toEqual([]);
   });
 });

@@ -478,9 +478,6 @@ evasion, +6-10 evasion
 # passive evasive
 evasion, +15% evasion
 
-# passive fortune
-utility, +3-8 luck
-
 // --- cluster jewels ---
 //
 // Every shape the catalogue holds is authored at least once, so a shape that
@@ -506,7 +503,7 @@ passives: 1 warded, 2 hale, 3 constitution, 5 hale, 6 mending
 examine: It does not add. It insists.
 shape: wheel
 open-connections: e, se
-passives: 1 hale, 2 tempered-frame, 3 brutal, 4 hardened, 5 tempered-frame, 6 brutal, 7 fortune
+passives: 1 hale, 2 tempered-frame, 3 brutal, 4 hardened, 5 tempered-frame, 6 brutal
 
 // Twelve positions and two exits. The inner ring is left mostly empty on
 // purpose: crossing it costs four points and pays on one, where the short way
@@ -522,7 +519,6 @@ passives:
   4 marksman
   5 hale
   6 honed
-  7 fortune
   10 flurry
 
 # cluster-jewel causeway

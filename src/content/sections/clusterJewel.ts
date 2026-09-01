@@ -1,11 +1,12 @@
 import { list } from '../../grammar/list';
-import { Cursor, DslError, Parser } from '../../grammar/parser';
-import { listMembers } from '../../grammar/section';
+import { Cursor, DslError, Parser, Span, Written } from '../../grammar/parser';
+import { AnySchema, HydrateContext, listMembers, parseAnySection, printSection } from '../../grammar/section';
+import { RawLine } from '../../grammar/structure';
 import { id, number, text } from '../../grammar/values';
 import { DIRECTIONS, Direction } from '../hex';
 import { getShape, Shape } from '../shapes';
 import { type Loose } from '../refs';
-import { section } from './define';
+import { PrintContext, schemaGrammar, section } from './define';
 import { TITLE_FIELD } from './info';
 
 const NON_ROOT_DIRECTIONS: readonly Direction[] = DIRECTIONS.filter((direction) => direction !== 'w');
@@ -113,3 +114,43 @@ export const clusterJewel = section<ClusterJewel>()({
     return { ...value, positions: Object.fromEntries(filled.map(([position, passiveId]) => [Number(position), passiveId])) };
   },
 });
+
+// What a jewel written under whatever carries it is missing: its own heading, and therefore its own
+// words. Every other line is the same line it would be under a heading of its own, read, built,
+// printed and refused by this file's one declaration.
+const bodySchema = (): AnySchema => {
+  const schema = clusterJewel.schema!;
+  return { ...schema, fields: Object.fromEntries(Object.entries(schema.fields).filter(([name]) => !clusterJewel.text.includes(name))) };
+};
+
+// Nothing under this body is keyed in the locale, because the body has no id of its own to key it under: whatever a line holds is written out where it stands.
+const AS_A_BODY: PrintContext = { moduleId: '', id: '', authored: () => true };
+
+const IS_THE_ITEMS = "is the item's, and a cluster-jewel written under one says what the item says";
+
+const spanning = (lines: readonly RawLine[]): Span => ({ start: lines[0]!.span.start, end: lines[lines.length - 1]!.span.end });
+
+function parseBody(lines: RawLine[]): object {
+  const span = spanning(lines);
+  const authored = parseAnySection({ kind: clusterJewel.kind, id: 'a-jewel-being-read', body: lines, span }, clusterJewel.schema!) as Record<string, unknown>;
+  for (const field of clusterJewel.text) if (field in authored) throw new DslError(`${field}: ${IS_THE_ITEMS}: take the line out`, span);
+  const { id: _read, ...body } = authored;
+  return body;
+}
+
+// A cluster jewel written under something that carries it, standing at that thing's id and saying its
+// words. The body is the whole of what an author wrote; everything else about a jewel is read off the
+// declaration above, so a field added there arrives here having done nothing.
+export const jewelCarried = (body: object, carrier: { id: string }, context: HydrateContext): ClusterJewel =>
+  clusterJewel.build({ ...Object.fromEntries(clusterJewel.text.map((field) => [field, (carrier as unknown as Loose)[field]])), ...body, id: carrier.id }, context);
+
+export const carriedJewel: Parser<string> & {
+  parseBlock(lines: RawLine[]): object;
+  printBlock(bodies: readonly unknown[]): string[];
+  lines(): readonly Written[];
+} = {
+  ...id,
+  parseBlock: parseBody,
+  printBlock: (bodies) => printSection(bodies[0] as object, bodySchema(), AS_A_BODY, () => []).slice(1),
+  lines: () => schemaGrammar(bodySchema()),
+};

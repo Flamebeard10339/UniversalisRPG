@@ -1,16 +1,25 @@
 import { actionResultLists } from '../../grammar/action';
+import type { ActionResult } from '../../grammar/actionResult';
 import { Action, actionBody, actionLines, actionLinesWritten } from '../../grammar/action';
-import { DslError } from '../../grammar/parser';
+import { Cursor, DslError, requireEnd, Span } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { humanizeEn, lastSegment } from '../../grammar/values';
+import type { RawSection } from '../../grammar/structure';
+import { humanizeEn, id, lastSegment } from '../../grammar/values';
 import { declaredId } from './entity';
 import { actionSlug, localeKey } from '../locale';
 import type { Namespace } from '../namespace';
-import { visitAction } from '../refs';
+import { put, visitAction } from '../refs';
 import { section, writtenWhole } from './define';
 
 export interface ActionDeclaration extends Action {
   id: string;
+  // The action this one is written over. Resolved where entities are linked, so what stands in the
+  // registry is the assembled action and what this module wrote is what prints back.
+  extends?: string;
+  // The result lists this declaration wrote, kept where an overlay has folded another action's in
+  // beside them: a line an extending action inherited is the words of whoever wrote it, and keying
+  // it a second time here would give one written line an entry per action that extends into it.
+  wrote?: ActionResult[][];
 }
 
 export function actionAddress(action: Action): string {
@@ -53,33 +62,63 @@ export function actionTextOwner(namespace: Namespace, kind: string, ownerId: str
 export const actionTextKey = (owner: ActionTextOwner): string => localeKey(owner.namespace, owner.kind, owner.id, owner.field);
 
 const TITLE = /^title:[ \t]*/;
+const EXTENDS = /^extends:[ \t]*/;
+
+// A line this section reads rather than the action body under it, taken out before `actionBody` sees
+// the block: everything an action body does not recognise it takes for a tag, so a field of the
+// section's own has to be lifted off the lines first or it lands as one.
+function lifted(raw: RawSection, keyword: RegExp, written: string): { value?: string; span?: Span } {
+  const found = raw.body.filter((line) => keyword.test(line.text));
+  if (found.length > 1) throw new DslError(`# action ${raw.id}: ${written} is defined more than once`, found[1]!.span);
+  return found[0] === undefined ? {} : { value: found[0].text.replace(keyword, ''), span: found[0].span };
+}
 
 export const action = section<ActionDeclaration>()({
-  says: (value) => actionResultLists(value),
+  says: (value) => value.wrote ?? actionResultLists(value),
   kind: 'action',
   ids: 'owned',
   vocabulary: 'declared',
   merge: writtenWhole,
   map: 'actions',
-  grammar: [{ form: 'title: <text>', example: 'title: Chop Wood' }, ...actionLinesWritten()],
+  grammar: [
+    { form: 'title: <text>', example: 'title: Chop Wood' },
+    {
+      form: 'extends: <action>',
+      example: 'extends: chop-wood',
+      names: { action: 'action' },
+      note: "that action's whole body, with every line written here laid over it and `+` adding to what it holds rather than replacing it. The name is this action's own either way, since a name is what an author extends an action to change",
+    },
+    ...actionLinesWritten(),
+  ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# action requires an id', raw.span);
-    const titles = raw.body.filter((line) => TITLE.test(line.text));
-    if (titles.length > 1) throw new DslError(`# action ${raw.id}: title is defined more than once`, titles[1].span);
-    const label = titles[0] ? titles[0].text.replace(TITLE, '') : raw.id;
-    const body = raw.body.filter((line) => !TITLE.test(line.text));
-    const generated = titles[0] ? {} : { generatedLabel: true as const };
+    const title = lifted(raw, TITLE, 'title');
+    const base = lifted(raw, EXTENDS, 'extends');
+    const label = title.value ?? raw.id;
+    const body = raw.body.filter((line) => !TITLE.test(line.text) && !EXTENDS.test(line.text));
     return {
       id: raw.id,
       ...actionBody.parseBlock(body, label),
       label,
-      ...generated,
+      ...(title.value === undefined ? { generatedLabel: true as const } : {}),
+      ...(base.value === undefined ? {} : { extends: reference(base.value, base.span!) }),
     } as ActionDeclaration;
   },
   print: (declared, { moduleId }) => {
     const [, ...body] = actionLines(declared);
     const title = declared.generatedLabel ? [] : [`title: ${declared.label}`];
-    return [`# action ${moduleLocalId(moduleId, declared.id)}`, ...title, ...body.map((line) => line.replace(/^ {2}/, ''))];
+    const base = declared.extends === undefined ? [] : [`extends: ${declared.extends}`];
+    return [`# action ${moduleLocalId(moduleId, declared.id)}`, ...title, ...base, ...body.map((line) => line.replace(/^ {2}/, ''))];
   },
-  visit: visitAction,
+  visit: (declared, where, visit) => {
+    put(declared, 'extends', 'action', `${where} extends:`, visit);
+    visitAction(declared, where, visit);
+  },
 });
+
+function reference(raw: string, span: Span): string {
+  const cursor = new Cursor(raw, 0, span.start);
+  const named = id.parse(cursor);
+  requireEnd(cursor, 'an action id');
+  return named;
+}

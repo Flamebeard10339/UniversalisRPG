@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { loadModule } from './load';
+import { loadModule, loadUniverse, loadUniverseWithDiagnostics } from './load';
+import { roundTripModule } from './serialize';
+import { DEFAULT_MOD_SLOTS } from './sections/clusterJewel';
 import { isBase } from './sections/item';
 
 const JEWEL = ['# stat max-health', '# passive hale', '# cluster-jewel keen-edge', 'shape: point', 'open-connections: e', 'passives: 1 hale'].join('\n');
@@ -17,6 +19,56 @@ describe('# item cluster-jewel:', () => {
   it('is optional: an ordinary item declares no cluster-jewel: at all', () => {
     const registry = loadModule('# item straw');
     expect(registry.items.get('straw')!.clusterJewel).toBeUndefined();
+  });
+});
+
+describe('# item cluster-jewel: written as a block', () => {
+  const PASSIVES = ['# stat max-health', '# passive hale', '# passive mending'].join('\n');
+  const carrying = (...lines: string[]) => [PASSIVES, '# item quiet-hour-jewel', 'title: Quiet Hour', 'examine: An hour nobody asked after.', ...lines].join('\n');
+  const QUIET_HOUR = carrying('cluster-jewel:', '  shape: spindle', '  open-connections: e', '  passives: 1 hale, 3 mending');
+  const jewelIn = (source: string) => loadModule(source).clusterJewels.get('quiet-hour-jewel')!;
+
+  it('declares the jewel at the item, so nothing has to name it and the item is that jewel', () => {
+    const registry = loadModule(QUIET_HOUR);
+    expect(registry.items.get('quiet-hour-jewel')!.clusterJewel).toBe('quiet-hour-jewel');
+    expect(registry.clusterJewels.get('quiet-hour-jewel')!.positions).toEqual({ 1: 'hale', 3: 'mending' });
+  });
+
+  it('is hydrated like a section of its own, defaults and all', () => {
+    expect(jewelIn(QUIET_HOUR).modSlots).toBe(DEFAULT_MOD_SLOTS);
+    expect(jewelIn(carrying('cluster-jewel:', '  shape: spindle', '  open-connections: e', '  mod-slots: 4')).modSlots).toBe(4);
+  });
+
+  it('says the words of the item carrying it, having none of its own to say', () => {
+    const jewel = jewelIn(QUIET_HOUR);
+    expect(jewel.title).toBe('Quiet Hour');
+    expect(jewel.examine).toBe('An hour nobody asked after.');
+  });
+
+  it('refuses words written inside it, since the item is where they are written', () => {
+    expect(() => loadModule(carrying('cluster-jewel:', '  title: Quieter Hour', '  shape: spindle', '  open-connections: e'))).toThrow(/title: is the item's, and a cluster-jewel written under one says what the item says/);
+    expect(() => loadModule(carrying('cluster-jewel:', '  examine: A quieter hour.', '  shape: spindle', '  open-connections: e'))).toThrow(/examine: is the item's/);
+  });
+
+  it('is refused for what a section of its own would be refused for, named as the item', () => {
+    expect(() => loadModule(carrying('cluster-jewel:', '  shape: spindle', '  open-connections: e', '  passives: 9 hale'))).toThrow(/# cluster-jewel quiet-hour-jewel: passives: position 9 is outside spindle's 1-3 range/);
+    expect(() => loadModule(carrying('cluster-jewel:', '  shape: spindle', '  open-connections: e', '  passives: 1 nope'))).toThrow(/# item quiet-hour-jewel cluster-jewel: passives: names an unknown passive: nope/);
+  });
+
+  it('refuses a # cluster-jewel written at the same id, which would be two bodies under one name', () => {
+    const written = ['# cluster-jewel quiet-hour-jewel', 'shape: point', 'open-connections: e'].join('\n');
+    expect(() => loadModule([QUIET_HOUR, written].join('\n'))).toThrow(/# cluster-jewel quiet-hour-jewel is already minted by # item quiet-hour-jewel/);
+    expect(() => loadModule([written, QUIET_HOUR].join('\n'))).toThrow(/# cluster-jewel quiet-hour-jewel is already minted by # item quiet-hour-jewel/);
+  });
+
+  it('prints back as the block it was written as, beside an item that names one instead', () => {
+    const text = ['# info jewels', 'version: 1.0.0', '', PASSIVES, '', '# cluster-jewel keen-edge', 'shape: point', 'open-connections: e', '', '# item keen-edge-jewel', 'cluster-jewel: keen-edge', '', '# item quiet-hour-jewel', 'title: Quiet Hour', 'cluster-jewel:', '  shape: spindle', '  open-connections: e', '  passives: 1 hale, 3 mending'].join('\n');
+    const trip = roundTripModule(loadUniverse([{ name: 'jewels', text }]), { info: { id: 'jewels', version: [1, 0, 0] } }, (again) => loadUniverseWithDiagnostics([{ name: 'jewels', text: again }]));
+
+    expect(trip.diagnostics.map((each) => each.message)).toEqual([]);
+    expect(trip.differences).toEqual([]);
+    expect(trip.printed).toContain(['cluster-jewel:', '  shape: spindle', '  open-connections: e', '  passives: 1 jewels.hale, 3 jewels.mending'].join('\n'));
+    expect(trip.printed).toContain('cluster-jewel: jewels.keen-edge\n');
   });
 });
 

@@ -371,6 +371,10 @@ export interface BaseEntry {
 export interface Locales {
   addressable: Set<string>;
   base: Map<string, BaseEntry>;
+  // A key whose words are another key's. A value a section carries rather than names says what that
+  // section says, and has no line of its own to key: so what is looked up under the kind it is read as
+  // is answered from where the words were written, rather than copied and left to be reviewed twice.
+  carried: Map<string, string>;
   prose: Map<string, ProseShape>;
   sections: LocaleDeclaration[];
   declared: Map<string, Map<string, string>>;
@@ -386,6 +390,7 @@ export interface LocaleDeclaration {
 export const emptyLocales = (): Locales => ({
   addressable: new Set(),
   base: new Map(),
+  carried: new Map(),
   english: new Map(),
   prose: new Map(),
   sections: [],

@@ -33,8 +33,9 @@ export interface Field<T, Self> extends FieldPrinting {
 
 export interface MappedField<T, Self> extends FieldPrinting {
   parser: Parser<unknown>;
-  hydrate(parsed: unknown): NonNullable<T>;
-  dehydrate?: (held: NonNullable<T>) => unknown[];
+  hydrate(parsed: unknown, self: Self, context: HydrateContext): NonNullable<T>;
+  // The members this value was written as, or nothing where this value is not written as a block at all: a field whose grammar takes either one line or an indented body says so by answering here.
+  dehydrate?: (held: NonNullable<T>) => unknown[] | undefined;
   default?: (self: Self, context: HydrateContext) => T;
   keyword?: string;
 }
@@ -78,7 +79,7 @@ export interface AnyField extends FieldPrinting {
   parser: unknown;
   keyword?: string;
   default?: (self: never, context: HydrateContext) => unknown;
-  dehydrate?: (held: never) => unknown[];
+  dehydrate?: (held: never) => unknown[] | undefined;
 }
 
 export interface AnySchema {
@@ -123,7 +124,7 @@ type AnyFields = Record<
   string,
   {
     parser: Parser<unknown>;
-    hydrate?: (parsed: unknown) => unknown;
+    hydrate?: (parsed: unknown, self: unknown, context: HydrateContext) => unknown;
     default?: (self: unknown, context: HydrateContext) => unknown;
     keyword?: string;
   }
@@ -354,7 +355,7 @@ export function hydrateSection<H extends { id: string }, F extends keyof H = nev
           state = 'resolving';
           const authoredValue = read[key];
           const hydrate = fields[key].hydrate;
-          cached = authoredValue === undefined ? fields[key].default?.(view, context) : hydrate ? hydrate(authoredValue) : authoredValue;
+          cached = authoredValue === undefined ? fields[key].default?.(view, context) : hydrate ? hydrate(authoredValue, view, context) : authoredValue;
           state = 'resolved';
         }
         return cached;
@@ -400,7 +401,7 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   const positional = isPositionalField(schema, name);
   const label = (text: string): string[] => (positional ? [text] : [`${keywordOf(name, spec)}: ${text}`]);
 
-  const members = Array.isArray(value) ? value : (spec.dehydrate as ((held: unknown) => unknown[]) | undefined)?.(value);
+  const members = Array.isArray(value) ? value : (spec.dehydrate as ((held: unknown) => unknown[] | undefined) | undefined)?.(value);
   if (members !== undefined) {
     if (members.length === 0 && spec.printed !== 'always') return [];
     const lines = parser.printBlock!(members);

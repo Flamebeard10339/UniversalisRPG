@@ -5,7 +5,7 @@ import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { DropTable } from '../content/sections/droptable';
 import { EventTrigger, GameEvent } from '../content/sections/event';
-import { isPoint, Range, sampleCount, sampleRange } from '../grammar/range';
+import { isPoint, Range, sampleCount, sampleRange, scaleRange } from '../grammar/range';
 import { Registry, startingLocationId } from '../content/registry';
 import { Resource } from '../content/sections/resource';
 import { evaluateCondition } from './conditions';
@@ -107,9 +107,24 @@ export function samplesPerApplication(results: readonly ActionResult[]): boolean
   });
 }
 
-function drawCount(state: GameState, amount: Range | undefined): number {
+// What the running action multiplies everything it hands over by, read off the player as a
+// percentage over what the lines say. Read here rather than carried in from wherever the action was
+// armed, so an amount is scaled by having been drawn at all: a `give:` of the action's own, a row of
+// a `one of:`, a table it rolls and a hook that fires under it all pass through one draw and none of
+// them has to know a stat is weighing it.
+function rewardScale(state: GameState, registry: Registry): number {
+  if (!state.activeAction) return 1;
+  const named = armedAction(state, registry).rewardScale;
+  // Nothing hands over less than none of a thing, so a stat driven under -100 pays nothing rather
+  // than taking what the player came with.
+  return named === undefined ? 1 : Math.max(0, 1 + statValue(named, state, registry) / 100);
+}
+
+function drawCount(state: GameState, registry: Registry, amount: Range | undefined): number {
   if (amount === undefined) return 1;
-  return isPoint(amount) ? amount.min : sampleCount(amount, nextRandom(state));
+  const scaled = scaleRange(amount, rewardScale(state, registry));
+  const whole = { min: Math.floor(scaled.min), max: Math.floor(scaled.max) };
+  return isPoint(whole) ? whole.min : sampleCount(whole, nextRandom(state));
 }
 
 function drawAmount(state: GameState, amount: Range): number {
@@ -224,7 +239,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       // The one arrival that happens while the world is running on the player's behalf. A pack with
       // no room for it does not swallow it quietly: `receiveItem` says so, and what is under way
       // stops with a reason, because carrying on would produce nothing.
-      const wanted = drawCount(state, result.amount) * count;
+      const wanted = drawCount(state, registry, result.amount) * count;
       const moved = receiveItem(state, registry, result.item, wanted);
       announceCarried(segment, Math.abs(moved));
       if (moved < wanted) segment.stopped = localizerOf(registry, state).engine('engine.stopped.pack-full');
@@ -246,7 +261,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return -gone;
     }
     case 'xp': {
-      const amount = drawCount(state, result.amount) * count;
+      const amount = drawCount(state, registry, result.amount) * count;
       const before = state.xp[result.skill] ?? 0;
       state.xp[result.skill] = before + amount;
       const reached = skillLevel(state.xp[result.skill]);

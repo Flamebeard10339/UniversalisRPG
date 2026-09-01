@@ -8,6 +8,7 @@ import { range, Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
 import { actions, condition as visitCondition, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { carriedJewel, ClusterJewel, clusterJewel as clusterJewelSection, jewelCarried } from './clusterJewel';
 import { section } from './define';
 import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
@@ -17,7 +18,7 @@ export interface ClusterEffect {
   percent: number;
 }
 
-export interface Item extends HookCarrier {
+export interface AuthoredItem extends HookCarrier {
   id: string;
   title: string;
   examine?: string;
@@ -25,13 +26,24 @@ export interface Item extends HookCarrier {
   requires?: Condition;
   tags: TagClause[];
   actions: Action[];
-  clusterJewel?: string;
+  jewel?: string | ClusterJewel;
   originCluster?: string;
   clusterEffect?: ClusterEffect;
   itemLevel?: Range;
   group?: string;
   value?: number;
 }
+
+export interface Item extends AuthoredItem {
+  clusterJewel?: string;
+}
+
+// Which jewel this item is: the one it names, or the one it carries, which stands at the item's own id.
+const jewelIdOf = (item: AuthoredItem): string | undefined => (typeof item.jewel === 'string' ? item.jewel : item.jewel?.id);
+
+const jewelCarriedBy = (item: AuthoredItem): ClusterJewel | undefined => (typeof item.jewel === 'object' ? item.jewel : undefined);
+
+const CARRIES_ONE = 'the jewel it is, written out where nothing else names one. It stands at this item\'s own id and says this item\'s title: and examine:';
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
@@ -51,9 +63,9 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
   examples: ['+25% max-health', '-10% max-health'],
 };
 
-export const isBase = (item: Item): boolean => item.itemLevel !== undefined;
+export const isBase = (item: AuthoredItem): boolean => item.itemLevel !== undefined;
 
-function roleProblem(item: Item): string | undefined {
+function roleProblem(item: AuthoredItem): string | undefined {
   if (item.requires !== undefined && item.slot === undefined) {
     return `requires: is what has to hold of whoever puts ${item.id} on, and nothing without a slot: is ever put on: give it a slot: or drop the field`;
   }
@@ -66,7 +78,7 @@ function roleProblem(item: Item): string | undefined {
   if (item.itemLevel !== undefined && item.slot === undefined) {
     return `item-level: gives ${item.id} a plane, and a plane is only ever read off what the player is wearing: give it a slot: or drop the field`;
   }
-  if (item.clusterJewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
+  if (item.jewel !== undefined && (isBase(item) || item.originCluster !== undefined)) {
     return `cluster-jewel: makes ${item.id} a jewel, which is exclusive with the ${isBase(item) ? 'item-level:' : 'origin-cluster:'} that makes it a base`;
   }
   if (item.clusterEffect !== undefined && (isBase(item) || item.originCluster !== undefined)) {
@@ -78,12 +90,18 @@ function roleProblem(item: Item): string | undefined {
   return undefined;
 }
 
-export const item = section<Item, never, 'actions'>()({
+export const item = section<AuthoredItem, never, 'actions'>()({
   says: (value) => [...value.actions.flatMap(actionResultLists), value.onHit, value.whenHit],
   kind: 'item',
   ids: 'owned',
   vocabulary: 'declared',
-  map: 'items',
+  maps: {
+    items: (value): readonly (readonly [string, Item])[] => [[value.id, { ...value, clusterJewel: jewelIdOf(value) }]],
+    clusterJewels: (value): readonly (readonly [string, ClusterJewel])[] => {
+      const carried = jewelCarriedBy(value);
+      return carried === undefined ? [] : [[value.id, carried]];
+    },
+  },
   nestsActions: 'wherever the player is carrying one, since an item goes where the player goes',
   text: ['title', 'examine'],
   fields: {
@@ -98,7 +116,15 @@ export const item = section<Item, never, 'actions'>()({
       note: 'how many points one of these drops carrying, rolled once on arrival and fixed on that copy; two copies that rolled differently do not stack',
     },
     tags: { parser: list(tagClause), default: () => [] },
-    clusterJewel: { parser: id, keyword: 'cluster-jewel', names: { id: 'cluster-jewel' } },
+    jewel: {
+      parser: carriedJewel,
+      keyword: 'cluster-jewel',
+      names: { id: 'cluster-jewel' },
+      block: true,
+      note: CARRIES_ONE,
+      hydrate: (parsed, self, context) => (typeof parsed === 'string' ? parsed : jewelCarried(parsed as object, self, context)),
+      dehydrate: (held) => (typeof held === 'string' ? undefined : [held]),
+    },
     originCluster: { parser: id, keyword: 'origin-cluster', names: { id: 'cluster-jewel' }, standsWithout: true },
     clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
     value: { parser: number, note: 'what one of these is worth in coin, and the only thing that makes it tradable: an item declaring no value is one no shop will price' },
@@ -114,6 +140,8 @@ export const item = section<Item, never, 'actions'>()({
     actions(held.actions, where, visit);
     hooks(held, where, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
+    // A jewel written out here holds names of its own, and reading them is the jewel's own business.
+    if (held.jewel !== null && typeof held.jewel === 'object') clusterJewelSection.visit(held.jewel as ClusterJewel, `${where} cluster-jewel:`, visit);
   },
   prune: (value, at, where) => {
     // A wear requirement is a gate, and a gate nobody can read is not a gate: an item asking for a
@@ -125,8 +153,10 @@ export const item = section<Item, never, 'actions'>()({
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
     const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
     const clusterEffect = value.clusterEffect?.statId === undefined || !at.gone('stat', value.clusterEffect.statId, `${where} cluster-effect:`) ? value.clusterEffect : undefined;
-    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit && clusterEffect === value.clusterEffect
+    const carried = jewelCarriedBy(value);
+    const jewel = carried === undefined ? value.jewel : (clusterJewelSection.prune(carried, at, `${where} cluster-jewel:`) ?? undefined);
+    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit && clusterEffect === value.clusterEffect && jewel === value.jewel
       ? value
-      : { ...value, tags, actions: kept, onHit, whenHit, clusterEffect };
+      : { ...value, tags, actions: kept, onHit, whenHit, clusterEffect, jewel };
   },
 });

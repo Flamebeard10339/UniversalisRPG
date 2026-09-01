@@ -136,7 +136,8 @@ interface Bespoke<V extends { id: string }> extends Common<V> {
 // What a keyword's shapes trail off in where it takes a list of them.
 const LISTED = ', …';
 
-const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('element' in parser ? () => (parser as ListParser<unknown>).lines() : undefined);
+// The grammar a field's own body is written in, where its parser has one. Asked of the parser rather than of the field, so any parser that says what its indented lines hold is offered as a block wherever it stands.
+const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('lines' in parser ? () => (parser as { lines(): readonly Written[] }).lines() : undefined);
 
 // The parser a value of this one is written with, which for a list is the parser one item of it is written with.
 const valueOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
@@ -173,12 +174,13 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const named = pointedAt(parser, written, said);
   const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];
   if (shapes.length === 0) return [];
-  // A block's lines are a grammar of their own and already say what they hold; only what the field says over its parser is laid on them.
-  const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...filledBy(spec) }));
+  // A block whose lines are this field's own values written one to a line takes what the field says over its parser; a block that is a grammar of its own already says what each of its lines holds.
+  const laid = valueOf(parser) === parser ? {} : filledBy(spec);
+  const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...laid }));
   return [...shapes, ...(held === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block: held }])];
 };
 
-const schemaGrammar = (schema: AnySchema): readonly Written[] => [
+export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec)),
   ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
   ...(schema.entries?.body.grammar ?? []),

@@ -1,10 +1,10 @@
 import type { LocaleSection } from './sections/locale';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Action, actionProblem, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionProblem, actionResultLists, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionAddress, actionTextKey, actionTextOwner, actionWords } from './sections/action';
+import { actionAddress, actionTextKey, actionTextOwner, actionWords, type ActionDeclaration } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
@@ -21,7 +21,7 @@ import { registrySlots, validateItemSlots, validateSectionReferences, validateTe
 import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { unpriceableStock } from './sections/shop';
-import { actionAddresses, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
+import { actionAddresses, carriedIds, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { validateTuningVariable } from './tuningVariables';
 import { humanizeEn } from '../grammar/values';
@@ -472,6 +472,61 @@ function overlayAction(base: Action, over: Action): Action {
   return merged as unknown as Action;
 }
 
+// An action written over another. What the base holds is the starting body, every line written here
+// is laid over it, and `+` adds to what it inherited rather than replacing it — the same overlay an
+// entity gets over what it `uses:`, with the one difference that an extending action keeps its own
+// name: a name is what an author extends an action to change, where an entity overloading a shared
+// action must not rename it for everyone else.
+// Which `# action` an overlay failed at, carried on the error rather than read back out of its
+// words: the one that could not be assembled is somewhere down a chain, and only the frame that gave
+// up knows which.
+class ExtendsFailure extends DslError {
+  constructor(
+    readonly at: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function linkActions(registry: Registry): ExtendsFailure | null {
+  const open = new Set<string>();
+  const done = new Set<string>();
+
+  const resolve = (id: string, trail: readonly string[]): Action => {
+    const declared = registry.actions.get(id)!;
+    if (done.has(id) || declared.extends === undefined) return declared;
+    if (open.has(id)) throw new ExtendsFailure(id, `# action ${id} extends itself: ${[...trail, id].join(' -> ')}`);
+    if (!registry.actions.has(declared.extends)) throw new ExtendsFailure(id, `# action ${id} extends: names an unknown action: ${declared.extends}`);
+
+    open.add(id);
+    const base = resolve(declared.extends, [...trail, id]);
+    open.delete(id);
+
+    const laid = { ...overlayAction(base, declared), label: declared.label, wrote: actionResultLists(declared) } as ActionDeclaration;
+    if (declared.generatedLabel) laid.generatedLabel = true;
+    else delete laid.generatedLabel;
+    delete laid.appended;
+
+    const problem = assembledActionProblem(laid);
+    if (problem) throw new ExtendsFailure(id, `# action ${id} ${actionProblem(laid.label, problem)}`);
+
+    done.add(id);
+    registry.actions.set(id, laid);
+    return laid;
+  };
+
+  for (const id of [...registry.actions.keys()]) {
+    try {
+      resolve(id, []);
+    } catch (raw) {
+      if (!(raw instanceof ExtendsFailure)) throw raw;
+      return raw;
+    }
+  }
+  return null;
+}
+
 function linkEntity(entity: Entity, registry: Registry): Entity {
   const handlers: Handler[] = [];
   const overloads = new Map<string, Action>();
@@ -535,6 +590,13 @@ function entityProblem(entity: Entity, registry: Registry, stoodIn: string | und
 
 function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
   compileFactionBits(registry);
+
+  const overlaid = linkActions(registry);
+  if (overlaid) {
+    const module = sectionOwner(owners, 'action', overlaid.at);
+    if (!module) throw overlaid;
+    return { module, stage: 'validate', error: overlaid };
+  }
 
   const players: Entity[] = [];
   const stood = entitiesStood(registry.locations);
@@ -784,8 +846,16 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       const owned = isOwnedKind(kind);
       if (owned && !registry.namespace.has(kind, id)) continue;
       const namespace = owned ? (registry.namespace.ownerOf(kind, id) ?? null) : null;
+      const language = languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE;
       try {
-        recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE);
+        recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, language);
+        // A value a section carries rather than names has no line of its own for a word to be written
+        // on, so what is asked of it under the kind it is read as is answered from the section that
+        // carries it.
+        for (const each of carriedIds(kind, section.value as { id: string })) {
+          if (!registry.namespace.has(each.kind, each.id)) continue;
+          for (const field of textFieldsOf(each.kind) ?? []) registry.locales.carried.set(localeKey(namespace, each.kind, each.id, field), localeKey(namespace, kind, id, field));
+        }
       } catch (error) {
         if (!(error instanceof DslError)) throw error;
         return { failure: { module: section.module, stage: 'build', error } };

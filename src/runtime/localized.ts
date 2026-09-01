@@ -31,7 +31,9 @@ function pattern(locales: Locales, language: string, key: string): string | unde
   const declared = locales.declared.get(language)?.get(key);
   if (declared !== undefined) return withoutNote(declared);
   const base = locales.base.get(key);
-  return base?.language === language ? withoutNote(base.text) : undefined;
+  if (base?.language === language) return withoutNote(base.text);
+  const said = locales.carried.get(key);
+  return said === undefined ? undefined : pattern(locales, language, said);
 }
 
 export interface Localizer {

@@ -167,6 +167,24 @@ function addressedIn(id: string, loaded: ReadonlySet<string>, visible: ReadonlyS
   return loaded.has(named) && visible.has(named) ? id.slice(named.length + 1) : null;
 }
 
+// Which kind owns each registry map, so a value one kind lands in another's is known for what it is.
+let owningKind: ReadonlyMap<string, string> | undefined;
+const ownerOfMap = (): ReadonlyMap<string, string> => (owningKind ??= new Map(contentSectionMaps().map(([kind, map]) => [map, kind])));
+
+// A section that carries a value of another kind rather than naming one declares that value's id under
+// that kind. What a section lands where is its `maps` and nothing else's to say, so a kind that starts
+// carrying one next month is held apart, resolved and refused for a name already taken with no edit here.
+export function carriedIds(kind: string, value: { id: string }): { kind: string; id: string }[] {
+  const owner = sectionFor(kind);
+  const found: { kind: string; id: string }[] = [];
+  for (const [map, lands] of Object.entries(owner?.maps ?? {})) {
+    const under = ownerOfMap().get(map);
+    if (under === undefined || under === kind) continue;
+    for (const [id] of lands(value)) found.push({ kind: under, id });
+  }
+  return found;
+}
+
 function declareIds(module: ParsedModule, namespace: Namespace, loaded: ReadonlySet<string>): void {
   const missingOptional = missingOptionalDependencies(module, loaded);
   const visible = visibleTo(module, loaded);
@@ -176,24 +194,32 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
     return id === undefined || !isOwnedKind(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
   });
 
+  // `carriedBy` names the section a value of this kind was written under rather than beside, and a name
+  // written there is minted: nothing else may be authored at it, or the two would be one key and the
+  // one that loaded last would silently win.
+  const declaring = (kind: string, id: string, carriedBy?: string): void => {
+    const scope = idScopeOf(kind);
+    if (scope === 'none') return;
+    // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
+    if (scope !== 'owned') return void namespace.declare(kind, null, id);
+    const addressed = addressedIn(id, loaded, visible);
+    if (addressed === null && id.includes('.')) return;
+    const own = addressed ?? id;
+    if (kind === 'flag' && own === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
+    const key = addressed === null ? qualify(module.namespace, own) : id;
+    if (carriedBy === undefined) namespace.declare(kind, module.namespace, key);
+    else namespace.mint(kind, key, carriedBy, module.namespace);
+  };
+
   for (const { kind, value } of createdSections(module)) {
     // An action minted under a section of its own takes that section's id, so it is declared where an authored one's would be and an author who writes the same heading is told rather than silently overwritten.
     for (const minted of sectionFor(kind)?.mintedActions?.(value) ?? []) {
       const under = actionTextSection(kind, value.id, minted.action);
       if (under.kind !== kind || under.id !== value.id) namespace.mint(under.kind, under.id, minted.from);
     }
-    const scope = idScopeOf(kind);
-    if (scope === 'none' || value.id === undefined) continue;
-    // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
-    if (scope !== 'owned') {
-      namespace.declare(kind, null, value.id);
-      continue;
-    }
-    const addressed = addressedIn(value.id, loaded, visible);
-    if (addressed === null && value.id.includes('.')) continue;
-    const own = addressed ?? value.id;
-    if (kind === 'flag' && own === VISITS) throw new DslError(`# flag ${VISITS} is reserved: the engine reads <node>.${VISITS} as a dialogue node's visit counter`);
-    namespace.declare(kind, module.namespace, addressed === null ? qualify(module.namespace, own) : value.id);
+    if (value.id === undefined) continue;
+    declaring(kind, value.id);
+    for (const each of carriedIds(kind, value as { id: string })) declaring(each.kind, each.id, `# ${kind} ${value.id}`);
   }
 }
 

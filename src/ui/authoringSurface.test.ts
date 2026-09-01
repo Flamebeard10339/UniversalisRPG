@@ -90,12 +90,15 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
 
   it('addresses every section the loaded registry holds', () => {
     const named = new Set(addressed.map((section) => `${section.kind} ${section.address}`));
+    // What a module wrote, which is not everything standing in a kind's map: a quest gives dialogues
+    // away and an item may carry the jewel it is, and those are their carrier's to be edited through
+    // and not sections of their own. The loader recorded a contribution for each body it read.
+    const wrote = new Set([...REGISTRY.contributions.values()].flat().map((each) => `${each.kind} ${each.id}`));
     let checked = 0;
 
     for (const [kind, map] of contentSectionMaps()) {
       for (const key of mapOf(REGISTRY, map).keys()) {
-        // What a module wrote, which is not everything standing in a kind's map: a quest gives dialogues away, and those are the quest's to be edited through and not sections of their own. The namespace declared the written ones.
-        if (!REGISTRY.namespace.has(kind, key)) continue;
+        if (!REGISTRY.namespace.has(kind, key) || !wrote.has(`${kind} ${key}`)) continue;
         checked += 1;
         expect(named, `${kind} ${key}`).toContain(`${kind} ${key}`);
       }

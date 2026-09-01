@@ -285,6 +285,17 @@ title: Stout Heart Jewel
 examine: It does not add. It insists.
 cluster-jewel: stout-heart
 
+// A jewel that names none: the one it is is written out under it, stands at this item's own id, and
+// says these words.
+# item quiet-hour-jewel
+title: Quiet Hour Jewel
+examine: An hour nobody asked after, kept in iron.
+value: 25
+cluster-jewel:
+  shape: spindle
+  open-connections: e
+  passives: 1 hale, 2 keen, 3 warded
+
 // --- somewhere to make something ---
 
 # station bench

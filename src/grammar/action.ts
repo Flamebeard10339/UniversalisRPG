@@ -42,6 +42,7 @@ export interface Action {
   depletes?: Sided;
   attempts?: number;
   stopsOn?: string[];
+  rewardScale?: string;
   appended?: string[];
 }
 
@@ -159,6 +160,8 @@ const positiveCount: Parser<number> = {
 // A placeholder is called after what it names, so the events an action ends on say so wherever the field is shown.
 const eventNamed: Parser<string> = { ...id, forms: ['<event>'], examples: ['level-up', 'core.level-up'] };
 
+const statNamed: Parser<string> = { ...id, forms: ['<stat>'], examples: ['luck'], names: { stat: 'stat' } };
+
 const stoppers = list(eventNamed);
 
 const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => ('element' in parser ? (parser as ListParser<unknown>) : undefined);
@@ -198,6 +201,14 @@ const ACTION_FIELDS: readonly (Filled & {
   { written: 'depletes', label: /depletes:[ \t]*/, name: 'depletes', parser: depleted, family: 'what it is contested on' },
   { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes', note: ATTEMPTS_BUDGET },
   { written: 'stops on', label: /stops on:[ \t]*/, name: 'stopsOn', parser: stoppers, family: 'how long it takes' },
+  {
+    written: 'rewards scaled by',
+    label: /rewards scaled by:[ \t]*/,
+    name: 'rewardScale',
+    parser: statNamed,
+    family: 'what it pays',
+    note: 'read off the player as a percentage over what is written, so 0 pays what the lines say and 100 pays twice it. It reaches every amount this action hands over, wherever that amount was written — a `give:` of its own, a row of a `one of:`, a `# droptable` it rolls — so no list has to know the stat exists, and a world weighing its haul by one stat and its xp by another declares two stats and names each on the action that pays it',
+  },
 ];
 
 const ACTION_READERS = ACTION_FIELDS.map((field) => ({ ...field, read: readsWith(field.written, field.parser) }));
@@ -442,7 +453,8 @@ export function actionLines(action: Action): string[] {
     action.damage ||
     action.depletes ||
     action.attempts !== undefined ||
-    action.stopsOn?.length;
+    action.stopsOn?.length ||
+    action.rewardScale !== undefined;
 
   if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
 
@@ -461,6 +473,7 @@ export function actionLines(action: Action): string[] {
   if (action.depletes) lines.push(`  depletes: ${printSided(action.depletes)}`);
   if (action.attempts !== undefined) lines.push(`  attempts: ${action.attempts}`);
   if (action.stopsOn?.length) lines.push(`${at('stopsOn')}stops on: ${stoppers.print(action.stopsOn)}`);
+  if (action.rewardScale !== undefined) lines.push(`  rewards scaled by: ${action.rewardScale}`);
   lines.push(...indentLines(action.results.flatMap(resultLines)));
   printResultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
   printResultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);

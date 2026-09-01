@@ -1216,7 +1216,7 @@ one of:
 # entity civilian
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 20
+stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 20
 uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 45s
@@ -1227,7 +1227,7 @@ pick-pocket:
   give: 3 coin
   xp: thieving.thieving 4
   1 in 400:
-    give: 1 thieving.a-light-touch-jewel
+    give: 1 thieving.thieving-rate-jewel
     say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
   // What a townsman is carrying that a skiller wants is what a townsman is wearing, so the clothes
   // come off the same pocket the coin does.
@@ -1241,7 +1241,7 @@ pick-pocket:
 # entity guardsman
 title: Guardsman
 examine: One of the duke's, in a coat of plates and a mood.
-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 55
+stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 55
 uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 70s
@@ -1255,12 +1255,12 @@ pick-pocket:
   +on unfinished:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
     drain: 1 health
-    inflict: thieving.dazed for thieving.collar-length
+    inflict: thieving.dazed for thieving.npc-daze-duration
 
 # entity knight
 title: Knight
 examine: Iron from the crown of his head to the soles of his feet, and he has been hit by better than you.
-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 80
+stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 80
 uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 100s
@@ -1275,7 +1275,7 @@ pick-pocket:
   +on unfinished:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
     drain: 1 health
-    inflict: thieving.dazed for thieving.collar-length
+    inflict: thieving.dazed for thieving.npc-daze-duration
 
 // The second band's mark. Watchful enough that a hand which has not put the hours in comes away with
 // nothing all afternoon, and carrying the one thing in Tulsa worth taking off a person: a hand that
@@ -1283,26 +1283,26 @@ pick-pocket:
 # entity thief
 title: Thief
 examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 100
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 100
 uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 80s
 on death:
   credit:
     roll: combat.purse
-    1 in 14: give: 1 thieving.lockpicks
+    1 in 14: give: 1 thieving.steel-lockpicks
 pick-pocket:
   hidden if: level.thieving < 11
   give: 18 coin
   xp: thieving.thieving 17
   1 in 60: give: 1 thieving.fingerless-gloves
   1 in 90:
-    give: 1 thieving.a-fences-eye-jewel
+    give: 1 thieving.luck-jewel
     say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
   +on unfinished:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
     drain: 1 health
-    inflict: thieving.dazed for thieving.collar-length
+    inflict: thieving.dazed for thieving.npc-daze-duration
 
 // --- what is locked ---
 //
@@ -1313,7 +1313,7 @@ pick-pocket:
 # entity house-chest
 title: Chest
 examine: A banded chest under the window with a lock on it older than the window.
-stats: thieving.thieving 0, thieving.wards 60
+stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 60
 uses: thieving.pick-the-lock
 pick-the-lock:
   roll: house-chest-contents
@@ -1333,7 +1333,7 @@ one of:
 # entity treasure-chest
 title: Treasure Chest
 examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-stats: thieving.thieving 0, thieving.wards 110
+stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 110
 uses: thieving.pick-the-lock
 pick-the-lock:
   time: 10
@@ -1358,7 +1358,7 @@ one of:
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: thieving.thieving 0, thieving.wards 132
+stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 132
 uses: thieving.pick-the-lock
 pick-the-lock:
   hidden if: level.thieving < 14
@@ -1369,7 +1369,7 @@ pick-the-lock:
   +on unfinished:
     say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
     drain: 2 health
-    inflict: thieving.dazed for thieving.collar-length
+    inflict: thieving.dazed for thieving.npc-daze-duration
 
 # droptable strongbox-contents
 one of:
@@ -1377,7 +1377,7 @@ one of:
   6x: give: 1 thieving.ruby
   4x: give: 1 thieving.soft-toed-boots
   2x: give: 1 thieving.fingerless-gloves
-  1x: give: 1 thieving.a-quiet-hour-jewel
+  1x: give: 1 thieving.thieving-ability-jewel
   1x: give: 1 thieving.thieving-utility-jewel
 
 // --- what is already hostile ---

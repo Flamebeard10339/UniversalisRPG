@@ -83,11 +83,14 @@ export class Namespace {
     return this.put(kind, owner, key);
   }
 
-  // A name the engine puts in a kind's id space on an author's behalf, minted the same way by every section that mints it and so held at the root rather than under any one of them. Nothing may be authored there: the two would file their words under one key and whichever loaded last would silently win.
-  mint(kind: string, id: string, from: string): string {
+  // A name the engine puts in a kind's id space on an author's behalf. Nothing may be authored there:
+  // the two would file their words under one key and whichever loaded last would silently win. It is
+  // held at the root where every section that mints it mints it the same way, and under a module where
+  // one section of that module is the whole of what stands there.
+  mint(kind: string, id: string, from: string, owner: string | null = null): string {
     if (!this.minted.has(`${kind} ${id}`) && this.has(kind, id)) this.refuseSquat(kind, id, from);
     this.minted.set(`${kind} ${id}`, from);
-    return this.put(kind, null, id);
+    return this.put(kind, owner, id);
   }
 
   declareMember(kind: string, ownerKind: string, owner: string, name: string): string {

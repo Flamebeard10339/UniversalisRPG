@@ -79,6 +79,13 @@ be opened to write a quest, an item or a town.
 met them, and they are the proof the rest of the module still works. Add to a
 module; replace one only having read what you are replacing.
 
+**Whether the language can already do something is a question for `npm run oracle`,
+not for `src/`.** The page is derived from the declarations, so it cannot drift; a
+reading of the parser is a guess with extra steps. This holds when changing the
+engine as much as when writing in the language — the commonest way a feature gets
+built twice here is an agent in `src/` concluding from source that the grammar
+cannot do what it already does.
+
 The rest of this section is about changing the language rather than writing in it.
 
 **One kind, one file: `src/content/sections/<kind>.ts`.** That file holds

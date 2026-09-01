@@ -147,13 +147,16 @@ export function treeOf(kind: string, seen: Seen = freshly(), said: ReadonlySet<s
   if (owner === undefined) return [`# ${kind} — no such kind`];
   const sitting = { under: `# ${kind} probe`, indent: 0 };
   const already: Already = { kind: `# ${kind}`, seen };
-  // A kind that is one named grammar and nothing else says which, rather than writing it out a second
-  // time — and asks before claiming that grammar's name for its own heading.
-  const held = heldBefore(already, keyOf(owner.grammar));
-  if (blockCalled(owner.grammar) !== undefined && held !== undefined) return [`# ${kind} <id>`, `${PART}what ${held} holds, and nothing else`];
+  const own = owner.grammar.filter((line) => !said.has(sameLine(line)));
+  // A kind whose lines this page has already written out says where they stand rather than writing them
+  // a second time: as a grammar with a name of its own, or as the block some other kind opens for a body
+  // of this kind written under one of its own sections. What is left to write is what is asked about,
+  // since the lines said above every kind have already been read by anyone reading the page through.
+  const held = heldBefore(already, keyOf(owner.grammar)) ?? (own.length > 0 ? heldBefore(already, keyOf(own)) : undefined);
+  if (held !== undefined) return [`# ${kind} <id>`, `${PART}what ${held} holds, and nothing else`];
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
   holdNow(already, keyOf(owner.grammar), `# ${kind}`);
-  const own = owner.grammar.filter((line) => !said.has(sameLine(line)));
+  if (own.length > 0 && keyOf(own) !== keyOf(owner.grammar)) holdNow(already, keyOf(own), `# ${kind}`);
   // A kind with nothing left to write out still has to say so, or its heading stands over a blank and
   // reads as a page that gave up: a kind whose lines are all said above says which, and one that has no
   // lines at all says that writing the heading is the whole of it.

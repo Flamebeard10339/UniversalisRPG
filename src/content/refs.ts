@@ -212,6 +212,7 @@ function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written
 
 export function visitAction(action: Action, where: string, visit: Visit): void {
   for (const site of sidedNames(action)) put(site.held, 'id', site.kind, `${where} ${site.written}:`, visit);
+  put(action as unknown as Loose, 'rewardScale', 'stat', `${where} rewards scaled by:`, visit);
   visitTags(action.tags, where, visit);
   strings(action as unknown as Loose, 'stopsOn', 'event', `${where} stops on:`, visit);
   condition(action.requires, `${where} requires:`, visit);

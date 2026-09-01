@@ -45,14 +45,23 @@ examine: Dizzy...
 
 // --- Actions ---
 
-# action generic-thieving-action
-title: CHANGETHIS
-continuous
+# action steal
 attempts: 1
-rate: my thieving-rate
 accuracy: my thieving-ability vs their npc-thieving-difficulty
 on unfinished:
   inflict: dazed for npc-daze-duration
+
+# action pick-pocket
+title: Pick a Pocket
+extends: steal
+continuous
+rate: my thieving-rate
+
+# action pick-the-lock
+title: Pick the Lock
+extends: steal
+continuous
+time: 6
 
 // --- Thieving Equipment ---
 
@@ -84,48 +93,48 @@ tools, +4 thieving-ability
 // --- Passives ---
 
 # passive flat-thieving-small
-Title: Light Fingers
+title: Light Fingers
 tools, +2 thieving-ability
 
 # passive flat-thieving-large
-Title: Nimble Fingers
+title: Nimble Fingers
 tools, +4 thieving-ability
 
 # passive flat-thieving-rate-small
-Title: Quick Fingers
+title: Quick Fingers
 tools, +1 thieving-rate
 
 # passive flat-thieving-rate-large
-Title: Planned Action
+title: Planned Action
 tools, +2 thieving-rate
 
 # passive increased-thieving-small
-Title: Rogue's Sense
+title: Rogue's Sense
 tools, +12% thieving-ability
 
 # passive thieving-flat-health-1
-Title: Thick Skin
+title: Thick Skin
 tools, +12 core.max-health
 
 # passive thieving-regeneration-1
-Title: Steady Nerve
+title: Steady Nerve
 tools, recovery, +1 core.regeneration
 
 # passive reduced-daze-duration-1
-Title: Brazen
+title: Brazen
 tools, -10% npc-daze-duration
 
 # passive reduced-daze-duration-2
-Title: Tough
+title: Tough
 tools, -25% npc-daze-duration
 
 # passive luck-1
-Title: Good Eye
-tools, +3-8 core.luck
+title: Good Eye
+tools, +3-8 luck
 
 # passive luck-2
-Title: Practised Fence
-tools, +8-15 core.luck
+title: Practised Fence
+tools, +8-15 luck
 
 // --- Cluster Jewels ---
 
@@ -159,7 +168,7 @@ value: 1500
 cluster-jewel: 
   shape: spindle
   open-connections: e
-  passives: 1 good-eye, 2 practised-fence
+  passives: 1 luck-1, 2 luck-2
 
 // --- Stealable Items ---
 
