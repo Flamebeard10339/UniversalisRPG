@@ -159,8 +159,45 @@ export function transcriptsUnder(root: string): string[] {
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
 }
 
+const idFromStdin = (): string | null => {
+  if (process.stdin.isTTY) return null;
+  try {
+    const event = JSON.parse(readFileSync(0, 'utf8')) as Record<string, unknown>;
+    const named = [event.agent_id, event.subagent_id, event.session_id].find((each) => typeof each === 'string');
+    return (named as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+function asHookOutput(root: string): string {
+  const found = transcriptsUnder(root);
+  const named = idFromStdin();
+  const chosen = (named === null ? [] : found.filter((file) => path.basename(file).includes(named)))[0] ?? found[0];
+  if (chosen === undefined) return '{}';
+
+  const reading = read(callsIn(readFileSync(chosen, 'utf8')));
+  const lines = report(reading, path.basename(chosen, '.jsonl'));
+  const probes = reading.scratchWrites.length + reading.rerunsOf.size + reading.helpAfterUse.length;
+
+  return JSON.stringify({
+    systemMessage: `${lines[0]}${probes > 0 ? ` — ${probes} thing(s) it had to work out for itself` : ''}`,
+    hookSpecificOutput: {
+      hookEventName: 'SubagentStop',
+      additionalContext: [
+        'What that subagent had to work out before it could start. Experimentation is not by itself waste — a lane whose',
+        'brief was engine work reads engine source because that is the job. It is a signal: each line is a question the',
+        'docs did not answer, and a scratch world built by a lane that was told to ask the oracle names a hole that will',
+        'cost the next lane the same time. Judge it, and say so; if it names a hole, that is worth fixing at the source.',
+        '',
+        ...lines,
+      ].join('\n'),
+    },
+  });
+}
+
 const usage = [
-  'Usage: npm run friction [-- <agent id | transcript path> | --all]',
+  'Usage: npm run friction [-- <agent id | transcript path> | --all | --hook]',
   '',
   'What a subagent had to work out for itself before it could start. Reads the',
   'transcript of a finished subagent and reports its opening moves — engine source',
@@ -181,6 +218,10 @@ function main(): void {
     return;
   }
   const root = path.join(os.homedir(), '.claude', 'projects', slugOf(process.cwd()));
+  if (args.includes('--hook')) {
+    console.log(asHookOutput(root));
+    return;
+  }
   const found = transcriptsUnder(root);
   const named = args.find((arg) => !arg.startsWith('--'));
 

@@ -14,6 +14,18 @@
           }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/friction-on-subagent-stop.sh",
+            "timeout": 60,
+            "statusMessage": "Reading back what the subagent had to work out"
+          }
+        ]
+      }
     ]
   }
 }
