@@ -1,35 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { shippedSources } from '../src/content/shipped';
+import { fixtureSources } from '../src/content/worldFixture';
 import { planeClusters, pointsSpent, type Plane } from '../src/runtime/clusterPlane';
-import { equip, wearable } from '../src/runtime/equipment';
-import { itemInstance, itemLevel, itemTemplate, receiveItem, type ItemInstance } from '../src/runtime/itemInstance';
-import { initialState, loadSave } from '../src/runtime/save';
+import { equip } from '../src/runtime/equipment';
+import { itemLevel, receiveItem, type ItemInstance } from '../src/runtime/itemInstance';
+import { initialState } from '../src/runtime/save';
 import { skillLevel } from '../src/runtime/skills';
-import { createGameState } from '../src/runtime/state';
 import { activitiesIn, poolForTier } from './lib/tiers';
 import { buildTier, evenlySpent, handedOver, parseTierArgs, tierLines } from './tier-build';
 
-const shipped = loadUniverseWithDiagnostics(shippedSources()).registry;
+const shipped = loadUniverseWithDiagnostics(fixtureSources()).registry;
 const activities = activitiesIn(shipped);
-const combat = activities.find((each) => each.id === 'combat')!;
-const fishing = activities.find((each) => each.id === 'fishing')!;
-
-// Every reference build the corpus carries, found by the name it is filed under rather than listed
-// here, so a tier added next month is held to the same claims by existing. A trailing word names
-// what the pool was grown toward rather than a second activity -- `combat-tier-20-sustain` is the
-// combat tier at twenty that bought recovery instead of a bigger swing -- so it is read off and
-// dropped, and the claims below hold it to combat's skills like any other.
-const TIER = /^tiers\.(.+)-tier-(\d+)(?:-[a-z]+)?$/;
-const shippedTiers = [...shipped.saves.keys()].flatMap((id) => {
-  const found = TIER.exec(id);
-  return found ? [{ id, activity: found[1]!, level: Number(found[2]) }] : [];
-});
+// Read off the world rather than named: one activity of more than one skill, and one of exactly
+// one, which is the only difference any claim below is about.
+const combat = activities.find((each) => each.skills.length > 1)!;
+const fishing = activities.find((each) => each.skills.length === 1)!;
 
 describe('what a gear list may say', () => {
   it('hands over one of a thing, or the stock a count asks for', () => {
-    expect(handedOver('fishing.dried-fish-bait')).toEqual({ item: 'fishing.dried-fish-bait', count: 1 });
-    expect(handedOver('fishing.dried-fish-bait:300')).toEqual({ item: 'fishing.dried-fish-bait', count: 300 });
+    expect(handedOver('core.bread')).toEqual({ item: 'core.bread', count: 1 });
+    expect(handedOver('core.bread:300')).toEqual({ item: 'core.bread', count: 300 });
   });
 
   it('refuses a stock that is not a count, rather than handing over one of the thing', () => {
@@ -52,9 +42,9 @@ describe('what a gear list may say', () => {
   });
 
   it('will not grow toward something the world declares no stat for', () => {
-    const asked = tierLines(shipped, { activity: 'combat', level: 20, items: [], grow: ['combat.attack'], list: false });
+    const asked = tierLines(shipped, { activity: combat.id, level: 20, items: [], grow: ['nothing.declares-this'], list: false });
     expect(asked.ok).toBe(false);
-    expect(asked.lines.join('\n')).toMatch(/combat\.attack/);
+    expect(asked.lines.join('\n')).toMatch(/nothing\.declares-this/);
   });
 });
 
@@ -75,19 +65,20 @@ describe('what a tier has climbed', () => {
 });
 
 describe('a build wears what the world lets it wear', () => {
-  const KIT = ['fishing.small-fishing-net', 'fishing.large-fishing-net'];
+  const KIT = ['core.jerkin', 'fixture-town.ledger'];
 
-  // The large net asks for a level and the small one asks for nothing, so the same list at two
-  // tiers is the gate answering rather than anything here choosing.
+  // The ledger asks for a level and the jerkin asks for nothing, so the same list at two tiers is
+  // the gate answering rather than anything here choosing.
   it('takes the gated piece only at the tier that has earned it, and says why where it does not', () => {
     const under = buildTier(shipped, fishing, 1, KIT);
     const over = buildTier(shipped, fishing, 10, KIT);
-    expect(under.worn.find((each) => each.item === 'fishing.large-fishing-net')?.refused).toMatch(/Large Fishing Net/);
-    expect(over.worn.find((each) => each.item === 'fishing.large-fishing-net')?.refused).toBeUndefined();
+    expect(under.worn.find((each) => each.item === 'fixture-town.ledger')?.refused).toMatch(/Ledger/);
+    expect(over.worn.find((each) => each.item === 'fixture-town.ledger')?.refused).toBeUndefined();
+    expect(under.worn.find((each) => each.item === 'core.jerkin')?.refused).toBeUndefined();
   });
 
   it('wears a thing that arrives as a copy of its own under the id the engine minted for it', () => {
-    const built = buildTier(shipped, fishing, 20, ['fishing.horsehair-line']);
+    const built = buildTier(shipped, fishing, 20, ['core.leather-gloves']);
     expect(built.worn[0]?.refused).toBeUndefined();
     expect(built.save).toMatch(/"gloves":"\d+"/);
   });
@@ -96,7 +87,7 @@ describe('a build wears what the world lets it wear', () => {
 describe('a build spends the points its gear dropped with', () => {
   // A blade with a plane in it, and two jewels that pull opposite ways. Which of them a build takes
   // is the whole question --grow answers, and nothing in the tool knows which is which.
-  const KIT = ['combat.knights-sword'];
+  const KIT = ['core.heavy-spade'];
   const JEWELS = ['core.keen-edge-jewel:20', 'core.stout-heart-jewel:20'];
 
   interface Saved {
@@ -152,59 +143,14 @@ describe('a build spends the points its gear dropped with', () => {
     expect(built.grown!.spent).toBe(spent);
   });
 });
-
-describe('the reference builds the corpus carries', () => {
-  it('has some, so the claims below are about something', () => {
-    expect(shippedTiers.length).toBeGreaterThan(0);
-  });
-
-  // The one that would go wrong silently. A tier's experience is the curve read at its level, so a
-  // re-tune of the curve makes every stored build a different character while the file on disk
-  // reads exactly as it did.
-  it.each(shippedTiers)('stands $level in every skill of $activity, as $id says it does', ({ id, activity, level }) => {
-    const named = activities.find((each) => each.id === activity);
-    expect(named, `${activity} declares no skills`).toBeDefined();
-    const state = createGameState();
-    loadSave(state, shipped.saves.get(id)!, shipped);
-    for (const skill of named!.skills) expect(skillLevel(state.xp[skill] ?? 0), skill).toBe(level);
-  });
-
-  // The other way a stored build goes stale: a slot it left empty that something it is already
-  // carrying would have filled. That is gear the tier earned and is not using, and it means the
-  // file was written before the world it is measuring.
-  it.each(shippedTiers)('leaves no slot empty that $id is already carrying something for', ({ id }) => {
-    const state = createGameState();
-    loadSave(state, shipped.saves.get(id)!, shipped);
-    for (const carried of Object.keys(state.inventory)) {
-      const slot = shipped.items.get(carried)?.slot;
-      if (slot === undefined || state.equipped[slot] !== undefined) continue;
-      expect(wearable(state, shipped, carried), `${id} could wear ${carried} in the empty ${slot}`).toBe(false);
-    }
-  });
-
-  // The third way one goes stale, and the one nothing caught: a piece worn with the whole of its
-  // plane untouched. That is a character at a fraction of what its own gear allows, and every rate
-  // measured against it is a rate for somebody who never spent a point.
-  it.each(shippedTiers)('wears nothing in $id that is standing on the whole of the points it dropped with', ({ id }) => {
-    const state = createGameState();
-    loadSave(state, shipped.saves.get(id)!, shipped);
-    for (const worn of Object.values(state.equipped)) {
-      const payload = itemInstance(state, worn);
-      const item = shipped.items.get(itemTemplate(state, worn));
-      if (!payload || !item || itemLevel(payload, item) === 0) continue;
-      expect(pointsSpent(payload.plane), `${id} wears ${itemTemplate(state, worn)} with nothing spent on it`).toBeGreaterThan(0);
-    }
-  });
-});
-
 describe('the doors a build is put together through', () => {
   it('are the engine\'s own, so a build cannot hold what a player could not', () => {
     const state = initialState(shipped);
-    receiveItem(state, shipped, 'combat.knights-sword', 1);
+    receiveItem(state, shipped, 'core.heavy-spade', 1);
     // A blade that drops with a plane arrives as a copy of its own, so it is worn under the id the
     // engine minted for it and not under its template's -- which is what the id is asked for here.
-    const [minted = 'combat.knights-sword'] = Object.keys(state.instances.byId);
-    expect(String(equip(state, shipped, minted))).toMatch(/Knight's Sword/);
-    expect(state.equipped['mainhand']).toBeUndefined();
+    const [minted = 'core.heavy-spade'] = Object.keys(state.instances.byId);
+    expect(String(equip(state, shipped, minted))).toMatch(/Heavy Spade/);
+    expect(state.equipped['main-hand']).toBeUndefined();
   });
 });

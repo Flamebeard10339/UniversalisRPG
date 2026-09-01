@@ -144,6 +144,9 @@ at: 1 1
 # slot body
 at: 1 2
 
+# slot gloves
+at: 2 1
+
 // --- what may be trained ---
 
 # skill digging
@@ -194,6 +197,15 @@ slot: main-hand
 value: 12
 +2 attack
 
+// A thing that arrives as a copy of its own, rolled once on arrival, so what is worn is a minted id
+// and not the base.
+# item leather-gloves
+title: Leather Gloves
+examine: Soft, and stained where the fingers go.
+slot: gloves
+item-level: 4
+value: 10
+
 # item jerkin
 title: Jerkin
 slot: body
@@ -237,6 +249,23 @@ examine: A knot of iron that will not be moved.
 shape: wheel
 open-connections: e, se
 passives: 1 warded, 2 hale, 3 fortune, 5 hale, 6 warded, 7 keen
+
+// A thing with a plane of its own, so points dropped with it have somewhere to be spent and a jewel
+// has a socket to go into.
+# cluster-jewel spade-core
+examine: The haft is bored through, end to end.
+shape: ring
+open-connections: e
+passives: 1 keen, 2 hale, 3 warded, 4 keen, 5 hale, 6 fortune
+
+# item heavy-spade
+title: Heavy Spade
+examine: Twice the spade the other one is.
+slot: main-hand
+requires: level.digging >= 5
+item-level: 20
+origin-cluster: spade-core
+value: 40
 
 # item keen-edge-jewel
 title: Keen Edge Jewel

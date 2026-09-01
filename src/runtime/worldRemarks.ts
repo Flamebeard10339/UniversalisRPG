@@ -8,6 +8,7 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
 import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
+import { staleTiers } from './tierSaves';
 
 // What is wrong with a world that the loader will still take. A refusal stops the game; these do
 // not, because every one of them is a thing an author is halfway through — a quarter with no road
@@ -149,9 +150,13 @@ function rootless(sources: readonly ModuleSource[]): Remark[] {
   });
 }
 
+// A reference build that has gone stale against the curve under it, or against the gear it is
+// already carrying. The file on disk reads exactly as it did, so nothing else would ever say.
+const stale = (registry: Registry): Remark[] => staleTiers(registry).map((each) => ({ where: `# save ${each.save}`, says: each.says }));
+
 // A rule that only wants the registry, and one that has to run the world to answer. Both are asked
 // of every world the oracle is pointed at, and each derives its own subjects.
-const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken];
+const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken, stale];
 const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread, (sources) => unpacked(sources), (sources) => rootless(sources)];
 
 export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => [

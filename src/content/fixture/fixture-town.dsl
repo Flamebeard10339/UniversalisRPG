@@ -98,9 +98,9 @@ holds: shed, pump, loft, cellar
 title: You
 faction: player
 stats: max-health 30, attack 10, accuracy 10, evasion 0, defense 0, attack-rate 60
-skills: digging, scavenging
+skills: core.digging, core.scavenging, haggling
 passives: hale, keen
-equipment-slots: main-hand, body
+equipment-slots: main-hand, body, gloves
 uses: melee-combat
 on line-snapped:
   roll: snapped-line
@@ -122,6 +122,25 @@ aggressive
 respawn after: 30s
 on death:
   roll: vermin-drops
+
+// A skill of its own, so this module is a second activity beside the core's — an activity is a
+// module that declares skills, and a world with only one of them cannot say what two costs.
+# stat haggling-rate
+base: 10
+group: skilling
+
+# skill haggling
+stat: haggling-rate
+
+// Worn only by somebody who has climbed for it, which is the one shape that makes a tier's gear list
+// depend on the tier.
+# item ledger
+title: Ledger
+examine: Columns of figures in three hands, none of them tidy.
+slot: main-hand
+requires: level.haggling >= 5
+value: 20
++3 core.attack
 
 // --- what is said here ---
 
