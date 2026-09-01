@@ -6,7 +6,7 @@ import { EntityBlock, isHandlerBlock } from './sections/entity';
 import { lastSegment } from '../grammar/values';
 import { VISITS } from '../grammar/condition';
 import { isFieldEdits, listMembers } from '../grammar/section';
-import { ACTION_MEMBER, Namespace, qualify } from './namespace';
+import { ACTION_MEMBER, Namespace, keyedUnderOwnerKind, qualify } from './namespace';
 import { idScopeOf, isOwnedKind } from './sections';
 import { contentSectionMaps, isActionOwnerKind, sectionFor } from './sections';
 import { MemberName } from './sections/define';
@@ -34,6 +34,7 @@ function missingOptionalDependencies(module: ParsedModule, loaded: ReadonlySet<s
 function namesMissingOptional(kind: string, raw: string, missing: ReadonlySet<string>): boolean {
   const segments = raw.split('.');
   if (segments[0] === kind && segments.length > 1) segments.shift();
+  if (keyedUnderOwnerKind(kind) && segments.length > 1) segments.shift();
   return segments.length > 1 && missing.has(segments[0]);
 }
 

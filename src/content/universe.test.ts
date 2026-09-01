@@ -370,6 +370,39 @@ describe('loadUniverseWithDiagnostics', () => {
     }
   });
 
+  it('finds the module an action-slug names one segment in, so a use: into an absent optional prunes the route rather than refusing the module that walks it', () => {
+    const ghost: ModuleSource = {
+      ...module(
+        'ghost',
+        '# info ghost',
+        '# entity brute',
+        'examine: Wider than the door he came through.',
+        'swing:',
+        '  say: thud',
+        '# item lamp',
+        'polish:',
+        '  say: shine',
+        '# location shore',
+        'x: 1, y: 0',
+        'light beacon:',
+        '  say: lit',
+      ),
+      enabled: false,
+    };
+    const walker = (use: string): ModuleSource => module('walk', '# info walk', 'dependencies: ? ghost', '# location camp', 'x: 0, y: 0', 'starting', '# test walk', `use: ${use}`);
+
+    for (const address of ['entity.ghost.brute.swing', 'item.ghost.lamp.polish', 'location.ghost.shore.light-beacon']) {
+      const { registry, loadedModules, diagnostics } = loadUniverseWithDiagnostics([ghost, walker(address)]);
+
+      expect({ address, loadedModules, diagnostics, tests: [...registry.tests.keys()] }).toEqual({
+        address,
+        loadedModules: ['walk'],
+        diagnostics: [],
+        tests: [],
+      });
+    }
+  });
+
   it('reads the survivors off the whole universe, so pruning one object does not take an identically named object of another kind with it', () => {
     const ghost: ModuleSource = {
       ...module('ghost', '# info ghost', '# item gem'),
