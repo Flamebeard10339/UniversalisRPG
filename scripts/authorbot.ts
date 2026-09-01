@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
+import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
@@ -146,6 +147,13 @@ The tools you have:
     npm run oracle -- --at <file>        read a draft: what the engine refuses, and whether it takes the file
     npm run oracle -- --at <file> --walk <line>
                                          one line: where it sits, what it reads as, what may stand there
+    npm run oracle -- --at ${corpus}
+                                         the whole world you are writing into: every line the engine
+                                         has something to say about, whether it loads, whether it
+                                         prints back to itself, whether every route in it still
+                                         walks, and anything it takes that an author probably did
+                                         not mean. This is the gate. There is no other one, and no
+                                         test suite anywhere answers for what you are writing
     npm run probe -- ${corpus} --test <id>
                                          run one \`# test\` and report PASSED or FAILED
     npm run simulate-activity -- <save> [<word>]   what every offer in front of a player standing on that save
@@ -320,6 +328,9 @@ async function run(asked: Asked): Promise<number> {
   mkdirSync(workdir, { recursive: true });
   const corpus = path.join(workdir, 'content').replace(/\\/g, '/');
   cpSync(path.join(repoRoot, CORPUS_DIR), path.join(workdir, 'content'), { recursive: true });
+  // The engine's own modules go in beside the author's, so the one directory the run is given is a
+  // whole world — the run may not name `src/`, and a world with no English in it is not one.
+  cpSync(path.join(repoRoot, ENGINE_MODULE_DIR), path.join(workdir, 'content'), { recursive: true });
   const draft = path.join(corpus, asked.target!).replace(/\\/g, '/');
   if (!existsSync(draft)) writeFileSync(draft, '');
 

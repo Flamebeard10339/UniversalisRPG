@@ -33,6 +33,35 @@ costs a call every time. The writing tool has no quoting layer to trip on. The s
 goes for a multi-line program handed to `node -e`: put it in a file under the
 scratchpad and pass the path.
 
+# Two jobs, and a line between them
+
+Authoring the world and changing the engine are separate work with separate tools,
+and neither one's gate answers for the other.
+
+|  | authoring | engine |
+|---|---|---|
+| writes | `content/*.dsl` | `src/`, `scripts/` |
+| reads | the corpus, and `npm run oracle` | anything |
+| its gate | `npm run oracle -- --at content` | `npm test`, `tsc`, `npm run layer-check` |
+
+**No test may read a line of `content/`.** A contributor editing the world inside the
+game cannot run vitest, so a suite that could go red on their edit is a gate nobody
+can answer. The suite stands on `src/content/fixture/` — a world the engine owns and
+no author touches — and `docs/authoring-split/open-tests.test.ts` is the rule's own
+proof, deriving both the doors into the corpus and every test that must not reach one.
+
+**So do not run `npm test` for DSL work, and do not fix a red suite by editing
+content.** The corpus's whole verdict is `npm run oracle -- --at content`: every line
+the engine has something to say about, whether it loads, whether it prints back to
+itself, whether every route still walks, and anything it takes that an author probably
+did not mean. Those last are remarks rather than refusals, they live in
+`src/content/worldRemarks.ts`, and each derives its own subjects.
+
+**Authoring a module is dispatched, not typed.** `npm run authorbot -- <brief>` hands
+one brief to an agent that cannot read the engine and counts every time it tried; the
+`authoring` skill is the procedure. Never hand-roll a subagent for it — the count is
+the measurement, and a hand-rolled agent throws it away.
+
 # The DSL
 
 Game content is written in a small line-based language. A file is a sequence of
@@ -151,6 +180,13 @@ every vitest project but `open`, which is the proofs standing under an open line
 `docs/<feature>/` — red on purpose, and described under *Work that outlives a
 session*.
 
+**The world the suite stands in is `src/content/fixture/`.** Three modules under two
+packs, small and complete: a rule with nothing there to fire on is a rule the suite
+cannot reach, so a test that needs a shape the fixture has not got adds it rather than
+reaching into `content/`. `FIXTURE_WORLD` in `worldFixture.ts` is still the cheaper
+habit where a test wants a world smaller than that. The fixture answers to the same
+gate an author's world does: `npm run oracle -- --at src/content/fixture`.
+
 **Run the one file you are editing; that costs about a second.** `npm test` is the
 gate, not the loop — the twenty seconds are import and transform, a function of how
 many test files there are, so nothing you cache moves them.
@@ -182,21 +218,24 @@ nine of tulsa's `# test` sections were written past this, one of them already ca
 eight ways over. The procedure, and how to measure it, live in the `one-home` skill.
 That skill is the authority; this paragraph is why.
 
-**A route's verdict is reported once.** Three harnesses replay every corpus `# test` —
-the shipped corpus, the corpus with every word replaced, and the consolidated tree. Only
-the first asserts that a route passes. The other two assert that their transformation did
-not *change* the verdict, so a genuinely broken route reddens one line and not eight. A
-failure repeated by three files with unrelated names is what sends a reader into the
-engine after a content bug.
+**A route's verdict is reported once.** Whether the shipped corpus still walks its own
+routes is `npm run oracle -- --at content`'s to say and nothing else's. The harnesses in
+the suite replay the *fixture's* routes under a transformation — every word replaced, the
+tree consolidated — and each asserts only that its transformation did not *change* the
+verdict, never that a route passes. A failure repeated by three files with unrelated names
+is what sends a reader into the engine after a content bug.
 
 `src/content/dsl.test.ts` is the general-purpose test and the one to extend
-first. Every claim in it picks its own subjects — from the shipped corpus in
-`content/`, from the section list, or from what a field's own parser says it
-accepts — so a kind or a field added next month is covered with no edit. It
-asserts the corpus loads clean, that printing every module and reloading it
-yields the same registry, that no parser silently swallows an indented block,
-that each kind's declaration is coherent, and that every field parser prints
-back what it parsed.
+first. Every claim in it picks its own subjects — from the fixture world in
+`src/content/fixture/`, from the section list, or from what a field's own parser says
+it accepts — so a kind or a field added next month is covered with no edit. It asserts
+that no parser silently swallows an indented block, that each kind's declaration is
+coherent, and that every field parser prints back what it parsed.
+
+**A claim about the shipped world is not one of these.** That the corpus loads, prints
+back to itself and walks its own routes is `npm run oracle -- --at content`'s to say,
+and a rule an author can break is a remark in `src/content/worldRemarks.ts`. A test
+that would go red because somebody wrote a quest is in the wrong file.
 
 Prefer adding a claim there over writing a new per-kind test file. Write a
 focused test when the thing under test is a refusal — the error an author sees
@@ -207,8 +246,8 @@ Tools, none of which are gates:
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
 - `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
 - `npm run simulate-activity -- <save> [<action-spec>]` — what every offer the engine puts in front of a player standing on that save pays over one hour of game time. Every figure is read off a run rather than reckoned: it writes a `# test` per offer, walks it under several seeds until the world's clock reaches the far end of the window, and prints cycles, how much of the window the offer itself ran for, xp and items an hour, and the engine's own sentence wherever a run stopped short. An offer that stops inside the window is taken up again, once the world has put back on its own whatever it takes — a fallen thing on its feet, a daze worn off. A run ends where going on would mean the player doing something else instead: buying bait, mending a line, walking back from wherever a faint carried them. The window is the only denominator and every run spends all of it, so dying at seven seconds costs the rest of the hour. Where the offer did not last the window out, the pace inside the time it did run is printed beside the rate — a ceiling, not an hour anything held. A second loose word narrows the sweep; `--at`, `--seeds`, `--window` and `--all` narrow or widen it further, and `--help` prints the rest. Reach for this before changing any stat, drop or rate: it is an hour of world per offer per seed, minutes for a whole town, so it is called when there is a balance question and is never a gate
-- `npm run oracle [-- <kind>... | --at <draft.dsl> [--walk [<line>]]]` — print the grammar the editing page offers, as a tree per kind, short enough with no kind named to read whole; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world. `--walk <line>` goes on to say, of one line, where it sits, what it is read as and what may stand there, which is what to reach for when one line has you stuck; `--help` prints the rest. Reach for this before writing anything under `content/`, and again after each pass
-- `npm run authorbot -- --brief <file>` — hand one brief to a coding agent over a copy of `content/` and count what it reached for. The engine is refused unless `--open`, and every reach for it is a question the oracle did not answer, which is what the run is for. It writes nothing in this checkout
+- `npm run oracle [-- <kind>... | --at <draft.dsl> [--walk [<line>]] | --at <dir>]` — print the grammar the editing page offers, as a tree per kind, short enough with no kind named to read whole; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world. `--walk <line>` goes on to say, of one line, where it sits, what it is read as and what may stand there, which is what to reach for when one line has you stuck. **A directory in place of a draft is the whole world in it, and is the gate** — `npm run oracle -- --at content` is the corpus's entire verdict and exits non-zero, which is what a contributor runs and what CI runs, since no test reads a line of `content/`. `--help` prints the rest. Reach for this before writing anything under `content/`, and again after each pass
+- `npm run authorbot -- <brief>` — hand one brief to a coding agent over a copy of `content/` and count what it reached for. The engine is refused unless `--open`, and every reach for it is a question the oracle did not answer, which is what the run is for. It writes nothing in this checkout. **This is how a module gets authored**; the `authoring` skill is the procedure, and a hand-rolled subagent throws the measurement away
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind
 - `npm run handoff` — which `docs/<feature>/` folders have drifted from the work they hand over, and how many commits have landed since they were last written. It also runs the proofs standing under their open lines and says which have gone green; `--quick` reports on the files without running them. `npm run open-tests` runs the `.test.ts` half alone, and `npm run probe -- content docs/<feature>/open-tests.dsl --test <id>` walks one route
 - `npm run notes [-- <source>...]` — list every `@@@` the corpus holds: writing that is standing in for better writing, and what an author asked for that the engine cannot do
