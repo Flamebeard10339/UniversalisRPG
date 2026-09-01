@@ -1,6 +1,6 @@
 # Authoring and the engine, split apart — open, for a lane
 
-## Twelve test files still read the shipped corpus
+## One test file still reads the shipped corpus
 
 `npm test` must not be able to fail because `content/` changed: a contributor editing the world in
 the game cannot run vitest, so a gate they can redden is a gate nobody can answer. The corpus's
@@ -11,29 +11,26 @@ cannot reach, and a test that needs a shape it has not got adds the shape rather
 `content/`. `FIXTURE_WORLD` in `worldFixture.ts` is still the cheaper habit where a test wants a
 world smaller than the whole fixture.
 
-It read 83 by the first count, which walked the import graph and counted a test that merely imported
-a CLI. What matters is which tests actually call a door, and that is twelve:
+What is left is `src/runtime/integration.test.ts`, and it is four different jobs:
 
-*Swap the world once the claim is re-pointed.* `scripts/lib/tiers.test.ts` and
-`scripts/tier-build.test.ts` read tier costs off the shipped skills and activities;
-`scripts/play-cli.test.ts` and `scripts/printedWords.test.ts` print terminal views of the tutorial
-island; `scripts/playbot.test.ts` plays it. Each was tried as a straight swap and each failed on
-what it asserts rather than on the world it loads — the fixture has one activity and two skills, and
-these are claims about a ladder. They want the fixture grown or the claim rewritten, one file at a
-time.
+*Already the oracle's, so they go.* That every module in `content/` assembles into one universe, and
+that every route the corpus ships walks — `npm run oracle -- --at content` says both, and says them
+where an author can hear.
 
-*Read the corpus directory itself.* `scripts/probe.test.ts`, `scripts/consolidate.test.ts` and
-`scripts/authorbot.test.ts` name `CORPUS_DIR` to get a directory of realistic modules on disk.
-`src/content/fixture` is one, and all three tools already take a directory.
+*Straight swaps.* That `core` loads identically from a CRLF checkout with or without a BOM and lands
+the kinds it declares; that a swing is spent out of the range it stands at; that health starts full,
+drains as something bites back and regenerates from a meal; that sitting is worth more than standing.
+None is about tulsa.
 
-*Their own shapes.* `src/content/shipped.test.ts` proves the standing-world derivation against an
-independent reading of the same corpus; the derivation wants to move somewhere pure over
-`ModuleSource[]` and be proved against sources written for it, leaving `shipped.ts` holding only the
-filesystem. `src/runtime/integration.test.ts` replays tulsa's own buff routes — rage, poison, thorns
-— and wants those written into the fixture. `src/runtime/proseReach.test.ts` walks every prose field
-to a surface and knows which fields have none; over the fixture two more go unsaid, which is either
-a hole in the fixture or a real gap the corpus was covering for. `src/ui/shippedContent.test.ts` is
-the bundle bridge, below.
+*Wants the fixture to fight properly.* The archetype claims — rage accumulating and moving attack and
+nothing else, a stack paying separately from its count, poison held on the struck party and falling
+its pool, a debuff lifting on its own clock, thorns costing the striker — replay tulsa's own routes.
+They want rage, poison and thorns written into the fixture, with routes to reach each. That is the
+one substantial piece left and it is a piece of its own.
+
+*An author's finding.* That every archetype has one flat jewel and one percent jewel and no archetype
+two of a kind is a rule about the world tulsa ships, not about the engine, and belongs beside the
+other remarks.
 *Closes when:* `no-test-reads-the-corpus` passes, and the proof has moved out of here into
 `scripts/`, where it gates.
 
@@ -45,7 +42,7 @@ tree has any use for that name. What a reading cannot see is a test that builds 
 at all: under vitest the corpus should not open, so that a test cannot read it however it tries.
 
 `shipped.ts` is the one place that opens it, and refusing there costs four lines. It cannot land
-until the twelve above are done, because it would redden every one of them at once.
+until the file above is done, because it would redden it at once.
 *Closes when:* every reader in `shipped.ts` throws under `process.env.VITEST`, naming the fixture,
 and the guard's `shuts every door` claim passes because of it.
 
@@ -53,17 +50,8 @@ and the guard's `shuts every door` claim passes because of it.
 
 `npm run oracle -- --at content` exits non-zero on a corpus that will not load, holds a line the
 engine refuses, does not print back to itself, has stopped walking one of its own routes, or holds
-something the loader takes and an author probably did not mean. Nothing calls it.
+one of the nine things the loader takes and an author probably did not mean. Nothing calls it.
 *Closes when:* CI runs it beside `tsc`, `npm test` and `npm run layer-check`.
-
-## The bundle's reading of what ships is still checked against content
-
-`src/ui/shippedContent.test.ts` compares `import.meta.glob`'s answer to the filesystem's, module by
-module, which is a claim about the build that can only fail because content moved. The fact worth
-holding is that the two readings name the same two directories — `src/content/engine` and
-`content/` — and that is a fact about two source files, not about anything either directory holds.
-*Closes when:* the bridge is a claim about the glob patterns and the directories `shipped.ts` reads,
-and the per-module comparison has gone to the corpus's own verdict.
 
 ## `journal.ts` names three group ids that only `core` can supply
 
@@ -77,3 +65,12 @@ The world should say which group means which standing, the way a group already s
 standard for, rather than the engine naming the ids.
 *Closes when:* a `# group` can declare the standing it stands for, `journal.ts` reads that off the
 registry, and the three ids are gone from `src/`.
+
+## A remark that has to run the world is not the same shape as one that reads it
+
+`src/runtime/worldRemarks.ts` holds both: six rules that want only the registry, and three that walk
+— prose to a surface, a root module loaded on its own, a pack read off each module's own source. The
+walking ones take the sources as well, because the prose probe is a module laid over the world and a
+registry cannot be added to. It works, and it means a rule's shape decides which list it joins.
+*Closes when:* either every rule takes the same two arguments and there is one list, or the two
+lists are named for what actually separates them.
