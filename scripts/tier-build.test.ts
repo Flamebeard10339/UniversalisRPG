@@ -16,8 +16,11 @@ const combat = activities.find((each) => each.id === 'combat')!;
 const fishing = activities.find((each) => each.id === 'fishing')!;
 
 // Every reference build the corpus carries, found by the name it is filed under rather than listed
-// here, so a tier added next month is held to the same claims by existing.
-const TIER = /^tiers\.(.+)-tier-(\d+)$/;
+// here, so a tier added next month is held to the same claims by existing. A trailing word names
+// what the pool was grown toward rather than a second activity -- `combat-tier-20-sustain` is the
+// combat tier at twenty that bought recovery instead of a bigger swing -- so it is read off and
+// dropped, and the claims below hold it to combat's skills like any other.
+const TIER = /^tiers\.(.+)-tier-(\d+)(?:-[a-z]+)?$/;
 const shippedTiers = [...shipped.saves.keys()].flatMap((id) => {
   const found = TIER.exec(id);
   return found ? [{ id, activity: found[1]!, level: Number(found[2]) }] : [];
