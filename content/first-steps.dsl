@@ -504,7 +504,7 @@ assert: player.name and player.race
 // search comes up empty behind the lockpick, so an assertion over inventory
 // alone would also hold in a world where the drawer never rolls at all — which
 // is the shape of test this branch's audit caught. The whole sheet is what tells
-// the two apart: `luck vs 60` and the table behind it move the rng cursor
+// the two apart: `<stat> vs 60` and the table behind it move the rng cursor
 // whether or not they yield anything, and `expect:` is what pins that.
 // Regenerate with npm run probe -- content --record first-steps.dresser-trinket
 // when the drawer's odds change on purpose.

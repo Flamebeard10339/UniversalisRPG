@@ -1198,7 +1198,7 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 // make it hostile — and each of them can be robbed instead, which is the other half of every sheet
 // below and the reason all three are the town's rather than combat's.
 //
-// The pockets are the contest `thieving.pick-their-pocket` runs, and what each mark brings to it is
+// The pockets are the contest `thieving.pick-pocket` runs, and what each mark brings to it is
 // one number on its own sheet. Each rung is watchful enough to be worth more than the one under it,
 // so a minute at any of them comes to about the same and what changes is whether you can stand there
 // at all.
@@ -1217,13 +1217,13 @@ one of:
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
 stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 20
-uses: core.melee-combat, thieving.pick-their-pocket
+uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 45s
 on death:
   credit:
     roll: combat.purse
-pick-their-pocket:
+pick-pocket:
   give: 3 coin
   xp: thieving.thieving 4
   1 in 400:
@@ -1242,14 +1242,14 @@ pick-their-pocket:
 title: Guardsman
 examine: One of the duke's, in a coat of plates and a mood.
 stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 55
-uses: core.melee-combat, thieving.pick-their-pocket
+uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 70s
 on death:
   credit:
     roll: combat.purse
     1 in 8: give: 1 combat.bronze-helmet
-pick-their-pocket:
+pick-pocket:
   give: 7 coin
   xp: thieving.thieving 7
   +on unfinished:
@@ -1261,14 +1261,14 @@ pick-their-pocket:
 title: Knight
 examine: Iron from the crown of his head to the soles of his feet, and he has been hit by better than you.
 stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 80
-uses: core.melee-combat, thieving.pick-their-pocket
+uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 100s
 on death:
   credit:
     roll: knights-purse
     1 in 10: give: 1 combat.iron-helmet
-pick-their-pocket:
+pick-pocket:
   hidden if: level.thieving < 11
   give: 12 coin
   xp: thieving.thieving 10
@@ -1284,14 +1284,14 @@ pick-their-pocket:
 title: Thief
 examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
 stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 100
-uses: core.melee-combat, thieving.pick-their-pocket
+uses: core.melee-combat, thieving.pick-pocket
 faction: world
 respawn after: 80s
 on death:
   credit:
     roll: combat.purse
     1 in 14: give: 1 thieving.lockpicks
-pick-their-pocket:
+pick-pocket:
   hidden if: level.thieving < 11
   give: 18 coin
   xp: thieving.thieving 17
@@ -1316,13 +1316,19 @@ examine: A banded chest under the window with a lock on it older than the window
 stats: thieving.thieving 0, thieving.wards 60
 uses: thieving.pick-the-lock
 pick-the-lock:
-  roll: thieving.house-chest-contents
+  roll: house-chest-contents
   xp: thieving.thieving 20
   say: The lock gives with a sound like a knuckle cracking.
   +on unfinished:
     say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
     drain: 3 health
     relocate: market-square
+
+# droptable house-chest-contents
+one of:
+  6x: give: 1 thieving.polished-buttons
+  3x: give: 1 thieving.gold-ring
+  1x: give: 1 thieving.gold-necklace
 
 # entity treasure-chest
 title: Treasure Chest
@@ -1331,13 +1337,20 @@ stats: thieving.thieving 0, thieving.wards 110
 uses: thieving.pick-the-lock
 pick-the-lock:
   time: 10
-  roll: thieving.treasure-chest-contents
+  roll: treasure-chest-contents
   xp: thieving.thieving 55
   say: The last ward turns over and the lid comes up on its own.
   +on unfinished:
     say: The runes light one after another and the cellar goes out from under you.
     drain: 8 health
     relocate: market-square
+
+# droptable treasure-chest-contents
+one of:
+  8x: give: 1 thieving.coloured-glass
+  5x: give: 1 thieving.topaz
+  3x: give: 1 thieving.sapphire
+  1x: give: 1 thieving.ruby
 
 // The best lock in Tulsa, in the one cellar where nobody will explain to you that it is not your
 // box — so this is the only lock in the world that does not end with a walk back from the market
@@ -1350,13 +1363,22 @@ uses: thieving.pick-the-lock
 pick-the-lock:
   hidden if: level.thieving < 14
   time: 14
-  roll: thieving.strongbox-contents
+  roll: strongbox-contents
   xp: thieving.thieving 90
   say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.
   +on unfinished:
     say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
     drain: 2 health
     inflict: thieving.dazed for thieving.collar-length
+
+# droptable strongbox-contents
+one of:
+  9x: give: 1 thieving.sapphire
+  6x: give: 1 thieving.ruby
+  4x: give: 1 thieving.soft-toed-boots
+  2x: give: 1 thieving.fingerless-gloves
+  1x: give: 1 thieving.a-quiet-hour-jewel
+  1x: give: 1 thieving.thieving-utility-jewel
 
 // --- what is already hostile ---
 
@@ -2038,7 +2060,7 @@ assert: xp.thieving.thieving > 0
 // the loop keeps going through one is what the last line is for.
 # test a-hand-goes-out-again-after-it-is-caught
 load: in-town
-use: entity.civilian.pick-their-pocket until xp.thieving.thieving >= 200
+use: entity.civilian.pick-pocket until xp.thieving.thieving >= 200
 assert: xp.thieving.thieving >= 200
 assert: has core.coin
 assert: not core.fainted

@@ -107,12 +107,6 @@ group: combat
 base: 6
 group: skilling
 
-// The drop channel. Contested like any other roll, so a charm that reads
-// `+20 luck` moves a rare find without any table knowing the charm exists.
-# stat luck
-base: 60
-group: skilling
-
 // What one swing of an axe takes off a trunk. An action with nothing to
 // deplete counts down a whole of its own instead of anybody's pool, so this is
 // a fraction of one felling and the swings it costs are read off it — the
