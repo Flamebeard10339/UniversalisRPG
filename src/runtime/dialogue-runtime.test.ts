@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { offering, spokenBy } from '../content/sections/dialogue';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { initialState } from './save';
 import { menuChoices, openersNow, reachedNow, talk } from './dialogue-runtime';
 
-const { registry } = loadUniverseWithDiagnostics(shippedSources());
+const { registry } = loadUniverseWithDiagnostics(fixtureSources());
 
 const owners = [...new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined))];
 
@@ -14,8 +14,8 @@ describe('an entity whose one word is the whole of talking to it', () => {
   // Owners for whom exactly one node is ever put forward, so nothing else can take the turn and whatever that node does is the whole of what talking to them ever is.
   const soleVoice = owners.filter((owner) => spokenBy(registry.dialogues, owner).flatMap((dialogue) => dialogue.nodes.filter(offering)).length === 1);
 
-  it('is most of the corpus, so the claim below is not vacuous', () => {
-    expect(soleVoice.length).toBeGreaterThan(5);
+  it('is most of the fixture world, so the claim below is not vacuous', () => {
+    expect(soleVoice.length).toBeGreaterThan(1);
     expect(soleVoice.every((owner) => reachedNow(registry, initialState(registry), owner) !== null)).toBe(true);
   });
 
@@ -32,7 +32,7 @@ describe('an entity whose one word is the whole of talking to it', () => {
   });
 });
 
-describe('everyone the corpus writes a word for', () => {
+describe('everyone the fixture world writes a word for', () => {
   // Talking twice, through the runtime rather than through a reading of it: what a second visit does is `enterNode`'s to decide, and a test that decided it again would drift the day that one changed. A list of threads is something said as much as a line is, which is why an entity holding several is held to this too.
   const saysSomethingTwice = (owner: string): boolean => {
     const state = initialState(registry);
@@ -57,7 +57,7 @@ describe('everyone the corpus writes a word for', () => {
     );
 
     expect(unnamed).toEqual([]);
-    expect(owners.flatMap((owner) => openersNow(registry, state, owner)).length).toBeGreaterThan(5);
+    expect(owners.flatMap((owner) => openersNow(registry, state, owner)).length).toBeGreaterThan(1);
   });
 });
 

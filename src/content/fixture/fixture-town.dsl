@@ -5,7 +5,7 @@
 # info fixture-town
 version: 1.0.0
 pack: fixture
-dependencies: fixture-core
+dependencies: core
 
 // --- places ---
 
@@ -14,6 +14,7 @@ title: The Green
 examine: Cropped grass, a bench, and three ways out of it.
 x: 0, y: 0
 starting
+adjacent: well, store
 entities: keeper
 
 # location well
@@ -26,7 +27,7 @@ entities: 2 rat
 title: The Store
 examine: One counter and a shelf behind it.
 north of green
-entities: keeper
+entities: keeper, wanderer
 
 // --- who is here ---
 
@@ -34,7 +35,8 @@ entities: keeper
 title: You
 faction: player
 stats: max-health 30, attack 10, accuracy 10, evasion 0, defense 0, attack-rate 60
-skills: digging
+skills: digging, scavenging
+passives: hale, keen
 equipment-slots: main-hand, body
 uses: melee-combat
 
@@ -62,7 +64,31 @@ owner = keeper
 
 node greeting:
   always
+  again: Still here, then.
   Morning. The green's yours to cross, and the well's yours to keep out of.
+  -> What is down the well?
+    goto the-well
+  -> Nothing, thanks.
+    goto parting
+
+node the-well:
+  Rats. More of them than there were.
+
+node parting:
+  Right you are.
+
+# entity wanderer
+title: The Wanderer
+examine: Somebody who has walked further today than you have.
+faction: world
+
+# dialogue wanderer
+owner = wanderer
+
+node greeting:
+  always
+  again: Three ways, still.
+  Three ways out of a green is two more than most greens manage.
 
 // --- what may be bought ---
 
@@ -81,3 +107,4 @@ dig:
   on success:
     xp: digging 4
     give: 1 rat-tail
+    give: 1 spade

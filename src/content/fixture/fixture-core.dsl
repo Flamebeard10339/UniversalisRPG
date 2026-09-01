@@ -6,7 +6,7 @@
 // Keep it small and keep it complete. Every kind the engine has a rule about wants one section
 // here, because a rule with nothing to fire on in this world is a rule the suite cannot reach.
 
-# info fixture-core
+# info core
 version: 1.0.0
 pack: fixture
 
@@ -87,6 +87,10 @@ base: 1
 base: 12
 group: skilling
 
+# stat scavenging-rate
+base: 8-14
+group: skilling
+
 // --- pools ---
 
 # resource health
@@ -126,6 +130,9 @@ at: 1 2
 # skill digging
 stat: digging-rate
 
+# skill scavenging
+stat: scavenging-rate
+
 // --- passives ---
 
 # passive hale
@@ -149,6 +156,7 @@ food
 
 # item spade
 title: Spade
+examine: Worn smooth at the handle and bright at the edge.
 slot: main-hand
 value: 12
 +2 attack
@@ -161,10 +169,12 @@ value: 8
 
 # item rat-tail
 title: Rat Tail
+examine: Somebody in town pays for these.
 value: 1
 
 # item rope
 title: Rope
+examine: Twelve feet of it, coiled and stiff.
 value: 5
 
 // --- what drops off a rat ---

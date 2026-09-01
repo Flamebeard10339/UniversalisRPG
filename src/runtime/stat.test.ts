@@ -17,7 +17,7 @@ import { Registry } from '../content/registry';
 import { loadModule, loadUniverse } from '../content/load';
 import { loadSave } from './save';
 import { statBreakdown, type StatBreakdown } from './stats';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import type { Skill } from '../content/sections/skill';
 import { tagClause } from '../grammar/tagClause';
 import { toMilliUnits } from './units';
@@ -397,7 +397,7 @@ describe('the stat fold reads the seat, not offerability', () => {
 // so a skill the player gains next month is held to the same claim with nothing edited; and each is
 // asked about every stat the world declares, so a grant landing anywhere else is what fails.
 describe('a skill of the shipped player', () => {
-  const SHIPPED = loadUniverse(shippedSources());
+  const SHIPPED = loadUniverse(fixtureSources());
   const HELD = (actorEntity(SHIPPED, PLAYER)?.skills ?? []).map((id) => SHIPPED.skills.get(id)!);
   const LEVEL = 9;
 
@@ -487,7 +487,7 @@ describe('a skill weighed against one that names no stat', () => {
 // prove only that it equals itself; what is worth proving is that the shares a player is shown are
 // the whole of what the engine added up.
 describe('the shares a stat publishes', () => {
-  const SHIPPED = loadUniverse(shippedSources());
+  const SHIPPED = loadUniverse(fixtureSources());
 
   const standing = (): Array<{ save: string; state: GameState }> =>
     [...SHIPPED.saves.entries()].map(([id, saved]) => {
@@ -511,8 +511,8 @@ describe('the shares a stat publishes', () => {
 
   it('is asked of a corpus that carries carriers, so nothing below is vacuous', () => {
     const carried = everyBreakdown().filter((each) => each.breakdown.parts.length > 0);
-    expect(SHIPPED.saves.size).toBeGreaterThan(5);
-    expect(carried.length).toBeGreaterThan(5);
+    expect(SHIPPED.saves.size).toBeGreaterThan(2);
+    expect(carried.length).toBeGreaterThan(2);
     expect(new Set(carried.flatMap((each) => each.breakdown.parts.map((part) => part.source.kind))).size).toBeGreaterThan(1);
   });
 

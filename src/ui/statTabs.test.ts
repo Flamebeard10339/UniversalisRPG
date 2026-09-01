@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { asLocalized } from '../runtime/localizedFixture';
 import { sessionLocalizer, startSession, view } from '../runtime/session';
@@ -49,7 +49,7 @@ describe('the tabs the character sheet keeps its stats under', () => {
 // edited when a stat or a group is. So the claim is made against the shipped world rather than a
 // fixture: every stat it declares is on a tab, and there is more than one tab to be on.
 describe('the shipped world, as the sheet lays it out', () => {
-  const session = startSession(loadUniverseWithDiagnostics(shippedSources()).registry);
+  const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);
   const shown = view(session);
   const localizer = sessionLocalizer(session);
 

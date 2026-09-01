@@ -5,7 +5,7 @@ import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSER
 import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import { roadsFrom } from './journey';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { applyResultsNow, createGameState, GameState, grantBuff, initResources, PLAYER } from './runtime';
@@ -264,13 +264,14 @@ describe('applyResults: watching what was applied', () => {
   });
 });
 
-// The two words the engine has for a place, told apart over every location the corpus declares
-// rather than over one that was easy to pick. Standing somewhere is the only thing that touches it,
-// and the same step puts every neighbour the roads open on the map without touching any of them —
-// so a `when:` asking whether the player has been here means something a `when:` asking whether
-// they have heard of it does not. A location written next month is held to this with no edit.
-describe('standing in a place the corpus declares', () => {
-  const world = loadUniverseWithDiagnostics(shippedSources()).registry;
+// The two words the engine has for a place, told apart over every location the fixture world
+// declares rather than over one that was easy to pick. Standing somewhere is the only thing that
+// touches it, and the same step puts every neighbour the roads open on the map without touching any
+// of them — so a `when:` asking whether the player has been here means something a `when:` asking
+// whether they have heard of it does not. A location added to the fixture is held to this with no
+// edit here.
+describe('standing in a place the fixture world declares', () => {
+  const world = loadUniverseWithDiagnostics(fixtureSources()).registry;
   const everywhere = [...world.locations.keys()];
 
   const stood = (id: string): GameState => {
@@ -288,8 +289,8 @@ describe('standing in a place the corpus declares', () => {
   const openOut = (id: string): string[] => roadsFrom(id, world, stood(id));
 
   it('is asked of enough places, with enough roads between them, for what is below to mean something', () => {
-    expect(everywhere.length).toBeGreaterThan(20);
-    expect(everywhere.filter((id) => openOut(id).length > 0).length).toBeGreaterThan(20);
+    expect(everywhere.length).toBeGreaterThan(2);
+    expect(everywhere.filter((id) => openOut(id).length > 0).length).toBeGreaterThan(2);
   });
 
   it.each(everywhere)('touches %s and nowhere else, however many roads run out of it', (id) => {
@@ -303,7 +304,7 @@ describe('standing in a place the corpus declares', () => {
   it('leaves every place with a road out of it heard of from somewhere nobody stood, which is the whole difference between the two', () => {
     const heardOnly = everywhere.filter((id) => flagged(stood(id), DISCOVERED).length > flagged(stood(id), TOUCHED).length);
     expect(heardOnly).toEqual(everywhere.filter((id) => openOut(id).length > 0));
-    expect(heardOnly.length).toBeGreaterThan(20);
+    expect(heardOnly.length).toBeGreaterThan(2);
   });
 });
 

@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'fs';
+import { engineModules } from './engineModules';
 import type { ModuleSource } from './universe';
 
 // The furniture a test world needs before it can say anything of its own: somewhere to stand, two
@@ -46,6 +47,9 @@ export function fixtureModule(id: string): ModuleSource {
   return { name: id, text: readFileSync(`${FIXTURE_CORPUS_DIR}/${id}.dsl`, 'utf8') };
 }
 
+// The engine's own modules come with it, the way they come with the corpus in `shipped.ts`: a world
+// with no English in it is not one, and a test that had to remember to add it would be a test that
+// forgot to.
 export function fixtureSources(): readonly ModuleSource[] {
-  return fixtureFiles().map((file) => fixtureModule(moduleId(file)));
+  return [...engineModules(), ...fixtureFiles().map((file) => fixtureModule(moduleId(file)))];
 }

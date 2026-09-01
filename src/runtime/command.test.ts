@@ -9,7 +9,7 @@ import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/transla
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { initialLocalChangesModule, LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../content/localChanges';
 import { ownedSectionKinds, sectionKinds } from '../content/sections';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import type { ModuleSource } from '../content/universe';
 import { startSaveId } from './runLog';
 import { SAVE_VERSION } from './save';
@@ -1331,8 +1331,14 @@ describe('what an author may write, and what is already written', () => {
 // the fixture above: what a listing has to survive is the shipped corpus, where one kind runs to a
 // hundred sections and the id somebody is after is written inside one of eighteen modules.
 describe('finding a section in the shipped world by the only name anyone was given', () => {
+  // More ids of one kind than a screenful, gathering into fewer families than there are of them,
+  // which is the only shape that makes `/source` fold. The world is otherwise the fixture's; this is
+  // written here rather than into the fixture because a heap of ids that does nothing is what the
+  // fold is about and not what a world is for.
+  const MANY = ['# info z-heap', 'version: 1.0.0', 'dependencies: core', '', ...Array.from({ length: 30 }, (_, at) => `# item ${at % 2 === 0 ? 'pebble' : 'shell'}-${at}\n`)].join('\n');
+
   const opened = (): CommandContext => {
-    const baseSources = [...shippedSources()];
+    const baseSources = [...fixtureSources(), { name: 'z-heap', text: MANY }];
     const loaded = loadUniverseWithDiagnostics(baseSources);
     const session = startSession(loaded.registry);
     const authoring: AuthoringContext = {

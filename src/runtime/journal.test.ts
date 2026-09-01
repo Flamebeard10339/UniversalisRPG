@@ -3,7 +3,7 @@ import { loadInEnglish } from '../content/engineLocale';
 import { stageNow } from '../content/sections/quest';
 import { evaluateCondition } from './conditions';
 import { loadUniverse } from '../content/load';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 import { journal, standingLine, STANDING_GROUP, type QuestStanding } from './journal';
 import { createGameState } from './runtime';
 import { runTest } from './session';
@@ -180,7 +180,7 @@ describe('a quest played through', () => {
 // other three. What tells them apart is a colour a world authored, which is what makes this a claim
 // about the corpus rather than about whatever draws the journal.
 describe('where a quest stands reaches a surface as a group', () => {
-  const shipped = loadUniverse(shippedSources());
+  const shipped = loadUniverse(fixtureSources());
   const STANDINGS = Object.keys(STANDING_GROUP) as QuestStanding[];
 
   it('names a group the world declares, and a colour for each', () => {

@@ -1,6 +1,6 @@
 # Authoring and the engine, split apart — open, for a lane
 
-## 83 test files still read the shipped corpus
+## 45 test files still read the shipped corpus
 
 `npm test` fails today when `content/` changes, which means a contributor editing the world in the
 game — who cannot run vitest at all, and whose edit is not about the engine — turns a gate red on
@@ -14,9 +14,11 @@ round-tripping clean. `worldFixture.ts` reads it, and `FIXTURE_WORLD` is still t
 wants a smaller world than that. Keep the fixture small and keep it complete: a rule with nothing
 here to fire on is a rule the suite cannot reach.
 
-Of the 83, 53 reached only `content/engine-en.dsl` and no longer reach anything — the engine's own
-English moved to `src/content/engine/`, because it is the engine's writing and not an author's.
-That leaves ~30, and the guard names each one and the shortest way it reaches.
+It was 83. Thirty-eight of those reached only `content/engine-en.dsl` and no longer reach anything —
+the engine's own English moved to `src/content/engine/`, because it is the engine's writing and not
+an author's. The guard names each of the 45 left and the shortest way it reaches. The fixture will
+have to grow as they come over: nothing in it yet has a cluster jewel, a region, a recipe or a
+station, a race, or a second dialogue node, and a test that wants one wants it here.
 *Closes when:* `docs/authoring-split/open-tests.test.ts` is green and has been moved into
 `scripts/`, where it gates.
 
@@ -37,14 +39,13 @@ the registry rather than listed per kind.
 that channel, `src/content/dsl.test.ts` reaches no corpus, and the suite proves each rule against a
 module written to break it rather than against the world.
 
-## Nothing yet gives the corpus a verdict in one command
+## CI does not run the corpus's verdict
 
-`npm run oracle -- --at <draft>` answers for one draft, and `npm run probe -- content --round-trip
---test <id>` answers for the corpus in pieces. What is missing is the one command a contributor runs
-and CI runs: load the corpus, say every line the engine has something to say about, round-trip it,
-and walk every route it holds.
-*Closes when:* `npm run oracle -- --at content` reads a directory as the corpus and exits non-zero
-on any of those, and CI runs it beside `npm test` rather than inside it.
+`npm run oracle -- --at content` is that verdict, and exits non-zero on a corpus that will not load,
+holds a line the engine refuses, does not print back to itself, or has stopped walking one of its own
+routes. Nothing calls it yet, and `CLAUDE.md` still describes a suite that reads the corpus.
+*Closes when:* CI runs it beside `tsc`, `npm test` and `npm run layer-check`, and `CLAUDE.md` says
+which of the two gates answers for which half of the tree.
 
 ## The bundle's reading of what ships is still checked against content
 
