@@ -1,8 +1,15 @@
 import { readdirSync, readFileSync } from 'fs';
+import { ENGINE_MODULE_DIR, engineModules } from './engineModules';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { parseModuleSource, type ModuleSource } from './universe';
 
 export const CORPUS_DIR = 'content';
+
+// Where the game's own world is written, for a tool that takes source paths rather than sources: the
+// engine's modules and the author's corpus, which is what `shippedSources` below reads in TypeScript.
+// A CLI whose default world is the shipped one names this rather than the corpus alone, or the game
+// it opens has no English in it.
+export const SHIPPED_DIRS: readonly string[] = [ENGINE_MODULE_DIR, CORPUS_DIR];
 
 const moduleId = (fileName: string): string => fileName.replace(/\.dsl$/, '');
 
@@ -24,8 +31,12 @@ export function moduleSource(id: string): ModuleSource {
   return { name: id, text: readFileSync(`${CORPUS_DIR}/${id}.dsl`, 'utf8') };
 }
 
+// Everything the game loads: the engine's own modules and the author's corpus, in one order by
+// module id, which is the order the page's own reading of the same two directories comes back in.
+// Two homes and one answer — `shippedFiles` stays the corpus alone, because every tool that writes
+// a module back, renames one, or offers one for review is asking about what an author wrote.
 export function shippedSources(): readonly ModuleSource[] {
-  return shippedFiles().map((file) => moduleSource(moduleId(file)));
+  return [...engineModules(), ...shippedFiles().map((file) => moduleSource(moduleId(file)))].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const mustLoad = (prefix: string): boolean => prefix !== 'optional' && prefix !== 'recommended' && prefix !== 'incompatible';

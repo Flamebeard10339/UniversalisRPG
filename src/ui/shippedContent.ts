@@ -1,7 +1,14 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 
-const BUNDLED = import.meta.glob('../../content/*.dsl', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+// Both homes the game loads from, in the browser's own way of reading them: the engine's modules
+// under `src/content/engine`, and the author's corpus under `content/`. `src/content/shipped.ts`
+// is the filesystem's answer to the same question, and `shippedContent.test.ts` holds them to
+// naming the same two directories.
+const BUNDLED = {
+  ...(import.meta.glob('../content/engine/*.dsl', { query: '?raw', import: 'default', eager: true }) as Record<string, string>),
+  ...(import.meta.glob('../../content/*.dsl', { query: '?raw', import: 'default', eager: true }) as Record<string, string>),
+};
 
 const moduleName = (path: string): string => path.replace(/^.*\//, '').replace(/\.[^.]*$/, '');
 

@@ -6,13 +6,13 @@ import { LISTABLE_MOD_LABELS, materializeApprovedModIssue, planModportalSync } f
 import type { ApprovedModIssue, MaterializedMod, ModportalEntry, ModportalManifest, ModTier } from '../src/content/modportal';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { SHIPPED_DIRS } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = CORPUS_DIR;
+const defaultContent = SHIPPED_DIRS.join(',');
 
 type Command = 'sync' | 'list' | 'enable' | 'disable' | 'sources' | 'show';
 

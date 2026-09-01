@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { shippedFiles, shippedSources } from '../content/shipped';
+import { shippedSources } from '../content/shipped';
 import { createDriver } from './driver';
 import { SHIPPED_SOURCES } from './shippedContent';
 
 // The bridge between the bundler's answer (import.meta.glob, in shippedContent.ts, which the
 // browser build needs and content/shipped.ts must stay out of) and the filesystem's answer.
-const authored = shippedFiles()
-  .map((name) => name.replace(/\.dsl$/, ''))
+const authored = shippedSources()
+  .map((source) => source.name)
   .sort();
 
 describe('the content the build carries', () => {

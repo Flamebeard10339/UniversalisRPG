@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
-import { moduleSource, shippedFiles, worldFor } from '../src/content/shipped';
+import { moduleSource, shippedFiles, shippedSources, worldFor } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, type RunLogEntry } from '../src/runtime/runLog';
@@ -633,7 +633,7 @@ adjacent:
   it('[--save] the default sources are the whole shipped corpus, and every fixture in it opens', () => {
     const read = fileContentReader(DEFAULT_SOURCES);
     const named = read().map((source) => source.name).sort();
-    const shipped = shippedFiles().map((file) => file.replace(/\.dsl$/, '')).sort();
+    const shipped = shippedSources().map((source) => source.name).sort();
     expect(named).toEqual(shipped);
 
     const loaded = loadUniverseWithDiagnostics(read());

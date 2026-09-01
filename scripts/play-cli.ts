@@ -7,7 +7,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 
 import { initialLocalChangesModule } from '../src/content/localChanges';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { SHIPPED_DIRS } from '../src/content/shipped';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import { fileSlots } from './lib/slotFile';
 import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
@@ -63,7 +63,7 @@ export function formatResult(result: CommandResult, localizer: Localizer): ReplL
 }
 
 const repoRoot = path.join(import.meta.dirname, '..');
-const defaultContent = CORPUS_DIR;
+const defaultContent = SHIPPED_DIRS.join(',');
 const defaultLocalChanges = 'content/local-changes.dsl';
 const defaultSaves = '.saves';
 const CTRL_C_BYTE = 0x03;

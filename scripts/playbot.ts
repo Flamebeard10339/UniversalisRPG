@@ -7,7 +7,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { ParsedSave } from '../src/content/sections/save';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { SHIPPED_DIRS } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, type AuthoringContext, type CommandAudience, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
@@ -579,7 +579,7 @@ export function createSdkModelClient(cwd: string): ModelClient {
   };
 }
 
-export const DEFAULT_SOURCES = [CORPUS_DIR];
+export const DEFAULT_SOURCES = [...SHIPPED_DIRS];
 
 // A run stages into a directory of its own unless an operator names a file, because the run that
 // found this could not say --local: `npx` on Windows drops every argument after a multi-line one,
