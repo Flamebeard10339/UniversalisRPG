@@ -1,5 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+import { probe, readSources } from './probe';
+import { withEngineLocale } from '../src/content/engineLocale';
 import { align, type Hole } from '../src/grammar/form';
 import { amissIn, fillingWords, offeringAt, type Addressed, type Amiss } from '../src/content/completion';
 import { grammarLines, standingLines } from '../src/content/grammarTree';
@@ -17,6 +19,12 @@ const usage = [
   '',
   '  <kind>    print every line that may be written under that kind, at the',
   '            indentation it is written at; with no kind, print every kind',
+  '            A directory in place of a draft is the whole world in it: every line',
+  '            of every module the engine has something to say about, then whether it',
+  '            loads, whether it prints back to itself, and whether every route it',
+  '            holds still walks. `--at content` is the shipped corpus\'s own verdict,',
+  '            which is what a contributor runs and what CI runs — the suite reads no',
+  '            content at all, so this is the only thing that answers for it',
   '  --at      read a draft: every line the engine has something to say about,',
   '            then what it says when handed the whole file beside the world as',
   '            it stands. That is the answer to "is this draft good, and where is',
@@ -280,6 +288,36 @@ export function parseArgs(argv: readonly string[]): Asked {
 // Where the walk is left unasked for, the answer says it is there. It is the rest of the same question, and an author stuck on one line has no other way to hear of it.
 const WALK = 'For any one line — where it sits, what it is read as, and what may stand there — run this again with --walk <line>, or --walk alone for the whole file.';
 
+// A whole world's verdict rather than one draft's: every line of every module the engine has
+// something to say about, then whether the world loads, prints back to itself, and still walks every
+// route it holds. It is the same two questions `--at <draft>` asks, asked of a directory — and it is
+// the only thing that answers for `content/`, since no test may read a line of it.
+//
+// The modules are held against the world they make together, so an id one declares is declared for
+// every other. A world that will not load declares nothing, so only refusals are reported until it
+// does, exactly as one draft is.
+export function corpusLines(sources: readonly ModuleSource[]): { lines: string[]; ok: boolean } {
+  const world = withEngineLocale(sources);
+  const loaded = loadUniverseWithDiagnostics(world);
+  const known = declaredBy(loaded.registry);
+  const stood = loaded.diagnostics.length === 0;
+  const said = sources.flatMap((source) => {
+    const amiss = amissIn(source.text, known)
+      .map((each) => (stood ? each : { ...each, undeclared: [] }))
+      .filter((each) => each.refused !== null || each.undeclared.length > 0);
+    return amiss.length === 0 ? [] : [`${source.name}: ${amiss.length} line(s) the engine has something to say about:`, ...amiss.flatMap(wrongIn), ''];
+  });
+  const verdict = probe(world, { show: [], roundTrip: true, test: [...loaded.registry.tests.keys()] });
+  const read = `${sources.length} module(s) read`;
+  const lines = [
+    ...(said.length === 0
+      ? [stood ? `${read}: no line is refused and every id they name is declared` : `${read}: no line is refused on its own, and the world still does not load — see below`, '']
+      : [...said, ...(stood ? [] : ['  (the world does not load — see below — so what it declares is not known, and only refusals are listed above)', ''])]),
+    ...verdict.lines,
+  ];
+  return { lines, ok: stood && verdict.ok && said.length === 0 };
+}
+
 export function atLines(file: string, written: string, world: readonly ModuleSource[], walk: boolean, line: number | null = null): string[] {
   const read = reading(file, written, world);
   const short = [...amissLines(written, read.known, read.stood), ...takenLines(read)];
@@ -301,6 +339,12 @@ function main(): void {
     process.exit(2);
   }
   if (asked.at !== null) {
+    if (statSync(asked.at).isDirectory()) {
+      const report = corpusLines(readSources([asked.at]));
+      console.log(report.lines.join('\n'));
+      if (!report.ok) process.exit(1);
+      return;
+    }
     const written = readFileSync(asked.at, 'utf8').replace(/\r\n?/g, '\n');
     console.log(atLines(asked.at, written, corpus(), asked.walk, asked.line).join('\n'));
     return;
