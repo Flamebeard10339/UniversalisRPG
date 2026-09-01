@@ -3,10 +3,10 @@
 //
 // The cast is `# action cast` and every water hangs off it, the way every foe in the game hangs off
 // `# action melee-combat`: `my` reads off the angler and `their` off the water, so one block is the
-// shrimp shoal and the salmon pool both. A water declares its own sheet — how deep it is — and, in
+// shrimp shoal and the sturgeon hole both. A water declares its own sheet — how deep it is — and, in
 // the block it overlays on the cast, what tackle reaches it, how often it gives you a chance,
 // what comes out of it, and what it says when it beats you. Nothing else is a water's business, and
-// a fifth water is those lines and no others.
+// a seventh water is those lines and no others.
 //
 // `line-health` is a real pool with a bar of its own, and it is there only because the tackle you
 // are wearing grants `max-line-health` — take the tackle off and the pool is not there at all. When
@@ -28,7 +28,7 @@ dependencies:
 // --- what the skill is measured in ---
 
 // The one side of every cast the player brings. Sixty is a little under four casts in five landing
-// at the easiest water and nothing at all at the hardest, which is what makes the tackle worth
+// at the easiest water and about one in four at the deepest, which is what makes the tackle worth
 // buying before the deep water is worth walking to.
 # stat fishing
 title: Fishing
@@ -194,12 +194,26 @@ title: Raw Salmon
 examine: A proper fish. Carrying it makes you walk differently.
 value: 26
 
+# item raw-pike
+title: Raw Pike
+examine: All head and teeth and bad temper, and it is not finished being alive.
+value: 38
+
+# item raw-sturgeon
+title: Raw Sturgeon
+examine: Armoured down both flanks, longer than your arm, and the market has no standing price for one.
+value: 70
+
 // --- the water ---
 //
-// Four kinds of water and a ladder up them. The two nets take the low water, where nothing is baited
+// Six kinds of water and a ladder up them. The two nets take the low water, where nothing is baited
 // and nothing is lost but the net; the rod takes the deep, where every cast eats a strip of bait and
 // the line is what pays for a miss. A water's `fishing` is nought because a water fishes nothing:
 // it is the angler's half of the contest, and a water carries it only to stand on the other side.
+//
+// The first four are one band and pay about the same by the minute, which is what makes the choice
+// between them a choice about what comes out rather than about the hour. The two below them are the
+// second band and pay for the climb.
 
 # entity shrimp-shoal
 title: Shrimp Shoal
@@ -257,6 +271,51 @@ cast:
   +on unfinished:
     roll: spend-bait
     say: Something enormous takes it and simply keeps going.
+
+// --- the water a levelled angler is for ---
+//
+// The four above pay about the same by the minute and differ in what comes out, which is right for
+// a ladder inside one band and wrong for a ladder across two: the curve asks nearly twice as much an
+// hour at the twentieth level as at the first, and a rung that pays what the rung below it pays
+// cannot answer that. These two pay more, and they are shut until the level that is meant to be
+// standing at them — a water is not hidden because it is hard, it is hidden because a hand that
+// cannot work it has no business being offered it.
+//
+// The gate is a level rather than a piece of tackle because tackle is testable by `has` and a pack
+// is not a skill: a beginner handed the gear would otherwise stand at the deepest water in Tulsa on
+// their first afternoon, which is the whole thing these are here to stop.
+
+# entity pike-reach
+title: Pike Reach
+examine: A straight of dark water under the willows where nothing smaller than your forearm is showing itself.
+stats: fishing 0, depth 96
+uses: cast
+cast:
+  hidden if: level.fishing < 11
+  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
+  rate: 4
+  roll: spend-bait
+  give: 1 raw-pike
+  xp: fishing 16
+  +on unfinished:
+    roll: spend-bait
+    say: It follows the bait almost to the bank, looks at you, and is not there any more.
+
+# entity sturgeon-hole
+title: Sturgeon Hole
+examine: Where the bed drops away and the water goes the colour of slate. Something down there is older than the town.
+stats: fishing 0, depth 118
+uses: cast
+cast:
+  hidden if: level.fishing < 16
+  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
+  rate: 4
+  roll: spend-bait
+  give: 1 raw-sturgeon
+  xp: fishing 17
+  +on unfinished:
+    roll: spend-bait
+    say: The rod goes over and stays over, and then there is nothing on the end of it at all.
 
 // --- what a line can be grown into ---
 //

@@ -96,6 +96,26 @@ eat:
   take: 1 cooked-salmon
   say: You eat the salmon slowly, because it is worth eating slowly.
 
+# item cooked-pike
+title: Cooked Pike
+examine: Firm white flesh off a fish that fought about it, and picked clean of the bones that come with that.
+value: 46
+food, +11 core.regeneration, 120s
+eat:
+  instant
+  take: 1 cooked-pike
+  say: You eat it slowly, because of the bones, and it is worth eating slowly.
+
+# item cooked-sturgeon
+title: Cooked Sturgeon
+examine: Steaks off something that was swimming here before the walls went up.
+value: 84
+food, +16 core.regeneration, 150s
+eat:
+  instant
+  take: 1 cooked-sturgeon
+  say: There is more of it than one person should eat and you eat all of it.
+
 # item cooked-chicken
 title: Cooked Chicken
 examine: Turned on the spit until the skin went the colour it is supposed to go.
@@ -207,6 +227,30 @@ accuracy: cooking
 skill: cooking 6
 rate: core.cooking-rate
 say: The salmon takes longer than anything else on the range and punishes you for looking away.
+
+// The two the narrows hand over, and the only reason cooking has anything to do above the tenth
+// level: what a kitchen is worth is bounded by what the water gave you, so a water shut until
+// eleven is a dish shut until eleven.
+
+# recipe cooked-pike
+station: stove
+in: fishing.raw-pike
+out: cooked-pike
+burnt: burnt-food
+accuracy: cooking
+skill: cooking 8
+rate: core.cooking-rate
+say: You cook the pike long and slow, which is the only way round the bones.
+
+# recipe cooked-sturgeon
+station: stove
+in: fishing.raw-sturgeon
+out: cooked-sturgeon
+burnt: burnt-food
+accuracy: cooking
+skill: cooking 12
+rate: core.cooking-rate
+say: It takes up the whole range and it is worth the whole range.
 
 # recipe roasted-chestnut
 station: oven

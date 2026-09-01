@@ -600,8 +600,20 @@ title: The Deep Water
 examine: Downstream of the wall, past the last of the houses. The bank is undercut here and the water does not look like the same river.
 adjacent:
   riverside
+  the-narrows
 entities:
   fishing.trout-run, fishing.salmon-pool
+
+// The far end of the river and the far end of the ladder: two waters that are shut to a hand which
+// has not put the hours in, so what stands here for a beginner is a walk and a look at it.
+# location the-narrows
+x: 6, y: 6
+title: The Narrows
+examine: The valley closes in and the river goes quiet and fast between two shoulders of rock. Nobody has built anything down here and the path stops being a path.
+adjacent:
+  deep-water
+entities:
+  fishing.pike-reach, fishing.sturgeon-hole
 
 // --- the sewers ---
 //
