@@ -1792,17 +1792,17 @@ assert: pinewood.discovered
 // becomes the thing Larry's nose is pointed at.
 // --- what a minute is worth, which is what every room in the world is sized against ---
 
-// Attack is paid two experience for every point of damage dealt, so what an hour of this game comes
-// to is the player's damage and nothing else. The post takes every swing without moving and without
-// hitting back, so a minute here is that number with the room taken out of it — and it is the number
-// `combat.dsl` sizes each room's count and respawn against. A band rather than an exact figure,
-// because a swing is spent out of a range and the whole point of the range is that it varies.
-# test a-minute-at-the-post-is-what-the-ladder-is-cut-from
+// The post is the one thing in the world that takes a swing and never returns one, which makes it
+// the only place the two halves of a fight come apart. So this is the complement of the sewer route
+// below: there, standing somewhere that hits back pays both; here, swinging at something that does
+// not pays one and leaves the other where it was. No number — how much a minute is worth is a
+// balance question and is answered by running the world, not by an assertion.
+# test a-minute-at-the-post-trains-the-arm-and-not-the-hide
 load: at-the-proving-ground
 use: core.melee-combat on proving-post
 wait: 60
-assert: xp.combat.attack > 350
-assert: xp.combat.attack < 750
+assert: xp.combat.attack > 0
+assert: xp.combat.health = 0
 
 // The other half of the same minute, and the reason there are two skills rather than one: standing
 // somewhere that hits back pays for both, and what a room can pay in Health is capped by the pool

@@ -278,6 +278,10 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   const hit = felling || action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
 
   const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry);
+  // What the pool had left to give, read before the blow takes any of it: a swing bigger than what
+  // it lands on is spent on nothing past the last point, and `amount` is what landed rather than
+  // what was thrown.
+  const capacity = dealt !== null && action.depletes ? Math.max(targetLevel(state, registry, action, self, other), 0) : null;
   if (dealt !== null) damageTarget(state, registry, action, self, other, dealt, segment.deltas);
   if (action.depletes) {
     logSwing(state, registry, self, other, dealt);
@@ -292,8 +296,9 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
       fireEvents(segment, self, 'missed');
       fireEvents(segment, struck, 'evaded');
     } else {
-      fireEvents(segment, self, 'damage-dealt', undefined, 1, fromMilliUnits(dealt));
-      fireEvents(segment, struck, 'damage-taken', undefined, 1, fromMilliUnits(dealt));
+      const landed = fromMilliUnits(Math.min(dealt, capacity ?? dealt));
+      fireEvents(segment, self, 'damage-dealt', undefined, 1, landed);
+      fireEvents(segment, struck, 'damage-taken', undefined, 1, landed);
     }
   }
 

@@ -33,24 +33,32 @@ trigger: damage-dealt
 # event damage-taken
 trigger: damage-taken
 
-// A point of damage is two experience. A minute of standing still and swinging comes to about five
-// hundred, which is the pace every room in the world is sized against, and it is held to that in
-// `tulsa.a-minute-at-the-post-is-what-the-ladder-is-cut-from` — at the one thing in the world that
-// takes a swing without moving, so the number is the player's arm with the room taken out of it.
+// A tenth of what the blow actually landed, which is two things at once. A tenth, because a whole
+// number of experience for a whole point of damage put every room in the world an order of
+// magnitude over what the curve asks. Landed, because the engine used to pay on what the swing
+// threw rather than on what the pool took — a chicken with eight health paid a full hit, which
+// made the smallest thing in a room the best thing in it.
+//
+// The award is rounded, so a swing under five points pays nothing at all: an arm that can barely
+// mark a thing does not train on it, and the rounding either way comes out in the wash over an
+// evening.
 # skill attack
 title: Attack
 stat: core.attack
-gain 2 * amount experience on damage-dealt
+gain 0.1 * amount experience on damage-dealt
 
-// Taken damage is worth fifteen times what dealt damage is, because a fight the player wins is one
+// Taken damage is worth sixty times what dealt damage is, because a fight the player wins is one
 // where they took a small fraction of what they gave. That both halves are paid at once is
 // `tulsa.the-sewer-pays-a-beginner-in-both-halves-of-a-fight`. What caps this is not the enemy but the
 // player's own pool and what they can put back into it, so armour that stops a tier hurting you is
-// armour that stops it training you — which is the whole reason to walk further out.
+// armour that stops it training you — which is the whole reason to walk further out. That ceiling is
+// why this half was the only one in the world already near what the curve asks while the other was
+// two hundred times over it, and why the two move together: an arm that kills slower stands in
+// front of the thing for longer, so trimming one raises the other.
 # skill health
 title: Health
 stat: core.max-health
-gain 15 * amount experience on damage-taken
+gain 6 * amount experience on damage-taken
 
 
 // --- what comes off the things you kill ---
