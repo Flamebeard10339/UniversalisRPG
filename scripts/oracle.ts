@@ -204,6 +204,7 @@ export function offeringLines(text: string, known: readonly Addressed[], only: n
     const opening = at - line.trimStart().length;
     out.push(`${line || '·'}`);
     out.push(`    in ${offering.where.join(' › ')}, reads as ${reads ?? '?'}${note === undefined ? '' : `   — ${note}`}`);
+    if (offering.laidOver !== undefined) out.push(`    over a body already there: ${offering.laidOver}`);
     if (offering.refused !== null) out.push(`    REFUSED, the engine will not read this line: ${offering.refused}`);
     if (offering.undeclared.length > 0) out.push(`    nothing declares these yet, which is only a remark if you mean to declare them: ${offering.undeclared.map((each) => `${each.id} as a # ${each.kind}${each.meant === undefined ? '' : `, one letter from ${each.meant}`}`).join(', ')}`);
     const seen = new Set<string>();

@@ -207,7 +207,7 @@ export const dialogue = section<Dialogue>()({
   members: (value) => value.nodes.map((node) => ({ kind: DIALOGUE_NODE, name: node.name })),
   grammar: [
     { form: 'owner = <entity>', example: 'owner = guide' },
-    { form: 'node <name>:', example: 'node greet:', block: () => nodeGrammar() },
+    { form: 'node <name>:', example: 'node greet:', over: 'by name', block: () => nodeGrammar() },
   ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# dialogue requires an id', raw.span);

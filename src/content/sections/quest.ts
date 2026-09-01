@@ -258,6 +258,7 @@ export const quest = section<Quest>()({
     {
       form: 'stage <name>:',
       example: 'stage offered:',
+      over: 'by name',
       note: STAGE_NOTE,
       block: (): Written[] => [
         { form: 'log: <text>', example: 'log: A guide called Miki offered to show me the ropes.', family: 'what the journal says', note: "the player's own note of what happened while the quest stood here" },

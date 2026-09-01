@@ -18,7 +18,7 @@ export const info = section<ModuleInfo>()({
   vocabulary: 'declared',
   fields: {
     version: { parser: version, default: () => [0, 0, 0] },
-    dependencies: { parser: list(dependency), default: () => [], note: `every module this one is written against, and how: a bare name is required, and otherwise ${PREFIX_MEANINGS()}` },
+    dependencies: { parser: list(dependency), default: () => [], note: `every module this one is written against, and how — ${PREFIX_MEANINGS()}` },
     pack: { parser: id, example: 'highland-expansion', note: 'the collection this module ships in, which is what a player installs and turns on as one thing' },
     language: { parser: text, default: () => DEFAULT_LANGUAGE, example: DEFAULT_LANGUAGE, note: 'the language every line this module says to a player is written in' },
   },

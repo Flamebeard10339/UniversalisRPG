@@ -7,11 +7,12 @@ import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { nestedResults, type ActionResult } from '../grammar/actionResult';
 import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
-import { DslError, type Written } from '../grammar/parser';
+import { DslError, type Overwritten, type Written } from '../grammar/parser';
 import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
-import { DEFAULT_CONTEXT, hydrateSection } from '../grammar/section';
+import { DEFAULT_CONTEXT, hydrateSection, type AnySchema } from '../grammar/section';
+import { BY_NAME, mergeFields, overwrittenField } from './merge';
 import { keyedUnderOwnerKind, memberKey, Namespace } from './namespace';
 import { TOUCHED } from './sections/define';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
@@ -743,9 +744,76 @@ describe('a second body written at an id a first body already holds', () => {
       }
     });
 
+  const branchOf = (schema: AnySchema, name: string): Overwritten => {
+    const byName = mergeFields({ [name]: [{ label: 'here', held: 1 }] }, { [name]: [{ label: 'here', added: 2 }, { label: 'other' }] }, schema)[name] as { held?: number; added?: number }[];
+    if (Array.isArray(byName) && byName.length === 2 && byName[0]?.held === 1 && byName[0]?.added === 2) return 'by name';
+    const listed = mergeFields({ [name]: ['held'] }, { [name]: { ops: [{ op: '+', values: ['added'] }] } }, schema)[name];
+    return Array.isArray(listed) && listed.length === 2 ? 'listed' : 'replaced';
+  };
+
+  const SCHEMATIC = sections().filter((each) => each.schema !== undefined && Object.keys(each.schema!.fields).length > 0);
+
+  it.each(SCHEMATIC.map((each) => each.kind))('%s says of every line it takes what mergeFields does with that line', (kind) => {
+    const schema = sectionFor(kind)!.schema!;
+    const names = [...Object.keys(schema.fields), ...(schema.keywords ?? []), ...(schema.entries === undefined ? [] : [schema.entries.into])];
+    for (const name of names) expect(overwrittenField(schema, name), `# ${kind} ${name}`).toBe(branchOf(schema, name));
+  });
+
+  it('marks the lines it lays over by name, and marks no others', () => {
+    const lines = sections().flatMap((owner) => owner.grammar.map((line) => ({ kind: owner.kind, line })));
+    expect(lines.filter(({ line }) => line.over === 'by name').length).toBeGreaterThan(3);
+    for (const { kind, line } of lines) expect(line.note?.includes(BY_NAME) === true, `# ${kind}: ${line.form}`).toBe(line.over === 'by name');
+  });
+
+  it('marks a line by name exactly where the kind lays a second one of it over the first by name', () => {
+    const held = (value: object): number => Object.values(value).filter(Array.isArray).flat().length;
+    let byName = 0;
+    let read = 0;
+    for (const owner of sections()) {
+      for (const line of owner.grammar) {
+        const hole = (holesIn(line.form, line.example) ?? [])[0];
+        if (hole === undefined) continue;
+        const opens = line.block?.()[0]?.example;
+        const body = (example: string): object | undefined => {
+          const written = [`# ${owner.kind} probe`, example, ...(opens === undefined ? [] : indentLines([opens], 2))].join('\n');
+          try {
+            return owner.parse(splitSections(written)[0]!);
+          } catch {
+            return undefined;
+          }
+        };
+        const first = body(line.example);
+        const again = body(line.example);
+        const other = body(standingIn(line.example, hole, `${valueIn(line.example, hole)}-elsewhere`));
+        if (first === undefined || again === undefined || other === undefined) continue;
+        const laid = ((): boolean => {
+          try {
+            return held(owner.merge(structuredClone(first), again)) === held(first) && held(owner.merge(structuredClone(first), other)) > held(first);
+          } catch {
+            return false;
+          }
+        })();
+        read += 1;
+        if (laid) byName += 1;
+        expect(line.over === 'by name', `# ${owner.kind}: ${line.form}`).toBe(laid);
+      }
+    }
+    expect(read).toBeGreaterThan(20);
+    expect(byName).toBeGreaterThan(1);
+  });
+
   it('is asked of every kind that lands in a map, which is most of them', () => {
     expect(MAPPED.length).toBeGreaterThan(20);
     expect(MAPPED.length).toBeLessThan(sections().length);
+  });
+
+  it.each(MAPPED.filter((each) => each.bodyOver === 'whole').map((each) => each.kind))('%s is written whole, so a second body is the section', (kind) => {
+    const owner = sectionFor(kind)!;
+    const first = AUTHORED.get(kind)?.[0];
+    expect(first, `the corpus writes no # ${kind}`).toBeDefined();
+    const seconds = secondBodies(owner, (first as { id: string }).id);
+    expect(seconds.length).toBeGreaterThan(0);
+    for (const second of seconds) expect(owner.merge(structuredClone(first!), structuredClone(second))).toEqual(second);
   });
 
   it.each(MAPPED.map((each) => each.kind))('%s says what it means, rather than keeping the first and dropping the second', (kind) => {

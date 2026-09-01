@@ -1,15 +1,20 @@
 import { DslError, Parser } from './parser';
 
-export const PREFIX_MEANINGS = (): string => Object.entries(PREFIXES).map(([symbol, prefix]) => `${symbol} ${prefix}`).join(', ');
-
 export type DependencyPrefix = 'required' | 'incompatible' | 'unordered' | 'optional' | 'recommended';
 
-const PREFIXES: Record<string, DependencyPrefix> = {
-  '!': 'incompatible',
-  '~': 'unordered',
-  '?': 'optional',
-  '+': 'recommended',
+const REQUIRED = 'it must be loaded, and this module is read after it';
+
+const PREFIXES: Record<string, { name: DependencyPrefix; does: string }> = {
+  '!': { name: 'incompatible', does: 'the world is refused where that module is loaded' },
+  '~': { name: 'unordered', does: 'it must be loaded, and neither module is read before the other' },
+  '?': { name: 'optional', does: 'it may be absent, and while it is, every id written here that names it is dropped, taking whatever will not stand without it' },
+  '+': { name: 'recommended', does: 'read exactly as ? is' },
 };
+
+const named = (symbol: string): DependencyPrefix => PREFIXES[symbol]!.name;
+
+export const PREFIX_MEANINGS = (): string =>
+  `a bare name is required — ${REQUIRED}; ${Object.entries(PREFIXES).map(([symbol, { name, does }]) => `${symbol} ${name} — ${does}`).join('; ')}`;
 
 export type VersionOperator = '<' | '<=' | '=' | '>=' | '>';
 
@@ -64,7 +69,7 @@ export function satisfies(actual: Version, operator: VersionOperator, required: 
 }
 
 export function formatDependency(value: Dependency): string {
-  const symbol = Object.keys(PREFIXES).find((key) => PREFIXES[key] === value.prefix);
+  const symbol = Object.keys(PREFIXES).find((key) => named(key) === value.prefix);
   const head = symbol === undefined ? value.module : `${symbol} ${value.module}`;
   return value.operator === undefined ? head : `${head} ${value.operator} ${formatVersion(value.version!)}`;
 }
@@ -80,7 +85,7 @@ export const dependency: Parser<Dependency> = {
         end: cursor.abs(cursor.pos),
       });
 
-    const prefix = symbol === null ? 'required' : PREFIXES[symbol];
+    const prefix = symbol === null ? 'required' : named(symbol);
     cursor.take(/[ \t]*/);
     const operator = cursor.take(/<=|>=|<|=|>/) as VersionOperator | null;
     if (operator === null) return { prefix, module };
@@ -89,5 +94,5 @@ export const dependency: Parser<Dependency> = {
   },
   print: (value) => formatDependency(value),
   forms: ['<module>', ...Object.keys(PREFIXES).map((symbol) => `${symbol} <module>`), '<module> <comparison> <version>'],
-  examples: ['core', ...Object.entries(PREFIXES).map(([symbol, prefix]) => `${symbol} some-${prefix}-module`), 'core >= 1.2.0'],
+  examples: ['core', ...Object.keys(PREFIXES).map((symbol) => `${symbol} some-${named(symbol)}-module`), 'core >= 1.2.0'],
 };

@@ -3,15 +3,18 @@ import { actionBody } from '../grammar/action';
 import { condition } from '../grammar/condition';
 import { offeringAt } from './completion';
 import { gathered, shownIn } from './offerGroups';
-import { sectionFor, sectionKinds } from './sections';
+import { globalSectionKinds, sectionFor, sectionKinds } from './sections';
+import { WRITTEN_WHOLE_NOTE } from './merge';
 import { grammarLines, headingOf, namedGrammars, PART, RULES, standingAt, treeOf } from './grammarTree';
 
 const REFERS = /…indented under it, what `(?<form>[^`]+)`(?: under `(?<kind>[^`]+)`)? holds$/;
 
+const heads = (page: readonly string[], kind: string): boolean => page.some((line) => line.startsWith(`# ${kind} <id>`));
+
 describe('the grammar tree', () => {
   it.each(sectionKinds())('%s is written out once, however deep its blocks reach', (kind) => {
     const tree = treeOf(kind);
-    expect(tree[0]).toBe(`# ${kind} <id>`);
+    expect(heads(tree, kind), tree[0]).toBe(true);
     expect(tree.length).toBeLessThan(200);
   });
 
@@ -25,6 +28,14 @@ describe('the grammar tree', () => {
       expect(heading, `nothing above ${JSON.stringify(line)} says which body it is written into`).toBeDefined();
       expect(indent(line), `${JSON.stringify(line)} does not stand under ${JSON.stringify(heading)}`).toBeGreaterThan(indent(heading!));
     }
+  });
+
+  it('says under which heading a second body is written, and which kinds keep nothing of the first', () => {
+    const addressed = grammarLines().find((line) => line.trimStart().startsWith('# <kind> <module>.<id>'));
+    expect(addressed).toBeDefined();
+    for (const kind of sectionKinds()) expect(addressed!.includes(`# ${kind} `), kind).toBe(globalSectionKinds().includes(kind));
+    expect(globalSectionKinds().length).toBeGreaterThan(0);
+    for (const kind of sectionKinds()) expect(treeOf(kind)[0]!.includes(WRITTEN_WHOLE_NOTE), kind).toBe(sectionFor(kind)!.bodyOver === 'whole');
   });
 
   it.each(sectionKinds())('%s points only back at a block it has already written out', (kind) => {
@@ -98,10 +109,11 @@ describe('the grammar tree', () => {
 
   describe('the whole answer', () => {
     it('heads every kind it was asked for, and every kind there is when it was asked for none', () => {
-      for (const kind of sectionKinds()) expect(grammarLines(), kind).toContain(`# ${kind} <id>`);
+      const whole = grammarLines();
+      for (const kind of sectionKinds()) expect(heads(whole, kind), kind).toBe(true);
       const two = sectionKinds().slice(0, 2);
       const asked = grammarLines(two);
-      for (const kind of sectionKinds()) expect(asked.includes(`# ${kind} <id>`), kind).toBe(two.includes(kind));
+      for (const kind of sectionKinds()) expect(heads(asked, kind), kind).toBe(two.includes(kind));
     });
 
     describe('a grammar the page names', () => {

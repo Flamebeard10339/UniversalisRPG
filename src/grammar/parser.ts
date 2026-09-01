@@ -22,9 +22,12 @@ export const calledBlock = (called: string, lines: Written[]): Written[] => Obje
 
 export const blockCalled = (lines: readonly Written[]): string | undefined => (lines as { [CALLED]?: string })[CALLED];
 
+export type Overwritten = 'replaced' | 'listed' | 'by name';
+
 export interface Written extends Filled {
   form: string;
   example: string;
+  over?: Overwritten;
   of?: string;
   family?: string;
   note?: string;
