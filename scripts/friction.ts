@@ -114,7 +114,7 @@ const PROBES_SHOWN = 6;
 export function report(reading: Reading, name: string): string[] {
   const { total, orientation } = reading;
   const share = total === 0 ? 0 : Math.round((100 * (orientation - 1)) / total);
-  const lines = [`${name} — ${total} calls; first non-scratch edit at ${orientation} (${share}% spent orienting)`, ''];
+  const lines = [`${name} — ${total} call${total === 1 ? '' : 's'}; first non-scratch edit at ${orientation} (${share}% spent orienting)`, ''];
 
   const counts: [string, number, string][] = [
     ['engine source read', reading.engineReads.length, reading.engineReads.map((call) => call.n).join(' ')],
