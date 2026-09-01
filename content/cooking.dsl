@@ -45,6 +45,7 @@ examine: Starched, ridiculous, and it is what the range at the castle expects to
 slot: head
 requires: level.cooking >= 20
 value: 180
+item-level: 8-14
 kitchen, +12 cooking
 
 # item oven-mitts
@@ -53,6 +54,7 @@ examine: Quilted to the wrist and scorched at the thumbs.
 slot: gloves
 requires: level.cooking >= 5
 value: 40
+item-level: 3-6
 kitchen, +5 cooking
 
 # item cast-iron-pan

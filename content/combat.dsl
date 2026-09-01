@@ -128,6 +128,7 @@ title: Bronze Dagger
 examine: Short, soft, and better than your hands.
 slot: mainhand
 value: 30
+item-level: 2-5
 weapon, +5 core.attack
 
 # item bronze-helmet
@@ -135,6 +136,7 @@ title: Bronze Helmet
 examine: A plain cap of hammered bronze, dented over the left ear by somebody else's evening.
 slot: head
 value: 26
+item-level: 2-4
 armour, +2 core.defense, +3 core.max-health
 
 # item bronze-platebody
@@ -142,6 +144,7 @@ title: Bronze Platebody
 examine: Front and back plate, laced at the sides. Heavier than it looks and quieter than you want.
 slot: body
 value: 44
+item-level: 3-6
 armour, +4 core.defense, +1 core.max-health
 
 # item bronze-platelegs
@@ -149,6 +152,7 @@ title: Bronze Platelegs
 examine: Skirted plate to the knee. Walking in them is a skill nobody warns you about.
 slot: legs
 value: 38
+item-level: 2-5
 armour, +3 core.defense, +2 core.max-health
 
 // --- iron, which is not for beginners ---
@@ -163,6 +167,7 @@ examine: Grey steel with a proper edge on it, and no decoration at all.
 slot: mainhand
 requires: level.attack >= 10
 value: 90
+item-level: 5-9
 weapon, +10 core.attack
 
 # item iron-helmet
@@ -171,6 +176,7 @@ examine: A full helm with a slot to see out of, and not much of one.
 slot: head
 requires: level.attack >= 10 and level.health >= 10
 value: 80
+item-level: 4-8
 armour, +4 core.defense, +6 core.max-health
 
 # item iron-platebody
@@ -179,6 +185,7 @@ examine: Riveted plate over a padded coat. You feel the weight of it in your kne
 slot: body
 requires: level.attack >= 10 and level.health >= 10
 value: 130
+item-level: 6-11
 armour, +7 core.defense, +3 core.max-health
 
 # item iron-platelegs
@@ -187,6 +194,7 @@ examine: Iron to the shin, hinged at the knee by somebody who had thought about 
 slot: legs
 requires: level.attack >= 10 and level.health >= 10
 value: 110
+item-level: 5-9
 armour, +6 core.defense, +4 core.max-health
 
 // The one thing in the game nothing drops and no counter sells: it is made, at an anvil, by a
@@ -197,6 +205,7 @@ examine: A long blade with a fuller down the middle and somebody's initials file
 slot: mainhand
 requires: level.attack >= 20
 value: 400
+item-level: 9-15
 weapon, +18 core.attack
 
 // --- the farm, which is where a beginner goes when the sewer is full ---

@@ -87,6 +87,7 @@ title: Small Fishing Net
 examine: A hand net on a short pole, mended twice.
 slot: mainhand
 value: 20
+item-level: 2-5
 tackle, +3 fishing, +40 max-line-health
 
 # item large-fishing-net
@@ -95,6 +96,7 @@ examine: A throw net wide enough to need both arms and a running start.
 slot: mainhand
 requires: level.fishing >= 10
 value: 70
+item-level: 5-9
 tackle, +7 fishing, +60 max-line-health
 
 # item fishing-rod
@@ -102,6 +104,7 @@ title: Fishing Rod
 examine: Split cane in three pieces, whipped at the joints. It holds no line of its own.
 slot: mainhand
 value: 45
+item-level: 4-8
 tackle, +5 fishing
 
 # item dried-fish-bait
@@ -123,6 +126,7 @@ title: Gut Line
 examine: Twisted gut, and it smells like it.
 slot: gloves
 value: 12
+item-level: 2-4
 tackle, +15 max-line-health
 
 # item braided-fiber-line
@@ -130,6 +134,7 @@ title: Braided Fibre Line
 examine: Four strands laid against each other so that no one of them ever takes the whole pull.
 slot: gloves
 value: 40
+item-level: 4-8
 tackle, +35 max-line-health
 
 # item horsehair-line
@@ -148,6 +153,7 @@ title: Steel Line
 examine: Wire, honestly. It will outlast the fish and it will spook every one of them first.
 slot: gloves
 value: 60
+item-level: 3-7
 tackle, +25 max-line-health, +100% max-line-health, -6 fishing
 
 // Every piece of tackle above that grants a line to empty. Nothing in the language selects an item

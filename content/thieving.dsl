@@ -130,6 +130,7 @@ title: Fingerless Gloves
 examine: Cut back to the second knuckle, so the ends of your fingers are yours and the backs of your hands are nobody's business.
 slot: gloves
 value: 45
+item-level: 3-6
 tools, +4 thieving
 
 # item soft-toed-boots
@@ -137,6 +138,7 @@ title: Soft-Toed Boots
 examine: Felt over the toe and no nails in the sole. They are no use in a fight and they are silent on a stair.
 slot: boots
 value: 60
+item-level: 3-6
 tools, +4 thieving
 
 // --- what a pair of picks can be grown into ---

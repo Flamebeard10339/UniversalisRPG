@@ -119,6 +119,7 @@ examine: A long, plain blade with nothing on it a smith would call decoration, a
 slot: mainhand
 requires: level.combat.attack >= 25
 value: 900
+item-level: 14-20
 weapon, +28 attack
 
 // The notebook the riddle turns up. Nothing but this quest has any use for it,

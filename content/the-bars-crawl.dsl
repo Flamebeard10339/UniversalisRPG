@@ -111,12 +111,14 @@ say: The bones go soft, then gone, and what is left in the pot is nothing like b
 title: Bar Cook's Cap
 slot: head
 value: 70
+item-level: 4-8
 kitchen, +6 cooking
 
 # item cooks-apron
 title: Bar Cook's Apron
 slot: body
 value: 70
+item-level: 4-8
 kitchen, +6 cooking
 
 // --- the quest ---

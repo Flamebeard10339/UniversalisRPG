@@ -59,6 +59,7 @@ title: Leather Coif
 examine: A hood of it, laced under the chin, and it will stop precisely one thing once.
 slot: head
 value: 22
+item-level: 1-3
 armour, +1 core.defense, +2 core.max-health
 
 # item leather-body
@@ -66,6 +67,7 @@ title: Leather Body
 examine: A hardened jerkin. Cheap, quiet, and it does not rust in the sewer.
 slot: body
 value: 34
+item-level: 2-5
 armour, +2 core.defense, +1 core.max-health
 
 # item leather-chaps
@@ -73,6 +75,7 @@ title: Leather Chaps
 examine: Over the knee and laced at the back, and every wolf in the pinewood has been through a pair.
 slot: legs
 value: 28
+item-level: 2-4
 armour, +2 core.defense
 
 # item leather-gloves
@@ -80,6 +83,7 @@ title: Leather Gloves
 examine: Close-cut, thin at the fingers, made by somebody who had to keep working in them.
 slot: gloves
 value: 24
+item-level: 1-3
 armour, +1 core.defense, +1 core.max-health
 
 # item wolfskin-gloves
@@ -88,6 +92,7 @@ examine: Fur to the wrist and leather in the palm. Nothing you do in these is qu
 slot: gloves
 requires: level.crafting >= 15
 value: 90
+item-level: 4-8
 armour, +2 core.defense, +4 core.max-health
 
 // --- turning what you killed into what you can use ---

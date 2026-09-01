@@ -126,6 +126,7 @@ examine: A jeweller's set wrapped in oilcloth, each pick a different weight for 
 slot: offhand
 thieving-tool, +2 thieving
 value: 45
+item-level: 2-5
 
 // --- tests ---
 

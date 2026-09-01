@@ -333,6 +333,7 @@ item-level: 3-8
 examine: A sturdy shield of banded oak.
 slot: offhand
 value: 12
+item-level: 2-4
 shield, +2 defense
 
 # item lockpick
@@ -626,6 +627,7 @@ title: Hand Axe
 examine: A short axe, good for firewood and not much else.
 slot: mainhand
 value: 12
+item-level: 1-3
 weapon, +1 attack
 
 # item bundle-of-firewood

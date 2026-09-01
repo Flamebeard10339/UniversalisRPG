@@ -280,5 +280,6 @@ give: 1 creeping-rot-jewel
 # item vigor-tally
 DEBUG
 slot: offhand
+item-level: 2-5
 +1 evasion per stack of accelerated-vigor
 
