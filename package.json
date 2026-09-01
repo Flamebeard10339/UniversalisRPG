@@ -28,6 +28,7 @@
     "mutate": "tsx scripts/mutate.ts",
     "friction": "tsx scripts/friction.ts",
     "migrate-saves": "tsx scripts/migrate-saves.ts",
+    "repair-saves": "tsx scripts/repair-saves.ts",
     "rename-module": "tsx scripts/rename-module.ts",
     "move-sections": "tsx scripts/move-sections.ts",
     "rename-section": "tsx scripts/rename-section.ts",
