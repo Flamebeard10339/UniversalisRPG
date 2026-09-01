@@ -570,8 +570,25 @@ examine: A dug passage running away from town, wide enough for two abreast. It h
 adjacent:
   tunnel-mouth
   ratkin-border
+  the-muster
 entities:
   6 feral-rat
+
+// Where combat goes after the tenth level, and the only room in Tulsa sized for a character in
+// iron: six of them, a hundred and fifteen health apiece, on a ninety-second respawn.
+//
+// Nothing here is aggressive, which is a decision and not an oversight. They are massing rather
+// than patrolling, and a war camp does not break formation to chase one person down a tunnel — so
+// a beginner who walks in has a look at what is coming and walks out again, and a fight here is
+// one somebody started on purpose.
+# location the-muster
+x: 16, y: 13, z: -1
+title: The Muster
+examine: The tunnel opens into a dug hall with a roof held up by pit props, and there are more of them down here than the town above has soldiers. Nobody is in a hurry. They are waiting for a date.
+adjacent:
+  tunnels
+entities:
+  6 ratkin-warrior
 
 # location ratkin-border
 x: 17, y: 11
@@ -1296,6 +1313,22 @@ respawn after: 10m
 on death:
   credit:
     roll: ratman-remains
+
+// The second band's foe, and the only thing in Tulsa with enough health in it to pay a character in
+// iron by the hour. Slower than a wolf and far harder to put down, so what it is worth is its own
+// pool rather than the speed of the room.
+# entity ratkin-warrior
+title: Ratkin Warrior
+examine: A head taller than the ones in the sewer and put together properly, in scale somebody cut and fitted rather than found. It watches you the whole way in.
+stats: attack 24, defense 12, max-health 115, attack-rate 14, accuracy 88, evasion 40
+uses: core.melee-combat
+faction: world
+respawn after: 90s
+on death:
+  credit:
+    roll: ratman-remains
+    give: 8-20 core.coin
+    1 in 20: give: 1 combat.iron-dagger
 
 # entity drone-bee
 title: Drone Bee
