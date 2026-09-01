@@ -1,20 +1,29 @@
 import path from 'node:path';
+import type { Direction, Hex, PlaneNode } from '../src/content/hex';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
+import type { Item } from '../src/content/sections/item';
 import { shippedSources } from '../src/content/shipped';
+import { isAllocated, neighbours, nodeKey, placementAt, planeClusters, rootPosition, slotState, type Plane } from '../src/runtime/clusterPlane';
 import { equip } from '../src/runtime/equipment';
-import { receiveItem } from '../src/runtime/itemInstance';
+import { allocate, itemInstance, itemTemplate, pointsRemaining, receiveItem, slotJewel, type ItemInstance } from '../src/runtime/itemInstance';
 import { initialState, serializeSave } from '../src/runtime/save';
+import { statValue } from '../src/runtime/stats';
+import type { GameState } from '../src/runtime/state';
 import { activitiesIn, poolForTier, type Activity } from './lib/tiers';
 
 const usage = [
-  'Usage: npm run tier-build -- <activity> <level> [<item>...]',
+  'Usage: npm run tier-build -- <activity> <level> [<item>...] [--grow <stat>...]',
   '',
   '  <activity>   a module that declares skills, as `npm run tier-build -- --list` prints them',
   '  <level>      the level every skill of that activity is brought to',
   '  <item>       gear to hand over and put on, in the order it should be tried. `<id>:<count>`',
   '               hands over a stock of it, which is what bait and anything else spent by using it',
-  '               wants -- a tier has everything it beat and every shop, so nothing here is budgeted',
+  '               wants -- a tier has everything it beat and every shop, so nothing here is budgeted.',
+  '               A jewel is an item like any other: hand it over here and it is there to be socketed',
+  '  --grow       the stats the build is trying for, best first. With it, every point every worn piece',
+  "               dropped with is spent, through the engine's own doors. Without it nothing is spent,",
+  '               which is a character at roughly half of what its gear allows',
   '',
   'Prints the `# save` section for a reference build, to paste into the corpus. Nothing here is',
   'modelled: the experience is the curve read at that level, and the gear is handed over and worn',
@@ -28,23 +37,34 @@ const usage = [
   'Gear a level does not reach is refused by the engine and the refusal is printed. So the list may',
   "name the whole of an activity's kit at every tier, and each tier wears the part of it it has",
   'earned -- what a build may wear is never written down here.',
+  '',
+  'The rule --grow spends by is greedy, and is a floor rather than an answer in exactly the way the',
+  'even split above is: it takes the next move whose finished plane reads highest, one piece at a',
+  'time and in the order they went on, so a piece that goes on first takes the jewels it likes and a',
+  'corridor that would have paid three nodes later is never crossed. Nothing here knows what any',
+  'passive or jewel is worth -- each move is applied and the stat is read back -- so the answer moves',
+  'when the world does, and a better search would replace this one without replacing anything else.',
 ].join('\n');
 
 export interface TierArgs {
   activity: string;
   level: number;
   items: string[];
+  grow: string[];
   list: boolean;
 }
 
 export function parseTierArgs(raw: readonly string[]): TierArgs {
   if (raw.includes('--help') || raw.includes('-h')) throw new Error(usage);
-  if (raw.includes('--list')) return { activity: '', level: 0, items: [], list: true };
-  const [activity, level, ...items] = raw;
+  if (raw.includes('--list')) return { activity: '', level: 0, items: [], grow: [], list: true };
+  const cut = raw.indexOf('--grow');
+  const [activity, level, ...items] = cut < 0 ? raw : raw.slice(0, cut);
+  const grow = cut < 0 ? [] : raw.slice(cut + 1);
   if (activity === undefined || level === undefined) throw new Error(`name an activity and a level\n\n${usage}`);
   const at = Number(level);
   if (!Number.isInteger(at) || at < 1) throw new Error(`a level is a whole number of at least 1, not ${level}`);
-  return { activity, level: at, items, list: false };
+  if (cut >= 0 && grow.length === 0) throw new Error(`--grow wants at least one stat to grow toward\n\n${usage}`);
+  return { activity, level: at, items, grow, list: false };
 }
 
 // What the build was handed, and what became of it. A refusal is the engine's own sentence, so a
@@ -72,6 +92,138 @@ export function handedOver(written: string): Handed {
 export interface TierBuild {
   save: string;
   worn: Worn[];
+  grown?: Grown;
+}
+
+// What spending the planes came to. `unspent` is the honest half: a budget the greedy rule could not
+// reach the end of, and the reading before and after is the whole of the evidence that a stat named
+// under --grow was one this world can actually move.
+export interface Grown {
+  spent: number;
+  unspent: number;
+  before: Record<string, number>;
+  after: Record<string, number>;
+}
+
+// One thing that may be done to a plane. Both are the engine's own doors; nothing here is a change
+// to a plane that a player at the growth screen could not make.
+type Move = { kind: 'allocate'; node: PlaneNode } | { kind: 'socket'; hex: Hex; direction: Direction; jewel: string };
+
+const applyMove = (state: GameState, registry: Registry, target: string, move: Move): boolean =>
+  (move.kind === 'allocate' ? allocate(state, registry, target, move.node) : slotJewel(state, registry, target, move.jewel, move.hex, move.direction)).ok;
+
+// A plane's own record of what is already paid for, which is where every next move has to start
+// from. The root of the plane's own cluster is allocated by standing there rather than by being
+// listed, so it is asked for the same way the engine asks -- and a cluster shape added next month
+// brings its own root with it.
+function standing(registry: Registry, plane: Plane): PlaneNode[] {
+  const nodes = new Map<string, PlaneNode>();
+  const keep = (node: PlaneNode): void => {
+    if (isAllocated(registry, plane, node)) nodes.set(nodeKey(node), node);
+  };
+  for (const { hex, cluster } of planeClusters(plane)) {
+    for (const position of cluster.allocatedPositions) keep({ hex, kind: 'position', position });
+    for (const direction of cluster.allocatedSlots) keep({ hex, kind: 'slot', direction });
+    const placement = placementAt(registry, plane, hex);
+    if (placement) keep({ hex, kind: 'position', position: rootPosition(placement.jewel) });
+  }
+  return [...nodes.values()];
+}
+
+// Everything that could be done next, derived from where the plane already stands: the unpaid
+// neighbours of everything paid for, and every jewel still held against every open socket already
+// paid for. What each is worth is not asked here -- that is read off the engine, one move at a time.
+function movesFrom(registry: Registry, plane: Plane, jewels: readonly string[]): Move[] {
+  const moves: Move[] = [];
+  const seen = new Set<string>();
+  for (const node of standing(registry, plane)) {
+    for (const next of neighbours(registry, plane, node)) {
+      if (isAllocated(registry, plane, next) || seen.has(nodeKey(next))) continue;
+      seen.add(nodeKey(next));
+      moves.push({ kind: 'allocate', node: next });
+    }
+  }
+  for (const { hex, cluster } of planeClusters(plane)) {
+    for (const direction of cluster.allocatedSlots) {
+      if (slotState(registry, plane, hex, direction) !== 'open') continue;
+      for (const jewel of jewels) moves.push({ kind: 'socket', hex, direction, jewel });
+    }
+  }
+  return moves;
+}
+
+// The plane, the stock a jewel comes out of and the cursor a socketed jewel rolls on: everything a
+// trial move writes, so a move can be tried and taken back rather than modelled.
+interface Undo {
+  plane: Plane;
+  inventory: Record<string, number>;
+  rng: number;
+}
+
+const snapshot = (state: GameState, payload: ItemInstance): Undo => ({ plane: structuredClone(payload.plane), inventory: { ...state.inventory }, rng: state.rng });
+
+function undo(state: GameState, payload: ItemInstance, taken: Undo): void {
+  payload.plane = taken.plane;
+  state.inventory = taken.inventory;
+  state.rng = taken.rng;
+}
+
+const reading = (state: GameState, registry: Registry, stats: readonly string[]): number[] => stats.map((id) => statValue(id, state, registry));
+
+// Better means better at the first stat the two differ on, which is what naming them in order means.
+function beats(one: readonly number[], other: readonly number[]): boolean {
+  for (let at = 0; at < one.length; at++) {
+    if (Math.abs(one[at]! - other[at]!) > 1e-9) return one[at]! > other[at]!;
+  }
+  return false;
+}
+
+const GUARD = 500;
+
+// One piece's plane, spent. `playedOut` is what makes a move that pays nothing legible: a socket and
+// the slot in front of it both read exactly as they did, and the only thing that tells one jewel from
+// another is what the plane comes to once the rest of the budget is spent behind it. So a move is
+// scored by finishing the build under it and reading that, and the finishing itself is scored move by
+// move -- which is where the greed is, and it is the only place it is.
+function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], playedOut: boolean): number {
+  let spent = 0;
+  for (let guard = 0; guard < GUARD; guard++) {
+    const payload = itemInstance(state, target);
+    if (!payload || pointsRemaining(payload, item) <= 0) break;
+
+    let chosen: Move | undefined;
+    let best: number[] | undefined;
+    for (const move of movesFrom(registry, payload.plane, jewels)) {
+      const taken = snapshot(state, payload);
+      const made = applyMove(state, registry, target, move);
+      if (made) {
+        if (playedOut) spendPlane(state, registry, target, item, stats, jewels, false);
+        const score = reading(state, registry, stats);
+        if (best === undefined || beats(score, best)) [chosen, best] = [move, score];
+      }
+      undo(state, payload, taken);
+    }
+    if (!chosen || !applyMove(state, registry, target, chosen)) break;
+    if (chosen.kind === 'allocate') spent += 1;
+  }
+  return spent;
+}
+
+// Every piece on the body that dropped with points, spent toward the named stats. Which pieces those
+// are is asked of what is worn rather than listed: anything the engine minted a plane for has one,
+// and anything else has no budget to spend and says so by having none.
+export function growWorn(state: GameState, registry: Registry, stats: readonly string[], jewels: readonly string[]): Grown {
+  const named = (values: number[]): Record<string, number> => Object.fromEntries(stats.map((id, at) => [id, values[at]!]));
+  const before = reading(state, registry, stats);
+  let spent = 0;
+  let unspent = 0;
+  for (const worn of Object.values(state.equipped)) {
+    const item = registry.items.get(itemTemplate(state, worn));
+    if (!item || !itemInstance(state, worn)) continue;
+    spent += spendPlane(state, registry, worn, item, stats, jewels, true);
+    unspent += Math.max(0, pointsRemaining(itemInstance(state, worn)!, item));
+  }
+  return { spent, unspent, before: named(before), after: named(reading(state, registry, stats)) };
 }
 
 // The pool spent evenly, which is what "every skill of this activity at this level" means. It is
@@ -80,7 +232,7 @@ export interface TierBuild {
 export const evenlySpent = (activity: Activity, level: number): Record<string, number> =>
   Object.fromEntries(activity.skills.map((skill) => [skill, poolForTier(activity, level) / activity.skills.length]));
 
-export function buildTier(registry: Registry, activity: Activity, level: number, items: readonly string[]): TierBuild {
+export function buildTier(registry: Registry, activity: Activity, level: number, items: readonly string[], grow: readonly string[] = []): TierBuild {
   const state = initialState(registry);
   Object.assign(state.xp, evenlySpent(activity, level));
 
@@ -100,7 +252,11 @@ export function buildTier(registry: Registry, activity: Activity, level: number,
     const refused = equip(state, registry, minted ?? item);
     worn.push(refused === undefined ? { item } : { item, refused: String(refused) });
   }
-  return { save: serializeSave(state, registry), worn };
+  // Which of the things handed over are jewels is asked of the items themselves, so a jewel written
+  // next month is socketable here by being handed over and nothing else.
+  const jewels = items.map((written) => handedOver(written).item).filter((item) => registry.items.get(item)?.clusterJewel !== undefined);
+  const grown = grow.length === 0 ? undefined : growWorn(state, registry, grow, jewels);
+  return { save: serializeSave(state, registry), worn, grown };
 }
 
 export function tierLines(registry: Registry, args: TierArgs): { lines: string[]; ok: boolean } {
@@ -114,7 +270,10 @@ export function tierLines(registry: Registry, args: TierArgs): { lines: string[]
   const unknown = args.items.map((written) => handedOver(written).item).filter((item) => !registry.items.has(item));
   if (unknown.length > 0) return { lines: [`no # item is declared under: ${unknown.join(', ')}`], ok: false };
 
-  const built = buildTier(registry, activity, args.level, args.items);
+  const unnamed = args.grow.filter((stat) => !registry.stats.has(stat));
+  if (unnamed.length > 0) return { lines: [`no # stat is declared under: ${unnamed.join(', ')}`], ok: false };
+
+  const built = buildTier(registry, activity, args.level, args.items, args.grow);
   const refused = built.worn.filter((each) => each.refused !== undefined);
   return {
     lines: [
@@ -124,10 +283,19 @@ export function tierLines(registry: Registry, args: TierArgs): { lines: string[]
       `${activity.id} at level ${String(args.level)}: ${String(poolForTier(activity, args.level))} experience across ${activity.skills.join(' and ')}`,
       `worn: ${built.worn.filter((each) => each.refused === undefined).map((each) => each.item).join(', ') || 'nothing'}`,
       ...(refused.length === 0 ? [] : ['carried but not worn:', ...refused.map((each) => `  ${each.item} — ${each.refused!}`)]),
+      ...grownLines(built.grown),
     ],
     ok: true,
   };
 }
+
+const grownLines = (grown: Grown | undefined): string[] =>
+  grown === undefined
+    ? []
+    : [
+        `grown: ${String(grown.spent)} points spent, ${String(grown.unspent)} the greedy rule could not reach`,
+        ...Object.keys(grown.before).map((stat) => `  ${stat} ${grown.before[stat]!.toFixed(1)} -> ${grown.after[stat]!.toFixed(1)}`),
+      ];
 
 function main(): void {
   let args: TierArgs;
