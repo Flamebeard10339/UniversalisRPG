@@ -26,6 +26,7 @@
     "review": "tsx scripts/review.ts",
     "inspect": "tsx scripts/inspect.ts",
     "mutate": "tsx scripts/mutate.ts",
+    "friction": "tsx scripts/friction.ts",
     "migrate-saves": "tsx scripts/migrate-saves.ts",
     "rename-module": "tsx scripts/rename-module.ts",
     "move-sections": "tsx scripts/move-sections.ts",
