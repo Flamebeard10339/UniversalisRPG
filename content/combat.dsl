@@ -96,9 +96,14 @@ give: 3-8 feather
 give: 1-2 raw-beef
 1 in 2: give: 1 cowhide
 
+// The pines are where a player goes who has decided they want to hit harder, and the ring is what
+// they come back with: everything on it is attack, accuracy or the speed of the arm, so a plane
+// grown out of one is a plane grown one way on purpose. It is off a pack rather than made at a
+// counter because choosing the room is the whole of the choice — the forge sells roads, not edges.
 # droptable wolf-remains
 give: 1 wolf-pelt
 1 in 3: give: 4-11 coin
+1 in 40: give: 1 core.keen-edge-jewel
 
 # droptable purse
 one of:
@@ -119,9 +124,13 @@ give: 15-30 coin
 
 // --- bronze, which anybody may wear ---
 //
-// About five points to a piece, spread between stopping a hit and surviving one. The whole set is
-// five attack, nine defense and six health, which against the sewer is the difference between a rat
-// costing four a bite and costing one.
+// About five points to a piece, spread between stopping a hit and surviving one. Six pieces, and
+// the whole set is five attack, fourteen defense and eight health, which against the sewer is the
+// difference between a rat costing four a bite and costing one.
+//
+// It is six rather than four because a slot with nothing in it is a plane the player never gets to
+// spend: the feet and the off hand each carry their own points, so filling them is a level's worth
+// of growth on its own and not only the armour on the line.
 
 # item bronze-dagger
 title: Bronze Dagger
@@ -154,6 +163,35 @@ slot: legs
 value: 38
 item-level: 2-5
 armour, +3 core.defense, +2 core.max-health
+
+# item bronze-boots
+title: Bronze Boots
+examine: Plate over the shin and the foot, and they are the loudest thing anybody wears.
+slot: boots
+value: 24
+item-level: 2-4
+armour, +2 core.defense, +1 core.max-health
+
+# item bronze-shield
+title: Bronze Shield
+examine: A round of bronze over a board, with a boss in the middle you are meant to punch things with.
+slot: offhand
+value: 32
+item-level: 2-4
+shield, +3 core.defense, +1 core.max-health
+
+// The rung between the two metals, and it is not a third metal: it is what a bronze smith makes for
+// somebody who has been fighting rather than for somebody who has just arrived. Five levels of the
+// arm is the whole of what it asks, which is the first thing in the game a player is refused and
+// then, some evening later, is not.
+# item bronze-sword
+title: Bronze Sword
+examine: A hand and a half of bronze with a real crossguard, and it is the first thing you have held that was made for this and nothing else.
+slot: mainhand
+requires: level.attack >= 5
+value: 70
+item-level: 4-7
+weapon, +8 core.attack
 
 // --- iron, which is not for beginners ---
 //
@@ -196,6 +234,24 @@ requires: level.attack >= 10 and level.health >= 10
 value: 110
 item-level: 5-9
 armour, +6 core.defense, +4 core.max-health
+
+# item iron-boots
+title: Iron Boots
+examine: Sabatons, jointed over the instep, and you hear yourself arrive everywhere for the rest of your life.
+slot: boots
+requires: level.attack >= 10 and level.health >= 10
+value: 70
+item-level: 4-8
+armour, +4 core.defense, +2 core.max-health
+
+# item iron-shield
+title: Iron Shield
+examine: A kite of iron over ash, tall enough to put a shoulder behind and heavy enough that you only do it once a fight.
+slot: offhand
+requires: level.attack >= 10 and level.health >= 10
+value: 95
+item-level: 4-8
+shield, +6 core.defense, +2 core.max-health
 
 // The one thing in the game nothing drops and no counter sells: it is made, at an anvil, by a
 // player who has already got there. Eighteen points in one hand, and it asks twenty attack.
@@ -260,3 +316,7 @@ on death:
     roll: highwaymans-keepsake
     give: 5-12 coin
     1 in 12: give: 1 iron-dagger
+    // The hardest thing on any road out of Tulsa, so it is the one that pays in the layer above
+    // steel: an orb scales a cluster a plane already carries, which means it is worth nothing to
+    // somebody who has not built one and a great deal to somebody who has.
+    1 in 45: give: 1 core.orb-of-the-edge
