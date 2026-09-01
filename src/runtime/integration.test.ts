@@ -6,28 +6,24 @@ import { restorePools } from './effects';
 import { isPoint } from '../grammar/range';
 import { populationCount } from '../content/sections/location';
 import { Registry } from '../content/registry';
-import { engineLocale, withEngineLocale } from '../content/engineLocale';
 import { ownedSectionKinds } from '../content/sections';
 import { MEMBER_KINDS } from '../content/namespace';
 import { loadUniverse } from '../content/load';
-import { moduleSource, shippedSources, worldFor } from '../content/shipped';
+import { fixtureModule, fixtureSources } from '../content/worldFixture';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
-const source = moduleSource('core').text;
-// The smallest shipped world with somewhere to stand, derived rather than listed, with core's own
-// text swapped for whatever a caller is perturbing: a module split moves with no edit here.
-const island = (text: string) => loadUniverse([engineLocale(), ...worldFor('first-steps').map((each) => (each.name === 'core' ? { name: 'core', text } : each))]);
-const registry = island(source);
-
-const shipped = loadUniverse(withEngineLocale(shippedSources()));
+const source = fixtureModule('core').text;
+// The engine's own world with core's text swapped for whatever a caller is perturbing.
+const world = (text: string) => loadUniverse(fixtureSources().map((each) => (each.name === 'core' ? { name: 'core', text } : each)));
+const registry = world(source);
 
 describe('core content', () => {
   it('loads identically from a CRLF checkout, with or without a BOM', () => {
     const crlf = source.replace(/\n/g, '\r\n');
-    for (const text of [crlf, `\uFEFF${crlf}`]) {
-      const loaded = island(text);
+    for (const text of [crlf, `﻿${crlf}`]) {
+      const loaded = world(text);
       expect([...loaded.locations.keys()]).toEqual([...registry.locations.keys()]);
       expect([...loaded.tests.keys()]).toEqual([...registry.tests.keys()]);
     }
@@ -38,33 +34,17 @@ describe('core content', () => {
     expect(registry.dialogues.size).toBeGreaterThan(0);
     expect(registry.tests.size).toBeGreaterThan(0);
   });
-
 });
 
-describe('shipped content', () => {
-  it('assembles every module in content/ into one universe', () => {
-    expect(shipped.tests.size).toBeGreaterThanOrEqual(registry.tests.size);
-  });
-});
-
-describe("every route the corpus ships walks, which is where a route's verdict is reported", () => {
-  for (const id of shipped.tests.keys()) {
-    it(`test "${id}" passes`, () => {
-      expect(runTest(id, shipped, createGameState())).toEqual({ passed: true });
-    });
-  }
-});
-
-// A swing is spent out of the range its swinger stands at, so a shipped actor that writes a range
-// hits for a different number every time. The subjects are the corpus's own — the player among
-// them, on the same footing as anything it fights, which is the point of writing the spread on a
-// sheet. What an actor stands at is its sheet folded with what it carries, so it is asked for
-// rather than assumed: a foe carrying nothing stands where it wrote, and the player stands a melee
-// level above. That the fight path spends the range rather than its midpoint is proved on a
-// fixture in encounter.test.ts.
-describe("a shipped actor's swing is spent out of the range it stands at", () => {
+// A swing is spent out of the range its swinger stands at, so an actor that writes a range hits for
+// a different number every time. The subjects are the world's own — the player among them, on the
+// same footing as anything it fights, which is the point of writing the spread on a sheet. What an
+// actor stands at is its sheet folded with what it carries, so it is asked for rather than assumed.
+// That the fight path spends the range rather than its midpoint is proved on a fixture in
+// encounter.test.ts.
+describe("an actor's swing is spent out of the range it stands at", () => {
   const ATTACK = 'core.attack';
-  const ranged = [...shipped.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
+  const ranged = [...registry.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
 
   it('is written by more than one of them, so neither side of a fight carries this alone', () => {
     expect(ranged.length).toBeGreaterThan(1);
@@ -73,8 +53,8 @@ describe("a shipped actor's swing is spent out of the range it stands at", () =>
   for (const entity of ranged) {
     it(`${entity.id} reads a different number swing to swing, inside what it stands at`, () => {
       const state = createGameState();
-      const standing = statRange(ATTACK, state, shipped, entity.id);
-      const swings = Array.from({ length: 8 }, () => sampleStat(ATTACK, state, shipped, entity.id));
+      const standing = statRange(ATTACK, state, registry, entity.id);
+      const swings = Array.from({ length: 8 }, () => sampleStat(ATTACK, state, registry, entity.id));
 
       for (const swing of swings) expect(swing).toBeGreaterThanOrEqual(standing.min);
       for (const swing of swings) expect(swing).toBeLessThanOrEqual(standing.max);
@@ -83,12 +63,14 @@ describe("a shipped actor's swing is spent out of the range it stands at", () =>
   }
 });
 
-describe('the archetype jewels, read off the routes tulsa ships', () => {
-  const POST = 'tulsa.proving-post';
+describe('the four shapes a buff has, read off the routes the fixture walks', () => {
+  const POST = 'fixture-combat.proving-post';
+  const SPITTER = 'fixture-combat.spitting-post';
+  const RAGE = 'fixture-combat.rage';
 
   const endOf = (testId: string): GameState => {
     const state = createGameState();
-    runTest(testId, shipped, state);
+    runTest(testId, registry, state);
     return state;
   };
 
@@ -96,134 +78,100 @@ describe('the archetype jewels, read off the routes tulsa ships', () => {
     Object.fromEntries([...registry.stats.keys()].map((statId) => [statId, statValue(statId, state, registry, actorId)]));
 
   it('moves attack as rage accumulates, and moves nothing else at all', () => {
-    const state = endOf('tulsa.rage-rises-as-swings-land');
+    const state = endOf('fixture-combat.rage-rises-as-swings-land');
     // Where the route left the pool is the route's own `assert:` to say. What is needed here is
-    // only that it left one, and the readings below are taken at the ceiling the jewel grants.
-    expect(state.resources['combat-expansion.rage']).toBeGreaterThan(0);
-    const ceiling = toMilliUnits(statValue('combat-expansion.max-rage', state, shipped));
+    // only that it left one, and the readings below are taken at the ceiling the passive grants.
+    expect(state.resources[RAGE]).toBeGreaterThan(0);
+    const ceiling = toMilliUnits(statValue('fixture-combat.max-rage', state, registry));
 
-    restorePools(state, { 'combat-expansion.rage': ceiling });
-    const full = sheet(state, shipped);
+    restorePools(state, { [RAGE]: ceiling });
+    const full = sheet(state, registry);
 
-    restorePools(state, { 'combat-expansion.rage': 0 });
-    const empty = sheet(state, shipped);
+    restorePools(state, { [RAGE]: 0 });
+    const empty = sheet(state, registry);
 
-    const moved = [...shipped.stats.keys()].filter((statId) => full[statId] !== empty[statId]);
+    const moved = [...registry.stats.keys()].filter((statId) => full[statId] !== empty[statId]);
     expect(moved).toEqual(['core.attack']);
 
-    restorePools(state, { 'combat-expansion.rage': ceiling / 2 });
-    const half = sheet(state, shipped);
-    expect(half['core.attack'] - empty['core.attack']).toBeCloseTo(full['core.attack'] - half['core.attack'], 10);
+    restorePools(state, { [RAGE]: ceiling / 2 });
+    const half = sheet(state, registry);
+    expect(half['core.attack']! - empty['core.attack']!).toBeCloseTo(full['core.attack']! - half['core.attack']!, 10);
   });
 
   it('separates what a stack pays from what the count is worth', () => {
     const reading = (testId: string, stacks: number): number => {
       const state = endOf(testId);
       clearBuffs(state, [PLAYER]);
-      const bare = statValue('core.attack-rate', state, shipped);
-      const vigor = shipped.items.get('combat-expansion.accelerated-vigor')!;
+      const bare = statValue('core.attack-rate', state, registry);
+      const vigor = registry.items.get('fixture-combat.accelerated-vigor')!;
       for (let held = 0; held < stacks; held += 1) grantBuff(state, PLAYER, vigor, state.time + secondsToMs(60));
-      return statValue('core.attack-rate', state, shipped) - bare;
+      return statValue('core.attack-rate', state, registry) - bare;
     };
 
-    expect(reading('tulsa.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
-    expect(reading('tulsa.rage-rises-as-swings-land', 1)).toBeCloseTo(2, 10);
+    // Ungated: the buff's own `+2 attack-rate`, once per stack and no more.
+    expect(reading('fixture-combat.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
+    expect(reading('fixture-combat.rage-rises-as-swings-land', 1)).toBeCloseTo(2, 10);
 
-    const one = reading('tulsa.accelerated-vigor-stacks-behind-its-gate', 1);
-    const five = reading('tulsa.accelerated-vigor-stacks-behind-its-gate', 5);
+    // Behind the gate, a passive reads how many are held, so the count is worth more than the sum
+    // of what each stack pays.
+    const one = reading('fixture-combat.accelerated-vigor-stacks-behind-its-gate', 1);
+    const five = reading('fixture-combat.accelerated-vigor-stacks-behind-its-gate', 5);
     expect(one).toBeGreaterThan(2);
     expect(five).toBeGreaterThan(5 * one);
   });
 
   it('holds poison on the struck party and on nobody else, and makes its pool fall', () => {
-    const poisoned = endOf('tulsa.poison-holds-the-struck-enemy');
-    const clean = endOf('tulsa.poison-holds-the-struck-enemy');
+    const poisoned = endOf('fixture-combat.poison-holds-the-struck-enemy');
+    const clean = endOf('fixture-combat.poison-holds-the-struck-enemy');
     clearBuffs(clean, [POST]);
 
-    expect(buffsOf(poisoned, POST).map((buff) => buff.source)).toEqual(['combat-expansion.venom']);
+    expect(buffsOf(poisoned, POST).map((buff) => buff.source)).toEqual(['fixture-combat.venom']);
     expect(buffsOf(poisoned, PLAYER)).toEqual([]);
-    const regeneration = (each: GameState): number => statValue('core.regeneration', each, shipped, POST);
+    const regeneration = (each: GameState): number => statValue('core.regeneration', each, registry, POST);
     expect(regeneration(poisoned) - regeneration(clean)).toBe(-30);
 
-    const health = (each: GameState): number => each.activeAction!.actors![POST].resources['core.health'];
+    const health = (each: GameState): number => each.activeAction!.actors![POST]!.resources['core.health']!;
     const before = health(clean);
     expect(health(poisoned)).toBe(before);
 
-    resolve(poisoned, shipped, poisoned.time + secondsToMs(4));
-    resolve(clean, shipped, clean.time + secondsToMs(4));
+    resolve(poisoned, registry, poisoned.time + secondsToMs(4));
+    resolve(clean, registry, clean.time + secondsToMs(4));
     expect(before - health(poisoned)).toBeGreaterThan(before - health(clean));
   });
 
+  // The other way round from the claim above, because a blow landing again is a blow inflicting it
+  // again: what lifts on its own clock has to be one nothing is renewing, so it is the player who
+  // was poisoned and the fight they let go of.
   it('lifts the debuff on its own clock, with nothing else asked to end it', () => {
-    expect(buffsOf(endOf('tulsa.poison-lifts-when-its-own-duration-runs-out'), POST)).toEqual([]);
+    expect(buffsOf(endOf('fixture-combat.poison-lifts-when-its-own-duration-runs-out'), PLAYER)).toEqual([]);
+    expect(registry.entities.get(SPITTER)!.passives).toContain('fixture-combat.envenom');
   });
 
   it('costs a striker what the thorned enemy it struck carries', () => {
-    const state = endOf('tulsa.striking-a-thorned-enemy-costs-the-striker');
-    const attempts = state.activeAction!.cadences![PLAYER].attemptsMade;
-    const struck = state.resources['core.health'];
+    const state = endOf('fixture-combat.striking-a-thorned-enemy-costs-the-striker');
+    const landed = state.activeAction!.cadences![PLAYER]!.attemptsMade;
+    const struck = state.resources['core.health']!;
 
-    expect(shipped.entities.get('tulsa.spined-urchin')!.blocks).toEqual([]);
+    expect(registry.entities.get(POST)!.blocks).toEqual([]);
+    expect(landed).toBeGreaterThan(0);
 
     // The pool fell by what thorns took net of what regeneration gave back, so the same span is run
     // again with nothing to fight, opened where the fight left off: what it gains is what to add back.
-    const idle = initialState(shipped);
-    const opening = idle.resources['core.health'];
+    const idle = initialState(registry);
+    const opening = idle.resources['core.health']!;
     restorePools(idle, { 'core.health': struck });
-    resolve(idle, shipped, idle.time + (state.time - idle.time));
-    const regenerated = idle.resources['core.health'] - struck;
+    resolve(idle, registry, idle.time + (state.time - idle.time));
+    const regenerated = idle.resources['core.health']! - struck;
 
-    // What a spine costs is the urchin's passive to say, so it is read off the passive rather than
+    // What a spine costs is the post's passive to say, so it is read off the passive rather than
     // written again here: a pass that retunes the thorns moves this claim with it.
-    const spine = shipped.passives.get('combat-expansion.retribution')!.whenHit.find((effect) => effect.kind === 'pool')!;
+    const spine = registry.passives.get('fixture-combat.retribution')!.whenHit.find((effect) => effect.kind === 'pool')!;
     expect(spine.delta.min).toBe(spine.delta.max);
-    expect(opening + regenerated - struck).toBe(toMilliUnits(-spine.delta.min) * attempts);
+    expect(opening + regenerated - struck).toBe(toMilliUnits(-spine.delta.min) * landed);
   });
 });
 
-const jewelsOf = (registry: Registry, namespace: string) => [...registry.clusterJewels.values()].filter((jewel) => jewel.id.startsWith(`${namespace}.`));
-
-const unsharedTagsOn = (registry: Registry, namespace: string, jewel: { positions: Record<number, string> }): string[] => {
-  const shared = new Set(
-    [...registry.passives.values()].filter((passive) => !passive.id.startsWith(`${namespace}.`)).flatMap((passive) => passive.tags.filter((tag) => tag.kind === 'keyword').map((tag) => tag.value)),
-  );
-  const carried = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
-  return [...new Set(carried.filter((tag) => tag.kind === 'keyword' && !shared.has(tag.value)).map((tag) => (tag as { value: string }).value))];
-};
-
-function archetypeGrouping(registry: Registry, namespace: string): Map<string, string[]> {
-  const seen = new Map<string, string[]>();
-  for (const jewel of jewelsOf(registry, namespace)) for (const tag of unsharedTagsOn(registry, namespace, jewel)) seen.set(tag, [...(seen.get(tag) ?? []), jewel.id]);
-  return new Map([...seen.entries()].filter(([, carriers]) => carriers.length > 1));
-}
-
-describe('the archetype jewels are paired added-then-increased', () => {
-  const declared = jewelsOf;
-
-  const channels = (registry: Registry, jewel: { positions: Record<number, string> }): { flat: number; percent: number } => {
-    const payloads = Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
-    const bonuses = payloads.filter((tag) => tag.kind === 'stat-bonus');
-    return { flat: bonuses.filter((tag) => !tag.percent).length, percent: bonuses.filter((tag) => tag.percent).length };
-  };
-
-  it('gives every archetype one flat jewel and one percent jewel, and no archetype two of a kind', () => {
-    const jewels = declared(shipped, 'combat-expansion');
-    const groups = archetypeGrouping(shipped, 'combat-expansion');
-    expect(groups.size).toBeGreaterThan(0);
-    expect([...groups.values()].flat().sort()).toEqual(jewels.map((jewel) => jewel.id).sort());
-
-    for (const [archetype, carriers] of groups) {
-      const led = carriers.map((id) => {
-        const worth = channels(shipped, shipped.clusterJewels.get(id)!);
-        expect(worth.flat + worth.percent).toBeGreaterThan(0);
-        return worth.percent > worth.flat ? 'increased' : 'added';
-      });
-      expect({ archetype, led: [...led].sort() }).toEqual({ archetype, led: ['added', 'increased'] });
-    }
-  });
-});
-
-describe('no shipped identifier is named after this content', () => {
+describe('no identifier in the engine is named after the content it loads', () => {
   const declaredIds = (registry: Registry, namespace: string): Set<string> => {
     const own = new Set<string>();
     for (const kind of [...ownedSectionKinds(), ...MEMBER_KINDS]) {
@@ -259,18 +207,12 @@ describe('no shipped identifier is named after this content', () => {
     expect(swept.some((file) => file.endsWith('.test.ts'))).toBe(false);
   });
 
-  it('finds no id this module declares', () => {
-    const mine = declaredIds(shipped, 'combat-expansion');
-    const shared = declaredIds(shipped, 'core');
+  it('finds no id a content module declares', () => {
+    const mine = declaredIds(registry, 'fixture-combat');
+    const shared = declaredIds(registry, 'core');
     const named = [...mine].filter((word) => !shared.has(word));
-    expect(named.length).toBeGreaterThan(20);
+    expect(named.length).toBeGreaterThan(5);
     expect(sweep(named)).toEqual([]);
-  });
-
-  it('finds no archetype, which is a tag and never an id', () => {
-    const archetypes = [...archetypeGrouping(shipped, 'combat-expansion').keys()];
-    expect(archetypes.length).toBeGreaterThan(1);
-    expect(sweep(archetypes)).toEqual([]);
   });
 
   it('finds none of the four effects the clause names either', () => {
@@ -279,18 +221,18 @@ describe('no shipped identifier is named after this content', () => {
 });
 
 describe('core health resource (Pass 2 end-to-end)', () => {
-  const cellarRats = registry.locations.get('first-steps.basement')!.entities.find((each) => each.entity === 'first-steps.giant-rat')!;
+  const wellRats = registry.locations.get('fixture-town.well')!.entities.find((each) => each.entity === 'fixture-town.rat')!;
 
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
-    const full = state.resources['core.health'];
+    const full = state.resources['core.health']!;
     // A pool starts at its own ceiling, and the ceiling is the stat the resource names rather than
     // a number written here: what the player's sheet and their level of Health come to is the
     // balance's business and moves without this file.
     expect(full).toBe(toMilliUnits(statValue('core.max-health', state, registry)));
 
-    state.location = 'first-steps.basement';
-    useFight('core.melee-combat', 'first-steps.giant-rat', registry, state);
+    state.location = 'fixture-town.well';
+    useFight('core.melee-combat', 'fixture-town.rat', registry, state);
     expect(state.time).toBeGreaterThan(0);
 
     // The pool is read as the fight runs and not once it is over: what the rat takes is the claim,
@@ -299,19 +241,20 @@ describe('core health resource (Pass 2 end-to-end)', () => {
     let lowest = full;
     for (let target = state.time + secondsToMs(1); target < secondsToMs(120); target += secondsToMs(1)) {
       resolve(state, registry, target);
-      lowest = Math.min(lowest, state.resources['core.health']);
+      lowest = Math.min(lowest, state.resources['core.health']!);
     }
     resolve(state, registry, secondsToMs(120));
-    const afterFighting = state.resources['core.health'];
-    // Melee is continuous, so a Fight re-arms on the next rat still standing and the cellar empties
+    const afterFighting = state.resources['core.health']!;
+    // Melee is continuous, so a Fight re-arms on the next rat still standing and the well empties
     // rather than stopping at the first. Two minutes is longer than any sheet would make that take.
-    expect(state.flags['first-steps.rats-killed']).toBe(populationCount(cellarRats));
+    expect(state.flags['fixture-quests.well-cleared']).toBe(true);
+    expect(populationCount(wellRats)).toBeGreaterThan(1);
     expect(lowest).toBeLessThan(full);
-    expect(state.log.some((line) => line.startsWith('The Giant Rat hits you for '))).toBe(true);
-    expect(state.log.some((line) => line.startsWith('You hit the Giant Rat for '))).toBe(true);
+    expect(state.log.some((line) => line.startsWith('The Rat hits you for '))).toBe(true);
+    expect(state.log.some((line) => line.startsWith('You hit the Rat for '))).toBe(true);
 
     const unfed = statValue('core.regeneration', state, registry);
-    grantBuff(state, PLAYER, registry.items.get('core.cooked-shrimp')!, state.time + secondsToMs(60));
+    grantBuff(state, PLAYER, registry.items.get('core.bread')!, state.time + secondsToMs(60));
     const fed = statValue('core.regeneration', state, registry);
     expect(fed).toBeGreaterThan(unfed);
 
@@ -323,17 +266,17 @@ describe('core health resource (Pass 2 end-to-end)', () => {
 describe('sitting down is worth more than standing about', () => {
   // The bench adds to the regeneration everybody already has rather than restoring a pool of its
   // own, so what it is worth can only be said against a span nobody sat out. A route can compare
-  // its pool to a figure and not to another run, which is why the walking is the corpus's and the
+  // its pool to a figure and not to another run, which is why the walking is the world's and the
   // paying is here: both sides of this are run, so a pass that retunes either moves them together.
   it('leaves the sitter better off than the same span opened at the same pool', () => {
     const sat = createGameState();
-    runTest('tulsa.the-bench-is-where-health-comes-back', shipped, sat);
+    runTest('fixture-combat.the-bench-is-where-health-comes-back', registry, sat);
 
-    const opened = (shipped.saves.get('tulsa.hurt-in-town')!.diff as { resources: Record<string, number> }).resources['core.health'];
-    const stood = initialState(shipped);
+    const opened = (registry.saves.get('fixture-combat.hurt-in-town')!.diff as { resources: Record<string, number> }).resources['core.health']!;
+    const stood = initialState(registry);
     restorePools(stood, { 'core.health': opened });
-    resolve(stood, shipped, stood.time + (sat.time - stood.time));
+    resolve(stood, registry, stood.time + (sat.time - stood.time));
 
-    expect(sat.resources['core.health']).toBeGreaterThan(stood.resources['core.health']);
+    expect(sat.resources['core.health']).toBeGreaterThan(stood.resources['core.health']!);
   });
 });

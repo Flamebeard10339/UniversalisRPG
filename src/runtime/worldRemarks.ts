@@ -3,6 +3,7 @@ import { isBase } from '../content/sections/item';
 import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import type { Directive } from '../content/sections/test';
+import { keywordsIn, type TagClause } from '../grammar/tagClause';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
@@ -154,9 +155,40 @@ function rootless(sources: readonly ModuleSource[]): Remark[] {
 // already carrying. The file on disk reads exactly as it did, so nothing else would ever say.
 const stale = (registry: Registry): Remark[] => staleTiers(registry).map((each) => ({ where: `# save ${each.save}`, says: each.says }));
 
+// An archetype is a word of an author's own that a module's passives carry and nothing outside it
+// does — one the engine acts on nowhere, which is what `keywordsIn` hands back as `beyond`. Which
+// archetypes a module has is read off its passives rather than declared. Each is meant to be
+// reachable two ways — a jewel that adds and a jewel that multiplies — because a player who can
+// only find one of them has half a build, and nothing but this would ever say so.
+function lopsided(registry: Registry): Remark[] {
+  const modulesOf = new Set([...registry.clusterJewels.keys()].map((id) => id.slice(0, id.indexOf('.'))));
+  return [...modulesOf].flatMap((namespace) => {
+    const own = (id: string): boolean => id.startsWith(`${namespace}.`);
+    const wordsOn = (tags: readonly TagClause[]): string[] => keywordsIn(tags, []).beyond;
+    const shared = new Set([...registry.passives.values()].filter((passive) => !own(passive.id)).flatMap((passive) => wordsOn(passive.tags)));
+    const jewels = [...registry.clusterJewels.values()].filter((jewel) => own(jewel.id));
+    const carried = (jewel: { positions: Record<number, string> }): TagClause[] => Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
+
+    const by = new Map<string, string[]>();
+    for (const jewel of jewels) {
+      for (const word of new Set(wordsOn(carried(jewel)).filter((each) => !shared.has(each)))) by.set(word, [...(by.get(word) ?? []), jewel.id]);
+    }
+    return [...by].flatMap(([archetype, carriers]) => {
+      // A word every one of a module's jewels carries divides nothing and is a label rather than an
+      // archetype: what makes one is that it tells some of them apart from the rest.
+      if (carriers.length < 2 || carriers.length === jewels.length) return [];
+      const led = carriers.map((id) => {
+        const bonuses = carried(registry.clusterJewels.get(id)!).flatMap((tag) => (tag.kind === 'stat-bonus' ? [tag] : []));
+        return bonuses.filter((each) => each.percent).length > bonuses.filter((each) => !each.percent).length ? 'increased' : 'added';
+      });
+      return new Set(led).size > 1 ? [] : [{ where: `# cluster-jewel ${carriers.join(', ')}`, says: `are every jewel of the ${archetype} archetype and all of them lead with ${led[0]}. An archetype wants one that adds and one that multiplies, or half of it is unreachable.` }];
+    });
+  });
+}
+
 // A rule that only wants the registry, and one that has to run the world to answer. Both are asked
 // of every world the oracle is pointed at, and each derives its own subjects.
-const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken, stale];
+const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken, stale, lopsided];
 const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread, (sources) => unpacked(sources), (sources) => rootless(sources)];
 
 export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => [

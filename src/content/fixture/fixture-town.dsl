@@ -97,7 +97,7 @@ holds: shed, pump, loft, cellar
 # entity player
 title: You
 faction: player
-stats: max-health 30, attack 10, accuracy 10, evasion 0, defense 0, attack-rate 60
+stats: max-health 30, attack 8-12, accuracy 100, evasion 0, defense 0, attack-rate 60
 skills: core.digging, core.scavenging, haggling
 passives: hale, keen
 equipment-slots: main-hand, body, gloves
@@ -116,10 +116,10 @@ keeps shop: counter
 title: Rat
 examine: Wet, and closer than it was.
 faction: vermin
-stats: max-health 8, attack 3, accuracy 8, evasion 2, defense 0, attack-rate 60
+stats: max-health 40, attack 2-4, accuracy 8, evasion 0, defense 0, attack-rate 60
 uses: melee-combat
 aggressive
-respawn after: 30s
+respawn after: 10m
 on death:
   roll: vermin-drops
 

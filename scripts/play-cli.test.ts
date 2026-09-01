@@ -170,10 +170,14 @@ describe('play-cli renders what a command result says happened', () => {
     runLine(ctx, '/wait 7');
     const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [`${row.title} (${row.id})`, row.value])));
     const state = shown(runLine(ctx, '/state'));
-    // Every line the readout is made of, and no other. What the world holds beyond the one room
-    // stood in here is its size rather than this readout's shape, so the line that counts it is
-    // read for its form.
-    expect(state).toHaveLength(9);
+    // Every line the readout is made of, and no other: seven of its own, a line for each pool the
+    // player has, and the count of what has been found. The pools are asked of the session rather
+    // than counted here, so a world that writes a second one is drawn the same way with nothing
+    // edited. What the world holds beyond the one room stood in here is its size rather than this
+    // readout's shape, so the line that counts it is read for its form.
+    const pools = sessionStatus(ctx.session).resources.length;
+    expect(pools).toBeGreaterThan(1);
+    expect(state).toHaveLength(8 + pools);
     expect(state.slice(0, 4)).toEqual([
       'Location: fixture-town.green',
       'Elapsed simulated time: 7s',
@@ -195,8 +199,8 @@ describe('play-cli renders what a command result says happened', () => {
     // The readout draws a pool the same way the room does: nobody has been hurt, so the bar is full
     // and the two figures read alike. What they come to is the sheet's business and not this one's.
     expect(state[7]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
-    expect(state[8]).toMatch(/^discovered: \d+ of \d+ found; not yet found: /);
-    expect(state[8]).toContain('fixture-town.cellar');
+    expect(state[7 + pools]).toMatch(/^discovered: \d+ of \d+ found; not yet found: /);
+    expect(state[7 + pools]).toContain('fixture-town.cellar');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: fixture-town.green');
   });
 

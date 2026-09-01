@@ -80,8 +80,10 @@ base: 60
 # stat max-health
 base: 30
 
+// Nobody mends by standing about in this world: a loaf or a bench is what mends you, so what either
+// is worth can be read off a pool that would otherwise have stood still.
 # stat regeneration
-base: 1
+base: 0
 
 # stat digging-rate
 base: 12
@@ -187,6 +189,7 @@ examine: A dense, dark loaf.
 value: 3
 food
 +2 attack
++3 regeneration
 30s
 
 # item spade
