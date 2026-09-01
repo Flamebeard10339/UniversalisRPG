@@ -6,6 +6,17 @@ import { standingWithin, worldWithin } from './worlds';
 
 export const CORPUS_DIR = 'content';
 
+// The corpus does not open while the suite is running. A contributor editing the world in the game
+// cannot run vitest, so a test that could go red on their edit is a gate nobody can answer — and a
+// rule that is only a search of the tree for ways round it is a rule that will be walked round.
+// This is the rule itself. `docs/authoring-split/` says why, and the engine's own world is
+// `src/content/fixture/`.
+const shut = (): void => {
+  if (process.env.VITEST !== undefined) {
+    throw new Error('the shipped corpus does not open while the suite is running: stand on src/content/fixture instead (worldFixture.ts), and let `npm run oracle -- --at content` answer for content/');
+  }
+};
+
 // Where the game's own world is written, for a tool that takes source paths rather than sources: the
 // engine's modules and the author's corpus, which is what `shippedSources` below reads in TypeScript.
 // A CLI whose default world is the shipped one names this rather than the corpus alone, or the game
@@ -22,6 +33,7 @@ const moduleId = (fileName: string): string => fileName.replace(/\.dsl$/, '');
 // disagree on, and the page and the filesystem have to answer in one order or a claim that they
 // carry the same corpus reads as a claim that they do not.
 export function shippedFiles(): readonly string[] {
+  shut();
   return readdirSync(CORPUS_DIR)
     .filter((name) => name.endsWith('.dsl'))
     .filter((name) => moduleId(name) !== LOCAL_CHANGES_MODULE_ID)
@@ -29,6 +41,7 @@ export function shippedFiles(): readonly string[] {
 }
 
 export function moduleSource(id: string): ModuleSource {
+  shut();
   return { name: id, text: readFileSync(`${CORPUS_DIR}/${id}.dsl`, 'utf8') };
 }
 

@@ -1,18 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { covers, SOURCE_TREES, sweptFiles } from '../../scripts/lib/layers';
-import { trackedFiles } from '../../scripts/lib/sourceFiles';
-import { stripComments } from '../../scripts/lib/stripComments';
-import * as shipped from '../../src/content/shipped';
+import { covers, SOURCE_TREES, sweptFiles } from './lib/layers';
+import { trackedFiles } from './lib/sourceFiles';
+import { stripComments } from './lib/stripComments';
+import * as shipped from '../src/content/shipped';
 
 const swept = sweptFiles(trackedFiles());
 // A comment saying the words `content/` is prose about the rule, not a reach through it — every
 // file that explains why it stays out of the corpus would otherwise read as a door into it.
 const codeOf = (file: string): string => stripComments(readFileSync(file, 'utf8')).join('\n');
 
-// Every file the `app` and `tools` projects run. Their includes are `src/**` and `scripts/**`, which
-// is what `SOURCE_TREES` already names; `docs/**` — the `open` project, this file among them — is
-// outside it, so the subjects are derived rather than listed, and a test written next month is one.
+// Every file the `app` and `tools` projects run — this file among them. Their includes are `src/**`
+// and `scripts/**`, which is what `SOURCE_TREES` already names, so the subjects are derived rather
+// than listed beside the vitest config, and a test written next month is one of them.
 const suiteTests = swept.filter((file) => /\.test\.[cm]?[jt]sx?$/.test(file) && SOURCE_TREES.some((tree) => covers(tree, file)));
 
 // `CORPUS_DIR` is the corpus and is nothing else, so naming it is exact where matching the word
@@ -24,7 +24,7 @@ const NAMES_CORPUS = /\bCORPUS_DIR\b/;
 // reader added to it is one of these with no edit here.
 const doors = Object.entries(shipped).filter(([, held]) => typeof held === 'function');
 
-describe('no-test-reads-the-corpus', () => {
+describe('no test reads the shipped corpus', () => {
   it('sweeps every test the gate runs, so nothing below is vacuous', () => {
     expect(suiteTests.length).toBeGreaterThan(100);
   });

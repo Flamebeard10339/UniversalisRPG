@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
-import { shippedSources } from '../src/content/shipped';
+import { fixtureSources } from '../src/content/worldFixture';
 import { isLeft, LEDGER, markedLines, nextUp, orphanLines, orphansIn, parseArgs, parseLedger, printLedger, sheetFor, sheetLines, STINT, stintLines, stintsLeft, through } from './review';
 
 const town = (...lines: string[]): string => ['# info town', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', ...lines].join('\n');
@@ -10,7 +10,7 @@ const sheet = (text: string) => {
   return sheetFor(registry, 'town', 'content/town.dsl', text);
 };
 
-const shipped = shippedSources;
+const shipped = fixtureSources;
 
 describe('the sheet a reviewer reads', () => {
   it('puts every line a section says under that section, at the line the section is written on', () => {
@@ -49,7 +49,7 @@ describe('the sheet a reviewer reads', () => {
   it('reviews the lines a module names outright, which is the only way the engine says anything on its own behalf', () => {
     const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
     const english = parsed.find((module) => module.info.id === 'engine-en')!;
-    const written = sheetFor(registry, 'engine-en', 'content/engine-en.dsl', english.source.text);
+    const written = sheetFor(registry, 'engine-en', 'engine-en.dsl', english.source.text);
 
     expect(written.sections.map((section) => section.kind)).toEqual(['locale']);
     expect(written.sections[0].said.map((said) => said.field)).toContain('engine.travel.to');
@@ -123,10 +123,12 @@ describe('the sheet a reviewer reads', () => {
     expect(parseLedger(printLedger(held))).toEqual(held);
   });
 
-  it('counts the corpus rather than a number written down here', () => {
+  it('counts what a module says rather than a number written down here', () => {
     const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
-    const tulsa = parsed.find((module) => module.info.id === 'tulsa')!;
-    const written = sheetFor(registry, 'tulsa', 'content/tulsa.dsl', tulsa.source.text);
+    // Whichever module says the most, found rather than named: what is being counted is the sheet's
+    // own arithmetic, and a module is only wanted here because it has enough in it to count.
+    const wordiest = parsed.reduce((most, each) => (sheetFor(registry, each.info.id, each.source.name, each.source.text).sections.flatMap((section) => section.said).length > sheetFor(registry, most.info.id, most.source.name, most.source.text).sections.flatMap((section) => section.said).length ? each : most));
+    const written = sheetFor(registry, wordiest.info.id, wordiest.source.name, wordiest.source.text);
     const said = written.sections.flatMap((section) => section.said);
 
     expect(sheetLines(written)[1]).toBe(`  ${said.length} line(s) left to read, of ${said.length} the game says across ${written.sections.length} section(s)`);

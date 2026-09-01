@@ -34,7 +34,7 @@ the machine keeps.
 *Closes when:* you say whether hand-editing `content/` from a session should be warned about, or
 left alone as the ordinary way you and an agent work together on a module.
 
-## Are nine warnings the right nine
+## Are ten warnings the right ten
 
 `src/runtime/worldRemarks.ts` holds what the engine takes and an author probably did not mean: a
 place no road reaches from where a game begins, a shop no entity keeps, a coin the shop that counts
@@ -43,9 +43,9 @@ it, a route that states no claim in words, words nothing in the game ever says, 
 turn off because it names no pack, a module that leans on nothing and will not load on its own, and
 a reference build that has gone stale against the curve under it.
 
-The shipped corpus breaks none of them. They caught four things in the engine's own fixture in the
-hours they were written — two rooms nothing reached, a route that claimed nothing, and a recipe
-whose name no screen ever said.
+The shipped corpus breaks none of them, and each was verified by planting the break it is meant to
+catch. They caught four things in the engine's own fixture in the hours they were written — two
+rooms nothing reached, a route that claimed nothing, and a recipe whose name no screen ever said.
 
 They are warnings and not refusals, so a half-written quarter still loads and the oracle still exits
 non-zero. What is unsettled is whether the list is the right list — a rule you would not act on is
