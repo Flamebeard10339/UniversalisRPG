@@ -109,6 +109,17 @@ export const id: Parser<string> = {
   examples: ['rusty-sword', 'forest.clearing'],
 };
 
+// How long something lasts, either counted out on the line or read off a stat when the line runs: a
+// stat standing here is read in seconds, so a stretch that is shorter for one player than another is
+// a number they carry rather than a second shape of the thing that grants it.
+export const durationOrStat: Parser<number | string> = {
+  called: 'duration',
+  parse: (cursor) => (cursor.peek(/\d/) === null ? id.parse(cursor) : duration.parse(cursor)),
+  print: (value) => (typeof value === 'string' ? value : duration.print(value)),
+  forms: [...duration.forms, '<stat>'],
+  examples: [...duration.examples, 'daze-length'],
+};
+
 export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
 
 // The one place a word is cased for a player to read. An address is written either way an

@@ -1255,7 +1255,7 @@ pick-their-pocket:
   +on unfinished:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
     drain: 1 health
-    inflict: thieving.collared
+    inflict: thieving.dazed for thieving.collar-length
 
 # entity knight
 title: Knight
@@ -1275,7 +1275,7 @@ pick-their-pocket:
   +on unfinished:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
     drain: 1 health
-    inflict: thieving.collared
+    inflict: thieving.dazed for thieving.collar-length
 
 // The second band's mark. Watchful enough that a hand which has not put the hours in comes away with
 // nothing all afternoon, and carrying the one thing in Tulsa worth taking off a person: a hand that
@@ -1302,7 +1302,7 @@ pick-their-pocket:
   +on unfinished:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
     drain: 1 health
-    inflict: thieving.collared
+    inflict: thieving.dazed for thieving.collar-length
 
 // --- what is locked ---
 //
@@ -1356,7 +1356,7 @@ pick-the-lock:
   +on unfinished:
     say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
     drain: 2 health
-    inflict: thieving.collared
+    inflict: thieving.dazed for thieving.collar-length
 
 // --- what is already hostile ---
 

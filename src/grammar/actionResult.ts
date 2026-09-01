@@ -4,7 +4,7 @@ import { ListParser } from './list';
 import { Cursor, DslError, Holds, Parser, Span, Written, calledBlock, requireEnd } from './parser';
 import { range, Range, scaleRange } from './range';
 import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
-import { countRange, decimalRange, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
+import { countRange, decimalRange, durationOrStat, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
 
 export type Party = 'me' | 'them';
 
@@ -37,7 +37,7 @@ export type ActionResult =
   | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'pool'; resource: string; delta: Range; party?: Party }
   | { kind: 'fill'; resource: string; party?: Party }
-  | { kind: 'inflict'; buff: string; party?: Party }
+  | { kind: 'inflict'; buff: string; party?: Party; lasts?: number | string }
   | { kind: 'stop' }
   | {
       kind: 'chance';
@@ -152,7 +152,13 @@ function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
 function parseInflict(cursor: Cursor): ActionResult {
   const buff = id.parse(cursor);
   const party = parseParty('inflict', cursor);
-  return party === undefined ? { kind: 'inflict', buff } : { kind: 'inflict', buff, party };
+  const lasts = cursor.take(/[ \t]+for[ \t]+/) === null ? undefined : durationOrStat.parse(cursor);
+  return {
+    kind: 'inflict',
+    buff,
+    ...(party === undefined ? {} : { party }),
+    ...(lasts === undefined ? {} : { lasts }),
+  };
 }
 
 function parseGive(value: Produced): ActionResult {
@@ -332,7 +338,16 @@ const LEAVES: readonly Leaf[] = [
     read: (cursor) => parsePool(1, cursor),
     notes: { 'restore: <resource>[ to <me or them>]': 'with no amount before it the pool is filled to whatever its ceiling stands at when this runs, which is the one thing a number cannot say: a race, an item or a buff may have moved it' },
   },
-  { opens: /inflict:[ \t]*/, forms: ['inflict: <buff item>[ on <me or them>]'], examples: ['inflict: dazzled'], read: parseInflict },
+  {
+    opens: /inflict:[ \t]*/,
+    forms: ['inflict: <buff item>[ on <me or them>]', 'inflict: <buff item>[ on <me or them>] for <duration>'],
+    examples: ['inflict: dazzled', 'inflict: dazzled for 10s'],
+    read: parseInflict,
+    notes: {
+      'inflict: <buff item>[ on <me or them>] for <duration>':
+        'how long it is held for, standing over whatever the buff itself declares, so one mark holds longer than another with no second buff declared to hold it; a stat written there is read off whoever it lands on, which is how a stretch is shortened by something the player carries',
+    },
+  },
   { opens: /roll:[ \t]*/, forms: ['roll: <droptable>'], examples: ['roll: common-drops'], read: (cursor) => ({ kind: 'roll', table: id.parse(cursor) }) },
   { opens: /stop(?![\w-])/, forms: ['stop'], examples: ['stop'], read: () => ({ kind: 'stop' }) },
 ];
@@ -457,7 +472,8 @@ export function printResult(value: ActionResult): string {
     }
     case 'inflict': {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
-      return `inflict: ${value.buff}${party}`;
+      const lasts = value.lasts === undefined ? '' : ` for ${durationOrStat.print(value.lasts)}`;
+      return `inflict: ${value.buff}${party}${lasts}`;
     }
     case 'roll':
       return `roll: ${value.table}`;
@@ -533,8 +549,8 @@ export const modalScreen = oneOf('modal', MODAL_SCREENS);
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
   print: printResult,
-  names: { variable: 'flag' },
-  holds: () => ({ place, modal: modalScreen }),
+  names: { variable: 'flag', duration: 'stat' },
+  holds: () => ({ place, modal: modalScreen, duration: durationOrStat }),
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,
   notes: LEAF_NOTES,

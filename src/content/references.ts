@@ -32,7 +32,7 @@ export function validateSectionReferences(section: ModuleSection, id: string, re
 function refuseUntimedPayload(itemId: string, where: string, registry: Registry): void {
   const source = registry.items.get(itemId);
   if (source && !source.tags.some((tag) => tag.kind === 'duration')) {
-    throw new DslError(`${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it`);
+    throw new DslError(`${where} names ${itemId}, which declares no duration, so an instance of it would be over before anything could read it — write one on the item, or say \`for <duration>\` where it is inflicted`);
   }
 }
 

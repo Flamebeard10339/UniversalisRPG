@@ -10,6 +10,11 @@ import { COUNTERS, TagClause } from '../grammar/tagClause';
 
 export const INFLICT_SITE = 'inflict:';
 
+// The same line where it says how long it holds. It is a site of its own because that is the whole
+// difference the buff it names cares about: a line that says the stretch answers for it, so the buff
+// need not declare one, and whoever checks that reads which site this is rather than asking again.
+export const TIMED_INFLICT_SITE = `${INFLICT_SITE} … for:`;
+
 export const WEIGHT_SITE = 'one of: row';
 
 export type ReferenceKind = string;
@@ -121,9 +126,12 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'roll':
         put(result, 'table', 'droptable', `${where} roll:`, visit);
         break;
-      case 'inflict':
-        put(result, 'buff', 'item', `${where} ${INFLICT_SITE}`, visit);
+      case 'inflict': {
+        const site = result.lasts === undefined ? INFLICT_SITE : TIMED_INFLICT_SITE;
+        put(result, 'buff', 'item', `${where} ${site}`, visit);
+        put(result, 'lasts', 'stat', `${where} ${site}`, visit);
         break;
+      }
       case 'contest':
         for (const side of ['left', 'right'] as const) put(result, side, 'stat', `${where} vs:`, visit);
         break;

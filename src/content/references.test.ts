@@ -163,9 +163,12 @@ describe('load-time reference resolution', () => {
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: bam on them')).toThrow(/# passive spined on hit: inflict: names an unknown item: bam/);
   });
 
-  it('refuses an inflicted payload that declares no duration', () => {
+  it('refuses an inflicted payload that declares no duration, unless the line inflicting it says one', () => {
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them')).toThrow(/inflict: names straw, which declares no duration/);
     expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: balm on them')).not.toThrow();
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them for 10s')).not.toThrow();
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them for attack')).not.toThrow();
+    expect(loading('when hit: drain: 5 health from them', 'on hit: inflict: straw on them for bogus')).toThrow(/inflict: … for: names an unknown stat: bogus/);
   });
 
   it('checks a food item tag, the other way a stat id reaches statRange', () => {

@@ -116,8 +116,8 @@ function drawAmount(state: GameState, amount: Range): number {
   return isPoint(amount) ? amount.min : sampleRange(amount, nextRandom(state));
 }
 
-function statSide(value: number | string, state: GameState, registry: Registry): number {
-  return typeof value === 'number' ? value : statValue(value, state, registry);
+function statSide(value: number | string, state: GameState, registry: Registry, actorId?: string): number {
+  return typeof value === 'number' ? value : statValue(value, state, registry, actorId);
 }
 
 function rowWeight(row: DropRow, state: GameState, registry: Registry): number {
@@ -291,7 +291,12 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'inflict': {
       const source = registry.items.get(result.buff);
       if (!source) throw new RuntimeError(`unknown buff source: ${result.buff}`);
-      for (let i = 0; i < count; i++) applyDeclared(state, subjectOf(segment, result.party, actor), source, state.time);
+      const subject = subjectOf(segment, result.party, actor);
+      // A stretch the result names is read off whoever the buff lands on, so a stat standing there
+      // is the subject's own: a mark holds every thief the same length of time and a thief who has
+      // bought the nerve for it shrugs some of that off.
+      const lasts = result.lasts === undefined ? undefined : statSide(result.lasts, state, registry, subject);
+      for (let i = 0; i < count; i++) applyDeclared(state, subject, source, state.time, lasts);
       return count;
     }
     case 'stop':

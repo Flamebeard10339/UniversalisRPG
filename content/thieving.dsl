@@ -46,12 +46,19 @@ title: Thieving Speed
 base: 6
 group: core.skilling
 
-// How much of somebody's grip a thief shrugs off. Nothing reads this yet: a buff's duration is a
-// literal and no result in the language reads a stat where a number stands, which is the wall
-// `collared` names below and the one `fishing.bait-persistance` hits from the other side. One
-// engine feature is under both.
-# stat daze-resistance
-title: Nerve
+// How long somebody's grip holds a thief. Two stretches rather than one, because a townsman lets go
+// of you and somebody who does this for a living does not, and each is read off the player rather
+// than copied onto every mark that deals it: a hand that has bought the nerve for it comes away
+// sooner from every pocket in the world. What a mark chooses is which of these it holds you by, and
+// nothing about a mark is a number of seconds.
+# stat daze-length
+title: Hold
+base: 3
+group: core.skilling
+
+# stat collar-length
+title: Long Hold
+base: 10
 group: core.skilling
 
 // The mark's half of the contest, and no player ever carries either: how much attention somebody is
@@ -70,15 +77,16 @@ title: Thieving
 stat: thieving
 
 
-// Three seconds of being no use to anybody, which is what a hand caught in somebody's pocket costs.
-// A buff is an item the world inflicts rather than one anybody carries, so it is not for sale and
-// has no value. The hundred off `thieving-rate` is what stops the hand rather than slowing it: a
-// pace of zero is a stalled run, so the three seconds are three seconds of standing there, and the
-// whole of what being caught costs is time the player can watch going.
+// Being no use to anybody, which is what a hand caught in somebody's pocket costs. A buff is an item
+// the world inflicts rather than one anybody carries, so it is not for sale and has no value. How
+// long it holds is written wherever it is inflicted rather than here, because that is the one thing
+// about being caught that differs from mark to mark. The hundred off `thieving-rate` is what stops
+// the hand rather than slowing it: a pace of zero is a stalled run, so the stretch is a stretch of
+// standing there, and the whole of what being caught costs is time the player can watch going.
 # item dazed
 title: Dazed
 examine: You are standing very still and hoping the moment passes.
-3s, -90% core.attack-rate, -100% thieving-rate
+-90% core.attack-rate, -100% thieving-rate
 
 // --- the two hands ---
 //
@@ -90,8 +98,11 @@ examine: You are standing very still and hoping the moment passes.
 //
 // What a caught hand costs in health, and where a lock puts you when it throws you out, are the
 // mark's rather than the hand's: a knight hits harder than a townsman and a cellar is a longer walk
-// back than a front room. So the daze is here, because it is the same three seconds everywhere, and
-// the drain and the walk are written where they differ.
+// back than a front room. So the daze is here, because every mark deals one, and the drain and the
+// walk are written where they differ. How long the daze holds is written beside it rather than on
+// it: an action's `on unfinished:` is inherited by every mark and can only be added to, so a mark
+// naming `collar-length` lands the same buff over the one this line just gave, and a mark naming
+// nothing is held for whatever `daze-length` stands at.
 
 # action pick-their-pocket
 title: Pick Their Pocket
@@ -100,7 +111,7 @@ attempts: 1
 rate: my thieving-rate
 accuracy: my thieving vs their vigilance
 on unfinished:
-  inflict: dazed
+  inflict: dazed for daze-length
 
 # action pick-the-lock
 title: Pick The Lock
@@ -108,14 +119,6 @@ continuous
 attempts: 1
 time: 6
 accuracy: my thieving vs their wards
-
-// A hand caught by somebody who does this for a living, and the reason the daze above is the floor
-// rather than the whole of it: an action's `on unfinished:` is inherited by every mark and can only
-// be added to, so a harder mark holds you as well rather than instead.
-# item collared
-title: Collared
-examine: Somebody has a fistful of your collar and is deciding what to do about it. @@@ asked for a `daze-resistance` stat that shortens how long this lasts, and for the length to differ per mark rather than per item. A buff's duration is written on the buff as a literal and nothing in the language reads a stat there, so two tiers of hold is the whole of what can be said — which is the same wall the Angler's Knot hits from the other side. One feature is under both: a number inside a result that can read a stat.
-10s, -90% core.attack-rate, -100% thieving-rate
 
 // --- what a thief wears ---
 //
@@ -195,8 +198,10 @@ examine: A sliver of horn worn to the shape of a fingertip that is not yours.
 cluster-jewel: a-light-touch
 
 // Health and recovery are combat's stats and they are a thief's too: what a caught hand costs is a
-// drain and ten seconds of somebody's fist, and the thief who can stand that robs the marks nobody
-// else will go near. The daze passives below grant a stat nothing reads yet -- see `collared`.
+// drain and a stretch of somebody's fist, and the thief who can stand that robs the marks nobody
+// else will go near. The two nerve passives take a percentage off both stretches rather than off
+// either, because a hand that is hard to hold on to is hard for a townsman and for a knight alike;
+// a wheel that shortened one and not the other would be saying something about knights.
 
 # passive thick-skinned
 tools, +12 core.max-health
@@ -205,10 +210,10 @@ tools, +12 core.max-health
 tools, recovery, +1 core.regeneration
 
 # passive brazen
-tools, +2 daze-resistance
+tools, -10% daze-length, -10% collar-length
 
 # passive hard-faced
-tools, +5 daze-resistance
+tools, -25% daze-length, -25% collar-length
 
 # cluster-jewel a-cold-nerve
 examine: Being caught is a cost like any other, and he has costed it.
