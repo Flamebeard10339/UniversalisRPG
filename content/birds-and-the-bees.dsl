@@ -175,7 +175,7 @@ on death:
 // Standing in the square with something to swing, and nothing yet said to
 // anybody about the bees.
 # save nothing-said-about-the-bees
-{"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1}}
+{"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // Start to finish: Kelsa hires without explaining, George explains, the crier
 // names the wrong wasp, all three hives are gone through, the way down opens
@@ -251,7 +251,7 @@ assert: kelsas-hives.hired
 // The count and both markers stand at nothing, which is what the route below
 // walks up from.
 # save sent-to-the-hives
-{"version":13,"location":"tulsa.bee-gate","inventory":{"core.hand-axe":1},"flags":{"birds-and-the-bees.kelsas-hives.hired":true,"birds-and-the-bees.kelsas-hives.ask-george":true,"birds-and-the-bees.kelsas-hives.the-hives":true}}
+{"version":13,"location":"tulsa.bee-gate","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"birds-and-the-bees.kelsas-hives.hired":true,"birds-and-the-bees.kelsas-hives.ask-george":true,"birds-and-the-bees.kelsas-hives.the-hives":true}}
 
 // The same three hives in another order, and the way down moves with it: the one
 // gone through last is the one that opens, so leaving a field hive until last
@@ -279,7 +279,7 @@ assert: kelsas-hives.the-third-hive
 // them back in. All three hives are behind it and the last was the one at the end
 // of the row, because that is the road the walk back out and down again takes.
 # save at-the-third-hive
-{"version":13,"location":"birds-and-the-bees.inside-the-hive","inventory":{"core.hand-axe":1},"flags":{"tulsa.hive-mouth.discovered":true,"tulsa.hives-searched":3,"tulsa.the-third-search-was-at-the-mouth":true,"birds-and-the-bees.kelsas-hives.the-hives":true,"birds-and-the-bees.kelsas-hives.the-third-hive":true}}
+{"version":13,"location":"birds-and-the-bees.inside-the-hive","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"tulsa.hive-mouth.discovered":true,"tulsa.hives-searched":3,"tulsa.the-third-search-was-at-the-mouth":true,"birds-and-the-bees.kelsas-hives.the-hives":true,"birds-and-the-bees.kelsas-hives.the-third-hive":true}}
 
 // The other way the fight ends, and that it is not the end of the quest. The
 // queen is the losing condition rather than a kill, so putting her down is what

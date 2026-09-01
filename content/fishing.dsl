@@ -359,13 +359,15 @@ cluster-jewel: anglers-knot
 // gets exactly one of them on, which says the refusal is the gate rather than the
 // slot being full or the net being absent. Level 1 is the floor every skill starts
 // on, so this route says nothing about where the gate is set and does not move
-// when it moves.
+// when it moves. Each net names a level of its own, so each arrives as a copy
+// under an id the engine mints rather than as a stack: `1` is the small one and
+// `2` the large, in the order they were handed over.
 # save both-nets-and-no-fishing-behind-them
-{"version":13,"inventory":{"fishing.small-fishing-net":1,"fishing.large-fishing-net":1}}
+{"version":13,"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.small-fishing-net","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.large-fishing-net","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # test a-net-that-names-a-level-is-refused-to-somebody-who-has-not-got-it
 load: both-nets-and-no-fishing-behind-them
-equip: fishing.large-fishing-net
+equip: 2
 refused
-equip: fishing.small-fishing-net
+equip: 1
 assert: stat.fishing > 60
