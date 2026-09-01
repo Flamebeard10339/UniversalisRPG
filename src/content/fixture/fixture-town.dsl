@@ -16,6 +16,13 @@ x: 0, y: 0
 starting
 adjacent: well, store, lane, gate while side-door.unlocked
 entities: keeper, side-door
+dig:
+  time: 2
+  on success:
+    xp: digging 4
+    give: 1 rat-tail
+    give: 1 spade
+    give: 20 copper-coin
 
 # location well
 title: The Well
@@ -208,13 +215,3 @@ buying: 1.5
 selling: 0.5
 accepts: stocked
 
-// --- what may be done here ---
-
-# location green
-dig:
-  time: 2
-  on success:
-    xp: digging 4
-    give: 1 rat-tail
-    give: 1 spade
-    give: 20 copper-coin

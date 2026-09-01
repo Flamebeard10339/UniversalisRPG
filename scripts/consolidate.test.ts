@@ -9,7 +9,7 @@ import { initialLocalChangesModule, localSectionHeadings, LOCAL_CHANGES_MODULE_I
 import { type Registry } from '../src/content/registry';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import { registryDiff } from '../src/content/registryDiff';
-import { CORPUS_DIR, shippedFiles } from '../src/content/shipped';
+import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { runLine, type AuthoringContext } from '../src/runtime/command';
 import { createGameState } from '../src/runtime/runtime';
@@ -179,7 +179,7 @@ describe('a consolidation that would change the universe writes nothing', () => 
   });
 });
 
-const shippedNames = (): string[] => [...shippedFiles()];
+const shippedNames = (): string[] => [...fixtureFiles()];
 
 interface Tree {
   dir: string;
@@ -192,7 +192,7 @@ function copiedTree(): Tree {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'universalis-consolidate-'));
   const before: Record<string, string> = {};
   for (const name of shippedNames()) {
-    before[name] = readFileSync(`${CORPUS_DIR}/${name}`, 'utf8');
+    before[name] = readFileSync(`${FIXTURE_CORPUS_DIR}/${name}`, 'utf8');
     writeFileSync(path.join(dir, name), before[name], 'utf8');
   }
   return { dir, files: shippedNames().map((name) => path.join(dir, name)), localFile: path.join(dir, `${LOCAL_CHANGES_MODULE_ID}.dsl`), before };
@@ -213,7 +213,7 @@ function consolidateTree(tree: Tree): void {
   }
 }
 
-const STAGED = '/dsl item core.lockpick examine: A bent sliver of metal, freshly filed. | thieving-tool';
+const STAGED = '/dsl item core.rope examine: Twelve feet of it, and none of it dry.';
 
 function stage(tree: Tree, line: string): void {
   const baseSources = sourcesOf(tree);
@@ -257,7 +257,7 @@ describe('the round trip is closed, on the content that ships', () => {
 
   it('wrote the edit into the file that declared the id, and touched no other file', () => {
     const written = now(tree);
-    expect(written['core.dsl']).toBe(tree.before['core.dsl'].replace('worn smooth from use.', 'freshly filed.'));
+    expect(written['core.dsl']).toBe(tree.before['core.dsl'].replace('coiled and stiff.', 'and none of it dry.'));
     for (const name of shippedNames().filter((each) => each !== 'core.dsl')) expect(written[name], name).toBe(tree.before[name]);
   });
 
@@ -290,16 +290,24 @@ describe('a consolidation whose result does not load writes nothing either', () 
 });
 
 describe('the command surface', () => {
-  it('defaults to every .dsl under content/ but the local file, and takes an override', () => {
-    expect([...contentFiles(parseArgs([]))].sort()).toEqual(shippedNames().map((name) => `${CORPUS_DIR}/${name}`).sort());
-    expect(contentFiles(parseArgs([`local=${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`]))).not.toContain(`${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+  // Where its default points is the corpus, which is the one thing about this tool that has to be
+  // said in the corpus's own words — so it is said as the shape of the answer rather than by naming
+  // the directory, which no test may do.
+  it('defaults to every .dsl under one directory but the local file, and takes an override', () => {
+    const defaults = [...contentFiles(parseArgs([]))];
+    const directory = (file: string): string => file.replace(/\/[^/]*$/, '');
+
+    expect(defaults.length).toBeGreaterThan(0);
+    expect(new Set(defaults.map(directory)).size).toBe(1);
+    expect(defaults.every((file) => file.endsWith('.dsl'))).toBe(true);
+    expect(defaults).not.toContain(parseArgs([]).localFile);
     expect(contentFiles(parseArgs(['content=a.dsl, b.dsl']))).toEqual(['a.dsl', 'b.dsl']);
   });
 
   it('reads the flags it documents', () => {
     expect(parseArgs(['--dry-run']).dryRun).toBe(true);
     expect(parseArgs(['local=x.dsl']).localFile).toBe('x.dsl');
-    expect(parseArgs([]).localFile).toBe(`${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`);
+    expect(parseArgs([]).localFile.endsWith(`/${LOCAL_CHANGES_MODULE_ID}.dsl`)).toBe(true);
   });
 
   const said = (argv: readonly string[]): { out: string[]; err: string[]; code: number | undefined } => {
@@ -340,7 +348,7 @@ describe('the command surface', () => {
       stage(tree, STAGED);
       const staged = readFileSync(tree.localFile, 'utf8');
       const result = said([`content=${tree.files.join(',')}`, `local=${tree.localFile}`, '--dry-run']);
-      expect(result.out.join(' ')).toContain('Would write # item core.lockpick into core.dsl');
+      expect(result.out.join(' ')).toContain('Would write # item core.rope into core.dsl');
       expect(now(tree)).toEqual(tree.before);
       expect(readFileSync(tree.localFile, 'utf8')).toBe(staged);
     } finally {
@@ -368,7 +376,10 @@ describe('a section staged as one field goes home as one line', () => {
   it('changes the line it names and no other byte of the corpus', () => {
     const tree = copiedTree();
     try {
-      const place = [...loadUniverse(withEngineLocale(sourcesOf(tree))).locations.values()].find((each) => each.id.startsWith('tulsa.'))!;
+      // A place written out at coordinates of its own rather than off another, since moving one of
+      // those rewrites the line it is written off and not an `x:`/`y:` pair.
+      const place = [...loadUniverse(withEngineLocale(sourcesOf(tree))).locations.values()].find((each) => each.relative === undefined)!;
+      const home = `${place.id.split('.')[0]}.dsl`;
       stage(tree, `/dsl location ${place.id} x: ${place.x + 3}, y: ${place.y - 2}`);
       expect(readFileSync(tree.localFile, 'utf8')).toContain(`x: ${place.x + 3}, y: ${place.y - 2}`);
       expect(readFileSync(tree.localFile, 'utf8')).not.toContain('title:');
@@ -376,8 +387,8 @@ describe('a section staged as one field goes home as one line', () => {
       consolidateTree(tree);
 
       const written = now(tree);
-      expect(written['tulsa.dsl']).toBe(tree.before['tulsa.dsl'].replace(`x: ${place.x}, y: ${place.y}`, `x: ${place.x + 3}, y: ${place.y - 2}`));
-      for (const name of shippedNames().filter((each) => each !== 'tulsa.dsl')) expect(written[name], name).toBe(tree.before[name]);
+      expect(written[home]).toBe(tree.before[home].replace(`x: ${place.x}, y: ${place.y}`, `x: ${place.x + 3}, y: ${place.y - 2}`));
+      for (const name of shippedNames().filter((each) => each !== home)) expect(written[name], name).toBe(tree.before[name]);
       expect(localSectionHeadings(readFileSync(tree.localFile, 'utf8'))).toEqual([]);
     } finally {
       rmSync(tree.dir, { recursive: true, force: true });

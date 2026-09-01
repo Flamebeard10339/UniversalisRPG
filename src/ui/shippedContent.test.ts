@@ -1,31 +1,41 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { shippedSources } from '../content/shipped';
+import { SHIPPED_DIRS } from '../content/shipped';
 import { createDriver } from './driver';
-import { SHIPPED_SOURCES } from './shippedContent';
+import { FIXTURE_CORPUS_DIR, fixtureSources } from '../content/worldFixture';
 
-// The bridge between the bundler's answer (import.meta.glob, in shippedContent.ts, which the
-// browser build needs and content/shipped.ts must stay out of) and the filesystem's answer.
-const authored = shippedSources()
-  .map((source) => source.name)
-  .sort();
+// The page reads what ships a second way — `import.meta.glob`, which the browser build needs and
+// `shipped.ts` must stay out of — so it is a second place a directory could be left out of. What
+// used to hold the two together was a module-by-module comparison of what each found, which could
+// only go red because somebody wrote a quest. The fact worth holding is the one that cannot: that
+// both readings name the same directories. Their agreeing about `content/` is then a fact about two
+// source files, and the corpus itself is `npm run oracle -- --at content`'s to answer for.
+const GLOBBED = /import\.meta\.glob\((['"`])([^'"`]+)\1/g;
+
+const globbedDirs = (): string[] =>
+  [...readFileSync('src/ui/shippedContent.ts', 'utf8').matchAll(GLOBBED)]
+    // A pattern is relative to `src/ui/`, the file it is written in, and names the files in a
+    // directory: one `../` up is `src/`, two is the repository root.
+    .map(([, , pattern]) => pattern!.replace(/\/[^/]*$/, ''))
+    .map((dir) => (dir.startsWith('../../') ? dir.slice('../../'.length) : `src/${dir.slice('../'.length)}`))
+    .sort();
 
 describe('the content the build carries', () => {
-  it('bundles every shipped DSL as text, with no path left for the browser to fetch', () => {
-    expect(SHIPPED_SOURCES.map((source) => source.name)).toEqual(authored);
-    for (const source of SHIPPED_SOURCES) expect(source.text).toMatch(/^#[ \t]/m);
+  it('reads the same directories the filesystem answer reads, and no others', () => {
+    expect(globbedDirs()).toEqual([...SHIPPED_DIRS].sort());
   });
 
-  // The page reads `content/` a second way, so it is a second place something could be left out
-  // of. What may legally be missing from either is derived in `src/content/shipped.test.ts`, and
-  // this is what carries that claim across to the page.
-  it('carries the same text the filesystem answer carries, so neither leaves out what the other ships', () => {
-    expect(SHIPPED_SOURCES.map((source) => source.text)).toEqual(shippedSources().map((source) => source.text));
-  });
+  it('opens a session out of what a world bundles, with nothing left for the browser to fetch', () => {
+    const bundled = fixtureSources().map((source) => ({ ...source }));
+    const driver = createDriver(bundled);
 
-  it('opens a session out of what it bundled', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
-
+    for (const source of bundled) expect(source.text, source.name).toMatch(/^#[ \t]/m);
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view.location.id).toBe('first-steps.guide-house');
+    expect(driver.snapshot().view.location.id).toBe('fixture-town.green');
+  });
+
+  it('is pointed at a directory that holds modules, so the reading above is not of nothing', () => {
+    expect(FIXTURE_CORPUS_DIR).toBe('src/content/fixture');
+    expect(fixtureSources().length).toBeGreaterThan(2);
   });
 });

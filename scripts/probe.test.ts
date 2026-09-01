@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { contentSectionMaps } from '../src/content/sections';
-import { CORPUS_DIR, moduleSource, shippedFiles, shippedSources } from '../src/content/shipped';
+import { FIXTURE_CORPUS_DIR, fixtureFiles, fixtureModule, fixtureSources } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { tsxCli } from './lib/tsxCli';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
@@ -189,7 +189,7 @@ describe('probe: --round-trip', () => {
   });
 
   it('round-trips the shipped content clean', () => {
-    const result = report([moduleSource('core')], { show: [], roundTrip: true });
+    const result = report([fixtureModule('core')], { show: [], roundTrip: true });
     expect(result.lines.join('\n')).toContain('round-trips clean');
     expect(result.ok).toBe(true);
   });
@@ -359,30 +359,30 @@ describe('probe: the command seam', () => {
   });
 
   it('reads a file from the repository', () => {
-    const result = run([`${CORPUS_DIR}/core.dsl`]);
+    const result = run([`${FIXTURE_CORPUS_DIR}/core.dsl`]);
     expect(result.status).toBe(0);
     expect(result.out).toContain('core');
   });
 
-  // sourceFiles is a generic any-directory reader, one layer above content and unaware of the
-  // shipped corpus; shippedFiles is content's own answer, which also excludes an author's local
-  // changes. This is the guard that the two agree on what content/ itself holds.
-  // What they agree on is which files, not what order: the generic reader sorts by file name and
-  // content's own answer sorts by module id, which differ wherever one id is a prefix of another.
-  it('reads a directory as the .dsl files in it, so the corpus is nameable where no glob expands', () => {
-    expect([...sourceFiles(CORPUS_DIR)].sort()).toEqual(shippedFiles().map((file) => path.join(CORPUS_DIR, file)).sort());
+  // sourceFiles is a generic any-directory reader, one layer above content and unaware of which
+  // world it is pointed at; a world's own answer excludes an author's local changes. This is the
+  // guard that the two agree on what a directory holds.
+  // What they agree on is which files, not what order: the generic reader sorts by file name and a
+  // world's own answer sorts by module id, which differ wherever one id is a prefix of another.
+  it('reads a directory as the .dsl files in it, so a world is nameable where no glob expands', () => {
+    expect([...sourceFiles(FIXTURE_CORPUS_DIR)].sort()).toEqual(fixtureFiles().map((file) => path.join(FIXTURE_CORPUS_DIR, file)).sort());
   });
 
-  it('runs one shipped # test by name and exits 0', () => {
-    const id = [...loadUniverseWithDiagnostics(shippedSources()).registry.tests.keys()][0];
-    const result = run([CORPUS_DIR, '--test', id]);
+  it('runs one # test by name and exits 0', () => {
+    const id = [...loadUniverseWithDiagnostics(fixtureSources()).registry.tests.keys()][0];
+    const result = run([FIXTURE_CORPUS_DIR, '--test', id]);
     expect(result.status).toBe(0);
     expect(result.out).toContain(`${id}: PASSED`);
   });
 });
 
 describe('probe: --record, the sheet a route is re-recorded into', () => {
-  const REGISTRY = loadUniverseWithDiagnostics(shippedSources()).registry;
+  const REGISTRY = loadUniverseWithDiagnostics(fixtureSources()).registry;
   const closing = [...REGISTRY.tests.keys()].flatMap((id) => {
     const sheet = recordedSheetId(REGISTRY, id);
     return sheet === undefined ? [] : [{ id, sheet }];

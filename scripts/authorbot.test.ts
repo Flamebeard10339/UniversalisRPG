@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CORPUS_DIR, shippedFiles } from '../src/content/shipped';
+import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
@@ -14,10 +14,10 @@ describe('what the run was asked for', () => {
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
-  // Not a convention this file invented: it is how the corpus is already named, so the module a
+  // Not a convention this file invented: it is how every module is already named, so the module a
   // brief writes is the one an author would have typed after --target.
-  it('names the module the way the shipped corpus is named', () => {
-    for (const file of shippedFiles()) expect(targetFor(path.join(CORPUS_DIR, `${path.basename(file, '.dsl')}.md`))).toBe(path.basename(file));
+  it('names the module the way a world names its modules', () => {
+    for (const file of fixtureFiles()) expect(targetFor(path.join(FIXTURE_CORPUS_DIR, `${path.basename(file, '.dsl')}.md`))).toBe(path.basename(file));
   });
 
   it('refuses to run without one, rather than inventing something to write', () => {
