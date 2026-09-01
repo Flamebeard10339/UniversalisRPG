@@ -75,9 +75,14 @@ examine: A heavy iron key, left on a table by someone who expected to come back 
 
 // --- drop tables ---
 
+// The smallest orb in the world, off the smallest thing in Tulsa worth swinging at, because the
+// first one a player ever sees should come out of the room they are already standing in. Ten percent
+// of a beginner's arm is barely a point, and finding out that it is spent on a cluster rather than
+// drunk is the whole of what it is for.
 # droptable feral-rat-remains
 give: 1-2 rat-pelt
 1 in 3: give: 1-4 coin
+1 in 90: give: 1 core.lesser-orb-of-the-edge
 
 # droptable ratman-remains
 give: 1 rat-pelt
@@ -691,7 +696,7 @@ examine: A dry room behind the water, kept by someone. A table, a shelf, and two
 adjacent:
   sewer-outfall
 entities:
-  2 ratman, key-table, treasure-chest
+  2 ratman, key-table, sewer-shelf, treasure-chest
 
 // --- the cast ---
 //
@@ -932,6 +937,21 @@ take the key:
   give: 1 sewer-key
   set: taken
   say: You pocket the key.
+
+// The other half of the room's own examine, and the best thing on the wrong side of the only door in
+// Tulsa that has to be opened rather than walked through. Twelve positions and two ways out of it is
+// more plane than anything a beginner is carrying can spend, which is the point of it: it is the
+// first thing in the game a player holds and has to grow into rather than put straight on.
+# entity sewer-shelf
+title: Shelf
+examine: A plank shelf on two spikes driven into the brick, with a lamp, a whetstone, and a flat iron thing at the back of it under a cloth.
+flags: emptied
+look under the cloth:
+  time: 6
+  hidden if: emptied
+  set: emptied
+  give: 1 core.great-work-jewel
+  say: Under the cloth is a disc of iron the size of a saucer, cut through in twelve places and filed at every one of them, and half the filing is fresher than the other half. Whoever kept this room was years into it and had not finished.
 
 # entity anvil
 title: Anvil
@@ -1341,6 +1361,9 @@ faction: world
 aggressive
 respawn after: 2m
 
+// The one thing in the mire that stands there and takes it, which is what its own sheet says and
+// what comes off it: eight defense behind a shell nobody can hurry, and the orb that multiplies
+// whatever a plane already puts into stopping a blow.
 # entity swamp-mollusk
 title: Swamp Mollusk
 examine: A shell the size of a shield, and the foot under it is wet with something you would not touch.
@@ -1351,6 +1374,7 @@ respawn after: 5m
 on death:
   credit:
     give: 1 mollusk-venom
+    1 in 10: give: 1 core.orb-of-the-bulwark
 
 # entity bog-lurker
 title: Bog Lurker
@@ -1363,6 +1387,10 @@ respawn after: 5m
 on death:
   credit:
     roll: swamp-pickings
+    // The wheel that multiplies rather than adds, out of the water rather than off a counter, and
+    // worth nothing to a player who has not stacked something flat for it to work on first. The
+    // mire is where a character who has been building for a while comes to find that out.
+    1 in 12: give: 1 core.tempered-will-jewel
 
 // --- what stands in the proving ground ---
 //
@@ -1402,8 +1430,10 @@ passives: combat-expansion.retribution
 // --- what stands in no room at all ---
 
 // It stands in no room, so nobody can reach it. It stays because the two
-// recorded growth tests below are the only route to a cluster plane, and a
-// DEBUG section is how the engine keeps one out of a player's hands.
+// recorded growth tests below need every shape in the catalogue and every orb
+// in one pair of hands at once, which no room in a town anybody plays is ever
+// going to hold, and a DEBUG section is how the engine keeps that out of a
+// player's hands.
 # entity smiths-chest
 DEBUG
 flags: emptied
@@ -1504,6 +1534,9 @@ respawn after: 5m
 on death:
   credit:
     give: 1 royal-jelly
+    // The jelly is what a princess is for and the orb is what she costs: the one fight on Kelsa's
+    // land that is a fight, paying in the thing that scales a pool rather than an edge.
+    1 in 8: give: 1 core.orb-of-vitality
 
 // --- recipes ---
 
@@ -1764,6 +1797,12 @@ node over-the-barrel:
 // water is reached by buying tackle, not by being given any.
 # save rodded-up-at-the-deep-water
 {"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":40,"fishing.braided-fiber-line":1}}
+
+// At the anvil with the hammer a smith never spends and enough coin to buy bar
+// stock over the counter beside it. Nothing here is a jewel: what the route this
+// stands under asks is whether a player who has found none can still grow one.
+# save at-the-forge-with-coin
+{"version":13,"location":"tulsa.forge","inventory":{"core.coin":200,"smithing.hammer":1}}
 
 # save growing-a-heartwood-blade-start
 {"version":13}
@@ -2177,6 +2216,26 @@ assert: inventory.core.heartwood-blade = 1
 assert: inventory.core.iron-sword = 1
 
 // --- growing an item ---
+
+// The plane a player reaches without ever having found anything: coin over the forge counter, a
+// blade and a blank off the anvil, and the point that opens the blade's own east slot spent on the
+// blank. Every other route below starts at a chest that stands in no room, so this is the one that
+// says a plane is a thing the world offers rather than a thing the engine can do. It asks nothing
+// about what the blank is worth — a causeway pays on one node and that is a balance question — only
+// that the road from a counter to a socketed cluster is open end to end.
+# test the-forge-is-a-way-onto-a-plane
+load: at-the-forge-with-coin
+shop: smithing.forge-supplies
+submit-modal: item=buy:smithing.bronze-bar
+submit-modal: count=3
+submit-modal: item=close
+craft: smithing.bronze-dagger
+craft: smithing.causeway-jewel
+assert: has core.causeway-jewel
+allocate: 1 at 0,0 slot e
+slot: 1 at 0,0 e with core.causeway-jewel
+assert: not has core.causeway-jewel
+
 //
 // Core's cluster planes, walked from the DEBUG smith's chest, which is the only
 // thing left that puts a jewel in anyone's hands and stands in no location.

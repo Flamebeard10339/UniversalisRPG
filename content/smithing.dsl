@@ -92,6 +92,30 @@ skill: smithing 45
 rate: smithing
 say: Front and back, laced at the sides, and it takes the whole afternoon.
 
+# recipe bronze-boots
+station: anvil
+in: 2 bronze-bar, 1 hammer
+out: 1 combat.bronze-boots, 1 hammer
+skill: smithing 25
+rate: smithing
+say: Two shells and a hinge across the instep, and the hinge is the only part anybody notices.
+
+# recipe bronze-shield
+station: anvil
+in: 2 bronze-bar, 1 hammer
+out: 1 combat.bronze-shield, 1 hammer
+skill: smithing 28
+rate: smithing
+say: You raise the boss out of the middle of it first and work the rest of it flat around that.
+
+# recipe bronze-sword
+station: anvil
+in: 2 bronze-bar, 1 hammer
+out: 1 combat.bronze-sword, 1 hammer
+skill: smithing 32
+rate: smithing
+say: A blade, a tang and a guard, and the guard is what makes it a sword rather than a long knife.
+
 // --- iron ---
 
 # recipe iron-dagger
@@ -126,6 +150,22 @@ skill: smithing 112
 rate: smithing
 say: Riveted plate over a padded coat, and every rivet is one you set yourself.
 
+# recipe iron-boots
+station: anvil
+in: 2 iron-bar, 1 hammer
+out: 1 combat.iron-boots, 1 hammer
+skill: smithing 62
+rate: smithing
+say: Jointed over the instep in five lames, and you walk the shop in them before you call them done.
+
+# recipe iron-shield
+station: anvil
+in: 2 iron-bar, 1 hammer
+out: 1 combat.iron-shield, 1 hammer
+skill: smithing 66
+rate: smithing
+say: Iron over ash, because iron alone that size is a thing nobody could lift twice.
+
 // The one thing here that is a piece of work rather than a piece of stock: ten bars of iron and
 // nothing else in the game costs that. It is also the only way a Knight's Sword ever exists.
 # recipe knights-sword
@@ -135,3 +175,31 @@ out: 1 combat.knights-sword, 1 hammer
 skill: smithing 500
 rate: smithing
 say: You take the whole day over it, and at the end of the day there is a sword on the anvil that somebody could be knighted with.
+
+// --- the two blanks, which are roads and not power ---
+//
+// The only jewels a smith can make, and the reason he can make these two and none of the others is
+// that neither of them is worth anything on its own: a causeway pays on one node in the middle of a
+// line, and a crossroads pays on nothing at all. What they sell is direction — the hexes a plane can
+// grow into next — and direction is the half of growth that a player who has decided what they want
+// should never have to wait on a drop for. Everything with a payload on it is out in the world
+// somewhere, and getting to it from where the plane already stands is what these are for.
+//
+// Neither declares a value and neither ever will: a counter pays for the bar and the day, and the
+// point spent on the far side of it is not a thing anybody sells.
+
+# recipe causeway-jewel
+station: anvil
+in: 2 bronze-bar, 1 hammer
+out: 1 core.causeway-jewel, 1 hammer
+skill: smithing 30
+rate: smithing
+say: You draw the bar out long and true and put nothing on it at all, which is harder than putting something on it.
+
+# recipe crossroads-jewel
+station: anvil
+in: 3 iron-bar, 1 hammer
+out: 1 core.crossroads-jewel, 1 hammer
+skill: smithing 110
+rate: smithing
+say: Five ways out of one stone, and every one of them has to leave it at the same angle or the thing is a lump with notches in it.
