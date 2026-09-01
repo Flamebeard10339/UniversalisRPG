@@ -16,9 +16,11 @@ happened, not a claim about what things cost.
 The candidate rule: **a number a balance pass would move is a balance number; a
 number a scripted hand-over produces is a path fact.** Under it
 `inventory.coin = 6` is balance and `inventory.small-fishing-net = 1` is a path
-fact. `tulsa.a-minute-at-the-post-is-what-the-ladder-is-cut-from` asserts attack xp
-between 350 and 750 for a minute at the post, which under the rule is squarely a
-balance number sitting in a `# test`, and it is the clearest case to decide against.
+fact. The clearest case has since been decided by hand rather than by rule:
+`a-minute-at-the-post` asserted attack xp between 350 and 750 for a minute, the
+rebalance moved it by two orders of magnitude, and it was rewritten to the claim that
+is actually the post's — it trains the arm and leaves the hide alone. That is one test
+answered out of forty-one, and it took a judgement each time.
 
 *Moves when: he states the rule, or rules that the candidate is it. Then the sweep
 over all 41 is a lane's afternoon.*

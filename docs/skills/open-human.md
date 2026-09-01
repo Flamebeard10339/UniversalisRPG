@@ -76,13 +76,25 @@ level 2 a trunk would fall in one swing where it now takes four.
 *Moves when: he names a stat, or `none`. It is one word in `content/core.dsl` and the
 derived proof in `stat.test.ts` follows it with nothing else edited.*
 
-## A jewel that cannot say what it is for
+## A number inside a result cannot read a stat, and three asks now want it to
 
 The Angler's Knot was asked to carry a chance not to spend the bait. What a cast consumes
 is written in the cast — `if has wrigglers: 3 in 4: take: 1 wrigglers` — and nothing reads
-a stat there, so a jewel cannot move it. The jewel carries fishing and line instead, and
-the item's `examine:` holds the `@@@` that `npm run notes` reads out.
+a stat there, so a jewel cannot move it.
 
-*Moves when: he says whether a chance should be able to read a stat. That is one shape in
-the result grammar and it would serve more than this jewel, but it is a language change and
-the note is honest without it.*
+Two more of the same shape have since arrived, both named in the starting-town brief and
+neither buildable. **`bait-persistance`** is that chance, as a stat. **`daze-resistance`**
+would shorten the daze a caught hand costs, and a buff's duration is written on the buff
+as a literal — so the only way one mark differs from another is by carrying its own buff
+item, which is what `thieving.collared` is. Two tiers of daze is tolerable; a number per
+mark is not, and neither is a player stat that shortens all of them.
+
+There is one feature under all three: **a number in a result that reads a stat** — a
+chance, a duration, a count. Two `@@@` carry them, on the Angler's Knot and on
+`thieving.collared`, each written where the thing should have been, so `npm run notes`
+reads them out. `bait-persistance` is the jewel's note said as a stat rather than a
+third one.
+
+*Moves when: he says whether a result's numbers may name a stat. It is one shape in the
+result grammar and it would serve at least these three; the notes are honest without it,
+and the workarounds shipped are honest too, so nothing is broken while it waits.*

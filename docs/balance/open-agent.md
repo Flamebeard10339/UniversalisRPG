@@ -6,45 +6,6 @@ what is below is what that plan does not already say to do next.
 
 ---
 
-## The rebalance, which the sheet is now specific enough to aim
-
-The ratio sheet reads, per activity per tier — `npm run simulate-activity --
-tiers.<activity>-tier-<level> --seeds 2`, the frontier's ratio to `R(L)`:
-
-| | tier 1 | tier 10 | tier 20 |
-|---|---|---|---|
-| `combat.attack` | 88× | 272× | 240× |
-| `combat.health` | 1.1× | 3× | 2.1× |
-| `fishing.fishing` | 34× | 95× | 72× |
-| `thieving.thieving` | 23× | — | 44× |
-
-**Health is the one skill in the world that is tuned, and it is tuned by
-accident.** It is paid per point of damage *taken*, which the player's own pool
-and the death that ends the run both bound. Attack is paid per point *dealt*,
-which nothing bounds. That asymmetry is the whole finding: the two halves of one
-fight are two orders of magnitude apart, and no `xp:` line was ever wrong — the
-two lines are `gain 2 * amount experience on damage-dealt` and `gain 15 * ... on
-damage-taken` at `content/combat.dsl:42` and `:52`, and they are the only awards
-that matter, because they dwarf all 25 authored `xp:` lines together.
-
-It gets worse with level, not better, because `R(L)` troughs at L ≈ 9.4 while the
-player's damage only climbs. `R(L)` then rises 57× to level 70, so **later rooms
-have to pay more by the minute** — every hunting ground in `content/combat.dsl`
-is sized to hand over roughly the same health a minute, which is flat. That was
-an open choice while the pace target was open; it is not one now, and the line it
-stood on in `docs/skills/open-human.md` was deleted with the ruling.
-
-Two rows are the room and not the offer, and the sheet says so by putting the
-runners-up underneath. `entity.tulsa.civilian.pick-their-pocket` reads 23× at
-Market Square and 3.1× at all six other places it is offered: the square is the
-free-death room, where a run that dies wakes where it fell and so fills the hour
-that every other row loses at the death. And the level-1 combat frontier is
-`core.melee-combat on combat.chicken` at `tulsa.pasture` — the chicken tops the
-world because it does not fight back, so the run never stops.
-
-*Closes when:* the sheet reads near 1 at the frontier for each activity at each
-shipped tier.
-
 ## The portal is built and nothing has been played through it
 
 `--off quests` is real on both `npm run probe` and `npm run simulate-activity`, and
@@ -53,15 +14,13 @@ that comes out: 107 of 202 offers stand at the market square with no quest in th
 world, and whether the first hour of that is a game is the question this branch
 exists to answer.
 
-The measurement is already pointed at it. `npm run simulate-activity --
-tiers.fishing-tier-1 --off quests --seeds 1` reads 52x the level-1 target for
-combat at the square and 23x for pickpocketing, which is the same finding the
-ratio table above holds — turning the quests off changed neither, which is worth
-knowing and is the only thing measured about the questless world so far.
+The sheet has since been read questless at every shipped tier, which is the whole of
+`docs/tulsa/`, and turning the quests off moves no frontier in the town: the same
+offers top the same skills either way. That is why the questless world needed no
+table of its own. What is left of this line is the walk.
 
 *Closes when:* a `# test` walks the questless town from the market square through
-one activity of each of the five skills, and the sheet above is re-read with
-`--off quests` so the frontier is the town's rather than the world's.
+one activity of each of the five skills.
 
 ## A route through the portal itself is not proved
 
@@ -74,26 +33,6 @@ the driver and open the world again: the save is pruned on the way through
 became of a save that was standing in a quest — either it survives with the quest
 pruned, or it is kept and the player is told, which is what `Resumption` already
 distinguishes.
-
-## The measurement accelerates itself, and now by how much
-
-Attack xp is paid per point of damage dealt (`combat.dsl:42`), a level grants `+1`
-flat and `+1%` to the skill's stat (`skill.ts:47-55`) through the unbounded `level`
-counter at `stats.ts:46`, and `combat.attack` names `core.attack`. Damage buys
-levels which buy damage.
-
-It used to be too slow to see. It is not now: the same offer under the same world,
-measured either side of the curve landing, went **28,635 → 62,476 xp/h** — 2.2×,
-with no number in the corpus touched. Health xp fell over the same window
-(2,880 → 1,305/h) because the character is killing faster and being hit less, which
-is the loop closing rather than a second effect.
-
-So an hour is not a rate any level actually holds, and a maximum (§7.2) selects
-whichever offer the acceleration inflated most, where a mean would dilute it. This
-is a precondition for trusting the ratio column, not an improvement to it.
-
-*Closes when:* a run at a fixed node is measured at several window lengths and the
-rate is shown either to converge, naming the level above which it does, or not to.
 
 ## A fixture marked `aggressive` may not be hostile at all
 

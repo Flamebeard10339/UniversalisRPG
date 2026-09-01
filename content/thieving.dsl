@@ -102,17 +102,11 @@ time: 6
 accuracy: my thieving vs their wards
 
 // A hand caught by somebody who does this for a living, and the reason the daze above is the floor
-// rather than the whole of it: a mark may add to what being caught costs and cannot take the three
-// seconds away, so a harder one holds you longer by holding you as well, not instead.
-//
-// @@@ asked for `daze-resistance` — a stat that shortens the daze. A buff's duration is written on
-// the buff and nothing in the language reads a stat there, so the only way a mark differs is by
-// carrying its own item, which is what this is. Two tiers is fine and a per-mark number is not, and
-// the same wall stops `bait-persistance`: what is missing is a number inside a result that can read
-// a stat.
+// rather than the whole of it: an action's `on unfinished:` is inherited by every mark and can only
+// be added to, so a harder mark holds you as well rather than instead.
 # item collared
 title: Collared
-examine: Somebody has a fistful of your collar and is deciding what to do about it.
+examine: Somebody has a fistful of your collar and is deciding what to do about it. @@@ asked for a `daze-resistance` stat that shortens how long this lasts, and for the length to differ per mark rather than per item. A buff's duration is written on the buff as a literal and nothing in the language reads a stat there, so two tiers of hold is the whole of what can be said — which is the same wall the Angler's Knot hits from the other side. One feature is under both: a number inside a result that can read a stat.
 10s, -90% core.attack-rate, -100% thieving-rate
 
 // --- what a thief wears ---
