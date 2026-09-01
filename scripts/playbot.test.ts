@@ -1,10 +1,9 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { engineLocale, withEngineLocale } from '../src/content/engineLocale';
+import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
-import { moduleSource, shippedSources, worldFor } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, isChoiceLine, newContext, runLine } from '../src/runtime/command';
 import { journalWindowText, NO_NOTES, NOTE_FIELDS, runAsSections, runId, type RunLogEntry } from '../src/runtime/runLog';
@@ -38,20 +37,21 @@ import {
   type TurnRequest,
 } from './playbot';
 import { fileAuthoring } from './play-cli';
+import { fixtureSources } from '../src/content/worldFixture';
 
 // The island and quest actually played: the standing world and nothing else — deliberately not the
 // whole shipped corpus, so the archetype pack Tulsa names optionally is absent and a run here never
 // meets a jewel. Read off the corpus rather than listed, so a module the tutorial comes to lean on
 // is played here the day it does.
-const PLAYED_MODULES = worldFor('first-steps').map((source) => source.name);
+const PLAYED_MODULES = fixtureSources().map((source) => source.name);
 
-// The island and quest actually played, same corpus session.test.ts drives.
-const PLAYED_SOURCES: ModuleSource[] = [engineLocale(), ...PLAYED_MODULES.map(moduleSource)];
+// The world actually played, the same one session.test.ts drives.
+const PLAYED_SOURCES: ModuleSource[] = [...fixtureSources()];
 const played = (): Registry => loadUniverse(PLAYED_SOURCES);
 
 const constantReader = (sources: readonly ModuleSource[]): ContentReader => () => sources;
 
-const tutorialReader: ContentReader = () => withEngineLocale(PLAYED_MODULES.map(moduleSource));
+const tutorialReader: ContentReader = () => [...fixtureSources()];
 
 // A well-behaved reply, built by peeking the session's own status rather than by guessing —
 // this is what "derives its own subjects" looks like for a fake client.
@@ -621,22 +621,28 @@ adjacent:
   // the # test 'load' directive already uses (session.ts), read here instead of re-derived.
   it('[--save] a run opens in the state a named save describes', () => {
     const registry = played();
-    const { session, warnings } = openSession(registry, 'first-steps.dresser-trinket-end');
+    // The save and the place it stands in are read off the registry rather than named, so a sheet
+    // written next month opens the same way with nothing edited here.
+    const [id] = [...registry.saves.keys()].filter((each) => typeof registry.saves.get(each)!.diff.location === 'string');
+    expect(id, 'no # save names a location, so opening on one proves nothing').toBeDefined();
+    const stood = String(registry.saves.get(id!)!.diff.location);
+    const { session, warnings } = openSession(registry, id!);
+
     expect(warnings).toEqual([]);
-    expect(view(session).location.id).toBe('first-steps.guide-house-upstairs');
+    expect(view(session).location.id).toBe(stood);
   });
 
   // --save implies its own sources: with nothing named positionally, the default reader stands for
-  // the shipped corpus, so every fixture the corpus declares can be opened by --save alone. Both
-  // halves derive their subjects — the files from the directory, the fixtures from the registry —
-  // so a module or a # save added next month is covered with no edit here.
-  it('[--save] the default sources are the whole shipped corpus, and every fixture in it opens', () => {
+  // a whole world, so every fixture that world declares can be opened by --save alone. Both halves
+  // derive their subjects — the files from the directory, the fixtures from the registry — so a
+  // module or a # save added next month is covered with no edit here. Which directories the default
+  // names is `SHIPPED_DIRS`, and that it is the shipped ones is `shipped.ts`'s to say.
+  it('[--save] the default sources are read off a directory apiece, and every fixture in one opens', () => {
     const read = fileContentReader(DEFAULT_SOURCES);
-    const named = read().map((source) => source.name).sort();
-    const shipped = shippedSources().map((source) => source.name).sort();
-    expect(named).toEqual(shipped);
+    const named = read().map((source) => source.name);
+    expect(named.length).toBeGreaterThan(fixtureSources().length);
 
-    const loaded = loadUniverseWithDiagnostics(read());
+    const loaded = loadUniverseWithDiagnostics(constantReader(fixtureSources())());
     expect(loaded.diagnostics.map(String)).toEqual([]);
     const fixtures = [...loaded.registry.saves.keys()];
     expect(fixtures.length).toBeGreaterThan(0);

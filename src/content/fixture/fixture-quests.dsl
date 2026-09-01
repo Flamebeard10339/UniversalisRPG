@@ -76,6 +76,14 @@ use: location.green.dig
 wait: done
 expect: dug-in
 
+# test minting-the-at-the-well-save
+travel: well
+expect: at-the-well
+
+# test a-save-stands-where-it-was-left-rather-than-where-a-game-begins
+load: at-the-well
+assert: fixture-town.well.touched
+
 # test a-save-puts-the-player-back-where-it-left-them
 load: dug-in
 assert: inventory.rat-tail >= 1
@@ -96,6 +104,9 @@ assert: stat.attack >= 16
 load: dug-in-and-fed
 assert: inventory.rat-tail >= 1
 assert: has bread
+
+# save at-the-well
+{"version":13,"flags":{"fixture-town.well.touched":true,"fixture-town.well.discovered":true,"fixture-town.green.discovered":true},"location":"fixture-town.well"}
 
 # save dug-in
 {"version":13,"inventory":{"core.rat-tail":1,"core.spade":1,"core.copper-coin":20},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"time":2000}
