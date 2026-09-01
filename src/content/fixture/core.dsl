@@ -91,6 +91,13 @@ group: skilling
 base: 8-14
 group: skilling
 
+// A ceiling nobody is born with: a player has this pool only while carrying something that grants
+// it, and emptying it costs them that thing. Two items grant it, so the table that takes it back has
+// two to name.
+# stat line-strength
+base: 0
+group: skilling
+
 // --- pools ---
 
 # resource health
@@ -101,6 +108,18 @@ start: 30
 # event death
 resource: health
 trigger: on empty
+
+# resource line
+max: line-strength
+start: 0
+
+# event line-snapped
+resource: line
+trigger: on empty
+
+# droptable snapped-line
+take: 1 twine
+take: 1 stout-twine
 
 # event inventory-changed
 trigger: inventory-changed
@@ -186,6 +205,20 @@ title: Rat Tail
 examine: Somebody in town pays for these. @@@ who, and how much
 value: 1
 
+# item twine
+title: Twine
+value: 2
++4 line-strength
+
+# item stout-twine
+title: Stout Twine
+value: 6
++9 line-strength
+
+// Written to prove the engine works, and refused wherever anything a player can reach names it.
+# item proving-token
+DEBUG
+
 # item rope
 title: Rope
 examine: Twelve feet of it, coiled and stiff.
@@ -231,10 +264,17 @@ time: 2
 # droptable vermin-drops
 give: 1 rat-tail
 one of:
-  2x: give: 1-3 copper-coin
+  digging-rate: give: 1-3 copper-coin
+  scavenging-rate: give: 1 twine
   1x: nothing
 
 // --- the one action everything fights with ---
+
+// Written to prove the engine works and reachable by nobody, which is what DEBUG is for.
+# entity proving-dummy
+DEBUG
+faction: world
+stats: max-health 1000, attack 0, accuracy 0, evasion 0, defense 0, attack-rate 60
 
 # action melee-combat
 title: Attack

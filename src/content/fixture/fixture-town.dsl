@@ -56,7 +56,7 @@ pay the toll:
 title: The Store
 examine: One counter and a shelf behind it.
 north of green
-adjacent: loft, cellar
+adjacent: loft, cellar, shed, pump
 entities: stair
 
 # location shed
@@ -95,6 +95,8 @@ skills: digging, scavenging
 passives: hale, keen
 equipment-slots: main-hand, body
 uses: melee-combat
+on line-snapped:
+  roll: snapped-line
 
 # entity keeper
 title: The Keeper
@@ -201,8 +203,8 @@ node greeting:
 # shop counter
 coin: copper-coin
 stocks: 5 bread, 2 rope
-buying: 50
-selling: 100
+buying: 1.5
+selling: 0.5
 accepts: stocked
 
 // --- what may be done here ---
@@ -214,3 +216,4 @@ dig:
     xp: digging 4
     give: 1 rat-tail
     give: 1 spade
+    give: 20 copper-coin

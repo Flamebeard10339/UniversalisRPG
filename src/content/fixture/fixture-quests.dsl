@@ -19,6 +19,10 @@ log: The keeper keeps looking at the well and not saying why.
 
 stage offered:
   log: The keeper asked me to deal with whatever is in the well.
+  fixture-town.keeper says:
+    when: time >= 0
+    ask: About the well.
+    That well wants clearing, and I am not the one to do it.
   done when: well-cleared
   goto settled
 
@@ -49,10 +53,16 @@ travel: well
 use: melee-combat on rat until done
 assert: clear-the-well.settled
 
-# test the-counter-opens
+# test the-counter-sells-what-it-stocks
 goto: green
+use: location.green.dig
+wait: done
 shop: counter
+assert: inventory.copper-coin >= 20
+submit-modal: item=buy:core.bread
+submit-modal: count=1
 submit-modal: item=close
+assert: has bread
 
 // --- saves ---
 //
@@ -88,12 +98,12 @@ assert: inventory.rat-tail >= 1
 assert: has bread
 
 # save dug-in
-{"version":13,"inventory":{"core.rat-tail":1,"core.spade":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"time":2000}
+{"version":13,"inventory":{"core.rat-tail":1,"core.spade":1,"core.copper-coin":20},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"time":2000}
 
 // Written over the one above rather than restating it: what is carried takes the ids every layer
 // writes, so this sheet holds the loaf and the tail both.
 # save kitted
-{"version":13,"inventory":{"core.rat-tail":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"equipped":{"main-hand":"core.spade"},"time":2000}
+{"version":13,"inventory":{"core.rat-tail":1,"core.copper-coin":20},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"equipped":{"main-hand":"core.spade"},"time":2000}
 
 # save dug-in-and-fed
 over: dug-in

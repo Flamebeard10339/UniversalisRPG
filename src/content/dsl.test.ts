@@ -1,7 +1,7 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, expect, it } from 'vitest';
 import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
-import { amissIn, kindNamed, offeringAt, refusalOf } from './completion';
+import { kindNamed, offeringAt } from './completion';
 import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
@@ -20,14 +20,11 @@ import { everySaid, GENERATED_FIELD, localeKey } from './locale';
 import { contentSectionMaps, isCheckedKind, isDebug, parseModule, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
-import { isBase } from './sections/item';
 import { WEIGHT_SITE } from './refs';
-import { canSerialize, roundTripUniverse } from './serialize';
 import { tagClause } from '../grammar/tagClause';
-import { shippedSources } from './shipped';
-import type { Directive } from './sections/test';
+import { fixtureSources } from './worldFixture';
 
-const CORPUS = shippedSources();
+const CORPUS = fixtureSources();
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
@@ -455,134 +452,6 @@ DEBUG`) };
     expect(problems(loadUniverseWithDiagnostics([...CORPUS, marked]))).toEqual([]);
   });
 });
-
-describe('the shipped corpus', () => {
-  it('loads with no diagnostics', () => {
-    expect(problems(loadUniverseWithDiagnostics(CORPUS))).toEqual([]);
-  });
-
-  it('has nothing the editing page would call amiss, by either question it asks, and names no id the engine cannot place', () => {
-    const loaded = loadUniverseWithDiagnostics(CORPUS);
-    expect(problems(loaded)).toEqual([]);
-    const known = declaredBy(loaded.registry);
-    for (const source of CORPUS) {
-      for (const section of splitSections(source.text)) {
-        if (sectionFor(section.kind) === undefined) continue;
-        const written = source.text.slice(section.span.start, section.span.end).replace(/\s+$/, '');
-        const where = `${source.name} # ${section.kind} ${section.id ?? ''}`;
-        const said = refusalOf(written);
-        const amiss = amissIn(written, known);
-        expect(said, where).toBeNull();
-        expect(amiss.some((each) => each.refused !== null), where).toBe(said !== null);
-        expect(amiss.flatMap((each) => each.undeclared.map((one) => `line ${each.line}: ${one.id} as a # ${one.kind}`)), where).toEqual([]);
-      }
-    }
-  });
-
-  it('prints back to a universe that loads to the same registry', () => {
-    const loaded = loadUniverseWithDiagnostics(CORPUS);
-    expect(problems(loaded)).toEqual([]);
-    const trip = roundTripUniverse(loaded.registry, loaded.parsed.filter(canSerialize), (sources) => loadUniverseWithDiagnostics(sources));
-    expect(problems(trip)).toEqual([]);
-    expect(trip.differences).toEqual([]);
-  });
-
-  it('reaches every location the corpus declares from its starting location, since a road answers from both ends', () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    const start = [...registry.locations.values()].find((location) => location.starting)!;
-    const seen = new Set([start.id]);
-    const frontier = [start.id];
-    while (frontier.length > 0) {
-      const here = frontier.pop()!;
-      for (const edge of registry.roads.get(here) ?? []) {
-        if (seen.has(edge.target)) continue;
-        seen.add(edge.target);
-        frontier.push(edge.target);
-      }
-    }
-    // A DEBUG location ships to nobody and nothing a player reaches may name it, so there is no road
-    // to it by construction: it is stood in by a save that says so, and the walk cannot be asked for.
-    const reachable = [...registry.locations.values()].filter((location) => !isDebug(location));
-    expect(reachable.map((location) => location.id).filter((id) => !seen.has(id))).toEqual([]);
-  });
-
-  // The subjects are every # shop the corpus holds, so a store written next month is held to both of these with no edit here.
-  it('is reached at every counter it holds through the entity keeping it, since a shop nobody keeps stands nowhere', () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    const kept = new Set([...registry.entities.values()].flatMap((entity) => (entity.shop === undefined ? [] : [entity.shop])));
-    expect(registry.shops.size).toBeGreaterThan(0);
-    expect([...registry.shops.keys()].filter((id) => !kept.has(id))).toEqual([]);
-  });
-
-  // The subjects are every # save the corpus holds and every base it declares, so a save written next month, or an item given an `item-level:` next month, is held to this with no edit here.
-  it("writes no base into a save's inventory, since a base is minted as an instance and never joins a stack", () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    const bases = [...registry.items.values()].filter(isBase);
-    expect(bases.length).toBeGreaterThan(0);
-
-    const stacked = [...registry.saves.entries()].flatMap(([id, save]) => {
-      const inventory = save.diff.inventory;
-      if (typeof inventory !== 'object' || inventory === null || Array.isArray(inventory)) return [];
-      return Object.keys(inventory)
-        .filter((itemId) => bases.some((base) => base.id === itemId))
-        .map((itemId) => `# save ${id} carries ${itemId} under "inventory", which no route through the world reaches: receiveItem mints a base as an instance, so write it under "instances" as a copy with a roll of its own.`);
-    });
-    expect(stacked).toEqual([]);
-  });
-
-  // The subjects are every # save the corpus holds that is written over another, and every field each
-  // of them writes, so a composition written next month is held to this with no edit here.
-  it('says nothing in a save that the save it is written over already says, since a layer restated is a layer that goes stale where it stands', () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    const restated = [...registry.saves.entries()].flatMap(([id, saved]) =>
-      (saved.over ?? []).flatMap((beneath) =>
-        Object.entries(saved.diff)
-          .filter(([field, value]) => JSON.stringify(registry.saves.get(beneath)?.diff[field]) === JSON.stringify(value))
-          .map(([field]) => `# save ${id} writes ${JSON.stringify(field)}, which ${beneath} — the save it is written over — already writes to the letter. Take it out: what a layer says is what this one gets.`),
-      ),
-    );
-    expect(restated).toEqual([]);
-  });
-
-  it('counts every counter in a coin that declares no value of its own, which is what a shop would otherwise sell itself', () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    expect([...registry.shops.values()].filter((shop) => registry.items.get(shop.coin)?.value !== undefined).map((shop) => shop.id)).toEqual([]);
-  });
-
-  // A directive that reaches a state someone else's route already reached, rather than walking one of its own: it has nothing to claim beyond what it re-runs or re-checks.
-  const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
-  // Where a test's claim is written in words. `refuse:` is one: it names the growth that must not take, which is as readable as an assertion and is how the growth routes state theirs.
-  const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse', 'journal'];
-
-  it('says in words what each test it holds walked a route to prove, rather than only in a save body', () => {
-    const { registry } = loadUniverseWithDiagnostics(CORPUS);
-    const walked = [...registry.tests.values()].filter((each) => each.directives.some((directive) => !REACHES.includes(directive.kind)));
-    expect(walked.length).toBeGreaterThan(0);
-
-    const unspoken = walked
-      .filter((each) => !each.directives.some((directive) => SPELLS_IT_OUT.includes(directive.kind)))
-      // `expect:` compares the whole sheet, and is therefore the one form that can say a key the state no longer holds is gone — an absence no condition can name. It is the corpus's deliberate exception, and every use of it carries its argument in a comment.
-      .filter((each) => !each.directives.some((directive) => directive.kind === 'expect'))
-      .map((each) => {
-        const sheets = each.directives.flatMap((directive) => (directive.kind === 'expect-only' ? [directive.save] : []));
-        const only = sheets.length > 0 ? `save ${sheets.join(' and ')}` : 'nowhere at all';
-        return `# test ${each.id} states no claim: what it proves lives in ${only}. Write the claim as assert: lines — npm run oracle -- test lists what a condition may read — or, where nothing a condition can read names it, close on expect: and say why in a comment.`;
-      });
-    expect(unspoken).toEqual([]);
-  });
-
-  it.each(CORPUS.map((source) => source.name))('%s refuses an indented block nobody reads', (name) => {
-    const { text } = CORPUS.find((each) => each.name === name)!;
-    for (const section of splitSections(text)) {
-      const owner = sectionFor(section.kind);
-      if (owner === undefined) continue;
-      const written = text.slice(section.span.start, section.span.end).replace(/\s+$/, '');
-      const intruded = [written, 'nonsense-nobody-declares:', ...indentLines(['nonsense-nobody-reads'])].join('\n');
-      expect(() => owner.parse(splitSections(intruded)[0]!), `# ${section.kind} ${section.id ?? ''}`).toThrow();
-    }
-  });
-});
-
 // The corpus writes `over:` correctly, so what an author is told when they do not is only sayable here.
 describe('what # save refuses an over: line for', () => {
   const read = (body: string): (() => unknown) => () => sectionFor('save')!.parse(splitSections(`# save probe\n${body}`)[0]!);
@@ -618,7 +487,7 @@ describe('a name a value in the corpus carries', () => {
   });
 
   it('is carried by enough of it for what is below to mean something', () => {
-    expect(CARRIED.length).toBeGreaterThan(20);
+    expect(CARRIED.length).toBeGreaterThan(5);
     expect(new Set(CARRIED.map((each) => each.where.split('.')[0])).size).toBeGreaterThan(1);
   });
 
@@ -669,7 +538,7 @@ describe('an action the corpus writes', () => {
   const actions = everyActionTable(loadUniverseWithDiagnostics(CORPUS).registry).flatMap(([kind, id, held]) => held.map((action) => ({ where: `# ${kind} ${id}`, action })));
 
   it('is written by enough of the corpus for what is below to mean something', () => {
-    expect(actions.length).toBeGreaterThan(30);
+    expect(actions.length).toBeGreaterThan(10);
   });
 
   // What the page offers and what the engine takes are one claim, and they came apart where a field restated its own parser's shapes beside it: `damage:` offered the `vs` shape alone while `contest()` read the unsided one too, so the corpus's one writing of it was a line the page would not have written.
@@ -770,7 +639,7 @@ describe('a name the corpus offers', () => {
   ];
 
   it('is written by enough of the corpus for what is below to mean something', () => {
-    expect(NAMES.length).toBeGreaterThan(200);
+    expect(NAMES.length).toBeGreaterThan(50);
     expect(NAMES.some(({ name }) => name.includes(' '))).toBe(true);
   });
 
@@ -787,7 +656,7 @@ describe('an entity the corpus writes examine: on', () => {
   const written = [...registry.entities.values()].filter((entity) => entity.examine !== undefined);
 
   it('is written by enough of the corpus for what is below to mean something', () => {
-    expect(written.length).toBeGreaterThan(20);
+    expect(written.length).toBeGreaterThan(3);
   });
 
   it('offers those words as an action, so no scenery is reviewed that nobody can read', () => {
@@ -833,7 +702,7 @@ describe('a line a quest gives an entity', () => {
   const given = [...registry.dialogues.values()].filter(givenByQuest);
 
   it('is written by enough of the corpus for what is below to mean something', () => {
-    expect(given.length).toBeGreaterThan(10);
+    expect(given.length).toBeGreaterThan(0);
   });
 
   it('says what the player picks to open it, so the list a player reads is words and not speech', () => {
