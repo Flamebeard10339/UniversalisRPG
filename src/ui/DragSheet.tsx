@@ -26,8 +26,6 @@ export interface Carried {
   by: Point;
 }
 
-// Written over `Element` rather than over an HTML one: a place is a button and a region is a path in
-// the sheet's own drawing, and both are carried by the same grip.
 export interface Grip {
   onPointerDown(event: React.PointerEvent<Element>): void;
   onPointerMove(event: React.PointerEvent<Element>): void;
@@ -79,9 +77,6 @@ export interface SheetHold {
   pan: Point;
   zoom: number;
   box: Box;
-  // How big each drawn thing is, in the order they were handed over, and the biggest of them. Two
-  // readings of one measurement: a road stops at the box of the place it runs to, and the room the
-  // whole sheet takes up is the widest label plus the spread of the points.
   sizes: Size[];
   node: Size;
   settle(pan: Point, zoom: number): void;
@@ -265,7 +260,6 @@ export function DragSheet({
     >
       <div
         className="absolute left-1/2 top-1/2 origin-top-left"
-        // translate, never translate3d: a promoted layer is rastered once and every label goes soft when the sheet is zoomed.
         style={{ transform: `translate(${hold.pan.x}px, ${hold.pan.y}px) scale(${hold.zoom})` }}
       >
         {debug === undefined ? null : (

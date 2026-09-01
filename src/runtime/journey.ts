@@ -6,8 +6,6 @@ import type { GameState } from './state';
 
 const discovered = (state: GameState, id: string): boolean => truthy(state.flags[`${id}.${DISCOVERED}`]);
 
-// What a location is adjacent to in play: its authored edges, plus the derived return edge
-// for any road the far end does not answer with an edge of its own. The one place that reads it.
 export function effectiveAdjacent(registry: Registry, from: string): readonly Edge[] {
   return registry.roads.get(from) ?? [];
 }
@@ -70,12 +68,6 @@ export function reachable(from: string, registry: Registry, state: GameState): M
   return found;
 }
 
-// How far each location stands from where a game begins, in roads walked. `reachable` above asks
-// about a player — where can this one walk now, given the gates they have opened and the places
-// they have found. This asks about the map: where a thing sits in the world whether anybody has
-// been there or not, which is why it takes no state. A road held shut by a condition is still a
-// road, because a gate is a beat in the story rather than a distance, and a location no road
-// reaches is absent rather than infinitely far.
 export function roadDepths(registry: Registry): ReadonlyMap<string, number> {
   const start = startingLocationId(registry);
   const depths = new Map<string, number>();

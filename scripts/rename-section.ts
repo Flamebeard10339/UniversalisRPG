@@ -16,16 +16,12 @@ import { corpusOf, sourceOf, type TextFile } from './rename-module';
 
 export { parseHeading };
 
-// Where a section id may be written and never rewritten from here: an id is a word, and a word under src/ is
-// as likely to be a fixture that happens to spell it as a name of this section. Named rather than written, so
-// the operator reads that part of the diff instead of trusting a tool that guessed.
 export const OUTSIDE: readonly string[] = ['src', 'scripts', 'package.json'];
 
 export interface SectionRenameReport {
   lines: string[];
   ok: boolean;
   files: TextFile[];
-  // The address the section was found at, once the id written on the command line was read against the world.
   address: string | null;
 }
 
@@ -49,8 +45,6 @@ const applyEdits = (text: string, edits: readonly Edit[]): string =>
 
 const overlaps = (edit: Edit, taken: readonly Edit[]): boolean => taken.some((each) => edit.start < each.end && each.start < edit.end);
 
-// Whether the language takes this as a section's own id, asked of the parser that reads a heading rather than of a
-// spelling written out again beside it.
 const headingTakes = (kind: string, id: string): boolean => {
   try {
     const raw = splitSections(`# ${kind} ${id}`);
@@ -70,9 +64,6 @@ const parsedSection = (text: string): { kind: SectionKind; value: object } | nul
   }
 };
 
-// Every name a section holds that addresses something else, in the order the kind's own walk reaches them. The walk
-// is the section declarations' to say — a kind or a field added next month is reached here with no edit — so nothing
-// below has a list of the places an id can be written.
 const refsOf = (kind: SectionKind, value: object): Ref[] => {
   const found: Ref[] = [];
   visitSection(sectionOf(kind, cloned(value)), `# ${kind}`, (each, id) => {
@@ -89,8 +80,6 @@ const withRefs = (kind: SectionKind, value: object, ids: readonly string[]): obj
   return next;
 };
 
-// One occurrence of a word swapped for another, which is what a single character range being rewritten does to the
-// name it stands in.
 const oneWordApart = (before: string, after: string, from: string, to: string): boolean => {
   for (const match of before.matchAll(occurrencesOf(from))) {
     if (`${before.slice(0, match.index)}${to}${before.slice(match.index + from.length)}` === after) return true;
@@ -131,15 +120,11 @@ export function renameSection(files: readonly TextFile[], named: Heading, to: st
 
   const rewrite: Rewriting = rewritingBetween([[{ module, kind, id }, { module, kind, id: to }]]);
 
-  // Whether a name resolved to a full key addresses this section, or a flag, node or action minted beneath it.
   const underTarget = (refKind: string, resolved: string): boolean => {
     const under = keyedUnderOwnerKind(refKind) ? resolved.slice(resolved.indexOf('.') + 1) : resolved;
     return under === key || under.startsWith(`${key}.`);
   };
 
-  // Whether a name as an author wrote it addresses this section. A name of this kind names it whole; a name of any
-  // kind names something minted beneath it by leading with it, which is how a flag or an action written under this
-  // section is spelled.
   const namesTarget = (refKind: string, raw: string, self: string): boolean => {
     const segments = spelledSegments(refKind, raw, self);
     const parts = keyedUnderOwnerKind(refKind) ? segments.slice(1) : segments;
@@ -148,8 +133,6 @@ export function renameSection(files: readonly TextFile[], named: Heading, to: st
     return false;
   };
 
-  // The modules holding a name that reaches this section, whichever way they spelled it. A bare id is only ever
-  // rewritten inside one of these, so a word written somewhere that never names this section is never a candidate.
   const reaching = new Set<string>([module]);
   for (const parsed of loaded.parsed) {
     const namespace = parsed.namespace;
@@ -172,10 +155,6 @@ export function renameSection(files: readonly TextFile[], named: Heading, to: st
     if (held !== undefined && parsed.namespace !== null) moduleOf.set(held.path, parsed.namespace);
   }
 
-  // The one occurrence of the word this section is called that a character range being rewritten may be: the section
-  // parses either side of the change, every name that moved addresses this section, every name that moved moved by
-  // this word alone, and nothing else about the section is different. Prose, a comment and a name of another kind all
-  // fail one of those, and none of them is enumerated here.
   const rewrites = (before: { kind: SectionKind; value: object }, text: string, self: string): boolean => {
     const after = parsedSection(text);
     if (after === null || after.kind !== before.kind) return false;
@@ -246,9 +225,6 @@ export function renameSection(files: readonly TextFile[], named: Heading, to: st
     return refused([`The corpus does not load once # ${kind} ${key} is written as ${renamed}.`, ...reloaded.diagnostics.map(formatModuleDiagnostic)]);
   }
 
-  // The whole claim: every key the rename touched is the same key under its new name, every name minted beneath it
-  // came with it, and nothing else in the world moved. Both walks derive their own subjects — registryDiff from the
-  // section list, the namespace from what it holds — so a kind or a field added next month is covered here with no edit.
   const held = new Set(reloaded.registry.namespace.snapshot());
   const wanted = loaded.registry.namespace.snapshot().map(rewrite);
   const gone = new Set(wanted);
@@ -293,8 +269,6 @@ const dslUnder = (root: string): string[] => {
 
 export const readCorpus = (root: string): TextFile[] => dslUnder(root).map((file) => ({ path: file, text: readFileSync(file, 'utf8') }));
 
-// Every tracked file outside the world that spells this section's address. Nothing here is written: a section id is a
-// word, and the two tools next door have rewritten one inside a fixture that only happened to share it.
 export function mentionsOutside(root: string, address: string): string[] {
   return trackedFiles()
     .map(posix)

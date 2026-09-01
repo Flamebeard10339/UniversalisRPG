@@ -3,8 +3,6 @@ import { inkOf } from './lineStyle';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
-// What the journal screen is showing, drawn above the question the screen is
-// asking. The question, and everything about leaving it, is the shared sheet's.
 export function QuestBody({ entry, words }: { entry: JournalEntry; words: Words }): JSX.Element {
   useTestSurface('quest', { entry });
 

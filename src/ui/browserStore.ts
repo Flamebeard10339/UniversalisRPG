@@ -15,7 +15,6 @@ function attempting<T>(what: string, act: () => T): T {
   }
 }
 
-// Storage is reached through a function: a browser with it switched off raises on the property itself.
 export function browserSlots(reach: () => Storage = () => window.localStorage, prefix: string = SLOT_PREFIX): SlotDriver {
   const keyed = (name: string): string => `${prefix}${name}`;
 

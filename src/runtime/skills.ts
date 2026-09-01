@@ -11,7 +11,4 @@ export function skillLevel(xp: number): number {
   return level;
 }
 
-// Read off what has been earned rather than off what the world declares, because a skill with nothing in
-// it reads as the first level and the first level is the floor: a skill added next month is covered
-// without being named, and a run that has earned nothing still stands at the level everyone starts on.
 export const highestSkillLevel = (xp: Readonly<Record<string, number>>): number => Math.max(skillLevel(0), ...Object.values(xp).map(skillLevel));

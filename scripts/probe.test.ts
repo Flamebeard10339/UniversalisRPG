@@ -364,11 +364,6 @@ describe('probe: the command seam', () => {
     expect(result.out).toContain('core');
   });
 
-  // sourceFiles is a generic any-directory reader, one layer above content and unaware of which
-  // world it is pointed at; a world's own answer excludes an author's local changes. This is the
-  // guard that the two agree on what a directory holds.
-  // What they agree on is which files, not what order: the generic reader sorts by file name and a
-  // world's own answer sorts by module id, which differ wherever one id is a prefix of another.
   it('reads a directory as the .dsl files in it, so a world is nameable where no glob expands', () => {
     expect([...sourceFiles(FIXTURE_CORPUS_DIR)].sort()).toEqual(fixtureFiles().map((file) => path.join(FIXTURE_CORPUS_DIR, file)).sort());
   });
@@ -388,9 +383,6 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     return sheet === undefined ? [] : [{ id, sheet }];
   });
 
-  // The subjects are every shipped test that closes on a sheet, so a route written next month is
-  // covered here with no edit. A name minted from the test id passes this only where the two happen
-  // to agree, and in the corpus they do not: `miki-route-full` closes on `miki-route-end`.
   it('names a section the file already writes, for every route that closes on one', () => {
     expect(closing.length).toBeGreaterThan(0);
     const missing = closing.filter(({ id, sheet }) => !REGISTRY.saves.has(`${id.slice(0, id.lastIndexOf('.'))}.${sheet}`));
@@ -417,9 +409,6 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     expect(rerun.ok).toBe(true);
   });
 
-  // A sheet written over other saves is re-recorded as a sheet written over them: the layers are laid
-  // down again and what is printed is the difference. Recording it whole would read back the same and
-  // quietly copy every layer into it, which is the one home going twice.
   it('keeps the layers of a sheet written over others, and prints only what stands over them', () => {
     const body = (save: readonly string[]): string =>
       [
@@ -459,10 +448,6 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     expect(rerun.ok).toBe(true);
   });
 
-  // The stale sheet a re-recording exists to replace fails on the route's last directive, so failing
-  // is not what tells a short walk apart — how far it got is. A route stopped before its end left the
-  // world somewhere the route does not end, and printing that body is the one thing this tool must
-  // never do, because pasting it in writes a truncated run into the file as if it were the route.
   it('refuses to print a body from a route that stopped short, and says where it stopped', () => {
     const source: ModuleSource = {
       name: 'm',
@@ -476,8 +461,6 @@ describe('probe: --record, the sheet a route is re-recorded into', () => {
     expect(result.ok).toBe(false);
   });
 
-  // Its counterpart, and the reason the refusal is measured rather than read off the verdict: this
-  // route also fails, on the sheet that is stale by definition, and its body is the one to paste in.
   it('prints the body of a route that failed only on its closing sheet, which is every re-recording', () => {
     const source: ModuleSource = {
       name: 'm',

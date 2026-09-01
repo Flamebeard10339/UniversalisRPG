@@ -243,7 +243,6 @@ describe('merging follows load order, not source order', () => {
   });
 });
 
-// A DEBUG section stays out of the world however many modules go on to add to it: a mod that could unmark one would be a mod that could put it in a player's hands.
 describe('a DEBUG mark survives every edit of the section', () => {
   const MARKED = module('base', '# stat attack', '# item rope', 'DEBUG', 'value: 3');
   const PLAIN = module('base', '# stat attack', '# item rope', 'value: 3');
@@ -262,8 +261,6 @@ describe('a DEBUG mark survives every edit of the section', () => {
     expect(registry.locales.base.get('base.item.rope.title')).toBeUndefined();
   });
 
-  // Marking a section is taking it out of the world, and a section that says something is not out of
-  // it until those words are gone: the mark is refused where it would leave a line nothing can read.
   it('is refused where the section it marks still says something', () => {
     expect(() => loadUniverse([module('base', '# stat attack', '# item rope', 'title: Hemp Rope'), patch('# item base.rope', 'DEBUG')])).toThrow(/# item base.rope: title: "Hemp Rope" is words a player reads/);
   });

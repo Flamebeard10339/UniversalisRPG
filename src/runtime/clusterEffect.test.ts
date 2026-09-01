@@ -351,8 +351,6 @@ describe("a plane's contribution reaches combat", () => {
   });
 });
 
-// A range on a passive is the same roll-and-fix the item level is: one number drawn when the thing
-// enters the world, and every range that thing declares read at it.
 describe('a passive written as a range', () => {
   const rolled = (state: GameState, hex: Hex): number => {
     const payload = instancePayloads(registry, itemInstance(state, '1')!).find((each) => each.node.hex.q === hex.q && each.node.hex.r === hex.r)!;

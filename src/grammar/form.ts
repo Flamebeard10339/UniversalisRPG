@@ -1,7 +1,3 @@
-// A form is what an author is shown: literal text, `<a placeholder>`, `[an optional part]`, and a trailing `, …` for a list.
-// Reading a form against what is written is the one thing every part of the editor asks: which shapes a half-typed line
-// could still become, which placeholder the cursor stands in, and what a whole line was read as.
-
 export interface Hole {
   name: string;
   start: number;
@@ -10,11 +6,8 @@ export interface Hole {
 
 export interface Alignment {
   holes: readonly Hole[];
-  // The hole the written text runs out inside, which is the one an author is filling. Its span ends where the text does.
   open: Hole | null;
-  // Every part of the form is accounted for, so the line stands on its own.
   complete: boolean;
-  // How many of the form's own characters the text has spelt out. A line that has spelt out none of a form is not yet being written in it.
   spelt: number;
 }
 
@@ -38,7 +31,6 @@ const closing = (parts: readonly string[], from: number): number => {
   return parts.length;
 };
 
-// An optional part is a fork rather than a special case: the form stands for every line that takes it and every line that leaves it out.
 function expand(parts: readonly string[]): Node[][] {
   if (parts.length === 0) return [[]];
   const [head, ...tail] = parts;
@@ -52,7 +44,6 @@ function expand(parts: readonly string[]): Node[][] {
   return expand(tail).map((rest) => [node, ...rest]);
 }
 
-// A hole runs until the text that follows it in the form turns up, so what an author has written divides on its own.
 const following = (nodes: readonly Node[], from: number): string | null => {
   for (let at = from; at < nodes.length; at++) {
     const node = nodes[at]!;
@@ -98,10 +89,8 @@ function scan(nodes: readonly Node[], written: string): Alignment | null {
   return at === written.length ? { holes, open: null, complete: true, spelt } : null;
 }
 
-// Two branches that account for the same amount of what is written differ in whether the text runs out inside a placeholder; the one that says where the author is standing is the one to take.
 const worth = (found: Alignment): number => (found.complete ? 1000 : 0) + found.spelt * 2 + (found.open === null ? 0 : 1);
 
-// How the form reads what is written, taking the branch that accounts for the most of it. Null where the text is not this form, half-written or whole.
 export function align(form: string, written: string): Alignment | null {
   let best: Alignment | null = null;
   for (const nodes of expand(pieces(form))) {
@@ -111,13 +100,10 @@ export function align(form: string, written: string): Alignment | null {
   return best;
 }
 
-// The text could still grow into this form, whether or not it has yet.
 export const fits = (form: string, written: string): boolean => align(form, written) !== null;
 
-// The text is this form, whole.
 export const matches = (form: string, written: string): boolean => align(form, written)?.complete === true;
 
-// What one example puts in each of a form's holes, which is the nearest thing to a value an author can be shown.
 export const holesIn = (form: string, example: string): readonly Hole[] | null => {
   const found = align(form, example);
   return found === null || !found.complete ? null : found.holes;
@@ -127,18 +113,14 @@ export const valueIn = (example: string, hole: Hole): string => example.slice(ho
 
 const NAMED = /<([a-z][a-z0-9 -]*)>/g;
 
-// What a form calls its placeholders, in the order it writes them. A form stands for every line it could be, so this asks the shape rather than any one line of it.
 export const holeNames = (form: string): string[] => [...form.matchAll(NAMED)].map((each) => each[1]!);
 
-// The example with one hole given over to a stand-in, which is how the engine is asked what that hole names.
 export const standingIn = (example: string, hole: Hole, stood: string): string => `${example.slice(0, hole.start)}${stood}${example.slice(hole.end)}`;
 
-// A form with the names of its placeholders rubbed out. Two shapes that differ only in what they call their holes are the same shape, and saying both says one thing twice.
 export const bare = (form: string): string => form.replace(/<[a-z][a-z0-9 -]*>/g, '<>');
 
 export const exampleOf = (form: string, examples: readonly string[]): string | undefined => examples.find((example) => matches(form, example));
 
-// One line to stand for each shape. A placeholder takes whatever is put in it, so an example an earlier shape has already claimed is a poor witness for a later one, and is passed over where there is another.
 export function paired(forms: readonly string[], examples: readonly string[]): (string | undefined)[] {
   const spent = new Set<string>();
   return forms.map((form) => {

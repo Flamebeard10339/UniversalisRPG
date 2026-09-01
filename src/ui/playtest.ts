@@ -1,18 +1,12 @@
 import { runAsSections, isPlayed, type KeptRun, type RecordedRun, type RunHeader, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, runId, serializeRun, turnRecord, type RunLogEntry, type RunNotes, type TurnOutcome } from '../runtime/runLog';
 import type { SlotStore } from '../runtime/store';
 
-// The app's own end of the playtest loop, and the counterpart of runPlaybot: it holds the run,
-// the model's loop holds its own, and both write the shape src/runtime/runLog.ts declares.
-
 export interface Feedback {
   readonly turn: number;
   readonly line: string;
   readonly held: RunNotes;
 }
 
-// Notes are about the turn that has just happened, whichever kind it was. An author writes them
-// having seen what the turn did, so attaching them to whatever comes next would say the opposite of
-// what they meant — and with nothing recorded there is nothing to be about.
 export function feedbackOn(log: readonly RunLogEntry[]): Feedback | null {
   const entry = log[log.length - 1];
   if (entry === undefined) return null;
@@ -30,29 +24,14 @@ export const emptyNotes = (): RunNotes => Object.fromEntries(NOTE_FIELDS.map((fi
 export const turnsPlayed = (log: readonly RunLogEntry[]): number => log.length;
 
 export interface Recorder {
-  // The run being recorded, or null when none is. Holding one is the whole of being in playtest
-  // mode; a second flag beside it would be the thing that could disagree with it.
   run(): RecordedRun | null;
-  // The run together with the saved game it walks forward from, which is what filing one needs and
-  // what drawing one does not.
   kept(): KeptRun | null;
-  // The saved game the run walks forward from, taken when recording starts rather than when the
-  // session opened: an author who plays twenty turns before starting a run means them.
   start(from: string): void;
   stop(): void;
-  // What the player picked, and whether the engine took it. What it answered with is not recorded:
-  // the author read it on the screen it was said on.
   opened(line: string, outcome: TurnOutcome, directives: readonly string[]): void;
-  // What a run that was left on the clock settled into when it came off it — how many times the
-  // loop came round, and whether it was called off. Nobody typed it, so it belongs to the turn that
-  // started the run rather than to a turn of its own, and without it a recorded run says a player
-  // began something and never says how much of it they sat through.
   settled(directives: readonly string[]): void;
-  // Where in the app the player went, which the engine never hears about and which they may still
-  // have something to say about.
   moved(where: string): void;
   attach(turn: number, notes: RunNotes): void;
-  // The run as the `# test` section that replays it, under the name it was minted with.
   written(): string;
 }
 

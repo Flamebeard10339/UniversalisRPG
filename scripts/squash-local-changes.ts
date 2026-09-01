@@ -72,7 +72,6 @@ function source(file: string): ModuleSource {
   return { name: sourceName(file), text: readFileSync(file, 'utf8') };
 }
 
-// A source may name a directory, which stands for the .dsl files in it, so `content` names the whole corpus.
 const contentSources = (files: readonly string[]): ModuleSource[] => files.flatMap((file) => sourceFiles(repoPath(file))).map(source);
 
 function fail(lines: string[]): never {

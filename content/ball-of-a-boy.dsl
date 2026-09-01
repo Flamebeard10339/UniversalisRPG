@@ -1,12 +1,3 @@
-// Ball of a Boy — a boy with black eyes and twitchy ears has lost his ball
-// down a grate, and what is under the town is worse than rats.
-//
-// The quest owns no flags of its own beyond its stages: `sewer-toll-paid` is
-// tulsa's, set here because nothing else sets it, and the door and the key are
-// tulsa's too. Take this module out and Larry still sits on his hatch, the
-// locked room still holds its ratmen and its table, and nobody can pay the
-// toll or read what is on the table beside the key.
-
 # info ball-of-a-boy
 version: 0.1.0
 pack: quests
@@ -46,8 +37,6 @@ stage reported:
   log: I told Larry what the book in that locked room said was done to a man down there. He did not look glad to know it.
   complete
 
-// --- what this quest owes the world ---
-
 # entity tulsa.larry
 pay the toll:
   instant
@@ -61,8 +50,6 @@ pay the toll:
 read the book:
   instant
   say: The book beside the key sets out, step by patient step, how to turn a man into a ratman — what is broken first, what is fed to him, how long the change takes if he lives through it. Someone has read it enough times to have worn the corners round.
-
-// --- tests ---
 
 # save at-the-grate
 {"version":13,"location":"tulsa.market-square","inventory":{"core.coin":10,"core.lockpick":1}}

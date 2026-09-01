@@ -44,17 +44,12 @@ const spoken = (driver: ReturnType<typeof createDriver>): string[] => driver.sna
 
 const sectionKeyOf = (section: Section): string => `${section.kind} ${section.address}`;
 
-// What the driver puts in front of the loader when an author stages something: the local-changes
-// module, headed and made to depend on everything shipped, so it has the last word the way it does in
-// the game. Written by the module that owns that file rather than spelt out again here.
 const MODULE_IDS = fixtureSources().map((source) => addressedSections(source).module);
 
 const stagedModule = (...sections: string[]): ModuleSource => ({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule(MODULE_IDS, sections) });
 
 const REGISTRY = loadUniverseWithDiagnostics(fixtureSources()).registry;
 
-// Any real location with a few entities standing in it proves the same rule;
-// naming one by hand would go stale the day an author renamed it.
 const HOUSE = [...REGISTRY.locations.values()].find((location) => location.entities.length >= 3)!;
 const GUIDE_HOUSE: Standing = { location: HOUSE.id, entities: HOUSE.entities.map((each) => each.entity) };
 const ELSEWHERE = [...REGISTRY.locations.keys()].find((id) => id !== GUIDE_HOUSE.location)!;
@@ -79,8 +74,6 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   }
 
   it('offers a section of every kind the load path can parse', () => {
-    // Including the kinds the key/value engine does not read: a surface that
-    // offered only the schema kinds would pass a walk over the schemas alone.
     expect(sectionKinds().filter((kind) => sectionFor(kind)!.schema === undefined)).not.toHaveLength(0);
 
     for (const kind of sectionKinds()) {
@@ -90,9 +83,6 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
 
   it('addresses every section the loaded registry holds', () => {
     const named = new Set(addressed.map((section) => `${section.kind} ${section.address}`));
-    // What a module wrote, which is not everything standing in a kind's map: a quest gives dialogues
-    // away and an item may carry the jewel it is, and those are their carrier's to be edited through
-    // and not sections of their own. The loader recorded a contribution for each body it read.
     const wrote = new Set([...REGISTRY.contributions.values()].flat().map((each) => `${each.kind} ${each.id}`));
     let checked = 0;
 
@@ -141,8 +131,6 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   });
 });
 
-// The addresses more than one shipped module writes at, read off the corpus rather than named: a
-// quest that adds a face to a room next month is covered by having been written.
 const WRITTEN_TWICE = (() => {
   const writers = new Map<string, Section[]>();
   for (const source of fixtureSources()) for (const section of sectionsIn(source)) writers.set(sectionKeyOf(section), [...(writers.get(sectionKeyOf(section)) ?? []), section]);
@@ -155,9 +143,6 @@ describe('a body offered at an address several modules write at (c3)', () => {
     for (const written of WRITTEN_TWICE) expect(new Set(written.map((section) => section.module)).size).toBe(written.length);
   });
 
-  // The claim the editing page stands on: what an author is handed at an address is what the world
-  // plays there, so staging it back is a no-op. Handed one module's half of it, staging silently took
-  // away what the other module had added — no diagnostic, no diff, just a room short of a face.
   it('is what the whole world plays there, so staging it back leaves the same universe', () => {
     const offered = addressable(fixtureSources());
     const local = stagedModule(...WRITTEN_TWICE.map((written) => offered.find((section) => sectionKeyOf(section) === sectionKeyOf(written[0]))!.text));
@@ -334,7 +319,6 @@ describe('narrowing the list to the sections being looked for', () => {
   it('holds every section back until each term matches it, so a module and a word narrow together', () => {
     const both = kept('core sword');
 
-    // A term is looked for in everything a section is searched by, its module among it, so a section of another module that names this one is a match and not a leak.
     expect(both.length).toBeGreaterThan(0);
     expect(both.every((section) => /core/i.test(`${section.module} ${section.kind} ${section.address} ${section.text}`))).toBe(true);
     expect(both.every((section) => /sword/i.test(`${section.address} ${section.text}`))).toBe(true);

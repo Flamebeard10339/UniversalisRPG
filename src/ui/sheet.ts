@@ -10,7 +10,6 @@ export interface Entry {
   id?: Answer;
   detail?: Localized;
   at?: Place;
-  // What kind of thing this row is, which is the one thing a cell is filled with.
   group?: GroupRow;
 }
 
@@ -22,9 +21,6 @@ type Contribution = Plane['contributions'][number];
 const byName = (left: Entry, right: Entry): number =>
   left.name < right.name ? -1 : left.name > right.name ? 1 : (left.id ?? '') < (right.id ?? '') ? -1 : (left.id ?? '') > (right.id ?? '') ? 1 : 0;
 
-// Who the player is, as sheet rows: the words the field is called by against the words its answer
-// reads as. Written in the sheet's own order rather than sorted, so the questions stand as they were
-// asked; a field nobody has answered draws nothing.
 export function identity(rows: PlayStatus['player']): Entry[] {
   return Object.values(rows).flatMap((row) => (row === null ? [] : [{ id: row.id, name: row.label, value: row.title }]));
 }
@@ -45,9 +41,6 @@ function detailOf(row: CarriedRow, planes: readonly Plane[], localizer: Localize
   return detail === '' ? {} : { detail };
 }
 
-// The pack, cell for cell, in the order the view hands it over — which is the order the player has
-// put it in. Nothing is sorted here: a sheet that arranged the pack for itself would be a second
-// answer to where a thing sits, and the player's own would never survive being drawn.
 export function carried(rows: readonly CarriedRow[], planes: readonly Plane[], localizer: Localizer): Entry[] {
   return rows
     .filter((row) => row.worn === undefined)

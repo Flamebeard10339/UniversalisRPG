@@ -324,10 +324,6 @@ describe('a frame carries a key, not a sentence', () => {
   });
 });
 
-// The words on a cluster jewel reach a player only where the screen focused on one says them, and no
-// driver names examine: each draws the label it is handed. So the claim is made over every jewel the
-// shipped corpus writes examine: on, standing each at the origin of a base of its own rather than
-// naming a route to it, and it is the published modal that is read.
 describe('a cluster jewel the corpus writes examine: on', () => {
   const corpus = loadUniverse(fixtureSources());
   const written = [...corpus.clusterJewels.values()].filter((each) => each.examine !== undefined);

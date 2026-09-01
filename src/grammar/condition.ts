@@ -9,11 +9,6 @@ export const TIME = 'time';
 export const PLAYER = 'player';
 export const SETTING = 'setting';
 
-// A root the engine holds itself, in one of the three shapes it can take: one that names a kind reads
-// the rest of the path as an id of that kind and is weighed against a number, one that only stands for
-// something reads a name of its own and is read as it is, and one that stands for a figure of its own is
-// written alone, weighed against a number, and says in `means` what its letters cannot. Either way the
-// one line standing for it wherever the shapes are shown is derived from it.
 interface Rooted {
   kind: string;
   stands: string;
@@ -29,7 +24,6 @@ interface Bare {
   against: number;
 }
 
-// What the engine holds itself, rather than a flag an author declares. A root paired with a kind reads the rest of the path as an id of that kind, so `xp.thieving` is the writing module's own skill and a name nothing declares is refused where it is written.
 export const ENGINE_ROOTS = {
   [TIME]: { means: 'seconds of game time this run has taken', against: 30 },
   [PLAYER]: { stands: 'race' },
@@ -60,7 +54,6 @@ export const rootedKind = (root: string): string | null => {
   return named(held) ? held.kind : null;
 };
 
-// The shapes an author is shown for the roots are the roots themselves, so one added above reaches the page with no second list to remember.
 const ROOTED_LINES = ENGINE_ROOT_NAMES.map((root): { form: string; example: string; note?: string } => {
   const held = rooted(root);
   if (bare(held)) return { form: `${root} <comparison> <number>`, example: `${root} >= ${held.against}`, note: held.means };
@@ -68,9 +61,6 @@ const ROOTED_LINES = ENGINE_ROOT_NAMES.map((root): { form: string; example: stri
   return { form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` };
 });
 
-// Everything the engine keeps about a run that a condition may weigh, said in one place because it is
-// one list: the roots are `ENGINE_ROOTS` and nothing else declares them, so a root added there reaches
-// the page here and every line that takes a condition is covered by having been written at all.
 export const engineState: Parser<string> = {
   parse: (cursor) => cursor.take(/.+/) ?? '',
   print: (value) => value,
@@ -86,7 +76,6 @@ export const visitedNode = (path: readonly string[]): readonly string[] | null =
 
 export type ComparisonOperator = '>' | '<' | '>=' | '<=' | '=' | '!=';
 
-// A figure an author wrote, and how many decimals they wrote it to.
 export interface Threshold {
   value: number;
   places: number;
@@ -98,10 +87,6 @@ const readAt = (value: number, places: number): number => {
   return Math.round(value * scale) / scale;
 };
 
-// An author's literal declares the precision it is compared at, so the figure their own arithmetic
-// gives is one they can write: the engine's answer is read to as many decimals as the literal has
-// and then weighed by the operator as written, which leaves `<`, `=` and `>` still dividing the
-// line between them. A whole number writes no decimals and is weighed as it stands.
 export function holds(value: number, operator: ComparisonOperator, right: Threshold): boolean {
   const at = readAt(value, right.places);
   switch (operator) {
@@ -222,7 +207,6 @@ export function printCondition(value: Condition): string {
   }
 }
 
-// The operators are a closed set of words, and a set of words is a parser like any other, so what an author is shown is the set the engine reads.
 export const comparison: Parser<ComparisonOperator> = {
   parse(cursor) {
     const raw = cursor.take(/>=|<=|!=|>|<|=/);

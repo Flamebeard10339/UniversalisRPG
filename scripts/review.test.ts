@@ -125,8 +125,6 @@ describe('the sheet a reviewer reads', () => {
 
   it('counts what a module says rather than a number written down here', () => {
     const { registry, parsed } = loadUniverseWithDiagnostics(shipped());
-    // Whichever module says the most, found rather than named: what is being counted is the sheet's
-    // own arithmetic, and a module is only wanted here because it has enough in it to count.
     const wordiest = parsed.reduce((most, each) => (sheetFor(registry, each.info.id, each.source.name, each.source.text).sections.flatMap((section) => section.said).length > sheetFor(registry, most.info.id, most.source.name, most.source.text).sections.flatMap((section) => section.said).length ? each : most));
     const written = sheetFor(registry, wordiest.info.id, wordiest.source.name, wordiest.source.text);
     const said = written.sections.flatMap((section) => section.said);
@@ -165,7 +163,6 @@ describe('review: a sitting, bounded', () => {
     expect(stintsLeft([sheet(held)]).every(({ section }) => section.said.some(isLeft))).toBe(true);
   });
 
-  // The batch a reviewer is shown and the batch a mark signs off are the same question asked twice, never a list carried between the two runs.
   it('signs off the batch it printed, worked out again rather than typed back in', () => {
     const { sheet } = shelf('rope', 'lamp', 'pan');
     const shown = nextUp([sheet()], 2);

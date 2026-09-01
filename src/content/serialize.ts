@@ -16,9 +16,6 @@ type Lines = string[];
 export interface SerializeModuleOptions {
   info: Pick<ModuleInfo, 'id'> & Partial<Pick<ModuleInfo, 'version' | 'dependencies' | 'pack' | 'language'>>;
   globals?: readonly string[];
-  // A module whose bodies are staged rather than shipped, printed here under the module each of
-  // their ids names. That is where consolidating them would put them, so this is what asks what
-  // this module's file would become.
   absorbing?: string;
 }
 
@@ -39,8 +36,6 @@ interface Printed {
 
 const tableOf = (registry: Registry, kind: SectionKind): ReadonlyMap<string, object> => mapOf(registry, registryMapOf(kind)!) as unknown as ReadonlyMap<string, object>;
 
-// What this module wrote, and — where one is being absorbed — what that module staged at an id
-// naming this one, laid over it the way consolidating the two would.
 function writingOf(registry: Registry, options: SerializeModuleOptions): Contribution[] {
   const written = [...(registry.contributions.get(options.info.id) ?? [])];
   if (options.absorbing === undefined) return written;
@@ -80,16 +75,12 @@ function printedSections(registry: Registry, options: SerializeModuleOptions): P
       continue;
     }
     if (owner.map === null) continue;
-    // What a module wrote of this kind, which is neither everything standing in this kind's map nor everything its ids are written under. A kind may land entries in another's — a quest gives dialogues away — and those are that kind's to write, not this one's; and a body written over another module's is a body this module wrote, however much of that section it names. So a module prints its own writing rather than the merge of everyone's, and a body it only added to goes back as the addition.
     for (const each of written) if (each.kind === kind) printed.push({ id: each.id, section: sectionOf(kind, each.value) });
   }
   return printed;
 }
 
 function sectionText(registry: Registry, moduleId: string, { id, section }: Printed): string {
-  // Where the words under this id are filed, which is under whoever declared it rather than under
-  // whoever is writing this file: a module adding to another's body says nothing about where that
-  // body's prose is kept.
   const namespace = sectionFor(section.kind)!.ids === 'global' ? null : (registry.namespace.ownerOf(section.kind, id) ?? moduleId);
   return printSectionOf(section, {
     moduleId,

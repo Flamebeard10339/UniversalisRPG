@@ -48,8 +48,6 @@ describe('which side is standing', () => {
     expect(partStanding(parts, 'sell')).toBe('sell');
   });
 
-  // A side the rows have stopped naming — the last thing sellable sold — must not leave the screen
-  // standing over nothing.
   it('falls back to the first when what was picked is no longer a side, and is nothing where there are none', () => {
     expect(partStanding(parts, 'barter')).toBe('buy');
     expect(partStanding([], 'buy')).toBeNull();

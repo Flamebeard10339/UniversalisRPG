@@ -1,7 +1,5 @@
 import { useRef } from 'react';
 
-// Mouse and touch events rather than pointer events: the column above this handle scrolls, and a
-// browser cancels a pointer stream as soon as it decides a scroller under the finger has the gesture.
 export function Splitter({ onGrab, onDrag }: { onGrab: () => void; onDrag: (dy: number) => void }): JSX.Element {
   const from = useRef<number | null>(null);
   const release = useRef<() => void>(() => undefined);

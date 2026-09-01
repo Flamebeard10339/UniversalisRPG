@@ -190,8 +190,6 @@ describe('what it refuses', () => {
   });
 });
 
-// What `--dry-run` skips, which is the only thing that ever writes: the rename itself reads the world
-// and hands back what the files would say, and nothing reaches the disk until `writeRename` is called.
 describe('nothing is written until it is asked for', () => {
   it('leaves every file as it was, and writes them once the report is taken', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'rename-section-'));

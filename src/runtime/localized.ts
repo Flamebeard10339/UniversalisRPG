@@ -26,7 +26,6 @@ function substitute(pattern: string, key: string, params: Params): string {
   });
 }
 
-// Every player-facing string the engine says is resolved here, which is why a note an author left in one is dropped here and nowhere else.
 function pattern(locales: Locales, language: string, key: string): string | undefined {
   const declared = locales.declared.get(language)?.get(key);
   if (declared !== undefined) return withoutNote(declared);
@@ -46,9 +45,6 @@ export interface Localizer {
   spoken(key: string): Localized;
   line(key: string, render: (segments: TextSegment[]) => string): Localized;
   identifier(id: string): Localized;
-  // An address handed to a player as words, for the things nothing declares and so nothing can have
-  // named — a modal screen, above all. `identifier` puts the address itself in front of them, which
-  // is right where a reader is meant to be able to type it back.
   minted(id: string): Localized;
 }
 

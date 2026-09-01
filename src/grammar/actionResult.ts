@@ -8,13 +8,8 @@ import { countRange, decimalRange, durationOrStat, id, numberOrStat, produced, P
 
 export type Party = 'me' | 'them';
 
-// The one location name the engine answers rather than a module declaring it: wherever a result
-// names a location, this stands for whichever `# location` is marked `starting` at the moment the
-// result runs. Nothing resolves it at load, so a module that stands nowhere may write it and a world
-// that moves its starting mark moves what it means, with no module naming another module's room.
 export const STARTING_LOCATION = 'starting-location';
 
-// The screens the engine runs, and the whole of what `open modal:` may name. It is written beside the syntax because a screen is not something a module declares: a content kind holding the list could only restate this one, and the engine's own openers key off it from above.
 export const MODAL_SCREENS = ['choose-name', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown'] as const;
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
@@ -62,11 +57,6 @@ export interface DropRow {
   results: ActionResult[];
 }
 
-// What running this list once will certainly take from the player, item by item. Only what is
-// written at the top level counts: everything nested sits under a chance, a contest, a gate or a
-// roll and may not happen at all, so it is answered for at the moment it is reached rather than
-// weighed beforehand. Everything that asks whether a list can be afforded — an action arming, a
-// dialogue node being offered, a line in a menu — reads this one answer.
 export function itemCost(results: readonly ActionResult[]): Map<string, number> {
   const cost = new Map<string, number>();
   for (const result of results) {
@@ -103,8 +93,6 @@ function parseAdd(cursor: Cursor): ActionResult {
   };
 }
 
-// What `take:` is written with to part the player with all of it rather than with a count of one
-// named thing. It is a word and not an id, so no module can declare an item that shadows it.
 export const EVERYTHING = 'everything';
 
 const EVERYTHING_TAKEN = new RegExp(`${EVERYTHING}(?![\\w-])`);
@@ -130,7 +118,6 @@ function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | und
   return party;
 }
 
-// There is deliberately no emptying form until something needs one.
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
   if (sign > 0 && cursor.peek(/[0-9.]/) === null) {
     const resource = id.parse(cursor);
@@ -286,17 +273,11 @@ function wrapperAt(cursor: Cursor): ((cursor: Cursor, line: RawLine | null, span
   return null;
 }
 
-// One result an author writes on a line: the word that opens it and tells it from every other, every
-// shape it takes, a line of each shape written out, and how the rest of it is read. The dispatch
-// below, the page an author reads, and the test for whether a line starts a result at all are every
-// one of them read off this, so a result written here once is parsed, offered and recognised with no
-// second list anywhere left to remember it.
 interface Leaf {
   opens: RegExp;
   forms: readonly string[];
   examples: readonly string[];
   read: (cursor: Cursor) => ActionResult;
-  // What is said beside one of this result's shapes where its letters do not carry it, under the shape itself.
   notes?: Readonly<Record<string, string>>;
 }
 
@@ -389,7 +370,6 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
   return results;
 }
 
-// Whether a line opens a result at all, which is a question only `LEAVES` can answer.
 const LEAF_RESULT = new RegExp(LEAVES.map((leaf) => leaf.opens.source).join('|'));
 
 export function startsResult(cursor: Cursor): boolean {
@@ -520,15 +500,12 @@ export const spansLines = (values: readonly ActionResult[] | undefined): boolean
 
 const printResults = (values: readonly ActionResult[]): string => values.map(printResult).join(', ');
 
-// The shapes and the lines, in the order `LEAVES` writes them, so a result added there reaches the
-// page an author reads by having been written down at all.
 const LEAF_FORMS: readonly string[] = LEAVES.flatMap((leaf) => leaf.forms);
 
 const LEAF_EXAMPLES: readonly string[] = LEAVES.flatMap((leaf) => leaf.examples);
 
 const LEAF_NOTES: Readonly<Record<string, string>> = Object.assign({}, ...LEAVES.map((leaf) => leaf.notes ?? {}));
 
-// A word standing for itself: it parses as the id it is written as, and its shapes are the whole of what may be written there.
 const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<string>> = {}): Parser<string> => ({
   parse: (cursor) => id.parse(cursor),
   print: (value) => value,
@@ -538,12 +515,8 @@ const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<st
   ...said,
 });
 
-// Where a `relocate:` or a `discover:` puts the player: a location the world declares, or the one word
-// for wherever the world begins. The word is not a location anything declares, so it is said here, once,
-// rather than beside every keyword that takes a place.
 export const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: { location: 'location' }, examples: ['camp', STARTING_LOCATION] });
 
-// The screens the engine runs. `MODAL_SCREENS` is the one home for which they are; this is the same list read as a grammar, so a screen added there is offered here.
 export const modalScreen = oneOf('modal', MODAL_SCREENS);
 
 export const actionResult: Parser<ActionResult> = {
@@ -556,12 +529,10 @@ export const actionResult: Parser<ActionResult> = {
   notes: LEAF_NOTES,
 };
 
-// The parser behind a `<result>`, which is the same wherever one stands.
 const RESULT: Holds = () => ({ result: actionResult });
 
 const ROW = 'one of these';
 
-// The three shapes are one row written three ways — a result inline, the word for no result, and a block of results — so the page says the row once and they stand together on its line.
 const ROW_NOTE = 'one of these is picked, weighed against the rows beside it';
 
 const WEIGHTED = { names: { weight: 'stat' }, holds: () => ({ condition, result: actionResult }) };
@@ -583,14 +554,11 @@ const WRAPPERS: readonly Written[] = [
   { form: 'credit:', example: 'credit:', family: SOMETIMES, note: 'its block runs for whoever brought the action, not whoever it landed on', block: () => resultGrammar() },
 ];
 
-// The same grammar wherever a result is written, so it is named here and written out once wherever the page writes it out.
 export const resultGrammar = (): readonly Written[] => calledBlock('result', [...writtenFrom(actionResult).map((line) => ({ ...line, family: HAPPENS })), ...WRAPPERS]);
 
 const RESULT_LIST_EXAMPLES: readonly string[] = [...LEAF_EXAMPLES, 'set: found-key, add: gold 5'];
 
-// `me` and `them` read only where there are two parties to tell apart, so a list reached from anywhere else refuses them and cannot show them.
 const HOOK_EXAMPLES: readonly string[] = [...RESULT_LIST_EXAMPLES, 'drain: 5 health from them', 'restore: 1-2 health to me', 'inflict: dazzled on them'];
-// A result list is one shape however many results it holds; what a single result may be is the block's business, and saying it twice is what makes a grammar unreadable.
 const RESULT_LIST_FORMS: readonly string[] = ['<result>, …'];
 
 export const resultList: ListParser<ActionResult> = {

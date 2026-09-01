@@ -56,8 +56,6 @@ describe('a body written at another module address belongs to whoever wrote it',
     expect(back.get('town')).not.toContain('mire');
   });
 
-  // A body naming nothing but the addressed module's own reloads to the same world wherever it is
-  // printed, so where it lands is the only thing that says whose it is.
   it('goes home there even when every name in it is the addressed module own', () => {
     const owl = errand('# entity town.owl', 'title: Owl', 'examine: An owl.');
     const back = printed(TOWN, owl);
@@ -77,9 +75,6 @@ describe('a body written at another module address belongs to whoever wrote it',
     expect(back.get('errand')).toContain('# location town.square\n+entities: town.dog');
   });
 
-  // The whole of why an addition goes home rather than folding into the body it adds to: a room in
-  // the town file may name nothing but the town's, so a quest that stands its own creature in one
-  // has nowhere to print if its line is folded in there.
   it('lets a body stand its own entity in another module room', () => {
     const dressing = errand('# entity toad', 'title: Toad', 'examine: A toad.', '# location town.square', '+entities: toad');
     const registry = loadUniverse([TOWN, dressing]);
@@ -159,8 +154,6 @@ describe('a heading creates or edits by its shape alone', () => {
     expect(registry.items.get('base.rope')!.title).toBe('Frayed Rope');
   });
 
-  // A path is where a section belongs and not only where one already is, which is what gives a
-  // section written from a module of its own — a run's local changes — somewhere to go home to.
   it('creates under the module the path names when nothing holds it yet', () => {
     const registry = loadUniverse([BASE, module('mod', 'dependencies: base', '# item base.cable', 'title: Cable')]);
     expect(registry.items.get('base.cable')!.title).toBe('Cable');

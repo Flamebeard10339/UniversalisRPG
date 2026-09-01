@@ -16,9 +16,6 @@ function modulesUnder(directory: string): string[] {
 
 const SOURCES = ['src', 'scripts'].flatMap((tree) => modulesUnder(join(repoRoot, tree))).map((path) => ({ file: path.slice(repoRoot.length + 1).split(sep).join(posix.sep), text: readFileSync(path, 'utf8') }));
 
-// A template literal whose value ends in `-start` or `-end`, which is how either naming would be
-// spelled a second time. A class name like `items-start` is not one, so the sweep does not have to
-// know about stylesheets.
 const MINTS_A_SAVE = /`[^`\n]*-(start|end)`/;
 
 const HOME = 'src/runtime/runLog.ts';

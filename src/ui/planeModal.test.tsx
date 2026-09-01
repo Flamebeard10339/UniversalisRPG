@@ -10,8 +10,6 @@ import { planeGraph } from './planeGraph';
 import { panelFor, type Choice } from './planePanel';
 import { fixtureSources } from '../content/worldFixture';
 
-// A blade with a plane in it, taken out of the chest that holds one, and the plane screen opened on
-// the copy it arrived as. `1` is where it sits in a pack that was empty before the chest was opened.
 const OPENING = [
   'goto: fixture-town.store',
   'use: entity.fixture-town.chest.open-the-strongbox',
@@ -32,7 +30,6 @@ function grown(): Driver {
   return driver;
 }
 
-// A plane screen is open in every one of these, so what it is reading is a plane.
 const planeRead = (view: PlayView): { instance: string; hex: string } => view.focus as { instance: string; hex: string };
 
 const planeOf = (view: PlayView): PlayView['planes'][number] => view.planes.find((each) => each.instance === planeRead(view).instance)!;
@@ -43,8 +40,6 @@ const readable = htmlRuns;
 
 const A_HEXAGON = /-?\d+\s*,\s*-?\d+/;
 
-// The walk round the ring that opens the socket at its one connection: a slot is offered once the
-// points between the origin and it have been spent, so reaching one is three presses and not one.
 const TO_THE_SOCKET = ['submit-modal: plane=allocate: position 2', 'submit-modal: plane=allocate: position 3', 'submit-modal: plane=allocate: position 4', 'submit-modal: plane=allocate: slot e'];
 
 describe('the plane a player drags', () => {

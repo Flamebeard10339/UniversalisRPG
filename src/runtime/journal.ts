@@ -14,10 +14,7 @@ export type { QuestStanding };
 export interface JournalLine {
   stage: Answer;
   said: Localized;
-  // The same line as its author wrote it, which is the same in every language. What a `# test` names
-  // it by, the way a dialogue choice is named by its authored words rather than by what a player reads.
   authored: string;
-  // Struck through, the way a journal crosses off what is behind you. What the quest is standing on is not struck, because it is what there is left to do.
   struck: boolean;
 }
 
@@ -26,18 +23,14 @@ export interface JournalEntry {
   title: Localized;
   stage: Answer;
   standing: QuestStanding;
-  // What the standing reaches a surface as: the colour a screen fills the row with, the word a terminal prints beside the title.
   group?: GroupRow;
-  // One line to each stage the quest has been through. A quest nobody has begun has been through nothing and reads as nothing, rather than reading out what has not happened yet.
   lines: JournalLine[];
 }
 
-// The one line a quest is standing on: the only one not struck through, and nothing once the quest is over. Derived from the lines rather than held beside them, so the journal and whatever asks it where a quest stands read the same words.
 const standingOn = (entry: JournalEntry): JournalLine | undefined => entry.lines.find((line) => !line.struck);
 
 export const standingLine = (entry: JournalEntry): Localized | null => standingOn(entry)?.said ?? null;
 
-// The same line, as its author wrote it. What a `# test` claims against, so that a recording says the same thing whatever language it is replayed in.
 export const standingAuthored = (entry: JournalEntry): string | null => standingOn(entry)?.authored ?? null;
 
 const spoken = (localizer: Localizer, state: GameState, registry: Registry, result: ActionResult | undefined): { said: Localized; authored: string } | null =>
@@ -45,7 +38,6 @@ const spoken = (localizer: Localizer, state: GameState, registry: Registry, resu
     ? null
     : { said: localizer.line(result.key, (segments) => renderSegments(segments, state, registry)), authored: withoutNote(result.text).trim() };
 
-// Not begun comes first: a quest whose only stage completes it has still not been begun until something of it has happened.
 const standingOf = (at: QuestStage, started: boolean): QuestStanding => (!started ? 'unstarted' : at.complete === true ? 'complete' : 'started');
 
 function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEntry | null {
@@ -54,7 +46,6 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
   if (at === undefined) return null;
   const localizer = localizerOf(registry, state);
   const standing = standingOf(at, begun(quest, at, (flag) => state.flags[flag] !== undefined && state.flags[flag] !== false));
-  // Before it has begun, a quest reads what it says of itself: what is known of it, and what would begin it. After, it reads what has happened.
   const opening = spoken(localizer, state, registry, quest.log);
   const lines =
     standing === 'unstarted'
@@ -69,7 +60,6 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
   return { quest: quest.id as Answer, title: localizer.title('quest', quest.id), stage: at.name as Answer, standing, ...(group === undefined ? {} : { group }), lines };
 }
 
-// Every quest the world declares, touched or not, in the order the world declares them. A journal that listed only what had been started would be a list of what the player already knows.
 export function journal(registry: Registry, state: GameState): JournalEntry[] {
   return listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest) ?? []);
 }

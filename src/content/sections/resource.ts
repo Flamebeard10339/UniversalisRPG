@@ -8,7 +8,6 @@ export type ResourceDisplay = 'full' | 'minimal';
 export interface Resource {
   id: string;
   title: string;
-  // Signed and net: regeneration and drain are one stat, not two fields.
   rate?: string;
   max: string;
   start?: number;

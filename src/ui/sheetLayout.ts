@@ -1,19 +1,11 @@
 import type { Entry } from './sheet';
 
-// Every shape a sheet is drawn in. The list and the type are one object, so a fourth cannot be drawn
-// without the claims that sweep every layout picking it up.
 export const LAYOUTS = ['list', 'grid', 'doll'] as const;
 
 export type Layout = (typeof LAYOUTS)[number];
 
-// The one grid every dense page is laid out on: as many columns of at least 6rem as the width
-// affords. A page that wants this shape takes it from here rather than writing the columns again.
 export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3';
 
-// How a name the world declares is drawn wherever a sheet draws one. It wraps and it breaks inside a
-// word, because a name is as long as its language makes it: cutting one off at the cell's edge reads
-// as a shorter name rather than as a name gone missing, and the languages that write longer ones than
-// English would lose the end of every row at once.
 export const NAME = 'whitespace-normal break-words';
 
 export interface Doll {
@@ -23,10 +15,6 @@ export interface Doll {
   rows: number;
 }
 
-// The body is as wide and as tall as the slots that say where they sit reach between them, and no
-// wider. A slot that says nothing about where it sits — including one no `# slot` describes at all,
-// which is every slot an `equipment-slots:` names and nothing else — falls to the row beneath, so
-// there is no position a slot can hold that leaves it undrawn.
 export function doll(entries: readonly Entry[]): Doll {
   const body = entries.filter((entry) => entry.at !== undefined);
   return {

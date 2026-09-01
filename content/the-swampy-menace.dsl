@@ -1,38 +1,3 @@
-// The Swampy Menace — read off `.planning/planning_quests/The Swampy Menace.md`.
-// The captain sends the player to Oolga once the sewers and the cellar are both
-// behind them; Oolga runs them in circles until they lose patience and take a
-// swing at her, and the swamp she sends them to for real herbs turns out to be
-// the same testing ground the ratmen and the groundwurm came out of.
-//
-// Everything this module stands on is tulsa's: the captain, the guards who
-// point toward her, Oolga and her house, and the swamp with its herb patch are
-// all declared there already. What this file adds — the errand Oolga hands
-// out, her reaction to being struck, the finds buried past the herb patch, and
-// the guards' extra word about the captain — is written as an addition to a
-// body already there: take this module out and the errand is gone, Oolga
-// stops reacting to being hit, the herb patch stops turning anything up beside
-// the herbs themselves, and the guards go back to only ever talking about the
-// road.
-//
-// The rat-toad is this module's own — nothing else in the world needed a
-// ratkin experiment gone wrong standing in the mire — so it is declared here
-// and added to `tulsa.swamp-mire`'s own list rather than replacing it.
-//
-// Two things the design asked for and could not be had straight, each marked
-// on the line that stands in for it:
-//
-// - The captain is meant to be standing in Oolga's doorway for the last
-//   conversation. Nothing in the grammar moves an entity from the room it is
-//   declared in to another one on a story beat — `npm run oracle -- entity`
-//   has `relocate:` only as a result the player's own action can perform on
-//   themselves, nothing that repositions anyone else. The nearest playable
-//   thing is on the stage itself: talking to either of them, wherever tulsa
-//   already stands each one, reaches the same conversation.
-// - The reward asks for defense experience on top of the health experience
-//   and the coin. `npm run oracle -- skill` lists only `attack` and `health`;
-//   this world has no defense skill to pay it into, so the figure is dropped
-//   rather than invented.
-
 # info the-swampy-menace
 version: 0.1.0
 pack: quests
@@ -117,21 +82,10 @@ stage settled:
     ask: About Oolga.
     again: Filed. Same as everything else she wastes my guards' time on.
 
-// --- flags this quest owns ---
-
-// Set when the player finally swings at Oolga, which is what ends the errands
-// stage. Hers to read, this quest's to name.
 # flag oolga-struck
 
-// One count over the three herbs, so the finds buried past the patch arrive in
-// order however the player picks them.
 # flag herbs-collected
 
-// --- what this quest owes the world ---
-
-// Oolga hands out the loop, and reacts to being hit. She carries no evasion
-// worth the name, so a swing lands quickly; she carries no attack worth the
-// name either, so nothing she does back is worth writing.
 # entity tulsa.oolga
 stats: attack 0, defense 999, max-health 999999, attack-rate 20, accuracy 0, evasion 0
 uses: core.melee-combat
@@ -140,16 +94,6 @@ when hit:
     set: oolga-struck
     say: Oolga's mouth snaps shut around whatever she was about to say next.
 
-// The guards point at the captain while the quest is on offer and not yet taken
-// up, which is the one window in which a player has no other reason to walk to
-// the barracks. Three threads rather than one line said three times: a guard on
-// the gate, a guard on the road and the guard sat on the hatch have different
-// reasons to have heard, and the words are each of theirs. The border guard is
-// Yanodonin's and hears nothing of Tulsa's captain, so he is not one of them.
-// Each is a thread rather than an `always`, so what each guard already says
-// stands beside it rather than being taken away. The window itself is written
-// out three times because the language has no way to name a condition once and
-// point at it; that is a gap in the grammar rather than a shape chosen here.
 # dialogue tulsa.castle-guard
 node the-captain-wants-you:
   when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
@@ -173,12 +117,6 @@ node the-captain-wants-you:
   The captain has, round this very hatch, and I told her I could not say where you were on account of not knowing. She looked at me as though that were my doing as well.
   Go and see her before she comes back and makes it my doing twice.
 
-// What a first herb out of the patch turns up, said once for however many herbs
-// there are to pick. A `# droptable` body runs in full, so this is a named
-// result list rather than a roll with odds on it; keying the finds to how many
-// distinct herbs are in the pack rather than to which one it was is what lets
-// one list answer for all three, and lets a fourth herb be five lines here and
-// nothing at all in the list. The third find names no herb for the same reason.
 # droptable herb-find
 add: herbs-collected 1
 if herbs-collected = 1:
@@ -188,8 +126,6 @@ if herbs-collected = 2:
 if herbs-collected = 3:
   say: Something surges up out of the mud before your hand closes round it — not a rat, though it was one once, and not a toad either.
 
-// The herb patch pays out the same three herbs it always did; what this adds is
-// the count and the two finds buried past it, one `roll:` per herb.
 # entity tulsa.herb-patch
 pick thistle:
   time: 4
@@ -210,10 +146,6 @@ take the leaf:
   give: 1 adders-tongue
   say: One split leaf, taken whole.
 
-// A ratkin experiment, standing in the mire until the third herb is in the
-// pack. Aggressive, so it does the ambushing itself the moment it is no
-// longer hidden; fleeing is a plain `travel:` back to the marsh gate, the same
-// as leaving any other room something aggressive stands in.
 # entity rat-toad
 title: Rat-Toad
 examine: A rat's shape gone wrong in a toad's skin — too many teeth, and none of either animal's reasons to run from you.
@@ -230,33 +162,13 @@ on death:
 # location tulsa.swamp-mire
 +entities: rat-toad
 
-// --- tests ---
-
-// Both prior quests done, standing where the captain is and carrying
-// something to hit her with. The axe names a level of its own, so it is held
-// as a copy under an id the engine minted rather than as a stack, and the
-// route below puts it on by that id.
 # save both-prior-quests-done
 {"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"kill-it-with-fire.oolgas-basement.cellar-cleared":true,"ball-of-a-boy.down-the-grate.reported":true}}
 
-// Start to finish: the captain sends the player to Oolga, Oolga loops them
-// through busywork until a swing of the axe lands on her, the swamp gives up
-// its three herbs with the two finds in between and the rat-toad on the
-// third, and the captain and Oolga close it out together with the reward. How
-// big that reward is belongs to the balance and not here: a purse that walked
-// in empty and a skill that walked in cold, both standing above nothing, is
-// the whole of what the last two lines ask.
-// Fighting the rat-toad rather than running from it is the one branch walked
-// here; running is the same `travel:` back to the marsh gate that leaves any
-// other aggressive room, and neither branch is what the quest's own
-// `done when:` is waiting on.
 # test the-swampy-menace-start-to-finish
 load: both-prior-quests-done
 equip: 1
 travel: castle-gate
-// The gate guard's own pointer to the barracks, which stands only while the
-// quest is on offer and untaken: walked here so the way a player is actually
-// told where to go is the way this route goes.
 talk: castle-guard
 choose: continue
 assert: castle-guard.the-captain-wants-you.visits = 1
@@ -288,11 +200,6 @@ travel: swamp-mire
 use: entity.herb-patch.pull-root
 assert: has fen-root
 assert: herbs-collected = 1
-// Leaving and coming back between herbs is load-bearing and not tidy pacing:
-// bog lurkers stand in this mire, arriving buys one quiet beat, and the first
-// pull spends it — so a second herb started without going out and back in is
-// cut short by a lurker before it hands anything over. Walking the marsh
-// three times for three herbs is what the room costs.
 travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pick-thistle

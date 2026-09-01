@@ -20,20 +20,8 @@ import {
   type Written,
 } from './lib/saveFixtures';
 
-// A `# save` body names ids and nothing checks them: rename the section and the recording still
-// parses, still loads, and quietly stops meaning what it says — the loader prunes what it cannot
-// find and plays on. `npm run oracle` says which bodies that has happened to; this says what the ids
-// became and puts them back.
-//
-// Rename inference is a reading of a diff and can be wrong, so nothing is written on a guess: an
-// answer with a second signal behind it writes under `--write`, and everything else waits for the
-// author to name it with `--rename`. Nothing is written at all unless every rewritten body then
-// loads against the real registry with the loader pruning nothing, and the run refuses as a whole
-// rather than in part.
-
 export interface RepairOptions {
   write?: boolean;
-  // Renames the author named themselves, which are taken over anything history would have said.
   renames?: ReadonlyMap<string, string>;
 }
 
@@ -47,13 +35,8 @@ const RENAME_FLAG = '--rename';
 
 const refused = (lines: string[]): RepairReport => ({ lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [] });
 
-// Whether anything in the world declares this id, under any kind. The kinds come off the registry
-// rather than a list here, so a kind added next month is asked about with nothing edited.
 const declaredIn = (registry: Registry) => (id: string): boolean => registry.namespace.kinds().some((kind) => registry.namespace.has(kind, id));
 
-// Every string a save body holds, as a key or as a value. A body is a recording rather than a
-// declared shape — no field says which of its strings are addresses — so all of them are asked
-// about and the registry says which it knows.
 function stringsIn(value: unknown, into: Set<string>): void {
   if (typeof value === 'string') {
     into.add(value);
@@ -71,16 +54,11 @@ function stringsIn(value: unknown, into: Set<string>): void {
   }
 }
 
-// The two ways a string in a body may be an address: written whole, or as the `<kind>.<id>` an
-// active action and its roster seats carry their owner as. Whichever the registry knows settles it.
 const readingsOf = (text: string): string[] => {
   const { obj, objId } = parseOwnerRef(text);
   return obj === '' ? [text] : [text, objId];
 };
 
-// The addresses a body names that nothing declares any more. A string with no module in front of it
-// is a slot, a plane position or a word of the engine's own rather than an address, and asking
-// history about it turns up nothing anyway.
 function danglingIn(body: SaveBody, declared: (id: string) => boolean): string[] {
   const strings = new Set<string>();
   stringsIn(body, strings);
@@ -110,7 +88,6 @@ const judge = (written: Written, text: string) => ({ id: written.fixture.id, ...
 
 interface Rotted {
   written: Written;
-  // What the loader had to prune to stand the body up as it stands.
   pruned: readonly string[];
 }
 

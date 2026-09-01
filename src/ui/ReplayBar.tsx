@@ -5,9 +5,6 @@ import type { Words } from './words';
 
 const CONTROL = 'shrink-0 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text transition-transform duration-75 active:scale-[0.97] disabled:opacity-40';
 
-// A step the game took reads as the game; what the player said about it reads as an aside; a page
-// move and a refusal are the run talking about itself. Four readings, one per StepKind, so a kind
-// added to the union arrives here as a missing key rather than as an unstyled line.
 const TONE: Readonly<Record<StepKind, string>> = {
   played: 'text-text',
   said: 'text-accent italic',
@@ -30,8 +27,6 @@ export interface ReplayBarProps {
   onClose: () => void;
 }
 
-// Drawn only while a run is being watched. The step standing is the one the cursor has just walked,
-// so `at` is a count of steps taken and `at - 1` is the line that did it.
 export function ReplayBar({ test, steps, at, playing, delay, failure, words, localizer, onGoTo, onPlaying, onDelay, onClose }: ReplayBarProps): JSX.Element {
   const named = localizer.identifier(test);
   const lines = replayLines(steps);

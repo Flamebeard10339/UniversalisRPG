@@ -218,9 +218,6 @@ function walkType(node: ts.TypeNode, file: string, where: string, walk: Walk): v
   if (ts.isTypeLiteralNode(node)) return speaksForTheTool(node.members) ? undefined : walkMembers(node.members, file, where, walk);
   if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) return walkReference(node.typeName.text, node.typeArguments, file, where, walk);
   if (ts.isIndexedAccessTypeNode(node)) return walkIndexedAccess(node, file, where, walk);
-  // A template literal type is a word built out of other words. What it holds is whatever its spans
-  // hold, so a `${string}` in one is as bare as a bare string and anything built from named words is
-  // a name itself.
   if (ts.isTemplateLiteralTypeNode(node)) {
     for (const span of node.templateSpans) walkType(span.type, file, where, walk);
     return;
@@ -238,9 +235,6 @@ function walkIndexedAccess(node: ts.IndexedAccessTypeNode, file: string, where: 
   walk.unread.push(`${where}: ${ts.SyntaxKind[node.kind]}`);
 }
 
-// `keyof typeof <a constant object>` is the set of names that object is written with, which are
-// machine names an author never reads — the same answer `Answer` gives, arrived at by deriving the
-// set rather than by writing it out as a union nobody may forget to extend.
 function isConstantKeys(node: ts.TypeNode, file: string): boolean {
   if (!ts.isTypeQueryNode(node) || !ts.isIdentifier(node.exprName)) return false;
   const held = constantValue(node.exprName.text, file);

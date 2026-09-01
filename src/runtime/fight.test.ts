@@ -440,7 +440,6 @@ describe('the populations save field', () => {
 });
 
 describe('a foe going down is said', () => {
-  // Every fight the module can seat, so a foe or an action added below is a subject with no edit here.
   function fellable(registry: Registry): Array<{ where: string; foe: string; action: string }> {
     const subjects: Array<{ where: string; foe: string; action: string }> = [];
     for (const location of registry.locations.values()) {
@@ -488,10 +487,6 @@ describe('a swing the player lands on themselves', () => {
   });
 });
 
-// The location never goes quiet on its own: what the player kills is back within a couple of
-// seconds, so something is always standing for `aggressive` to open the next fight on. The player
-// regenerates faster than a limpet can hurt them, so the death that legitimately stops a dangerous
-// action never arrives either, and nothing is left to end the loop but the loop's own bound.
 const TIDEPOOL =
   FIXTURE_WORLD +
   `
@@ -669,9 +664,6 @@ describe('a condition terminator that was never reached is a failure', () => {
   });
 });
 
-// A room with something in it that will not let you be, a pile of stones that takes half a minute to
-// stack, and a way out. The beat is written large so a claim can stand either side of it without
-// naming it: how long it is, is the world's business and is read back off the world below.
 const WASPS = `
 # variable engagement-seconds
 value: 5

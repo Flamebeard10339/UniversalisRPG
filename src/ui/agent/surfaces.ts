@@ -47,8 +47,6 @@ export function shellSurface(held: AgentSurfaces['shell']): TestSurface {
   };
 }
 
-// An author's run, and the same three acts the bar offers, so an agent can play the browser and
-// read back what was played in the words a playbot run is written in.
 function notesFrom(value: unknown): RunNotes {
   const given = (value ?? {}) as Record<string, unknown>;
   const notes = emptyNotes() as Record<string, string>;
@@ -61,8 +59,6 @@ function notesFrom(value: unknown): RunNotes {
   return notes as RunNotes;
 }
 
-// The mod portal, said the way the page says it: the packs, what each is standing at, and the two
-// things a click can be. Turning a pack is turning its modules, so the surface offers no third verb.
 export function modsSurface(held: AgentSurfaces['mods']): TestSurface {
   const { packs, controls } = held;
   const named = (pack: string): PortalPack | undefined => packs.find((each) => each.pack === pack);
@@ -127,8 +123,6 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
   };
 }
 
-// A run being watched, and the four ways of moving through it. What an agent reads back is what the
-// bar draws: the same lines, the same cursor, the same word on whether the record still holds.
 export function replaySurface(held: AgentSurfaces['replay']): TestSurface {
   const { replay, controls } = held;
   return {
@@ -170,22 +164,17 @@ export interface MapPlace {
   here: boolean;
   climb: number;
   goes: number | null;
-  // Which way this place lies from where the player stands, which is how a driver with no eyes asks
-  // for the road going north without working the geometry out for itself.
   bearing: Bearing | null;
 }
 
 export interface MapState {
   plane: number;
-  // The floor being looked at over the shoulder of the one drawn, which is a floor the author is
-  // pointing at rather than one they have gone to.
   ghost: number | null;
   planes: readonly number[];
   zoom: number;
   pan: Point;
   mode: MapMode;
   from: string | null;
-  // The region a gathering gesture is aimed at, as the author has it typed.
   gathering: string;
   places: MapPlace[];
 }
@@ -413,7 +402,6 @@ export function skillNamed(panels: readonly SkillPanel[], value: unknown): Answe
   return panel.id;
 }
 
-// The list of quests, and the one way in: opening one, which is a screen the engine opens.
 export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   return {
     state: () => ({ rows: held.rows.map((row) => ({ id: row.id, title: row.title, standing: row.standing, lines: row.lines.map((line) => ({ said: line.said, struck: line.struck })) })) }),
@@ -423,8 +411,6 @@ export function journalSurface(held: AgentSurfaces['journal']): TestSurface {
   };
 }
 
-// The character sheet's tabs, which are the groups the world's own stats belong to, and the one way
-// in: pressing one, which changes nothing the engine hears about.
 export function statsSurface(held: AgentSurfaces['stats']): TestSurface {
   return {
     state: () => ({ chosen: held.chosen, tabs: held.tabs.map((tab) => ({ id: tab.group?.id ?? null, title: tab.group?.title ?? null, stats: tab.rows.map((row) => row.id) })) }),
@@ -440,9 +426,6 @@ export function tabNamed(tabs: readonly StatTab[], value: unknown): Answer | nul
   return tab.group?.id ?? null;
 }
 
-// The words a screen is saying, as much of them as have arrived, and the one press that carries the
-// beat on. An agent reads what is on the screen rather than what the engine has said, because those
-// are not the same thing while a line is still arriving.
 export function beatSurface(held: AgentSurfaces['beat']): TestSurface {
   return {
     state: () => ({ shown: [...held.arriving.shown], typing: held.arriving.typing, awaits: held.arriving.awaits }),
@@ -450,7 +433,6 @@ export function beatSurface(held: AgentSurfaces['beat']): TestSurface {
   };
 }
 
-// What the breakdown screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
 export function statSurface(held: AgentSurfaces['stat']): TestSurface {
   return {
     state: () => ({ stat: held.row.id, value: held.row.value, from: held.row.from.map((share) => share.title) }),
@@ -458,7 +440,6 @@ export function statSurface(held: AgentSurfaces['stat']): TestSurface {
   };
 }
 
-// What the journal screen is showing, which is read and not driven: closing it is the modal's own question, answered the way every modal is.
 export function questSurface(held: AgentSurfaces['quest']): TestSurface {
   return {
     state: () => ({ quest: held.entry.quest, standing: held.entry.standing, lines: held.entry.lines.map((line) => ({ said: line.said, struck: line.struck })) }),

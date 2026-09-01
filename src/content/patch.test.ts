@@ -9,8 +9,6 @@ const schemaOf = (kind: string): AnySchema => sectionFor(kind)!.schema!;
 const folded = (declared: string, patch: string, kind = 'location'): string => {
   const patched = patchedInto(declared, patch, schemaOf(kind));
   if (refused(patched)) throw new Error(patched.refused);
-  // Every claim below is about a fold. Handing the patch straight back is the other answer, and one
-  // that says nothing about where a line went, so no claim here may pass by being given it.
   if (travelsWhole(patched)) throw new Error(`expected a fold, got the patch whole:\n${patched.text}`);
   return patched.text;
 };
@@ -64,9 +62,6 @@ describe('a patch folded into the section that declared the id', () => {
     ]);
   });
 
-  // A line's own span stops at the words on it, so a block was sited through its last direct child and
-  // a child holding a block of its own was cut off at its first line. Folded home, the tail of what an
-  // author wrote went missing, and the file they never touched was the one refused for it.
   it('takes a block in whole, down under a line that opens a block of its own', () => {
     const struck = ['# entity oolga', 'when hit:', '  if not oolga-struck:', '    set: oolga-struck', '    say: Snap.'];
     const declared = ['# entity oolga', 'title: Grandma Oolga', 'stats: attack 1, defense 1, max-health 10'];
@@ -90,8 +85,6 @@ describe('a patch folded into the section that declared the id', () => {
   });
 });
 
-// The claim a patch has to answer: staged as a later module and written home into the module that
-// declared the id are two roads to one world. Loaded either way, the registry says the same thing.
 describe('a patch means the same folded home as it does staged', () => {
   const TOWN = [
     '# info town',
@@ -139,9 +132,6 @@ describe('a patch means the same folded home as it does staged', () => {
   }
 });
 
-// An entry goes home by the label it carries and not by where it is written, which is the one thing a
-// field site could not say. What a label matches is settled by `mergeEntries`, and these are the three
-// answers it gives, asked of the patcher instead.
 describe('an entry folded home by the label it carries', () => {
   const GATE = ['# location gate', 'x: 1, y: 2', 'title: The Gate', 'push it open:', '  time: 4', '  say: It gives.'];
   const KNOCK = ['knock twice:', '  time: 2', '  say: Nobody answers.'];
@@ -158,9 +148,6 @@ describe('an entry folded home by the label it carries', () => {
     expect(folded(GATE.join('\n'), '# location gate\n-knock twice:')).toBe(GATE.join('\n'));
   });
 
-  // The shape a patch cannot say: an entry written over one of the same label is laid over it key by
-  // key from inside a body grammar that keeps no sites, so `time: 4` here survives a patch that writes
-  // only `say:`. There is nowhere in the declaration to write that, so the patch stands for the section.
   it('hands the patch back whole where an entry is laid over one already standing', () => {
     const patched = patchedInto(GATE.join('\n'), '# location gate\npush it open:\n  say: It sticks.', schemaOf('location'));
 
@@ -169,8 +156,6 @@ describe('an entry folded home by the label it carries', () => {
     expect((patched as { text: string }).text).toBe('# location gate\npush it open:\n  say: It sticks.');
   });
 
-  // A body heading may join its words with dots, so a label can name another module's event. It is one
-  // label either way, and matches its home by being the same one and not by being spelt without a dot.
   const ANGLER = ['# entity angler', 'title: Angler', 'stats: attack 1, defense 1, max-health 10', 'on fishing.line-parted:', '  say: The line goes slack.'];
 
   it('matches a dotted label to its home the way an undotted one matches', () => {
@@ -193,8 +178,6 @@ describe('a patch written over a patch', () => {
     expect(folded(STAGED, '# location market-square\n+adjacent: riverside')).toBe('# location market-square\nx: 3, y: 4\n+adjacent: kiln-lane, riverside');
   });
 
-  // Not nothing: adding a road the declaration already holds says nothing, so what an add and its
-  // undoing leave behind is the undoing — the one of the two that still means something at home.
   it('lets the later word stand where the two disagree about one member', () => {
     expect(folded(STAGED, '# location market-square\n-adjacent: kiln-lane')).toBe('# location market-square\nx: 3, y: 4\n-adjacent: kiln-lane');
     expect(folded('# location market-square\n-adjacent: kiln-lane', '# location market-square\n+adjacent: kiln-lane')).toBe('# location market-square\n+adjacent: kiln-lane');

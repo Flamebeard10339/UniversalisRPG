@@ -55,7 +55,6 @@ export interface Item {
   body: string[];
 }
 
-// An item's own clause naming what would close or move it is the whole format: without it a reader cannot tell an open question from a decision already taken, and a lane invents the answer.
 const namesItsClose = (line: string): boolean => /^\*[^*\s]/.test(line.trimStart());
 
 export function itemsIn(lines: readonly string[]): Item[] {
@@ -67,7 +66,6 @@ export function itemsIn(lines: readonly string[]): Item[] {
   return items;
 }
 
-// A line that is struck through, or a heading that calls itself finished, is the shape this format exists to remove: it leaves a reader working out which half of the file still applies.
 export function complaintsIn(file: string, text: string): Complaint[] {
   const complaints: Complaint[] = [];
   const lines = text.split(/\r?\n/);
@@ -81,15 +79,11 @@ export function complaintsIn(file: string, text: string): Complaint[] {
   return complaints;
 }
 
-// What a proof file declares, read out of the file rather than off a list beside it: a route
-// is a `# test`, and a proof about anything a route cannot say is a top-level `describe`.
 const DECLARES: Readonly<Record<string, RegExp>> = {
   '.dsl': /^#[ \t]+test[ \t]+(\S+)/gm,
   '.ts': /^describe\([ \t]*['"`]([^'"`]+)['"`]/gm,
 };
 
-// A line hands its evidence over by closing on the proof, so the citation is the closing clause
-// rather than a second sentence beside it. One form, so neither side can drift from the other.
 const CITES = /`([^`\s]+)` passes/g;
 
 export const declaredIn = (file: string, text: string): string[] => [...text.matchAll(DECLARES[path.extname(file)] ?? DECLARES['.ts'])].map((match) => match[1]);
@@ -121,10 +115,6 @@ export function proofComplaints(proofs: ReadonlyArray<readonly [string, string]>
   return complaints;
 }
 
-// A route is walked beside the shipped corpus, because a proof with nowhere to stand is why it is
-// here rather than in content/. A module the loader will not take reports no verdict at all, which
-// leaves every route in it failing — which is the safe reading, and the reason a refusal is proved
-// in the .test.ts half instead.
 function routeVerdicts(file: string, ids: readonly string[]): Verdict[] {
   const moduleId = /^#[ \t]+info[ \t]+(\S+)/m.exec(readFileSync(file, 'utf8'))?.[1];
   const walked = new Map<string, boolean>();
@@ -189,7 +179,6 @@ function reviewFolder(dir: string, run: boolean): Folder {
   let since = 0;
   let lastWrote = '(never committed)';
   if (written.length > 0) {
-    // The docs are as old as their youngest line, so the commit to count from is the last one that touched either of them.
     const commits = written.map((line) => line.split(' ')[0]);
     const times = commits.map((hash) => Number(git('show', '-s', '--format=%ct', hash)));
     const at = times.indexOf(Math.max(...times));
@@ -228,9 +217,6 @@ export function folderLines(folder: Folder): string[] {
   return lines;
 }
 
-// docs/ is the folders that hand over and nothing beside them. A spec tree, a folder of dated
-// audits and two jsonl logs stood here — 135 files of what was already in the code — and this is
-// the line that says so the next time one starts, since a folder nobody is handed grows quietly.
 export const besideThem = (root = 'docs', dirs: readonly string[] = featureFolders(root)): string[] => {
   const handing = new Set(dirs.map((dir) => path.basename(dir)));
   return readdirSync(root).filter((name) => !handing.has(name));

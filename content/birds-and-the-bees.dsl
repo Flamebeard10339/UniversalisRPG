@@ -1,25 +1,3 @@
-// Birds and the Bees — read off `.planning/planning_quests/Birds and the Bees.md`.
-// Kelsa takes whoever walks into her yard for the Mayor's man, sets them on her
-// hives and will not say what is wrong with them. George says what is wrong with
-// them. The town crier names it, loudly, and is wrong. What is in the third hive
-// is a Korning Mind Wasp with the queen of that hive under it.
-//
-// Everything this module stands on is tulsa's: Kelsa and George in the
-// farmhouse, the crier in the square, the apiary with its two working hives and
-// its drones, and the third hive at the end of the row. What this file adds is
-// the errand, the inside of that third hive, the two things in it, and the
-// reward. Take this module out and the apiary is a field with angry bees in it
-// and a chewed comb nobody explains, which is exactly what tulsa says it is.
-//
-// Nothing here is written into tulsa, and one measurement is why. A location
-// holds only entities the module that declared it can see: `# location
-// tulsa.hive-mouth` written from here — whole body or `+entities:` patch, it
-// makes no difference — merges into tulsa and is printed back under tulsa, and
-// tulsa cannot name a birds-and-the-bees wasp. So the quest brings its own room.
-// The way into the hive is written from this end only, because the engine
-// answers a road from both ends, and it is open only while there is something in
-// there worth going in after.
-
 # info birds-and-the-bees
 version: 0.1.0
 pack: quests
@@ -105,14 +83,6 @@ stage settled:
     ask: About the third hive.
     again: Working again, near enough. And I am still waiting to hear who walked it here.
 
-// --- what this quest owes the world ---
-
-// The arena, and the whole of what this quest owns about getting into it. One
-// road in per ground the hives stand on, each open while tulsa's own count says
-// three and tulsa's marker says the third search happened there — so the hive a
-// player goes through last is the one that lets them down, wherever they were
-// standing when they did it, and the other ground does not. A hive on a third
-// ground is a fourth line here and nothing else in this file.
 # location inside-the-hive
 below tulsa.hive-mouth
 title: Inside the Hive
@@ -124,8 +94,6 @@ entities:
   mind-wasp
   taken-queen
 
-// What the crier was certain it was not. It feeds off what it lands on, which
-// is the only half of the drain the grammar will say.
 # entity mind-wasp
 title: Korning Mind Wasp
 examine: Longer than your forearm and banded in a colour no bee wears, and the head of it turns to follow you before the body does.
@@ -142,12 +110,6 @@ on death:
     say: The queen goes where she was always going to go once nothing was steering her, which is back onto the comb. You follow the gallery until it stops going anywhere and opens on daylight, at the far end of the row.
     relocate: tulsa.hive-mouth
 
-// The other half of the drain: she is being burned down for as long as she is
-// being made to fight, which is what makes the fight a clock. She is worth
-// nothing to kill — a lost queen is the losing condition and George is what
-// happens next. Losing her only means anything while the wasp is still up: a
-// fight does not stop the moment its reason does, so the swing that follows the
-// wasp's last one can still land on her, and that one is not a loss.
 # entity taken-queen
 title: The Third Queen
 examine: A queen bee the length of your hand, and she moves the way a hand moves a glove. Nothing behind her eyes is hers.
@@ -164,26 +126,13 @@ on death:
       say: George gets you as far as the mouth of the hive before he lets go of you. "I got here just in time to drag you out. Are you alright?"
       relocate: tulsa.hive-mouth
 
-// --- flags ---
-
 # flag wasp-put-down
 
 # flag queen-fell
 
-// --- tests ---
-
-// Standing in the square with something to swing, and nothing yet said to
-// anybody about the bees.
 # save nothing-said-about-the-bees
 {"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// Start to finish: Kelsa hires without explaining, George explains, the crier
-// names the wrong wasp, all three hives are gone through, the way down opens
-// under the third of them, what is at the bottom of it is put down, and Kelsa
-// pays — a purse that walked in empty and stands above nothing, because what
-// she pays is hers to move. Unkillable and instant-kill, so what level walks
-// the apiary is not what this is asking — the drones between the postern and
-// the hive are tulsa's, and so are their numbers.
 # test birds-and-the-bees-start-to-finish
 unkillable
 instant-kill
@@ -203,9 +152,6 @@ choose: How can you be so sure?
 travel: kelsa-farmhouse
 travel: bee-gate
 travel: apiary-field
-// Each search is waited out rather than left running: a second one started in
-// the same room takes the first one's place, and a hive half gone through is a
-// hive not gone through.
 use: entity.tulsa.first-hive.search-the-comb until done
 use: entity.tulsa.second-hive.search-the-comb until done
 travel: hive-mouth
@@ -226,12 +172,6 @@ choose: continue
 assert: kelsas-hives.settled
 assert: inventory.core.coin > 0
 
-// George keeps his own word while this quest stands beside it. The first stage
-// stands from the outset, so the hint under it is open to a player who has never
-// spoken to Kelsa — and both are in the list, which is the whole claim: a line
-// given to somebody here adds to what the town gave them rather than replacing
-// it. That is a property of the `ask:` on his tulsa node and of the one on the
-// node below, so it is proved by picking each in turn out of the same list.
 # test george-answers-for-himself-while-the-quest-stands-beside-him
 load: in-town
 travel: kelsa-farmhouse
@@ -241,25 +181,12 @@ choose: continue
 talk: george
 choose: kelsas-hives.hired.george.1.said
 choose: continue
-// The quest's own thread is proved reachable by the `choose:` above taking it —
-// a node id with a number in it is not something `visits` will read. What is
-// left to say is that his tulsa word was taken too, and that the stage offering
-// the other one was standing the whole time.
 assert: tulsa.george.helpful.visits = 1
 assert: kelsas-hives.hired
 
-// Out the postern with the errand taken and none of the hives yet gone through.
-// The count and both markers stand at nothing, which is what the route below
-// walks up from.
 # save sent-to-the-hives
 {"version":13,"location":"tulsa.bee-gate","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"birds-and-the-bees.kelsas-hives.hired":true,"birds-and-the-bees.kelsas-hives.ask-george":true,"birds-and-the-bees.kelsas-hives.the-hives":true}}
 
-// The same three hives in another order, and the way down moves with it: the one
-// gone through last is the one that opens, so leaving a field hive until last
-// puts the gallery in the field and not at the end of the row. The route above
-// walks the other ground, and between them both roads into this room are walked
-// rather than one. Unkillable for the same reason as above — the drones in that
-// field are tulsa's and what they cost is not what this is asking.
 # test the-way-down-opens-under-whichever-hive-is-gone-through-last
 unkillable
 load: sent-to-the-hives
@@ -275,19 +202,9 @@ assert: not tulsa.the-third-search-was-at-the-mouth
 travel: inside-the-hive
 assert: kelsas-hives.the-third-hive
 
-// Standing inside the third hive with the fight already on, which is the state a
-// player reaches by walking down the gallery and the state a lost attempt puts
-// them back in. All three hives are behind it and the last was the one at the end
-// of the row, because that is the road the walk back out and down again takes.
 # save at-the-third-hive
 {"version":13,"location":"birds-and-the-bees.inside-the-hive","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"tulsa.hive-mouth.discovered":true,"tulsa.hives-searched":3,"tulsa.the-third-search-was-at-the-mouth":true,"birds-and-the-bees.kelsas-hives.the-hives":true,"birds-and-the-bees.kelsas-hives.the-third-hive":true}}
 
-// The other way the fight ends, and that it is not the end of the quest. The
-// queen is the losing condition rather than a kill, so putting her down is what
-// gets the player carried out; the walk back down is the whole of what this
-// world has instead of an arena that resets, and the wasp is still standing in
-// it. That second `travel:` is what proves the carrying out — a road does not go
-// from a room to itself, so a player who was never moved cannot walk it.
 # test losing-the-queen-is-a-walk-back-rather-than-a-dead-end
 unkillable
 instant-kill

@@ -1,7 +1,6 @@
 import { matches, paired } from './form';
 import { Filled, Parser, Written, parseWhole } from './parser';
 
-// What a form says its placeholders hold, carried from the parser that wrote the form onto every line built out of it.
 export const filledBy = (parser: Filled): Filled => ({ ...(parser.names === undefined ? {} : { names: parser.names }), ...(parser.holds === undefined ? {} : { holds: parser.holds }) });
 
 export function isCodec(value: unknown): value is Parser<unknown> {

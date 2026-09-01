@@ -1,7 +1,3 @@
-// A pack of its own, so the fixture world has two of them and a test about turning one off has
-// something to turn off. It also holds the routes: a `# test` here is a claim about the engine, and
-// is the only kind of route the suite walks now that no corpus test reaches it.
-
 # info fixture-quests
 version: 1.0.0
 pack: fixture-quests
@@ -29,8 +25,6 @@ stage offered:
 stage settled:
   log: The well is quiet again.
   complete
-
-// --- routes ---
 
 # test the-green-is-where-a-game-begins
 assert: resource.health >= 30
@@ -63,12 +57,6 @@ submit-modal: item=buy:core.bread
 submit-modal: count=1
 submit-modal: item=close
 assert: has bread
-
-// --- saves ---
-//
-// The one route here that closes on a sheet rather than on words, because minting the sheet is what
-// it is for: `npm run probe -- src/content/fixture --record minting-the-dug-in-save` prints the
-// `# save` body below when the world under it changes.
 
 # test minting-the-dug-in-save
 goto: green
@@ -111,8 +99,6 @@ assert: has bread
 # save dug-in
 {"version":13,"inventory":{"core.rat-tail":1,"core.spade":1,"core.copper-coin":20},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"time":2000}
 
-// Written over the one above rather than restating it: what is carried takes the ids every layer
-// writes, so this sheet holds the loaf and the tail both.
 # save kitted
 {"version":13,"inventory":{"core.rat-tail":1,"core.copper-coin":20},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"equipped":{"main-hand":"core.spade"},"time":2000}
 

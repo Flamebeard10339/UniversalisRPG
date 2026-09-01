@@ -72,9 +72,6 @@ describe('where the author was survives the tab (c10)', () => {
   });
 });
 
-// A floor reaches the map once somewhere on it has been stood in, and a new game has stood
-// nowhere but the ground floor, so a claim about the floor a page opens on walks down to one
-// first — on both sides of the comparison, so that what differs is the remembered map.
 const DOWNSTAIRS = '/goto first-steps.basement';
 
 function reopened(where: Editing | null, walk?: string): string {

@@ -91,9 +91,6 @@ interface DeterministicFightPlan extends FightParams {
   outcome: FightOutcome;
 }
 
-// The `their` of every sided field on the player's own action: whoever it is aimed at. Both ways
-// into arming write that down in the seat the player holds, so a fight and a gather are read the
-// same way and the answer is never reckoned a second time.
 const aimedAt = (state: GameState): string => state.activeAction?.roster?.[PLAYER]?.target ?? PLAYER;
 
 function fightParams(action: Action, state: GameState, registry: Registry, other: string): FightParams {
@@ -157,10 +154,6 @@ function completionsBeforeDrain(action: Action, state: GameState, registry: Regi
   return completions;
 }
 
-// The first instant between now and `toTime` at which the world has something of its own due — a
-// buff wearing off, what is under way coming round, a pool running dry, a fallen thing back on its
-// feet — or `toTime` where it has nothing. Whatever may put a stopped run back on its feet is on
-// this one list, so nothing that waits for the world has to hold a list of its own.
 export function nextBoundary(state: GameState, registry: Registry, toTime: number): Boundary {
   let boundary: Boundary = { at: toTime, source: { kind: 'requested' } };
   const expiry = nextBuffExpiry(state);
@@ -269,18 +262,12 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   const half = (field: { side?: 'my' | 'their'; id: string } | undefined, read: typeof statValue, fallback: number): number =>
     field === undefined ? fallback : read(field.id, state, registry, sideOf(field, self, other));
 
-  // A blow of the player's under `instant-kill`: it lands, and it takes everything the thing it lands
-  // on has. Read off who is struck rather than off who swings, so an action that depletes the
-  // player's own pool is left alone and so are two foes going at each other.
   const struck = action.depletes ? sideOf(action.depletes, self, other) : null;
   const felling = self === PLAYER && struck !== null && struck !== PLAYER && debugging(state, 'instant-kill');
 
   const hit = felling || action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
 
   const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry);
-  // What the pool had left to give, read before the blow takes any of it: a swing bigger than what
-  // it lands on is spent on nothing past the last point, and `amount` is what landed rather than
-  // what was thrown.
   const capacity = dealt !== null && action.depletes ? Math.max(targetLevel(state, registry, action, self, other), 0) : null;
   if (dealt !== null) damageTarget(state, registry, action, self, other, dealt, segment.deltas);
   if (action.depletes) {
@@ -306,8 +293,6 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   return { felled: felledBy(segment, action, self, other, reached), finished: false };
 }
 
-// Every cycle of an action that resolves, resolves here — one swing that felled what it was aimed
-// at, or a batch of them settled at once — so this is where the world's tally of them is kept.
 function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, times: number): void {
   const batch = fightBatch(action, times, outcome);
   if (batch.count <= 0) return;
@@ -316,26 +301,16 @@ function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, t
   fireEvents(segment, PLAYER, outcome === 'completion' ? 'completed' : 'unfinished', undefined, batch.count);
 }
 
-// Whether a depleting loop has anything left to swing at. It asks where its foe is and not whether
-// the room stands it: a template no room stands anywhere is not missing from this one, so a fight
-// that a directive opened on it goes on rather than being stopped by a room that was never going to
-// stand it.
 function standsAgain(state: GameState, registry: Registry, action: Action, targetId: string): boolean {
   if (!action.depletes || isFightScoped(targetId)) return true;
   const location = registry.locations.get(state.location);
   return !location || !isElsewhere(state, registry, location, targetId);
 }
 
-// Nothing comes at the player for a beat. Arriving somewhere and felling something both say it, and
-// both an aggressive thing opening a fight and a repeating one looking for its next foe read it, so
-// the pause before a fight is one number in one place rather than one per way of starting one.
 function quietFor(state: GameState, registry: Registry): void {
   state.engagesAt = Math.max(state.engagesAt, state.time + engagementDelay(registry));
 }
 
-// A fight the player has nobody to swing at: whoever they were fighting fell, and the action repeats,
-// so the next one has to be found before anything else can happen. Whoever else is in the fight goes
-// on fighting while that happens — a search is the player looking round, not the world holding still.
 function searchingForAFoe(state: GameState, action: Action): boolean {
   const active = state.activeAction!;
   if (!action.depletes || !active.repeating) return false;
@@ -343,10 +318,6 @@ function searchingForAFoe(state: GameState, action: Action): boolean {
   return target !== undefined && active.actors?.[target] === undefined;
 }
 
-// How far this pass of the loop may carry the paces it has just read. A buff landing inside the
-// segment puts a moment in it that the boundary the segment was opened to was read too early to
-// know about, and everyone's pace is read again on the far side of it — so a run held at a
-// standstill starts again where it wore off rather than where the caller happened to stop asking.
 function goodUntil(state: GameState, segEnd: number): number {
   const expiry = nextBuffExpiry(state);
   return expiry !== undefined && expiry.at > state.time && expiry.at < segEnd ? expiry.at : segEnd;
@@ -391,8 +362,6 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       }
     }
 
-    // Whoever has been slowed to a standstill is counted no time at all: their bar holds where it
-    // stood and picks up again when whatever stopped them wears off.
     const ticking = paced.filter((each) => !stalledPace(each.duration));
 
     if (paced.length === 0 && !searching) {
@@ -401,8 +370,6 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
       return;
     }
 
-    // Finding the next one is an event on the clock like a swing, and the first of the two to come
-    // round is what the segment steps to.
     const foundAt = looking === undefined ? Infinity : Math.max(state.time, state.engagesAt);
     if (foundAt <= until && foundAt <= nextAt) {
       const elapsed = foundAt - state.time;
@@ -450,8 +417,6 @@ function resolveStochasticSegment(segment: Segment, action: Action, segEnd: numb
         return;
       }
       if (active.repeating && standsAgain(state, registry, action, armedTarget ?? next.other)) {
-        // A foe that fell is not replaced where it stood. The loop is searching from here on, and
-        // what stands up again does so when the room has been quiet for the beat it takes to find it.
         if (action.depletes) {
           clearActorDeltas(segment.deltas, armedTarget ?? next.other);
           if (active.actors?.[armedTarget ?? next.other] !== undefined) enterEncounter(active, armedTarget ?? next.other, state, registry, PLAYER);
@@ -539,10 +504,6 @@ function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   return isElsewhere(state, registry, location, target);
 }
 
-// Who is standing here that will not let the player get on with anything else, once the room is
-// quiet no longer: something aggressive that opposes them, that can swing at them and that they can
-// swing back at. Opening the fight and knowing one is coming are the same question asked here, so a
-// loop waiting the world out and the world itself cannot come to differ about whether it is over.
 function aggressorHere(state: GameState, registry: Registry): { entity: string; id: string; action: Action } | undefined {
   const location = registry.locations.get(state.location);
   if (!location) return undefined;
@@ -558,8 +519,6 @@ function aggressorHere(state: GameState, registry: Registry): { entity: string; 
   return undefined;
 }
 
-// An aggressive thing takes the fight to the player whatever they were doing, and goes on doing it
-// until they leave — so cancelling one buys the beat the room is quiet for and nothing more.
 function openAggression(state: GameState, registry: Registry): void {
   if (state.time < state.engagesAt) return;
   const coming = aggressorHere(state, registry);
@@ -613,9 +572,6 @@ export function resolve(state: GameState, registry: Registry, toTimeMs: number):
   }
 }
 
-// An author waiting out an action wants it finished, not a number of seconds guessed large enough to cover it. What is under way is stepped one unit of its own at a time — the cycle the progress bar reads — and stops the moment nothing is in flight, so a fight ends when the last swing lands rather than when a clock a test picked runs out.
-//
-// Some worlds never go quiet: an `aggressive` location that respawns its dead hands the loop a fresh fight forever, and a player who out-regenerates it never reaches the death that would have stopped them. So the loop carries a backstop of its own for the case where none of the terminators that do the real work — nothing left in flight, a condition met, `attempts:` spent, the player dead — ever fires. It is measured in the world's time rather than in steps of it: an author should not have to remember to write one, and how many cycles a thing took is not a question anyone asked. Four hours is how long a player may be left running unattended, and this loop is the engine running the world on their behalf, so it is the same number; anything shorter is a policy about how much game time one directive should be allowed to spend, which would cut off a legitimate `until xp.mining >= 500`.
 export const UNDER_WAY_LIMIT_HOURS = 4;
 export const UNDER_WAY_LIMIT_MS = UNDER_WAY_LIMIT_HOURS * 60 * MS_PER_MINUTE;
 
@@ -631,8 +587,6 @@ const underWayUnit = (state: GameState, registry: Registry): number => {
   return actionFirstUnit(obj, objId, active.actionSlug, registry, state, aimedAt(state));
 };
 
-// One cycle of whatever is under way, or — where it is standing still and has no cycle to step —
-// as far as the next thing due, which is what could start it moving again.
 function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   const unit = underWayUnit(state, registry);
   if (Number.isFinite(unit)) {
@@ -643,16 +597,9 @@ function advanceUnderWayCycle(state: GameState, registry: Registry): void {
   resolve(state, registry, Math.max(state.time + 1, Math.ceil(next)));
 }
 
-// Handing the engine a terminator is asking it to run the world in the player's absence, so the
-// terminator is also what decides whether they are told turn by turn or handed a summary: issuing an
-// action without one comes back after a single cycle and never reaches here. `done` is not a
-// condition anything could evaluate, so the loop takes the terminator rather than a test made from
-// it — reading which one it was given is the whole of the split.
 export function resolveUnderWay(state: GameState, registry: Registry, terminator: Terminator = 'done', start: SpanStart = spanStart(state)): WaitedOut {
   const startedAt = start.at;
   const say = localizerOf(registry, state);
-  // A count is read off the world's own tally rather than off the steps this loop takes, so what a
-  // recorded run says it sat through and what a replay of it sits through are the same fact.
   const counted = isCycles(terminator) ? { wanted: terminator.times, cycled: (): number => state.cyclesDone - start.state.cyclesDone } : null;
   const met = terminator === 'done' || isCycles(terminator) ? null : terminator;
 
@@ -668,15 +615,11 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
       return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(met)) }));
     }
     if (!state.activeAction && !state.journey) {
-      // A room that has not come at the player yet is not a room that is done with them: the beat
-      // before something engages is part of what they were waiting out.
       if (state.time < state.engagesAt && aggressorHere(state, registry)) {
         resolve(state, registry, state.engagesAt);
         continue;
       }
       const because = state.endedBecause ?? say.engine('engine.stopped.finished');
-      // A terminator that was never reached did not finish, whatever ran out first: the condition is
-      // what was asked for, and running out of things to do without it is the asking having failed.
       if (terminator === 'done') return over(true, because);
       if (counted) return over(false, say.engine('engine.stopped.short-count', { because, times: counted.cycled(), wanted: counted.wanted }));
       return over(false, say.engine('engine.stopped.short', { because, condition: say.identifier(describeCondition(met!)) }));
@@ -712,8 +655,6 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
 
 export type ArmResult = { armed: true; firstUnit: number } | { armed: false };
 
-// Run the world through the span an action just armed. A span that reads as forever is an action
-// standing still before it ever swung, so no time is spent on it and it waits where it is.
 function resolveFirstUnit(state: GameState, registry: Registry, firstUnit: number): void {
   resolve(state, registry, state.time + (Number.isFinite(firstUnit) ? Math.ceil(firstUnit) : 0));
 }
@@ -723,15 +664,8 @@ function firstUnitSpan(action: Action, state: GameState, registry: Registry, oth
   return resolvesPerAttempt(action) ? duration : fightPlan(action, state, registry, other).attemptsToResolve * duration;
 }
 
-// A free action is one that costs the player no time — looking at something, eating what they are
-// carrying, anything the world gave no cadence. Nothing that occupies no span can displace something
-// that does, so these run where they stand and leave the fight or the gather under way alone. What is
-// free is read off the action's own pace, so an action that starts or stops declaring one moves side
-// with no list anywhere to follow it.
 const isFree = (action: Action, state: GameState, registry: Registry, other: string): boolean => attemptDuration(action, state, registry, PLAYER, other) <= 0;
 
-// Everything an action does when it completes, done at once and with nothing armed. A `stop` among
-// its results still stops what was under way: the author asked for that in so many words.
 function runFreely(state: GameState, registry: Registry, owner: string, action: Action): void {
   const segment = newSegment(state, registry);
   applyResults(segment, outcomeResults(action, 'completion'), PLAYER, 1);
@@ -741,19 +675,11 @@ function runFreely(state: GameState, registry: Registry, owner: string, action: 
   if (segment.stopped) endAction(state, segment.stopped);
 }
 
-// What a directive named an action on: the kind and the id, as `# test` writes them. A fight names
-// the foe it swings at the same way, so both ways into arming ask the questions below about the
-// same thing.
 interface NamedOn {
   obj: string;
   id: string;
 }
 
-// That the thing an action was named on is somewhere the player is not, in the words they read. Two
-// lists answer it and they are one reading twice: a room is somewhere by being itself, and an entity
-// is somewhere by a room standing it. An owner in neither list — a recipe, an action of the player's
-// own, a thing in the pack that goes wherever they go, a template no room stands — is nowhere to be
-// missing from, so there is nothing to say about it.
 function whereItIsNot(named: NamedOn, registry: Registry, state: GameState): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const absent = (target: Localized): Localized => localizer.engine('engine.target.absent', { target });
@@ -765,9 +691,6 @@ function whereItIsNot(named: NamedOn, registry: Registry, state: GameState): Loc
   return here && isElsewhere(state, registry, here, named.id) ? absent(actorTitle(named.id, registry, state)) : undefined;
 }
 
-// Why an action a player was offered turns them away the moment they take it, in the words they
-// read — the one home for every such reason. An author's `on failure:` stands in place of all of
-// them.
 function whyRefused(action: Action, registry: Registry, state: GameState, named?: NamedOn): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const item = (id: string): Localized => localizer.title('item', id);
@@ -790,12 +713,6 @@ function refuseWith(action: Action, registry: Registry, state: GameState, becaus
   return { armed: false };
 }
 
-// The order arming asks its questions in, for both ways a directive reaches it. Where the thing is
-// comes first and `hidden if:` second: hiding is a gate on what a room offers, and a room the player
-// is not standing in offers them nothing to be gated — so an action hidden from over there is hidden
-// from nobody, and what the player has to be told is that the thing is not here. Standing where it
-// stands, the same gate is the world saying this was never on offer, and a directive that names it
-// anyway is a mistake in the directive rather than a player being turned away.
 function refuseArming(action: Action, named: NamedOn, written: string, registry: Registry, state: GameState): ArmResult | undefined {
   const away = refuseWith(action, registry, state, whereItIsNot(named, registry, state));
   if (away) return away;
@@ -837,14 +754,6 @@ export function armAction(obj: string, objId: string, actionId: string, registry
   return { armed: true, firstUnit: firstUnitSpan(action, state, registry, objId) };
 }
 
-// How far through its cycle what is under way has got, as the fraction a bar draws.
-//
-// The clock an action keeps counts milliseconds inside the attempt in flight, while the cycle a
-// player watches is every attempt it takes to resolve. Dividing one by the other measures two
-// different spans and caps the bar at a fraction of itself the moment an action needs more than one
-// attempt, so the attempts already made are counted in the same span here. A repeat carries its
-// leftover milliseconds into the next attempt, which is why the bar comes back to nearly nothing
-// rather than to exactly nothing.
 export function actionProgress(state: GameState, registry: Registry): number {
   const active = state.activeAction;
   if (!active) return 0;
@@ -853,8 +762,6 @@ export function actionProgress(state: GameState, registry: Registry): number {
   const attemptMs = attemptDuration(action, state, registry, PLAYER, aimedAt(state));
   if (!(attemptMs > 0)) return 1;
   const within = attemptFraction(clock, attemptMs);
-  // A contested action resolves one swing at a time and its cycle is that swing, so the attempts
-  // behind it are a tally of the fight rather than a share of anything being drawn.
   if (resolvesPerAttempt(action)) return within;
   const attempts = fightPlan(action, state, registry, aimedAt(state)).attemptsToResolve;
   if (!(attempts > 0)) return 1;

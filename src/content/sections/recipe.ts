@@ -90,8 +90,6 @@ function compile(recipe: Recipe): ActionDeclaration {
 
 const compiled = new WeakMap<Recipe, ActionDeclaration>();
 
-// One compiled craft per recipe, because keying the words it speaks stamps the
-// result objects themselves — the registry and the prose walk must hold the same.
 function recipeAction(recipe: Recipe): ActionDeclaration {
   const already = compiled.get(recipe);
   if (already) return already;

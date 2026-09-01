@@ -318,10 +318,6 @@ describe('a two-sided action resolves per attempt, and stays associative doing i
   });
 });
 
-// A location declares how many of a kind stand in it, never which ones, so the dummy left standing
-// after a kill is indistinguishable by id from the one that fell. What the view can honestly say is
-// how many of the kind are left, and it says it by asking the population — the same reading
-// `standing` gives everything else, not a tally of its own that would have to be kept in step.
 describe('how many of a foe are left is read off the population, not counted twice', () => {
   const inTheHall = (registry: Registry): GameState => {
     const state = createGameState('training-hall');

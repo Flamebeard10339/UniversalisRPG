@@ -18,10 +18,6 @@ const DEBUGGING = typeof window !== 'undefined' && new URLSearchParams(window.lo
 
 const NOT_CARRIED: Point = { x: 0, y: 0 };
 
-// Each of the four things a place can be while a journey is on, said in a colour of its own. Written
-// as a record over the states themselves, so a state added to the walk has to be drawn before this
-// compiles. Where the player stands is the one that is filled; the rest are edges and lettering,
-// because a filled bubble reads as somewhere you already are.
 const WALKING_CLASS: Record<Walking, string> = {
   here: 'border-accent bg-accent-strong font-semibold text-accent-text',
   next: 'border-accent-strong font-semibold text-accent ring-2 ring-accent-strong',
@@ -76,9 +72,6 @@ function Bubble({
     </>
   );
 
-  // `data-still` is what tells the sheet under it that a press here is not a press on the sheet. The
-  // grip stops the pointer event it holds, but the sheet listens for a mouse and a touch, which are
-  // events of their own — so without this a finger on a place both carries the place and drags the map.
   if (grip) {
     return (
       <button data-drive="map.place" data-still type="button" {...grip} {...look}>
@@ -103,10 +96,6 @@ function Bubble({
   );
 }
 
-// Whether a road is walked both ways is what the line is: solid for a road walked both, dashed and pointed for one walked only towards where it points. Whether it is open is the weight and the colour, so the two facts do not share a channel.
-//
-// Each end stops at its own label rather than at the widest one on the map, which is what left a road
-// out of a short name hanging in the air a name's width short of it.
 function Road({ from, to, open, mutual, walking, grid, boxes }: { from: Node; to: Node; open: boolean; mutual: boolean; walking: Walked | null; grid: number; boxes: [Size, Size] }): JSX.Element {
   const ends = [spotOf(from, grid), spotOf(to, grid)];
   const along = heading(ends[0], ends[1]);
@@ -135,9 +124,6 @@ function Road({ from, to, open, mutual, walking, grid, boxes }: { from: Node; to
   );
 }
 
-// The shape drawn round a region: its own ring, with the corners taken off. How round a corner is is
-// how far the curve reaches back along each side, so a shape stays the shape the engine gave it and
-// only stops having points on it.
 const CORNER = 0.28;
 
 export function roundedRing(points: readonly Point[], reach = CORNER): string {
@@ -154,11 +140,6 @@ export function roundedRing(points: readonly Point[], reach = CORNER): string {
   return `${path.join(' ')} Z`;
 }
 
-// The shape a region draws, and the tag that names it. The tag is the region's own handle — dragging
-// it in place mode carries every room the region holds, where dragging a room carries only that room,
-// so both gestures say what they do and neither has to guess which the author meant. It is a button
-// beside the places rather than lettering inside the drawing, for the same reason a place is: a thing
-// meant to be pressed is drawn where a press lands.
 function RegionShape({ region, grid, carried, chosen }: { region: Sheet['regions'][number]; grid: number; carried: Point; chosen: boolean }): JSX.Element | null {
   const path = roundedRing(cornersOf(region, grid, carried));
   if (path === '') return null;
@@ -189,7 +170,6 @@ function RegionTag({
 }): JSX.Element | null {
   const corners = cornersOf(region, grid, carried);
   if (corners.length === 0) return null;
-  // Above the shape rather than inside it, where a room would be standing on the letters.
   const spot = { x: corners.reduce((sum, point) => sum + point.x, 0) / corners.length, y: Math.min(...corners.map((point) => point.y)) };
   const look = {
     'data-region-tag': region.id,
@@ -220,9 +200,6 @@ function RegionTag({
 const HEAD = 10;
 const BARB = 7;
 
-// The point of a one-way road, drawn at the middle of it and pointing the way the road runs. Which
-// way that is comes from the places themselves rather than from the trimmed line between them: a road
-// short enough that its two ends meet has no direction of its own left to read.
 export function arrowAt(a: Point, b: Point, along: Point): string {
   const tip = { x: (a.x + b.x) / 2 + (along.x * HEAD) / 2, y: (a.y + b.y) / 2 + (along.y * HEAD) / 2 };
   const back = { x: tip.x - along.x * HEAD, y: tip.y - along.y * HEAD };
@@ -259,17 +236,11 @@ export function MapPane({
   const [ghost, setGhost] = useState<number | null>(null);
   const [gathering, setGathering] = useState('');
 
-  // An author is shown every place on the floor they are looking at, found or not: a map that draws
-  // only what a player has found is no use for putting the next place beside the last one. The floor
-  // being pointed at rather than stood on comes with it, so an author can see what is under the one
-  // they are laying out without leaving it.
   const { plane: at, here, sheet } = drawnFor(view, plane, dev ? 'every' : 'found', ghost);
   const grid = view.mapGrid;
   const spots = sheet.nodes.map((node) => spotOf(node, grid));
   const hold = useSheetHold(spots, bubbles, JSON.stringify(sheet.nodes.map((node) => node.place.title)), where, (id, by) => letGo(id, by));
   const drawn = new Map(sheet.nodes.map((node) => [String(node.place.id), node]));
-  // How big each place is drawn, by the id on it: the same measurement the sheet is sized from, read
-  // a second way so a road knows the label it has to stop short of.
   const boxes = new Map(sheet.nodes.map((node, at) => [String(node.place.id), hold.sizes[at] ?? hold.node]));
   const boxOf = (id: string): Size => boxes.get(String(id)) ?? hold.node;
 
@@ -292,9 +263,6 @@ export function MapPane({
 
   const place = (id: string, at: Point): void => onSend(placeLine(id, settledOn(at)));
 
-  // Which places move with whatever is under the finger is the engine's judgement — a room and
-  // whatever is written off it, or every room a region holds — so it is asked once, and asked while
-  // the finger is still down as well as on the drop, so a house and the shape round it move together.
   const holdsOf = (held: string): string[] => {
     const region = regionGripped(held);
     return region === null ? [held] : (view.regions.find((each) => String(each.id) === region)?.holds ?? []).map(String);
@@ -304,8 +272,6 @@ export function MapPane({
 
   const carriedBy = (ids: readonly string[]): Point => (hold.carried !== null && ids.some((id) => carrying!.includes(String(id))) ? hold.carried.by : NOT_CARRIED);
 
-  // A region follows the finger when the finger has hold of the region, which is not the same as one
-  // of its rooms moving: a region with every room shut away inside it still has a shape to carry.
   const carriedRegion = (id: string): Point => (hold.carried !== null && regionGripped(hold.carried.id) === String(id) ? hold.carried.by : NOT_CARRIED);
 
   function letGo(id: string, by: Point): void {
@@ -322,9 +288,6 @@ export function MapPane({
     setFrom(null);
   };
 
-  // The same two taps a road is drawn with, saying something else: the first place is written off the
-  // second and lands one step from it. The two need not be tapped on one floor — the first is still
-  // held while the author changes floors, which is how a cellar is written off the room above it.
   const pin = (id: string): void => {
     if (from === id) return setFrom(null);
     if (from === null) return setFrom(id);
@@ -338,9 +301,6 @@ export function MapPane({
 
   const holding = (region: string, place: string): boolean => (view.regions.find((each) => sameSection(each.id, region))?.holds ?? []).some((held) => String(held) === place);
 
-  // Tapping a room while a region is named puts it in or takes it out; tapping one while no region is
-  // named picks up the region it already belongs to, which is how an existing one is got hold of
-  // without knowing what it is called.
   const gather = (region: string, place: string): void => {
     if (region === '') {
       const held = view.regions.find((each) => each.holds.some((one) => String(one) === place));

@@ -20,8 +20,6 @@ const DRAWN_AS: Record<MomentKind, string> = {
 
 const LESS_MOTION = '(prefers-reduced-motion: reduce)';
 
-// The same preference the stylesheet answers, put to a caller that has to pace something in
-// JavaScript because no stylesheet can pace it. Neither side holds a copy: both ask the browser.
 export const useMotionless = (): boolean => useMedia(LESS_MOTION);
 
 export const FILL_TRANSITION = { transitionProperty: 'width', transitionTimingFunction: 'linear', transitionDuration: `${LIVE_TICK_MS}ms` };
@@ -30,8 +28,6 @@ export const playedAfter = (ms: number): { animationDelay: string; animationFill
 
 export const STIRRING = 'stirring';
 
-// A road being walked, and the same road drawn from the other end than the one it is walked from, so
-// that what marches along it marches the way the player is going either way round.
 export const MARCHING = 'marching';
 
 export const MARCHING_BACK = 'marching marching-back';
@@ -91,8 +87,6 @@ export function createTransientChannel(options: TransientOptions = {}): Transien
     note(said) {
       const grew = merged(shown, said, wrote('note', sayingOf(said)));
       shown = grew.shown;
-      // By identity, so a notice told something more is a new object the earlier waking passes over
-      // and the later one takes: being fed keeps a notice alive without anything reading a clock.
       schedule(() => {
         shown = shown.filter((each) => each !== grew.one);
         tell();

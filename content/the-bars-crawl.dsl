@@ -1,28 +1,3 @@
-// The Bar's Crawl — Sunny wants something on the bar nobody in Tulsa has had
-// before, and she has already worked out what it is made from: the dissolved
-// bones of a fish that will kill you if the meat is cooked wrong.
-//
-// The fish is this module's own — nothing in fishing.dsl has a poisonous one,
-// so `raw-blowfish` and the water it comes out of are declared here and hung
-// off `tulsa.deep-water` the way `ball-of-a-boy.dsl` hangs an action off
-// `tulsa.larry`: take this module out and the deep water goes back to trout
-// and salmon only. The water is a fifth water and nothing else — it declares
-// how deep it is and overlays `fishing.cast`, same as the four in fishing.dsl.
-//
-// The poison is the cooking system already in this world: `accuracy: cooking`
-// against a `burnt:` fallback is exactly "cook it right or ruin it and try
-// again," so the recipe uses that rather than inventing a second poison of
-// its own. What it cannot do is say so on the way past — a recipe has one
-// `say:` and no `on failure:` of its own, so a fumbled attempt falls back to
-// the world's one generic `burnt-food` and its fixed description rather than
-// anything about the poison staying in. Flagged on the line below rather than
-// built around, since the workaround (a second, fish-specific ruined item)
-// would just be the generic burnt-food wearing a costume.
-//
-// Reward is a cap and an apron of this module's own rather than the castle's
-// `cooking.chefs-hat` — Sunny is not the castle range, and nothing says a bar
-// cook dresses like one.
-
 # info the-bars-crawl
 version: 0.1.0
 pack: quests
@@ -31,18 +6,6 @@ dependencies:
   tulsa
   fishing
   cooking
-
-// --- what this quest owes the world ---
-
-// The water and what comes out of it. Deep water already means "the rod
-// reaches further than a net does," so the same requirement and the same
-// bait-spend as trout and salmon apply here without restating why.
-//
-// The one thing this water asks that depth does not: a landed cast still has a
-// blowfish on the end of it, and getting a swelling ball of spines off a hook is
-// its own question. So the catch is a row weighed against the angler's own
-// fishing rather than a second contest — a hand that knows the fish gets it off
-// the hook, and one that does not lets go of the line.
 
 # item raw-blowfish
 title: Raw Blowfish
@@ -72,11 +35,6 @@ cast:
 # location tulsa.deep-water
 +entities: blowfish-hole
 
-// The cook and the brew. Two recipes rather than one, because the meat is
-// finished the moment the poison is out of it and the bones are not dissolved
-// until well after that — the same distinction `sunnys-poison` draws between
-// gathering three things and mixing them.
-
 # item blowfish-bones
 title: Cleaned Blowfish Bones
 examine: Picked out whole and boiled once already. Whatever was in them that would have killed you came off in the water instead.
@@ -104,9 +62,6 @@ skill: cooking 8
 time: 4
 say: The bones go soft, then gone, and what is left in the pot is nothing like broth.
 
-// The reward. A cap and an apron rather than the castle's own chef's hat,
-// because Sunny's kitchen is her bar and not the castle range.
-
 # item cooks-cap
 title: Bar Cook's Cap
 slot: head
@@ -120,8 +75,6 @@ slot: body
 value: 70
 item-level: 4-8
 kitchen, +6 cooking
-
-// --- the quest ---
 
 # quest sunnys-brew
 title: The Bar's Crawl
@@ -178,23 +131,9 @@ stage poured:
     ask: About the brew.
     again: Out on the bar already, if you want to see how it's going over.
 
-// --- tests ---
-
-// Everything the deep water, the stove and Sunny's own bar are asked to do:
-// catch the fish, cook the poison out of it, dissolve the bones down into the
-// brew, and hand it across the bar for the reward. Cooking's accuracy roll
-// and the cast's own chance of a snapped line are real chances rather than a
-// fight, so the levels below are bought high enough that both come in
-// reliably instead of being asked to stand or fall on either one, and three
-// fish are caught against one recipe attempt each so a single burnt one does
-// not stall the route — that headroom is a balance question for a pass of
-// its own, not for this file.
 # save fresh-for-the-brew
 {"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.dried-fish-bait":30},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// The rod and the line each name a level of their own, so each is a copy under
-// an id — `1` the rod and `2` the line — and the bait, which names none, is the
-// stack it has always been.
 # test the-bars-crawl-start-to-finish
 load: fresh-for-the-brew
 equip: 1

@@ -212,11 +212,6 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
   return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);
 }
 
-// Nothing a DEBUG section says is a string this game can say. What an author wrote is refused where it is written, and what the engine generated — a title humanized off an id, the label an action is addressed by — is taken off the tables here. Both halves are one sweep over the tables once they are full rather than a gate at each place that fills one, so a kind or a field that starts saying something next month is covered with no edit — and `npm run review`, `npm run notes`, the translation sweep and the game itself all read these tables, so one sweep answers for all of them.
-//
-// The refusal is what makes the emptying safe to rely on. Words taken off a table are words the printer can no longer tell from words nobody wrote, and words a runtime reader falls back to a bare key for; refusing them at the door means a DEBUG section prints back what it parsed and has no key to leak.
-//
-// What a section says is filed beneath the section, which is what makes the whole of it one prefix. It is asked under every kind that holds a map and not only under the section's own, because a kind may say something through an entry it gives another kind — a quest hands a dialogue away — and those words are still the giver's.
 function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, ReadonlyMap<string, OwnedSection>>): BuildFailure | null {
   const kinds = contentSectionMaps().map(([kind]) => kind);
   const marked: Array<{ owner: OwnedSection; kind: SectionKind; id: string; under: SectionKind; prefix: string }> = [];
@@ -248,7 +243,6 @@ function unsayDebug(registry: Registry, merged: ReadonlyMap<SectionKind, Readonl
   return null;
 }
 
-// A line the game says as nothing is a line nobody has written yet, and a player meets it as a broken engine rather than as a blank. A `@@@` note is dropped when the line is said, so a line that is only a note says nothing at all; a note trailing words is playable and stays legal. This asks the same table `npm run notes` and `npm run review` ask, so a kind or a field added next month is covered with no edit.
 function silence(locales: Locales): DslError | undefined {
   for (const { key, language, text } of everySaid(locales)) {
     if (withoutNote(text).trim() !== '') continue;
@@ -270,22 +264,15 @@ class DanglingReference extends Error {}
 
 const ownerKey = (kind: string, id: string): string => `${kind}\0${id}`;
 
-// A module writing twice at one address has written one thing, so what it contributed is the two laid
-// over each other — the world's own merge, run over one module's writing alone.
 function contribute(contributions: Map<string, readonly Contribution[]>, module: string, kind: string, id: string, value: object): void {
   const written = [...(contributions.get(module) ?? [])];
   const at = written.findIndex((each) => each.kind === kind && each.id === id);
-  // The first writing is kept as it was written rather than merged into an empty body: a body that
-  // only adds to a list is saying so about a list in another module's file, and merging it into
-  // nothing would resolve the addition into a list of its own and lose what it was.
   const laid = { kind, id, value: at === -1 ? value : mergeSection(kind, written[at]!.value, value) };
   if (at === -1) written.push(laid);
   else written[at] = laid;
   contributions.set(module, written);
 }
 
-// A section nothing holds any more is a section nobody wrote: whoever contributed to it has nothing
-// left to print, so it leaves every module's writing along with the value itself.
 function forgetContribution(held: ReadonlyMap<string, readonly Contribution[]>, kind: string, id: string): void {
   const contributions = held as Map<string, readonly Contribution[]>;
   for (const [module, written] of contributions) contributions.set(module, written.filter((each) => each.kind !== kind || each.id !== id));
@@ -363,7 +350,6 @@ function pruneStrandedActionMembers(registry: Registry, pruned: Set<string>): bo
   return dropped;
 }
 
-// A map that some kind derives into rather than owns outright is emptied once pruning has settled and refilled from everything that lands in it. It is refilled from every such kind and not only from the one that calls it its own: `dialogues` is where # dialogue keeps its own and where # quest puts the ones it gives away, and rebuilding it from either alone loses the other. The primaries are read before anything is emptied, because one of them may be what is being emptied.
 function rebuildDerivedMaps(registry: Registry): void {
   const owned = new Map(contentSectionMaps());
   const derived = new Set(contentSectionMaps().flatMap(([kind]) => Object.keys(sectionFor(kind)!.maps).filter((name) => name !== owned.get(kind))));
@@ -472,14 +458,6 @@ function overlayAction(base: Action, over: Action): Action {
   return merged as unknown as Action;
 }
 
-// An action written over another. What the base holds is the starting body, every line written here
-// is laid over it, and `+` adds to what it inherited rather than replacing it — the same overlay an
-// entity gets over what it `uses:`, with the one difference that an extending action keeps its own
-// name: a name is what an author extends an action to change, where an entity overloading a shared
-// action must not rename it for everyone else.
-// Which `# action` an overlay failed at, carried on the error rather than read back out of its
-// words: the one that could not be assembled is somewhere down a chain, and only the frame that gave
-// up knows which.
 class ExtendsFailure extends DslError {
   constructor(
     readonly at: string,
@@ -849,9 +827,6 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       const language = languages.get(owned ? namespace : section.module.namespace) ?? DEFAULT_LANGUAGE;
       try {
         recordBaseText(registry, kind, section.value as Record<string, unknown>, namespace, language);
-        // A value a section carries rather than names has no line of its own for a word to be written
-        // on, so what is asked of it under the kind it is read as is answered from the section that
-        // carries it.
         for (const each of carriedIds(kind, section.value as { id: string })) {
           if (!registry.namespace.has(each.kind, each.id)) continue;
           for (const field of textFieldsOf(each.kind) ?? []) registry.locales.carried.set(localeKey(namespace, each.kind, each.id, field), localeKey(namespace, kind, id, field));

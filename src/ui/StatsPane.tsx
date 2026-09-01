@@ -9,9 +9,6 @@ import { shownTab, statTabs } from './statTabs';
 import { useTestSurface } from './useTestSurface';
 import { TOUCH_FLOOR } from './viewport';
 
-// The character sheet: who the player is, then one group of stats at a time. Which groups there are
-// and which stats fall to each is the world's own `group:` on the stat, so this page holds no list
-// of tabs and a stat regrouped in content moves pages with nothing edited here.
 export function StatsPane({ view, localizer, onOpen }: { view: PlayView; localizer: Localizer; onOpen: (stat: string) => void }): JSX.Element {
   const [chosen, setChosen] = useState<Answer | null>(null);
   const tabs = statTabs(view.stats);
@@ -41,8 +38,6 @@ export function StatsPane({ view, localizer, onOpen }: { view: PlayView; localiz
           ))}
         </div>
       )}
-      {/* Who the player is stands above the stats and is not one: pressing a row asks what is adding
-          to a stat, and a name has nothing adding to it. */}
       <Ledger entries={[...identity(view.player), ...counted(shown?.rows ?? [], localizer)]} onOpen={(id) => void (view.stats.some((row) => row.id === id) && onOpen(id))} />
     </div>
   );

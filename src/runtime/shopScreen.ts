@@ -8,8 +8,6 @@ import { buy, coinHeld, countAsked, forSale, sell, Trade, wanted, type Refusal }
 
 export const LEAVE: Answer = 'close';
 
-// The word the count question leaves by. It is no number, so nothing a player could mean as a count
-// can be mistaken for it, and it is what clicking away from the question answers with.
 export const BACK: Answer = 'back';
 
 export type Side = 'buy' | 'sell';
@@ -29,7 +27,6 @@ export const holdsShop = (value: Record<string, unknown>): boolean => typeof val
 
 export const holdsCount = (value: Record<string, unknown>): boolean => holdsShop(value) && typeof value.item === 'string' && (value.side === 'buy' || value.side === 'sell');
 
-// One row of the counter is a side and an item, and the player picks it as one answer, so the two travel as one string.
 export const rowAnswer = (side: Side, item: string): Answer => `${side}:${item}`;
 
 export function rowOf(answer: Answer | undefined): { side: Side; item: string } | undefined {
@@ -40,9 +37,6 @@ export function rowOf(answer: Answer | undefined): { side: Side; item: string } 
   return { side, item: answer.slice(at + 1) };
 }
 
-// One row of the counter, as words for a surface that reads it as a line and as figures for one that
-// draws it as a cell. Both are made here from the one trade, so no surface has to take a price back
-// apart and none of them can differ about what a thing costs or how many there are.
 const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer: Localizer): ModalChoice[] =>
   trades.map((trade) => {
     const item = heldName(state, localizer, trade.item);
@@ -78,14 +72,12 @@ export function shopSubmit(frame: ShopFrame, _state: GameState, registry: Regist
   return row === undefined ? null : countFrame(frame.shop, row.side, row.item);
 }
 
-// How many, asked as free text, because a shop takes any number a player can name and a list of every number it would take is not a question.
 export function countOptions(frame: ShopCountFrame, state: GameState, registry: Registry): ModalOption[] {
   if (!registry.shops.has(frame.shop)) return [];
   const localizer = localizerOf(registry, state);
   return [{ key: 'count', label: localizer.engine(frame.side === 'buy' ? 'engine.shop.count.buy' : 'engine.shop.count.sell', { item: heldName(state, localizer, frame.item) }), values: null }];
 }
 
-// A shop stays open across a trade: what comes back is a fresh counter, so it is re-read against what the player now carries and the shop now holds.
 export function countSubmit(frame: ShopCountFrame, state: GameState, registry: Registry): ModalFrame | null {
   const shop = registry.shops.get(frame.shop);
   if (!shop) return null;
@@ -94,10 +86,6 @@ export function countSubmit(frame: ShopCountFrame, state: GameState, registry: R
   return shopFrame(frame.shop);
 }
 
-// Naming none of something is how a player backs out, and backing out is not a mistake to be told
-// about: the word the screen leaves by, an empty line and the number zero all put the player back at
-// the counter with nothing said. Writing that names no number at all is the one thing answered,
-// because it is the one case where what was meant cannot be read off what was written.
 function tradeRefusal(shop: Shop, state: GameState, registry: Registry, side: Side, item: string, written: string): Refusal | undefined {
   if (written.trim() === BACK || written.trim() === '') return undefined;
   const count = countAsked(written);

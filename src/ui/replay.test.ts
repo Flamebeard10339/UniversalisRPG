@@ -7,8 +7,6 @@ const steps = (...lines: string[]): Directive[] => lines.map((line) => parseDire
 const RUN = steps('load: run-start', 'page: home/home', 'use: entity.first-steps.mirror.look-in', 'confusion: the refusal is fancy about failing', 'page: character/inventory', 'travel: tulsa.nowhere', 'refused');
 
 describe('what a step reads as', () => {
-  // Every kind a directive can be gets a reading, taken off the union rather than off a list here —
-  // a directive added next month is drawn as something rather than as nothing.
   it('reads every step in the words the file writes it in', () => {
     expect(replayLines(RUN).map((line) => line.text)).toEqual(RUN.map(printDirective));
   });
@@ -38,8 +36,6 @@ describe('the cursor', () => {
     expect(advances({ at: RUN.length, steps: RUN, failure: null })).toBe(false);
   });
 
-  // Carrying on past a divergence would be feeding an old script to a world that has stopped
-  // answering to it, which reads as a replay working while it says nothing true.
   it('stops where the record and the world have parted, however much record is left', () => {
     expect(advances({ at: 0, steps: RUN, failure: 'travel: tulsa.nowhere was not refused' })).toBe(false);
   });
@@ -51,8 +47,6 @@ describe('which page the run was on', () => {
     expect(pageAt(RUN, 5)).toEqual({ layer: 'character', subpage: 'inventory' });
   });
 
-  // The page is a function of the cursor, exactly as the game state is. Scrubbing back lands on the
-  // page the author was looking at, not on the last one the replay happened to walk through.
   it('goes back with the cursor rather than staying where the replay last walked', () => {
     expect(pageAt(RUN, RUN.length)).toEqual({ layer: 'character', subpage: 'inventory' });
     expect(pageAt(RUN, 3)).toEqual({ layer: 'home', subpage: 'home' });

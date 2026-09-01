@@ -24,9 +24,6 @@ import { createTransientChannel, type TransientChannel } from './transient';
 
 export const REMEDIES = ['clear-local', 'reopen'] as const;
 
-// Where a stopped run was filed, or why it could not be. Only a run that files clears the slot: the
-// author who cannot land one has not stopped wanting it, and dropping it here is the one loss
-// nothing else in the app could make good.
 export type Filing = { readonly filed: true; readonly at: string } | { readonly filed: false; readonly because: string };
 
 export type Remedy = (typeof REMEDIES)[number];
@@ -39,9 +36,6 @@ function remediesFor(problems: readonly UniverseProblem[], ifCleared: () => read
   return cleared !== null && asRead(cleared) !== asRead(problems) ? ['clear-local', 'reopen'] : ['reopen'];
 }
 
-// A `# test` being watched happen: which one, what it is made of, how far the cursor has walked,
-// and where the record and the world parted. A replay is a function of that cursor — the state, the
-// page and what has been said all follow from it — which is why there is nothing else here.
 export interface ReplaySnapshot {
   readonly test: Answer;
   readonly steps: readonly Directive[];
@@ -52,8 +46,6 @@ export interface ReplaySnapshot {
 }
 
 export interface ReplayControls {
-  // The test to watch, or null to stop watching. The world is left standing where the replay left
-  // it, since that is usually the thing the author opened one to look at.
   watching(test: string | null): void;
   at(step: number): void;
   playing(on: boolean): void;
@@ -68,34 +60,19 @@ export interface DriverSnapshot {
   remedies: readonly Remedy[];
   dev: boolean;
   speed: number;
-  // The run being recorded, or null when none is. Holding one is the whole of being in playtest
-  // mode; there is no second flag to disagree with it.
   playtest: RecordedRun | null;
-  // The run being watched, or null when none is.
   replay: ReplaySnapshot | null;
-  // Every module the world was opened with, under the pack each declares. What the settings page
-  // draws the mod portal off, so a module or a pack added to the corpus reaches it with no edit.
   mods: readonly PortalPack[];
 }
 
 export interface PlaytestControls {
   start(): void;
-  // Stopping files the run into the local changes, adopting them as `/dsl` does, so the `# test` is
-  // in the registry at once and a reload runs through what was just played. A run the game could
-  // not be left holding is refused, said, and still recorded afterwards.
   stop(): Filing;
   attach(turn: number, notes: RunNotes): void;
-  // Where in the app the player went. The engine never hears about a page, and a player who has
-  // just navigated somewhere is a player with something to say about having navigated there.
   moved(where: string): void;
-  // The run as the `# test` section that replays it, under the name it was minted with.
   written(): string;
-  // The runs already filed into the game, read fresh rather than kept in the snapshot: a list only
-  // whoever is drawing it wants, and one the engine's own clock has no reason to recompute.
   filed(): readonly FiledRun[];
-  // Dropping one, both its sections in the one edit that files them.
   drop(run: string): void;
-  // Renaming one, every section it is filed as moving together.
   rename(run: string, to: string): void;
 }
 
@@ -119,8 +96,6 @@ export interface Driver {
   editorMemory: { read(): string | null; write(text: string): void };
   note(text: string): void;
   reopen(): void;
-  // Turn a set of modules off and open the world again. The names are source names, which is what a
-  // row on the page carries; a name matching nothing loaded turns nothing off.
   turnModulesOff(names: readonly string[]): void;
   clearLocalChanges(): void;
   playtest: PlaytestControls;
@@ -167,8 +142,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const header = (): RunHeader => ({ at: new Date(save.now()).toISOString(), built: typeof __BUILT_FROM__ === 'string' ? __BUILT_FROM__ : 'unknown' });
 
-  // A run is read back out of its slot before anything else, so a reload lands mid-playtest with
-  // what was already played rather than starting a second run beside it.
   const record = createRecorder(save.store, (text) => complain(text), header);
 
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
@@ -196,8 +169,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     const local = readLocal();
     const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local.text };
     const held = local.text.trim() === '' ? shipped : [...shipped, localSource];
-    // The player's own set is laid on every open, so reopening after a toggle is the whole of what a
-    // toggle does and nothing carries the choice around separately.
     const sources = withModulesOff(held, modulesTurnedOff(save));
     const opened = openUniverse(sources, { save });
 
@@ -238,8 +209,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // An edit to the runs filed in the game: the world it leaves behind, and whatever the edit said
-  // about itself, said where every other command's words are said.
   const filing = (result: CommandResult): void => {
     current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
     publish();
@@ -250,9 +219,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // Stop the app's clock without saying anything to the engine about it. A line the player types is
-  // not by itself a reason to drop what they were doing, so what the world does with it is the
-  // world's to decide.
   const unhook = (): LiveRun | null => {
     const run = running;
     running = null;
@@ -290,10 +256,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // What the player picked, rather than how the line spelled it. Answering a numbered choice is the
-  // one place the two differ — the engine's protocol for picking one is its position, and a run log
-  // of 1, 2, 3 says nothing to whoever reads it afterwards. Read off the line rather than off which
-  // control sent it, because a tap on the map sends the same position the choice list does.
   const picked = (line: string): string => {
     const at = /^[ 	]*(\d+)[ 	]*$/.exec(line);
     return at === null ? line : (current.view.choices[Number(at[1]) - 1]?.id ?? line);
@@ -307,10 +269,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       complain(refusal);
       return;
     }
-    // A line no longer calls off what was under way. The run comes off the clock, the line runs
-    // beside it, and whatever the engine is still holding afterwards is what gets picked back up —
-    // so examining something or opening a screen costs the fight nothing, and beginning something
-    // else displaces it because the engine says so and not because a line was typed.
     const held = unhook();
     if (held) settleRun(held, false);
 
@@ -339,8 +297,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  // A session over the same world standing at the beginning. A replay scrubbing backwards walks
-  // forward from nothing rather than undoing anything, so this is what nothing is.
   const restart = (): void => {
     const session = startSession(context.session.registry);
     context = newContext(session, view(session), { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } });
@@ -350,8 +306,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     if (replay === null) return;
     const target = clamped(step, replay.steps);
 
-    // Walking a step at a time is what lets each step say its own words. Going anywhere behind the
-    // cursor — or anywhere at all once the record and the world have parted — starts over.
     const backwards = target < replay.at || replay.failure !== null;
     if (backwards) restart();
     const from = backwards ? 0 : replay.at;
@@ -378,8 +332,6 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     sinceStep = 0;
   };
 
-  // A replay is watched, so it advances on the clock rather than as fast as the engine can settle
-  // the steps. It runs off the same ticker every other timed thing here does.
   const replayTick = (elapsedMs: number): void => {
     if (replay === null || !replay.playing) return;
     sinceStep += elapsedMs;

@@ -132,11 +132,6 @@ function applyEdits(text: string, edits: readonly Edit[]): string {
 
 const rehead = (heading: string, section: string): string => [heading, ...section.split('\n').slice(1)].join('\n');
 
-// A staged section is a patch over the one that declares the id, however much of it it happens to
-// write: the fields it names go home where that file writes them and every other line is left
-// standing. A kind that reads its own body has no fields to name and goes home whole, as every staged
-// section did before patches existed; so does one the patcher cannot lay in line by line, which it
-// answers for by handing the body straight back.
 function foldedHome(base: readonly ModuleSource[], declaration: Declaration, section: LocalSection): Patching {
   const written = rehead(declaration.heading, section.text);
   const schema = sectionFor(section.kind)?.schema;
@@ -157,10 +152,6 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
   const declared = declarations(base, namespaces);
   const files = new Map(base.flatMap((source) => (namespaces.get(source.name) == null ? [] : [[namespaces.get(source.name)!, source] as const])));
 
-  // Where a section nothing declares yet goes home: the module its id names, read off the id the
-  // loader settled rather than off the words an author typed. Which module a staged body belongs to
-  // is not the same question — a staged section belongs to the staging module until it is placed,
-  // and placing it is what this is.
   const newIn = (target: Target): ModuleSource | undefined => {
     if (target.remove) return undefined;
     const named = moduleNamed(target.id);

@@ -8,9 +8,6 @@ import { packTurnsTo, type PortalPack } from '../content/packs';
 import { settingLine, standsAt } from './settingLines';
 import type { Words } from './words';
 
-// One row per preference the engine publishes, drawn off the live view rather than off a list of
-// this page's own: a setting declared next month arrives here with nothing edited, and picking one
-// sends the line a player would have typed.
 function Preference({ row, onSend }: { row: SettingRow; onSend: (line: string) => void }): JSX.Element {
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-border bg-panel px-3 py-2 text-sm text-text">
@@ -61,14 +58,7 @@ function Rates({ speed, words, onSend }: { speed: number; words: Words; onSend: 
   );
 }
 
-// The packs the world was opened with, and what turning one on or off leaves behind. A pack row is
-// a control over the modules under it rather than a second thing to agree with them, so a pack that
-// is half on says so and the next click takes it the rest of the way on.
 function Mods({ packs, words, localizer, onTurn }: { packs: readonly PortalPack[]; words: Words; localizer: Localizer; onTurn: (names: readonly string[], on: boolean) => void }): JSX.Element {
-  // Which packs are showing what is under them. Page state and nothing else — every module is on the
-  // harness surface whether it is drawn or not, and what a pack is standing at is on its own row, so
-  // a shut pack hides no answer. Held by pack name rather than as a count, so a pack that appears or
-  // is renamed is shut rather than inheriting whatever was open at its position.
   const [open, setOpen] = useState<readonly string[]>([]);
   const showing = (pack: string): boolean => open.includes(pack);
 
@@ -140,9 +130,6 @@ function Mods({ packs, words, localizer, onTurn }: { packs: readonly PortalPack[
 
 const RUN_CONTROL = 'shrink-0 rounded-xl border border-border bg-surface px-3 text-sm text-text-subtle transition-transform duration-75 active:scale-[0.97]';
 
-// One filed run and the three things that can be done to it: watched back, renamed, or dropped.
-// Renaming asks here rather than through a screen — the name is one word about a row that is
-// already on the page, and the row is where it is read.
 function Run({ run, renaming, words, localizer, onRenaming, onReplay, onRename, onDrop }: { run: FiledRun; renaming: string | null; words: Words; localizer: Localizer; onRenaming: (name: string | null) => void; onReplay: () => void; onRename: (to: string) => void; onDrop: () => void }): JSX.Element {
   if (renaming !== null) {
     return (
@@ -181,9 +168,6 @@ function Run({ run, renaming, words, localizer, onRenaming, onReplay, onRename, 
   );
 }
 
-// The runs already filed into the game, and what can be done to one here. They pile up two sections
-// at a time and nothing prunes them on a clock — a run the author has not exported yet is theirs to
-// keep — so this is where they go.
 function Runs({ runs, words, localizer, onReplay, onRename, onDrop }: { runs: readonly FiledRun[]; words: Words; localizer: Localizer; onReplay: (run: string) => void; onRename: (run: string, to: string) => void; onDrop: (run: string) => void }): JSX.Element {
   const [renaming, setRenaming] = useState<{ run: string; to: string } | null>(null);
 

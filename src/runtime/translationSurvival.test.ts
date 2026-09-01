@@ -59,7 +59,6 @@ describe('a universe with every word replaced', () => {
 
   it('says nothing a shipped title says', () => {
     const asShipped = localizerFor(shipped, BASE_LANGUAGE);
-    // A title that moves is one somebody is shown, so the subjects are the items the locale carries words for rather than every item declared: a DEBUG section says nothing in any language, and asking its untranslatable fallback to move would be asking for the opposite of that.
     const ids = [...shipped.items.keys()].filter((id) => asShipped.words('item', id, 'title') !== undefined);
 
     expect(ids.length).toBeGreaterThan(5);
@@ -70,10 +69,6 @@ describe('a universe with every word replaced', () => {
   });
 });
 
-// What this asks is whether replacing every word changes the answer — not whether the route passes,
-// which is `integration.test.ts`'s question and is answered there once. A route broken by a balance
-// pass reddens that file alone; if it reddened here too, a content bug would read as a translation
-// bug in three files at once and send its reader into the engine.
 describe('a recording survives translation', () => {
   for (const id of registry.tests.keys()) {
     for (const language of PLAYED) {
@@ -87,11 +82,6 @@ describe('a recording survives translation', () => {
 const talkedTo = (holds: (dialogue: object) => boolean): ReadonlySet<string> =>
   new Set([...registry.dialogues.values()].filter(holds).flatMap((dialogue) => (dialogue.owner === undefined ? [] : [dialogue.owner])));
 
-// Every entity anybody has written a word for, which is where a list of threads comes from. An
-// entity holding a DEBUG dialogue is not one of them: that dialogue says nothing in any language,
-// so its threads read the same in both and the claim below is about words it has not got. The mark
-// is read off the section rather than off whether the locale carries the words, so a node whose
-// words really are missing still fails here rather than quietly leaving the sweep.
 const silenced = talkedTo(isDebug);
 const owners = [...talkedTo((dialogue) => !isDebug(dialogue))].filter((owner) => !silenced.has(owner));
 
@@ -103,7 +93,6 @@ const readsAs = (entityId: string, language: string): string[] => {
 };
 
 describe('a list of threads', () => {
-  // The lists the corpus actually puts up, rather than the entity that says one thing and is entered outright.
   const listing = owners.filter((owner) => threadsOf(owner, BASE_LANGUAGE).length > 1);
 
   it('is something the corpus puts up, so there is a list here to pick out of at all', () => {
@@ -124,7 +113,6 @@ describe('a list of threads', () => {
   });
 });
 
-// The claim above is about the engine; this one is about whether the corpus uses it. A recording that counts to its choice takes a different one in another language, so the shipped ones name theirs, and both routes that pick from a list are replayed in both languages by the recording sweep above. The subjects derive from the recordings themselves, so one converted next month needs no edit here and one converted back is caught.
 describe('a recording the corpus ships', () => {
   it('names the choice it takes rather than counting to it', () => {
     const counting = [...registry.tests.values()].filter((test) => test.directives.some((directive) => directive.kind === 'choose' && /^\d+$/.test(directive.text)));

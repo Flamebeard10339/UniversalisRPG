@@ -12,8 +12,6 @@ export function actorEntity(registry: Registry, actorId: string): Entity | undef
   return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
 }
 
-// A section kind that nests actions answers from its own map; the rest are
-// sources of an action that no section declares.
 export function findActionOwner(obj: string, objId: string, registry: Registry): unknown {
   if (isActionOwnerKind(obj)) return mapOf(registry, registryMapOf(obj)!).get(objId);
   switch (obj) {

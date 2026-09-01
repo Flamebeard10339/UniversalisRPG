@@ -12,21 +12,16 @@ import { parametersOf } from '../../grammar/values';
 
 export type { PrintContext };
 
-// Where a kind's own ids are kept apart. `owned` qualifies the id with its module's namespace, `global` means one name across every module, `none` declares nothing anyone can name. This says nothing about what happens where one of these is named — `Vocabulary` does.
 export type Ids = 'owned' | 'global' | 'none';
 
-// Whether a name of this kind is held to what the world declares. `declared` refuses one nothing declared, where it is written; `open` takes whatever an author writes, which is what a kind whose vocabulary is written somewhere other than its own sections has to do.
 export type Vocabulary = 'declared' | 'open';
 
 export type Maps = Record<string, Map<string, never>>;
 
-// A section written to prove something about the engine, which ships to nobody. Upper case because nothing else in the language is, so it can never be read as an id, a keyword or a value of some kind's own; and written under the heading rather than in it, because a heading is rebuilt from its parts wherever a section is moved or renamed and a body line is carried along whole.
 export const DEBUG_MARK = 'DEBUG';
 
-// A second body at an id already written is laid over the one there rather than replacing it, and these are how it adds to and takes back what the first one wrote. The engine reads them wherever a line is written, so they belong to no kind and are said once; a kind that will not take one refuses it where it stands.
 const WRITTEN_AGAIN = 'writing over a body already there';
 
-// The line every kind takes and no kind declares. It is not in any kind's grammar because it belongs to none of them — what holds of every section is written here once, and the page an author reads says so in the same words.
 export const EVERY_SECTION: readonly Written[] = [
   {
     form: DEBUG_MARK,
@@ -47,30 +42,21 @@ export const EVERY_SECTION: readonly Written[] = [
   },
 ];
 
-// The one name for *the player has interacted with this thing themselves*, put in a kind's `flags`
-// by every kind whose things a player interacts with. It is named on the contract rather than in one
-// kind's file because two kinds mean the same thing by it — an entity that has been read and a
-// location that has been stood in are the same fact about the player — and a third kind that becomes
-// interactable joins them by declaring this, not by minting a word of its own.
 export const TOUCHED = 'touched';
 
 const isMark = (line: RawLine): boolean => line.text === DEBUG_MARK;
 
 export const isDebug = (value: object | undefined): boolean => (value as { debug?: unknown } | undefined)?.debug === true;
 
-// What a sheet that lists what the world declares may put on it. What keeps a DEBUG section out of a player's hands everywhere else is that anything they can reach is refused for naming it — and a sheet that walks a registry map names nothing, it lists everything, so the refusal never fires there and the sheet asks here instead. A sheet that reports what a player holds or where they stand is reading their state and is not one of these.
 export const listedToPlayer = <V extends object>(declared: Iterable<V>): V[] => [...declared].filter((value) => !isDebug(value));
 
-// Laid on the value rather than held in a table beside it, so every hand a section passes through — a merge, a build, a prune that spreads it, a printer — carries the mark without knowing it is there.
 const asDebug = <V extends object>(value: V): V => Object.defineProperty(value, 'debug', { enumerable: true, configurable: true, value: true });
 
-// An action a section of this kind offers that its author did not write as an action block: the action itself, which says where it is addressed and whose words it is, and the line an author reads it under.
 export interface MintedAction {
   action: Action;
   from: string;
 }
 
-// A name the namespace holds under one value of this kind, wherever that value came from. A kind declaring this is answering for every value that lands in its map, including the ones another kind put there.
 export interface MemberName {
   kind: string;
   name: string;
@@ -107,15 +93,10 @@ interface Common<V extends { id: string }> {
   kind: string;
   ids: Ids;
   vocabulary: Vocabulary;
-  // Where the actions written under this kind reach, said as the rest of "offered …". A kind that nests actions is the only thing that knows this — nothing in the engine can tell an item the player carries from an entity that stays where it stands — so declaring the reach is how a kind declares that it nests them at all.
   nestsActions?: string;
-  // The actions a section of this kind offers that its author did not write as an action block. Read off the value, since a kind mints one only where the field it compiles is written.
   mintedActions?: (value: V) => readonly MintedAction[];
-  // Flags every section of this kind owns without an author writing them.
   flags?: readonly string[];
-  // The result lists an author wrote here, whose spoken lines key under this id.
   says?: (value: V) => ActionResult[][];
-  // The names one of these holds that anything may address, which the namespace declares beneath whatever section landed the value.
   members?: (value: V) => readonly MemberName[];
   text?: readonly string[];
   validate?: (value: V) => string | undefined;
@@ -133,29 +114,21 @@ interface Bespoke<V extends { id: string }> extends Common<V> {
   grammar: readonly Written[];
 }
 
-// What a keyword's shapes trail off in where it takes a list of them.
 const LISTED = ', …';
 
-// The grammar a field's own body is written in, where its parser has one. Asked of the parser rather than of the field, so any parser that says what its indented lines hold is offered as a block wherever it stands.
 const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('lines' in parser ? () => (parser as { lines(): readonly Written[] }).lines() : undefined);
 
-// The parser a value of this one is written with, which for a list is the parser one item of it is written with.
 const valueOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
 
-// Every shape the parser takes, written out where it stands.
 const spelled = (parser: Parser<unknown>, written: (value: string) => string, said: object, shown?: string): Written[] =>
   paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(shown ?? example), ...said }]));
 
-// A grammar with a name of its own is pointed at rather than written out: the field takes `<name>`,
-// and what a `<name>` is written with is said once, wherever the page says it. What the hole holds is
-// the parser itself, which is how the same line still answers an author standing in it.
 function pointedAt(parser: Parser<unknown>, written: (value: string) => string, said: object): Written | undefined {
   const called = parser.called;
   if (called === undefined) return undefined;
   const shown = spelled(parser, written, said)[0];
   if (shown === undefined) return undefined;
   const held = (said as { holds?: Holds }).holds?.() ?? {};
-  // A list is its element written over and over, so the name stands where one item does and the list's own `, …` is kept.
   const list = parser.forms.every((form) => form.endsWith(LISTED));
   return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: valueOf(parser) }) };
 }
@@ -167,14 +140,11 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
-  // What the field says its placeholders hold stands over what the parser says, since one parser writes the values of fields that name different kinds.
   const filled = { ...filledBy(parser), ...filledBy(spec) };
-  // A family says what a line is for. Whether it was declared as a field, as a positional one or as a keyword is how the engine holds it, not what an author is choosing between, so a schema line joins no family unless its kind says which one it is in.
   const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }), ...filled };
   const named = pointedAt(parser, written, said);
   const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];
   if (shapes.length === 0) return [];
-  // A block whose lines are this field's own values written one to a line takes what the field says over its parser; a block that is a grammar of its own already says what each of its lines holds.
   const laid = valueOf(parser) === parser ? {} : filledBy(spec);
   const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...laid }));
   return [...shapes, ...(held === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block: held }])];
@@ -186,17 +156,14 @@ export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...(schema.entries?.body.grammar ?? []),
 ];
 
-// A shape that is one placeholder and nothing else, which is what a field written as a bare name has.
 const ALONE = /^<(?<hole>[a-z][a-z0-9 -]*)>(?:, …)?$/;
 
-// The kind a field's values name, where a value of it is a name and nothing else. Its shapes say so, so the engine walks them under that kind rather than each kind's file writing the same word into a `visit` of its own.
 function nameKind(spec: AnyField): string | undefined {
   const parser = spec.parser as Parser<unknown>;
   const holes = parser.forms.map((form) => ALONE.exec(form)?.groups?.hole);
   if (holes.length === 0 || holes.some((hole) => hole === undefined)) return undefined;
   const held = parser.holds?.() ?? {};
   const said = { ...parser.names, ...spec.names };
-  // A placeholder that holds a grammar holds more than a name, and a shape that names nothing leaves the field's word to the shapes that do.
   const kinds = new Set(
     holes
       .filter((hole) => held[hole!] === undefined)
@@ -206,7 +173,6 @@ function nameKind(spec: AnyField): string | undefined {
   return kinds.size === 1 ? [...kinds][0] : undefined;
 }
 
-// A field whose values are names of one kind, which is what the engine walks and prunes without its kind's file saying so again.
 export interface Named {
   field: string;
   kind: string;
@@ -221,7 +187,6 @@ const namedFields = (schema: AnySchema): readonly Named[] =>
     return kind === undefined ? [] : [{ field, kind, site: `${spec.keyword ?? field}:`, list: isListField(schema, field), standsWithout: spec.standsWithout === true }];
   });
 
-// How an action nested under a kind is addressed and how far it reaches, laid on the lines `actionBody` itself declares. Those forms are what tells an action apart from whatever else a kind nests beside it — an entity's `on <event>:` is not offered anywhere — and the reach is the kind's own word, so this is written once for however many kinds nest actions.
 function nestedActionLines(kind: string, offered: string, lines: readonly Written[]): readonly Written[] {
   const own = new Set(actionBody.grammar.map((line) => line.form));
   const note = `addressed as \`${kind}.<${kind}>.<action>\`, which is how a # test names one, and offered ${offered}`;
@@ -236,10 +201,6 @@ const notContent = (kind: string): never => {
   throw new DslError(`a # ${kind} is not content and cannot be built into the registry`);
 };
 
-// What a second body at one id means for a kind whose body has no fields to lay over one another:
-// the later writing is the section, and the earlier one is gone. A kind with a rule of its own
-// declares it instead; a kind with neither is refused where it is declared, because keeping the
-// first and dropping the second is the one answer an author is never told about.
 export const writtenWhole = (_into: object | undefined, from: object): object => from;
 
 export const section =
@@ -268,7 +229,6 @@ export const section =
       }
       walk(value, where, visit);
     };
-    // What is left of a section once the names it holds that nothing declares any more are taken out of it. A list loses those members; a name held on its own takes the section with it, unless its field says the section stands without it.
     const without = (value: V, at: Pruning, where: string): V | null => {
       let held: Loose | undefined;
       for (const each of names) {
@@ -286,7 +246,6 @@ export const section =
       }
       return (held ?? value) as V;
     };
-    // A prose field is said to a player as it is written: nothing stands beside it to fill a hole, so a `{…}` in one names something that will never arrive. What is spoken — a line of dialogue, a `say:` — is read as segments instead, and is not one of these.
     const unfillable = (value: V): string | undefined => {
       for (const field of text) {
         const written = (value as unknown as Loose)[field];
@@ -332,7 +291,6 @@ export const section =
       text,
       schema,
       parse: read,
-      // A section already marked cannot be unmarked by a later edit of it: what is written to prove something about the engine stays out of the world however many modules go on to add to it.
       merge: (into, from) => {
         const merged = mergeBodies(into, from);
         return isDebug(into) || isDebug(from) ? asDebug(merged) : merged;

@@ -58,10 +58,6 @@ function accountedFor(run: string, permitted: readonly string[]): boolean {
 
 const onScreen = (runs: readonly string[], text: string): boolean => runs.some((run) => run.includes(text));
 
-// What a live view published as words a player may read: every string it holds anywhere, less the
-// addresses the world declares, since a title reaches the screen and the id beside it may not. Both
-// halves derive — the strings off the view's own leaves, the addresses off the sources — so a field
-// the view grows next month is covered with nothing here edited.
 const published = (view: PlayView, addresses: ReadonlySet<string>): string[] =>
   leaves(view).flatMap((leaf) => leaf.signatures).filter((each) => !addresses.has(each));
 
@@ -71,9 +67,6 @@ function pagesDrawn(view: PlayView): Record<string, number> {
 
 const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
-// Every parameter any label takes, read off the labels themselves. A label added next month with a
-// parameter nobody here has heard of is still rendered, rather than throwing over a list that was
-// not grown to meet it.
 const SAID = loadInEnglish('');
 const NODE: Params = Object.fromEntries(
   Object.values(LABELS).flatMap((key) => parametersOf(SAID.locales.english.get(key) ?? SAID.locales.base.get(key)?.text ?? '').map((name) => [name, asLocalized(name)])),
@@ -87,9 +80,6 @@ const authored = (driver: Driver): string[] => addressable(sourcesOf(driver)).ma
 
 const addressesOf = (driver: Driver): ReadonlySet<string> => new Set(addressable(sourcesOf(driver)).map((section) => section.address));
 
-// The names the mod portal draws, which the load path published and the driver carries. Read off the
-// snapshot rather than listed, so a pack minted in the corpus next month is accounted for by having
-// been declared — the same way a section address is.
 const packed = (driver: Driver): string[] => driver.snapshot().mods.flatMap((pack) => [pack.pack, ...pack.modules.map((module) => module.id)]);
 
 const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
@@ -168,8 +158,6 @@ function stocked(): Driver {
   return read(driver);
 }
 
-// A room nobody has read offers only the looks that read it, so a sheet is asked about after
-// taking them, which is what a player does before anything else here is on it.
 function read(driver: Driver): Driver {
   for (const choice of unreadHere(driver.snapshot().view)) driver.send(String(choice.id));
   return driver;
@@ -280,7 +268,6 @@ describe('what the shell puts on the screen', () => {
     };
 
     step();
-    // The room arrives masked, and every look that lifts one is a screen of its own to account for.
     for (const choice of unreadHere(driver.snapshot().view)) {
       driver.send(String(choice.id));
       step();
@@ -290,8 +277,6 @@ describe('what the shell puts on the screen', () => {
     const menu = driver.snapshot().view.modals[0].options[0];
     driver.answer(menu.key, menu.values![0]!.value);
     step();
-    // A thread that goes on holds the screen, so it is answered to its end before anything the room
-    // offers is reached for again. The last choice on a node is the one that leaves.
     for (let guard = 0; guard < 8 && driver.snapshot().view.modals.length > 0; guard += 1) {
       const asked = driver.snapshot().view.modals[0]!.options[0]!;
       driver.answer(asked.key, asked.values![asked.values!.length - 1]!.value);
@@ -318,9 +303,6 @@ describe('what the shell puts on the screen', () => {
     }
   });
 
-  // The playtest bar and its sheet are drawn only while a run is being recorded, so no other
-  // claim in this file ever reaches them. This is the smoke check that an author starting one
-  // does not lose the session; what the sheet decides is proved in playtest.test.ts.
   it('draws the playtest bar while a run is recorded, and nothing when none is', () => {
     const driver = createDriver(fixtureSources());
     const quiet = readable(renderToStaticMarkup(<App driver={driver} />));
@@ -377,8 +359,6 @@ describe('what the shell puts on the screen', () => {
     expect(second.node.top - first.node.top).toBe((second.place.y - first.place.y) * grid);
   });
 
-  // The number is the world's, not the engine's: `# variable map-grid`. A world that wants its quarter
-  // spread out says so in its own file, and every surface that draws a map draws it at that size.
   it('draws the world at the grid the world declares', () => {
     const wider = { ...SURVEYED, text: SURVEYED.text.replace('# stat might', ['# variable map-grid', 'value: 300', '', '# stat might'].join('\n')) };
     const driver = createDriver([wider]);
@@ -474,9 +454,6 @@ describe('what the shell puts on the screen', () => {
     }
   });
 
-  // Below every page rather than inside one: the run is drawn after the last thing any layer draws,
-  // which is what puts it on the lower band whichever layer the player is standing on. The subjects
-  // are the sheet's own rows, so the claim keeps meaning this if a page is added.
   it('draws the run below every page, without withdrawing the choices', () => {
     const driver = stocked();
     const idle = driver.snapshot().view.choices;
@@ -585,8 +562,6 @@ describe('what the shell puts on the screen', () => {
     expect(renderToStaticMarkup(<ModalSheet option={field} manner={{}} onAnswer={() => undefined} />)).toContain(`aria-label="${field.label}"`);
   });
 
-  // A pool meter fills on the same declaration, so the duration is in the markup of any tree at all
-  // and finding it there says nothing. The bar under a run is the one that has to carry it.
   it('moves a bar over exactly one tick of the cadence both drivers read, and draws none when nothing is under way', () => {
     const idle = stocked();
     expect(renderToStaticMarkup(<App driver={idle} />)).not.toContain('data-live="fill"');
@@ -610,8 +585,6 @@ describe('what the shell puts on the screen', () => {
 
     driver.answer(menu.key, menu.values![0].value);
 
-    // Taking a line out of the menu leaves Miki still talking, and what he says next asks nothing:
-    // the shell is still up, carrying the one answer that says the beat has been read.
     const beat = driver.snapshot().view.modals[0].options[0];
     expect(asking(renderToStaticMarkup(<App driver={driver} />))).toBe(true);
 
@@ -669,9 +642,6 @@ describe('what the shell puts on the screen', () => {
       expect(under).toEqual({ x: MAPPING.where.pan.x, y: MAPPING.where.pan.y, zoom: MAPPING.where.zoom });
     });
 
-    // The frame of reference is the sheet's own origin and not the middle of what happens to be on it.
-    // Read off the drawn things, it moved whenever any one of them moved — which is why dragging a
-    // place in dev mode slid every other place across the map under the finger holding it.
     it('leaves every other place where it was when one place moves', () => {
       const driver = createDriver([SURVEYED]);
       driver.choose(position(driver, LOOK_OUT));
@@ -789,8 +759,6 @@ describe('what a screen wider than it is tall gets', () => {
   });
 });
 
-// The travel offers are drawn where they lie rather than in the order the engine happened to list
-// them, and the square each one sits in is the map's own judgement rather than the sheet's.
 describe('the ways out, laid out the way they lie', () => {
   const compass = (html: string): Array<{ bearing: string; runs: string[] }> =>
     [...html.matchAll(/<button([^>]*data-bearing="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, , bearing, inner]) => ({ bearing, runs: readable(inner) }));
@@ -811,7 +779,6 @@ describe('the ways out, laid out the way they lie', () => {
       expect(way, `${square.bearing} holds ${square.runs.join('')}`).toBeDefined();
       expect(way!.bearing).toBe(square.bearing);
     }
-    // Each way out is on the screen once: in its square, and not among the cells above it too.
     const runs = readable(html);
     for (const square of drawn) expect(runs.filter((run) => run === square.runs.join('')), square.runs.join('')).toHaveLength(1);
   });

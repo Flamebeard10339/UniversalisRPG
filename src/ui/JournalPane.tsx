@@ -4,8 +4,6 @@ import { inkOf } from './lineStyle';
 import { useTestSurface } from './useTestSurface';
 import type { Words } from './words';
 
-// The list itself. Reading one is a screen the engine opens, so a row sends the
-// line that opens it rather than holding a quest open on its own.
 export function JournalPane({ view, words, onOpen }: { view: PlayView; words: Words; onOpen: (quest: string) => void }): JSX.Element {
   const rows = journalRows(view.journal);
 

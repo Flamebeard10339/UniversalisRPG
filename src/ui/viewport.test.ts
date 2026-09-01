@@ -104,8 +104,6 @@ describe('where a sheet comes to rest', () => {
     expect(close).toBeGreaterThan(far);
   });
 
-  // Measured from where the drawing's own middle would sit rather than from the sheet's origin: the
-  // limit is about the drawing, and the origin may be nowhere near it.
   it('stops a whole drawing away from the middle of the window', () => {
     const drawn = 416 + 150;
     const middle = 416 / 2;
@@ -137,8 +135,6 @@ describe('putting one node back in the middle', () => {
     expect(panOnto({ x: 200, y: 100 }, 2)).toEqual({ x: -400, y: -200 });
   });
 
-  // The one claim: whatever `panOnto` hands back, the middle of the frame is then looking at the node
-  // it was given, whatever the sheet had got to and whatever else is drawn on it.
   it('lands the node in the middle from wherever the sheet had got to', () => {
     for (const zoom of [0.5, 1, 1.5, 3]) {
       const node = { x: 320, y: 40 };
@@ -147,8 +143,6 @@ describe('putting one node back in the middle', () => {
     }
   });
 
-  // What a place is dragged to, and where a new place is put, are read back through this: they are
-  // sheet points, and nothing about the frame of reference may depend on what else is drawn.
   it('reads back the same point whatever else the sheet holds', () => {
     expect(lookingAt({ x: -300, y: 50 }, 2)).toEqual({ x: 150, y: -25 });
   });
@@ -182,8 +176,6 @@ describe('where a road between two places starts and stops', () => {
     expect(corner.y).toBeCloseTo(20 + EDGE_GAP, 10);
   });
 
-  // Past the middle and the two ends swap over, which drew a short road backwards and put the arrow
-  // on it the wrong way round.
   it('stops at the middle rather than running past it, for two places nearly on top of each other', () => {
     expect(leaving({ x: 0, y: 0 }, { x: 3, y: 0 }, BUBBLE)).toEqual({ x: 1.5, y: 0 });
     expect(leaving({ x: 3, y: 0 }, { x: 0, y: 0 }, BUBBLE)).toEqual({ x: 1.5, y: 0 });

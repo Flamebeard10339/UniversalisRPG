@@ -12,9 +12,6 @@ describe('the pace a level is meant to take', () => {
     }
   });
 
-  // The frontier is what the best offer within reach pays, and every offer a weaker character can
-  // take a stronger one can take too — so the pace a world holds never falls with level. A target
-  // that fell would be asking for a world that cannot exist, whatever was authored into it.
   it('asks a target that never falls, because a stronger character never earns less at the same offer', () => {
     for (let level = 1; level < 100; level += 1) expect(rateAtLevel(level + 1)).toBeGreaterThanOrEqual(rateAtLevel(level));
   });

@@ -1,11 +1,3 @@
-// English for every string the engine says on its own behalf. It is content,
-// loaded through the same `# locale` mechanism any other language uses, and its
-// own module so that a universe without the tutorial island still has English
-// and a test can load English without loading an island.
-//
-// The keys are closed in code, by the union in src/content/locale.ts. A key
-// missing from here shows itself on screen rather than falling back.
-
 # info engine-en
 version: 1.0.0
 pack: engine

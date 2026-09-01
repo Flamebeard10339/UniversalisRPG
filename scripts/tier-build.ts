@@ -67,8 +67,6 @@ export function parseTierArgs(raw: readonly string[]): TierArgs {
   return { activity, level: at, items, grow, list: false };
 }
 
-// What the build was handed, and what became of it. A refusal is the engine's own sentence, so a
-// tier that cannot yet wear the good gloves says so in the words a player would have read.
 export interface Worn {
   item: string;
   refused?: string;
@@ -79,8 +77,6 @@ export interface Handed {
   count: number;
 }
 
-// `<id>:<count>`, or one of it. An id carries dots and never a colon, so the two cannot be confused
-// for one another.
 export function handedOver(written: string): Handed {
   const cut = written.lastIndexOf(':');
   if (cut < 0) return { item: written, count: 1 };
@@ -95,9 +91,6 @@ export interface TierBuild {
   grown?: Grown;
 }
 
-// What spending the planes came to. `unspent` is the honest half: a budget the greedy rule could not
-// reach the end of, and the reading before and after is the whole of the evidence that a stat named
-// under --grow was one this world can actually move.
 export interface Grown {
   spent: number;
   unspent: number;
@@ -105,17 +98,11 @@ export interface Grown {
   after: Record<string, number>;
 }
 
-// One thing that may be done to a plane. Both are the engine's own doors; nothing here is a change
-// to a plane that a player at the growth screen could not make.
 type Move = { kind: 'allocate'; node: PlaneNode } | { kind: 'socket'; hex: Hex; direction: Direction; jewel: string };
 
 const applyMove = (state: GameState, registry: Registry, target: string, move: Move): boolean =>
   (move.kind === 'allocate' ? allocate(state, registry, target, move.node) : slotJewel(state, registry, target, move.jewel, move.hex, move.direction)).ok;
 
-// A plane's own record of what is already paid for, which is where every next move has to start
-// from. The root of the plane's own cluster is allocated by standing there rather than by being
-// listed, so it is asked for the same way the engine asks -- and a cluster shape added next month
-// brings its own root with it.
 function standing(registry: Registry, plane: Plane): PlaneNode[] {
   const nodes = new Map<string, PlaneNode>();
   const keep = (node: PlaneNode): void => {
@@ -130,9 +117,6 @@ function standing(registry: Registry, plane: Plane): PlaneNode[] {
   return [...nodes.values()];
 }
 
-// Everything that could be done next, derived from where the plane already stands: the unpaid
-// neighbours of everything paid for, and every jewel still held against every open socket already
-// paid for. What each is worth is not asked here -- that is read off the engine, one move at a time.
 function movesFrom(registry: Registry, plane: Plane, jewels: readonly string[]): Move[] {
   const moves: Move[] = [];
   const seen = new Set<string>();
@@ -152,8 +136,6 @@ function movesFrom(registry: Registry, plane: Plane, jewels: readonly string[]):
   return moves;
 }
 
-// The plane, the stock a jewel comes out of and the cursor a socketed jewel rolls on: everything a
-// trial move writes, so a move can be tried and taken back rather than modelled.
 interface Undo {
   plane: Plane;
   inventory: Record<string, number>;
@@ -170,7 +152,6 @@ function undo(state: GameState, payload: ItemInstance, taken: Undo): void {
 
 const reading = (state: GameState, registry: Registry, stats: readonly string[]): number[] => stats.map((id) => statValue(id, state, registry));
 
-// Better means better at the first stat the two differ on, which is what naming them in order means.
 function beats(one: readonly number[], other: readonly number[]): boolean {
   for (let at = 0; at < one.length; at++) {
     if (Math.abs(one[at]! - other[at]!) > 1e-9) return one[at]! > other[at]!;
@@ -180,11 +161,6 @@ function beats(one: readonly number[], other: readonly number[]): boolean {
 
 const GUARD = 500;
 
-// One piece's plane, spent. `playedOut` is what makes a move that pays nothing legible: a socket and
-// the slot in front of it both read exactly as they did, and the only thing that tells one jewel from
-// another is what the plane comes to once the rest of the budget is spent behind it. So a move is
-// scored by finishing the build under it and reading that, and the finishing itself is scored move by
-// move -- which is where the greed is, and it is the only place it is.
 function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], playedOut: boolean): number {
   let spent = 0;
   for (let guard = 0; guard < GUARD; guard++) {
@@ -209,9 +185,6 @@ function spendPlane(state: GameState, registry: Registry, target: string, item: 
   return spent;
 }
 
-// Every piece on the body that dropped with points, spent toward the named stats. Which pieces those
-// are is asked of what is worn rather than listed: anything the engine minted a plane for has one,
-// and anything else has no budget to spend and says so by having none.
 export function growWorn(state: GameState, registry: Registry, stats: readonly string[], jewels: readonly string[]): Grown {
   const named = (values: number[]): Record<string, number> => Object.fromEntries(stats.map((id, at) => [id, values[at]!]));
   const before = reading(state, registry, stats);
@@ -226,9 +199,6 @@ export function growWorn(state: GameState, registry: Registry, stats: readonly s
   return { spent, unspent, before: named(before), after: named(reading(state, registry, stats)) };
 }
 
-// The pool spent evenly, which is what "every skill of this activity at this level" means. It is
-// spelled as the pool over the skills rather than as the level's cost so that the one place a tier's
-// size is decided stays `poolForTier`.
 export const evenlySpent = (activity: Activity, level: number): Record<string, number> =>
   Object.fromEntries(activity.skills.map((skill) => [skill, poolForTier(activity, level) / activity.skills.length]));
 
@@ -239,21 +209,13 @@ export function buildTier(registry: Registry, activity: Activity, level: number,
   const worn: Worn[] = [];
   for (const written of items) {
     const { item, count } = handedOver(written);
-    // An item declaring an `item-level:` arrives as a copy of its own under an id the engine mints,
-    // and is worn under that id rather than under its template's. Which items those are is asked of
-    // the table rather than known here: whatever appeared in it is what was handed over.
     const before = new Set(Object.keys(state.instances.byId));
     receiveItem(state, registry, item, count);
-    // A stock is not always something with a slot. Bait is worn and raw fish is not, and both are
-    // handed over for the same reason -- they are spent by doing the activity -- so a thing with
-    // nowhere to go on the body is carried and nothing is tried.
     if (registry.items.get(item)?.slot === undefined) continue;
     const minted = Object.keys(state.instances.byId).find((id) => !before.has(id));
     const refused = equip(state, registry, minted ?? item);
     worn.push(refused === undefined ? { item } : { item, refused: String(refused) });
   }
-  // Which of the things handed over are jewels is asked of the items themselves, so a jewel written
-  // next month is socketable here by being handed over and nothing else.
   const jewels = items.map((written) => handedOver(written).item).filter((item) => registry.items.get(item)?.clusterJewel !== undefined);
   const grown = grow.length === 0 ? undefined : growWorn(state, registry, grow, jewels);
   return { save: serializeSave(state, registry), worn, grown };

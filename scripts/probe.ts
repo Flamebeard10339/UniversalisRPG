@@ -149,7 +149,6 @@ function showRecord(registry: Registry, spec: string): { lines: string[]; ok: bo
   return { lines: [`${kind}.${id}`, JSON.stringify(record, null, 2)], ok: true };
 }
 
-// An id is a test's own or a prefix over some: `tulsa` names no test and runs every test the module owns, which is what an author asks for while a module is the thing being written.
 function testsNamed(registry: Registry, spec: string): string[] {
   if (registry.tests.has(spec)) return [spec];
   return [...registry.tests.keys()].filter((id) => id.startsWith(`${spec}.`)).sort();
@@ -167,7 +166,6 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
       continue;
     }
     for (const id of named) {
-      // A directive the engine refuses outright throws rather than failing, and one test throwing is not a reason to stop running the others: it is reported where its verdict would have been.
       const failure = ((): string | null => {
         try {
           const result = runTest(id, registry, createGameState());
@@ -183,10 +181,6 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
   return { lines, ok };
 }
 
-// The sheet a test closes on, which is the one a re-recording replaces: its own last `expect:`, read
-// off the directive rather than minted again from the test id, so the printed section lands under
-// the name the file already writes. Its own directives and not `testSteps`' — a test that opens with
-// `run:` inherits the sheet that one closes on, and pasting over that would rewrite another route's.
 function closingSaveId(registry: Registry, testId: string): string | undefined {
   let closing: string | undefined;
   for (const directive of registry.tests.get(testId)?.directives ?? []) {
@@ -200,15 +194,6 @@ export function recordedSheetId(registry: Registry, testId: string): string | un
   return closing === undefined ? undefined : localId(registry.namespace.ownerOf('save', closing) ?? null, closing);
 }
 
-// A route's end state, written the way a `# save` writes one. The walk leaves the state it reached,
-// so recording a sheet is running the route and serializing what it stopped on — there is no second
-// reading of the world here, which is the whole reason a re-recorded sheet can be trusted.
-//
-// A re-recording is run against a route whose sheet is stale by definition, so failing is the
-// ordinary case and the verdict cannot say whether the body is worth having. How far the walk got
-// can: a route that reached its last directive ended where it ends, whatever that directive said
-// about the sheet, and one that stopped before it ended somewhere else entirely. Only the first
-// prints a body.
 function recordTests(registry: Registry, specs: readonly string[]): { lines: string[]; ok: boolean } {
   const lines: string[] = [];
   let ok = true;
@@ -238,9 +223,6 @@ function recordTests(registry: Registry, specs: readonly string[]): { lines: str
       }
       const closing = closingSaveId(registry, id);
       const sheet = recordedSheetId(registry, id);
-      // A sheet written over other saves keeps standing on them: the layers are laid down again here
-      // and what is printed is what is left over them, so pasting it back replaces a body and not a
-      // composition. Recording one whole would drop the `over:` line and copy its layers into it.
       const over = (closing === undefined ? undefined : registry.saves.get(closing))?.over ?? [];
       lines.push(verdict === null ? `${id}: PASSED, so this sheet says what the one in the file already says` : `${id}: FAILED — ${verdict}`);
       if (sheet === undefined) lines.push(`${id}: closes on no expect:, so this replaces nothing and is named the way a recorded run names its end`);

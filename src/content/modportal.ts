@@ -95,9 +95,6 @@ function cloned<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-// A stat is named by the key it is written under rather than by a value anything visits, so it is
-// the one name a section walk cannot reach. An entity holds them as written pairs before it is built
-// and as one object after, and this rewrites a name of a module wherever the section is read from.
 function renamedStats(held: unknown, from: string, to: string): unknown {
   const renamed = ([statId, range]: [string, unknown]): [string, unknown] => [renamedId(statId, from, to), range];
   if (Array.isArray(held)) return (held as [string, unknown][]).map(renamed);
@@ -112,9 +109,6 @@ function rewriteSection(kind: SectionKind, key: string, value: object, from: str
   return next;
 }
 
-// What each module wrote, under the module's new name and with every id in it rewritten. The printer
-// reads a module's file off these rather than off the merge, so a registry renamed without them
-// prints an empty module.
 function renamedContributions(loaded: Registry, moduleId: string): ReadonlyMap<string, readonly Contribution[]> {
   const next = new Map(loaded.contributions);
   const written = next.get(LOCAL_CHANGES_MODULE_ID) ?? [];

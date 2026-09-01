@@ -371,9 +371,6 @@ export interface BaseEntry {
 export interface Locales {
   addressable: Set<string>;
   base: Map<string, BaseEntry>;
-  // A key whose words are another key's. A value a section carries rather than names says what that
-  // section says, and has no line of its own to key: so what is looked up under the kind it is read as
-  // is answered from where the words were written, rather than copied and left to be reviewed twice.
   carried: Map<string, string>;
   prose: Map<string, ProseShape>;
   sections: LocaleDeclaration[];
@@ -429,15 +426,12 @@ export interface Said {
   text: string;
 }
 
-// Every string the game can say, read off the tables the engine itself fills, so a kind or a field added next month is swept with no edit wherever this is asked.
 export function everySaid(locales: Locales): Said[] {
   const said = [...locales.base].map(([key, entry]) => ({ key, language: entry.language, text: entry.text }));
   for (const [language, table] of locales.declared) for (const [key, text] of table) said.push({ key, language, text });
   return said;
 }
 
-// The same sweep as the words alone. What tells a string a player reads from an id, an enum or a
-// figure, wherever a rendered surface is read back and asked what put a word on it.
 export const saidWords = (locales: Locales): ReadonlySet<string> => new Set(everySaid(locales).map((each) => each.text));
 
 export function moduleLocaleSections(locales: Locales, module: string | null): LocaleDeclaration[] {

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { headingsChangedIn } from './gitHistory';
 
-// A patch is text, so nothing here runs git either. What is under test is the one reading this file
-// does — which heading moved, in which file, carrying which words — and the log it came out of is
-// written down rather than produced.
-
 const MARK = String.fromCharCode(1);
 
 const patch = (...lines: string[]): string => lines.join('\n');

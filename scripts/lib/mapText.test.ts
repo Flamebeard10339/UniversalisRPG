@@ -13,8 +13,6 @@ const place = (id: string, x: number, y: number, z = 0, ...adjacent: string[]): 
   adjacent: adjacent.map((to) => ({ to, open: true })),
 });
 
-// The number beside a way out is where it sits in the engine's own list of offers, which is what a
-// player types; nothing here counts a list of its own.
 const travel = (to: string): PlayChoice => ({ id: `travel:${to}`, kind: 'travel', label: asLocalized(`Travel to ${to}`), leadsTo: to, legs: 1 });
 
 const sheet = (places: readonly Place[], here: string, choices: readonly PlayChoice[] = []): Sheet =>
@@ -69,8 +67,6 @@ describe('the map drawn as characters', () => {
     expect(text).not.toContain('also:');
   });
 
-  // A bend takes the one line of paper the lattice leaves between two rows, and a road drawn straight
-  // wants that line too, so the straight one has it whichever order the sheet lists them in.
   it('leaves the paper to a road that can be drawn straight, and says the bend it then cannot draw', () => {
     const crossed = [place('west', 0, 0, 0, 'south-east'), place('north', 1, 0, 0, 'south'), place('south', 1, 2, 0, 'north'), place('south-east', 2, 1, 0, 'west')];
 
@@ -83,8 +79,6 @@ describe('the map drawn as characters', () => {
     expect(said).toMatch(/South East/);
   });
 
-  // The one thing an ASCII map must not do is claim a road it cannot draw. A road blocked by a place
-  // standing in its way is said in words instead, and never left off.
   it('says in words the roads it could not draw, rather than dropping them', () => {
     const blocked = [place('one', 0, 0, 0, 'three'), place('two', 1, 0), place('three', 2, 0, 0, 'one')];
 
@@ -110,7 +104,6 @@ describe('the map drawn as characters', () => {
 });
 
 describe('the nine squares drawn as characters', () => {
-  // North is a smaller `y`: the map counts down the page, the way a map on paper does.
   const CROSS = [
     place('middle', 1, 1, 0, 'north', 'east', 'cellar'),
     place('north', 1, 0, 0, 'middle'),

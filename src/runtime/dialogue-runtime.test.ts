@@ -11,7 +11,6 @@ const { registry } = loadUniverseWithDiagnostics(fixtureSources());
 const owners = [...new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined))];
 
 describe('an entity whose one word is the whole of talking to it', () => {
-  // Owners for whom exactly one node is ever put forward, so nothing else can take the turn and whatever that node does is the whole of what talking to them ever is.
   const soleVoice = owners.filter((owner) => spokenBy(registry.dialogues, owner).flatMap((dialogue) => dialogue.nodes.filter(offering)).length === 1);
 
   it('is most of the fixture world, so the claim below is not vacuous', () => {
@@ -19,7 +18,6 @@ describe('an entity whose one word is the whole of talking to it', () => {
     expect(soleVoice.every((owner) => reachedNow(registry, initialState(registry), owner) !== null)).toBe(true);
   });
 
-  // Talking to them enters the node itself rather than putting up a list of one to pick out of, which the visit it records is the proof of: a list is answered before anything is entered.
   it('costs no click, because the one thread open is entered outright', () => {
     const clicked = soleVoice.filter((owner) => {
       const state = initialState(registry);
@@ -33,7 +31,6 @@ describe('an entity whose one word is the whole of talking to it', () => {
 });
 
 describe('everyone the fixture world writes a word for', () => {
-  // Talking twice, through the runtime rather than through a reading of it: what a second visit does is `enterNode`'s to decide, and a test that decided it again would drift the day that one changed. A list of threads is something said as much as a line is, which is why an entity holding several is held to this too.
   const saysSomethingTwice = (owner: string): boolean => {
     const state = initialState(registry);
     for (let visit = 0; visit < 2; visit++) {
@@ -49,7 +46,6 @@ describe('everyone the fixture world writes a word for', () => {
     expect(owners.filter((owner) => !saysSomethingTwice(owner))).toEqual([]);
   });
 
-  // The phrase a player picks a thread by falls back to the first line it says, and falls through to the node's own name when it says nothing at all — which is an identifier put in front of a player. Every opener the corpus holds is its own subject here, so a dialogue written next month is covered with no edit.
   it('names every thread they hold open in words rather than in an identifier', () => {
     const state = initialState(registry);
     const unnamed = [...registry.dialogues.values()].flatMap((dialogue) =>
@@ -61,9 +57,6 @@ describe('everyone the fixture world writes a word for', () => {
   });
 });
 
-// Written out rather than drawn from the corpus, because the corpus holds no such line: the author
-// who met this paired their one-sided clauses so that one of each pair always stands, which is the
-// technique the fragment's own entry now points at.
 describe('a line that is nothing but a fragment that does not hold', () => {
   const world = `
 # info base

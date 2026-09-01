@@ -12,14 +12,11 @@ export type QuestFrame = Extract<ModalFrame, { name: 'quest-journal' }>;
 
 export const questFrame = (quest = ''): QuestFrame => ({ name: 'quest-journal', answers: {}, quest });
 
-// Which quest the open journal is reading, where it is reading one. The list itself reads none, and publishes nothing for a page to draw beside it.
 export const questFocus = (frame: { quest: string }): { kind: 'quest'; quest: Answer } | undefined => (frame.quest === '' ? undefined : { kind: 'quest', quest: frame.quest as Answer });
 
-// The journal opened on nothing asks which quest; opened on one it asks only to be closed, and what it is showing is published on the view for a page to draw.
 export function questOptions(frame: { quest: string }, state: GameState, registry: Registry): readonly ModalOption[] {
   const localizer = localizerOf(registry, state);
   if (frame.quest !== '') return [{ key: LEAVE, label: localizer.engine('engine.journal.reading'), values: [{ value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
-  // The way out is one of the values, the way it is on every list a screen offers: a screen is left by answering it, and clicking away from it answers it with this.
   const quests = journal(registry, state).map((entry) => ({ value: entry.quest, shown: entry.title }));
   return [{ key: 'quest', label: localizer.engine('engine.journal.which'), values: [...quests, { value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
 }

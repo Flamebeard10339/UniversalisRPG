@@ -14,9 +14,6 @@ export interface SaveSection extends ParsedSave {
   id: string;
 }
 
-// What `over:` does, said once: the page prints it beside the line and the engine refuses a section
-// that writes one and no saved game with it, so what an author is offered and what they are told
-// cannot come apart.
 const OVER_LAYERS =
   'the saves this one is written over, laid down left to right with this body on top. A field holding ids — what is carried, which flags are set — takes the ids every layer writes, and every other field is taken from the last layer that writes it. Only one layer may carry item copies, since two layers mint the same copy ids';
 
@@ -79,7 +76,6 @@ export const save = section<SaveSection>()({
   vocabulary: 'declared',
   merge: writtenWhole,
   maps: {
-    // The section itself, rather than the two fields read off it: a mark laid on a section travels with the section, and one copied field at a time is one mark left behind.
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, value]],
   },
   grammar: [

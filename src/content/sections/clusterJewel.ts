@@ -115,15 +115,11 @@ export const clusterJewel = section<ClusterJewel>()({
   },
 });
 
-// What a jewel written under whatever carries it is missing: its own heading, and therefore its own
-// words. Every other line is the same line it would be under a heading of its own, read, built,
-// printed and refused by this file's one declaration.
 const bodySchema = (): AnySchema => {
   const schema = clusterJewel.schema!;
   return { ...schema, fields: Object.fromEntries(Object.entries(schema.fields).filter(([name]) => !clusterJewel.text.includes(name))) };
 };
 
-// Nothing under this body is keyed in the locale, because the body has no id of its own to key it under: whatever a line holds is written out where it stands.
 const AS_A_BODY: PrintContext = { moduleId: '', id: '', authored: () => true };
 
 const IS_THE_ITEMS = "is the item's, and a cluster-jewel written under one says what the item says";
@@ -138,9 +134,6 @@ function parseBody(lines: RawLine[]): object {
   return body;
 }
 
-// A cluster jewel written under something that carries it, standing at that thing's id and saying its
-// words. The body is the whole of what an author wrote; everything else about a jewel is read off the
-// declaration above, so a field added there arrives here having done nothing.
 export const jewelCarried = (body: object, carrier: { id: string }, context: HydrateContext): ClusterJewel =>
   clusterJewel.build({ ...Object.fromEntries(clusterJewel.text.map((field) => [field, (carrier as unknown as Loose)[field]])), ...body, id: carrier.id }, context);
 

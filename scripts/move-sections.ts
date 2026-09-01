@@ -71,7 +71,6 @@ export function moveSections(files: readonly TextFile[], from: string, to: strin
     ]);
   }
 
-  // An id is written whole in every machine form, so a moved id and a staying one that spell the same cannot be told apart by the text alone.
   const moving = new Set(headings.map((heading) => heading.id));
   const shared = sections.filter((section) => section.id !== undefined && moving.has(section.id) && !headings.some((heading) => heading.kind === section.kind && heading.id === section.id));
   if (shared.length > 0) {
@@ -110,7 +109,6 @@ export function moveSections(files: readonly TextFile[], from: string, to: strin
     return refused([`The corpus does not load once ${headings.length} section(s) move from ${from} to ${to}.`, ...reloaded.diagnostics.map(formatModuleDiagnostic)]);
   }
 
-  // The whole claim: every key the move touched is the same key under its new module, and nothing else in the registry moved with it. registryDiff derives its own subjects from the section list, so a kind added next month is covered here with no edit.
   const drift = registryDiff(loaded.registry, reloaded.registry, rewrite);
   if (drift.length > 0) {
     return refused([`Moving ${from}'s sections to ${to} did not leave the registry it should have.`, ...drift.slice(0, 20), ...(drift.length > 20 ? [`… and ${drift.length - 20} more`] : [])]);

@@ -29,20 +29,6 @@ import { driveRun, formatResult, openRepl } from './play-cli';
 import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
 import { fixtureSources } from '../src/content/worldFixture';
 
-// One question, asked of all three drivers over one engine: no surface may lose a capability the
-// others kept. The subjects derive themselves — the leaf paths a live view actually carries, and
-// the commands the table marks a player's — so a field a section grows or a command somebody adds
-// arrives here on its own, and a driver that draws it while another does not fails naming both.
-//
-// Nothing here says what ought to be drawn. A path no driver draws is one decision made
-// everywhere — a machine name a player never reads, an enum a renderer acts on instead of
-// printing — and needs no excuse from anybody. The list below is only for where they genuinely
-// differ, which is why it is one list and not one per driver: an excuse for a *difference*
-// belongs to no single surface.
-// A group is a colour, and a colour is not a word. The app fills the cell with it and has nothing
-// to say; a terminal cannot fill anything, so it prints the group's own `title:` beside what it
-// belongs to — which is the whole reason the word exists on the row at all. Held to each row that
-// carries one, so a driver that stopped saying it where it has no fill still fails.
 const DRAWN_RATHER_THAN_SAID = 'a group reaches the app as the colour it fills a cell with, which a terminal cannot draw and says in words instead. Neither surface has lost anything the other kept: the fill and the word are the same fact on the two channels each can carry';
 
 const PARITY_EXCUSED: readonly PathExcuse[] = [
@@ -50,9 +36,6 @@ const PARITY_EXCUSED: readonly PathExcuse[] = [
   {
     path: 'modals[].options[].label',
     why: 'a screen whose only answer is the one that leaves is not asking anything, so the app draws what it is showing and no question above it. A terminal has no frame around a screen and names the question to say one is open at all',
-    // The app's own judgement, asked rather than restated, so this covers the moments it covers and
-    // not the path. Every other screen's question is load-bearing — an item's own words, a jewel's —
-    // and a driver that dropped one fails here.
     covers: (view) => asksNothing(view.modals),
   },
   {
@@ -86,16 +69,8 @@ const ANSWER_EXCUSED: readonly CommandExcuse[] = [
   },
 ];
 
-// A field at its freshly-started value can be indistinguishable from noise a renderer prints for
-// an unrelated reason — 0 seconds elapsed reads as "0" wherever a digit turns up by coincidence.
-// Advancing the clock to a distinctive figure gives every timed field a signature worth searching
-// for.
 const DISTINCTIVE_SECONDS = 54321;
 
-// A fresh view carries nothing at most of its paths: no fight, no open screen, no quest under way,
-// so `encounter.foes[].remaining` and `journal[].lines[].said` are absent and nothing has to draw
-// them. Walking a short run instead is what puts those paths in front of every driver. Each line
-// is one the engine takes from any of the three.
 const SCRIPT: readonly string[] = [
   '/load fixture-combat.supplied',
   `/wait ${DISTINCTIVE_SECONDS}`,
@@ -105,17 +80,12 @@ const SCRIPT: readonly string[] = [
   '/quests fixture-quests.clear-the-well',
   'submit-modal: close=close',
   '/stat',
-  // Character creation and the breakdown of one stat. Neither stands in anybody's way through the
-  // world, so neither is reached by walking one — and a screen no walk reaches is a screen no driver
-  // was ever asked to draw.
   'open-modal: choose-name',
   'submit-modal: name=Rowan',
   'open-modal: choose-race',
   'submit-modal: race=core.badger',
   '/stat core.attack',
   'submit-modal: close=close',
-  // A plane, reached the way a player reaches one: out of the chest that holds a thing with a plane
-  // in it, and opened on the copy it arrived as.
   '/goto fixture-town.store',
   'use:entity.fixture-town.chest.open-the-strongbox',
   '/look',
@@ -126,8 +96,6 @@ const SCRIPT: readonly string[] = [
   'submit-modal: plane=back',
   'submit-modal: verb=close',
   '/settings',
-  // A counter and the question it asks about how many, reached the way a player reaches one: the
-  // shopkeeper is looked at before anything they keep is on offer.
   '/load fixture-combat.supplied',
   'use:entity.fixture-town.keeper.examine',
   'shop:fixture-town.counter',
@@ -139,29 +107,17 @@ const SCRIPT: readonly string[] = [
   'submit-modal: choice=0',
   '/goto fixture-town.well',
   '/state',
-  // Nothing offers a fight against something nobody has looked at, so the rat is read first — which
-  // is also how every driver is asked to draw the mask and then the thing behind it.
   'use:entity.fixture-town.rat.examine',
-  // Picked as a choice rather than typed as the directive behind it, which is the one shape that
-  // arms an action instead of applying it: a driver that can advance a run gets one to advance, and
-  // the live sheet a terminal draws while it runs is only reachable this way.
   'fight:core.melee-combat:fixture-town.rat',
   '/state',
 ];
 
 const registry = () => loadUniverseWithDiagnostics(fixtureSources()).registry;
 
-// The same script, walked once per driver, so a path is asked of each of them in the same state.
 const walkScript = (step: (line: string) => SurfaceStep): SurfaceStep[] => SCRIPT.map(step);
 
-// A bound on a loop that stops itself: driveRun ends the run the tick it goes inactive and clears
-// the ticker, so this only decides how long a run that never ends is watched before the next line
-// interrupts it — which is what typing one does at the real terminal.
 const LIVE_TICKS_WATCHED = 200;
 
-// The terminal's own live loop, on a clock this walk turns by hand. Everything play-cli says while
-// an action runs it says through driveRun, so the sheet naming the action under way is reached here
-// the same way a player reaches it, rather than described a second time.
 function driveHere(run: LiveRun, localizer: Localizer): string[] {
   const written: string[] = [];
   const ticks: Array<(elapsedMs: number) => void> = [];
@@ -180,9 +136,6 @@ function driveHere(run: LiveRun, localizer: Localizer): string[] {
   return written;
 }
 
-// The lines of the walk that came back with a run to advance, beside the steps themselves. A walk
-// where that list is empty puts play-cli in a shape it is never in — every claim below still
-// passes and the live sheet is never drawn — so the list is something to assert on, not a detail.
 interface TerminalWalk {
   readonly steps: SurfaceStep[];
   readonly armedBy: string[];
@@ -204,10 +157,6 @@ function cliWalk(driving: boolean): TerminalWalk {
   return { steps, armedBy };
 }
 
-// Both shapes of the one terminal, because `--live` on a TTY is a boolean and a boolean has no
-// third value. Driving, a choice arms an action and everything said while it runs is said through
-// the live sheet; not driving, the same choice resolves at once and `/state` is the only place an
-// action under way is named. Either walk alone leaves whatever only the other draws unproved.
 function cliRun(): TerminalWalk {
   const walks = [true, false].map(cliWalk);
   return { steps: walks.flatMap((walk) => walk.steps), armedBy: walks.flatMap((walk) => walk.armedBy) };
@@ -220,17 +169,12 @@ function botRun(): SurfaceStep[] {
     const result = runLine(ctx, line);
     const localizer = sessionLocalizer(session);
     ctx.view = view(session);
-    // Both halves of what a turn puts in front of the model: the view it opens with, and what the
-    // line it sent answered with.
     return { view: ctx.view, rendered: `${renderView(ctx.view, localizer)}\n${answerLines(result, localizer).join('\n')}` };
   });
 }
 
 const EVERY_PAGE = LAYERS.flatMap((layer, at) => layer.subpages.map((subpage) => toSubpage(toLayer(OPENING, at), at, subpage.id)));
 
-// Markup, read back as the words it puts on a screen. React escapes what it draws, so `Smith's
-// Chest` reaches the page as `Smith&#x27;s Chest` and a search for the words the world wrote finds
-// nothing — a punctuation mark would otherwise read as a whole surface having dropped a line.
 const ESCAPES: ReadonlyArray<readonly [RegExp, string]> = [
   [/&#x27;|&#39;|&apos;/g, "'"],
   [/&quot;|&#34;/g, '"'],
@@ -244,9 +188,6 @@ const asWords = (markup: string): string => ESCAPES.reduce((held, [pattern, char
 
 const drawEveryPage = (driver: Driver): string => asWords(EVERY_PAGE.map((where) => renderToStaticMarkup(createElement(App, { driver, opening: where }))).join(''));
 
-// The player's pages only. Dev mode opens the authoring map, which draws every location the
-// registry holds whether or not anybody has walked to one — an author's sight, and the thing the
-// other two drivers are deliberately refused.
 function guiRun(): SurfaceStep[] {
   const slots = browserSlots(() => pageStorage());
   const driver = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
@@ -256,9 +197,6 @@ function guiRun(): SurfaceStep[] {
   });
 }
 
-// Each driver walks the script once, however many claims ask about it. The walk is deterministic —
-// one engine, one script, one starting save — so a second one would be the same steps again at the
-// price of drawing every page of the app all over.
 const once = <T,>(walk: () => T): (() => T) => {
   let held: { value: T } | null = null;
   return () => (held ??= { value: walk() }).value;
@@ -279,21 +217,12 @@ describe('no driver draws less of a live view than the others', () => {
     expect(cli().armedBy).not.toEqual([]);
   });
 
-  // The subjects are every screen the engine declares, read off the engine and never listed here. A
-  // screen this walk never opens is one no driver is asked to draw, so a surface that has quietly
-  // stopped drawing it goes on passing — which is how the app came to be the only place a stat's
-  // shares were ever shown. A tenth screen declared next month fails here with nothing edited.
   it('opens every screen the engine can raise, so each is put in front of all three drivers', () => {
     const opened = new Set(bot().flatMap((step) => step.view.modals.map((modal) => modal.name)));
 
     expect([...opened].sort()).toEqual([...MODAL_NAMES].sort());
   });
 
-  // A screen that is about something publishes what it is about, and every surface has to draw it.
-  // The claim above makes the subjects here every screen the engine declares; a screen grown next
-  // month that says nothing beside its own question fails with nothing edited. The parity claim
-  // cannot reach this: a stat share's words are an item's or a stat's own, so no word on the surface
-  // proves that path drew rather than one of the paths it shares its words with.
   it('draws what a screen is about beside it, wherever a screen is about something', () => {
     const localizer = localizerFor(registry(), BASE_LANGUAGE);
     const about = bot().flatMap((step) => (step.view.focus === null ? [] : [step.view.focus.kind]));
@@ -313,8 +242,6 @@ describe('no driver draws less of a live view than the others', () => {
   });
 });
 
-// The other half of a surface: a player types a line and is answered. The subjects are every
-// command the table marks a player's, so one added next month has to be answered everywhere.
 describe('no driver meets a command with silence that the others answer', () => {
   const surfaces = (): SurfaceAnswers[] => {
     const botSession = startSession(registry());
@@ -326,9 +253,6 @@ describe('no driver meets a command with silence that the others answer', () => 
       { name: 'the playbot', answer: (spec) => answerLines(runLine(botCtx, spec.name), sessionLocalizer(botSession)) },
       { name: 'play-cli', answer: (spec) => formatResult(runLine(cliCtx, spec.name), sessionLocalizer(cliSession)).map(printed) },
       {
-        // Two channels here, not one: the log a command writes into, and the screen itself. A
-        // command that opens a screen has answered the player who is looking at it, and saying so
-        // is not the same as saying nothing.
         name: 'the GUI',
         answer: (spec) => {
           const before = gui.snapshot().transcript.entries.length;
@@ -351,17 +275,12 @@ describe('no driver meets a command with silence that the others answer', () => 
   });
 });
 
-// The playbot is the one driver that renders a whole view for itself every turn rather than
-// logging what changed, so it is the one that can afford to leave an output kind to the next
-// turn's render. Whatever it leaves has to say so.
 describe('the playbot answers for every kind of output a command can carry', () => {
   it('names a reason for each kind it does not read back to the player', () => {
     for (const excuse of ANSWER_NOT_SHOWN) expect(excuse.why.length, excuse.kind).toBeGreaterThan(20);
   });
 });
 
-// Kept beside the parity claims because it is the same question about the terminal itself: the
-// startup footnote is this driver's own and rides under the help the engine hands every driver.
 describe('a command context is shared, not copied', () => {
   it('the terminal adds its own startup lines to the engine help without editing it', () => {
     const session = startSession(registry());

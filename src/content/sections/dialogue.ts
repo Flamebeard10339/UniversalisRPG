@@ -22,12 +22,10 @@ export interface Choice extends Spoken {
 
 export type NodeStep = ({ kind: 'say' } & Spoken) | { kind: 'effect'; result: ActionResult } | { kind: 'goto'; target: string } | { kind: 'menu'; choices: Choice[] };
 
-// The player's own phrase for a thread. Held as a said line rather than a plain string, because it is shown to a player and so is addressed, translated and reviewed like everything else the game says.
 type Asked = Extract<ActionResult, { kind: 'say' }>;
 
 export interface DialogueNode {
   name: string;
-  // Reachable on its own rather than only by a goto, which is what an entity says when nothing further along has anything to say. A `when:` beside it narrows when that is.
   always?: boolean;
   when?: Condition;
   ask?: Asked;
@@ -36,24 +34,19 @@ export interface DialogueNode {
   steps: NodeStep[];
 }
 
-// A node put forward on its own rather than only ever arrived at by a goto from another.
 export const offering = (node: DialogueNode): boolean => node.always === true || node.when !== undefined;
 
-// A thread of this entity's, as against what they say when no thread of theirs is open. Saying which moment is its turn makes one, and so does being named: a node a quest gives is a thread because the quest has already said which moment it belongs to, and a node offering nothing but `always` is not one.
 export const isThread = (node: DialogueNode): boolean => node.when !== undefined || node.ask !== undefined;
 
-// What entering this node runs on its own account, as against what a line in its menu runs when the player picks it.
 export const nodeEffects = (node: DialogueNode): ActionResult[] => node.steps.flatMap((step) => (step.kind === 'effect' ? [step.result] : []));
 
 export interface Dialogue {
   id: string;
   owner?: string;
-  // The quest that handed this away, where a quest did. Nothing writes it in a `# dialogue`: it is minted where the quest mints the dialogue, and it is what tells a line a quest has for the player now from a line the entity has for anybody.
   fromQuest?: string;
   nodes: DialogueNode[];
 }
 
-// A quest speaking through somebody is never what they say when they have nothing to say, and stands ahead of whatever else they hold open, because it is the thing the player is in the middle of.
 export const givenByQuest = (dialogue: Dialogue): boolean => dialogue.fromQuest !== undefined;
 
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
@@ -81,9 +74,6 @@ function parseChoice(source: RawLine): Choice {
   return choice;
 }
 
-// Where a node goes next is the next thing in whatever it sits in, which is a stage under a quest and a
-// node under a dialogue. The hole is what an author standing in it is offered, so it is the one thing
-// written per site; the block it belongs to carries a name, so the page still writes it out once.
 const GOES = (goes: { hole: string; like: string }): Written => ({
   form: `goto <${goes.hole}>`,
   example: `goto ${goes.like}`,
@@ -91,7 +81,6 @@ const GOES = (goes: { hole: string; like: string }): Written => ({
   note: 'the next place in whatever this node is written in: a node of the dialogue, or a stage of the quest',
 });
 
-// The lines a node holds, which is the same grammar wherever a node is written — in a # dialogue of its own, or under a stage of a quest. What a goto names is the one thing that differs, because what a node sits in is what it goes to next.
 export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] =>
   calledBlock('node', [
   { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open' },
@@ -105,7 +94,6 @@ export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[
   ...resultGrammar(),
   ]);
 
-// `sticky` says a node in full on every visit, and `again:` is what a node without it says instead of the silence it would otherwise fall to. A node writing both has written a line nothing reaches. A node reached on its own without being a thread is what is left when no thread is open, and one that takes has nothing behind it.
 function contradiction(node: DialogueNode): string | undefined {
   if (node.sticky && node.again) return `node ${node.name} is sticky and also writes again:, and a sticky node says everything again on every visit, so its again: line is never reached`;
   const cost = [...itemCost(nodeEffects(node)).keys()];
@@ -173,7 +161,6 @@ function mergeNodes(into: Dialogue, from: Dialogue): Dialogue {
 
 export const nodeLines = (node: DialogueNode): string[] => [`node ${node.name}:`, ...nodeBody(node)];
 
-// A node's own lines, indented once, without the heading that names it — which is what a quest writes under a stage instead.
 export function nodeBody(node: DialogueNode): string[] {
   const lines: string[] = [];
   if (node.always) lines.push('  always');
@@ -196,7 +183,6 @@ export function nodeBody(node: DialogueNode): string[] {
   return lines;
 }
 
-// A goto names a node of this dialogue, and this dialogue holds every node it may name, so the answer is here and needs nothing else loaded.
 function unknownNode(value: Dialogue): string | undefined {
   const names = new Set(value.nodes.map((node) => node.name));
   for (const node of value.nodes) {
@@ -241,7 +227,6 @@ export const dialogue = section<Dialogue>()({
   visit: visitDialogue,
 });
 
-// Everything an entity says. A dialogue names its owner rather than an owner naming its dialogue, so an entity speaks with as many voices as there are dialogues pointing at it — its own, and whatever a quest or an expansion has since given it. Nothing here settles which of them talking to that entity reaches: every thread they hold open is put to the player at once.
 export const spokenBy = (dialogues: ReadonlyMap<string, Dialogue>, owner: string): Dialogue[] => [...dialogues.values()].filter((each) => each.owner === owner);
 
 export function visitDialogue(value: Dialogue, where: string, visit: Visit): void {

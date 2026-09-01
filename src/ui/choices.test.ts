@@ -7,16 +7,12 @@ import { sheetOffers, type PlayView } from '../runtime/session';
 import { drawsNothing, groupOffers, offerCells } from './choices';
 import { drawnFor, type Place } from './discovery';
 
-// Whatever offers a choice is named as the engine names it and drawn as the engine draws it, which
-// is one call there and is why the fixture cannot hand out one without the other.
 const offeredBy = (source: string): Pick<PlayView['choices'][number], 'of' | 'detail'> => ({ of: `entity.${source.toLowerCase().replace(/ /g, '-')}`, detail: asLocalized(source) });
 
 const choice = (id: string, label: string, detail?: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized(label), ...(detail ? offeredBy(detail) : {}) });
 
 const unread = (id: string, of: string): PlayView['choices'][number] => ({ id, kind: 'action', label: asLocalized('Examine'), of, detail: asLocalized('?') });
 
-// The list the sheet is handed, cut and numbered by the engine rather than by this file — so a
-// fixture cannot make a claim here that no view would ever put in front of the page.
 const sheet = (...choices: PlayView['choices']): ReturnType<typeof sheetOffers> => sheetOffers({ choices });
 
 describe('the offers on the sheet', () => {
@@ -38,10 +34,6 @@ describe('the offers on the sheet', () => {
     expect(groupOffers(sheet())).toEqual([]);
   });
 
-  // A way out of here is how a player leaves without opening the map; anywhere further off is the
-  // map's, which is what keeps a seventy-room town from arriving as a seventy-entry menu. What is
-  // cut still counts, so `Look around` is answered as the fourth thing the engine offered though it
-  // is drawn third — a page that counted its own list again would take the walk instead.
   it('keeps the way out of here, leaves what is further off to the map, and renumbers neither', () => {
     const near: PlayView['choices'][number] = { id: 'travel:yard', kind: 'travel', label: asLocalized('Travel to Yard'), leadsTo: 'yard', legs: 1 };
     const far: PlayView['choices'][number] = { id: 'travel:ford', kind: 'travel', label: asLocalized('Travel to Ford'), leadsTo: 'ford', legs: 3 };
@@ -104,8 +96,6 @@ describe('the offers on the sheet', () => {
     for (const cell of cells) expect(cell.offers).toHaveLength(1);
   });
 
-  // Everything nobody has read yet is drawn under the same placeholder, so a sheet keyed on the
-  // words would gather a whole unread room into one box with one way into it.
   it('keeps two things nobody has read apart, though they are drawn under the same name', () => {
     const cells = offerCells(sheet(unread('use:entity.dresser.examine', 'entity.dresser'), unread('use:entity.cabinet.examine', 'entity.cabinet')));
 
@@ -119,8 +109,6 @@ describe('the offers on the sheet', () => {
     expect(offerCells(sheet())).toEqual([]);
   });
 
-  // The other half of the cut: what the page stops drawing is not what the player stops reaching.
-  // The map is asked of the view's own list, so it still draws the far room and still walks there.
   it('leaves a walk two rooms off to the map, which draws the place it leads to and walks there still', () => {
     const at = (id: string, z: number, ...adjacent: string[]): Place => ({ id, title: asLocalized(id.toUpperCase()), x: 0, y: 0, z, adjacent: adjacent.map((to) => ({ to, open: true })) });
     const discovered = [at('landing', 1, 'hall'), at('hall', 0, 'landing', 'cellar'), at('cellar', -1, 'hall')];

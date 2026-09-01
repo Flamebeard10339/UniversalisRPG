@@ -1,24 +1,3 @@
-// Kill it with Fire — read off `.planning/planning_quests/Kill it with Fire.md`.
-// Oolga wants her basement cleared without a rat killed, and what the repellent
-// draws instead is worse than what it drives off.
-//
-// The sacks in the cellar, the wurm under it, the princess bee at the apiary,
-// the poison and the recipe for it are all tulsa's, because they are things
-// standing in tulsa's rooms whatever this quest does: take this module out and
-// the cellar still has something in the corner worth poisoning. The rats are
-// this quest's own — nobody but Oolga ever asked for a rat to be left alive —
-// so they are declared here and stood in her cellar by a line written from
-// here over `# location tulsa.oolga-basement`.
-//
-// Reward is 1500 cooking xp and, on paper, "access to Oolga's potion shop" —
-// the shop itself is not written here. The grammar `npm run oracle -- shop
-// entity` prints has no conditional form of `keeps shop:` and no `hidden if:`
-// on a `# shop`, so there is no way to open her counter ON COMPLETION without
-// also leaving it open to a player who has not done the quest, which is worse
-// than not opening it at all. `tulsa.oolgas-counter` is left exactly as
-// tulsa.dsl has it; Oolga's own closing line carries the reward instead. Worth
-// a real fix — a gate on `keeps shop:` — rather than a workaround here.
-
 # info kill-it-with-fire
 version: 0.1.0
 pack: quests
@@ -74,17 +53,6 @@ stage groundwurm-fight:
     ask: About the noise under your house.
     again: Still under there, is it. Best you finish what you started before you come telling me about it.
     Whatever's under there now, it isn't rats. That much I'll grant you.
-  // Oolga asked for every rat breathing and the quest closes either way: what
-  // the player did to them is answered in what she says and what she pays, not
-  // in a door shut on the way out. One speech rather than two, because the
-  // middle of it — her thesis, and the hook under it — is the same whichever
-  // way the cellar was cleared, and a second copy of those two paragraphs is a
-  // second place to edit them.
-  // A line that is nothing but a fragment is said as a blank line when the
-  // fragment does not hold, so the two acknowledgements share one line and the
-  // two farewells share another: between them they always hold, so the line
-  // always has words in it. The one-sided fragment hangs off a sentence that
-  // is said either way.
   oolga says:
     when: wurm-defeated
     ask: It's dealt with.
@@ -107,19 +75,8 @@ stage cellar-cleared:
     ask: About my shelves.
     again: Same as I said. They're behind me, same as they always were.
 
-// --- flags this quest owns ---
-
-// One count over the rats under Oolga's floor, which is what her closing word
-// reads to know whether the player took the errand at its word.
 # flag cellar-rats-killed
 
-// --- what this quest owes the world ---
-
-// The rats under Oolga's floor, which are the only ones in town anybody has
-// asked to be left alive: same title, same examine and same numbers as a feral
-// rat anywhere else, and a separate id so that a death down there can be
-// counted without counting every rat in the sewers. They go the moment the
-// corners are slathered, which is what the repellent was for.
 # entity cellar-rat
 title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
@@ -137,26 +94,9 @@ on death:
 # location tulsa.oolga-basement
 +entities: 4 cellar-rat
 
-// --- tests ---
-
-// What the two errands are worth in the pack rather than how they were come by:
-// the jelly is off the princess bee and the venom off a swamp mollusk, and both
-// of those fights are tulsa's and stand or fall on tulsa's numbers rather than
-// on anything this quest says. An axe because it is the plainest thing in town
-// to swing; it names a level of its own, so it is held as the copy the engine
-// would have minted and the routes below put it on by that copy's id.
-//
-// Nothing else, and no experience: the route below walks unkillable and strikes
-// to kill, so what level lives through the cellar is not what it is asking.
-// What the wurm should cost is a balance question and is answered by running
-// the world, not from here.
 # save sent-out-for-oolga
 {"version":13,"location":"tulsa.market-square","inventory":{"core.royal-jelly":1,"core.mollusk-venom":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// Start to finish: Oolga sets the task, Sunny names the three things and hands
-// over the vodka she keeps for herself, the three come together over Sunny's
-// own stove, the sacks in Oolga's cellar take the poison, the thing it draws
-// is put down, and Oolga has the truth out of the player.
 # test kill-it-with-fire-start-to-finish
 unkillable
 instant-kill
@@ -194,14 +134,6 @@ choose: oolgas-basement.groundwurm-fight.oolga.1.said
 choose: continue
 assert: oolgas-basement.cellar-cleared
 
-// The other way through, which the route above cannot walk and no other route
-// in the module reaches: the player puts the rats down first and Oolga's task
-// is still finished, because there is no failure state here and never was. It
-// asks the two things the clean walk cannot ask — that a rat under this floor
-// is a rat the quest counts, and that a counted one still ends at
-// `cellar-cleared` — and the front of it is a fixture rather than a second
-// proof of the errands, which is why it says nothing about the vodka or the
-// stove that the walk above has already said.
 # test kill-it-with-fire-rats-put-down
 unkillable
 instant-kill

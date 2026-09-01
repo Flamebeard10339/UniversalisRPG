@@ -47,20 +47,11 @@ export function declaredKey(namespace: string | null, kind: string, id: string):
   return id.includes('.') ? null : qualify(namespace, id);
 }
 
-// The module an id names, which is the first thing written in it. Where a section belongs is read off
-// its id and asked of nothing else, so anything composing an id for a section it is about to make
-// takes the module apart the same way the loader puts it together.
 export const moduleNamed = (id: string): string | null => (id.includes('.') ? id.slice(0, id.indexOf('.')) : null);
 
-// A section made during a run is staged rather than shipped, and its id is the only thing saying
-// which file it goes home to, so a kind a module owns cannot be made under a name that says no
-// module: there would be no file to take it back to. Said here beside the rule it is the refusal
-// for, and read by every command that makes a section rather than by the one that was written first.
 export const homelessId = (kind: string, id: string): string | null =>
   isOwnedKind(kind) && !id.includes('.') ? `${id} names no module: write it as <module>.${id}, which is where the section belongs` : null;
 
-// The module a body is written over is the one its address names, and not whoever wrote at that
-// address first: under a ~ dependency which of the two came first is the very thing in doubt.
 function refuseUnorderedEdit(module: ParsedModule, key: string, where: string): void {
   const edited = moduleNamed(key);
   if (edited !== null && edited !== module.namespace && unorderedDependencies(module).has(edited)) {
@@ -108,7 +99,6 @@ type Members = (value: { id: string }) => readonly MemberName[];
 
 let bearing: ReadonlyMap<string, Members> | undefined;
 
-// Which registry map holds values carrying names of their own, and the kind those names are read off. A # quest declares the nodes it hands out because it fills `dialogues`, not because anything here names quest beside dialogue.
 const memberBearingMaps = (): ReadonlyMap<string, Members> =>
   (bearing ??= new Map(
     contentSectionMaps().flatMap(([kind, map]) => {
@@ -117,7 +107,6 @@ const memberBearingMaps = (): ReadonlyMap<string, Members> =>
     }),
   ));
 
-// A member is declared beneath the section that landed it, which is what lets removing that section take its members with it. A value a section lands under another kind's map carries its own id, and that id sits under the section's.
 const beneath = (owner: string, id: string, name: string): string => (id === owner ? name : `${id.slice(owner.length + 1)}.${name}`);
 
 function landedMembers(namespace: Namespace, kind: string, value: MemberOwner): Member[] {
@@ -159,22 +148,15 @@ type Created = { kind: string; value: MemberOwner };
 
 const createdSections = (module: ParsedModule): Created[] => module.sections.filter((section) => section.kind !== 'remove') as Created[];
 
-// The name inside the module a qualified id addresses, where that module is one this one can see.
-// An id naming a module this one cannot see is left to `resolve`, which says so in the words an
-// author reads everywhere else.
 function addressedIn(id: string, loaded: ReadonlySet<string>, visible: ReadonlySet<string | null>): string | null {
   const named = moduleNamed(id);
   if (named === null) return null;
   return loaded.has(named) && visible.has(named) ? id.slice(named.length + 1) : null;
 }
 
-// Which kind owns each registry map, so a value one kind lands in another's is known for what it is.
 let owningKind: ReadonlyMap<string, string> | undefined;
 const ownerOfMap = (): ReadonlyMap<string, string> => (owningKind ??= new Map(contentSectionMaps().map(([kind, map]) => [map, kind])));
 
-// A section that carries a value of another kind rather than naming one declares that value's id under
-// that kind. What a section lands where is its `maps` and nothing else's to say, so a kind that starts
-// carrying one next month is held apart, resolved and refused for a name already taken with no edit here.
 export function carriedIds(kind: string, value: { id: string }): { kind: string; id: string }[] {
   const owner = sectionFor(kind);
   const found: { kind: string; id: string }[] = [];
@@ -195,13 +177,9 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
     return id === undefined || !isOwnedKind(section.kind) || !id.includes('.') || !namesMissingOptional(section.kind, id, missingOptional);
   });
 
-  // `carriedBy` names the section a value of this kind was written under rather than beside, and a name
-  // written there is minted: nothing else may be authored at it, or the two would be one key and the
-  // one that loaded last would silently win.
   const declaring = (kind: string, id: string, carriedBy?: string): void => {
     const scope = idScopeOf(kind);
     if (scope === 'none') return;
-    // A global id is one name whichever module wrote it, so the world holds it at the root instead of under the module that happened to.
     if (scope !== 'owned') return void namespace.declare(kind, null, id);
     const addressed = addressedIn(id, loaded, visible);
     if (addressed === null && id.includes('.')) return;
@@ -213,7 +191,6 @@ function declareIds(module: ParsedModule, namespace: Namespace, loaded: Readonly
   };
 
   for (const { kind, value } of createdSections(module)) {
-    // An action minted under a section of its own takes that section's id, so it is declared where an authored one's would be and an author who writes the same heading is told rather than silently overwritten.
     for (const minted of sectionFor(kind)?.mintedActions?.(value) ?? []) {
       const under = actionTextSection(kind, value.id, minted.action);
       if (under.kind !== kind || under.id !== value.id) namespace.mint(under.kind, under.id, minted.from);

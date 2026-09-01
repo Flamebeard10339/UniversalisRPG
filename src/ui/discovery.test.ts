@@ -4,7 +4,6 @@ import type { Node, Place } from '../runtime/map';
 import { CLIMB_NUDGE, sheetOf } from '../runtime/map';
 import { mapBox, newlyFound, onWalk, walkingAt, walkLine } from './discovery';
 
-// Any grid proves the same rule; the world's own number is `# variable map-grid` and is not this file's business.
 const GRID = 140;
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({

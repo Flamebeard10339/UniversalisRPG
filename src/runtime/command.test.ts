@@ -221,9 +221,6 @@ describe('the command table is the one definition of the command set', () => {
     expect(runLine(ctx, '/quit').quit).toBe(true);
   });
 
-  // A turn is one line and `|` is where one of its lines ends, so it ends the word before it too.
-  // Read once for the whole line, before any command sees its arguments, that holds for every
-  // command there is rather than for the one that needed it: nothing parsed can carry a `|`.
   it('ends a word at | for every command, so no argument or refusal holds one', () => {
     const { ctx } = fixture(SAVE_MODULE);
     for (const spec of COMMANDS) {
@@ -990,9 +987,6 @@ ring:
     expect(recorder.history).toEqual(['begin: use entity.oven.roast', 'wait: 2 times', 'cancel']);
   });
 
-  // What the count is for. The same recording, replayed against a world where a roast takes half as
-  // long, walks the same path; written as the ten seconds it actually took it would come back with
-  // five chestnuts and a run nobody could read as the one that was played.
   it('replays as the same path in a world that has been rebalanced under it', () => {
     const { recorder, started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast');
     started.live!.tick(10_000);
@@ -1238,10 +1232,6 @@ function authoringFixture(alsoWritten = '') {
   return { ...fixture(module, authoring), authoring, writes, elsewhere, elsewhereWholeFile };
 }
 
-// An author writing a section has two questions, and neither of them is answerable from the view:
-// what may be written under this kind, and what one already written looks like. Both are asked of
-// the same command line the writing itself goes through, so a driver with no filesystem — the
-// playbot — can ask them mid-run.
 describe('what an author may write, and what is already written', () => {
   it('/grammar names the kinds there are, and writes out only the ones it was asked for', () => {
     const { ctx } = authoringFixture();
@@ -1268,8 +1258,6 @@ describe('what an author may write, and what is already written', () => {
     const chest = runLine(ctx, '/source chest').output[0];
     expect(chest.kind === 'source' && chest.lines).toEqual(['# entity chest', 'title: Chest', 'open:', '  say: Empty.']);
     expect(runLine(ctx, '/source entity chest').output[0]).toEqual(chest);
-    // A section is written under its module-local id and addressed by the whole of it, and the
-    // view a player reads prints the whole of it — so that is the id /source has to answer to.
     expect(runLine(ctx, '/source base.chest').output[0]).toEqual(chest);
     expect(runLine(ctx, '/source entity base.chest').output[0]).toEqual(chest);
 
@@ -1285,7 +1273,6 @@ describe('what an author may write, and what is already written', () => {
       '1 loaded as # entity; /source entity <id> writes one out as its author wrote it:',
       '  base.chest',
     ]);
-    // Every id it lists is one it will read out, which is the whole use of listing them.
     for (const line of listed.kind === 'source' ? listed.lines.slice(1) : []) expect(errors(runLine(ctx, `/source entity ${line.trim()}`)), line).toEqual([]);
 
     expect(errors(runLine(ctx, '/source nothing-of-that-kind'))).toEqual(['nothing loaded is written as nothing-of-that-kind; /source <kind> lists what is loaded of a kind']);
@@ -1313,8 +1300,6 @@ describe('what an author may write, and what is already written', () => {
     const { ctx } = authoringFixture();
     runLine(ctx, '/dsl item base.gem title: Gem | examine: Cut bright.');
 
-    // Verbatim means the heading the author typed, and a staged section is written under the id
-    // that says which module it goes home to — so that is the heading it reads back as.
     const staged = runLine(ctx, '/source base.gem').output[0];
     expect(staged.kind === 'source' && staged.lines).toEqual(['# item base.gem', 'title: Gem', 'examine: Cut bright.']);
   });
@@ -1322,19 +1307,11 @@ describe('what an author may write, and what is already written', () => {
   it('/grammar and /source are refused outright where there is no authoring context', () => {
     const { ctx } = fixture(AUTHORING_MODULE);
     expect(errors(runLine(ctx, '/source chest'))).toEqual([UNAVAILABLE]);
-    // Grammar is the language itself and not this session's content, so it answers with or without one.
     expect(errors(runLine(ctx, '/grammar item'))).toEqual([]);
   });
 });
 
-// A brief hands an author a module name and nothing else, and the world it names is far larger than
-// the fixture above: what a listing has to survive is the shipped corpus, where one kind runs to a
-// hundred sections and the id somebody is after is written inside one of eighteen modules.
 describe('finding a section in the shipped world by the only name anyone was given', () => {
-  // More ids of one kind than a screenful, gathering into fewer families than there are of them,
-  // which is the only shape that makes `/source` fold. The world is otherwise the fixture's; this is
-  // written here rather than into the fixture because a heap of ids that does nothing is what the
-  // fold is about and not what a world is for.
   const MANY = ['# info z-heap', 'version: 1.0.0', 'dependencies: core', '', ...Array.from({ length: 30 }, (_, at) => `# item ${at % 2 === 0 ? 'pebble' : 'shell'}-${at}\n`)].join('\n');
 
   const opened = (): CommandContext => {
@@ -1354,7 +1331,6 @@ describe('finding a section in the shipped world by the only name anyone was giv
     return out.kind === 'source' ? out.lines : [];
   };
 
-  // Read off the head line rather than counted here, so a section written next month is counted too.
   const counted = (head: string): number => Number(/^(\d+) loaded/.exec(head)![1]);
 
   it('says how many of a kind are loaded, and writes them out unless there are more than a screenful', () => {
@@ -1368,11 +1344,8 @@ describe('finding a section in the shipped world by the only name anyone was giv
       expect(rows.length, kind).toBeLessThanOrEqual(held);
       if (rows.length === held) continue;
       folded += 1;
-      // A folded row stands for a family, and the families it folded to add back up to the whole.
       expect(rows.map((row) => Number(/\((\d+)\)$/.exec(row)?.[1] ?? 1)).reduce((sum, each) => sum + each, 0), kind).toEqual(held);
     }
-    // The shipped world is the reason the fold exists; a corpus small enough not to need it would
-    // leave the branch unproved and this says so rather than passing quietly.
     expect(folded).toBeGreaterThan(0);
   });
 
@@ -1381,8 +1354,6 @@ describe('finding a section in the shipped world by the only name anyone was giv
     for (const kind of ownedSectionKinds()) {
       const listed = sourced(ctx, `/source ${kind}`);
       if (listed.length === 0) continue;
-      // Whatever the first row names — a family or a whole id — the module is what stands before the
-      // first dot, and that is the half a brief hands over.
       const module = listed[1]!.trim().split(' ')[0]!.split('.')[0]!;
 
       const asked = runLine(ctx, `/source ${kind} ${module}`);
@@ -1390,17 +1361,11 @@ describe('finding a section in the shipped world by the only name anyone was giv
       const ids = named.map((line) => String(line).trim()).filter((line) => line.startsWith(`${module}.`));
       expect(ids.length, `${kind} ${module}`).toBeGreaterThan(0);
 
-      // And every id it named is one it will write out, which is the whole use of naming them.
-      // A section is written under its module-local id, or whole where another module patches it.
       const read = sourced(ctx, `/source ${kind} ${ids[0]}`);
       expect([`# ${kind} ${ids[0]!.slice(module.length + 1)}`, `# ${kind} ${ids[0]}`], `${kind} ${ids[0]}`).toContain(read[0]);
     }
   });
 
-  // The ids an author has in hand are the ones a run just printed at them, and a choice id names an
-  // action on an owner rather than a section. The section it reads out is the owner's, because the
-  // owner is the file the action is written in. Subjects are whatever the world offers where the
-  // player is standing, so an offer added next month is asked about too.
   it('reads out an owner from the choice id of one of its actions, and from the owner id alone', () => {
     const ctx = opened();
     const asked = sessionStatus(ctx.session)
@@ -1411,7 +1376,6 @@ describe('finding a section in the shipped world by the only name anyone was giv
     for (const use of asked) {
       const read = sourced(ctx, `/source ${usePayload(use)}`);
       expect([`# ${use.obj} ${use.objId.slice(use.objId.indexOf('.') + 1)}`, `# ${use.obj} ${use.objId}`], usePayload(use)).toContain(read[0]);
-      // The owner on its own is the other half of what a view prints, and it names the same section.
       expect(sourced(ctx, `/source ${use.obj}.${use.objId}`), use.objId).toEqual(read);
     }
   });
@@ -1496,9 +1460,6 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(session.registry.entities.get('base.chest')?.actions[0].results).toEqual([{ kind: 'say', text: 'Empty.', key: 'base.entity.chest.say.0' }]);
   });
 
-  // A line and a column into a file nobody at this command line can open is not something an author
-  // can write against, and a refusal they cannot write against costs them the turn and teaches
-  // nothing. This is what makes a draft cheaper to try than to read up on.
   it('/dsl answers a refusal with the line it stopped on and what may stand there', () => {
     const { ctx } = authoringFixture();
 
@@ -1566,8 +1527,6 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(runLine(ctx, '/load local-changes.blank').recorded).toEqual(['load: local-changes.blank']);
   });
 
-  // A refusal that only restates the shape is unreadable to somebody whose line already looks like
-  // the shape: what they cannot see is the word the line was read down to. So it is handed back.
   it('reports the malformed and the unknown by name, saying what it read', () => {
     const { ctx } = authoringFixture();
     expect(errors(runLine(ctx, '/dsl'))).toEqual(['/dsl requires <kind> <module>.<id> [body]; it read nothing as the kind and nothing as the id']);
@@ -1577,8 +1536,6 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(errors(runLine(ctx, '/local delete item nosuch'))).toEqual(['no local # item nosuch is staged.']);
   });
 
-  // `|` stands for a newline, so an id written up against one is an id at the end of its line and
-  // not an id with a `|` in it. The body it introduces reads the same whether a space precedes it.
   it('takes | as the end of the id it follows', () => {
     const { ctx } = authoringFixture();
     expect(errors(runLine(ctx, '/dsl item base.gem|title: Gem|examine: Cut bright.'))).toEqual([]);
@@ -1593,8 +1550,6 @@ describe('local DSL authoring takes its file as an argument, never reaching for 
     expect(homeless[1]).toEqual(homeless[0]);
   });
 
-  // Where a section goes home is written in its id and nowhere else, so an id that names no module
-  // is refused at the point of writing rather than landing in the local changes with no way back.
   it('refuses an id of a kind a module owns that names no module', () => {
     const { ctx } = authoringFixture();
     expect(errors(runLine(ctx, '/dsl item gem title: Gem'))).toEqual(['/dsl item gem names no module: write it as <module>.gem, which is where the section belongs']);

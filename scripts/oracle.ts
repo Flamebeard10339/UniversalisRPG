@@ -44,7 +44,6 @@ const usage = [
 
 const corpus = (): ModuleSource[] => [...shippedSources()];
 
-// One reading of the draft beside the world, which both the per-line pass and the whole-file verdict are about. A draft stands in the world it declares as well as in the one already loaded, so an id it declares on one line is declared for every other line that names it; a draft the engine will not take is not in that world at all, and then nothing it declares is known. A draft that is a version of a module already loaded takes that module's place in the world rather than standing beside it, since both answers an author wants are about the world their edit would make.
 export interface Reading {
   known: Addressed[];
   said: readonly ModuleDiagnostic[];
@@ -72,10 +71,8 @@ export function reading(file: string, text: string, world: readonly ModuleSource
 
 const DECLARES_A_MODULE = /^#[ \t]+info\b/m;
 
-// A module the engine will not name, which is still a module the draft has declared: nothing that ships is called this, so such a draft stands beside the world rather than in place of anything in it, and the loader says what is wrong with it.
 const UNNAMED = '';
 
-// Which module a text is a version of, or null where it is none. A module is which module it is by the id its own `# info` names and not by where its file sits, so a draft declaring `# info tulsa` is a new tulsa whether it is `content/tulsa.dsl`, a copy under another name, or a scratch file no path comparison would ever match. The heading is read with the grammar's own splitter, so a draft broken further down still says which module it is.
 function moduleDeclaredIn(text: string): string | null {
   try {
     const info = splitSections(text).find((section) => section.kind === 'info');
@@ -87,7 +84,6 @@ function moduleDeclaredIn(text: string): string | null {
 
 const slug = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'draft';
 
-// Ids are kept apart by the module that owns them, so the engine will not take a file that declares none. A draft that has not said which module it is is read as one of its own, standing on everything already loaded.
 export function draftModule(file: string, text: string, world: readonly ModuleSource[]): { source: ModuleSource; supplied: boolean } {
   const id = slug(file);
   if (moduleDeclaredIn(text) !== null) return { source: { name: id, text }, supplied: false };
@@ -96,23 +92,19 @@ export function draftModule(file: string, text: string, world: readonly ModuleSo
   return { source: { name: id, text: [...head, text].join('\n') }, supplied: true };
 }
 
-// What the engine says when it is handed the whole file beside everything already loaded. The lines above are each read on their own, and a rule that is about two sections at once — one starting location, one player, a table that rolls itself — has no line to be laid on and is only reachable by taking the file.
 export function takenLines({ said, read, stood }: Reading): string[] {
   if (stood) return [`the engine takes this file into the world, ${read}`, ''];
   return [`the engine will not take this file into the world, ${read}.`, 'It stops at the first thing it cannot take, so fixing this may uncover another:', ...said.map((each) => `  ${formatModuleDiagnostic(each)}`), ''];
 }
 
-// The page names a kind where the cursor stands and lists what an author has begun to type of it; a file has typed the whole of it already, so the oracle lists everything of that kind the world declares. An answer given once is pointed back at rather than written out again, so listing them whole costs one paragraph per kind however long a draft is — and a truncated list is the one thing that sends an author to read the corpus instead.
 const namesAt = (text: string, cursor: number, known: readonly Addressed[], already: Set<string>): string | undefined => {
   const offering = offeringAt(text, cursor, known);
   if (offering.filling === null) return undefined;
-  // A hole that holds a whole line of its own — a `<result>` — names nothing itself, but the line in it does, and that is what an author standing there is choosing.
   const kind = offering.filling.kind ?? [...new Set(offering.offers.flatMap((offer) => (offer.kind === undefined ? [] : [offer.kind])))][0];
   const ids = (of: string): string => {
     const named = known.filter((each) => each.kind === of).map((each) => each.address).sort();
     return named.length === 0 ? 'none anywhere' : `${named.join(', ')}${named.length === 1 ? '' : ` — ${named.length} in all`}`;
   };
-  // A hole with a grammar of its own is broken into the words it is written with and the things it may name; a hole that only names something is that one list.
   const holds = offering.filling.holds;
   const under =
     holds === undefined
@@ -124,7 +116,6 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[], alre
           ...holds.names.flatMap((each) => [`      <${each.hole}>`, `        ${ids(each.kind)}`]),
         ];
   const words = `    ${fillingWords({ ...offering.filling, ...(kind === undefined ? {} : { kind }) })}`;
-  // What a hole holds is the same answer wherever it is asked for, and a draft asks on every line. It is written out where it is first met and pointed back at after.
   const key = [kind, ...(holds?.words ?? []), ...(holds?.names ?? []).map((each) => each.hole)].join('|');
   if (under.length === 0) return words;
   if (already.has(key)) return `${words}, as above`;
@@ -132,10 +123,8 @@ const namesAt = (text: string, cursor: number, known: readonly Addressed[], alre
   return [words, ...under].join('\n');
 };
 
-// A page moves its cursor and the offering follows it; a file does not, so the oracle walks the cursor to each placeholder in turn and reports what stands there.
 const holesOf = (offering: { reads: string | null; filling: { form: string } | null }, line: string): readonly Hole[] => {
   const form = offering.reads ?? offering.filling?.form;
-  // Read against the line as written but for its indentation: a line that stops in the middle of a hole stops there, and trimming its end would close the hole an author is standing in.
   return form === undefined ? [] : (align(form, line.trimStart())?.holes ?? []);
 };
 
@@ -145,9 +134,6 @@ const wrongIn = (each: Amiss): string[] => [
   ...(each.undeclared.length === 0 ? [] : [`    nothing declares ${each.undeclared.map((one) => `${one.id} as a # ${one.kind}${one.meant === undefined ? '' : `, one letter from ${one.meant}`}`).join(', ')}`]),
 ];
 
-// What stands between the draft and the engine taking it, said first and all at once, so an author works down a list rather than reading every line looking for the one that is wrong.
-//
-// A draft the engine would not take is not in the world, so nothing it declares is known and every id it names itself reads as undeclared — hundreds of lines of noise around the one refusal that caused it. In that state only the refusals are reported, and the whole-file verdict below names what kept the draft out.
 export function amissLines(text: string, known: readonly Addressed[], stood = true): string[] {
   const amiss = amissIn(text, known).map((each) => (stood ? each : { ...each, undeclared: [] })).filter((each) => each.refused !== null || each.undeclared.length > 0);
   if (amiss.length === 0) return [stood ? 'nothing here is refused and every id it names is declared' : 'no line here is refused on its own, and the engine still will not take the file: see below. Until it does, what this draft declares is not in the world, so no id it names is checked.', ''];
@@ -169,7 +155,6 @@ const lineStarts = (draft: readonly string[]): number[] => {
   return starts;
 };
 
-// Which lines of a draft the engine actually reads, taken from the splitter's own account of what it kept — so nothing here has to know what a comment looks like, and a comment written where no one would guess one is legal is still read as one. Null where the splitter will not split the file at all, and then every line is answered for, as it was before there was anything to skip.
 const linesRead = (draft: readonly string[], starts: readonly number[]): ReadonlySet<number> | null => {
   let sections: RawSection[];
   try {
@@ -207,9 +192,7 @@ export function offeringLines(text: string, known: readonly Addressed[], only: n
   const draft = text.split('\n');
   const starts = lineStarts(draft);
   const read = linesRead(draft, starts);
-  // A blank line before the next heading is the end of a section, not a place an author is about to write, and the whole grammar of the kind above it is nothing they asked for.
   const writing = (after: number): boolean => draft.slice(after + 1).find((line) => line.trim() !== '')?.startsWith('#') !== true;
-  // A line the engine drops is not a place an author writes either, so it is passed over the same way. A blank line is kept: what may be written on it is the one thing an author standing there is asking.
   const dropped = (index: number, line: string): boolean => read !== null && line.trim() !== '' && !read.has(index);
   for (const [index, line] of draft.entries()) {
     if (only !== null && index + 1 !== only) continue;
@@ -237,7 +220,6 @@ export function offeringLines(text: string, known: readonly Addressed[], only: n
 export interface Asked {
   at: string | null;
   walk: boolean;
-  // The one line the walk was asked about, where it was asked about one. A module is thousands of lines walked and an author who is stuck is stuck on one of them.
   line: number | null;
   kinds: readonly string[];
 }
@@ -271,7 +253,6 @@ export function parseArgs(argv: readonly string[]): Asked {
     }
     if (arg === '--walk') {
       walk = true;
-      // A kind is a word and a line is a number, so the one that follows --walk says on its own which it is.
       if (argv[i + 1] !== undefined && LINE.test(argv[i + 1]!)) line = requireLine(argv[++i]!);
       continue;
     }
@@ -286,17 +267,8 @@ export function parseArgs(argv: readonly string[]): Asked {
   return { at, walk, line, kinds };
 }
 
-// Where the walk is left unasked for, the answer says it is there. It is the rest of the same question, and an author stuck on one line has no other way to hear of it.
 const WALK = 'For any one line — where it sits, what it is read as, and what may stand there — run this again with --walk <line>, or --walk alone for the whole file.';
 
-// A whole world's verdict rather than one draft's: every line of every module the engine has
-// something to say about, then whether the world loads, prints back to itself, and still walks every
-// route it holds. It is the same two questions `--at <draft>` asks, asked of a directory — and it is
-// the only thing that answers for `content/`, since no test may read a line of it.
-//
-// The modules are held against the world they make together, so an id one declares is declared for
-// every other. A world that will not load declares nothing, so only refusals are reported until it
-// does, exactly as one draft is.
 export function corpusLines(sources: readonly ModuleSource[]): { lines: string[]; ok: boolean } {
   const world = withEngineLocale(sources);
   const loaded = loadUniverseWithDiagnostics(world);
@@ -308,9 +280,6 @@ export function corpusLines(sources: readonly ModuleSource[]): { lines: string[]
       .filter((each) => each.refused !== null || each.undeclared.length > 0);
     return amiss.length === 0 ? [] : [`${source.name}: ${amiss.length} line(s) the engine has something to say about:`, ...amiss.flatMap(wrongIn), ''];
   });
-  // What the loader takes and an author still meant otherwise. They stop nothing loading, which is
-  // why they are said here and nowhere else: `src/content/worldRemarks.ts` owns the rules, and each
-  // derives its own subjects, so a section written next month is held to them with no edit.
   const remarks = stood ? remarksOn(world, loaded.registry) : [];
   const remarked = remarks.length === 0 ? [] : [`${remarks.length} thing(s) the engine takes and an author probably did not mean:`, ...remarks.map((each) => `  ${each.where} ${each.says}`), ''];
   const verdict = probe(world, { show: [], roundTrip: true, test: [...loaded.registry.tests.keys()] });
@@ -333,7 +302,6 @@ export function atLines(file: string, written: string, world: readonly ModuleSou
 
 function main(): void {
   const argv = process.argv.slice(2);
-  // Asked for before anything is read as anything else, so a flag mistyped after it still gets the page that says what the flags are.
   if (argv.includes('--help') || argv.includes('-h')) {
     console.log(usage);
     return;

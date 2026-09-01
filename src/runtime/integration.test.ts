@@ -15,7 +15,6 @@ import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
 
 const source = fixtureModule('core').text;
-// The engine's own world with core's text swapped for whatever a caller is perturbing.
 const world = (text: string) => loadUniverse(fixtureSources().map((each) => (each.name === 'core' ? { name: 'core', text } : each)));
 const registry = world(source);
 
@@ -36,12 +35,6 @@ describe('core content', () => {
   });
 });
 
-// A swing is spent out of the range its swinger stands at, so an actor that writes a range hits for
-// a different number every time. The subjects are the world's own — the player among them, on the
-// same footing as anything it fights, which is the point of writing the spread on a sheet. What an
-// actor stands at is its sheet folded with what it carries, so it is asked for rather than assumed.
-// That the fight path spends the range rather than its midpoint is proved on a fixture in
-// encounter.test.ts.
 describe("an actor's swing is spent out of the range it stands at", () => {
   const ATTACK = 'core.attack';
   const ranged = [...registry.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
@@ -79,8 +72,6 @@ describe('the four shapes a buff has, read off the routes the fixture walks', ()
 
   it('moves attack as rage accumulates, and moves nothing else at all', () => {
     const state = endOf('fixture-combat.rage-rises-as-swings-land');
-    // Where the route left the pool is the route's own `assert:` to say. What is needed here is
-    // only that it left one, and the readings below are taken at the ceiling the passive grants.
     expect(state.resources[RAGE]).toBeGreaterThan(0);
     const ceiling = toMilliUnits(statValue('fixture-combat.max-rage', state, registry));
 
@@ -108,12 +99,9 @@ describe('the four shapes a buff has, read off the routes the fixture walks', ()
       return statValue('core.attack-rate', state, registry) - bare;
     };
 
-    // Ungated: the buff's own `+2 attack-rate`, once per stack and no more.
     expect(reading('fixture-combat.rage-rises-as-swings-land', 5)).toBeCloseTo(10, 10);
     expect(reading('fixture-combat.rage-rises-as-swings-land', 1)).toBeCloseTo(2, 10);
 
-    // Behind the gate, a passive reads how many are held, so the count is worth more than the sum
-    // of what each stack pays.
     const one = reading('fixture-combat.accelerated-vigor-stacks-behind-its-gate', 1);
     const five = reading('fixture-combat.accelerated-vigor-stacks-behind-its-gate', 5);
     expect(one).toBeGreaterThan(2);
@@ -139,9 +127,6 @@ describe('the four shapes a buff has, read off the routes the fixture walks', ()
     expect(before - health(poisoned)).toBeGreaterThan(before - health(clean));
   });
 
-  // The other way round from the claim above, because a blow landing again is a blow inflicting it
-  // again: what lifts on its own clock has to be one nothing is renewing, so it is the player who
-  // was poisoned and the fight they let go of.
   it('lifts the debuff on its own clock, with nothing else asked to end it', () => {
     expect(buffsOf(endOf('fixture-combat.poison-lifts-when-its-own-duration-runs-out'), PLAYER)).toEqual([]);
     expect(registry.entities.get(SPITTER)!.passives).toContain('fixture-combat.envenom');
@@ -155,16 +140,12 @@ describe('the four shapes a buff has, read off the routes the fixture walks', ()
     expect(registry.entities.get(POST)!.blocks).toEqual([]);
     expect(landed).toBeGreaterThan(0);
 
-    // The pool fell by what thorns took net of what regeneration gave back, so the same span is run
-    // again with nothing to fight, opened where the fight left off: what it gains is what to add back.
     const idle = initialState(registry);
     const opening = idle.resources['core.health']!;
     restorePools(idle, { 'core.health': struck });
     resolve(idle, registry, idle.time + (state.time - idle.time));
     const regenerated = idle.resources['core.health']! - struck;
 
-    // What a spine costs is the post's passive to say, so it is read off the passive rather than
-    // written again here: a pass that retunes the thorns moves this claim with it.
     const spine = registry.passives.get('fixture-combat.retribution')!.whenHit.find((effect) => effect.kind === 'pool')!;
     expect(spine.delta.min).toBe(spine.delta.max);
     expect(opening + regenerated - struck).toBe(toMilliUnits(-spine.delta.min) * landed);
@@ -226,18 +207,12 @@ describe('core health resource (Pass 2 end-to-end)', () => {
   it('starts full, drains as the rat bites back, then regenerates from a meal as time passes', () => {
     const state = initialState(registry);
     const full = state.resources['core.health']!;
-    // A pool starts at its own ceiling, and the ceiling is the stat the resource names rather than
-    // a number written here: what the player's sheet and their level of Health come to is the
-    // balance's business and moves without this file.
     expect(full).toBe(toMilliUnits(statValue('core.max-health', state, registry)));
 
     state.location = 'fixture-town.well';
     useFight('core.melee-combat', 'fixture-town.rat', registry, state);
     expect(state.time).toBeGreaterThan(0);
 
-    // The pool is read as the fight runs and not once it is over: what the rat takes is the claim,
-    // and a world tuned to regenerate faster than it bites would stand back at the ceiling by the
-    // end of the window without a single bite having stopped landing.
     let lowest = full;
     for (let target = state.time + secondsToMs(1); target < secondsToMs(120); target += secondsToMs(1)) {
       resolve(state, registry, target);
@@ -245,8 +220,6 @@ describe('core health resource (Pass 2 end-to-end)', () => {
     }
     resolve(state, registry, secondsToMs(120));
     const afterFighting = state.resources['core.health']!;
-    // Melee is continuous, so a Fight re-arms on the next rat still standing and the well empties
-    // rather than stopping at the first. Two minutes is longer than any sheet would make that take.
     expect(state.flags['fixture-quests.well-cleared']).toBe(true);
     expect(populationCount(wellRats)).toBeGreaterThan(1);
     expect(lowest).toBeLessThan(full);
@@ -264,10 +237,6 @@ describe('core health resource (Pass 2 end-to-end)', () => {
 });
 
 describe('sitting down is worth more than standing about', () => {
-  // The bench adds to the regeneration everybody already has rather than restoring a pool of its
-  // own, so what it is worth can only be said against a span nobody sat out. A route can compare
-  // its pool to a figure and not to another run, which is why the walking is the world's and the
-  // paying is here: both sides of this are run, so a pass that retunes either moves them together.
   it('leaves the sitter better off than the same span opened at the same pool', () => {
     const sat = createGameState();
     runTest('fixture-combat.the-bench-is-where-health-comes-back', registry, sat);

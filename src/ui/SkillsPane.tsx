@@ -11,8 +11,6 @@ import { useMoment } from './transient';
 import type { Crossings } from './levelling';
 import type { Words } from './words';
 
-// A skill's figures are about the ring the player just pressed, so the panel stays on the page that
-// holds the rings and leaves the bar along the bottom where the thumb left it.
 const PANEL: Declared = { over: 'pane' };
 
 const RING_RADIUS = 17;

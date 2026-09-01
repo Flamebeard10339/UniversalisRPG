@@ -28,9 +28,6 @@ describe('the tabs the character sheet keeps its stats under', () => {
     expect(shownTab(tabs, 'core.fighting')?.group?.id).toBe('core.fighting');
   });
 
-  // A world that classifies none of its stats still draws all of them, on one tab with no strip
-  // above it. No corpus reaches that — a `# group` standing standard for the kind catches every stat
-  // naming none — but a sheet that lost a row over it would be disagreeing with the engine.
   it('keeps every stat a world grouped none of, on the one tab there then is', () => {
     const tabs = statTabs([row('attack'), row('luck')]);
 
@@ -45,9 +42,6 @@ describe('the tabs the character sheet keeps its stats under', () => {
   });
 });
 
-// The whole point of reading the tab off the stat's own `group:` is that nothing here has to be
-// edited when a stat or a group is. So the claim is made against the shipped world rather than a
-// fixture: every stat it declares is on a tab, and there is more than one tab to be on.
 describe('the shipped world, as the sheet lays it out', () => {
   const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);
   const shown = view(session);

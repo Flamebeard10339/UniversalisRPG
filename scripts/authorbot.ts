@@ -7,11 +7,6 @@ import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
-// scripts/authorbot.ts hands one brief to a coding agent and counts what it reached for. The
-// playbot beside it plays the world through the game's own command line; this one writes the
-// world's source, and the question it exists to answer is which of an author's questions the
-// oracle does not answer — every reach into the engine is one of them.
-
 export const repoRoot = path.join(import.meta.dirname, '..');
 
 export const DEFAULT_TURNS = 150;
@@ -48,9 +43,6 @@ export interface Asked {
   watch: boolean;
 }
 
-// The one reading of a brief's name: the module it writes, the directory it runs in and the name
-// the watch prints are all this, so pointing a run at a brief and finding its output are the same
-// word. It is how the shipped corpus is already named — `A Grand Blade.md` beside a-grand-blade.dsl.
 export const moduleNameFor = (brief: string): string =>
   path
     .basename(brief)
@@ -94,9 +86,6 @@ export function parseArgs(argv: readonly string[]): Asked {
   return asked;
 }
 
-// What this run treats as the engine's own. An author's questions are answered by `npm run oracle`
-// and by the corpus; a reach for one of these is a question neither of them answered, which is the
-// whole measurement and is why it is counted whether or not it is refused.
 const ENGINE_DIRS = ['src', 'scripts', 'docs', 'node_modules', 'dist'];
 const ENGINE_TEXT = /\b(src|scripts|docs)[/\\]|\.tsx?\b/i;
 
@@ -105,15 +94,10 @@ const engineUnder = (repo: string, written: string): boolean => {
   return ENGINE_DIRS.some((dir) => rel === dir || rel.startsWith(`${dir}/`));
 };
 
-// The tools that change a file rather than read one, held in the case a host is free to hand them
-// over in: what a tool is called is that host's word and not this one's.
 const WRITES = new Set(['write', 'edit', 'notebookedit']);
 
 export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | { reaching: true; why: 'elsewhere' };
 
-// Whether a call is reaching for the engine, or writing somewhere it may not. A tool that runs a
-// command is read as its command and a tool that names a file as its file, since the two are the
-// only ways in and a `grep` over `src/` is the same reach as a `Read` of one file in it.
 export function verdictOf(tool: string, input: Record<string, unknown>, repo: string, workdir: string): Verdict {
   const written = input.file_path;
   if (WRITES.has(tool.toLowerCase()) && typeof written === 'string') {
@@ -193,9 +177,6 @@ export interface Cost {
   usage?: Record<string, number>;
 }
 
-// What the run cost and what it reached for, which is the report this script exists to print. The
-// reaches are listed rather than counted: which questions sent an author into the engine is the
-// answer, and a number alone is not one.
 export function summaryLines(reaches: readonly Reach[], cost: Cost, workdir: string): string[] {
   const engine = reaches.filter((each) => each.decision !== 'allow');
   return [
@@ -220,9 +201,6 @@ const ENDED_FILE = 'ended';
 
 export const workdirFor = (brief: string): string => path.join(os.tmpdir(), `${WORKDIR_PREFIX}${moduleNameFor(brief)}`);
 
-// Two calls are the same call when they name the same tool and the same thing, which is what makes
-// a run hand-building one throwaway section over and over look different from a run getting on with
-// it: the first stops discovering new ones and the second does not.
 export const signatureOf = (reach: Reach): string => `${reach.tool} ${reach.target.replace(/\s+/g, ' ').trim().slice(0, 90)}`;
 
 export const CIRCLING_WINDOW = 40;
@@ -263,9 +241,6 @@ export function statusOf(name: string, reaches: readonly Reach[], ended: boolean
   };
 }
 
-// The operator's question is whether a run is working or stuck, so the answer is one block: how far
-// it has got, how long since it last did anything, and whether what it is doing now is anything it
-// had not already done.
 export function statusLines(status: RunStatus): string[] {
   const head = status.ended
     ? `${status.name} — ended, ${status.reply} reply(s), ${status.calls} call(s)`
@@ -293,8 +268,6 @@ const reachesIn = (workdir: string): readonly Reach[] => {
     });
 };
 
-// Which runs there are is read off the directories they made, not off a list somebody keeps: a run
-// started from another terminal, or five started at once, are all here by having started.
 export const runsInFlight = (dir: string): readonly string[] =>
   readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith(WORKDIR_PREFIX))
@@ -328,8 +301,6 @@ async function run(asked: Asked): Promise<number> {
   mkdirSync(workdir, { recursive: true });
   const corpus = path.join(workdir, 'content').replace(/\\/g, '/');
   cpSync(path.join(repoRoot, CORPUS_DIR), path.join(workdir, 'content'), { recursive: true });
-  // The engine's own modules go in beside the author's, so the one directory the run is given is a
-  // whole world — the run may not name `src/`, and a world with no English in it is not one.
   cpSync(path.join(repoRoot, ENGINE_MODULE_DIR), path.join(workdir, 'content'), { recursive: true });
   const draft = path.join(corpus, asked.target!).replace(/\\/g, '/');
   if (!existsSync(draft)) writeFileSync(draft, '');
@@ -349,9 +320,6 @@ async function run(asked: Asked): Promise<number> {
     appendFileSync(calls, `${JSON.stringify(reach)}\n`);
   };
 
-  // Every call is gated here rather than through `canUseTool`: read-only tools are approved before
-  // that callback is consulted, so a run gated there sees the commands and none of the reads — and
-  // the reads are the question.
   const preToolUse = async (input: unknown): Promise<Record<string, unknown>> => {
     const { tool_name: tool, tool_input: held } = input as { tool_name: string; tool_input: Record<string, unknown> };
     const args = held ?? {};
@@ -379,8 +347,6 @@ async function run(asked: Asked): Promise<number> {
     cwd: repoRoot,
     model: asked.model,
     maxTurns: asked.turns,
-    // Nothing is named in `allowedTools`: a bare allow entry approves the tool before the hook is
-    // consulted, and then nothing is gated and nothing is counted.
     hooks: { PreToolUse: [{ hooks: [preToolUse] }] },
     settingSources: [],
     disallowedTools: ['Task', 'WebSearch', 'WebFetch'],

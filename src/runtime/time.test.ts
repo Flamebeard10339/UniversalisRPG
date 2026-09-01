@@ -265,7 +265,6 @@ wait: 4 times
     expect(runTest('nothing-under-way', registry(), createGameState())).toEqual({ passed: true });
   });
 
-  // nextBoundary predicts the runway of an action that drains a pool it can read, and a fight drains the pool of whoever is being swung at, which is not one of them. Stepping by the action's own cycle needs no such prediction.
   it('runs a fight out to the end of it, which no boundary the engine computes predicts', () => {
     expect(runTest('one-straw-man', registry(), createGameState())).toEqual({ passed: true });
   });
@@ -274,8 +273,6 @@ wait: 4 times
     expect(runTest('four-bakings', registry(), createGameState())).toEqual({ passed: true });
   });
 
-  // The same span either way: what the line does on the way to being under way is inside the count,
-  // as it is inside the seconds.
   it('counts the same whether the loop was armed by the line before or by the line itself', () => {
     expect(runTest('four-bakings-on-one-line', registry(), createGameState())).toEqual({ passed: true });
   });

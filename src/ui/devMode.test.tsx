@@ -338,9 +338,6 @@ describe('with dev off, nothing changes (c11)', () => {
   });
 });
 
-// A room reads as it is written for whoever is writing it. The rule about what is held back has one
-// home — `maskedHere` — and dev mode turns it off through the ordinary settings path rather than
-// growing a second copy of the rule beside it.
 describe('an author sees the room as it is written (c9)', () => {
   const masking = (driver: Driver): string | undefined => driver.snapshot().view.settings.find((row) => row.name === 'masking')?.standing;
 

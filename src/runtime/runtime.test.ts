@@ -382,9 +382,6 @@ describe('renderSegments', () => {
     expect(sheetLine(createGameState(), registry)).toBe('There you are, , .');
   });
 
-  // Subjects off the sheet's own declaration, so a field it grows next month is held to the same
-  // rule with nothing edited: a field naming a kind is read out as that kind's words, and a field
-  // the player wrote themselves is read out as what they wrote.
   for (const field of PLAYER_FIELDS) {
     const { names } = PLAYER_SHEET[field];
     it(`reads player.${field} out as ${names === null ? 'the words the player typed' : `the words the world titles a ${names}`}`, () => {
@@ -697,7 +694,6 @@ describe('what an engine root reads', () => {
     expect(reads(['inventory', 'island', 'plank'], state, 0)).toBe(true);
   });
 
-  // Derived from the grammar's own roots: a root that fell through to the flag table would read whatever a flag of that name held.
   it.each(ENGINE_ROOT_NAMES)('does not let a flag named after %s answer for it', (root) => {
     const state = createGameState();
     const path = [root, 'island', 'anything'];
@@ -756,10 +752,6 @@ cast:
   });
 });
 
-// The world runs on whatever step the caller happens to take — a frame, a cycle of what is under
-// way, one `wait:` of a minute — and what it settles on may not depend on which. A pace taken to
-// nothing is where that is hardest: whoever is held still is counted no time, so the moment the
-// hold wears off has to be reached whether or not the caller stopped there.
 describe('a debuff an enemy lands mid-fight leaves every step size in the same place', () => {
   const DEN = `
 # stat attack
@@ -820,8 +812,6 @@ on death:
 
   const SPAN = secondsToMs(120);
 
-  // Everything the run settled on but the words it said, so a field that starts moving is covered
-  // by this having been written at all.
   const settledOn = (registry: Registry, seed: number, step: number): string => {
     const state = createGameState('den');
     initResources(state, registry);

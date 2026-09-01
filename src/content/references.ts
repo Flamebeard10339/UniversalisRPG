@@ -9,7 +9,6 @@ import { INFLICT_SITE, Visit } from './refs';
 import { visitSection } from './sections';
 import { mapOf } from './registry';
 
-// What a player may reach is everything a DEBUG section did not declare, and this is what says so: a section anyone can play their way to may not name one, so the only way to a DEBUG thing is another DEBUG thing. Asked of whichever map the named kind lands in, so a kind added next month is answered for with no edit — and of nothing at all for the members a kind mints, which stand or fall with the section that minted them.
 function refuseDebugReference(kind: string, target: string, where: string, registry: Registry): void {
   const name = registryMapOf(kind);
   if (name === null || !isDebug((mapOf(registry, name) as ReadonlyMap<string, object>).get(target))) return;
@@ -36,7 +35,6 @@ function refuseUntimedPayload(itemId: string, where: string, registry: Registry)
   }
 }
 
-// Every name a reference written in a draft may resolve to: the namespace the engine built while loading — sections, the flags they mint, the actions nested in them, the nodes inside a dialogue.
 export const declaredBy = (registry: Registry): Addressed[] =>
   registry.namespace.kinds().flatMap((kind) => registry.namespace.declaredKeys(kind).map((address) => ({ kind, address, module: registry.namespace.ownerOf(kind, address) ?? null })));
 

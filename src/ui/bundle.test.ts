@@ -76,7 +76,7 @@ const ELSEWHERE = sourcesUnder(resolve(here, '..'))
 const AGENT_ONLY = await Promise.all(
   OWNERS.map(async (module) => ({
     path: module.path,
-    names: Object.keys((await import(/* @vite-ignore */ pathToFileURL(module.path).href)) as object),
+    names: Object.keys((await import(pathToFileURL(module.path).href)) as object),
     says: messages(module.text).filter((message) => !ELSEWHERE.includes(message)),
   })),
 );

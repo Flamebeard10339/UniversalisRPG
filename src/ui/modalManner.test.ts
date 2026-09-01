@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clickingOffLeaves, declaredFor, DEFAULT_MANNER, EVERY_MANNER, layerOf, mannerOf, showsTheBeat, type Manner } from './modalManner';
 
-// Every claim below picks its subjects from EVERY_MANNER, which is built out of the tables that
-// have to resolve a word rather than listed beside the type. A strategy grown next month is held to
-// all of them with nothing edited here.
-
 const withPlace = (place: Manner['place']): readonly Manner[] => EVERY_MANNER.filter((manner) => manner.place === place);
 
 describe('the manner a screen is drawn in', () => {

@@ -13,11 +13,6 @@ export interface ModuleSource {
   enabled?: boolean;
 }
 
-// What a set of turned-off modules means, said once. A source is named before it is parsed, so the
-// name is the only handle both a player's stored set and a tool's flag can hold it by; a name that
-// matches nothing loaded turns nothing off, which is what makes a stored set survive a module being
-// renamed or dropped. Turning one off here is not turning it off instead of the source saying so —
-// a source already disabled stays disabled.
 export const withModulesOff = (sources: readonly ModuleSource[], off: Iterable<string>): ModuleSource[] => {
   const held = new Set(off);
   return sources.map((source) => ({ ...source, enabled: source.enabled !== false && !held.has(source.name) }));

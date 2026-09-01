@@ -104,9 +104,6 @@ describe('the tab bar of a screen showing more than one page', () => {
   });
 });
 
-// A language that writes longer words than English is the case a fixture can state and a screenshot
-// cannot: the name goes in whole and has to come out whole, in every shape a sheet is drawn in, so a
-// fourth layout has to answer this before it can ship.
 describe('a name longer than the cell it is drawn in', () => {
   const LONG = asLocalized('Reichsstraßenbauverwaltungsschlüssel des Eisenschwertes');
 

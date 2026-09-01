@@ -1,12 +1,3 @@
-// Thieving: a standard contest between ability and task-difficulty.
-//
-// The skill reaches out and nothing reaches in. Tulsa knows nothing about pockets: every mark, every
-// lock and every lift below writes itself over a section the town declared, so the whole of what
-// thieving is — what it costs, what it pays, who can be robbed and where the picks come from — is
-// this one file. Take the file away and the town is still a town, with nobody's hand in anybody's
-// purse. That is what `? tulsa` is for: an optional dependency prunes whatever names a module that
-// is not there, so a world with no Tulsa in it gets the skill and none of the marks.
-
 # info thieving
 version: 1.1.0
 pack: skills
@@ -30,7 +21,6 @@ title: Daze Duration
 base: 0
 group: core.skilling
 
-// Multiplier on thieving rewards. Rounds down.
 # stat luck
 base: 0
 group: skilling
@@ -43,15 +33,10 @@ group: core.other
 title: Thieving
 stat: thieving-ability
 
-// --- Debuffs ---
-
-// Standard thieving debuff that applies on some failed checks. 
 # item dazed
 title: Dazed
 examine: Dizzy...
 -100% thieving-rate
-
-// --- Actions ---
 
 # action steal
 attempts: 1
@@ -70,8 +55,6 @@ title: Pick the Lock
 extends: steal
 continuous
 time: 6
-
-// --- Thieving Equipment ---
 
 # item steel-lockpicks
 title: Steel Lockpicks
@@ -97,8 +80,6 @@ slot: boots
 value: 60
 item-level: 3-6
 tools, +4 thieving-ability
-
-// --- Passives ---
 
 # passive flat-thieving-small
 title: Light Fingers
@@ -144,8 +125,6 @@ tools, +3-8 luck
 title: Practised Fence
 tools, +8-15 luck
 
-// --- Cluster Jewels ---
-
 # item thieving-ability-jewel
 title: Quiet Hour
 value: 250
@@ -177,8 +156,6 @@ cluster-jewel:
   shape: spindle
   open-connections: e
   passives: 1 luck-1, 2 luck-2
-
-// --- Stealable Items ---
 
 # item polished-buttons
 title: Polished Buttons
@@ -215,14 +192,6 @@ title: Ruby
 examine: A red, translucent gemstone.
 value: 150
 
-// --- who can be robbed ---
-//
-// A townsman, a guardsman and a knight are three rungs of one ladder in the town's own reckoning,
-// and the same three rungs here: each is watchful enough to be worth more than the one under it, so
-// a minute at any of them comes to about the same and what changes is whether you can stand there
-// at all. The town writes what they are worth to an arm; every line below is what they are worth to
-// a hand, and it is added to their sheets rather than written on them.
-
 # entity tulsa.player
 +skills: thieving
 
@@ -235,8 +204,6 @@ pick-pocket:
   1 in 400:
     give: 1 thieving-rate-jewel
     say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
-  // What a townsman is carrying that a skiller wants is what a townsman is wearing, so the clothes
-  // come off the same pocket the coin does.
   1 in 14:
     roll: townsmans-wardrobe
     say: They are carrying it rather than wearing it, which is somebody's washing and now it is yours.
@@ -244,9 +211,6 @@ pick-pocket:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
     drain: 1 core.health
 
-// One piece of somebody's washing, and never the same piece twice running. The store sells the
-// whole set to anybody with the coin; this is the other way, and it is the way a thief who has not
-// got the coin yet gets dressed.
 # droptable townsmans-wardrobe
 one of:
   1x: give: 1 core.unassuming-cap
@@ -277,14 +241,6 @@ pick-pocket:
     drain: 1 core.health
     inflict: dazed for npc-daze-duration
 
-// The second band's mark, and the one entity here the town does not declare at all: it is a thief,
-// it is only ever robbed, and what comes off it is picks. The cellar under the doss house is the
-// town's floor and this is what stands on it — take the skill away and the room is empty, which is
-// the honest answer, because there was never anything down there but this.
-//
-// Nothing here is aggressive. They are not going to start something in their own cellar over a hand
-// in a pocket, which is what lets a beginner walk down, try it, fail, and walk back up having
-// learned where the ceiling is — the vigilance is the gate, not a fight.
 # entity thief
 title: Thief
 examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
@@ -308,14 +264,6 @@ pick-pocket:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
     drain: 1 core.health
     inflict: dazed for npc-daze-duration
-
-// --- what is locked ---
-//
-// Three boxes, running `pick-the-lock` against the wards on each. Winning empties the box; losing
-// puts you on the step outside with the owner explaining it, and where that step is is the town's
-// business rather than the hand's. Nothing in Tulsa is a container until this file says so, which
-// is why the chests are declared here and stood in the town's rooms below rather than the other way
-// about.
 
 # entity house-chest
 title: Chest
@@ -359,9 +307,6 @@ one of:
   3x: give: 1 sapphire
   1x: give: 1 ruby
 
-// The best lock in Tulsa, in the one cellar where nobody will explain to you that it is not your
-// box — so this is the only lock in the world that does not end with a walk back from the market
-// square. It is where the boots and the quiet hour come from.
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
@@ -387,12 +332,6 @@ one of:
   1x: give: 1 thieving-ability-jewel
   1x: give: 1 thieving-utility-jewel
 
-// --- where the locks and the thieves stand ---
-//
-// The town says where its rooms are and this says what is in them, which is the same direction
-// everything else in this file runs. Four kitchens with a chest under the window, two upstairs in
-// the castle, one in the cellar and one behind the barred door, and the den under the doss house.
-
 # location tulsa.oolga-house
 +entities: house-chest
 
@@ -417,24 +356,11 @@ one of:
 # location tulsa.rogue-den
 +entities: 4 thief, strongbox
 
-// --- what a light hand takes off a room rather than off a person ---
-//
-// One-offs the town already writes: the prop, the words and the flag that hides it once it is gone
-// are Tulsa's, and what the doing of it is worth in a skill is this file's. A line written into an
-// action already standing replaces the field it names and leaves every other field alone, so the
-// experience goes wherever the town left room for it — at the top of the body where the town wrote
-// its own results under `on success:`, and under `+on success:` where it wrote them at the top.
-// Which of the two is read off the action rather than agreed with it, and either way nothing here
-// holds a second copy of a line the town owns.
-
 # location tulsa.market-row
 lift an axe off the rack:
   +on success:
     xp: thieving 12
 
-// Paid once, because there is one thing up here to notice and noticing it twice is not a second
-// thing. The whole action is written here rather than layered onto one of the town's: a roof with
-// nothing to see from it is a roof, and the looking is the skill.
 # flag castle-watched
 
 # location tulsa.market-rooftops
@@ -464,13 +390,6 @@ take one off the sill:
   +on success:
     xp: thieving 10
 
-// --- tests ---
-
-// The two things in the market a light hand gets: one at the grate and one off the rack. Each sets
-// its own flag, which is what its own `hidden if:` reads, so neither is a second helping — and the
-// axe is the tool the dead alder wants, which is why the rack is worth a hand at all. Both are the
-// town's own actions with this file's experience hung on the end of them, so a lift that stopped
-// paying is what the last line catches.
 # test the-market-is-two-lifts-to-a-light-hand
 load: tulsa.in-town
 use: entity.tulsa.sewer-grate.reach-through-the-bars
@@ -482,12 +401,6 @@ assert: has core.hand-axe
 assert: tulsa.market-row.axe-taken
 assert: xp.thieving.thieving > 0
 
-// A hand going out over and over at the same pocket, which is the whole shape of thieving: the
-// player starts it, a lift pays, a catch costs health and stands them still for three seconds, and
-// then it goes again. The two lifts above are one-shot props and prove none of that — this is the
-// only route that walks the loop, and it walks it far enough that a catch has certainly happened
-// along the way. What a catch costs is not asserted, because that is stochastic and a number; that
-// the loop keeps going through one is what the last line is for.
 # test a-hand-goes-out-again-after-it-is-caught
 load: tulsa.in-town
 use: entity.tulsa.civilian.pick-pocket until xp.thieving.thieving >= 200

@@ -44,8 +44,6 @@ import { tidy } from '../src/runtime/figures';
 
 export { formatView, printed, type PlayerLine, type ReplLine, type ToolLine } from './lib/replLines';
 
-// How this terminal is started is this terminal's own footnote, and rides in under the help the
-// engine hands every driver rather than inside it.
 const STARTUP_LINES = [
   '<a.dsl,b.dsl> at startup loads content files, comma-separated in one argument',
   'local=<file> at startup chooses the local DSL file',
@@ -141,7 +139,6 @@ function runLiveAction(run: LiveRun, localizer: Localizer, armed: readonly Local
     const wasRaw = Boolean(input.isRaw);
     rl.pause();
     if (isTTY) input.setRawMode(true);
-    // A `data` listener auto-flows a stream only for the first one attached, and readline already attached one.
     input.resume();
     print(armed.map((said) => say(said)));
     process.stdout.write(`${localizer.engine('engine.repl.live.stop')}\n`);
@@ -290,9 +287,6 @@ export function fileSaves(dir: string, now: () => number = Date.now): SaveContex
   return createSaveContext(fileSlots(repoPath(dir)), now);
 }
 
-// The sources are asked for rather than held, because a driver that re-expands a directory every
-// turn — the playbot — authors modules into that directory while it runs, and a snapshot taken at
-// startup would stage them against a dependency list that predates them.
 export function fileAuthoring(read: () => readonly ModuleSource[], localFile: string): AuthoringContext {
   const dependencies = (): string[] => loadUniverseWithDiagnostics(read()).loadedModules;
   return {

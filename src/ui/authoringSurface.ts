@@ -23,10 +23,6 @@ export type SurfaceId = (typeof SURFACES)[number];
 
 export const MAPPED_KIND = 'location';
 
-// A module's own heading is not a section anybody edits here. Everything else it wrote is handed over
-// headed by the address it answers to rather than by the id its author typed inside the file, so a
-// section reads the same wherever it came from, and under that heading stand the author's own bytes.
-// A module nothing here can read holds nothing to offer, which is what a file half-typed is.
 export function sectionsIn(source: ModuleSource): Section[] {
   let written: WrittenModule;
   try {
@@ -52,9 +48,6 @@ export function sectionsIn(source: ModuleSource): Section[] {
 
 const keyOf = (section: Pick<Section, 'kind' | 'address'>): string => `${section.kind} ${section.address}`;
 
-// The order the loader will merge these in, which is the order two modules writing at one address
-// have to be folded in. A source that will not parse says nothing about what depends on what, so the
-// order they were handed in stands.
 function inLoadOrder(sources: readonly ModuleSource[]): readonly ModuleSource[] {
   try {
     const ordered = parseUniverse(sources).map((module) => module.source);
@@ -64,11 +57,6 @@ function inLoadOrder(sources: readonly ModuleSource[]): readonly ModuleSource[] 
   }
 }
 
-// A second module writing at an address already written at, folded into what stands there the way the
-// loader folds it, so an author handed the address back is handed what the world plays at it. What
-// cannot travel as a patch is the last word on its own, as it was before: a kind that reads its own
-// body, one the patcher hands straight back rather than laying in, and one whose fold the engine will
-// not read back — this page offers no body the engine refuses, least of all one it wrote itself.
 function foldedOver(standing: Section, over: Section): Section {
   const schema = sectionFor(over.kind)?.schema;
   if (schema === undefined) return over;
@@ -77,10 +65,6 @@ function foldedOver(standing: Section, over: Section): Section {
   return { ...over, text: patched.text };
 }
 
-// One address is one thing to edit, and more than one module may write at it. Which of them has the
-// last word is the same answer the loader gives a player — load order decides, and a module controls
-// where it lands by what it depends on — and the words the ones before it wrote stand under that,
-// so staging the body back does not quietly take away what another module added to it.
 export function addressable(sources: readonly ModuleSource[]): Section[] {
   const held = new Map<string, Section>();
   for (const source of inLoadOrder(sources)) {
@@ -145,7 +129,6 @@ const TERMS = /\S+/g;
 
 const searched = (section: Section): string => `${section.module}\n${section.text}`;
 
-// What is true of a section beyond the words in it, which is what an author narrows a long list by. Each is asked of the whole set, because being a copy of something is not a fact one section holds alone.
 export const STATES: Record<string, (sections: readonly Section[]) => (section: Section) => boolean> = {
   changed: () => (section) => section.staged,
   shadowed: (sections) => {
@@ -179,7 +162,6 @@ function everyTerm(query: string, sections: readonly Section[]): Search {
   return { holds: (section) => held.every((asked) => asked(section)) && patterns.every((pattern) => pattern.test(searched(section))), broken: false };
 }
 
-// Terms beside each other narrow, and `||` widens, so two states an author wants at once are asked for the way they would be anywhere else. A side with nothing written on it asks for nothing, which is what a query still being typed has.
 export function searching(query: string, sections: readonly Section[] = []): Search {
   const sides = query.split(EITHER).filter((side) => side.trim() !== '').map((side) => everyTerm(side, sections));
   if (sides.some((side) => side.broken)) return { holds: () => false, broken: true };
@@ -187,7 +169,6 @@ export function searching(query: string, sections: readonly Section[] = []): Sea
   return { holds: (section) => sides.some((side) => side.holds(section)), broken: false };
 }
 
-// The words the box takes, said in the box itself, so a state that is declared is a state an author can find.
 export const searchHint = (words: string): string => `${words} ${Object.keys(STATES).map((state) => `is:${state}`).join(` ${EITHER} `)}`;
 
 export type Staged = { line: string } | { refused: string };

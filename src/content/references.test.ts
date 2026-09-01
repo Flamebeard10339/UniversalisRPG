@@ -381,7 +381,6 @@ describe('a use: names an object and a member of it', () => {
   });
 });
 
-// Derived from the roots the grammar declares, so a root paired with a kind next month is answered here without an edit.
 describe('an engine root reads an id of the kind it names', () => {
   const maps = new Map(contentSectionMaps());
   const WHEN = 'when: time >= 0';
@@ -405,7 +404,6 @@ describe('an engine root reads an id of the kind it names', () => {
   }
 });
 
-// What a player may reach is everything a DEBUG section did not declare, and the only thing that makes that true is a refusal — so the refusal, and the words an author is refused in, are the contract.
 describe('a DEBUG section', () => {
   const marking = (heading: string): string => VALID.replace(heading, `${heading}\nDEBUG`);
   const HAMMER = '# item hat';
@@ -421,10 +419,6 @@ describe('a DEBUG section', () => {
     expect(() => loadModule(`${marking(HAMMER)}\n# droptable a-lucky-find\nDEBUG\ngive: 1 hat\ngive: 1 straw\n`)).not.toThrow();
   });
 
-  // A section that says nothing in any language has no business carrying words: a locale row filed
-  // under one is a row the printer cannot tell from a row nobody wrote, and a key the terminal says
-  // in place of a line. Refused where it is written, whether it is a field of the kind's own or a
-  // line said at run time, so neither ever comes to exist.
   const alsoSaying = (...lines: string[]): string => `${VALID}\n${lines.join('\n')}\n`;
 
   it('is refused the words it would say, wherever they are written', () => {
@@ -434,8 +428,6 @@ describe('a DEBUG section', () => {
     expect(() => loadModule(alsoSaying('# entity keeper', 'DEBUG', '', '# dialogue keeper-chat', 'DEBUG', 'owner = keeper', '', 'node hello:', '  always', '  Good day.'))).toThrow(/# dialogue keeper-chat: hello.line.0: "Good day." is words a player reads/);
   });
 
-  // What it may keep is what a # test names it by. An action's label is its address as much as its
-  // words, and a section nothing can address is a section no test can drive.
   it('keeps the label its actions are addressed by', () => {
     const registry = loadModule(marking('# item hat').replace('slot: head', 'slot: head\nwear it:\n  instant'));
 

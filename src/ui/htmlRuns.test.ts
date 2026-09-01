@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { htmlRuns } from './htmlRuns';
 
-// What a claim about words on a screen is allowed to read. A label that went unread would make
-// every such claim pass by reading nothing, which is the failure this file exists to refuse.
 describe('the runs rendered markup puts in front of a reader', () => {
   it('reads a tag with no words as a break and nothing else', () => {
     expect(htmlRuns('<p class="loud">Up the stair</p><hr/>')).toEqual(['Up the stair']);

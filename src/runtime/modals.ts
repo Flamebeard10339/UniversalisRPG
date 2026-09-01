@@ -10,7 +10,6 @@ import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStal
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
-// What the screen standing open is about, where it is about something the view publishes elsewhere. A plane and a quest are both read beside the question rather than in it.
 export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer } | { readonly kind: 'stat'; readonly stat: Answer };
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
@@ -30,9 +29,6 @@ interface ModalDefinition<F extends ModalFrame> {
   stale?(frame: F, state: GameState, registry: Registry): Localized | null;
   focus?(frame: F): Focus | undefined;
   leaves?: Answer;
-  // Whether this screen puts nothing to the player but what it is already showing. A screen says so
-  // itself rather than being worked out from the options it offers, because a list of one is still a
-  // decision and being the only race in the world does not make choosing it not choosing.
   asksNothing?(frame: F): boolean;
 }
 
@@ -41,7 +37,6 @@ function carriedWords(localizer: Localizer, tag: TagClause): Localized {
   return localizer.engine('engine.modal.race.bonus', { amount: localizer.identifier(bonusAmount.print(tag)), stat: localizer.title('stat', tag.statId) });
 }
 
-// Every race the world declares. The order is the order they are written in, which is the same list in every language — sorting by the words would reorder the answers a recording replays.
 function raceChoices(registry: Registry, state: GameState): readonly { value: Answer; shown: Localized }[] {
   const localizer = localizerOf(registry, state);
   return listedToPlayer(registry.races.values()).map((race) => {
@@ -125,9 +120,6 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
   },
 };
 
-// A recording that stops with a screen still up has walked away from a question, which is a failure
-// and reads as one. A beat somebody has only to read is not a question — a player who put the game
-// down while the last thing said was still on screen recorded exactly that.
 export const awaitsAnAnswer = (frame: ModalFrame): boolean => definitionFor(frame).asksNothing?.(frame) !== true;
 
 export const MODAL_NAMES: readonly ModalName[] = Object.keys(DEFINITIONS) as ModalName[];

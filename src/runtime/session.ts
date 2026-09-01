@@ -55,9 +55,6 @@ export interface PlayChoice {
   id: Answer;
   kind: PlayChoiceKind;
   label: Localized;
-  // The address of whatever offers this choice, of which `detail` is the words. A surface that puts
-  // one thing's offers together keys on this and not on the words, because everything a player has
-  // not read is called the same thing.
   of?: Answer;
   detail?: Localized;
   group?: GroupRow;
@@ -66,34 +63,19 @@ export interface PlayChoice {
 }
 
 export interface OfferedChoice extends PlayChoice {
-  // Where the choice sits in the view's own list, which is how a player answers it. A surface that
-  // draws some of the list rather than all of it would lose that by counting again, so it is carried.
   position: number;
 }
 
-// What a page of offers draws: everything on offer where the player stands, and the one step out of
-// it. Anywhere further is the map's — `waysOut` is what answers that — because a room's offers are
-// what can be done from it, and every place the player has ever found is not that. The cut is read
-// off the choice's own `legs`, so a world that grows a district does not grow this list with it.
 export function sheetOffers(status: Pick<PlayStatus, 'choices'>): OfferedChoice[] {
   return status.choices.map((choice, at) => ({ ...choice, position: at + 1 })).filter((choice) => (choice.legs ?? 0) <= 1);
 }
 
 export interface PlayAction {
   label: Localized;
-  // Who the action under way is aimed at, said the way a choice says what offers it. The seat is
-  // where the target is read from and the registry is asked whether it names an entity, because a
-  // seat also carries addresses that are not one — a travel seats the road it is walking.
   of?: Answer;
   detail?: Localized;
-  // How far through its cycle it has got, as the fraction a bar draws. A pace taken to nothing holds
-  // this where it stood rather than emptying it: the bar is stopped, not lost, and it moves again
-  // when whatever stopped it wears off.
   progress: number;
   attempts: number;
-  // How much of this cycle is still to be counted, or null when there is no such figure to give.
-  // A renderer draws it when it is there and says nothing when it is not; deciding for itself what
-  // a bare number meant is what had every driver printing a constant as though it were progress.
   completion: number | null;
 }
 
@@ -103,14 +85,8 @@ export interface CountedRow {
   value: number;
 }
 
-// A stat, and everything the engine folded to reach it — where it starts and what every carrier put
-// in. The shares are the same ones the number is folded from, so a row that says nothing about a
-// bonus is a row the bonus did not reach.
 export interface StatRow extends CountedRow {
   from: StatShare[];
-  // What kind of measure this is, read off the stat's own `group:`. It is what the character sheet
-  // keeps its tabs by, so which page a stat is on is a fact the world declares and not one a screen
-  // holds a list of.
   group?: GroupRow;
 }
 
@@ -120,10 +96,6 @@ export interface SkillRow extends CountedRow {
   span: number;
 }
 
-// One row per field of the player's sheet — what the field is called, the id the state holds, and the
-// words that id is read out as, which are the same string for a field the player wrote themselves. A
-// field nobody has answered yet is null rather than a row of empty strings, so a sheet no character
-// creation has been through publishes nothing to draw.
 export interface PlayerRow {
   id: Answer;
   label: Localized;
@@ -132,10 +104,6 @@ export interface PlayerRow {
 
 export type PlayerRows = Readonly<Record<PlayerField, PlayerRow | null>>;
 
-// One row per preference a run is played by, drawn from the declaration that names them: what it is
-// called, what it is for, the word it stands at, and every word it takes with the words each is
-// shown as. Every surface that lists a setting or offers one reads these rows, so the terminal and
-// the settings page cannot come to differ about what may be set to what.
 export interface SettingChoiceRow {
   written: Answer;
   shown: Localized;
@@ -149,9 +117,6 @@ export interface SettingRow {
   choices: SettingChoiceRow[];
 }
 
-// A place the player has found, as every surface is handed it. Its own interface because the map is
-// what its coordinates and roads are for, and a map that had to name a field of a field to say what
-// it draws is a map that cannot be read.
 export interface Place {
   id: Answer;
   title: Localized;
@@ -159,15 +124,9 @@ export interface Place {
   y: number;
   z: number;
   adjacent: Array<{ to: Answer; open: boolean }>;
-  // What this place hangs off, for one placed by saying which way it lies from another rather than
-  // by saying where it is. Its coordinates above are already worked out; this is how they were
-  // arrived at, and so what moves when the place it names moves.
   relative?: { direction: Direction; of: Answer };
 }
 
-// A shape the map draws round a group of places. Published whole rather than cut down to what has
-// been found: which places a region holds is the world's fact, and which of those are on the map is
-// the map's.
 export interface Region {
   id: Answer;
   title: Localized;
@@ -176,7 +135,6 @@ export interface Region {
 
 export interface PlayStatus {
   location: { id: Answer; title: Localized; description?: Localized };
-  // What stands here, and whether the view is holding its name back because nobody has read it yet.
   entities: Array<{ id: Answer; title: Localized; masked: boolean }>;
   choices: PlayChoice[];
   time: number;
@@ -192,13 +150,8 @@ export interface PlayStatus {
   xp: SkillRow[];
   stats: StatRow[];
   flags: AnswerTable<boolean | number>;
-  // Every place there is, split by whether the player has found it. Two lists rather than one with a
-  // flag on it, because almost everything that reads them wants the found ones and nothing else; and
-  // not one list plus a second saying which ids exist, because that was the same fact written twice.
   discovered: Place[];
   undiscovered: Place[];
-  // How far apart one step of this world's coordinates is drawn. Published beside the places rather
-  // than held by whoever is drawing them, so every surface that draws a map draws it at one size.
   mapGrid: number;
   regions: Region[];
   journey: Journey | null;
@@ -234,19 +187,12 @@ export const sessionLocalizer = (session: PlaySession): Localizer => localizerOf
 
 export const sessionJournal = (session: PlaySession): JournalEntry[] => journal(session.registry, stateOf(session));
 
-// How many times something under way has come round since this world was opened. Read as the
-// difference across a span, which is what a run recorded off a live session writes down in place of
-// the seconds that span happened to take.
 export const cyclesDone = (session: PlaySession): number => stateOf(session).cyclesDone;
 
 function stateOf(session: PlaySession): GameState {
   return own(session).state;
 }
 
-// Every way of getting a session comes through here — a new game, a status read, a # test run —
-// so the pools a state plays with are filled here rather than by each caller remembering to. A
-// state that reaches play with empty resources reads as a player at zero health, which is what a
-// # test drained by a plain action saw where the same script under the REPL did not.
 export function sessionOver(registry: Registry, state: GameState): PlaySession {
   initResources(state, registry);
   const internals: SessionInternals = { registry, state, logCursor: state.log.length };
@@ -257,13 +203,6 @@ export function sessionOver(registry: Registry, state: GameState): PlaySession {
 
 type Actable = { actions?: Action[] };
 
-// What an entity, a place or a thing in the pack puts in front of the player. `hidden if:` is the
-// only field that takes an action off this list: one whose `requires:` does not stand is offered,
-// and turns the player away in words when they take it.
-//
-// A depleting contest is left out because `fightChoices` puts it up instead, off the player's own
-// `uses:`, and two lists offering one swing is one swing offered twice. A contest that depletes
-// nothing has no such second road, so this is the only place it can be offered from.
 function actionAvailable(action: Action, state: GameState, registry: Registry): boolean {
   if (isTwoSided(action) && action.depletes) return false;
   return actionVisible(action, state, registry);
@@ -285,8 +224,6 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   return movesTo(action) === target;
 }
 
-// A road the place itself offers is dropped only where something standing here already walks it —
-// which an offer that would refuse does not, so a gated door never takes the plain way out with it.
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
   return standingHere(registry, state, location).some((entityId) => {
     const entity = registry.entities.get(entityId);
@@ -295,18 +232,6 @@ function entityAliasesTravelTo(location: Location, target: string, registry: Reg
   });
 }
 
-// What stands here that the player has not read yet. Such a thing publishes no name and no offer
-// but the one that reads it, so a room nobody has looked at is a short list of unknowns rather than
-// everything it holds at once.
-//
-// Two things are deliberately never masked. One with no `examine:` mints no offer that could lift
-// the mask, so masking it would leave it standing with nothing a player could ever do; and a foe in
-// the fight under way has been met, whatever anybody has read.
-//
-// And a run may turn the whole of it off, which is how an author sees a room as it is written rather
-// than clicking through a list of question marks to find out what they wrote. It is a setting rather
-// than a fact about dev mode because it is saved, replayed and reachable from a `# test` that way,
-// and because the rule about what is held back has one home and this is it.
 function maskedHere(registry: Registry, state: GameState, location: Location): ReadonlySet<string> {
   if (settingStands(state.settings, 'masking') !== true) return new Set();
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
@@ -320,7 +245,6 @@ function maskedHere(registry: Registry, state: GameState, location: Location): R
 
 const standingHere = (registry: Registry, state: GameState, location: Location): string[] => standing(state, registry, location).map((entry) => entry.entity);
 
-// Whoever is standing here that opens this shop. A shop is reached through the thing keeping it, so a shop nobody here keeps is not reachable from here at all.
 export function shopkeeperHere(registry: Registry, state: GameState, shopId: string): string | undefined {
   const location = registry.locations.get(state.location);
   if (!location) return undefined;
@@ -346,12 +270,6 @@ interface Offered {
   minted: boolean;
 }
 
-// Everything one entity offers, gathered into the run a player reads as that entity's: talking to
-// it, its shop, what it can be asked to do, and what the player can open on it. Every one of them
-// carries the entity as `choice.of`, which is the key a surface groups by.
-//
-// Masked, that run is the one offer that reads the thing, drawn under a placeholder — its name, its
-// words and everything else it could be asked for are what looking at it buys.
 function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer, masked: boolean): Offered[] {
   const source = offeredBy(registry, localizer, 'entity', entityId, masked);
   const offers: Offered[] = [];
@@ -373,9 +291,6 @@ function entityOffers(entity: Entity, entityId: string, registry: Registry, stat
   return offers;
 }
 
-// What an entity mints stands second among the offers it makes, so examine sits in one place
-// whether the thing is fought, traded with, or only has words about itself. This list is what
-// every surface draws, so none of them sorts and none of them can drift from the others.
 function mintedSecond(offers: readonly Offered[]): PlayChoice[] {
   const at = offers.findIndex((offer) => offer.minted);
   const rest = offers.map((offer) => offer.choice);
@@ -432,19 +347,12 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   return choices;
 }
 
-// Reading a room: every mask standing in it lifted at once, which costs a player nothing but the
-// looking. A driver that is not a person takes it on arrival — the playbot, so its turns go on the
-// quest, and a proof walking the shipped world, which asks what a room offers a reader.
 export function readRoom(session: PlaySession): void {
   for (const choice of unreadHere(sessionStatus(session))) {
     if (computeChoices(session).some((each) => each.id === choice.id)) applyDirective(session, choiceToDirective(choice));
   }
 }
 
-// Every offer a masked thing here is making, which is the look that reads it and nothing else. It
-// is a fact about the published view rather than about the session, so a driver holding only a view
-// reads a room by the same answer the engine masked it by. Nothing is offered while an action is
-// under way or a screen is open, because taking one of these would drop what is already going on.
 export function unreadHere(status: PlayStatus): PlayChoice[] {
   if (status.action !== null || status.modals.length > 0) return [];
   const masked = new Set(status.entities.filter((entity) => entity.masked).map((entity) => ownerRef('entity', entity.id)));
@@ -522,8 +430,6 @@ export function loadSaved(session: PlaySession, saved: ParsedSave): PruneWarning
   const internals = own(session);
   const { registry } = internals;
   const next = createGameState('', internals.state.language);
-  // Carried over the way the language is: both are the sitting's word about how this run is being
-  // read and walked, and neither is anything the world it loads has an opinion about.
   next.debug = internals.state.debug;
   const warnings = loadSave(next, saved, registry);
   standWhereTheyAre(next, registry);
@@ -639,10 +545,6 @@ export function carriedListing(session: PlaySession): CarriedEntry[] {
   return carriedEntries(stateOf(session), session.registry);
 }
 
-// Every place, split by whether it has been found. A found place's roads run only to other found
-// places — a road to somewhere nobody has heard of is not a road anybody can be told about — while a
-// place nobody has found carries all of its roads, since what an author is looking at when they ask
-// for the whole floor is the map as it is written.
 function publishPlaces(state: GameState, registry: Registry): { discovered: Place[]; undiscovered: Place[] } {
   const localizer = localizerOf(registry, state);
   const every = listedToPlayer(registry.locations.values());
@@ -697,10 +599,6 @@ function actionUnderWay(localizer: Localizer, obj: string, objId: string, action
   return localizer.actionLabel(obj, objId, action);
 }
 
-// `implicitTarget` counts down from full, and only for an action with nothing of anyone's to
-// deplete: a targeted one drains a pool instead and leaves this standing at full for as long as it
-// runs. Full is also where every cycle starts, so full is the absence of a reading rather than a
-// reading of nothing counted, and telling those two apart is the whole of this.
 function stillToCount(action: Action, active: ActiveAction): number | null {
   if (action.depletes || active.implicitTarget >= IMPLICIT_TARGET_FULL) return null;
   return fromMilliUnits(active.implicitTarget);
@@ -831,9 +729,6 @@ function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'trave
 
 export interface DirectiveOutcome {
   failure?: string;
-  // What loading dropped, addressed to whoever asked for the load — never to the player, who did
-  // not write these ids and cannot act on them. `pruneStateForRegistry` has always returned this;
-  // the only question was which way out it took.
   pruned?: readonly PruneWarning[];
 }
 
@@ -853,8 +748,6 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       throw new RuntimeError('run: is handled by runTest, not applyDirective');
     case 'refused':
       throw new RuntimeError('refused is about the line before it, so runTest settles it and not applyDirective');
-    // What a player thought, and where in the app they went. The engine has no opinion about either
-    // and no pages to move between, so a run recorded through the app replays through a terminal.
     case 'note':
     case 'page':
       return {};
@@ -935,8 +828,6 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'wait-out':
       return waitedOut(state, registry, directive.until);
     case 'until': {
-      // One directive, one span: what the inner directive does on the way to being under way is
-      // part of what the player was away for, and it happens before the loop is ever entered.
       const start = spanStart(state);
       const started = performDirective(session, directive.inner);
       return started.failure ? started : waitedOut(state, registry, directive.until, start);
@@ -994,10 +885,6 @@ export interface TestResult {
   failure?: string;
 }
 
-// A refusal is what a player is told they cannot do, whichever way the engine says it — an outcome
-// that failed or a RuntimeError thrown out of the middle of one. runLine already makes no
-// distinction, so a recording taken through the app and a test replaying it agree about which
-// lines bounced. Null is a line that took.
 function refusalFrom(session: PlaySession, directive: Directive): string | null {
   try {
     return applyDirective(session, directive).failure ?? null;
@@ -1007,9 +894,6 @@ function refusalFrom(session: PlaySession, directive: Directive): string | null 
   }
 }
 
-// The directives a test runs, with `run:` expanded where it stands. Anything that drives a `# test`
-// steps this one list — the suite, the REPL, and the app's replay — so none of them can come to
-// differ about what a test is made of, and a cycle is refused once rather than in each of them.
 export function testSteps(testId: string, registry: Registry, stack: readonly string[] = []): Directive[] {
   if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
   const test = registry.tests.get(testId);
@@ -1018,27 +902,16 @@ export function testSteps(testId: string, registry: Registry, stack: readonly st
 }
 
 export interface Replayed {
-  // What actually ran, which is every step up to and including the one that parted from the record.
   readonly walked: readonly Directive[];
-  // Where the replay and the record first disagreed, or null where they never did. A line the
-  // record marks `refused` and which refuses again agrees; one that now takes does not, and that is
-  // how an author sees a fix land.
   readonly failure: string | null;
 }
 
-// Walk `steps[from..upTo)` against a session as it stands, stopping at the first place the world
-// stopped answering the way the record says it does. A driver watching a run steps a little at a
-// time and hands back the range it has not walked yet; a driver scrubbing backwards starts a
-// session over and walks from nothing, which is why the engine never has to undo anything.
-// `refused` is read off the whole record rather than off the range, so a range ending between a
-// line and its mark still knows the mark is there.
 export function walkTest(session: PlaySession, steps: readonly Directive[], upTo: number = steps.length, from = 0): Replayed {
   const walked: Directive[] = [];
 
   for (const [at, directive] of steps.entries()) {
     if (at < from) continue;
     if (at >= upTo) break;
-    // Settled by the step it is about, one line above.
     if (directive.kind === 'refused') {
       walked.push(directive);
       continue;
@@ -1057,10 +930,6 @@ export function walkTest(session: PlaySession, steps: readonly Directive[], upTo
 
 export interface TestRun {
   readonly result: TestResult;
-  // How many directives the route is made of, beside how many of them the walk reached. They are
-  // equal or the walk stopped short, and a walk that stopped short left the state somewhere the
-  // route does not end — which is the difference between a stale sheet and a body nothing should be
-  // recorded from, and the verdict alone cannot tell them apart.
   readonly steps: number;
   readonly walked: number;
 }

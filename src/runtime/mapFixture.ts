@@ -2,9 +2,6 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import type { ModuleSource } from '../content/universe';
 import { placing } from './mapEdit';
 
-// A real place to move, and squares the world leaves empty to move it onto. Both are read off the
-// world a test opens rather than written down: a test that named its own square went red the day an
-// author put a location there, and said nothing about the square.
 export interface MapFixture {
   MOVED_PLACE: string;
   MOVED_TO: { x: number; y: number };
@@ -18,8 +15,6 @@ export function mapFixtureFor(sources: readonly ModuleSource[]): MapFixture {
   const places = [...registry.locations.values()];
   const corner = { x: Math.max(...places.map((place) => place.x)), y: Math.max(...places.map((place) => place.y)) };
 
-  // Past the far corner of everything drawn, so every square this hands out is clear of every place,
-  // of every room hanging off one, and of the other squares.
   const emptySquare = (nth = 0): { x: number; y: number } => ({ x: corner.x + 1 + nth, y: corner.y + 1 + nth });
 
   const MOVED_PLACE = places.find((place) => place.starting)!.id;

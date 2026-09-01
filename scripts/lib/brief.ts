@@ -1,7 +1,5 @@
 import { readFileSync } from 'node:fs';
 
-// Both bots take a brief, and both take it the same way: as the path to a file. What that buys is
-// in the lines below, which every usage block that offers a brief prints rather than wording again.
 export const BRIEF_IS_A_FILE: readonly string[] = [
   'a file rather than an argument, because `npm run` and',
   '`npx` on Windows cut a multi-line argument at its first',

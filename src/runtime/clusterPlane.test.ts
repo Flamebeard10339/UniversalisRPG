@@ -367,10 +367,6 @@ function fillWhole(where: Registry, plane: Plane): void {
   }
 }
 
-// A plane that can shrink can be shrunk into a graph growing alone could never have made, so the
-// claim is over the corpus's own jewels and over an arbitrary order of taking back: whatever order a
-// player finds, the plane a load would have to repair is never reached, and nothing left standing is
-// left standing silently.
 describe('every cluster jewel the corpus declares', () => {
   const corpus = loadUniverse(fixtureSources());
   const declared = [...corpus.clusterJewels.values()].map((jewel) => jewel.id);

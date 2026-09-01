@@ -41,9 +41,6 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
   return payloads;
 }
 
-// The cluster drew one number when it entered the plane, and every range its jewel's passives declare
-// is read at that number. One roll a cluster and not one a payload, so a jewel is good or bad rather
-// than good in places, and a save that keeps the roll keeps every payload with it.
 function rolledAt(bonus: BonusAmount, roll: number): BonusAmount {
   return bonus.percent || isPoint(bonus.amount) ? bonus : { percent: false, amount: point(sampleCount(bonus.amount, roll)) };
 }

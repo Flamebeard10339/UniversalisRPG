@@ -5,9 +5,6 @@ import { fillOf } from './lineStyle';
 import { NAME } from './sheetLayout';
 import { useTestSurface } from './useTestSurface';
 
-// What the breakdown screen is showing, drawn above the question the screen is asking. The question,
-// and everything about leaving it, is the shared sheet's. One row per share, which is the whole
-// reason this is a screen: the same list under a sheet row had to be one line of run-together text.
 export function StatBody({ row }: { row: StatRow }): JSX.Element {
   useTestSurface('stat', { row });
 

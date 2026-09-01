@@ -12,9 +12,6 @@ export function fillPercent(current: number, max: number): number {
 
 export { signed, tidy } from '../runtime/figures';
 
-// `×3` beside a bar is how a reader tells a fresh foe at full health from the one they were hitting
-// healing itself back up. A numeral reads the same in every language a pool line is written in, so
-// it rides beside the meter rather than through the localizer.
 export function remainingBadge(remaining: number | null): string | null {
   return remaining === null ? null : `×${remaining}`;
 }

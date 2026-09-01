@@ -13,32 +13,15 @@ import { loadSave } from './save';
 import { createGameState } from './state';
 import { staleTiers } from './tierSaves';
 
-// What is wrong with a world that the loader will still take. A refusal stops the game; these do
-// not, because every one of them is a thing an author is halfway through — a quarter with no road
-// into it yet, a route whose claim is not written down. They are said by `npm run oracle` and by
-// nothing else, which is the whole arrangement: the corpus's verdict is the oracle's, and no test
-// may read a line of `content/`. `docs/authoring-split/` says why.
-//
-// Each rule below derives its own subjects from the registry, so a section written next month is
-// held to it with no edit here. A rule that could name its subjects instead does not belong here.
-
 export interface Remark {
-  // The section the remark is about, written `# <kind> <id>`, so an author can go straight to it.
   where: string;
   says: string;
 }
 
-// A directive that reaches a state someone else's route already reached, rather than walking one of
-// its own: it has nothing to claim beyond what it re-runs or re-checks.
 const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
 
-// Where a test's claim is written in words. `refuse:` is one: it names the growth that must not
-// take, which is as readable as an assertion and is how the growth routes state theirs.
 const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse', 'journal'];
 
-// Every place a player can walk to from where a new game begins. A DEBUG location ships to nobody
-// and nothing a player reaches may name it, so there is no road to it by construction: it is stood
-// in by a save that says so, and the walk cannot be asked for.
 function stranded(registry: Registry): Remark[] {
   const start = [...registry.locations.values()].find((location) => location.starting);
   if (start === undefined) return [];
@@ -57,23 +40,17 @@ function stranded(registry: Registry): Remark[] {
     .map((location) => ({ where: `# location ${location.id}`, says: `no road reaches this from ${start.id}, where a new game begins, so nobody can walk to it. A road answers from both ends: write it at either.` }));
 }
 
-// A shop is reached at the counter the entity keeping it stands behind, so a shop nobody keeps
-// stands nowhere.
 function unkept(registry: Registry): Remark[] {
   const kept = new Set([...registry.entities.values()].flatMap((entity) => (entity.shop === undefined ? [] : [entity.shop])));
   return [...registry.shops.values()].filter((shop) => !kept.has(shop.id)).map((shop) => ({ where: `# shop ${shop.id}`, says: 'no # entity keeps this, so there is no counter anywhere to stand at and nothing in the world can open it. Write `keeps shop:` on whoever is behind it.' }));
 }
 
-// A shop counts in a coin, and will neither buy nor sell that coin. A coin that declares a `value:`
-// of its own is therefore something the shop would price and refuse in the same breath.
 function pricedCoin(registry: Registry): Remark[] {
   return [...registry.shops.values()]
     .filter((shop) => registry.items.get(shop.coin)?.value !== undefined)
     .map((shop) => ({ where: `# shop ${shop.id}`, says: `counts in ${shop.coin}, which declares a value: of its own — so this shop would put a price on the very thing it prices in. Take the value: off the coin.` }));
 }
 
-// A base is minted as a copy of its own the moment it drops, so it never joins a stack: a save that
-// writes one under `inventory` is a state no route through the world reaches.
 function stackedBases(registry: Registry): Remark[] {
   const bases = new Set([...registry.items.values()].filter(isBase).map((item) => item.id));
   return [...registry.saves.entries()].flatMap(([id, save]) => {
@@ -85,8 +62,6 @@ function stackedBases(registry: Registry): Remark[] {
   });
 }
 
-// A save written over another takes every field the layer beneath it writes, so restating one to the
-// letter says nothing — and goes stale where it stands the day the layer changes.
 function restated(registry: Registry): Remark[] {
   return [...registry.saves.entries()].flatMap(([id, saved]) =>
     (saved.over ?? []).flatMap((beneath) =>
@@ -97,9 +72,6 @@ function restated(registry: Registry): Remark[] {
   );
 }
 
-// A route that walks somewhere states what it proved in words. `expect:` is the deliberate exception
-// — it compares the whole sheet, and is the one form that can say a key the state no longer holds is
-// gone, an absence no condition can name.
 function unspoken(registry: Registry): Remark[] {
   return [...registry.tests.values()]
     .filter((each) => each.directives.some((directive) => !REACHES.includes(directive.kind)))
@@ -112,10 +84,6 @@ function unspoken(registry: Registry): Remark[] {
     });
 }
 
-// Prose a world writes that nothing in the game ever says. A field is asked about rather than one
-// value of it, because whether the engine has a surface for `# entity examine:` at all is what one
-// value settles — a line behind a flag nobody has set is not something this can see. What it does
-// catch is words written into a kind the game has no screen for, which is writing thrown away.
 function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] {
   const written = proseWritten(registry);
   const excused = new Map(NOT_SAID.map((each) => [each.field, each.why]));
@@ -124,15 +92,10 @@ function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] 
     ...unsaidFields(written, publishedSurfaces(sources, registry)).flatMap((field) =>
       excused.has(field) ? [] : [{ where: `# ${field.split('.')[0]}`, says: `writes ${field.split('.').slice(1).join('.')}: and nothing in the game ever says it, so those words reach nobody.` }],
     ),
-    // An excuse for a field this world does not write is an excuse for nothing, and goes stale where
-    // it stands. It is reported the same way, so the list cannot rot quietly.
     ...[...excused.keys()].filter((field) => !held.has(field)).map((field) => ({ where: `NOT_SAID in src/runtime/proseSaid.ts`, says: `excuses ${field}, which nothing in this world writes. Take the entry out.` })),
   ];
 }
 
-// A pack is what a player installs and turns on as one thing, so a module that declares none is one
-// nobody can turn off — it draws a row of its own on the portal under its own id, which is a pack of
-// one that its author did not mean to make.
 function unpacked(sources: readonly ModuleSource[]): Remark[] {
   return sources.flatMap((source) => {
     const info = parseModuleSource(source).info;
@@ -140,9 +103,6 @@ function unpacked(sources: readonly ModuleSource[]): Remark[] {
   });
 }
 
-// A module nothing loads before it has nothing to lean on, so it has to load alone or it cannot load
-// at all — and a world is written from its roots outward, so one that will not is a module the next
-// module written on top of cannot be started either.
 function rootless(sources: readonly ModuleSource[]): Remark[] {
   const byId = new Map(sources.map((source) => [parseModuleSource(source).info.id, source]));
   return rootModules(sources).flatMap((id) => {
@@ -153,16 +113,8 @@ function rootless(sources: readonly ModuleSource[]): Remark[] {
   });
 }
 
-// A reference build that has gone stale against the curve under it, or against the gear it is
-// already carrying. The file on disk reads exactly as it did, so nothing else would ever say.
 const stale = (registry: Registry): Remark[] => staleTiers(registry).map((each) => ({ where: `# save ${each.save}`, says: each.says }));
 
-// A `# save` is a recording of a state somebody stood in, and every id in its body was declared the
-// day it was written. Rename or move that section and the body still parses, still loads and quietly
-// stops saying what it says: the loader prunes whatever it can no longer find and plays on, so the
-// recording is read as a state the world never reached. Which ids a body may name is not written out
-// here and could not be — `pruneStateForRegistry` answers that off `SAVE_FIELDS` and the prune each
-// kind writes for itself, so a field or a kind added next month is held to this with nothing edited.
 function rotted(registry: Registry): Remark[] {
   return [...registry.saves.entries()].flatMap(([id, saved]) => {
     const where = `# save ${id}`;
@@ -177,11 +129,6 @@ function rotted(registry: Registry): Remark[] {
   });
 }
 
-// An archetype is a word of an author's own that a module's passives carry and nothing outside it
-// does — one the engine acts on nowhere, which is what `keywordsIn` hands back as `beyond`. Which
-// archetypes a module has is read off its passives rather than declared. Each is meant to be
-// reachable two ways — a jewel that adds and a jewel that multiplies — because a player who can
-// only find one of them has half a build, and nothing but this would ever say so.
 function lopsided(registry: Registry): Remark[] {
   const modulesOf = new Set([...registry.clusterJewels.keys()].map((id) => id.slice(0, id.indexOf('.'))));
   return [...modulesOf].flatMap((namespace) => {
@@ -196,8 +143,6 @@ function lopsided(registry: Registry): Remark[] {
       for (const word of new Set(wordsOn(carried(jewel)).filter((each) => !shared.has(each)))) by.set(word, [...(by.get(word) ?? []), jewel.id]);
     }
     return [...by].flatMap(([archetype, carriers]) => {
-      // A word every one of a module's jewels carries divides nothing and is a label rather than an
-      // archetype: what makes one is that it tells some of them apart from the rest.
       if (carriers.length < 2 || carriers.length === jewels.length) return [];
       const led = carriers.map((id) => {
         const bonuses = carried(registry.clusterJewels.get(id)!).flatMap((tag) => (tag.kind === 'stat-bonus' ? [tag] : []));
@@ -208,9 +153,6 @@ function lopsided(registry: Registry): Remark[] {
   });
 }
 
-// One list, and every rule takes the same two things: the modules as written and the world they
-// made. Most read only the second — a rule is free to ignore what it does not want — and splitting
-// them by which they happened to use made a rule's shape decide where it was written down.
 type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
 const RULES: readonly Rule[] = [

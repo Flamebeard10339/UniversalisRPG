@@ -10,9 +10,6 @@ import { actions, condition as visitCondition, pruneActions, put, type Loose } f
 import { section, TOUCHED } from './define';
 import { TITLE_FIELD } from './info';
 
-// Whether this place is on the player's map — which a road reaching it from somewhere they stood is
-// enough for. It is a weaker thing than `TOUCHED`, and the two are separate flags because a place
-// heard of and a place stood in are what a `when:` most often needs to tell apart.
 export const DISCOVERED = 'discovered';
 
 export type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
@@ -27,7 +24,6 @@ export interface Edge {
   condition?: Condition;
 }
 
-// An absent count is one.
 export interface Population {
   count?: number;
   entity: string;
@@ -78,14 +74,6 @@ export const edgeValue: Parser<Edge> = {
   examples: ['clearing', 'clearing while has-key'],
 };
 
-// How a place written off another is written, one phrase per direction. The four headings take `of`;
-// the two floors read as the prepositions they already are, because `below market-row` is what
-// somebody would say and a floor written as a heading is not.
-//
-// A record over `Direction`, so a language that grew a seventh would not compile until this said how
-// to write it. And the only place the phrasing is written: reading one, printing one, and the forms
-// the editing page offers are this table read three ways, so the wording is changed here and in the
-// worlds that were written in it, and nowhere else.
 const RELATIVE_WORDS: Record<Direction, string> = {
   north: 'north of',
   south: 'south of',
@@ -95,7 +83,6 @@ const RELATIVE_WORDS: Record<Direction, string> = {
   down: 'below',
 };
 
-// Longest phrase first, so a short one that begins a long one could never win the match.
 const RELATIVE_ORDER = (Object.keys(RELATIVE_WORDS) as Direction[]).sort((one, other) => RELATIVE_WORDS[other].length - RELATIVE_WORDS[one].length);
 
 const RELATIVE_PATTERN = new RegExp(RELATIVE_ORDER.map((direction) => RELATIVE_WORDS[direction].replace(/ /g, '[ \\t]+')).join('|'));
@@ -124,10 +111,6 @@ export const relativeValue: Parser<Relative> = {
   examples: RELATIVE_ORDER.map((direction) => `${RELATIVE_WORDS[direction]} clearing`),
 };
 
-// Which way each direction goes, in the coordinates a world writes. North is a smaller `y`, the way
-// it is on every map anybody has drawn: `y` counts down the page, so the north gate of a town is
-// written above its square and drawn above it. Everything that has an opinion about which way a place
-// lies reads this, so a world that wanted its map the other way up would turn it here and nowhere else.
 export const DIRECTION_VECTORS: Record<Direction, readonly [number, number, number]> = {
   north: [0, -1, 0],
   south: [0, 1, 0],
@@ -137,12 +120,6 @@ export const DIRECTION_VECTORS: Record<Direction, readonly [number, number, numb
   down: [0, 0, -1],
 };
 
-// Which single step out of one place points at another. A place is written off another as one step in
-// one direction, so this is the direction that step would have to be: the floor between them if they
-// are on different floors, because a heading keeps its floor and only `up` and `down` leave it, and
-// otherwise whichever heading runs most nearly the way the far place lies. Both halves are read off
-// the vectors above rather than listed, so a language that grew a seventh direction offers it here
-// with nothing edited. Nothing at all for a place and itself, which is no step.
 export function stepToward(from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }): Direction | null {
   const run = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };
   if (run.x === 0 && run.y === 0 && run.z === 0) return null;
@@ -152,17 +129,12 @@ export function stepToward(from: { x: number; y: number; z: number }, to: { x: n
   return going.reduce((best, direction) => (runs(direction) > runs(best) ? direction : best));
 }
 
-// Where a player may walk up to each entity anything stands. Nothing else puts one in a room — a
-// population only counts the deficit against this list — so an entity absent here is one no player
-// meets, which is what the entity a game is played as has in common with a template nobody stands.
 export function entitiesStood(locations: ReadonlyMap<string, Location>): Map<string, string> {
   const stood = new Map<string, string>();
   for (const location of locations.values()) for (const entry of location.entities) if (!stood.has(entry.entity)) stood.set(entry.entity, location.id);
   return stood;
 }
 
-// A road an author writes only from one end is walked from the other end too, carrying the same
-// condition, unless the far end already writes an edge back — an authored edge always beats a derived one.
 export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<string, Edge[]> {
   const roads = new Map<string, Edge[]>();
   for (const location of locations.values()) roads.set(location.id, [...location.adjacent]);
@@ -176,13 +148,6 @@ export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<st
   return roads;
 }
 
-// Two places on one square are one place to everything that reads a coordinate: the map draws them
-// stacked, the compass has no bearing between them, and the step from one to the other is no step.
-// The squares are counted off whatever it is handed rather than named here, so a floor genuinely
-// over another is told apart by its `z` and nothing has to be exempted — and a map edit can put the
-// world it is about to write to the same question the load path puts to the world it read, getting
-// the same answer in the same words. Whatever is handed in last is the one the sentence leads with,
-// so an editor showing a move its own room first only has to say what is moving last.
 export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): string | undefined {
   const standing = new Map<string, string>();
   for (const location of placed) {
@@ -226,10 +191,6 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
   };
 
   for (const location of locations.values()) place(location);
-  // The coordinates are worked out and written on; how they were arrived at is kept. A place written
-  // `above castle-hall` is somewhere the moment the world is loaded — nothing downstream resolves
-  // anything — and it still says what it hangs off, which is what prints it back the way it was
-  // written and what tells a map that moving the hall moves this too.
   for (const location of [...locations.values()]) {
     if (!location.relative) continue;
     const [x, y, z] = coords.get(location.id)!;

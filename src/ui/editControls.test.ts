@@ -297,9 +297,6 @@ describe('what a row in the list wears', () => {
   });
 });
 
-// The picker is offered by the grammar rather than by a page that knows which field is which: a
-// hole a colour goes in is one written with the colour parser, under whatever keyword and whatever
-// kind.
 describe('the control a colour hole is edited with', () => {
   const GROUP = '# group weapon\n';
 

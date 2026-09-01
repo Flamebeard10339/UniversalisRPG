@@ -32,8 +32,6 @@ function Row({ entry, onOpen }: { entry: Entry; onOpen?: (id: string) => void })
 
 const NOT_CARRIED: Point = { x: 0, y: 0 };
 
-// Where a cell sits is the cell's own business: an entry that says where it belongs takes that
-// square of whatever grid it is drawn in, and one that says nothing takes the next square going.
 function Cell({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => void; drag: Held | null }): JSX.Element {
   const held = drag?.carried ?? null;
   const by = held !== null && held.id === entry.id ? held.by : NOT_CARRIED;
@@ -66,10 +64,6 @@ interface Held {
   carried: Carried | null;
 }
 
-// Picking a cell up off the sheet, carrying it, and putting it down on another. The grip is the one
-// the map and the plane are dragged by, at the page's own scale, so what it reports is already in
-// the pixels the cells were measured in. What a press turns out to have been is the drop's own
-// question, and both answers to it are answered here.
 function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: string) => void): Held | null {
   const drawn = useRef(new Map<string, HTMLElement>());
   const holding = useRef<{ id: string; from: Point } | null>(null);

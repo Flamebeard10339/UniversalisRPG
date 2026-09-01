@@ -30,8 +30,6 @@ const world = (luck: number, ...lines: string[]): string =>
 
 const sifted = (luck: number, ...body: string[]) => {
   const session = startSession(loadInEnglish(world(luck, ...body)));
-  // Nothing a room holds offers anything but its own examine until it has been read, so the heap is
-  // looked at before it is sifted.
   beginAction(session, 'use:entity.heap.examine');
   beginAction(session, 'use:entity.heap.sift');
   return view(session);

@@ -30,8 +30,6 @@ const quest = (id: string, stage: string, standing: PlayView['journal'][number][
 
 const viewOf = (parts: Partial<PlayView>): PlayView => ({ xp: [], carried: [], journal: [], ...parts }) as PlayView;
 
-// Echoes the label and the parameters it was handed, so a claim about a raiser is a claim about
-// what it asked for rather than about the English that answers.
 const words = ((id, params) => asLocalized([id, ...Object.values(params ?? {})].join(' '))) as Words;
 
 const said = (before: PlayView, after: PlayView): string[] => noticesBetween(before, after, words).map(sayingOf);
@@ -167,8 +165,6 @@ describe('two gains the same size, landing together', () => {
     expect(said(notice('xp:attack', 5, 'Attack'), notice('xp:defence', 3, 'Defence'))).toEqual(['+5 Attack', '+3 Defence']);
   });
 
-  // Roasting one chestnut raises +1 of the chestnut and +1 of cooking in the same breath, and
-  // `+1 Roast Chestnut, Cooking` is a sentence about nothing.
   it('leaves an item and a skill apart however alike their counts are', () => {
     expect(said(notice('item:roast-chestnut', 1, 'Roast Chestnut'), notice('xp:cooking', 1, 'Cooking'))).toEqual(['+1 Roast Chestnut', '+1 Cooking']);
   });

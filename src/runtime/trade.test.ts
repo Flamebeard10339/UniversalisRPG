@@ -79,13 +79,11 @@ describe('what a shop asks and what it pays', () => {
     expect(sellPrice(shopOf('stall'), registry.items.get('nail'))).toBe(2);
   });
 
-  // The boundary the integer rule turns on: at a value of 1 the ceil and the floor land on either side of it.
   it('charges 2 for a pin worth 1 and pays 0, so the cheapest thing there is still costs more than it fetches', () => {
     expect(buyPrice(shopOf('stall'), registry.items.get('pin'))).toBe(2);
     expect(sellPrice(shopOf('stall'), registry.items.get('pin'))).toBe(0);
   });
 
-  // Derived from every item the fixture declares a value for: a shop that paid at least what it charged could be bought from and sold back to forever.
   it('never pays as much for a thing as it charges, at any value from 1 to 200', () => {
     const stall = shopOf('stall');
     for (let value = 1; value <= 200; value++) {
@@ -124,7 +122,6 @@ describe('a shop holds what its author said until someone trades', () => {
     expect(stockNow(shopOf('stall'), state)).toEqual({ nail: 1, pin: 2 });
   });
 
-  // The floor the whole counter is written against.
   it('refuses to sell 5 of the 4 nails it has, and leaves all 4 and all 20 coin where they were', () => {
     const state = carrying({ coin: 20 });
     expect(buy(shopOf('stall'), state, registry, 'nail', 5)).toBe('out-of-stock');
@@ -161,7 +158,6 @@ describe('a shop holds what its author said until someone trades', () => {
 });
 
 describe('a grown copy sells for what its base is worth', () => {
-  // A base drops as a copy of its own, so a Honed Blade is held and never stacked however many arrive.
   const withGrownBlades = (grown: number): GameState => {
     const state = carrying({});
     receiveItem(state, registry, 'honed-blade', grown);
@@ -179,14 +175,9 @@ describe('a grown copy sells for what its base is worth', () => {
     expect(sell(shopOf('stall'), state, registry, copy, 1)).toBeUndefined();
     expect(state.inventory.coin).toBe(8);
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 0, worn: 0 });
-    // The shop counts what it took in items, not in the name the player's copy went by.
     expect(stockNow(shopOf('stall'), state)).toEqual({ nail: 4, pin: 2, 'honed-blade': 1 });
   });
 
-  // The half of the ruling that was deliberately not built: a copy is priced at its base's value:,
-  // so the points on it and the plane it carries move nothing. Derived over every row the pack holds
-  // rather than over the two the fixture happens to mint, and the levels are asserted to be read off
-  // the copies so the claim is about copies that genuinely differ.
   it('prices every copy at its base, whatever level the copy rolled', () => {
     const state = withGrownBlades(4);
     const copies = grownCopies(state);
@@ -201,8 +192,6 @@ describe('a grown copy sells for what its base is worth', () => {
     }
   });
 
-  // Stack size is 1, which is what the ruling leaned on: there is exactly one of it, so the only
-  // number it answers to is one and asking for two takes nothing.
   it('refuses to sell two of the one there is, and the one is still held', () => {
     const state = withGrownBlades(1);
     const [copy] = grownCopies(state);
@@ -211,8 +200,6 @@ describe('a grown copy sells for what its base is worth', () => {
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
   });
 
-  // What survives of the old refusal, and the reason the counter reads the pack's own rows: what is
-  // worn is on the player rather than in the pack, so it is not on offer and does not answer if named.
   it('leaves the copy on the arm off the counter and refuses it there, worn and whole after', () => {
     const state = withGrownBlades(1);
     const [copy] = grownCopies(state);
@@ -241,7 +228,6 @@ describe('a grown copy sells for what its base is worth', () => {
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
   });
 
-  // The whole of the bug: the counter asked how many were held and the till took from the stack, so a blade on the arm fetched 8 coin over and over without ever leaving. The claim is the difference, because every holding where nothing moves also gains nothing.
   it('pays 8 a blade for exactly the blades that leave, over every holding of 0 to 2 loose beside 0 or 1 worn', () => {
     for (const on of [0, 1]) {
       for (const plain of [0, 1, 2]) {
@@ -288,7 +274,6 @@ describe('replenishing runs on simulated time', () => {
     expect(stockNow(shop, held)).toEqual({ nail: 4, pin: 2 });
   });
 
-  // Settling to now would throw away the part-minute each time, so a shop somebody buys from every thirty seconds would restock never.
   it('restocks 1 nail across two buys thirty seconds apart, the same as if nobody had come between', () => {
     const state = carrying({ coin: 40 });
     buy(shopOf('stall'), state, registry, 'nail', 4);

@@ -21,7 +21,6 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
 
   const offsets = layerOffsets(bands);
   const heights = bodyHeights(bands);
-  // translate, never translate3d: a promoted layer is rastered once and the text on it goes soft.
   const restingAt = (at: number): string => `translate(0, ${-offsets[at]}px)`;
 
   useLayoutEffect(() => {

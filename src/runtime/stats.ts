@@ -23,9 +23,6 @@ export function hitChance(accuracy: number, evasion: number, registry: Registry)
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
 }
 
-// What one carrier does to one stat: a flat amount and a percentage, the two channels every bonus
-// in the language lands on. `increased` is the percentage itself, as an item's own contribution
-// already reports it, so a row a player reads and a row the engine folds are the same row.
 interface StatFold {
   added: Range;
   increased: number;
@@ -68,9 +65,6 @@ function ownStores(state: GameState, actorId: string): { buffs: readonly BuffIns
   return { buffs: buffsOf(state, actorId), equipped: stored ? Object.values(state.equipped) : [], xp: stored ? state.xp : {} };
 }
 
-// Where a carrier's own name is written: the section that holds it and the field the words sit in.
-// Every kind writes its name under `title:`; an action writes its under the address it is addressed
-// by, which is why the field is asked for rather than assumed.
 export interface StatSource {
   readonly kind: string;
   readonly id: string;
@@ -136,15 +130,10 @@ export function hasPool(state: GameState, registry: Registry, actorId: string, r
   return resource !== undefined && statValue(resource.max, state, registry, actorId) > 0;
 }
 
-// One line of the answer to *where did this number come from*: what a single carrier put in, named
-// by where its words are written.
 export interface StatPart extends StatFold {
   readonly source: StatSource;
 }
 
-// The whole of a stat, kept apart: what it starts at, and what every carrier adds to it. `statRange`
-// is this folded up, so a breakdown that omitted a carrier would change the number it explains
-// rather than quietly disagreeing with it.
 export interface StatBreakdown {
   readonly base: Range;
   readonly parts: readonly StatPart[];
@@ -152,8 +141,6 @@ export interface StatBreakdown {
 
 const contributes = (fold: StatFold): boolean => fold.increased !== 0 || fold.added.min !== 0 || fold.added.max !== 0;
 
-// One line per *source*, not per carrier: eight stacks of one buff are one thing eight times over,
-// and a reader asking where a number came from is told the thing rather than the bookkeeping.
 const addressOf = (source: StatSource): string => [source.kind, source.id, source.field].join(' ');
 
 export function statBreakdown(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
@@ -204,9 +191,6 @@ export function hitDamage(attack: number, dr: number, registry: Registry): numbe
   return Math.max(floor, toMilliUnits(attack - dr));
 }
 
-// How long one attempt takes, or Infinity where whoever is making it has been slowed to a standstill.
-// No attempts a minute is a rate like any other and the arithmetic already says what it costs, so a
-// modifier that takes the pace to nothing stalls the action rather than being refused as impossible.
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER, other: string = actorId): number {
   if (actionKind(action) === 'instant') return 0;
   if (action.rate === undefined) return secondsToMs(action.time ?? defaultActionDuration(registry));
@@ -220,7 +204,4 @@ export function attemptDuration(action: Action, state: GameState, registry: Regi
   return duration;
 }
 
-// Whether what is under way is standing still: its pace has been taken to nothing and no amount of
-// time will advance it. The bar it draws is stopped rather than crawling, and what has already been
-// counted is waiting rather than lost.
 export const stalledPace = (duration: number): boolean => !Number.isFinite(duration);

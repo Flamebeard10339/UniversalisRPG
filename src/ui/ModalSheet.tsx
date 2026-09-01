@@ -12,8 +12,6 @@ type Option = PlayView['modals'][number]['options'][number];
 
 const ROW = 'min-h-[48px] w-full rounded-xl border border-border bg-panel px-4 py-2 text-left transition-transform duration-75 active:scale-[0.99] active:bg-accent-strong active:text-accent-text';
 
-// One row of a counter, drawn as the cell the engine published it as: what it goes for in the corner
-// the eye reaches first, what it is in the middle, and how many there are in the corner opposite.
 function Cell({ cell, onPick }: { cell: ChoiceCell; onPick: () => void }): JSX.Element {
   return (
     <button
@@ -30,9 +28,6 @@ function Cell({ cell, onPick }: { cell: ChoiceCell; onPick: () => void }): JSX.E
   );
 }
 
-// A screen whose choices name sides of their own, drawn as those sides: one tab each, the rows of the
-// standing one as a grid, and whatever stands under no side as ordinary rows beneath. The tabs are
-// the sides the engine published and nothing here decides which exist.
 function Counter({ option, onAnswer }: { option: Option; onAnswer: (key: string, value: string) => void }): JSX.Element {
   const { parts, loose } = partsOf(option);
   const [picked, setPicked] = useState<string | null>(null);
