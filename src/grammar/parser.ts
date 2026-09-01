@@ -34,10 +34,13 @@ export const calledBlock = (called: string, lines: Written[]): Written[] => Obje
 
 export const blockCalled = (lines: readonly Written[]): string | undefined => (lines as { [CALLED]?: string })[CALLED];
 
+export type Overwritten = 'replaced' | 'listed' | 'by name';
+
 // One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.
 export interface Written extends Filled {
   form: string;
   example: string;
+  over?: Overwritten;
   // The named grammar this shape is one of, where a site writes the shapes out because the engine needs them to tell this line from another. The page says the name instead, once, rather than spelling that grammar a second time.
   of?: string;
   family?: string;

@@ -3,7 +3,8 @@ import type { ListParser } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
-import { EVERY_SECTION, parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
+import { addressedNote, EVERY_SECTION, parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
+import { PLUS_BY_NAME } from './merge';
 import { namesSection, sameSection } from './namespace';
 import { filledBy } from '../grammar/codec';
 import { REFERENCE } from '../grammar/values';
@@ -65,9 +66,20 @@ export interface Offering {
   refused: string | null;
   undeclared: readonly Undeclared[];
   offers: readonly Offer[];
+  laidOver?: string;
 }
 
 const NOTHING: Offering = { from: 0, to: 0, where: [], reads: null, filling: null, refused: null, undeclared: [], offers: [] };
+
+const OP_KEY = /^(?<op>[+-])[ 	]*(?=[a-z][a-z0-9 -]*:)/;
+
+const opNote = (op: string): string | undefined => EVERY_SECTION.find((line) => line.form === `${op}<line>`)?.note;
+
+const laidOverBy = (op: string, byName: boolean): { laidOver?: string } => {
+  if (byName) return { laidOver: PLUS_BY_NAME };
+  const note = opNote(op);
+  return note === undefined ? {} : { laidOver: `${op} ${note}` };
+};
 
 const HEADING = /^#[ \t]*(?<kind>[a-z][a-z0-9-]*)?(?<gap>[ \t]+)?(?<id>[a-z0-9.-]*)?/;
 const INDENT = /^[ \t]*/;
@@ -133,17 +145,19 @@ function enclosing(text: string, lineStart: number, indent: number): Enclosing[]
   return held;
 }
 
-function linesAt(owner: Section, text: string, lineStart: number, indent: number): { lines: readonly Written[]; where: string[] } {
+function linesAt(owner: Section, text: string, lineStart: number, indent: number): { lines: readonly Written[]; where: string[]; byName: boolean } {
   // What every section takes stands beside what this kind declares, and only at the top of one: nothing of it opens a block, so a line written inside one is answered by that block's own grammar and nothing else.
   let lines: readonly Written[] = [...owner.grammar, ...EVERY_SECTION];
   const where = [`# ${owner.kind}`];
+  let byName = false;
   for (const above of enclosing(text, lineStart, indent)) {
     const found = opened(lines, above.text);
-    if (found === undefined) return { lines: [], where };
+    if (found === undefined) return { lines: [], where, byName };
     where.push(found.form);
+    byName = byName || found.over === 'by name';
     lines = found.block!();
   }
-  return { lines, where };
+  return { lines, where, byName };
 }
 
 // What the engine makes of the line as it stands: the whole shape it fits that spells out the most of itself.
@@ -505,6 +519,7 @@ function headingOffering(text: string, at: number, before: string, lineEnd: numb
     refused: null,
     undeclared: [],
     offers: addressOffers(known, new Set(kind === '' ? [] : [kind]), '', typed),
+    ...(addressedNote(kind) === undefined ? {} : { laidOver: addressedNote(kind)! }),
   };
 }
 
@@ -523,15 +538,17 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   if (owner === undefined || head === undefined) return NOTHING;
 
   const indent = INDENT.exec(before)![0].length;
-  const opening = CLAUSE.exec(before.slice(indent));
-  const from = lineStart + indent + (opening === null ? 0 : opening.index + opening[0].length);
+  const laying = OP_KEY.exec(before.slice(indent));
+  const keyedAt = indent + (laying === null ? 0 : laying[0].length);
+  const opening = CLAUSE.exec(before.slice(keyedAt));
+  const from = lineStart + keyedAt + (opening === null ? 0 : opening.index + opening[0].length);
   const typed = text.slice(from, at);
   const tail = text.slice(at, lineEnd);
   const to = at + (tail.indexOf(',') < 0 ? tail.length : tail.indexOf(','));
 
   const trailing = TRAILING_ID.exec(typed)![0];
   const continuing = opening !== null && opening[0].startsWith(',');
-  const written = continuing ? text.slice(lineStart + indent, from) : typed;
+  const written = continuing ? text.slice(lineStart + keyedAt, from) : typed;
   const field = fieldNamed(owner, written, true);
   const under = field.key === null || continuing ? '' : (KEYED.exec(written)?.[0] ?? '');
   const left = typed.slice(under.length);
@@ -545,7 +562,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     ...(field.parser === null ? [] : field.parser.forms).map((form) => shapeOf({ form, example: exampleOf(form, field.parser!.examples) ?? form, ...field.filled }, under, left, alongside)),
   ];
   const line = text.slice(lineStart, lineEnd);
-  const reads = readAs(here.lines, line.trim());
+  const reads = readAs(here.lines, line.trim().slice(laying === null ? 0 : laying[0].length));
   const read = reading(shapes);
   const shown = narrowed(read);
   // Where the engine has already read the whole line as one shape, the cursor stands in that shape, whether or not another shape spells out one character more of it. Two shapes the line has spelt nothing of are otherwise told apart by which was declared first, which is no answer at all.
@@ -580,6 +597,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
     filling: filled === undefined ? null : { form: filled.form, hole: filled.hole, at: reached, ...(filled.like === undefined ? {} : { like: filled.like }), ...(naming === undefined ? {} : { kind: naming }), ...(holdings === undefined ? {} : { holds: holdings }) },
     refused,
     undeclared: undeclaredAt(text, lineStart, known),
+    ...(laying === null ? {} : laidOverBy(laying.groups!.op!, here.byName)),
     // A shape whose words are the ones already written would put back what it replaced, and an author who has written them is being offered nothing.
     offers: deduped([
       // A hole broken into what it may name puts each kind under the placeholder that names it, so `<flag>` and `<item>` are told apart under an `if` rather than heaped together.

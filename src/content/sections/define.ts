@@ -2,12 +2,12 @@ import { Action, actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
 import { paired } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
-import { DslError, Holds, Parser, Written } from '../../grammar/parser';
+import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, put, strings } from '../refs';
-import { mergeFields } from '../merge';
+import { BY_NAME, mergeFields, overwrittenField } from '../merge';
 import { parametersOf } from '../../grammar/values';
 
 export type { PrintContext };
@@ -91,6 +91,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   flags: readonly string[];
   names: readonly Named[];
   grammar: readonly Written[];
+  bodyOver: BodyOver;
   says?: (value: V) => ActionResult[][];
   members?: (value: V) => readonly MemberName[];
   text: readonly string[];
@@ -181,9 +182,9 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
 };
 
 export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
-  ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec)),
-  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
-  ...(schema.entries?.body.grammar ?? []),
+  ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec).map((line) => ({ ...line, over: overwrittenField(schema, name) }))),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, over: overwrittenField(schema, word), ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.entries === undefined ? [] : schema.entries.body.grammar.map((line) => ({ ...line, over: overwrittenField(schema, schema.entries!.into) }))),
 ];
 
 // A shape that is one placeholder and nothing else, which is what a field written as a bare name has.
@@ -241,6 +242,17 @@ const notContent = (kind: string): never => {
 // declares it instead; a kind with neither is refused where it is declared, because keeping the
 // first and dropping the second is the one answer an author is never told about.
 export const writtenWhole = (_into: object | undefined, from: object): object => from;
+
+export type BodyOver = 'lines' | 'whole';
+
+const marked = (line: Written): Written => (line.over !== 'by name' ? line : { ...line, note: line.note === undefined ? BY_NAME : `${line.note} — ${BY_NAME}` });
+
+const markedLines = (lines: readonly Written[]): readonly Written[] => {
+  if (!lines.some((line) => line.over === 'by name')) return lines;
+  const out = lines.map(marked);
+  const called = blockCalled(lines);
+  return called === undefined ? out : calledBlock(called, out);
+};
 
 export const section =
   <V extends { id: string }, F extends keyof V = never, E extends keyof V = never>() =>
@@ -326,7 +338,8 @@ export const section =
       mintedActions,
       flags,
       names,
-      grammar: nestsActions === undefined ? written : nestedActionLines(kind, nestsActions, written),
+      grammar: markedLines(nestsActions === undefined ? written : nestedActionLines(kind, nestsActions, written)),
+      bodyOver: merge === writtenWhole ? 'whole' : 'lines',
       says,
       members,
       text,

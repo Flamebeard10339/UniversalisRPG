@@ -4,7 +4,8 @@ import { writtenFrom } from '../grammar/codec';
 import { NOTE_MARK } from '../grammar/note';
 import { namesKind, offeringAt, said, type Offer } from './completion';
 import { gathered, shownIn } from './offerGroups';
-import { EVERY_SECTION, sectionFor, sectionKinds } from './sections';
+import { addressedHeading, EVERY_SECTION, sectionFor, sectionKinds } from './sections';
+import { LAID_OVER_RULE, WRITTEN_WHOLE_NOTE } from './merge';
 
 const STEP = '  ';
 
@@ -12,7 +13,6 @@ const STEP = '  ';
 // heading above it is what says, and the heading is the half an author cannot guess. So the page writes it,
 // and the shapes under it at the indentation they are written at.
 const HOLDS_A_LINE = 'line';
-const OVER_HEADING = '# <kind> <module>.<id>';
 const laidOver = (line: Written | undefined): boolean => line !== undefined && holeNames(line.form).includes(HOLDS_A_LINE);
 
 // No line of the language begins with this, so what is written out here can be told from what an author writes.
@@ -106,7 +106,7 @@ function treeLines(written_: readonly Written[], pad: string, sitting: Sitting, 
     if (family.name !== null) holdNow(written, sign, label);
     const over = own.some((line) => laidOver(line));
     const writtenAt = over ? pad + STEP : pad;
-    if (over) out.push(`${pad}${OVER_HEADING}`);
+    if (over) out.push(`${pad}${addressedHeading()}`);
     // The shapes a keyword takes stand on its own line, one or another of them; only a block it opens is indented, because only a block is indented in a file.
     for (const group of family.groups) {
       const spoken = (form: string | null): string => (form === null ? '' : saidOf(held.get(form)));
@@ -139,12 +139,14 @@ export const RULES: readonly string[] = [
   `${PART}an \`e.g.\` shows one line of that shape written out; the ids in it stand for ids and are not ids anything declares`,
   `${PART}an id may be written whole, as \`core.bread\`, or by the name its own module gave it, as \`bread\` — except in a heading, where a short id declares a section of the module being written: writing over a section some other module declared means writing that section's id whole`,
   `${PART}an answer given once is pointed back at rather than written out again: \`as under X\` and \`what X holds\` both say to read it there`,
+  `${PART}${LAID_OVER_RULE}`,
   `${PART}in a line the game says to a player, a \`${NOTE_MARK}\` and everything after it is a note the engine drops: write what you can say now, then \`${NOTE_MARK}\` alone to mark it rough, or \`${NOTE_MARK} <what you wanted>\` where the engine cannot do what was asked. \`npm run notes\` lists them`,
 ];
 
 export function treeOf(kind: string, seen: Seen = freshly(), said: ReadonlySet<string> = new Set()): string[] {
   const owner = sectionFor(kind);
   if (owner === undefined) return [`# ${kind} — no such kind`];
+  const heading = `# ${kind} <id>${owner.bodyOver === 'whole' ? `   — ${WRITTEN_WHOLE_NOTE}` : ''}`;
   const sitting = { under: `# ${kind} probe`, indent: 0 };
   const already: Already = { kind: `# ${kind}`, seen };
   const own = owner.grammar.filter((line) => !said.has(sameLine(line)));
@@ -153,7 +155,7 @@ export function treeOf(kind: string, seen: Seen = freshly(), said: ReadonlySet<s
   // of this kind written under one of its own sections. What is left to write is what is asked about,
   // since the lines said above every kind have already been read by anyone reading the page through.
   const held = heldBefore(already, keyOf(owner.grammar)) ?? (own.length > 0 ? heldBefore(already, keyOf(own)) : undefined);
-  if (held !== undefined) return [`# ${kind} <id>`, `${PART}what ${held} holds, and nothing else`];
+  if (held !== undefined) return [heading, `${PART}what ${held} holds, and nothing else`];
   // The section's own lines are a block like any other, so a wrapper that holds them again points back at the heading rather than writing them out twice.
   holdNow(already, keyOf(owner.grammar), `# ${kind}`);
   if (own.length > 0 && keyOf(own) !== keyOf(owner.grammar)) holdNow(already, keyOf(own), `# ${kind}`);
@@ -162,9 +164,9 @@ export function treeOf(kind: string, seen: Seen = freshly(), said: ReadonlySet<s
   // lines at all says that writing the heading is the whole of it.
   if (own.length === 0) {
     const shared = owner.grammar.map((line) => `\`${line.form}\``);
-    return [`# ${kind} <id>`, `${PART}${shared.length === 0 ? 'nothing but the heading, which is what declares the name' : `nothing of its own: it takes ${shared.join(', ')}, said above`}`];
+    return [heading, `${PART}${shared.length === 0 ? 'nothing but the heading, which is what declares the name' : `nothing of its own: it takes ${shared.join(', ')}, said above`}`];
   }
-  return [`# ${kind} <id>`, ...treeLines(own, '', sitting, already, `# ${kind}`)];
+  return [heading, ...treeLines(own, '', sitting, already, `# ${kind}`)];
 }
 
 // The heading the lines every kind takes stand under, which is not a kind and so is not written as one.

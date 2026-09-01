@@ -108,6 +108,19 @@ export const isOwnedKind = (kind: string): boolean => idScopeOf(kind) === 'owned
 // A kind that answers for every name of it there is, so one nothing declared is refused where it is written.
 export const isCheckedKind = (kind: string): boolean => sectionFor(kind)?.vocabulary === 'declared' || MEMBER_KINDS.includes(kind);
 
+const OWNED_ADDRESS = 'writes over the section that module declared, which is how a kind whose ids its own module owns is reached from outside the file that declared it';
+
+const GLOBAL_ADDRESS = 'is one name whichever module writes it, so a second body at it carries the short id it was declared with and no module in front';
+
+export const addressedHeading = (): string =>
+  `# <kind> <module>.<id>   — ${OWNED_ADDRESS}. A ${globalSectionKinds().map((kind) => `# ${kind}`).join(' or a ')} ${GLOBAL_ADDRESS}`;
+
+export const addressedNote = (kind: string): string | undefined => {
+  const scope = idScopeOf(kind);
+  if (scope === 'owned') return `\`# ${kind} <module>.<id>\` ${OWNED_ADDRESS}`;
+  return scope === 'global' ? `a # ${kind} ${GLOBAL_ADDRESS}` : undefined;
+};
+
 export const registryMapOf = (kind: string): string | null => sectionFor(kind)?.map ?? null;
 
 export const contentSectionMaps = (): readonly (readonly [SectionKind, string])[] => sections().flatMap((each) => (each.map === null ? [] : [[each.kind, each.map] as const]));

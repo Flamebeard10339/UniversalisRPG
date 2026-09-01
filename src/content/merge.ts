@@ -1,6 +1,17 @@
 import { AnySchema, clearedBy, FieldEdits, isEntryRemoval, isFieldEdits, isListField } from '../grammar/section';
+import type { Overwritten } from '../grammar/parser';
 
 type Fields = Record<string, unknown>;
+
+export const overwrittenField = (schema: AnySchema, name: string): Overwritten => (name === schema.entries?.into ? 'by name' : isListField(schema, name) ? 'listed' : 'replaced');
+
+export const BY_NAME = 'laid over by name';
+
+export const LAID_OVER_RULE = `a second body written at an id already there is laid over the one there keyword by keyword: a line stands in place of whatever that keyword held, and a line marked \`${BY_NAME}\` opens a body of its own that goes home by the name it is written under — a name not there yet is added, a name already there keeps every line the second body says nothing about and takes its word for every line it does write, a \`+\` line among them, and \`-<that name>\` takes the whole of it out`;
+
+export const PLUS_BY_NAME = `the + adds nothing here — the body this line sits in is ${BY_NAME}, so the line stands in place of whatever that body already holds`;
+
+export const WRITTEN_WHOLE_NOTE = 'a second body at one of these ids is the section, and the one already there is gone';
 
 interface Labelled extends Fields {
   label: string;
