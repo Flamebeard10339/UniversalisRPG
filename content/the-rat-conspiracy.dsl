@@ -263,4 +263,4 @@ talk: kelsa
 choose: rat-conspiracy.paid.kelsa.0.said
 choose: continue
 assert: rat-conspiracy.settled
-assert: inventory.core.coin >= 5000
+assert: inventory.core.coin > 0

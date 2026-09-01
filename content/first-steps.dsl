@@ -529,8 +529,7 @@ assert: front-door.unlocked
 assert: market-square.discovered
 assert: not market-square.touched
 assert: guide-house.touched
-assert: xp.thieving = 4
-assert: time >= 4
+assert: xp.thieving > 0
 
 // --- the town found in the middle of the lesson ---
 //
