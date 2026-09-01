@@ -55,7 +55,7 @@ function reachToCorpus(from: string): string[] | null {
   return null;
 }
 
-describe('the suite and the corpus', () => {
+describe('no-test-reads-the-corpus', () => {
   it('sweeps every test the gate runs, so nothing below is vacuous', () => {
     expect(suiteTests.length).toBeGreaterThan(100);
   });

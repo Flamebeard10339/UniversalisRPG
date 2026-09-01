@@ -1,6 +1,6 @@
 # Authoring and the engine, split apart — open, for a lane
 
-## 45 test files still read the shipped corpus
+## 38 test files still read the shipped corpus
 
 `npm test` fails today when `content/` changes, which means a contributor editing the world in the
 game — who cannot run vitest at all, and whose edit is not about the engine — turns a gate red on
@@ -16,10 +16,11 @@ here to fire on is a rule the suite cannot reach.
 
 It was 83. Thirty-eight of those reached only `content/engine-en.dsl` and no longer reach anything —
 the engine's own English moved to `src/content/engine/`, because it is the engine's writing and not
-an author's. The guard names each of the 45 left and the shortest way it reaches. The fixture will
-have to grow as they come over: nothing in it yet has a cluster jewel, a region, a recipe or a
-station, a race, or a second dialogue node, and a test that wants one wants it here.
-*Closes when:* `docs/authoring-split/open-tests.test.ts` is green and has been moved into
+an author's. Seven more have come over since, and the guard names each of the 38 left and the
+shortest way it reaches. The fixture grows as they arrive, which is how it is meant to grow —
+nothing in it yet has a cluster jewel, a region, a recipe or a station, or a race, and a test that
+wants one wants it here.
+*Closes when:* `no-test-reads-the-corpus` passes, and the proof has moved out of here into
 `scripts/`, where it gates.
 
 ## The corpus rules in `src/content/dsl.test.ts` have nowhere to go yet
@@ -55,3 +56,16 @@ holding is that the two readings name the same two directories — `src/content/
 `content/` — and that is a fact about two source files, not about anything either directory holds.
 *Closes when:* the bridge is a claim about the glob patterns and the directories `shipped.ts` reads,
 and the per-module comparison has moved to the corpus's own verdict.
+
+## `journal.ts` names three group ids that only `core` can supply
+
+`STANDING_GROUP` is `core.quest-unstarted`, `core.quest-started`, `core.quest-complete` written out
+in the engine, so a world whose furniture module is called anything else has an uncoloured journal
+and nothing says so. It is why the fixture's furniture module is `# info core`: the engine already
+requires a world to have one, and every other engine-to-content coupling in `src/` is an example in
+a comment rather than a lookup.
+
+The world should say which group means which standing, the way a group already says which kind it is
+standard for, rather than the engine naming the ids.
+*Closes when:* a `# group` can declare the standing it stands for, `journal.ts` reads that off the
+registry, and the three ids are gone from `src/`.
