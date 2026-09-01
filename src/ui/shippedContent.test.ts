@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { SHIPPED_DIRS } from '../content/shipped';
+import { SHIPPED_DIRS, shippedFiles } from '../content/shipped';
 import { createDriver } from './driver';
+import { SHIPPED_SOURCES } from './shippedContent';
 import { FIXTURE_CORPUS_DIR, fixtureSources } from '../content/worldFixture';
 
 const GLOBBED = /import\.meta\.glob\((['"`])([^'"`]+)\1/g;
@@ -29,5 +30,18 @@ describe('the content the build carries', () => {
   it('is pointed at a directory that holds modules, so the reading above is not of nothing', () => {
     expect(FIXTURE_CORPUS_DIR).toBe('src/content/fixture');
     expect(fixtureSources().length).toBeGreaterThan(2);
+  });
+});
+
+describe('both doors into the shipped corpus', () => {
+  const refused = /does not open while the suite is running/;
+
+  it('refuses the loader that reads the directory', () => {
+    expect(() => shippedFiles()).toThrow(refused);
+  });
+
+  it('refuses the page that globs the same two directories', () => {
+    expect(() => SHIPPED_SOURCES[0]).toThrow(refused);
+    expect(() => [...SHIPPED_SOURCES]).toThrow(refused);
   });
 });

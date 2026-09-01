@@ -1,16 +1,11 @@
 import { readdirSync, readFileSync } from 'fs';
+import { shut } from './corpusDoor';
 import { ENGINE_MODULE_DIR, engineModules } from './engineModules';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import type { ModuleSource } from './universe';
 import { standingWithin, worldWithin } from './worlds';
 
 export const CORPUS_DIR = 'content';
-
-const shut = (): void => {
-  if (process.env.VITEST !== undefined) {
-    throw new Error('the shipped corpus does not open while the suite is running: stand on src/content/fixture instead (worldFixture.ts), and let `npm run oracle -- --at content` answer for content/');
-  }
-};
 
 export const SHIPPED_DIRS: readonly string[] = [ENGINE_MODULE_DIR, CORPUS_DIR];
 

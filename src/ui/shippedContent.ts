@@ -1,3 +1,4 @@
+import { shut } from '../content/corpusDoor';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 
@@ -7,12 +8,6 @@ const BUNDLED = {
 };
 
 const moduleName = (path: string): string => path.replace(/^.*\//, '').replace(/\.[^.]*$/, '');
-
-const shut = (): void => {
-  if (process.env.VITEST !== undefined) {
-    throw new Error('the shipped corpus does not open while the suite is running: stand on src/content/fixture instead (worldFixture.ts), and let `npm run oracle -- --at content` answer for content/');
-  }
-};
 
 const bundled = (): readonly ModuleSource[] => {
   shut();
