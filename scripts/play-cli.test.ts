@@ -91,7 +91,7 @@ describe('play-cli renders what a command result says happened', () => {
 
     expect(lines[0]).toBe('The Green (fixture-town.green)');
     expect(lines[1]).toBe('Cropped grass, a bench, and three ways out of it.');
-    expect(lines[2]).toBe('Here: The Keeper, The Side Door');
+    expect(lines[2]).toBe('Here: The Keeper, The Side Door, The Bench');
     // A pool is drawn as its name, a bar and what it stands at over its ceiling. Nobody has been
     // hurt yet, so the bar is full and the two figures read alike — which is the shape of the line
     // rather than the figure the sheet of the day puts in it.
@@ -110,7 +110,7 @@ describe('play-cli renders what a command result says happened', () => {
     expect(unread).toContain('?');
     expect(unread).not.toContain('The Keeper');
 
-    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: The Keeper, The Side Door');
+    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: The Keeper, The Side Door, The Bench');
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {

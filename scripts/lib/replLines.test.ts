@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../../src/content/load';
 import { sessionLocalizer, startSession, view } from '../../src/runtime/session';
-import { SHIPPED_SOURCES } from '../../src/ui/shippedContent';
 import { formatView, printed } from './replLines';
+import { fixtureSources } from '../../src/content/worldFixture';
 
 // The parity harness counts the words a surface says, and `choices[].detail` holds the same word
 // set as `entities[].title` at a `/look` — so a terminal that stopped naming who offers a choice
 // still passes it. This is that hole: a choice that names an owner says the owner on its own line.
 describe('a choice line carries what offers it', () => {
-  const registry = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
+  const registry = loadUniverseWithDiagnostics(fixtureSources()).registry;
 
   it('says the owner beside the choice, for every choice the view gives one', () => {
     const session = startSession(registry);

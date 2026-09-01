@@ -29,11 +29,11 @@ import {
   type Standing,
 } from './authoringSurface';
 import { createDriver } from './driver';
-import { SHIPPED_SOURCES } from './shippedContent';
+import { fixtureSources } from '../content/worldFixture';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
-const addressed = addressable(SHIPPED_SOURCES);
+const addressed = addressable(fixtureSources());
 
 const SPARE: ModuleSource = {
   name: 'spare',
@@ -47,11 +47,11 @@ const sectionKeyOf = (section: Section): string => `${section.kind} ${section.ad
 // What the driver puts in front of the loader when an author stages something: the local-changes
 // module, headed and made to depend on everything shipped, so it has the last word the way it does in
 // the game. Written by the module that owns that file rather than spelt out again here.
-const MODULE_IDS = SHIPPED_SOURCES.map((source) => addressedSections(source).module);
+const MODULE_IDS = fixtureSources().map((source) => addressedSections(source).module);
 
 const stagedModule = (...sections: string[]): ModuleSource => ({ name: LOCAL_CHANGES_MODULE_ID, text: renderLocalChangesModule(MODULE_IDS, sections) });
 
-const REGISTRY = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
+const REGISTRY = loadUniverseWithDiagnostics(fixtureSources()).registry;
 
 // Any real location with a few entities standing in it proves the same rule;
 // naming one by hand would go stale the day an author renamed it.
@@ -125,7 +125,7 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
   });
 
   it('offers the last source’s word at an address, over everything written there before it', () => {
-    const withLocal = addressable([...SHIPPED_SOURCES, stagedModule([`# location ${ELSEWHERE}`, 'x: 4, y: 0'].join('\n'))]);
+    const withLocal = addressable([...fixtureSources(), stagedModule([`# location ${ELSEWHERE}`, 'x: 4, y: 0'].join('\n'))]);
     const shadowing = withLocal.filter((section) => section.address === ELSEWHERE);
     const written = addressed.find((section) => section.address === ELSEWHERE)!;
 
@@ -142,7 +142,7 @@ describe('the three surfaces are three predicates over one list (c7)', () => {
 // quest that adds a face to a room next month is covered by having been written.
 const WRITTEN_TWICE = (() => {
   const writers = new Map<string, Section[]>();
-  for (const source of SHIPPED_SOURCES) for (const section of sectionsIn(source)) writers.set(sectionKeyOf(section), [...(writers.get(sectionKeyOf(section)) ?? []), section]);
+  for (const source of fixtureSources()) for (const section of sectionsIn(source)) writers.set(sectionKeyOf(section), [...(writers.get(sectionKeyOf(section)) ?? []), section]);
   return [...writers.values()].filter((written) => written.length > 1);
 })();
 
@@ -156,9 +156,9 @@ describe('a body offered at an address several modules write at (c3)', () => {
   // plays there, so staging it back is a no-op. Handed one module's half of it, staging silently took
   // away what the other module had added — no diagnostic, no diff, just a room short of a face.
   it('is what the whole world plays there, so staging it back leaves the same universe', () => {
-    const offered = addressable(SHIPPED_SOURCES);
+    const offered = addressable(fixtureSources());
     const local = stagedModule(...WRITTEN_TWICE.map((written) => offered.find((section) => sectionKeyOf(section) === sectionKeyOf(written[0]))!.text));
-    const after = loadUniverseWithDiagnostics([...SHIPPED_SOURCES, local]);
+    const after = loadUniverseWithDiagnostics([...fixtureSources(), local]);
 
     expect(after.diagnostics.map(formatModuleDiagnostic)).toEqual([]);
     expect(registryDiff(REGISTRY, after.registry)).toEqual([]);
@@ -195,7 +195,7 @@ describe('every control sends a line the shared table parses (c2)', () => {
 
   for (const section of ONE_OF_EACH_KIND) {
     it(`puts back the ${section.kind} it was given, through the command and the store`, () => {
-      const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
+      const driver = createDriver(fixtureSources(), { ticker: () => () => undefined });
       driver.send((stage(section.text) as { line: string }).line);
       const held = driver.localChanges() ?? '';
       const staged = addressable([{ name: 'local-changes', text: held }]);
@@ -340,9 +340,9 @@ describe('narrowing the list to the sections being looked for', () => {
   });
 
   it('reads a term as a pattern rather than as the letters it is spelt with', () => {
-    expect(kept('sword|shield').length).toBeGreaterThan(kept('sword').length);
-    expect(kept('sw.rd').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
-    expect(kept('SWORD').map(sectionKeyOf)).toEqual(kept('sword').map(sectionKeyOf));
+    expect(kept('spade|jerkin').length).toBeGreaterThan(kept('spade').length);
+    expect(kept('sp.de').map(sectionKeyOf)).toEqual(kept('spade').map(sectionKeyOf));
+    expect(kept('SPADE').map(sectionKeyOf)).toEqual(kept('spade').map(sectionKeyOf));
   });
 
   it('reaches the module a section came from, which its address need not spell', () => {

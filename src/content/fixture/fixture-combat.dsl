@@ -59,6 +59,7 @@ on hit: inflict: venom on them
 // --- a plane that carries the gate, so a route can reach it and another route can not ---
 
 # cluster-jewel fury-core
+title: Fury Core
 examine: Wound tight, and getting tighter.
 shape: ring
 open-connections: e
@@ -111,6 +112,8 @@ uses: core.melee-combat
 open the strongbox:
   instant
   give: 1 fury-blade
+  give: 1 core.keen-edge-jewel
+  give: 1 core.stout-heart-jewel
 
 // Sitting adds to the regeneration everybody already has rather than restoring a pool of its own,
 // so what it is worth can only be said against a span nobody sat out.
@@ -119,10 +122,24 @@ title: Rested
 examine: The bench is warm where somebody else was.
 +20 core.regeneration, 120s
 
-# location fixture-town.green
-sit on the bench:
+// A thing standing in the room with no `examine:` on it, so it is named rather than masked: what a
+// player has not read yet is drawn as a placeholder, and a room where everything is one says nothing
+// about a room where something is not.
+# entity bench
+title: The Bench
+faction: world
+stations: core.bench
+sit:
   instant
   inflict: rested
+
+# location fixture-town.green
++entities: bench
+
+// Standing where the counter and the bench are, with what a rope is twisted out of and a coin or
+// two: a sheet for a screen that wants an offer to draw rather than a route to walk.
+# save supplied
+{"version":13,"location":"fixture-town.green","inventory":{"core.rat-tail":4,"core.twine":4,"core.copper-coin":20}}
 
 # save hurt-in-town
 {"version":13,"location":"fixture-town.green","resources":{"core.health":12000}}
@@ -171,6 +188,6 @@ assert: stat.attack > 10
 
 # test the-bench-is-where-health-comes-back
 load: hurt-in-town
-use: location.fixture-town.green.sit-on-the-bench
+use: entity.fixture-combat.bench.sit
 wait: 30
 assert: resource.health > 12

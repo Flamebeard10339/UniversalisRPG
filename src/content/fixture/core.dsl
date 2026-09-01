@@ -244,12 +244,14 @@ value: 5
 // --- a plane to spend points on ---
 
 # cluster-jewel keen-edge
+title: Keen Edge
 examine: A closed ring of iron, warm to the touch.
 shape: ring
 open-connections: e
 passives: 1 keen, 2 hale, 3 warded, 4 keen, 5 hale, 6 fortune
 
 # cluster-jewel stout-heart
+title: Stout Heart
 examine: A knot of iron that will not be moved.
 shape: wheel
 open-connections: e, se
@@ -258,6 +260,7 @@ passives: 1 warded, 2 hale, 3 fortune, 5 hale, 6 warded, 7 keen
 // A thing with a plane of its own, so points dropped with it have somewhere to be spent and a jewel
 // has a socket to go into.
 # cluster-jewel spade-core
+title: Spade Core
 examine: The haft is bored through, end to end.
 shape: ring
 open-connections: e

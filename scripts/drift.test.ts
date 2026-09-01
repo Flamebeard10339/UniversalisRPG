@@ -14,10 +14,10 @@ import { slotStore, type SlotDriver } from '../src/runtime/store';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
 import { pageStorage } from '../src/ui/agent/pageStorage';
-import { SHIPPED_SOURCES } from '../src/ui/shippedContent';
 import { appendOutputs } from '../src/ui/transcript';
 import { fileSlots } from './lib/slotFile';
 import { openRepl, type Repl } from './play-cli';
+import { fixtureSources } from '../src/content/worldFixture';
 
 const refused = (result: CommandResult): boolean => result.output.some((each) => each.kind === 'message' && each.tone === 'error');
 
@@ -64,7 +64,7 @@ function bothOver(base: readonly ModuleSource[], local: string): { repl: Repl; g
   };
 }
 
-const bothDrivers = (): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gui: SlotDriver } } => bothOver(SHIPPED_SOURCES, '');
+const bothDrivers = (): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gui: SlotDriver } } => bothOver(fixtureSources(), '');
 
 function slotBytes(driver: SlotDriver): Record<string, unknown> {
   const store = slotStore(driver, () => STAMP);
@@ -82,18 +82,22 @@ function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = ()
   return { result };
 }
 
+// A walk that spends points round a ring, opens the socket at its one connection, puts a jewel
+// through it and steps onto the cluster that arrives — then wears what it grew. A slot is offered
+// only once the points between the origin and it have been spent, which is what the three
+// allocations before it are.
 const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
   ['verb', 'grow'],
+  ['plane', 'allocate: position 2'],
+  ['plane', 'allocate: position 3'],
+  ['plane', 'allocate: position 4'],
   ['plane', 'allocate: slot e'],
-  ['plane', 'slot: e with core.crossroads-jewel'],
+  ['plane', 'slot: e with core.keen-edge-jewel'],
   ['plane', 'go: 1,0'],
-  ['plane', 'allocate: position 1'],
-  ['plane', 'allocate: slot ne'],
-  ['plane', 'slot: ne with core.keen-edge-jewel'],
-  ['plane', 'go: 2,-1'],
   ['plane', 'allocate: position 1'],
   ['plane', 'back'],
   ['verb', 'equip'],
+  ['verb', 'close'],
 ];
 
 interface SerializedGrowth {
@@ -114,7 +118,7 @@ describe('the two drivers cannot drift', () => {
       '/bogus',
       '/assert time >= 3',
       '/expect empty',
-      '/dsl location first-steps.guide-house x: 9, y: 9',
+      '/dsl location fixture-town.green x: 9, y: 9',
       '/local list',
       '/local show',
       '/reload',
@@ -157,8 +161,8 @@ describe('the two drivers cannot drift', () => {
     const at = (found: (choice: PlayChoice) => boolean): string => String(gui.snapshot().view.choices.findIndex(found) + 1);
 
     // Nobody has read this room, so the only thing Miki offers either driver is the look that reads her.
-    inStep(repl, gui, at((choice) => choice.of === 'entity.first-steps.miki'));
-    inStep(repl, gui, at((choice) => choice.id === 'talk:first-steps.miki'));
+    inStep(repl, gui, at((choice) => choice.of === 'entity.fixture-town.keeper'));
+    inStep(repl, gui, at((choice) => choice.id === 'talk:fixture-town.keeper'));
 
     // Two answers, and both go through the same table: the line taken out of Miki's menu, and then
     // the beat it leaves him saying, which asks nothing but is still a screen somebody dismisses.
@@ -172,14 +176,18 @@ describe('the two drivers cannot drift', () => {
 
   it('walks the crafting route through both drivers, gesture against typed line', () => {
     const { repl, gui } = bothDrivers();
-    inStep(repl, gui, 'use: entity.tulsa.smiths-chest.open');
-    inStep(repl, gui, '/inv 2', () => gui.open('2'));
+    inStep(repl, gui, 'goto: fixture-town.store');
+    inStep(repl, gui, 'use: entity.fixture-town.chest.open-the-strongbox');
+    inStep(repl, gui, '/inv 1', () => gui.open('1'));
     for (const [key, value] of CRAFTING_ROUTE) inStep(repl, gui, `submit-modal: ${key}=${value}`, () => gui.answer(key, value));
 
     expect(gui.snapshot().view.modals).toEqual([]);
     const grown = JSON.parse(gui.serialized()) as SerializedGrowth;
-    expect(Object.keys(grown.instances.byId['2'].payload.plane)).toEqual(['0,0', '1,0', '2,-1']);
-    expect(grown.equipped).toEqual({ mainhand: '2' });
+    // The copy the blade arrived as, and the slot the world says it goes in: both read off what was
+    // grown rather than named, since which id the engine minted is the engine's business.
+    const [minted] = Object.keys(grown.instances.byId);
+    expect(Object.keys(grown.instances.byId[minted!]!.payload.plane)).toEqual(['0,0', '1,0']);
+    expect(Object.values(grown.equipped)).toEqual([minted]);
   });
 });
 

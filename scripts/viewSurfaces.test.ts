@@ -13,7 +13,6 @@ import { App } from '../src/ui/App';
 import { browserSlots } from '../src/ui/browserStore';
 import { createDriver, type Driver } from '../src/ui/driver';
 import { LAYERS, OPENING, toLayer, toSubpage } from '../src/ui/nav';
-import { SHIPPED_SOURCES } from '../src/ui/shippedContent';
 import {
   driftingPaths,
   excusedCommandsAreReal,
@@ -28,6 +27,7 @@ import {
 import { formatFocus, FOCUS_KINDS, printed, say } from './lib/replLines';
 import { driveRun, formatResult, openRepl } from './play-cli';
 import { ANSWER_NOT_SHOWN, answerLines, renderView } from './playbot';
+import { fixtureSources } from '../src/content/worldFixture';
 
 // One question, asked of all three drivers over one engine: no surface may lose a capability the
 // others kept. The subjects derive themselves — the leaf paths a live view actually carries, and
@@ -54,6 +54,11 @@ const PARITY_EXCUSED: readonly PathExcuse[] = [
     // not the path. Every other screen's question is load-bearing — an item's own words, a jewel's —
     // and a driver that dropped one fails here.
     covers: (view) => asksNothing(view.modals),
+  },
+  {
+    path: 'undiscovered[].title',
+    why: "a place nobody has found is not drawn on the app's map, which is the whole of what finding one is for there — the map fills in as it is walked. A terminal has no map to fill in, so its status readout names what is still out there in words, which is the same fact on the only channel it has. This is `/state`'s excuse said at the path rather than at the command",
+    covers: () => true,
   },
   {
     path: 'planes[].clusters[].positions[].title',
@@ -92,12 +97,12 @@ const DISTINCTIVE_SECONDS = 54321;
 // them. Walking a short run instead is what puts those paths in front of every driver. Each line
 // is one the engine takes from any of the three.
 const SCRIPT: readonly string[] = [
-  '/load first-steps.miki-route-end',
+  '/load fixture-combat.supplied',
   `/wait ${DISTINCTIVE_SECONDS}`,
   '/look',
   '/state',
   '/quests',
-  '/quests first-steps.finding-your-feet',
+  '/quests fixture-quests.clear-the-well',
   'submit-modal: close=close',
   '/stat',
   // Character creation and the breakdown of one stat. Neither stands in anybody's way through the
@@ -106,10 +111,13 @@ const SCRIPT: readonly string[] = [
   'open-modal: choose-name',
   'submit-modal: name=Rowan',
   'open-modal: choose-race',
-  'submit-modal: race=core.elf',
+  'submit-modal: race=core.badger',
   '/stat core.attack',
   'submit-modal: close=close',
-  '/load tulsa.growing-through-the-inventory-screen-end',
+  // A plane, reached the way a player reaches one: out of the chest that holds a thing with a plane
+  // in it, and opened on the copy it arrived as.
+  '/goto fixture-town.store',
+  'use:entity.fixture-town.chest.open-the-strongbox',
   '/look',
   '/state',
   '/quests',
@@ -120,31 +128,28 @@ const SCRIPT: readonly string[] = [
   '/settings',
   // A counter and the question it asks about how many, reached the way a player reaches one: the
   // shopkeeper is looked at before anything they keep is on offer.
-  '/load tulsa.in-town',
-  'travel:tulsa.market-row',
-  'use:entity.tulsa.general-store.examine',
-  'shop:tulsa.general-store',
-  'submit-modal: item=buy:core.pot-of-flour',
+  '/load fixture-combat.supplied',
+  'use:entity.fixture-town.keeper.examine',
+  'shop:fixture-town.counter',
+  'submit-modal: item=buy:core.bread',
   'submit-modal: count=back',
   'submit-modal: item=close',
-  '/load first-steps.miki-route-start',
-  'use:entity.first-steps.miki.examine',
-  'talk:first-steps.miki',
+  'talk:fixture-town.keeper',
   'submit-modal: choice=0',
   'submit-modal: choice=0',
-  '/goto first-steps.basement',
+  '/goto fixture-town.well',
   '/state',
   // Nothing offers a fight against something nobody has looked at, so the rat is read first — which
   // is also how every driver is asked to draw the mask and then the thing behind it.
-  'use:entity.first-steps.giant-rat.examine',
+  'use:entity.fixture-town.rat.examine',
   // Picked as a choice rather than typed as the directive behind it, which is the one shape that
   // arms an action instead of applying it: a driver that can advance a run gets one to advance, and
   // the live sheet a terminal draws while it runs is only reachable this way.
-  'fight:core.melee-combat:first-steps.giant-rat',
+  'fight:core.melee-combat:fixture-town.rat',
   '/state',
 ];
 
-const registry = () => loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry;
+const registry = () => loadUniverseWithDiagnostics(fixtureSources()).registry;
 
 // The same script, walked once per driver, so a path is asked of each of them in the same state.
 const walkScript = (step: (line: string) => SurfaceStep): SurfaceStep[] => SCRIPT.map(step);
@@ -184,7 +189,7 @@ interface TerminalWalk {
 }
 
 function cliWalk(driving: boolean): TerminalWalk {
-  const { context: ctx } = openRepl(SHIPPED_SOURCES, { driving });
+  const { context: ctx } = openRepl(fixtureSources(), { driving });
   const { session } = ctx;
   const armedBy: string[] = [];
   const steps = walkScript((line) => {
@@ -244,7 +249,7 @@ const drawEveryPage = (driver: Driver): string => asWords(EVERY_PAGE.map((where)
 // other two drivers are deliberately refused.
 function guiRun(): SurfaceStep[] {
   const slots = browserSlots(() => pageStorage());
-  const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+  const driver = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
   return walkScript((line) => {
     driver.send(line);
     return { view: driver.snapshot().view, rendered: drawEveryPage(driver) };
@@ -316,7 +321,7 @@ describe('no driver meets a command with silence that the others answer', () => 
     const botCtx = newContext(botSession, view(botSession));
     const cliSession = startSession(registry());
     const cliCtx = newContext(cliSession, view(cliSession));
-    const gui = createDriver(SHIPPED_SOURCES, { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined });
+    const gui = createDriver(fixtureSources(), { slots: browserSlots(() => pageStorage()), ticker: () => () => undefined });
     return [
       { name: 'the playbot', answer: (spec) => answerLines(runLine(botCtx, spec.name), sessionLocalizer(botSession)) },
       { name: 'play-cli', answer: (spec) => formatResult(runLine(cliCtx, spec.name), sessionLocalizer(cliSession)).map(printed) },

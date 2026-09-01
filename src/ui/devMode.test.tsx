@@ -16,9 +16,9 @@ import { browserSlots } from './browserStore';
 import { devLine, devRefusal, speedLine, tappedPlace } from './devMode';
 import { createDriver, type Driver } from './driver';
 import { mapFixtureFor } from '../runtime/mapFixture';
-import { SHIPPED_SOURCES } from './shippedContent';
 import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
 import { SHIPPED_UI } from './shell.test';
+import { fixtureSources } from '../content/worldFixture';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -31,14 +31,14 @@ const pageSlots = (): SlotDriver => {
 
 function playing(): { driver: Driver; slots: SlotDriver } {
   const slots = pageSlots();
-  return { driver: createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined }), slots };
+  return { driver: createDriver(fixtureSources(), { slots, ticker: () => () => undefined }), slots };
 }
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
 const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.audience === 'cheat');
 
-const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(SHIPPED_SOURCES);
+const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(fixtureSources());
 
 const ACTS_ON: Record<string, string> = { '/goto': MOVED_PLACE };
 
@@ -207,7 +207,7 @@ describe('every dev power is a line the shared command table parses (c8)', () =>
 
     const { driver } = playing();
     driver.send(devLine(true));
-    const session = startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry);
+    const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);
     const repl = newContext(session, view(session));
 
     for (const spec of MARKED) {

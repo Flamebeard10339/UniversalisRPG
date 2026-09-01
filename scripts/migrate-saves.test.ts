@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { tsxCli } from './lib/tsxCli';
 import { SHAPE_CHANGE, isStaleDeclaration, migrate, noFieldMoved, readContent, writeMigration, type ContentFile, type ShapeChange } from './migrate-saves';
+import { FIXTURE_CORPUS_DIR } from '../src/content/worldFixture';
 
 const BEHIND = SAVE_VERSION - 1;
 
@@ -123,8 +124,8 @@ describe('c1: the body, and nothing else', () => {
     expect(readFileSync(path.join(directory, 'island.dsl'), 'utf8')).toBe(at(SAVE_VERSION));
   });
 
-  it('returns the shipped content unchanged when the only thing behind it is the version stamp', () => {
-    const shipped = readContent('content');
+  it('returns a world unchanged when the only thing behind it is the version stamp', () => {
+    const shipped = readContent(FIXTURE_CORPUS_DIR);
     const behind = shipped.map((file) => ({ ...file, text: file.text.replace(new RegExp(`\\{"version":${SAVE_VERSION},`, 'g'), `{"version":${BEHIND},`) }));
     expect(behind).not.toEqual(shipped);
 
@@ -158,8 +159,8 @@ describe('c2: running it twice is running it once', () => {
     expect(migrated).toContain('"rng":123');
   });
 
-  it('has nothing to do against shipped content, which is already at SAVE_VERSION', () => {
-    const report = migrate(readContent('content'), addsRng);
+  it('has nothing to do against a world already at SAVE_VERSION', () => {
+    const report = migrate(readContent(FIXTURE_CORPUS_DIR), addsRng);
 
     expect(report.ok).toBe(true);
     expect(report.files).toEqual([]);

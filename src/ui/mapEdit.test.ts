@@ -8,17 +8,17 @@ import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '.
 import { createDriver, type Driver } from './driver';
 import { addressFor, answering, centredOn, created, droppedAt, joinedInto, joinLine, pinnedInto, placeLine, settledOn } from './mapEdit';
 import { mapFixtureFor } from '../runtime/mapFixture';
-import { SHIPPED_SOURCES } from './shippedContent';
 import type { Point } from './viewport';
+import { fixtureSources } from '../content/worldFixture';
 
 // Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
 const GRID = 140;
 
-const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
+const opened = (): Driver => createDriver(fixtureSources(), { ticker: () => () => undefined });
 
-const REGISTRY_PLACES = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
+const REGISTRY_PLACES = loadUniverseWithDiagnostics(fixtureSources()).registry.locations;
 
-const { emptySquare } = mapFixtureFor(SHIPPED_SOURCES);
+const { emptySquare } = mapFixtureFor(fixtureSources());
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
@@ -62,7 +62,7 @@ describe('where a drag lets go is where the place is (c8)', () => {
 // hand does the same thing. A gesture that composed its own edit was an edit only a screen could make.
 describe('what a gesture on the map says', () => {
   it('puts a place where it was dropped', () => {
-    expect(placeLine('tulsa.market-square', { x: 8, y: -1 })).toBe('/place tulsa.market-square 8 -1');
+    expect(placeLine('fixture-town.green', { x: 8, y: -1 })).toBe('/place fixture-town.green 8 -1');
   });
 
   it('draws a road where there is none, and rubs one out where there is', () => {
@@ -116,15 +116,15 @@ describe('what a staged edit does from a surface (c8)', () => {
 });
 
 describe('a new place is written where the map is looking', () => {
-  const HERE = 'tulsa.market-square';
-  const MADE = 'tulsa.north-shore';
+  const HERE = 'fixture-town.green';
+  const MADE = 'fixture-town.orchard';
 
   const lineOf = (staged: ReturnType<typeof created>, where: string): string => {
     if ('refused' in staged) throw new Error(`${where}: ${staged.refused}`);
     return staged.line;
   };
 
-  const madeAt = (at: Point, plane = 0): string => lineOf(created(addressFor('north-shore', HERE), at, plane), MADE);
+  const madeAt = (at: Point, plane = 0): string => lineOf(created(addressFor('orchard', HERE), at, plane), MADE);
 
   it('reads the point at the middle of the sheet, wherever the sheet has been dragged to', () => {
     expect(centredOn({ pan: { x: 0, y: 0 }, zoom: 1 }, GRID)).toEqual({ x: 0, y: 0 });
@@ -140,12 +140,12 @@ describe('a new place is written where the map is looking', () => {
   // Where a room goes home is written in its id and nowhere else, so a bare name is written under the
   // module of the room the author is standing beside — and a name they qualified is left as they wrote it.
   it('names the module the new room belongs to, or keeps the one the author wrote', () => {
-    expect(addressFor('north-shore', HERE)).toBe(MADE);
-    expect(addressFor('elsewhere.north-shore', HERE)).toBe('elsewhere.north-shore');
+    expect(addressFor('orchard', HERE)).toBe(MADE);
+    expect(addressFor('elsewhere.orchard', HERE)).toBe('elsewhere.orchard');
   });
 
   it('refuses a room it could name no module for, rather than one nothing could take home', () => {
-    expect(created(addressFor('north-shore', 'nowhere'), { x: 0, y: 0 }, 0)).toHaveProperty('refused');
+    expect(created(addressFor('orchard', 'nowhere'), { x: 0, y: 0 }, 0)).toHaveProperty('refused');
   });
 
   it('stands the author in the place they made, which is the one the map goes on to draw', () => {
@@ -178,12 +178,12 @@ describe('a new place is written where the map is looking', () => {
 // One case per drawn place: the map is a rule about all of them, and a corpus that grows a quarter is
 // covered with nothing here edited.
 describe('a drag is a section edit and nothing else (c8)', () => {
-  const DRAWN = offeredBy(addressable(SHIPPED_SOURCES), NOWHERE, 'map');
+  const DRAWN = offeredBy(addressable(fixtureSources()), NOWHERE, 'map');
   const ABSOLUTE = DRAWN.filter((section) => REGISTRY_PLACES.get(section.address)?.relative === undefined);
 
   it('reads the locations it is a rule about', () => {
-    expect(DRAWN.length).toBeGreaterThan(3);
-    expect(ABSOLUTE.length).toBeGreaterThan(3);
+    expect(DRAWN.length).toBeGreaterThan(2);
+    expect(ABSOLUTE.length).toBeGreaterThan(2);
     expect(DRAWN.length - ABSOLUTE.length).toBeGreaterThan(0);
   });
 
@@ -195,7 +195,7 @@ describe('a drag is a section edit and nothing else (c8)', () => {
       driver.send(placeLine(section.address, emptySquare(2)));
 
       expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
-      const moved = loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: driver.localChanges()! }]).registry.locations.get(section.address);
+      const moved = loadUniverseWithDiagnostics([...fixtureSources(), { name: 'local-changes', text: driver.localChanges()! }]).registry.locations.get(section.address);
       expect(moved).toEqual({ ...before, ...emptySquare(2) });
     });
   }

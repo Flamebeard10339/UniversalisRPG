@@ -16,14 +16,14 @@ import type { UniverseProblem } from '../runtime/openUniverse';
 import { createDriver, REMEDIES, type Driver } from './driver';
 import { FaultBanner } from './FaultBanner';
 import { mapFixtureFor } from '../runtime/mapFixture';
-import { SHIPPED_SOURCES } from './shippedContent';
 import { wordsOf } from './words';
+import { fixtureSources } from '../content/worldFixture';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const words = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
-const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(SHIPPED_SOURCES);
+const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(fixtureSources());
 
 const pageSlots = (): SlotDriver => {
   const storage = pageStorage();
@@ -78,7 +78,7 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
   });
 
   it('draws it over the whole shell, over a game and over the stand-in alike', () => {
-    const withGame = openedOver({ base: SHIPPED_SOURCES, local: brokenLocal() });
+    const withGame = openedOver({ base: fixtureSources(), local: brokenLocal() });
     const standingIn = openedOver({ base: [{ name: 'empty', text: '# info empty\nversion: 0.0.0\npack: test\n' }], local: '' });
 
     expect(standingIn.snapshot().view.location.id).not.toBe(withGame.snapshot().view.location.id);
@@ -90,12 +90,12 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
   });
 
   it('draws nothing of the sort when the universe opened with nothing to say', () => {
-    expect(alerting(renderToStaticMarkup(<App driver={createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined })} />)).drawn).toBe(false);
+    expect(alerting(renderToStaticMarkup(<App driver={createDriver(fixtureSources(), { ticker: () => () => undefined })} />)).drawn).toBe(false);
   });
 });
 
 function brokenLocal(): string {
-  const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
+  const driver = createDriver(fixtureSources(), { slots: pageSlots(), ticker: () => () => undefined });
   driver.send(MOVE_LINE);
   return (driver.localChanges() ?? '').replace(MOVED_TO_FIELDS, 'x: sideways');
 }
@@ -113,7 +113,7 @@ export const SHIPPED_UI = shippedModules(here, 'src/ui');
 
 describe('taking a remedy changes the state it was taken from (c7)', () => {
   it('clears the local module, and the session is the one a first launch opens', () => {
-    const driver = openedOver({ base: SHIPPED_SOURCES, local: brokenLocal() });
+    const driver = openedOver({ base: fixtureSources(), local: brokenLocal() });
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual([LOCAL_CHANGES_MODULE_ID]);
 
     driver.clearLocalChanges();
@@ -125,7 +125,7 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     const slots = pageSlots();
     const store = slotStore(slots, () => 0);
     store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal());
-    const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+    const driver = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual([LOCAL_CHANGES_MODULE_ID]);
 
     store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal().replace('x: sideways', MOVED_TO_FIELDS));

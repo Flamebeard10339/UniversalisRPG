@@ -64,7 +64,7 @@ title: The Store
 examine: One counter and a shelf behind it.
 north of green
 adjacent: loft, cellar, shed, pump
-entities: stair, chest
+entities: stair, chest, keeper
 
 # location shed
 title: The Shed
@@ -184,7 +184,6 @@ faction: world
 # entity stair
 title: The Stair
 faction: world
-stations: bench
 go up:
   instant
   relocate: loft

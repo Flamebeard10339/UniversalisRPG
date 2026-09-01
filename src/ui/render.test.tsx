@@ -24,20 +24,20 @@ import { htmlRuns } from './htmlRuns';
 import { devLine, RATES, speedLine } from './devMode';
 import { FORGOTTEN, recorded } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
-import { SHIPPED_SOURCES } from './shippedContent';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
 import { HOME_LAYER, LAYERS, OPENING, toLayer, toSubpage } from './nav';
 import { Pager } from './Pager';
+import { fixtureSources } from '../content/worldFixture';
 
 const MAPPING = { sections: [], where: FORGOTTEN.map, onWhere: () => undefined, onSend: () => undefined, onNote: () => undefined, dev: false };
 
 const noTicks: Ticker = () => () => undefined;
 
-const ROAST = 'craft:cooking.roasted-chestnut';
-const TALK = 'talk:first-steps.miki';
+const ROAST = 'craft:core.rope-from-tails';
+const TALK = 'talk:fixture-town.keeper';
 
-const STOCKED = { kind: 'load', save: 'first-steps.chestnuts-in-hand' } as const;
+const STOCKED = { kind: 'load', save: 'fixture-combat.supplied' } as const;
 
 const readable = (html: string): string[] => htmlRuns(html).filter((run) => /[A-Za-z]/.test(run));
 
@@ -95,7 +95,7 @@ const packed = (driver: Driver): string[] => driver.snapshot().mods.flatMap((pac
 const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
 
 function whatStoppingSays(): string[] {
-  const session = startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry);
+  const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);
   applyDirective(session, STOCKED);
   readRoom(session);
   const opening = view(session);
@@ -163,7 +163,7 @@ function skillPanels(html: string): Array<{ id: string; runs: string[]; ring: bo
 }
 
 function stocked(): Driver {
-  const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+  const driver = createDriver(fixtureSources(), { ticker: noTicks });
   driver.send(`/load ${STOCKED.save}`);
   return read(driver);
 }
@@ -261,7 +261,7 @@ function everyPageFilled(): Driver {
 
 describe('what the shell puts on the screen', () => {
   it('renders nothing a player can read that the engine did not publish', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send(`/load ${STOCKED.save}`);
     const addresses = addressesOf(driver);
     const engine = new Set<string>(whatStoppingSays());
@@ -288,12 +288,19 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, TALK));
     step();
     const menu = driver.snapshot().view.modals[0].options[0];
-    driver.answer(menu.key, menu.values![1].value);
+    driver.answer(menu.key, menu.values![0]!.value);
     step();
+    // A thread that goes on holds the screen, so it is answered to its end before anything the room
+    // offers is reached for again. The last choice on a node is the one that leaves.
+    for (let guard = 0; guard < 8 && driver.snapshot().view.modals.length > 0; guard += 1) {
+      const asked = driver.snapshot().view.modals[0]!.options[0]!;
+      driver.answer(asked.key, asked.values![asked.values!.length - 1]!.value);
+      step();
+    }
     driver.choose(position(driver, ROAST));
     step();
     driver.cancel();
-    driver.choose(position(driver, 'use:entity.first-steps.mirror.look-in'));
+    driver.choose(position(driver, 'use:entity.fixture-town.keeper.examine'));
     step();
 
     expect(seen).toBeGreaterThan(20);
@@ -315,7 +322,7 @@ describe('what the shell puts on the screen', () => {
   // claim in this file ever reaches them. This is the smoke check that an author starting one
   // does not lose the session; what the sheet decides is proved in playtest.test.ts.
   it('draws the playtest bar while a run is recorded, and nothing when none is', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
+    const driver = createDriver(fixtureSources());
     const quiet = readable(renderToStaticMarkup(<App driver={driver} />));
     expect(onScreen(quiet, shellWord('playtest-attach'))).toBe(false);
 
@@ -329,7 +336,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws every offer the page is handed, or else the cell that is the way to it', () => {
-    const driver = createDriver(SHIPPED_SOURCES);
+    const driver = createDriver(fixtureSources());
 
     const runs = readable(renderToStaticMarkup(<App driver={driver} />));
     const offers = sheetOffers(driver.snapshot().view);
@@ -493,7 +500,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('names where the player is, what time it is there and who is standing with them', () => {
-    const view = createDriver(SHIPPED_SOURCES, { ticker: noTicks }).snapshot().view;
+    const view = createDriver(fixtureSources(), { ticker: noTicks }).snapshot().view;
 
     const html = renderToStaticMarkup(<LocationBanner view={view} flash={false} />);
 
@@ -503,7 +510,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws one meter per resource the view publishes, in the order it published them', () => {
-    const view = createDriver(SHIPPED_SOURCES, { ticker: noTicks }).snapshot().view;
+    const view = createDriver(fixtureSources(), { ticker: noTicks }).snapshot().view;
 
     const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} stirring={false} />));
 
@@ -512,7 +519,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('narrows the Local surface to what is standing where the player is', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send(devLine(true));
     const view = driver.snapshot().view;
     const sections = addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]);
@@ -528,7 +535,7 @@ describe('what the shell puts on the screen', () => {
     const leaves = createDriver([engineLocale(), SURVEYED]);
     leaves.choose(position(leaves, LOOK_OUT));
     leaves.open('surveyed.awl');
-    const stays = read(createDriver(SHIPPED_SOURCES));
+    const stays = read(createDriver(fixtureSources()));
     stays.choose(position(stays, TALK));
 
     expect(dismissal(leaves.snapshot().view.modals)).not.toBeNull();
@@ -541,7 +548,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws the command field once the setting asks for it, and nothing of it until then', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     const field = `aria-label="${shellWord('command')}"`;
 
     const closed = renderToStaticMarkup(<App driver={driver} />);
@@ -554,7 +561,7 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('offers every rate on Settings and marks the one the session is running', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     const running = RATES[RATES.length - 2];
     driver.send(devLine(true));
     driver.send(speedLine(String(running)));
@@ -593,8 +600,8 @@ describe('what the shell puts on the screen', () => {
   });
 
   it('draws the modal the engine is asking for, and stops once it is answered', () => {
-    const driver = read(createDriver(SHIPPED_SOURCES));
-    driver.choose(position(driver, 'talk:first-steps.miki'));
+    const driver = read(createDriver(fixtureSources()));
+    driver.choose(position(driver, 'talk:fixture-town.keeper'));
     const menu = driver.snapshot().view.modals[0].options[0];
 
     const asked = renderToStaticMarkup(<App driver={driver} />);
@@ -736,7 +743,7 @@ describe('what the editing page says about a section', () => {
   };
 
   it('says what the filter takes while nothing has been typed into it', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send(devLine(true));
 
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
@@ -745,12 +752,12 @@ describe('what the editing page says about a section', () => {
   });
 
   it('tells a staged section from a shipped one by its colour rather than by a slant', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send(devLine(true));
-    driver.send('/dsl entity first-steps.miki title: Miki');
+    driver.send('/dsl entity fixture-town.keeper title: The Keeper');
     const html = renderToStaticMarkup(<App driver={driver} opening={toSubpage(toLayer(OPENING, HOME_LAYER), HOME_LAYER, 'edit')} />);
-    const staged = rowClass(html, 'entity first-steps.miki');
-    const shipped = rowClass(html, 'entity first-steps.oven');
+    const staged = rowClass(html, 'entity fixture-town.keeper');
+    const shipped = rowClass(html, 'entity fixture-town.carter');
 
     expect(staged, 'the editing page drew no row for the staged section').not.toBe('');
     expect(staged).not.toBe(shipped);
@@ -789,9 +796,9 @@ describe('the ways out, laid out the way they lie', () => {
     [...html.matchAll(/<button([^>]*data-bearing="([^"]*)"[^>]*)>([\s\S]*?)<\/button>/g)].map(([, , bearing, inner]) => ({ bearing, runs: readable(inner) }));
 
   it('gives each way out its own square, and draws it nowhere else on the sheet', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send('/dev on');
-    driver.send('/goto tulsa.market-square');
+    driver.send('/goto fixture-town.green');
     const view = driver.snapshot().view;
 
     const html = renderToStaticMarkup(<App driver={driver} />);
@@ -810,9 +817,9 @@ describe('the ways out, laid out the way they lie', () => {
   });
 
   it('puts the room the player is standing in in the middle, where no heading points', () => {
-    const driver = createDriver(SHIPPED_SOURCES, { ticker: noTicks });
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
     driver.send('/dev on');
-    driver.send('/goto tulsa.market-square');
+    driver.send('/goto fixture-town.green');
 
     const html = renderToStaticMarkup(<App driver={driver} />);
 

@@ -13,9 +13,9 @@ import { LAYOUTS } from './sheetLayout';
 import { createDriver } from './driver';
 import { SPLIT_DEFAULT } from './gesture';
 import { BOUNDARIES, LAYERS, shownIn } from './nav';
-import { SHIPPED_SOURCES } from './shippedContent';
 import { TabBar } from './TabBar';
 import { wordsOf } from './words';
+import { fixtureSources } from '../content/worldFixture';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -38,7 +38,7 @@ const SOURCES = [
 
 const NOT_A_FINGER = [/onMouse(?:Enter|Over|Leave|Out)\b/, /onContextMenu\b/, /onDoubleClick\b/, /onKey(?:Down|Up|Press)\b/, /\bhover:/, /:hover\b/, /group-hover/];
 
-const markup = (): string => renderToStaticMarkup(<App driver={createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined })} />);
+const markup = (): string => renderToStaticMarkup(<App driver={createDriver(fixtureSources(), { ticker: () => () => undefined })} />);
 
 const attributes = (html: string, name: string): string[] => [...html.matchAll(new RegExp(`${name}="([^"]*)"`, 'g'))].map(([, value]) => value);
 

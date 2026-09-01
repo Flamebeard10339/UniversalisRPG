@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { startSession, view, type SettingRow } from '../runtime/session';
 import { arriving, cutTo, landed, lettersIn, OPENS, pressed, revealing, typedOn, type Reading } from './reveal';
-import { SHIPPED_SOURCES } from './shippedContent';
+import { fixtureSources } from '../content/worldFixture';
 
-const ROWS: readonly SettingRow[] = view(startSession(loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry)).settings;
+const ROWS: readonly SettingRow[] = view(startSession(loadUniverseWithDiagnostics(fixtureSources()).registry)).settings;
 
 // One preference on its own, so what a row answers is about that row and not about what its
 // neighbours happen to stand at.

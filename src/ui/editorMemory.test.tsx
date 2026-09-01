@@ -7,9 +7,9 @@ import { browserSlots } from './browserStore';
 import { createDriver } from './driver';
 import { addressable } from './authoringSurface';
 import { sectionKey } from './editControls';
-import { SHIPPED_SOURCES } from './shippedContent';
 import { EDITOR_SLOT, FORGOTTEN, recorded, remembered, type Editing } from './editorMemory';
 import { SPLIT_MAX, SPLIT_MIN } from './gesture';
+import { fixtureSources } from '../content/worldFixture';
 
 const MOVED: { [K in keyof Editing]: Editing[K] } = {
   surface: 'global',
@@ -81,7 +81,7 @@ function reopened(where: Editing | null, walk?: string): string {
   const storage = pageStorage();
   const slots = browserSlots(() => storage);
   if (where) slotStore(slots, () => 0).write(EDITOR_SLOT, recorded(where));
-  const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
+  const driver = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
   driver.send('/dev on');
   if (walk) driver.send(walk);
   return renderToStaticMarkup(<App driver={driver} />);
@@ -96,7 +96,7 @@ const showing = (html: string): string[] => paired(html, 'data-surface', 'data-s
 
 const opened = (html: string): string[] => paired(html, 'data-section', 'data-opened');
 
-const addressed = addressable(SHIPPED_SOURCES);
+const addressed = addressable(fixtureSources());
 
 const found = (kind: string): string => {
   const section = addressed.find((each) => each.kind === kind);
@@ -142,6 +142,6 @@ describe('where the author was is on the screen when the page opens (c10)', () =
     const where: Editing = { ...FORGOTTEN, open: OPENED, cursor: 42, scroll: 317 };
     slotStore(slots, () => 0).write(EDITOR_SLOT, recorded(where));
 
-    expect(remembered(createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined }).editorMemory.read())).toEqual(where);
+    expect(remembered(createDriver(fixtureSources(), { slots, ticker: () => () => undefined }).editorMemory.read())).toEqual(where);
   });
 });

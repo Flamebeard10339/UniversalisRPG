@@ -8,25 +8,27 @@ import { createDriver, type Driver } from './driver';
 import { htmlRuns } from './htmlRuns';
 import { planeGraph } from './planeGraph';
 import { panelFor, type Choice } from './planePanel';
-import { SHIPPED_SOURCES } from './shippedContent';
+import { fixtureSources } from '../content/worldFixture';
 
+// A blade with a plane in it, taken out of the chest that holds one, and the plane screen opened on
+// the copy it arrived as. `1` is where it sits in a pack that was empty before the chest was opened.
 const OPENING = [
-  'load: growing-a-heartwood-blade-start',
-  'use: entity.smiths-chest.open',
+  'goto: fixture-town.store',
+  'use: entity.fixture-town.chest.open-the-strongbox',
   'open-modal: carried-items',
-  'submit-modal: item=2',
+  'submit-modal: item=1',
   'submit-modal: verb=grow',
 ];
 
 function opened(...more: string[]): Driver {
-  const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
+  const driver = createDriver(fixtureSources(), { ticker: () => () => undefined });
   for (const line of [...OPENING, ...more]) driver.send(line);
   return driver;
 }
 
 function grown(): Driver {
-  const driver = createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
-  for (const line of ['load: growing-a-heartwood-blade-end', 'open-modal: carried-items', 'submit-modal: item=1', 'submit-modal: verb=grow']) driver.send(line);
+  const driver = createDriver(fixtureSources(), { ticker: () => () => undefined });
+  for (const line of [...OPENING, ...TO_THE_SOCKET]) driver.send(line);
   return driver;
 }
 
@@ -41,6 +43,10 @@ const readable = htmlRuns;
 
 const A_HEXAGON = /-?\d+\s*,\s*-?\d+/;
 
+// The walk round the ring that opens the socket at its one connection: a slot is offered once the
+// points between the origin and it have been spent, so reaching one is three presses and not one.
+const TO_THE_SOCKET = ['submit-modal: plane=allocate: position 2', 'submit-modal: plane=allocate: position 3', 'submit-modal: plane=allocate: position 4', 'submit-modal: plane=allocate: slot e'];
+
 describe('the plane a player drags', () => {
   it('opens on a plane, so nothing below is a rule about an empty screen', () => {
     const view = opened().snapshot().view;
@@ -51,7 +57,7 @@ describe('the plane a player drags', () => {
   });
 
   it('draws no hexagon and no direction, whichever way the plane has been grown', () => {
-    for (const driver of [opened(), opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel')]) {
+    for (const driver of [opened(), opened(...TO_THE_SOCKET, 'submit-modal: plane=slot: e with core.keen-edge-jewel')]) {
       const runs = readable(renderToStaticMarkup(<App driver={driver} />));
 
       for (const run of runs) {
@@ -119,7 +125,7 @@ describe('what the panel says about the node that was pressed', () => {
 
 describe('a socket with nothing through it', () => {
   it('offers the jewels the engine published for it, each named by the copy it brings', () => {
-    const driver = opened('submit-modal: plane=allocate: slot e');
+    const driver = opened(...TO_THE_SOCKET);
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const socket = graph.nodes.find((node) => node.socket && node.standing === 'allocated' && node.holds === null)!;
@@ -131,7 +137,7 @@ describe('a socket with nothing through it', () => {
   });
 
   it('offers no jewels once one has gone through it, and says what it holds instead', () => {
-    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel');
+    const driver = opened(...TO_THE_SOCKET, 'submit-modal: plane=slot: e with core.keen-edge-jewel');
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const filled = graph.nodes.find((node) => node.socket && node.holds !== null)!;
@@ -151,7 +157,7 @@ describe('a socket with nothing through it', () => {
 
 describe('a node of a cluster the screen is not standing on', () => {
   it('is walked to by a published move, so one press reaches any node the graph draws', () => {
-    const driver = opened('submit-modal: plane=allocate: slot e', 'submit-modal: plane=slot: e with core.crossroads-jewel');
+    const driver = opened(...TO_THE_SOCKET, 'submit-modal: plane=slot: e with core.keen-edge-jewel');
     const view = driver.snapshot().view;
     const graph = planeGraph(planeOf(view));
     const elsewhere = graph.nodes.filter((node) => node.hex !== planeRead(view).hex);
