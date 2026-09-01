@@ -54,7 +54,9 @@ export function callsIn(transcript: string): Call[] {
   return calls;
 }
 
-const writes = (call: Call): boolean => call.tool === 'Write' || call.tool === 'Edit' || call.tool === 'NotebookEdit';
+const WRITING_TOOL = /^(Write|Edit|NotebookEdit)$/;
+
+const writes = (call: Call): boolean => WRITING_TOOL.test(call.tool);
 
 export const firstRealEdit = (calls: readonly Call[]): number => {
   const found = calls.find((call) => writes(call) && !SCRATCH.test(call.target));
@@ -118,7 +120,7 @@ export function report(reading: Reading, name: string): string[] {
     ['engine source read', reading.engineReads.length, reading.engineReads.map((call) => call.n).join(' ')],
     ['scratch files written', reading.scratchWrites.length, reading.scratchWrites.map((call) => call.n).join(' ')],
     ['scratch runs', reading.scratchRuns.length, reading.scratchRuns.map((call) => call.n).join(' ')],
-    ['tools re-run while orienting', reading.rerunsOf.size, [...reading.rerunsOf].map(([command, at]) => `${command} x${at.length}`).join(', ')],
+    ['tools re-run while orienting', reading.rerunsOf.size, [...reading.rerunsOf].map(([command, at]) => `${at.length}× ${command}`).join(', ')],
     ['--help after first use', reading.helpAfterUse.length, reading.helpAfterUse.map((call) => call.n).join(' ')],
   ];
   for (const [label, count, at] of counts) lines.push(`  ${String(count).padStart(3)}  ${label.padEnd(30)}${shorten(at, 40)}`);
