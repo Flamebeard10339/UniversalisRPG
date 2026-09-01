@@ -6,12 +6,12 @@ import { everyActionTable } from '../content/registry';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
-import { moduleSource, standingSources } from '../content/shipped';
 import { NOTE_MARK } from '../grammar/note';
 import { everyKey, englishOf } from '../content/translation';
 import { hasNote, withoutNote } from '../grammar/note';
 import { itemExamine, localizerFor, type Localized } from './localized';
 import { initialState, pruneStateForRegistry } from './save';
+import { fixtureModule, fixtureSources } from '../content/worldFixture';
 
 const ISLAND = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope', '', '# item apple'].join('\n');
 
@@ -164,11 +164,11 @@ describe('an action is displayed under the address it is identified by', () => {
 // not both declared in one module, so a world small enough to hold only one of them cannot say
 // anything about the other.
 describe('one line translates an action for every owner that performs it (c7)', () => {
-  const world = standingSources();
-  const english = loadUniverse([engineLocale(), ...world]);
+  const world = fixtureSources();
+  const english = loadUniverse([...world]);
   const declarations = [...english.actions.keys()];
   const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', ...world.map((each) => `  ${each.name}`), '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
-  const registry = loadUniverse([engineLocale(), ...world, { name: 'isla-es', text: locale.join('\n') }]);
+  const registry = loadUniverse([...world, { name: 'isla-es', text: locale.join('\n') }]);
   const say = localizerFor(registry, 'es');
   // Only the ones a `# action` declares: an action minted onto an owner — the examine every thing
   // carries — is keyed under that owner rather than under a declaration, so it is not what a line
@@ -210,7 +210,7 @@ describe('a note an author left is dropped from every line the game says', () =>
 
   // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit. What a key is measured against is the English with any note the author already left taken off it — a corpus that ships its own rough lines is the point of the mark, and comparing against the raw declaration would fail the moment one appeared.
   it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
-    const shipped = withEngineLocale([moduleSource('core')]);
+    const shipped = withEngineLocale([fixtureModule('core')]);
     const plain = loadUniverse(shipped);
     const keys = everyKey(plain.locales);
     const notes = { name: 'noted', text: ['# info noted', 'version: 1.0.0', '', '# locale en', ...keys.map((key) => `${key}: ${marked(englishOf(plain.locales, key))}`)].join('\n') };

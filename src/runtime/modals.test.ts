@@ -11,13 +11,13 @@ import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack
 import { MODAL_SCREENS } from '../grammar/actionResult';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { localizerFor } from './localized';
-import { shippedSources } from '../content/shipped';
 import { SAVE_VERSION } from './save';
 import { receiveItem } from './itemInstance';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { askedOption } from './command';
 import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
+import { fixtureSources } from '../content/worldFixture';
 
 const STACKING_MODULE =
   FIXTURE_WORLD +
@@ -195,7 +195,7 @@ node greeting:
 const NAMES_A_MODAL = /open[ -]modal:[ \t]*([a-z][a-z0-9-]*)/g;
 
 function modalsNamed(): { name: string; where: string }[] {
-  return shippedSources().flatMap((source) => [...source.text.matchAll(NAMES_A_MODAL)].map((found) => ({ name: found[1]!, where: source.name })));
+  return fixtureSources().flatMap((source) => [...source.text.matchAll(NAMES_A_MODAL)].map((found) => ({ name: found[1]!, where: source.name })));
 }
 
 function stackingSession(): PlaySession {
@@ -324,7 +324,7 @@ describe('opening and answering', () => {
 
     expect(named.length).toBeGreaterThan(0);
     for (const { name, where } of named) expect(() => openModalNamed(createGameState(), name), `${where}: ${name}`).not.toThrow();
-    expect(() => loadUniverse(shippedSources())).not.toThrow();
+    expect(() => loadUniverse(fixtureSources())).not.toThrow();
   });
 
   it('refuses an option it does not have, a value it does not take, and an answer with nothing open', () => {

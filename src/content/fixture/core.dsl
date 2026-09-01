@@ -133,6 +133,14 @@ stat: digging-rate
 # skill scavenging
 stat: scavenging-rate
 
+// --- what a life is lived as ---
+
+# race human
++5% max-health
+
+# race badger
++5% defense
+
 // --- passives ---
 
 # passive hale
@@ -140,6 +148,12 @@ stat: scavenging-rate
 
 # passive keen
 +4 attack
+
+# passive warded
++2 defense
+
+# passive fortune
++2% max-health
 
 // --- items ---
 
@@ -169,13 +183,48 @@ value: 8
 
 # item rat-tail
 title: Rat Tail
-examine: Somebody in town pays for these.
+examine: Somebody in town pays for these. @@@ who, and how much
 value: 1
 
 # item rope
 title: Rope
 examine: Twelve feet of it, coiled and stiff.
 value: 5
+
+// --- a plane to spend points on ---
+
+# cluster-jewel keen-edge
+examine: A closed ring of iron, warm to the touch.
+shape: ring
+open-connections: e
+passives: 1 keen, 2 hale, 3 warded, 4 keen, 5 hale, 6 fortune
+
+# cluster-jewel stout-heart
+examine: A knot of iron that will not be moved.
+shape: wheel
+open-connections: e, se
+passives: 1 warded, 2 hale, 3 fortune, 5 hale, 6 warded, 7 keen
+
+# item keen-edge-jewel
+title: Keen Edge Jewel
+examine: Six facets, each one sharpened against the last.
+cluster-jewel: keen-edge
+
+# item stout-heart-jewel
+title: Stout Heart Jewel
+examine: It does not add. It insists.
+cluster-jewel: stout-heart
+
+// --- somewhere to make something ---
+
+# station bench
+
+# recipe rope-from-tails
+station: bench
+in: 3 rat-tail
+out: 1 rope
+skill: scavenging 10
+time: 2
 
 // --- what drops off a rat ---
 

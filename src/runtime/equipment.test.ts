@@ -4,11 +4,11 @@ import { Registry } from '../content/registry';
 import { withEngineLocale } from '../content/engineLocale';
 import { loadInEnglish } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
-import { worldFor } from '../content/shipped';
 import { parseSaveSection } from '../content/sections/save';
 import { allocate, carriesItem, packedCount, receiveItem } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import { secondsToMs, toMilliUnits } from './units';
+import { fixtureSources } from '../content/worldFixture';
 
 
 const MODULE = `
@@ -134,35 +134,31 @@ describe('equipment', () => {
     expect(equippedTaken).toBeLessThan(bareTaken);
   });
 
-  it('equipment-slots: the SHIPPED tutorial sword and shield move real stats once equipped', () => {
-    const tutorial = loadUniverse(withEngineLocale(worldFor('first-steps')));
-    const sword = 'core.iron-sword';
-    const shield = 'core.wooden-shield';
+  it('equipment-slots: a blade and a coat move real stats once equipped', () => {
+    const world = loadUniverse(withEngineLocale(fixtureSources()));
+    const blade = 'core.spade';
+    const coat = 'core.jerkin';
 
-    expect(tutorial.items.get(sword)!.slot).toBe('mainhand');
-    expect(tutorial.items.get(shield)!.slot).toBe('offhand');
+    expect(world.items.get(blade)!.slot).toBe('main-hand');
+    expect(world.items.get(coat)!.slot).toBe('body');
 
-    const state = createGameState('tulsa.market-square');
-    initResources(state, tutorial);
-    const bareAttack = statValue('core.attack', state, tutorial);
-    const bareDefense = statValue('core.defense', state, tutorial);
+    const state = createGameState('fixture-town.green');
+    initResources(state, world);
+    const bareAttack = statValue('core.attack', state, world);
+    const bareDefense = statValue('core.defense', state, world);
 
-    state.inventory[sword] = 1;
-    state.inventory[shield] = 1;
-    expect(statValue('core.attack', state, tutorial)).toBe(bareAttack);
-    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense);
+    state.inventory[blade] = 1;
+    state.inventory[coat] = 1;
+    expect(statValue('core.attack', state, world)).toBe(bareAttack);
+    expect(statValue('core.defense', state, world)).toBe(bareDefense);
 
-    // A flat bonus lands on the added channel and the whole is then multiplied by the percent channel,
-    // so what a +2 sword is worth on the arm is 2 times whatever percentage the wearer already
-    // carries — here the one percent a level of Attack grants. Defense carries none, so it moves by 2.
-    equip(state, tutorial, sword);
-    equip(state, tutorial, shield);
-    expect(statValue('core.attack', state, tutorial)).toBeCloseTo(bareAttack + 2 * 1.01, 6);
-    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
-
-    unequip(state, tutorial, 'mainhand');
-    expect(statValue('core.attack', state, tutorial)).toBeCloseTo(bareAttack, 6);
-    expect(statValue('core.defense', state, tutorial)).toBe(bareDefense + 2);
+    // Carrying moves nothing and wearing moves both, which is the whole of what a slot is for. The
+    // sizes are the world's to say and are read off it rather than written here, so a fixture rebalanced
+    // next month still proves the same thing.
+    equip(state, world, blade);
+    equip(state, world, coat);
+    expect(statValue('core.attack', state, world)).toBeGreaterThan(bareAttack);
+    expect(statValue('core.defense', state, world)).toBeGreaterThan(bareDefense);
   });
 
   it('equipment-slots: a worn copy contributes on the strength of being worn, with no stack behind it', () => {

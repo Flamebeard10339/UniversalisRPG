@@ -10,7 +10,6 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import type { ModuleSource } from '../content/universe';
-import { shippedSources, worldFor } from '../content/shipped';
 import { isMintedAction } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
@@ -20,9 +19,10 @@ import { skillLevel, xpForLevel } from './skills';
 
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 import { actionLinesWritten } from '../grammar/action';
+import { fixtureSources } from '../content/worldFixture';
 
 // The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
-const tutorial = (): Registry => loadUniverse(withEngineLocale(worldFor('first-steps')));
+const tutorial = (): Registry => loadUniverse(withEngineLocale(fixtureSources()));
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
   registry.saves.set('primed', { version: SAVE_VERSION, diff });
@@ -358,34 +358,34 @@ adjacent:
 describe('travel edges aliased by a free entity relocate are hidden', () => {
   it('hides a travel edge that a stairs-like entity already offers as a free relocate', () => {
     const registry = tutorial();
-    const session = startSession(registry);
+    const session = primed(registry, { location: 'fixture-town.store' });
 
     const choiceIds = ids(view(session));
-    expect(choiceIds).toContain('use:entity.first-steps.stairs.ascend');
-    expect(choiceIds).toContain('use:entity.first-steps.stairs.descend');
-    expect(choiceIds).not.toContain('travel:first-steps.basement');
-    expect(choiceIds).not.toContain('travel:first-steps.guide-house-upstairs');
+    expect(choiceIds).toContain('use:entity.fixture-town.stair.go-up');
+    expect(choiceIds).toContain('use:entity.fixture-town.stair.go-down');
+    expect(choiceIds).not.toContain('travel:fixture-town.loft');
+    expect(choiceIds).not.toContain('travel:fixture-town.cellar');
   });
 
-  // The road out of the guide house is `market-square while front-door.unlocked`, so the door
-  // already governed it and was still only a thing to look at. Now the door is what the player
-  // walks through, and the room stops drawing a way out beside it that nothing in the room offers.
-  it('hands the road out of the house to the front door once the door will open', () => {
+  // The road out of the green is `gate while side-door.unlocked`, so the door already governed it
+  // and was still only a thing to look at. Now the door is what the player walks through, and the
+  // room stops drawing a way out beside it that nothing in the room offers.
+  it('hands the road out of the green to the side door once the door will open', () => {
     const registry = tutorial();
     const locked = ids(view(startSession(registry)));
 
-    expect(locked).not.toContain('travel:tulsa.market-square');
-    expect(locked).not.toContain('use:entity.first-steps.front-door.step-outside');
+    expect(locked).not.toContain('travel:fixture-town.gate');
+    expect(locked).not.toContain('use:entity.fixture-town.side-door.step-through');
 
     // A masked thing offers nothing but the look that reads it, so the road stands until the
     // player has met the door — which is the fallback that keeps a room from stranding anyone.
-    const session = primed(registry, { flags: { 'first-steps.front-door.unlocked': true } });
-    expect(ids(view(session))).toContain('travel:tulsa.market-square');
+    const session = primed(registry, { flags: { 'fixture-town.side-door.unlocked': true } });
+    expect(ids(view(session))).toContain('travel:fixture-town.gate');
     readRoom(session);
     const opened = ids(view(session));
 
-    expect(opened).toContain('use:entity.first-steps.front-door.step-outside');
-    expect(opened).not.toContain('travel:tulsa.market-square');
+    expect(opened).toContain('use:entity.fixture-town.side-door.step-through');
+    expect(opened).not.toContain('travel:fixture-town.gate');
   });
 
   it('keeps an unaliased edge, and one whose relocate is not free (has a cost)', () => {
@@ -423,18 +423,18 @@ enter:
 
 describe('cancelAction', () => {
   it('drops the action in flight, keeping units already completed and un-consumed inputs', () => {
-    const session = primed(tutorial(), { inventory: { 'core.dough': 2 } });
+    const session = primed(tutorial(), { inventory: { 'core.rat-tail': 6 } });
     readRoom(session);
 
-    beginAction(session, 'craft:cooking.bread');
-    const baked = wait(session, 4);
-    expect(baked.inventory['core.bread']).toBe(1);
-    expect(baked.action).not.toBeNull();
+    beginAction(session, 'craft:core.rope-from-tails');
+    const made = wait(session, 2);
+    expect(made.inventory['core.rope']).toBe(1);
+    expect(made.action).not.toBeNull();
 
     const v = cancelAction(session);
     expect(v.action).toBeNull();
-    expect(v.inventory['core.bread']).toBe(1);
-    expect(v.inventory['core.dough']).toBe(1);
+    expect(v.inventory['core.rope']).toBe(1);
+    expect(v.inventory['core.rat-tail']).toBe(3);
     expect(v.choices.length).toBeGreaterThan(0);
   });
 
@@ -1735,7 +1735,7 @@ describe('an entity puts the offer it mints second', () => {
     minted: string | undefined;
   }
 
-  const world = (): Registry => loadUniverse(withEngineLocale(shippedSources()));
+  const world = (): Registry => loadUniverse(withEngineLocale(fixtureSources()));
 
   // Every entity the shipped world stands anywhere, with the offers it makes where it stands and
   // the id of the one it minted. The subjects come off the corpus and off `isMintedAction`, so an
@@ -2141,7 +2141,7 @@ describe('a fight named on a foe no room stands', () => {
 // next month is held to this with no edit — and the pair of claims is what makes the cut a rule
 // instead of a repair: being placed somewhere is what makes *not here* a thing that can be said.
 describe('every entity the shipped world places, named by a directive from a room that does not stand it', () => {
-  const registry = loadUniverse(shippedSources());
+  const registry = loadUniverse(fixtureSources());
   const placed = entitiesStood(registry.locations);
   const rooms = [...registry.locations.values()];
   const away = (entityId: string): string => rooms.find((room) => !room.entities.some((entry) => entry.entity === entityId))!.id;

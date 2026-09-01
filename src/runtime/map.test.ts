@@ -4,7 +4,7 @@ import { DIRECTION_VECTORS } from '../content/sections/location';
 import { bearingOf, CLIMB_NUDGE, COMPASS, compassOf, drawnAt, placedAt, REGION_PAD, regionHolding, sheetOf, type Bearing, type Place, type Sheet, type Standing, type Way } from './map';
 import type { PlayChoice } from './session';
 import { loadUniverse } from '../content/load';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 
 const place = (id: string, x: number, y: number, z: number, ...adjacent: string[]): Place => ({
   id,
@@ -180,16 +180,17 @@ describe('which way one place lies from another', () => {
     expect(bearingOf(from, { x: 10, y: -8, z: 0 })).toBe('north-east');
   });
 
-  // The world's own words and the map's own bearings have to agree, and they did not: the corpus
-  // writes its north gate above its square, and the language said north was below.
-  it('agrees with what the shipped world calls its gates', () => {
-    const places = loadUniverse([...shippedSources()]).locations;
-    const square = places.get('tulsa.market-square')!;
+  // A world's own words and the map's own bearings have to agree, and they did not: a place written
+  // `north of` another was drawn below it. The subjects are the four the fixture writes one of each
+  // way round its green, so the four headings are each read off a line an author wrote.
+  it('agrees with what a world calls the ways out of a place', () => {
+    const places = loadUniverse([...fixtureSources()]).locations;
+    const green = places.get('fixture-town.green')!;
 
-    expect(bearingOf(square, places.get('tulsa.kings-road')!)).toContain('north');
-    expect(bearingOf(square, places.get('tulsa.riverside')!)).toContain('south');
-    expect(bearingOf(square, places.get('tulsa.swamp-edge')!)).toBe('west');
-    expect(bearingOf(square, places.get('tulsa.market-row')!)).toBe('east');
+    expect(bearingOf(green, places.get('fixture-town.store')!)).toContain('north');
+    expect(bearingOf(green, places.get('fixture-town.lane')!)).toContain('south');
+    expect(bearingOf(green, places.get('fixture-town.gate')!)).toBe('west');
+    expect(bearingOf(green, places.get('fixture-town.well')!)).toBe('east');
   });
 
   it('is a floor rather than a heading for a place straight above or below', () => {

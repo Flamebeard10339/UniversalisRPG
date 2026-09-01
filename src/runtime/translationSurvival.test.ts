@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { withEngineLocale } from '../content/engineLocale';
 import { loadUniverse } from '../content/load';
 import { isDebug } from '../content/sections';
-import { standingSources } from '../content/shipped';
 import { englishOf, everyKey, hasWords, translationOf, TRANSLATED_LANGUAGE } from '../content/translation';
 import { choose, openerShown, openersNow, talk } from './dialogue-runtime';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { createGameState } from './runtime';
 import { runTest, type TestResult } from './session';
+import { fixtureSources } from '../content/worldFixture';
 
-const sources = withEngineLocale(standingSources());
+const sources = withEngineLocale(fixtureSources());
 const shipped = loadUniverse(sources);
 const registry = loadUniverse([...sources, translationOf(shipped)]);
 

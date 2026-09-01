@@ -5,7 +5,7 @@ import type { ModuleSource } from '../content/universe';
 import { newContext, runLine, type AuthoringContext, type CommandContext } from './command';
 import { carriedWith, gathering, joining, pinning, placing, shifting, type Editing } from './mapEdit';
 import { startSession, view } from './session';
-import { shippedSources } from '../content/shipped';
+import { fixtureSources } from '../content/worldFixture';
 
 const KEEP: ModuleSource = {
   name: 'keep',
@@ -218,7 +218,7 @@ describe('editing a region', () => {
 // makes with a finger, and it lands in local changes as a patch and nowhere else.
 describe('the map edited from the command line', () => {
   const opened = (): { ctx: () => CommandContext; local: () => string } => {
-    const baseSources = [...shippedSources()];
+    const baseSources = [...fixtureSources()];
     const loaded = loadUniverseWithDiagnostics(baseSources);
     const session = startSession(loaded.registry);
     const authoring: AuthoringContext = {
@@ -234,8 +234,8 @@ describe('the map edited from the command line', () => {
   it('takes a place named the short way, the way somebody types one', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/place market-square 20 20'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.market-square\nx: 20, y: 20');
+    expect(errors(runLine(game.ctx(), '/place well 20 20'))).toEqual([]);
+    expect(game.local()).toContain('# location fixture-town.well\nx: 20, y: 20');
   });
 
   // The other half of a room drawn on the map: it is staged in local changes, and the module its id
@@ -243,42 +243,42 @@ describe('the map edited from the command line', () => {
   it('makes a room the world holds under the module its id names, not under the changes it was staged in', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/place tulsa.north-shore 20 20'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.north-shore\nx: 20, y: 20');
-    expect(loadUniverseWithDiagnostics([...shippedSources(), { name: LOCAL_CHANGES_MODULE_ID, text: game.local() }]).registry.locations.get('tulsa.north-shore')).toBeDefined();
+    expect(errors(runLine(game.ctx(), '/place fixture-town.orchard 20 20'))).toEqual([]);
+    expect(game.local()).toContain('# location fixture-town.orchard\nx: 20, y: 20');
+    expect(loadUniverseWithDiagnostics([...fixtureSources(), { name: LOCAL_CHANGES_MODULE_ID, text: game.local() }]).registry.locations.get('fixture-town.orchard')).toBeDefined();
   });
 
-  it('moves one room of the castle and no other, because a room is a place', () => {
+  it('moves one room of the yard and no other, because a room is a place', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/place castle-hall 20 20'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.castle-hall\nx: 20, y: 20');
-    for (const room of ['castle-gate', 'castle-yard', 'castle-kitchen']) expect(game.local(), room).not.toContain(`# location tulsa.${room}`);
+    expect(errors(runLine(game.ctx(), '/place store 20 20'))).toEqual([]);
+    expect(game.local()).toContain('# location fixture-town.store\nx: 20, y: 20');
+    for (const room of ['well', 'green', 'lane']) expect(game.local(), room).not.toContain(`# location fixture-town.${room}`);
   });
 
-  it('moves the castle and every room of it, and writes nothing for the rooms above and below', () => {
+  it('moves the region and every room of it, and writes nothing for the rooms above and below', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/region castle by 0 -3'))).toEqual([]);
+    expect(errors(runLine(game.ctx(), '/region the-yard by 0 -3'))).toEqual([]);
     const staged = game.local();
-    for (const room of ['castle-gate', 'castle-yard', 'castle-hall', 'castle-kitchen', 'guard-barracks']) expect(staged, room).toContain(`# location tulsa.${room}`);
-    for (const hung of ['castle-quarters', 'castle-solar', 'castle-cellar']) expect(staged, hung).not.toContain(`# location tulsa.${hung}`);
+    for (const room of ['shed', 'pump']) expect(staged, room).toContain(`# location fixture-town.${room}`);
+    for (const hung of ['loft', 'cellar']) expect(staged, hung).not.toContain(`# location fixture-town.${hung}`);
   });
 
   it('gathers a room into a region named the short way, and lets one go again', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/region castle +market-square'))).toEqual([]);
-    expect(game.local()).toContain('# region tulsa.castle\n+holds: market-square');
-    expect(errors(runLine(game.ctx(), '/region castle -castle-kitchen'))).toEqual([]);
-    expect(game.local()).toContain('-holds: castle-kitchen');
+    expect(errors(runLine(game.ctx(), '/region the-yard +green'))).toEqual([]);
+    expect(game.local()).toContain('# region fixture-town.the-yard\n+holds: green');
+    expect(errors(runLine(game.ctx(), '/region the-yard -shed'))).toEqual([]);
+    expect(game.local()).toContain('-holds: shed');
   });
 
   it('leaves the world where it was when it refuses', () => {
     const game = opened();
 
     expect(errors(runLine(game.ctx(), '/place nowhere-at-all 1 1'))[0]).toContain('nowhere-at-all');
-    expect(errors(runLine(game.ctx(), '/place castle-solar below nowhere-at-all'))[0]).toContain('nowhere-at-all');
+    expect(errors(runLine(game.ctx(), '/place loft below nowhere-at-all'))[0]).toContain('nowhere-at-all');
     expect(game.local()).not.toContain('# location');
   });
 
@@ -287,22 +287,22 @@ describe('the map edited from the command line', () => {
   it('pins a place under another and looses it again', () => {
     const game = opened();
 
-    expect(errors(runLine(game.ctx(), '/place castle-solar 1 1'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.castle-solar\nx: 1, y: 1, z: 2');
-    expect(errors(runLine(game.ctx(), '/place castle-solar above castle-quarters'))).toEqual([]);
-    expect(game.local()).toContain('# location tulsa.castle-solar\nabove castle-quarters');
+    expect(errors(runLine(game.ctx(), '/place loft 1 1'))).toEqual([]);
+    expect(game.local()).toContain('# location fixture-town.loft\nx: 1, y: 1, z: 1');
+    expect(errors(runLine(game.ctx(), '/place loft above store'))).toEqual([]);
+    expect(game.local()).toContain('# location fixture-town.loft\nabove store');
     expect(game.local()).not.toContain('x: 1, y: 1');
   });
 
   it('draws a road and rubs it out again, leaving the world as it started', () => {
     const game = opened();
-    const roads = (): string[] => [...startSession(loadUniverseWithDiagnostics([...shippedSources(), { name: LOCAL_CHANGES_MODULE_ID, text: game.local() }]).registry).registry.roads.get('tulsa.market-square')!].map((edge) => edge.target).sort();
+    const roads = (): string[] => [...startSession(loadUniverseWithDiagnostics([...fixtureSources(), { name: LOCAL_CHANGES_MODULE_ID, text: game.local() }]).registry).registry.roads.get('fixture-town.green')!].map((edge) => edge.target).sort();
     const before = roads();
 
-    expect(errors(runLine(game.ctx(), '/link market-square aggies-house'))).toEqual([]);
-    expect(roads()).toContain('tulsa.aggies-house');
+    expect(errors(runLine(game.ctx(), '/link green loft'))).toEqual([]);
+    expect(roads()).toContain('fixture-town.loft');
 
-    expect(errors(runLine(game.ctx(), '/unlink market-square aggies-house'))).toEqual([]);
+    expect(errors(runLine(game.ctx(), '/unlink green loft'))).toEqual([]);
     expect(roads()).toEqual(before);
   });
 });

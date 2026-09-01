@@ -88,12 +88,12 @@ assert: inventory.rat-tail >= 1
 assert: has bread
 
 # save dug-in
-{"version":13,"inventory":{"core.rat-tail":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true},"xp":{"core.digging":4},"resourceRateRemainders":{"core.health":20000},"time":2000}
+{"version":13,"inventory":{"core.rat-tail":1,"core.spade":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"time":2000}
 
 // Written over the one above rather than restating it: what is carried takes the ids every layer
 // writes, so this sheet holds the loaf and the tail both.
 # save kitted
-{"version":13,"inventory":{"core.rat-tail":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"equipped":{"main-hand":"core.spade"},"time":2000}
+{"version":13,"inventory":{"core.rat-tail":1},"flags":{"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true},"xp":{"core.digging":4},"resources":{"core.health":30033},"resourceRateRemainders":{"core.health":20000},"equipped":{"main-hand":"core.spade"},"time":2000}
 
 # save dug-in-and-fed
 over: dug-in

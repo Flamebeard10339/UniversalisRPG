@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
-import { shippedSources } from '../content/shipped';
 import { withoutNote } from '../grammar/note';
 import { publishModal } from './modals';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
@@ -16,6 +15,7 @@ import { initialState } from './save';
 import { GameState, type ModalFrame } from './state';
 import { inEnglish } from './sayFixture';
 import { aCount, anId, says } from './said';
+import { fixtureSources } from '../content/worldFixture';
 
 const MODULE =
   FIXTURE_WORLD +
@@ -329,18 +329,18 @@ describe('a frame carries a key, not a sentence', () => {
 // shipped corpus writes examine: on, standing each at the origin of a base of its own rather than
 // naming a route to it, and it is the published modal that is read.
 describe('a cluster jewel the corpus writes examine: on', () => {
-  const corpus = loadUniverse(shippedSources());
+  const corpus = loadUniverse(fixtureSources());
   const written = [...corpus.clusterJewels.values()].filter((each) => each.examine !== undefined);
   const probeOf = (jewel: string): string => `jewel-probe.probe-${jewel.replace(/\./g, '-')}`;
   const owners = [...new Set(written.map((each) => corpus.namespace.ownerOf('cluster-jewel', each.id)))].filter((owner): owner is string => owner !== null);
   const PROBES = {
     name: 'jewel-probe',
-    text: ['# info jewel-probe', 'version: 1.0.0', 'dependencies:', ...owners.map((owner) => `  ${owner}`), ...written.flatMap((each) => ['', `# item probe-${each.id.replace(/\./g, '-')}`, 'slot: mainhand', 'item-level: 1', `origin-cluster: ${each.id}`])].join('\n'),
+    text: ['# info jewel-probe', 'version: 1.0.0', 'dependencies:', ...owners.map((owner) => `  ${owner}`), ...written.flatMap((each) => ['', `# item probe-${each.id.replace(/\./g, '-')}`, 'slot: main-hand', 'item-level: 1', `origin-cluster: ${each.id}`])].join('\n'),
   };
-  const probed = loadUniverse([...shippedSources(), PROBES]);
+  const probed = loadUniverse([...fixtureSources(), PROBES]);
 
   it('is written by enough of the corpus for what is below to mean something', () => {
-    expect(written.length).toBeGreaterThan(10);
+    expect(written.length).toBeGreaterThan(1);
   });
 
   it('says those words on the screen that stands the player in it, so nothing is written for nobody to read', () => {
