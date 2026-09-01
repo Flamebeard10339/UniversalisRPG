@@ -10,6 +10,7 @@ import { browserSlots, SLOT_PREFIX, STORAGE_REFUSALS } from './browserStore';
 import { listLocalSections, LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { clearingReaches, OPENING_CELLS, type OpeningCell } from '../runtime/openUniverseFixture';
 import { createDriver, REMEDIES, type Driver } from './driver';
+import { mapFixtureFor } from '../runtime/mapFixture';
 import { noStorage, pageStorage, REFUSING as BROWSER_REFUSALS } from './agent/pageStorage';
 import { EDITOR_SLOT, FORGOTTEN, recorded } from './editorMemory';
 import { SHIPPED_SOURCES } from './shippedContent';
@@ -341,26 +342,23 @@ const sourceLines = (driver: Driver): string[] =>
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.filter((entry) => entry.words === 'tool').map((entry) => String(entry.text));
 
-// Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
-const STARTING_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
-
-const EDIT = `/dsl location ${STARTING_LOCATION} x: 7, y: 7`;
+const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(SHIPPED_SOURCES);
 
 describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
   it('stages a section, adopts it, and the session is playing the edit', () => {
     const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
 
-    driver.send(EDIT);
+    driver.send(MOVE_LINE);
 
-    expect(said(driver)).toContain(`Staged # location ${STARTING_LOCATION} in local-changes.`);
-    expect(shown(driver).discovered.find((place) => place.id === STARTING_LOCATION)).toMatchObject({ x: 7, y: 7 });
+    expect(said(driver)).toContain(`Staged # location ${MOVED_PLACE} in local-changes.`);
+    expect(shown(driver).discovered.find((place) => place.id === MOVED_PLACE)).toMatchObject(MOVED_TO);
   });
 
   it('refuses a whole edit that does not load, and goes on playing what it had', () => {
     const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots() });
     const before = shown(driver);
 
-    driver.send(`/dsl location ${STARTING_LOCATION} adjacent: nowhere-at-all`);
+    driver.send(`/dsl location ${MOVED_PLACE} adjacent: nowhere-at-all`);
 
     expect(said(driver)).toContain(NOT_LOADED);
     expect(shown(driver)).toEqual(before);
@@ -370,25 +368,25 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
   it('opens a second driver over the same store with the edit already applied', () => {
     const slots = pageSlots();
     const first = createDriver(SHIPPED_SOURCES, { slots });
-    first.send(EDIT);
+    first.send(MOVE_LINE);
     first.send('/local list');
 
     const reopened = createDriver(SHIPPED_SOURCES, { slots });
     reopened.send('/local list');
 
-    expect(shown(reopened).discovered.find((place) => place.id === STARTING_LOCATION)).toMatchObject({ x: 7, y: 7 });
-    expect(sourceLines(reopened)).toEqual([`# location ${STARTING_LOCATION} — also in ${STARTING_LOCATION.split('.')[0]}`, ...sourceLines(first)]);
+    expect(shown(reopened).discovered.find((place) => place.id === MOVED_PLACE)).toMatchObject(MOVED_TO);
+    expect(sourceLines(reopened)).toEqual([`# location ${MOVED_PLACE} — also in ${MOVED_PLACE.split('.')[0]}`, ...sourceLines(first)]);
     expect(reopened.localChanges()).toBe(first.localChanges());
   });
 
   it('hands over the same bytes /local show prints and the slot holds', () => {
     const slots = pageSlots();
     const driver = createDriver(SHIPPED_SOURCES, { slots });
-    driver.send(EDIT);
+    driver.send(MOVE_LINE);
     driver.send('/local show');
 
     const handed = driver.localChanges()!;
-    expect(handed).toContain(`# location ${STARTING_LOCATION}`);
+    expect(handed).toContain(`# location ${MOVED_PLACE}`);
     expect(sourceLines(driver).join('\n')).toBe(handed.trimEnd());
     expect(slotStore(slots, () => 0).read('local-changes')?.payload).toBe(handed);
   });
@@ -416,7 +414,7 @@ describe('a store that refuses leaves the session playing (c13)', () => {
       asks: (store) => void store.read('local-changes'),
     },
     staging: {
-      drive: (driver) => driver.send(EDIT),
+      drive: (driver) => driver.send(MOVE_LINE),
       asks: (store) => {
         store.read('local-changes');
         store.write('local-changes', HEADER);
@@ -472,7 +470,7 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
       const quiet = through(pageSlots());
 
       expect(refused.driver.snapshot().problems).toEqual([]);
-      expect(shown(refused.driver).location.id).toBe(STARTING_LOCATION);
+      expect(shown(refused.driver).location.id).toBe(MOVED_PLACE);
 
       const refusing = Object.keys(MOMENTS).filter((moment) => refusesAt(slots, moment));
       expect(refusing, `${mode} refuses nothing, so nothing below is asked`).not.toEqual([]);
@@ -481,7 +479,7 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
       }
 
       refused.driver.send('/look');
-      expect(shown(refused.driver).location.id).toBe(STARTING_LOCATION);
+      expect(shown(refused.driver).location.id).toBe(MOVED_PLACE);
     });
   }
 });
@@ -601,7 +599,7 @@ describe('the controls a state offers follow from the door\'s report (c7)', () =
   it('offers nothing where the door had nothing to say, with a module staged', () => {
     const slots = pageSlots();
     const staging = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
-    staging.send(EDIT);
+    staging.send(MOVE_LINE);
     expect(staging.localChanges()).not.toBe('');
 
     const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
@@ -631,15 +629,15 @@ describe('the controls a state offers follow from the door\'s report (c7)', () =
 describe('a local module that will not load never costs the session (c1)', () => {
   const STAGED = ((): string => {
     const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
-    driver.send(EDIT);
+    driver.send(MOVE_LINE);
     const text = driver.localChanges();
     if (text === null || text.trim() === '') throw new Error('nothing was staged, so every module below would be empty');
     return text;
   })();
 
   const BROKEN: Record<string, string> = {
-    'will not parse': STAGED.replace('x: 7, y: 7', 'x: sideways'),
-    'will not resolve': STAGED.replace('x: 7, y: 7', 'x: 7, y: 7\nadjacent:\n  nowhere-at-all'),
+    'will not parse': STAGED.replace(MOVED_TO_FIELDS, 'x: sideways'),
+    'will not resolve': STAGED.replace(MOVED_TO_FIELDS, `${MOVED_TO_FIELDS}\nadjacent:\n  nowhere-at-all`),
   };
 
   const over = (local: string): Driver => opened({ where: local, base: SHIPPED_SOURCES, local, broke: null, names: [], aim: OPENING_CELLS[0].aim }).driver;

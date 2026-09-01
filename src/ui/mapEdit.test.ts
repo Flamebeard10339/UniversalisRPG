@@ -7,6 +7,7 @@ import { gotoLine } from './devMode';
 import { drawnAt, placedAt, sheetOf, type Node, type Place, type Sheet } from '../runtime/map';
 import { createDriver, type Driver } from './driver';
 import { addressFor, answering, centredOn, created, droppedAt, joinedInto, joinLine, pinnedInto, placeLine, settledOn } from './mapEdit';
+import { mapFixtureFor } from '../runtime/mapFixture';
 import { SHIPPED_SOURCES } from './shippedContent';
 import type { Point } from './viewport';
 
@@ -16,6 +17,8 @@ const GRID = 140;
 const opened = (): Driver => createDriver(SHIPPED_SOURCES, { ticker: () => () => undefined });
 
 const REGISTRY_PLACES = loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations;
+
+const { emptySquare } = mapFixtureFor(SHIPPED_SOURCES);
 
 const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.map((entry) => String(entry.text));
 
@@ -149,7 +152,7 @@ describe('a new place is written where the map is looking', () => {
     const driver = opened();
     driver.send('/dev on');
 
-    driver.send(madeAt({ x: 8, y: -8 }));
+    driver.send(madeAt(emptySquare()));
     driver.send(gotoLine(MADE));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
@@ -160,15 +163,15 @@ describe('a new place is written where the map is looking', () => {
   it('places again a place it made, which is a section of the module its id named all along', () => {
     const driver = opened();
     driver.send('/dev on');
-    driver.send(madeAt({ x: 8, y: -8 }));
+    driver.send(madeAt(emptySquare()));
     driver.send(gotoLine(MADE));
     const made = addressable([{ name: 'local-changes', text: driver.localChanges() ?? '' }]).find((each) => each.address === MADE)!;
 
     expect(sameSection(made.address, MADE)).toBe(true);
-    driver.send(placeLine(MADE, { x: 9, y: 9 }));
+    driver.send(placeLine(MADE, emptySquare(1)));
 
     expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
-    expect(driver.snapshot().view.discovered.find((place) => place.id === MADE)).toMatchObject({ x: 9, y: 9 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === MADE)).toMatchObject(emptySquare(1));
   });
 });
 
@@ -189,11 +192,11 @@ describe('a drag is a section edit and nothing else (c8)', () => {
       const driver = opened();
       const before = REGISTRY_PLACES.get(section.address)!;
 
-      driver.send(placeLine(section.address, { x: 11, y: -7 }));
+      driver.send(placeLine(section.address, emptySquare(2)));
 
       expect(said(driver).filter((line) => line.includes('did not load'))).toEqual([]);
       const moved = loadUniverseWithDiagnostics([...SHIPPED_SOURCES, { name: 'local-changes', text: driver.localChanges()! }]).registry.locations.get(section.address);
-      expect(moved).toEqual({ ...before, x: 11, y: -7 });
+      expect(moved).toEqual({ ...before, ...emptySquare(2) });
     });
   }
 });

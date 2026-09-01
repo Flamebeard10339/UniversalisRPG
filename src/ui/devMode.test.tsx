@@ -15,6 +15,7 @@ import { App } from './App';
 import { browserSlots } from './browserStore';
 import { devLine, devRefusal, speedLine, tappedPlace } from './devMode';
 import { createDriver, type Driver } from './driver';
+import { mapFixtureFor } from '../runtime/mapFixture';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
 import { SHIPPED_UI } from './shell.test';
@@ -37,10 +38,9 @@ const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.
 
 const MARKED: readonly CommandSpec[] = COMMANDS.filter((spec) => spec.audience === 'cheat');
 
-// Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
-const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
+const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(SHIPPED_SOURCES);
 
-const ACTS_ON: Record<string, string> = { '/goto': REAL_LOCATION };
+const ACTS_ON: Record<string, string> = { '/goto': MOVED_PLACE };
 
 const lineFor = (spec: CommandSpec): string => `${spec.name}${ACTS_ON[spec.name] ? ` ${ACTS_ON[spec.name]}` : ''}`;
 
@@ -171,7 +171,7 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
   it('takes the snapshot on the way in and puts the session back on the way out', () => {
     const { driver, slots } = playing();
     const store = slotStore(slots, () => 0);
-    driver.send(`/dsl location ${REAL_LOCATION} x: 7, y: 7`);
+    driver.send(MOVE_LINE);
     const before = driver.serialized();
 
     driver.send(devLine(true));
@@ -190,14 +190,14 @@ describe("the toggle is the dev slot's entry, not a second one (c7)", () => {
   it('leaves the staged edits where they were, because they are not a game', () => {
     const { driver } = playing();
     driver.send(devLine(true));
-    driver.send(`/dsl location ${REAL_LOCATION} x: 7, y: 7`);
+    driver.send(MOVE_LINE);
     const staged = driver.localChanges();
-    expect(staged).toContain('x: 7, y: 7');
+    expect(staged).toContain(MOVED_TO_FIELDS);
 
     driver.send(devLine(false));
 
     expect(driver.localChanges()).toBe(staged);
-    expect(driver.snapshot().view.discovered.find((place) => place.id === REAL_LOCATION)).toMatchObject({ x: 7, y: 7 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === MOVED_PLACE)).toMatchObject(MOVED_TO);
   });
 });
 
