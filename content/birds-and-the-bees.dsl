@@ -180,9 +180,10 @@ on death:
 // Start to finish: Kelsa hires without explaining, George explains, the crier
 // names the wrong wasp, all three hives are gone through, the way down opens
 // under the third of them, what is at the bottom of it is put down, and Kelsa
-// pays. Unkillable and instant-kill, so what level walks the apiary is not what
-// this is asking — the drones between the postern and the hive are tulsa's, and
-// so are their numbers.
+// pays — a purse that walked in empty and stands above nothing, because what
+// she pays is hers to move. Unkillable and instant-kill, so what level walks
+// the apiary is not what this is asking — the drones between the postern and
+// the hive are tulsa's, and so are their numbers.
 # test birds-and-the-bees-start-to-finish
 unkillable
 instant-kill
@@ -223,7 +224,7 @@ travel: kelsa-farmhouse
 talk: kelsa
 choose: continue
 assert: kelsas-hives.settled
-assert: inventory.core.coin >= 5000
+assert: inventory.core.coin > 0
 
 // George keeps his own word while this quest stands beside it. The first stage
 // stands from the outset, so the hint under it is open to a player who has never

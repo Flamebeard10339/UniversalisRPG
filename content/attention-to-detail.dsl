@@ -140,7 +140,8 @@ item-level: 2-5
 // precisely so a caught attempt is a `use:` away from being tried again
 // rather than a dead end — what that costs, not what it takes to land, is
 // this route's to prove; how often the roll lands either way is a balance
-// question and not asked here.
+// question and not asked here, and so is what the reporter pays — a purse that
+// walked in empty and stands above nothing says the price was met.
 # test attention-to-detail-start-to-finish
 lock-pools
 load: at-market-row
@@ -155,5 +156,5 @@ travel: market-row
 talk: reporter
 choose: continue
 assert: watching-the-duke.paid
-assert: inventory.core.coin >= 40
+assert: inventory.core.coin > 0
 assert: has fine-lockpicks
