@@ -51,12 +51,25 @@ at position 6 and in the DEBUG-only `heartwood-core`; and `orb-of-renewal` (+25%
 1-in-25 off the ratkin-warrior. Sitting is +10 and a cooked dish up to +16, so every
 temporary source dwarfs everything a build can permanently carry.
 
-*Moves when: he says which of the three carries it — knowing now that gear carries
-attack on its own, that health cannot be levelled by fighting better, and that the
-sustain layer a long fight needs is the least reachable thing in the world. If gear,
-`mending` needs more homes than one jewel position. If food, cooking is load-bearing
-for combat and nothing says so. If dying cheaply, a faint should put you near where you
-fell, and that is a real change to what dying costs.*
+**It is dying cheaply, and the sheet now says so in one line.** The king's road
+guardsman at tier-1 pays health **4,670–5,103/h while it ran** against a 1,200/h
+target — nearly 4x — and reads 0.28x over the window, because it `worked 233–254s of
+the 3,600s` and `Death happened` in 4 of 4 seeds. The room is not weak. Uptime is 7%.
+
+`content/tulsa.dsl:1473` is the whole of it: `on death` does `relocate: market-square`
+from anywhere in the world, so every death at the castle gate, the king's road or the
+muster costs the same walk back, and that walk is 93% of the hour. Attack is unhurt
+because it is paid per swing landed, so a short life still earns; health is paid per
+hit taken and is therefore pure uptime.
+
+The arithmetic is unusually clean: ~4x target at 7% uptime, so **~25% uptime lands
+health on the curve** and nothing about any enemy, drop, rate or piece of gear has to
+change.
+
+*Moves when: he says what a faint costs. The comment there notes content can name only
+a location and not "where you fell", so the shapes are: no relocate at all for a plain
+faint (dying costs the health bar and the interruption, nothing more); a respawn point
+per region; or leaving it and accepting health as a slow skill with its own curve.*
 
 ## Whether the sheet is allowed to eat
 

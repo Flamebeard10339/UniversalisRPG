@@ -7,6 +7,25 @@ The sheet is `npm run simulate-activity -- tiers.<activity>-tier-<level> --off q
 
 ---
 
+## The muster is ungated, so the tenth level's best fight is the twentieth's room
+
+Read at tier-10 with the tiers dressed, attack inside the town makes a good ladder —
+north-road 1,800/h against a curve asking 1,593 (1.13x), castle-gate and the barracks
+1,400, market square 1,218, down through kiln-lane and the king's road to the castle
+hall at 503. Nothing there overshoots.
+
+The muster pays **2,638/h, 1.66x**, and tops the sheet. It is past the tunnels and
+nothing stops a level-10 character walking into it — no combat action in the corpus
+carries a `hidden if: level.<skill> < n` at all, so combat has no bands, only rooms a
+weak build happens to die in. At tier-1 that soft gate holds (the market square still
+tops the sheet at 1.0x); by ten it does not.
+
+So the 1-10 attack band is not over-tuned and wants no rebalancing. What it wants is
+the gate.
+
+*Closes when:* the muster is reachable only by a character the band was meant to hand
+over to, and tier-10's best attack offer is inside the town.
+
 ## No route stands at a band gate
 
 Five actions are shut by level and nothing walks up to one: `hidden if:
