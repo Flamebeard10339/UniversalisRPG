@@ -190,13 +190,16 @@ stage poured:
 // not stall the route — that headroom is a balance question for a pass of
 // its own, not for this file.
 # save fresh-for-the-brew
-{"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":30,"fishing.braided-fiber-line":1}}
+{"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.dried-fish-bait":30},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
+// The rod and the line each name a level of their own, so each is a copy under
+// an id — `1` the rod and `2` the line — and the bait, which names none, is the
+// stack it has always been.
 # test the-bars-crawl-start-to-finish
 load: fresh-for-the-brew
-equip: fishing.fishing-rod
+equip: 1
 equip: fishing.dried-fish-bait
-equip: fishing.braided-fiber-line
+equip: 2
 travel: tavern-street
 travel: sha-dynastys
 talk: sunny

@@ -1762,10 +1762,11 @@ node over-the-barrel:
 {"version":13,"location":"tulsa.market-square"}
 
 // What a new arrival walks into town holding and nothing takes back off them,
-// standing in the row that would buy either. The sword is the copy the sendoff
-// handed over, lifted whole out of miki-route-end with the roll it came out with.
+// standing in the row that would buy either. Both are the copies the sendoff
+// handed over, lifted whole out of miki-route-end with the rolls they came out
+// with: each names a level of its own, so each stands in a row of its own.
 # save in-town-with-a-sword-and-a-shield
-{"version":13,"location":"tulsa.market-row","inventory":{"core.wooden-shield":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":13,"location":"tulsa.market-row","instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // A pocket of curios out of a new arrival's first fights, which is what they
 // have to trade with and the whole of the town's on-ramp to money. About this
@@ -1783,8 +1784,11 @@ node over-the-barrel:
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
+// The axe off the rack, standing where the dead alder is. It names a level of
+// its own, so what a lift leaves in the pack is the copy the engine minted and
+// not a stack of one — which is what the alder asks after by template anyway.
 # save axe-at-the-swamp-edge
-{"version":13,"location":"tulsa.swamp-edge","inventory":{"core.hand-axe":1}}
+{"version":13,"location":"tulsa.swamp-edge","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // A netful out of the water at the bottom of Well Lane, which is what somebody
 // walking up that lane is carrying.
@@ -1794,9 +1798,11 @@ node over-the-barrel:
 // Down past the wall with the rod the stall sells, the bait it sells by the
 // hundred and a line to lose, and enough water behind them to be standing here
 // rather than at the shingle. What the shop stocks is what this holds: the deep
-// water is reached by buying tackle, not by being given any.
+// water is reached by buying tackle, not by being given any. The rod and the
+// line each name a level of their own, so each stands as a copy under an id —
+// `1` the rod, `2` the line — and the bait, which names none, stacks.
 # save rodded-up-at-the-deep-water
-{"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.fishing-rod":1,"fishing.dried-fish-bait":40,"fishing.braided-fiber-line":1}}
+{"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // At the anvil with the hammer a smith never spends and enough coin to buy bar
 // stock over the counter beside it. Nothing here is a jewel: what the route this
@@ -2016,16 +2022,17 @@ assert: not has core.herring
 // store's own rate leaves of a twenty-four and a twelve, rounded its way both
 // times.
 //
-// The two rows of the counter are the two kinds of holding there are: the sword
-// is a grown copy standing in a row of its own and is answered for by its id,
-// and the shield is a stack answered for by its item. One number covers both
-// because a copy fetches what its base is worth and not what its plane holds.
+// Both name a level of their own, so each is a grown copy standing in a row of
+// its own and is answered for at the counter by its id rather than by its item.
+// One number covers both because a copy fetches what its base is worth and not
+// what its plane holds. A stack sold by its item is the other kind of row, and
+// `a-bent-coin-becomes-a-cooked-herring` above is where that one is walked.
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-a-sword-and-a-shield
 shop: general-store
 submit-modal: item=sell:1
 submit-modal: count=1
-submit-modal: item=sell:core.wooden-shield
+submit-modal: item=sell:2
 submit-modal: count=1
 submit-modal: item=close
 assert: inventory.coin = 28
@@ -2097,9 +2104,9 @@ assert: inventory.core.jug-of-water = 2
 // line is for.
 # test the-deep-water-is-fished-with-a-rod-and-bait
 load: rodded-up-at-the-deep-water
-equip: fishing.fishing-rod
+equip: 1
 equip: fishing.dried-fish-bait
-equip: fishing.braided-fiber-line
+equip: 2
 use: entity.fishing.trout-run.cast until has fishing.raw-trout
 assert: has fishing.raw-trout
 use: entity.fishing.salmon-pool.cast until has fishing.raw-salmon
@@ -2405,27 +2412,29 @@ expect only: rage-rises-as-swings-land-end
 
 # save at-the-proving-ground-with-a-tally
 DEBUG
-{"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true},"inventory":{"combat-expansion.vigor-tally":1}}
+{"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.vigor-tally","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // The gate is a wrapper and the payload stacks, so what a minute of swinging
 // leaves the player holding is several instances of one declaration, each on
 // its own clock, rather than one that keeps being refreshed. `quickening` is
 // allocated beside `spurred` and reads how many are held; the two are separate
-// passives on separate points, which is what makes them separable.
+// passives on separate points, which is what makes them separable. The tally
+// names a level of its own and so stands in the save as copy `1`; what the
+// chest hands over is the next id the world mints, which is `2`.
 # test accelerated-vigor-stacks-behind-its-gate
 DEBUG
 load: at-the-proving-ground-with-a-tally
 use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with combat-expansion.wrath-jewel
+allocate: 2 at 0,0 slot e
+slot: 2 at 0,0 e with combat-expansion.wrath-jewel
 // Round the outer ring rather than across the hub, so the rage passive is not
 // allocated and nothing in this sheet came from it.
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 2
-allocate: 1 at 1,0 position 6
-allocate: 1 at 1,0 position 5
+allocate: 2 at 1,0 position 1
+allocate: 2 at 1,0 position 2
+allocate: 2 at 1,0 position 6
+allocate: 2 at 1,0 position 5
+equip: 2
 equip: 1
-equip: combat-expansion.vigor-tally
 use: core.melee-combat on proving-post
 wait: 60
 // The tally is worth one evasion a stack and nothing else on this route touches that
@@ -2505,7 +2514,7 @@ unallocate: 1 at 1,0 position 1
 {"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":381},"resources":{"combat-expansion.rage":19800},"equipped":{"mainhand":"1"},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1809706,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":3953799810}
 
 # save accelerated-vigor-stacks-behind-its-gate-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":1063},"equipped":{"mainhand":"1","offhand":"combat-expansion.vigor-tally"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":88800},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":97428},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":107183},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":112508},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":119000},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":121980}]},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":420,"attemptsMade":30,"span":1374}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1468992,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":829729617}
+{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":39},"equipped":{"mainhand":"2","offhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":88800},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":97428},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":107183},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":112508},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":119000},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":121980}]},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":420,"attemptsMade":30,"span":1374}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1590538,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"combat-expansion.vigor-tally","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":829729617}
 
 # save poison-holds-the-struck-enemy-end
 {"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":133},"resourceRateRemainders":{"core.health":40000},"equipped":{"mainhand":"1"},"buffs":{"tulsa.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1928692,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":40000}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":2882385315}

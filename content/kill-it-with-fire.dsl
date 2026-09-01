@@ -142,15 +142,16 @@ on death:
 // What the two errands are worth in the pack rather than how they were come by:
 // the jelly is off the princess bee and the venom off a swamp mollusk, and both
 // of those fights are tulsa's and stand or fall on tulsa's numbers rather than
-// on anything this quest says. An axe because it is carried as a stack and
-// needs no instance written by hand.
+// on anything this quest says. An axe because it is the plainest thing in town
+// to swing; it names a level of its own, so it is held as the copy the engine
+// would have minted and the routes below put it on by that copy's id.
 //
 // Nothing else, and no experience: the route below walks unkillable and strikes
 // to kill, so what level lives through the cellar is not what it is asking.
 // What the wurm should cost is a balance question and is answered by running
 // the world, not from here.
 # save sent-out-for-oolga
-{"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1,"core.royal-jelly":1,"core.mollusk-venom":1}}
+{"version":13,"location":"tulsa.market-square","inventory":{"core.royal-jelly":1,"core.mollusk-venom":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 // Start to finish: Oolga sets the task, Sunny names the three things and hands
 // over the vodka she keeps for herself, the three come together over Sunny's
@@ -160,7 +161,7 @@ on death:
 unkillable
 instant-kill
 load: sent-out-for-oolga
-equip: core.hand-axe
+equip: 1
 travel: tavern-street
 travel: oolga-house
 talk: oolga
@@ -205,7 +206,7 @@ assert: oolgas-basement.cellar-cleared
 unkillable
 instant-kill
 load: sent-out-for-oolga
-equip: core.hand-axe
+equip: 1
 travel: tavern-street
 travel: oolga-house
 talk: oolga

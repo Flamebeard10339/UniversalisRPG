@@ -233,9 +233,11 @@ on death:
 // --- tests ---
 
 // Both prior quests done, standing where the captain is and carrying
-// something to hit her with.
+// something to hit her with. The axe names a level of its own, so it is held
+// as a copy under an id the engine minted rather than as a stack, and the
+// route below puts it on by that id.
 # save both-prior-quests-done
-{"version":13,"location":"tulsa.market-square","inventory":{"core.hand-axe":1},"flags":{"kill-it-with-fire.oolgas-basement.cellar-cleared":true,"ball-of-a-boy.down-the-grate.reported":true}}
+{"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"kill-it-with-fire.oolgas-basement.cellar-cleared":true,"ball-of-a-boy.down-the-grate.reported":true}}
 
 // Start to finish: the captain sends the player to Oolga, Oolga loops them
 // through busywork until a swing of the axe lands on her, the swamp gives up
@@ -247,7 +249,7 @@ on death:
 // `done when:` is waiting on.
 # test the-swampy-menace-start-to-finish
 load: both-prior-quests-done
-equip: core.hand-axe
+equip: 1
 travel: castle-gate
 // The gate guard's own pointer to the barracks, which stands only while the
 // quest is on offer and untaken: walked here so the way a player is actually
