@@ -9,6 +9,8 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
 import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
+import { loadSave } from './save';
+import { createGameState } from './state';
 import { staleTiers } from './tierSaves';
 
 // What is wrong with a world that the loader will still take. A refusal stops the game; these do
@@ -155,6 +157,26 @@ function rootless(sources: readonly ModuleSource[]): Remark[] {
 // already carrying. The file on disk reads exactly as it did, so nothing else would ever say.
 const stale = (registry: Registry): Remark[] => staleTiers(registry).map((each) => ({ where: `# save ${each.save}`, says: each.says }));
 
+// A `# save` is a recording of a state somebody stood in, and every id in its body was declared the
+// day it was written. Rename or move that section and the body still parses, still loads and quietly
+// stops saying what it says: the loader prunes whatever it can no longer find and plays on, so the
+// recording is read as a state the world never reached. Which ids a body may name is not written out
+// here and could not be — `pruneStateForRegistry` answers that off `SAVE_FIELDS` and the prune each
+// kind writes for itself, so a field or a kind added next month is held to this with nothing edited.
+function rotted(registry: Registry): Remark[] {
+  return [...registry.saves.entries()].flatMap(([id, saved]) => {
+    const where = `# save ${id}`;
+    try {
+      return loadSave(createGameState(), saved, registry).map((pruned) => ({
+        where,
+        says: `writes ${pruned.path}, and the loader prunes it before it can stand this up: ${pruned.message} The body still reads and still loads, and no longer means what it says — \`npm run repair-saves\` looks back through history for what that id became.`,
+      }));
+    } catch (error) {
+      return [{ where, says: `will not load at all: ${error instanceof Error ? error.message : String(error)}` }];
+    }
+  });
+}
+
 // An archetype is a word of an author's own that a module's passives carry and nothing outside it
 // does — one the engine acts on nowhere, which is what `keywordsIn` hands back as `beyond`. Which
 // archetypes a module has is read off its passives rather than declared. Each is meant to be
@@ -199,6 +221,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => restated(registry),
   (_sources, registry) => unspoken(registry),
   (_sources, registry) => stale(registry),
+  (_sources, registry) => rotted(registry),
   (_sources, registry) => lopsided(registry),
   (sources) => unpacked(sources),
   (sources) => rootless(sources),
