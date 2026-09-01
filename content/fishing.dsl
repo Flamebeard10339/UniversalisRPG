@@ -46,6 +46,20 @@ group: core.skilling
 title: Depth
 group: core.other
 
+// How often the net goes out. It was a bare 6 on the cast itself, which is a pace nothing could
+// take hold of; as a stat it is the same six and there is somewhere to spend a point.
+# stat fishing-rate
+title: Casting Speed
+base: 6
+group: core.skilling
+
+// How well a strip of bait survives the fish that took it. Nothing reads this yet -- what a cast
+// consumes is written in the cast rather than rolled against a stat -- so a point spent here buys
+// nothing until `spend-bait` can be made to ask.
+# stat bait-persistance
+title: Bait
+group: core.skilling
+
 # resource line-health
 title: Line
 rate: core.regeneration
@@ -70,7 +84,7 @@ stat: fishing
 title: Fish
 continuous
 attempts: 1
-rate: 6
+rate: my fishing-rate
 accuracy: my fishing vs their depth
 on unfinished:
   drain: 1 line-health
@@ -136,6 +150,16 @@ slot: gloves
 value: 40
 item-level: 4-8
 tackle, +35 max-line-health
+
+// The one thing a fisherman wears that is not in his hands, so it is the second plane the skill
+// has and the only one a net fisherman gets at all.
+# item wide-straw-hat
+title: Wide Straw Hat
+examine: A brim you can see the whole river from under, and it has been sat on more than once.
+slot: head
+value: 18
+item-level: 3-6
+tackle, +2 fishing
 
 # item horsehair-line
 title: Horsehair Line
@@ -224,7 +248,7 @@ value: 70
 # entity shrimp-shoal
 title: Shrimp Shoal
 examine: A dark shifting patch a foot under, moving the way one thing moves.
-stats: fishing 0, depth 8
+stats: fishing 0, fishing-rate 0, depth 8
 uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
@@ -236,7 +260,7 @@ cast:
 # entity anchovy-shoal
 title: Anchovy Shoal
 examine: A shoal turning over on itself, all of it silver on one beat and gone on the next.
-stats: fishing 0, depth 48
+stats: fishing 0, fishing-rate 0, depth 48
 uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
@@ -248,7 +272,7 @@ cast:
 # entity trout-run
 title: Trout Run
 examine: Fast water over stones, and every so often something turns in it.
-stats: fishing 0, depth 80
+stats: fishing 0, fishing-rate 0, depth 80
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
@@ -256,6 +280,9 @@ cast:
   roll: spend-bait
   give: 1 raw-trout
   xp: fishing 9
+  1 in 220:
+    give: 1 quick-water-jewel
+    say: A river stone comes up in the net with a thumb-groove worn into one face of it.
   +on unfinished:
     roll: spend-bait
     say: It takes the bait, turns once, and the line sings and then stops singing.
@@ -263,7 +290,7 @@ cast:
 # entity salmon-pool
 title: Salmon Pool
 examine: Slow black water under the far bank, deep enough that you cannot see the bottom of it in summer.
-stats: fishing 0, depth 102
+stats: fishing 0, fishing-rate 0, depth 102
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
@@ -294,7 +321,7 @@ cast:
 # entity pike-reach
 title: Pike Reach
 examine: A straight of dark water under the willows where nothing smaller than your forearm is showing itself.
-stats: fishing 0, depth 96
+stats: fishing 0, fishing-rate 0, depth 96
 uses: cast
 cast:
   hidden if: level.fishing < 11
@@ -303,6 +330,9 @@ cast:
   roll: spend-bait
   give: 1 raw-pike
   xp: fishing 16
+  1 in 180:
+    give: 1 slack-water-jewel
+    say: There is a length of old line in its mouth, and whatever it was tied to is still down there.
   +on unfinished:
     roll: spend-bait
     say: It follows the bait almost to the bank, looks at you, and is not there any more.
@@ -310,7 +340,7 @@ cast:
 # entity sturgeon-hole
 title: Sturgeon Hole
 examine: Where the bed drops away and the water goes the colour of slate. Something down there is older than the town.
-stats: fishing 0, depth 118
+stats: fishing 0, fishing-rate 0, depth 118
 uses: cast
 cast:
   hidden if: level.fishing < 16
@@ -319,6 +349,9 @@ cast:
   roll: spend-bait
   give: 1 raw-sturgeon
   xp: fishing 17
+  1 in 150:
+    give: 1 a-full-tin-jewel
+    say: It brings up somebody's tin with it, and there is still bait in the tin.
   +on unfinished:
     roll: spend-bait
     say: The rod goes over and stays over, and then there is nothing on the end of it at all.
@@ -351,6 +384,75 @@ passives: 1 keen-line, 2 drawn-out, 3 sure-hand, 4 unbreaking, 5 keen-line, 6 dr
 title: Angler's Knot
 examine: Six turns of something that is not quite line, and it does not come undone. @@@ It should also carry a chance not to spend the bait, which nothing in the language can say: what a cast consumes is written in the cast rather than read off a stat.
 cluster-jewel: anglers-knot
+
+// The knot above is the generalist and the three below are the ways of not being one: faster,
+// longer, or cheaper to keep in bait. A fisherman has one plane and four stats to put in it, so
+// which of these goes in the line is the build.
+
+# passive quick-cast
+tackle, +1 fishing-rate
+
+# passive practised-throw
+tackle, +2 fishing-rate
+
+# passive fast-hands
+tackle, +12% fishing-rate
+
+# cluster-jewel quick-water
+examine: The trick is that the net is already going out while the last one is still coming in.
+shape: ring
+open-connections: e
+passives: 1 quick-cast, 2 keen-line, 3 practised-throw, 4 fast-hands, 5 quick-cast, 6 sure-hand
+
+# item quick-water-jewel
+title: Quick Water
+examine: A wrist-weight of river stone, worn smooth on one side by a thumb.
+cluster-jewel: quick-water
+
+// The line comes back at whatever `core.regeneration` stands at -- `# resource line-health` says
+// so -- so a fisherman who buys recovery is buying the same thing a fighter does, and the wheel
+// is the one place in the skill where the two builds are the same build.
+
+# passive slack-given
+tackle, +9 max-line-health
+
+# passive well-tended
+tackle, recovery, +1 regeneration
+
+# passive braided-through
+tackle, +25% max-line-health
+
+# cluster-jewel slack-water
+examine: Nobody lands anything here in a hurry, and nothing here breaks.
+shape: wheel
+open-connections: e, nw
+passives: 1 slack-given, 2 well-tended, 3 drawn-out, 4 braided-through, 5 slack-given, 6 well-tended, 7 unbreaking
+
+# item slack-water-jewel
+title: Slack Water
+examine: A coil of line that has been wet a very long time and has not rotted.
+cluster-jewel: slack-water
+
+// Two positions and no way on: the cheapest thing in the catalogue and the only one that pays a
+// deep-water fisherman in what he actually spends. It is worth nothing at all until `spend-bait`
+// reads the stat, which is the note on the knot above.
+
+# passive thrifty
+tackle, +2 bait-persistance
+
+# passive miserly
+tackle, +4 bait-persistance
+
+# cluster-jewel a-full-tin
+examine: Whatever is in it, there is always another one.
+shape: spindle
+open-connections: e
+passives: 1 thrifty, 2 miserly
+
+# item a-full-tin-jewel
+title: A Full Tin
+examine: A dented tin that rattles, and has rattled the same amount for as long as anyone has had it.
+cluster-jewel: a-full-tin
 
 // --- tests ---
 

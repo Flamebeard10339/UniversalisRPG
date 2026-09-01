@@ -287,3 +287,41 @@ passives: 1 seasoned, 2 practised, 3 second-nature, 4 seasoned, 5 practised, 6 s
 title: A Cook's Hands
 examine: A ring of blackened iron, worn smooth on the inside by somebody who never took it off.
 cluster-jewel: a-cooks-hands
+
+// A kitchen has two numbers and the ring above only moves one of them. `core.cooking-rate` is on
+// every recipe in the file already, so a point spent here is a dish a minute rather than a dish
+// saved from the fire — which is the other kind of cook and, over an evening, the better one.
+
+# passive quick-hands
+kitchen, +1 core.cooking-rate
+
+# passive short-order
+kitchen, +2 core.cooking-rate
+
+# passive never-still
+kitchen, +12% core.cooking-rate
+
+# cluster-jewel a-hot-pass
+examine: Six things going at once and none of them waiting on him.
+shape: ring
+open-connections: e
+passives: 1 quick-hands, 2 seasoned, 3 short-order, 4 never-still, 5 quick-hands, 6 short-order
+
+# item a-hot-pass-jewel
+title: A Hot Pass
+examine: A brass tally worn through in one corner, off a kitchen that fed a great many people very fast.
+cluster-jewel: a-hot-pass
+
+// Two positions and no way on: the cheapest thing a cook can splice in, and the only one that pays
+// the burn back rather than the clock.
+
+# cluster-jewel a-steady-hand
+examine: Nothing in this kitchen has ever caught, and nobody has ever seen him hurry.
+shape: spindle
+open-connections: e
+passives: 1 practised, 2 second-nature
+
+# item a-steady-hand-jewel
+title: A Steady Hand
+examine: A wooden spoon burnt black at one edge and not the other, which took some doing.
+cluster-jewel: a-steady-hand

@@ -219,7 +219,7 @@ examine: The city's bar. Low beams, long tables, and a stove in the corner that 
 adjacent:
   tavern-street
 entities:
-  sunny, bar-stove, drunk-patron, 3 civilian
+  sunny, bar-stove, pass-rail, drunk-patron, 3 civilian
 
 # location oolga-house
 x: 8, y: 2
@@ -460,7 +460,7 @@ examine: Nets over every surface that will take one, and a stove going under a p
 adjacent:
   kiln-lane
 entities:
-  aggie, aggies-stove, 2 civilian
+  aggie, aggies-stove, spoon-crock, 2 civilian
 
 // --- the wall, and the four ways through it ---
 //
@@ -1058,6 +1058,31 @@ work it open:
   give: 1 cooking.a-cooks-hands-jewel
   say: The drawer comes out crooked and almost entirely empty. What is in it is a ring of blackened iron, and it is warm.
 
+// The other two kitchens each keep one, and each keeps the one that kitchen would have worn out:
+// the bar cooked fast for a great many people and Aggie has never burnt anything in her life.
+
+# entity pass-rail
+title: The Pass Rail
+examine: The shelf over the bar's stove where the dockets went up, and the last of them is still on the spike.
+flags: emptied
+go through the spike:
+  time: 6
+  hidden if: emptied
+  set: emptied
+  give: 1 cooking.a-hot-pass-jewel
+  say: Under forty years of dockets there is a brass tally worn through at one corner, from a kitchen that never once got behind.
+
+# entity spoon-crock
+title: The Spoon Crock
+examine: A crock by Aggie's stove with more wooden spoons in it than one person could use in a life.
+flags: emptied
+look through the spoons:
+  time: 6
+  hidden if: emptied
+  set: emptied
+  give: 1 cooking.a-steady-hand-jewel
+  say: One of them is burnt black along a single edge and nowhere else, which takes a steadier hand than most people have.
+
 // Going through a hive frame by frame, and the one action all three of Kelsa's
 // hives hang off. What a hive adds to it is its own: the words for what is in
 // that one, and which ground it stands on if it turns out to be the third gone
@@ -1187,6 +1212,9 @@ on death:
 pick-their-pocket:
   give: 3 coin
   xp: thieving.thieving 4
+  1 in 400:
+    give: 1 thieving.a-light-touch-jewel
+    say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
   +on unfinished:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
     drain: 1 health
@@ -1249,6 +1277,9 @@ pick-their-pocket:
   give: 18 coin
   xp: thieving.thieving 17
   1 in 60: give: 1 thieving.fingerless-gloves
+  1 in 90:
+    give: 1 thieving.a-fences-eye-jewel
+    say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
   +on unfinished:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
     drain: 1 health

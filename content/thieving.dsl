@@ -46,6 +46,14 @@ title: Thieving Speed
 base: 6
 group: core.skilling
 
+// How much of somebody's grip a thief shrugs off. Nothing reads this yet: a buff's duration is a
+// literal and no result in the language reads a stat where a number stands, which is the wall
+// `collared` names below and the one `fishing.bait-persistance` hits from the other side. One
+// engine feature is under both.
+# stat daze-resistance
+title: Nerve
+group: core.skilling
+
 // The mark's half of the contest, and no player ever carries either: how much attention somebody is
 // paying, and how good a lock is. Two rather than one because the two hands are two, and a chest is
 // not watchful the way a townsman is — a number that had to mean both would mean neither.
@@ -164,6 +172,75 @@ examine: A blank iron token on a thong, worn shiny. Whoever carried it was not i
 cluster-jewel: a-quiet-hour
 value: 260
 
+// The token above is the generalist and it is also behind a level-14 lock, so until now a thief in
+// the first band could build nothing at all. The three below are the ways of being a particular
+// thief: the hand that is never caught, the one that does not mind being caught, and the one that
+// comes away with more.
+
+# passive quick-fingers
+tools, +2 thieving-rate
+
+# passive practised-lift
+tools, +12% thieving
+
+# cluster-jewel a-light-touch
+examine: Out before the coat has finished moving.
+shape: ring
+open-connections: e
+passives: 1 light-fingers, 2 quick-fingers, 3 nerveless, 4 practised-lift, 5 quick-fingers, 6 light-fingers
+
+# item a-light-touch-jewel
+title: A Light Touch
+examine: A sliver of horn worn to the shape of a fingertip that is not yours.
+cluster-jewel: a-light-touch
+
+// Health and recovery are combat's stats and they are a thief's too: what a caught hand costs is a
+// drain and ten seconds of somebody's fist, and the thief who can stand that robs the marks nobody
+// else will go near. The daze passives below grant a stat nothing reads yet -- see `collared`.
+
+# passive thick-skinned
+tools, +12 core.max-health
+
+# passive steady-nerve
+tools, recovery, +1 core.regeneration
+
+# passive brazen
+tools, +2 daze-resistance
+
+# passive hard-faced
+tools, +5 daze-resistance
+
+# cluster-jewel a-cold-nerve
+examine: Being caught is a cost like any other, and he has costed it.
+shape: wheel
+open-connections: e, nw
+passives: 1 thick-skinned, 2 brazen, 3 steady-nerve, 4 hard-faced, 5 thick-skinned, 6 steady-nerve, 7 nerveless
+
+# item a-cold-nerve-jewel
+title: A Cold Nerve
+examine: A knuckle-bone, drilled. It is not the owner's own and he was not shy about saying so.
+cluster-jewel: a-cold-nerve
+
+// Two positions and no way on. `core.luck` is the drop channel, contested like any other roll, so
+// this moves what comes off a mark without any table knowing it exists.
+
+# passive good-eye
+tools, +6-12 core.luck
+
+# passive practised-fence
+tools, +10 core.luck
+
+# cluster-jewel a-fences-eye
+examine: Knowing which pocket is worth the hand before the hand goes out.
+shape: spindle
+open-connections: e
+passives: 1 good-eye, 2 practised-fence
+
+# item a-fences-eye-jewel
+title: A Fence's Eye
+examine: A jeweller's loupe with the lens gone milky. It was not the lens he was using.
+cluster-jewel: a-fences-eye
+
 // --- what is worth taking ---
 
 # item polished-buttons
@@ -223,3 +300,4 @@ one of:
   4x: give: 1 soft-toed-boots
   2x: give: 1 fingerless-gloves
   1x: give: 1 a-quiet-hour-jewel
+  1x: give: 1 a-cold-nerve-jewel
