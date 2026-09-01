@@ -1,6 +1,6 @@
 import type { LocaleSection } from './sections/locale';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Action, actionProblem, actionResultLists, assembledActionProblem, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionProblem, actionResultLists, assembledActionProblem, isFight, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
@@ -558,8 +558,9 @@ function entityProblem(entity: Entity, registry: Registry, stoodIn: string | und
   for (const handler of entity.handlers) {
     if (!registry.events.has(handler.event)) return `on ${handler.event}: names an unknown event: ${handler.event}`;
   }
+  const swingsItself = namesSection(entity.id, PLAYER_ENTITY) ? isTwoSided : isFight;
   for (const action of entity.actions) {
-    if (!isTwoSided(action)) continue;
+    if (!swingsItself(action)) continue;
     const problem = performerStatProblem(entity, action, registry);
     if (problem) return problem;
   }

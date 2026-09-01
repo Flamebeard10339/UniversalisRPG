@@ -308,6 +308,15 @@ describe('the performer declares every stat its action reads off it', () => {
     expect(loading('stats: max-health 12, dr 2', 'stats: max-health 12')).not.toThrow();
   });
 
+  it('asks nothing of an entity that empties no pool, because only the player ever swings that', () => {
+    const pinch = ['# action pinch', 'title: Pinch', 'continuous', 'rate: my attack-rate', 'accuracy: my attack vs their dr'].join('\n');
+    expect(() => loadModule(`${VALID}\n${pinch}\n# entity training-dummy\n+uses: pinch\n`)).not.toThrow();
+  });
+
+  it('still asks it of an entity that swings the pool-emptying action back', () => {
+    expect(() => loadModule(`${VALID}\n# entity training-dummy\n+uses: strike\n`)).toThrow(/# entity training-dummy: action "Strike": rate: reads attack-rate, which stats: does not set/);
+  });
+
   it('leaves a one-sided action alone, whoever owns it', () => {
     expect(loading('examine: A fistful of straw.', 'examine: A fistful of straw.\nsmash:\n  time: 1\n  say: Straw everywhere.')).not.toThrow();
     expect(loading('# location shed\nx: 1, y: 0', '# location shed\nx: 1, y: 0\ncollapse:\n  time: 1\n  say: It groans.')).not.toThrow();

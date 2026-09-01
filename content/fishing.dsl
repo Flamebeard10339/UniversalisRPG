@@ -180,7 +180,7 @@ value: 70
 # entity shrimp-shoal
 title: Shrimp Shoal
 examine: A dark shifting patch a foot under, moving the way one thing moves.
-stats: fishing 0, fishing-rate 0, depth 8
+stats: depth 8
 uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
@@ -192,7 +192,7 @@ cast:
 # entity anchovy-shoal
 title: Anchovy Shoal
 examine: A shoal turning over on itself, all of it silver on one beat and gone on the next.
-stats: fishing 0, fishing-rate 0, depth 48
+stats: depth 48
 uses: cast
 cast:
   requires: has small-fishing-net or has large-fishing-net
@@ -204,7 +204,7 @@ cast:
 # entity trout-run
 title: Trout Run
 examine: Fast water over stones, and every so often something turns in it.
-stats: fishing 0, fishing-rate 0, depth 80
+stats: depth 80
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
@@ -222,7 +222,7 @@ cast:
 # entity salmon-pool
 title: Salmon Pool
 examine: Slow black water under the far bank, deep enough that you cannot see the bottom of it in summer.
-stats: fishing 0, fishing-rate 0, depth 102
+stats: depth 102
 uses: cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
@@ -240,7 +240,7 @@ cast:
 # entity pike-reach
 title: Pike Reach
 examine: A straight of dark water under the willows where nothing smaller than your forearm is showing itself.
-stats: fishing 0, fishing-rate 0, depth 96
+stats: depth 96
 uses: cast
 cast:
   hidden if: level.fishing < 11
@@ -259,7 +259,7 @@ cast:
 # entity sturgeon-hole
 title: Sturgeon Hole
 examine: Where the bed drops away and the water goes the colour of slate. Something down there is older than the town.
-stats: fishing 0, fishing-rate 0, depth 118
+stats: depth 118
 uses: cast
 cast:
   hidden if: level.fishing < 16

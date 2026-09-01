@@ -23,7 +23,7 @@ import { foldStat, hasPool, statBreakdown } from './stats';
 import { midpoint } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
 import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
-import { isTwoSided } from '../grammar/action';
+import { isFight } from '../grammar/action';
 import { standing } from './population';
 import { truthy } from './conditions';
 import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
@@ -204,7 +204,7 @@ export function sessionOver(registry: Registry, state: GameState): PlaySession {
 type Actable = { actions?: Action[] };
 
 function actionAvailable(action: Action, state: GameState, registry: Registry): boolean {
-  if (isTwoSided(action) && action.depletes) return false;
+  if (isFight(action)) return false;
   return actionVisible(action, state, registry);
 }
 
@@ -257,7 +257,7 @@ function fightChoices(entityId: string, registry: Registry, state: GameState, lo
   const choices: PlayChoice[] = [];
   for (const action of player.actions) {
     const id = declaredId(action);
-    if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
+    if (id === undefined || !isFight(action)) continue;
     if (!actionVisible(action, state, registry)) continue;
     if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
     choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });

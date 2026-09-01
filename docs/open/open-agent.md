@@ -303,27 +303,6 @@ rather than a note.
 a condition, with `npm run oracle` printing the form off the declaration.
 
 
-## Three tier builds name ids that no longer exist
-
-`npm run oracle -- --at content` reports fourteen remarks against `content/tiers.dsl`:
-`# save tiers.thieving-tier-1`, `-10` and `-20` each name `thieving.a-quiet-hour-jewel`,
-`thieving.a-quiet-hour` and `thieving.lockpicks`, and the loader prunes all three before
-the build can stand up. The bodies still read and still load, so nothing said a word
-about it until the remark was written; the rot predates this branch.
-
-`npm run repair-saves` settles two of the three out of history — `a-quiet-hour-jewel →
-thieving-ability-jewel` (kept its title) and `lockpicks → steel-lockpicks` (written out
-of its name) — and refuses the run as a whole, because the third is not a rename at all:
-`# cluster-jewel thieving.a-quiet-hour` was folded inline under its item in `e0231f1c`,
-so no id arrived in its place and no rewrite makes those bodies true.
-
-The two settled renames are worth nothing on their own: the builds stay pruned while the
-third stands. What closes this is re-recording the three, not renaming them.
-
-*Closes when:* `npm run oracle -- --at content` reports no save remark, the three builds
-having been re-recorded with `npm run probe -- content --record <test-id>` against a
-route that grows the jewel where it now lives.
-
 ## The page teaches merging and says nothing about a field that clears another
 
 `npm run oracle` now says what a second body does to a line it writes again — laid over

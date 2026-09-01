@@ -1,5 +1,5 @@
 import { RuntimeError } from './error';
-import { Action, isTwoSided, sideOf } from '../grammar/action';
+import { Action, isFight, sideOf } from '../grammar/action';
 import { attemptDuration, hasPool, stalledPace, statValue } from './stats';
 import { participants, performable, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
@@ -38,7 +38,7 @@ export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 export function retaliation(state: GameState, registry: Registry, actorId: string, attackerId: string): { id: string; action: Action } | undefined {
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {
     const id = declaredId(action);
-    if (id === undefined || !isTwoSided(action) || !action.depletes) continue;
+    if (id === undefined || !isFight(action)) continue;
     if (!performable(action, state, registry)) continue;
     if (!hasPool(state, registry, attackerId, action.depletes.id)) continue;
     return { id, action };

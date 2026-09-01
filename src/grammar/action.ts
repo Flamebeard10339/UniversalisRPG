@@ -295,6 +295,8 @@ export const sideOf = (field: Sided, self: string, other: string): string => (fi
 
 export const isTwoSided = (action: Action): boolean => sidedFields(action).some((field) => field.value.side !== undefined);
 
+export const isFight = (action: Action): action is Action & { depletes: Sided } => isTwoSided(action) && action.depletes !== undefined;
+
 export function assembledActionProblem(action: Action): string | undefined {
   const cadence = [action.time !== undefined && 'time:', action.rate !== undefined && 'rate:'].filter((written): written is string => written !== false);
   if (cadence.length > 1) return 'time: and rate: are the same axis written two ways; give one';

@@ -196,7 +196,7 @@ value: 150
 +skills: thieving
 
 # entity tulsa.civilian
-+stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 20
++stats: npc-thieving-difficulty 20
 +uses: pick-pocket
 pick-pocket:
   give: 3 core.coin
@@ -219,7 +219,7 @@ one of:
   1x: give: 1 core.simple-boots
 
 # entity tulsa.guardsman
-+stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 55
++stats: npc-thieving-difficulty 55
 +uses: pick-pocket
 pick-pocket:
   give: 7 core.coin
@@ -230,7 +230,7 @@ pick-pocket:
     inflict: dazed for npc-daze-duration
 
 # entity tulsa.knight
-+stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 80
++stats: npc-thieving-difficulty 80
 +uses: pick-pocket
 pick-pocket:
   hidden if: level.thieving < 11
@@ -244,7 +244,7 @@ pick-pocket:
 # entity thief
 title: Thief
 examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 100
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 100
 uses: core.melee-combat, pick-pocket
 faction: core.world
 respawn after: 80s
@@ -268,7 +268,7 @@ pick-pocket:
 # entity house-chest
 title: Chest
 examine: A banded chest under the window with a lock on it older than the window.
-stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 60
+stats: npc-thieving-difficulty 60
 uses: pick-the-lock
 pick-the-lock:
   roll: house-chest-contents
@@ -288,7 +288,7 @@ one of:
 # entity treasure-chest
 title: Treasure Chest
 examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 110
+stats: npc-thieving-difficulty 110
 uses: pick-the-lock
 pick-the-lock:
   time: 10
@@ -310,7 +310,7 @@ one of:
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: thieving-ability 0, thieving-rate 0, npc-thieving-difficulty 132
+stats: npc-thieving-difficulty 132
 uses: pick-the-lock
 pick-the-lock:
   hidden if: level.thieving < 14

@@ -15,7 +15,7 @@ value: 4
 # entity blowfish-hole
 title: The Blowfish Hole
 examine: A slack backwater off the main current, and whatever lives in it does not have to swim fast to eat.
-stats: fishing 0, depth 86
+stats: depth 86
 uses: fishing.cast
 cast:
   requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
