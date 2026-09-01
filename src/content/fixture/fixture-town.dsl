@@ -64,7 +64,7 @@ title: The Store
 examine: One counter and a shelf behind it.
 north of green
 adjacent: loft, cellar, shed, pump
-entities: stair
+entities: stair, chest
 
 # location shed
 title: The Shed
@@ -203,6 +203,17 @@ step through:
   instant
   hidden if: not side-door.unlocked
   relocate: gate
+
+// Somewhere a plane and the jewels for it come from in one action, so a route reaches a plane screen
+// without a save being written to put one in the player's hands.
+# entity chest
+title: The Chest
+faction: world
+open:
+  instant
+  give: 1 heavy-spade
+  give: 1 keen-edge-jewel
+  give: 1 stout-heart-jewel
 
 # entity carter
 title: The Carter

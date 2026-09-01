@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { DIRECTIONS } from '../src/content/hex';
 import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse } from '../src/content/load';
-import { worldFor } from '../src/content/shipped';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../src/content/translation';
 import { BASE_LANGUAGE, localizerFor } from '../src/runtime/localized';
 import { COMMANDS, newContext, runLine, type CommandContext } from '../src/runtime/command';
@@ -11,6 +10,7 @@ import { serializeSession, startSession, view, type PlayView } from '../src/runt
 import { shippedModules } from './lib/layers';
 import { stripComments } from './lib/stripComments';
 import { formatResult, printed, type ReplLine } from './play-cli';
+import { fixtureSources } from '../src/content/worldFixture';
 
 const modules = shippedModules();
 
@@ -79,7 +79,7 @@ describe('one function cases a name for a player (c1, c2)', () => {
   });
 });
 
-const sources = withEngineLocale(worldFor('first-steps'));
+const sources = withEngineLocale(fixtureSources());
 const registry = loadUniverse([...sources, translationOf(loadUniverse(sources))]);
 
 const RUN = /[A-Za-z][A-Za-z0-9._-]*/g;
@@ -153,12 +153,15 @@ const SCRIPT: readonly string[] = [
     const bare = SHAPED[spec.name] ?? spec.name;
     return [bare, `${bare} 1`];
   }),
-  'use: entity.tulsa.smiths-chest.open',
-  '/inv 2',
+  // A chest that hands over a thing with a plane and the jewels for it, so what follows reaches the
+  // plane screen without a sheet being written to put one in the player's hands.
+  'goto: fixture-town.store',
+  'use: entity.fixture-town.chest.open',
+  '/inv 1',
   ...[
     ['verb', 'grow'],
     ['plane', 'allocate: slot e'],
-    ['plane', 'slot: e with core.crossroads-jewel'],
+    ['plane', 'slot: e with core.keen-edge-jewel'],
     ['plane', 'go: 1,0'],
     ['plane', 'allocate: position 1'],
     ['plane', 'allocate: slot ne'],
@@ -198,10 +201,10 @@ describe('what the REPL puts on the terminal (c10)', () => {
   });
 
   it('grants that permission to a place drawn beside its own name', () => {
-    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('first-steps.guide-house')));
+    const at = base.findIndex((drawn) => drawn.player.some((line) => line.includes('fixture-town.green')));
     const words = vocabulary(base[at].view, other[at].view);
 
     expect(at).toBeGreaterThan(-1);
-    expect([...(words.beside.get('first-steps.guide-house') ?? [])]).toContain(base[at].view.location.title);
+    expect([...(words.beside.get('fixture-town.green') ?? [])]).toContain(base[at].view.location.title);
   });
 });
