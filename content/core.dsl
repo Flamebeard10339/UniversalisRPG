@@ -274,6 +274,10 @@ at: 1 3
 title: Legs
 at: 2 3
 
+# slot boots
+title: Boots
+at: 2 4
+
 // --- stations ---
 
 // The names a recipe may be worked at. They stand nowhere: an # entity that

@@ -398,8 +398,24 @@ title: The Doss House
 examine: Beds by the night, eleven of them in one room, and a fire at the end that everybody cooks on and nobody cleans.
 adjacent:
   well-lane
+  rogue-den
 entities:
   doss-house-fire, 7 civilian
+
+// Under the doss house, which is the one building in Tulsa where nobody asks who anybody is. The
+// town's second band of thieving, and the only place the picks and the jewel come from.
+//
+// Nothing here is aggressive. They are not going to start something in their own cellar over a hand
+// in a pocket, which is what lets a beginner walk down, try it, fail, and walk back up having
+// learned where the ceiling is — the vigilance is the gate, not a fight.
+# location rogue-den
+x: 3, y: 2, z: -1
+title: The Rogue Den
+examine: A cellar under the beds with a good floor, better light than the room above it, and eleven people down here who are all facing the door.
+adjacent:
+  doss-house
+entities:
+  4 thief, strongbox
 
 # location kiln-lane
 x: 11, y: 1
@@ -1153,8 +1169,9 @@ pick-their-pocket:
   give: 7 coin
   xp: thieving.thieving 7
   +on unfinished:
-    say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do.
-    drain: 3 health
+    say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
+    drain: 1 health
+    inflict: thieving.collared
 
 # entity knight
 title: Knight
@@ -1168,11 +1185,37 @@ on death:
     roll: knights-purse
     1 in 10: give: 1 combat.iron-helmet
 pick-their-pocket:
+  hidden if: level.thieving < 11
   give: 12 coin
-  xp: thieving.thieving 11
+  xp: thieving.thieving 10
   +on unfinished:
-    say: There is a great deal of iron in the way and then a great deal of iron coming the other way.
-    drain: 6 health
+    say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
+    drain: 1 health
+    inflict: thieving.collared
+
+// The second band's mark. Watchful enough that a hand which has not put the hours in comes away with
+// nothing all afternoon, and carrying the one thing in Tulsa worth taking off a person: a hand that
+// robs thieves for long enough ends up holding their picks.
+# entity thief
+title: Thief
+examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 100
+uses: core.melee-combat, thieving.pick-their-pocket
+faction: world
+respawn after: 80s
+on death:
+  credit:
+    roll: combat.purse
+    1 in 14: give: 1 thieving.lockpicks
+pick-their-pocket:
+  hidden if: level.thieving < 11
+  give: 18 coin
+  xp: thieving.thieving 17
+  1 in 60: give: 1 thieving.fingerless-gloves
+  +on unfinished:
+    say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
+    drain: 1 health
+    inflict: thieving.collared
 
 // --- what is locked ---
 //
@@ -1208,6 +1251,25 @@ pick-the-lock:
     say: The runes light one after another and the cellar goes out from under you.
     drain: 8 health
     relocate: market-square
+
+// The best lock in Tulsa, in the one cellar where nobody will explain to you that it is not your
+// box — so this is the only lock in the world that does not end with a walk back from the market
+// square. It is where the boots and the quiet hour come from.
+# entity strongbox
+title: Strongbox
+examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
+stats: thieving.thieving 0, thieving.wards 132
+uses: thieving.pick-the-lock
+pick-the-lock:
+  hidden if: level.thieving < 14
+  time: 14
+  roll: thieving.strongbox-contents
+  xp: thieving.thieving 90
+  say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.
+  +on unfinished:
+    say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
+    drain: 2 health
+    inflict: thieving.collared
 
 // --- what is already hostile ---
 
@@ -1336,7 +1398,7 @@ title: You
 faction: core.player
 stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
 skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, thieving.thieving, smithing.smithing, crafting.crafting
-equipment-slots: mainhand, offhand, head, body, legs, gloves
+equipment-slots: mainhand, offhand, head, body, legs, gloves, boots
 uses: core.melee-combat
 // Waking up is the market square once the market square has been stood in, and
 // the house the game begins in before that. `starting` may only be on one

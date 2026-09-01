@@ -101,6 +101,73 @@ attempts: 1
 time: 6
 accuracy: my thieving vs their wards
 
+// A hand caught by somebody who does this for a living, and the reason the daze above is the floor
+// rather than the whole of it: a mark may add to what being caught costs and cannot take the three
+// seconds away, so a harder one holds you longer by holding you as well, not instead.
+//
+// @@@ asked for `daze-resistance` — a stat that shortens the daze. A buff's duration is written on
+// the buff and nothing in the language reads a stat there, so the only way a mark differs is by
+// carrying its own item, which is what this is. Two tiers is fine and a per-mark number is not, and
+// the same wall stops `bait-persistance`: what is missing is a number inside a result that can read
+// a stat.
+# item collared
+title: Collared
+examine: Somebody has a fistful of your collar and is deciding what to do about it.
+10s, -90% core.attack-rate, -100% thieving-rate
+
+// --- what a thief wears ---
+//
+// The kit is the whole of what a levelled hand has that a beginner does not, since the pockets ask
+// for no tool at all: a townsman is robbed with a hand and the strongbox under the doss house is
+// not. The picks are the one piece worn long enough to be worth spending points on, which is why
+// they are the pair with a plane in them.
+
+# item lockpicks
+title: Lockpicks
+examine: A roll of them in oiled cloth, filed thin, and every one of them shaped for a lock somebody has already met.
+slot: mainhand
+requires: level.thieving >= 10
+value: 180
+item-level: 8-14
+tools, +8 thieving
+
+# item fingerless-gloves
+title: Fingerless Gloves
+examine: Cut back to the second knuckle, so the ends of your fingers are yours and the backs of your hands are nobody's business.
+slot: gloves
+value: 45
+tools, +4 thieving
+
+# item soft-toed-boots
+title: Soft-Toed Boots
+examine: Felt over the toe and no nails in the sole. They are no use in a fight and they are silent on a stair.
+slot: boots
+value: 60
+tools, +4 thieving
+
+// --- what a pair of picks can be grown into ---
+
+# passive light-fingers
+tools, +3 thieving
+
+# passive unhurried
+tools, +1 thieving-rate
+
+# passive nerveless
+tools, +4 thieving
+
+# cluster-jewel a-quiet-hour
+examine: The habit of being somewhere for an hour and leaving nothing behind that says you were.
+shape: ring
+open-connections: e
+passives: 1 light-fingers, 2 unhurried, 3 nerveless, 4 light-fingers, 5 unhurried, 6 nerveless
+
+# item a-quiet-hour-jewel
+title: A Quiet Hour
+examine: A blank iron token on a thong, worn shiny. Whoever carried it was not in a hurry about anything.
+cluster-jewel: a-quiet-hour
+value: 260
+
 // --- what is worth taking ---
 
 # item polished-buttons
@@ -150,3 +217,13 @@ one of:
   5x: give: 1 topaz
   3x: give: 1 sapphire
   1x: give: 1 ruby
+
+// What is in the one box the rogues keep for themselves: better stones than a house has, the two
+// pieces of kit that are not for sale anywhere in Tulsa, and, once in a while, the jewel.
+# droptable strongbox-contents
+one of:
+  9x: give: 1 sapphire
+  6x: give: 1 ruby
+  4x: give: 1 soft-toed-boots
+  2x: give: 1 fingerless-gloves
+  1x: give: 1 a-quiet-hour-jewel

@@ -61,18 +61,20 @@ dependencies:
 
 // --- thieving ---
 
-// A hand and nothing else. Thieving is the one activity here whose offers ask for no tackle,
-// so its tiers differ by the climb alone -- which makes them the cleanest reading of what a
-// level on its own is worth.
+// The picks, the gloves and the boots, all three of which the rogue den under the doss house is the
+// only source of -- so a tier here is what somebody who has already robbed that cellar carries. The
+// first wears two of the three, because the picks ask ten: what a tier may wear is the world's own
+// `requires:` lines answered rather than a decision anybody made here.
 
 # save thieving-tier-1
-{"version":13}
+{"version":13,"equipped":{"gloves":"thieving.fingerless-gloves","boots":"thieving.soft-toed-boots"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"thieving.lockpicks","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}
 
 # save thieving-tier-10
-{"version":13,"xp":{"thieving.thieving":1382}}
+{"version":13,"xp":{"thieving.thieving":1382},"equipped":{"mainhand":"1","gloves":"thieving.fingerless-gloves","boots":"thieving.soft-toed-boots"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"thieving.lockpicks","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}
 
 # save thieving-tier-20
-{"version":13,"xp":{"thieving.thieving":5345}}
+{"version":13,"xp":{"thieving.thieving":5345},"equipped":{"mainhand":"1","gloves":"thieving.fingerless-gloves","boots":"thieving.soft-toed-boots"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"thieving.lockpicks","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}
+
 
 // --- cooking ---
 

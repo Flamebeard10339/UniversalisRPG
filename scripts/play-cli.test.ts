@@ -186,10 +186,12 @@ describe('play-cli renders what a command result says happened', () => {
     // the same way with nothing edited here — and every skill they hold has to be on the line.
     expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
     for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
-    expect(state.slice(5, 7)).toEqual([
-      'Equipped: {"Head (head)":null,"Main Hand (mainhand)":null,"Body (body)":null,"Off Hand (offhand)":null,"Gloves (gloves)":null,"Legs (legs)":null}',
-      `stats: ${sheet}`,
-    ]);
+    // Same claim as the line above, for the same reason: the shape, and then every slot the player
+    // actually has, asked of the session rather than written out. Listing them meant a slot the body
+    // grew reddened this file, which is a test naming its subjects rather than deriving them.
+    expect(state[5]).toMatch(/^Equipped: \{("[^"]+ \([a-z][a-z0-9.-]*\)":null,?)+\}$/);
+    for (const row of sessionStatus(ctx.session).equipment) expect(state[5]).toContain(`(${row.slot})":null`);
+    expect(state[6]).toBe(`stats: ${sheet}`);
     // The readout draws a pool the same way the room does: nobody has been hurt, so the bar is full
     // and the two figures read alike. What they come to is the sheet's business and not this one's.
     expect(state[7]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
