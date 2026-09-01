@@ -284,3 +284,21 @@ Whether any shipped item that grows also carries an action is not the point —
 *Closes when:* an action owned by a grown copy survives a save and a load, or the
 pair is refused at load time so an author is told rather than quietly losing it.
 
+## A counter and an anvil cannot be opened by a quest
+
+`npm run oracle -- shop entity recipe` has no conditional form of `keeps shop:`, no
+`hidden if:` on a `# shop`, no `requires:` on a `# recipe` and no condition on an
+entity's `stations:`. So a quest whose reward is a shop or a station can only open
+it to everybody or to nobody, and two shipped quests have taken the second: the
+potion counter `kill-it-with-fire` pays out is left as `tulsa.oolgas-counter`
+already had it, and `a-grand-blade` cannot gate `tulsa.anvil` on having met the
+smith's son, so a player can craft at the forge before the quest exists. Both
+carry the reward in a line of dialogue instead.
+
+This was written in a comment in each file and is here because comments are gone.
+It is a wall two modules have hit independently, which is what makes it a line
+rather than a note.
+
+*Closes when:* a `# shop`'s counter and an entity's `stations:` can each be gated on
+a condition, with `npm run oracle` printing the form off the declaration.
+
