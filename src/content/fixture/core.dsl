@@ -256,6 +256,7 @@ cluster-jewel: stout-heart
 station: bench
 in: 3 rat-tail
 out: 1 rope
+say: The tails twist up into something that will hold.
 skill: scavenging 10
 time: 2
 

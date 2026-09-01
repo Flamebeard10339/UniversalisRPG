@@ -158,6 +158,7 @@ faction: world
 # entity stair
 title: The Stair
 faction: world
+stations: bench
 go up:
   instant
   relocate: loft
