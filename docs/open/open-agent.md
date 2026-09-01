@@ -302,3 +302,44 @@ rather than a note.
 *Closes when:* a `# shop`'s counter and an entity's `stations:` can each be gated on
 a condition, with `npm run oracle` printing the form off the declaration.
 
+
+## Three tier builds name ids that no longer exist
+
+`npm run oracle -- --at content` reports fourteen remarks against `content/tiers.dsl`:
+`# save tiers.thieving-tier-1`, `-10` and `-20` each name `thieving.a-quiet-hour-jewel`,
+`thieving.a-quiet-hour` and `thieving.lockpicks`, and the loader prunes all three before
+the build can stand up. The bodies still read and still load, so nothing said a word
+about it until the remark was written; the rot predates this branch.
+
+`npm run repair-saves` settles two of the three out of history — `a-quiet-hour-jewel →
+thieving-ability-jewel` (kept its title) and `lockpicks → steel-lockpicks` (written out
+of its name) — and refuses the run as a whole, because the third is not a rename at all:
+`# cluster-jewel thieving.a-quiet-hour` was folded inline under its item in `e0231f1c`,
+so no id arrived in its place and no rewrite makes those bodies true.
+
+The two settled renames are worth nothing on their own: the builds stay pruned while the
+third stands. What closes this is re-recording the three, not renaming them.
+
+*Closes when:* `npm run oracle -- --at content` reports no save remark, the three builds
+having been re-recorded with `npm run probe -- content --record <test-id>` against a
+route that grows the jewel where it now lives.
+
+## The page teaches merging and says nothing about a field that clears another
+
+`npm run oracle` now says what a second body does to a line it writes again — laid over
+keyword by keyword, `laid over by name` where a body goes home by its own name, and four
+kinds where the one already there is gone. It says nothing about `schema.exclusive`,
+which is a *third* thing a second body can do: writing one field clears another outright.
+`clearedBy` in `src/grammar/section.ts:60` is the machinery, and `# location`'s
+`exclusive: [['x', 'y', 'z'], ['relative']]` (`src/content/sections/location.ts:217`) is
+its only declaration — so a second body writing `relative:` silently drops the `x/y/z`
+the first one had, and the page an author reads does not mention it.
+
+It is derivable exactly like the rest: the groups are on the schema and nothing has to be
+enumerated. It is not written because the page is held to a size — the whole merge
+teaching cost one line, 372 to 373 — and a fourth thing to say about merging is where
+that budget starts to bite.
+
+*Closes when:* an author reading `npm run oracle -- location` is told that `relative:`
+and `x/y/z` displace each other, derived from `schema.exclusive`, with the no-kind page
+no longer than it is now.

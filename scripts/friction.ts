@@ -170,20 +170,20 @@ const idFromStdin = (): string | null => {
   }
 };
 
+export function hookEnvelope(reading: Reading, name: string): string {
+  const probes = reading.scratchWrites.length + reading.rerunsOf.size + reading.helpAfterUse.length;
+  const signal = probes > 0 ? `${probes} thing(s) it worked out for itself — npm run friction -- ${name.replace('agent-', '')}` : 'nothing it had to work out first';
+
+  return JSON.stringify({ systemMessage: `${report(reading, name)[0]}; ${signal}`, suppressOutput: true });
+}
+
 function asHookOutput(root: string): string {
   const found = transcriptsUnder(root);
   const named = idFromStdin();
   const chosen = (named === null ? [] : found.filter((file) => path.basename(file).includes(named)))[0] ?? found[0];
   if (chosen === undefined) return '{}';
 
-  const reading = read(callsIn(readFileSync(chosen, 'utf8')));
-  const lines = report(reading, path.basename(chosen, '.jsonl'));
-  const probes = reading.scratchWrites.length + reading.rerunsOf.size + reading.helpAfterUse.length;
-
-  const name = path.basename(chosen, '.jsonl');
-  const signal = probes > 0 ? `${probes} thing(s) it worked out for itself — npm run friction -- ${name.replace('agent-', '')}` : 'nothing it had to work out first';
-
-  return JSON.stringify({ systemMessage: `${lines[0]}; ${signal}`, suppressOutput: true });
+  return hookEnvelope(read(callsIn(readFileSync(chosen, 'utf8'))), path.basename(chosen, '.jsonl'));
 }
 
 const usage = [

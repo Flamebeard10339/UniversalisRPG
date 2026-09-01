@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { callsIn, firstRealEdit, read, report } from './friction';
+import { callsIn, firstRealEdit, hookEnvelope, read, report } from './friction';
 
 const use = (name: string, input: Record<string, unknown>) => ({ type: 'tool_use', name, input });
 
@@ -92,6 +92,40 @@ describe('--help reached for after a tool was already used', () => {
       callsIn([nested(use('Bash', { command: 'npm run probe -- --help' })), nested(use('Bash', { command: 'npm run probe -- content' }))].join('\n')),
     );
     expect(reading.helpAfterUse).toEqual([]);
+  });
+});
+
+describe('the envelope the stop hook returns', () => {
+  const probed = read(
+    callsIn(
+      [
+        nested(use('Write', { file_path: `${SCRATCH}/exp/base.dsl`, content: '# info base' })),
+        nested(use('Bash', { command: `npm run probe -- ${SCRATCH}/exp/base.dsl` })),
+        nested(use('Edit', { file_path: `${WORKTREE}/content/town.dsl`, new_string: 'x' })),
+      ].join('\n'),
+    ),
+  );
+
+  it('carries nothing that is fed back to a model, because that is what cycled the agent it reports on', () => {
+    const envelope = JSON.parse(hookEnvelope(probed, 'agent-probe')) as Record<string, unknown>;
+
+    expect(Object.keys(envelope).sort()).toEqual(['suppressOutput', 'systemMessage']);
+    expect(envelope).not.toHaveProperty('hookSpecificOutput');
+    expect(envelope).not.toHaveProperty('decision');
+    expect(JSON.stringify(envelope)).not.toContain('additionalContext');
+  });
+
+  it('says in one line what was found and names the command that prints the rest', () => {
+    const { systemMessage } = JSON.parse(hookEnvelope(probed, 'agent-probe')) as { systemMessage: string };
+
+    expect(systemMessage.split('\n')).toHaveLength(1);
+    expect(systemMessage).toContain('npm run friction -- probe');
+  });
+
+  it('says so plainly when there was nothing to work out', () => {
+    const quiet = read(callsIn(nested(use('Edit', { file_path: `${WORKTREE}/content/town.dsl`, new_string: 'x' }))));
+
+    expect(JSON.parse(hookEnvelope(quiet, 'agent-quiet')).systemMessage).toContain('nothing it had to work out first');
   });
 });
 

@@ -122,3 +122,26 @@ be asking on a route where the rats are already levelling attack.
 *Moves on which of the three it is. `npm run simulate-activity` is where the answer is read rather
 than reckoned, and any one of the three is a lane's afternoon once picked; a lane cannot
 pick, because the choice is about what the tutorial is teaching.*
+
+## Whether the other four skills should reach into the town the way thieving now does
+
+Thieving was inverted: `content/tulsa.dsl` names no `thieving.*` id at all, and the skill
+writes itself onto the town's people and rooms from `content/thieving.dsl` through
+addressed headings and `? tulsa`. Verified — `npm run probe -- content --off thieving
+--off quests --off tiers` loads clean and all 27 of tulsa's routes pass, so the skill
+strips out and leaves a town behind.
+
+What that leaves is lopsided rather than finished. Tulsa's `# entity player` still names
+`fishing.fishing`, `cooking.cooking`, `smithing.smithing` and `crafting.crafting` on its
+`skills:` line and no longer names thieving, so the town now depends on every skill but
+the one that was done. Either thieving is the pattern and four modules should follow it,
+or thieving is the exception because a skill whose whole subject is other people is the
+one that genuinely belongs on top of a town, and the other four are fine where they are.
+
+The cost is known and small: the thieving inversion was one lane, and the same move is
+four-ish lines per module — the entity merges, the `? tulsa`, the `skills:` line. The
+question is not the work, it is whether one shape or two is the right answer.
+
+*Moves when: he says whether the inversion is the pattern or the exception. A lane cannot
+pick, because it is a ruling about what a module is for rather than about what any file
+does.*
