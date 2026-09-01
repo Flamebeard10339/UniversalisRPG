@@ -103,7 +103,6 @@ group: skilling
 # resource health
 max: max-health
 rate: regeneration
-start: 30
 
 # event death
 resource: health

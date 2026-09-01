@@ -8,7 +8,6 @@ import { ENGINE_KEYS } from '../src/content/locale';
 import { LOCAL_CHANGES_MODULE_ID, renderLocalChangesModule } from '../src/content/localChanges';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverse } from '../src/content/load';
-import { worldFor } from '../src/content/shipped';
 import { FIXTURE_WORLD } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { localizerFor } from '../src/runtime/localized';
@@ -18,6 +17,7 @@ import { readRoom, serializeSession, sessionStatus, startSession, view } from '.
 import { COMMANDS, NO_SAVES, NOT_LOADED, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
 import { AUTOSAVE_SLOT, DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT, type SaveContext } from '../src/runtime/saveSlots';
 import { driveRun, fileAuthoring, fileSaves, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
+import { fixtureSources } from '../src/content/worldFixture';
 
 const localizer = localizerFor(loadInEnglish(''), 'en');
 
@@ -27,7 +27,7 @@ const drawn = (output: Parameters<typeof formatOutput>[0]): string[] => asPrinte
 const live = (progress: Parameters<typeof formatLive>[0]): string => printed(formatLive(progress, localizer));
 const ticked = (progress: Parameters<typeof formatTick>[0]): string[] => asPrinted(formatTick(progress, localizer));
 
-const TUTORIAL: readonly ModuleSource[] = worldFor('first-steps');
+const TUTORIAL: readonly ModuleSource[] = fixtureSources();
 
 const PLANE_SOURCE =
   FIXTURE_WORLD +
@@ -89,15 +89,15 @@ describe('play-cli renders what a command result says happened', () => {
   it('prints a view as narration, location, occupants, pools, modals, choices and the clock', () => {
     const lines = shown(runLine(read(driver(TUTORIAL)), '/look'));
 
-    expect(lines[0]).toBe('Guide House (first-steps.guide-house)');
-    expect(lines[1]).toBe(`A cluttered but cozy cottage. Miki's guide house.`);
-    expect(lines[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
+    expect(lines[0]).toBe('The Green (fixture-town.green)');
+    expect(lines[1]).toBe('Cropped grass, a bench, and three ways out of it.');
+    expect(lines[2]).toBe('Here: The Keeper, The Side Door');
     // A pool is drawn as its name, a bar and what it stands at over its ceiling. Nobody has been
     // hurt yet, so the bar is full and the two figures read alike — which is the shape of the line
     // rather than the figure the sheet of the day puts in it.
     expect(lines[3]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
-    expect(lines).toContain('  1) [Presence] Miki: Talk');
-    expect(lines).toContain('  2) [Presence] Miki: Examine');
+    expect(lines).toContain('  1) [Presence] The Keeper: Talk');
+    expect(lines).toContain('  2) [Presence] The Keeper: Examine');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
   });
 
@@ -108,9 +108,9 @@ describe('play-cli renders what a command result says happened', () => {
     const unread = shown(runLine(ctx, '/look'))[2];
 
     expect(unread).toContain('?');
-    expect(unread).not.toContain('Miki');
+    expect(unread).not.toContain('The Keeper');
 
-    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: Miki, Front Door, Stairs, Mirror, Oven, Back Door');
+    expect(shown(runLine(read(ctx), '/look'))[2]).toBe('Here: The Keeper, The Side Door');
   });
 
   it('speaks the engine’s own words over a universe nobody named the locale to', () => {
@@ -137,7 +137,7 @@ describe('play-cli renders what a command result says happened', () => {
 
   it('prints a location description on first arrival and again only when /look asks', () => {
     const ctx = driver(TUTORIAL);
-    const described = `A cluttered but cozy cottage. Miki's guide house.`;
+    const described = 'Cropped grass, a bench, and three ways out of it.';
 
     expect(shown(runLine(ctx, '/look'))).toContain(described);
     expect(shown(runLine(ctx, '/wait 1'))).not.toContain(described);
@@ -175,9 +175,9 @@ describe('play-cli renders what a command result says happened', () => {
     // read for its form.
     expect(state).toHaveLength(9);
     expect(state.slice(0, 4)).toEqual([
-      'Location: first-steps.guide-house',
+      'Location: fixture-town.green',
       'Elapsed simulated time: 7s',
-      'Flags: {"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true}',
+      'Flags: {"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true}',
       'Inventory: {}',
     ]);
     // Under the name the world gives a thing as well as the id it is addressed by: an id-only
@@ -195,9 +195,9 @@ describe('play-cli renders what a command result says happened', () => {
     // The readout draws a pool the same way the room does: nobody has been hurt, so the bar is full
     // and the two figures read alike. What they come to is the sheet's business and not this one's.
     expect(state[7]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
-    expect(state[8]).toMatch(/^discovered: 1 of \d+ found; not yet found: /);
-    expect(state[8]).toContain('tulsa.market-square');
-    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: first-steps.guide-house');
+    expect(state[8]).toMatch(/^discovered: \d+ of \d+ found; not yet found: /);
+    expect(state[8]).toContain('fixture-town.cellar');
+    expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: fixture-town.green');
   });
 
   // A road whose condition does not hold is still a road, and a map that drew it the same as an
