@@ -29,6 +29,17 @@ export const memberKey = (memberKind: string, ownerKind: string, owner: string, 
 
 const SELF = 'self';
 
+// A written reference taken apart the way a lookup takes it apart: an author may lead with the kind
+// they are naming and may write `self` for the module they are standing in, and neither word is part
+// of the name being looked up. Anything asking what a reference names asks this rather than reading
+// the spellings off `resolve` again.
+export function spelledSegments(kind: string, raw: string, self: string | null): string[] {
+  const segments = raw.split('.');
+  if (segments[0] === kind && segments.length > 1) segments.shift();
+  if (segments[0] === SELF && segments.length > 1 && self !== null) segments[0] = self;
+  return segments;
+}
+
 const SHORTEST_COMPARED = 4;
 
 function oneTypoApart(a: string, b: string): boolean {

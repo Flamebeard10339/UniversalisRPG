@@ -30,6 +30,7 @@
     "migrate-saves": "tsx scripts/migrate-saves.ts",
     "rename-module": "tsx scripts/rename-module.ts",
     "move-sections": "tsx scripts/move-sections.ts",
+    "rename-section": "tsx scripts/rename-section.ts",
     "contribution:issue": "tsx scripts/publish-local-changes.ts",
     "contribution:consolidate": "tsx scripts/consolidate.ts",
     "contribution:squash": "tsx scripts/squash-local-changes.ts",
