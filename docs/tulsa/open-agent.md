@@ -60,3 +60,20 @@ it now costs a great deal more when it fires.
 
 *Closes when:* a parting takes the piece that parted. If the language cannot say
 "the worn one", that is a finding for `open-human.md` and this line crosses.
+
+## No reference build has ever worn a jewel, so half of every combat row is missing
+
+`tier-build` hands items over and equips them and never slots or allocates, so all
+fifteen saves in `content/tiers.dsl` carry empty planes. That is not a rounding error
+on the combat rows: regeneration is **1** bare and **3.5** on one cluster with an orb
+on it, measured, and what a long fight sustains is exactly that number. Combat reads
+0.55× on attack and 0.24× on health at twenty against builds that could not have been
+worn by anybody who had opened a chest.
+
+`docs/balance/open-agent.md` already carries this as a build-search line. It is worth
+taking on its own first: the search is hours and dressing a tier is one directive per
+allocation, and until a tier can wear a jewel no search has anything to search over.
+
+*Closes when:* `npm run tier-build` accepts a jewel and a set of allocations, the combat
+tiers are regenerated wearing what the level can reach, and the combat rows are re-read
+against them.

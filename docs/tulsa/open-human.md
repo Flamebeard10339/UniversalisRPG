@@ -4,39 +4,41 @@
 `open-agent.md` carrying what was measured for it.
 
 Fishing and thieving both land on the curve at all three shipped tiers and their
-frontiers climb with the level. Combat does not, and the reason is one rule rather
-than a room — that is the first line and everything else here is smaller.
+frontiers climb with the level. Combat does not, and no room is the reason — every
+combat room in the town pays on target for as long as anybody can stand in it. What
+is undecided is what pays for standing there, and that is the first line; everything
+else here is smaller.
 
 ---
 
-## Where a faint puts you, which is what decides whether a fight can be stood in
+## Whether a long fight is meant to be paid for by gear, by food, or by dying cheaply
 
 Only **two** offers in the whole questless town run a full hour: the market square,
 where a faint puts you back where you fell, and the pasture, where the chickens do not
-fight back. Every other combat offer ends in a death and a walk back from the square,
-and the tool stops the run there because going on would mean doing something else.
+fight back. Everywhere else the run ends in a death and a walk back from the square.
 
-So read the sheet's two columns rather than one. Nearly every combat row pays
-**2,300–4,500/h while it ran** against a level-20 target of 2,177 — the muster itself
-pays 4,344–4,790 on attack and 2,903–3,226 on health for the five minutes a tier-20
-build lasts in it. Over the window those become 307–396 and 228–240. **The rooms are
-sized correctly and none of them can be occupied.**
+Read the sheet's two columns rather than one. Nearly every combat row pays
+**2,300–4,500/h while it ran** against a level-20 target of 2,177 — the muster pays
+4,344–4,790 on attack and 2,903–3,226 on health for the five minutes a tier-20 build
+lasts in it, and 307–396 and 228–240 over the window. **The rooms are sized correctly
+and none of them can be occupied.**
 
-That is why attack reads 0.55× and health 0.24× at twenty while the other three skills
-read ~1×, and why the best attack in Tulsa for a character in full iron is still
-picking on townsmen. It is bounded by `core.regeneration`, which is one health a
-minute and scales with nothing.
+What bounds it is `core.regeneration`, and that stat does scale — measured, not
+reckoned: bare **1**, wearing one cluster whose root is `mending` **3**, with
+`orb-of-renewal` on that cluster **3.5**, and a fuller plane reaches about six, which
+is where health would land near 1× at twenty. So the ceiling is a build's, not a rule's.
 
-The world already has an answer — every cooked fish grants regeneration for a couple of
-minutes, which is the whole reason cooking exists — and it changes nothing above,
-because a run measuring a fight never stops to eat. Whether that is a hole in the tool
-or the honest floor is the next line.
+Which leaves the question as a design one rather than a defect. Three things pay for a
+long fight and the world half-builds all three: **gear** (jewels, now reachable — see
+`open-agent.md` for what the sheet still cannot wear), **food** (every cooked fish
+grants regeneration for a couple of minutes, which is what cooking is for), and **dying
+cheaply** (the market square, today, by accident of where a faint puts you).
 
-*Moves when: he says what sustains a long fight. Food is one answer and needs nothing
-built. A faint putting you somewhere near where you fell rather than always in the
-market square is another, and is a real change to what dying costs. Regeneration that
-climbs with the Health level is a third and is one word in `content/core.dsl`. Each
-makes a different game and no measurement picks between them.*
+*Moves when: he says which of the three carries it. If gear, the numbers above are the
+budget and the jewel drops need pricing against it. If food, the fight rooms are fine
+as they are and cooking is load-bearing for combat, which nothing currently says. If
+dying cheaply, a faint should put you somewhere near where you fell rather than always
+in the market square, and that is a real change to what dying costs.*
 
 ## Whether the sheet is allowed to eat
 
@@ -47,7 +49,9 @@ actually sit on, and it is the difference between a room reading 0.24× and read
 
 Making the tool eat breaks its own stated principle — it would be the tool deciding
 what a player does rather than asking the engine what is on offer — so this is not a
-small change and it is not obviously right.
+small change and it is not obviously right. It only matters at all if food is the answer
+to the line above; if gear is, the tool needs to wear a jewel instead, which is
+`open-agent.md`'s.
 
 *Moves when: he says whether a run may take an offer it was not pointed at in order to
 keep going. If yes it is one rule ("when a pool is low and something in the pack fills

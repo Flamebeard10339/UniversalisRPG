@@ -1329,6 +1329,8 @@ on death:
     roll: ratman-remains
     give: 8-20 core.coin
     1 in 20: give: 1 combat.iron-dagger
+    // The orb the jewel wants, behind the harder room, so sustain is bought in two steps.
+    1 in 25: give: 1 core.orb-of-renewal
 
 # entity drone-bee
 title: Drone Bee

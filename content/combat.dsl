@@ -106,6 +106,13 @@ one of:
   3x: give: 7-15 coin
   1x: give: 20-40 coin
 
+// The one thing in Tulsa that raises regeneration, and the reason it is on the road rather than in
+// the town: what a long fight costs is what a long fight is bounded by, so the thing that pays for
+// standing there has to be gettable by standing somewhere easier first. Every other source of one --
+// the smith's cache and the heartwood blade -- is behind a DEBUG chest that stands in no room.
+# droptable highwaymans-keepsake
+1 in 30: give: 1 core.stout-heart-jewel
+
 # droptable knights-purse
 give: 15-30 coin
 1 in 4: give: 1 core.rats-eye-gem
@@ -241,5 +248,6 @@ respawn after: 70s
 on death:
   credit:
     roll: purse
+    roll: highwaymans-keepsake
     give: 5-12 coin
     1 in 12: give: 1 iron-dagger
