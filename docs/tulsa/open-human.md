@@ -92,9 +92,9 @@ the never-ate floor and the balance target for them has to be stated in those te
 ## Whether a guard should jail rather than hold
 
 The brief says a hand caught in a guard's pocket ends in jail. What ships is
-`collared` — ten seconds of somebody's fist in your shirt — because a `relocate:` to
-the barracks ends the run and the sheet then measures the walk back rather than the
-guard. Jail is the better fiction and it costs the guardsman its place on the ladder:
+`inflict: thieving.dazed for thieving.collar-length` — ten seconds of somebody's fist
+in your shirt — because a `relocate:` to the barracks ends the run and the sheet then
+measures the walk back rather than the guard. Jail is the better fiction and it costs the guardsman its place on the ladder:
 it currently tops the first band at 0.99× of target at level ten, and it would go to
 roughly what the knight reads when it is throwing you across town.
 

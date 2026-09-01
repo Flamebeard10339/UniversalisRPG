@@ -114,7 +114,7 @@ watch the castle windows:
       say: The captain crosses the yard below and takes the stairs to the solar without being announced. The shutters are open for her. "Not yet," the duke says, plain enough to carry. "Not until the last of them is finished." The shutters swing to before you hear finished what.
     100x:
       drain: 2 core.health
-      inflict: thieving.dazed
+      inflict: thieving.dazed for thieving.daze-length
       say: Someone on the wall-walk turns your way a beat too long, and you go flat against the tile and very still. @@@ asked for a stealth mission where being spotted ends the attempt outright; the nearest the grammar gives for a watch that can fail is the weighted roll `pick their pocket` and the two chests already use, retried by hand, so that is what stands here instead. It carries no detection state: nobody comes looking, nothing escalates on a second or third catch, and "ends the attempt" is read as the dazed three seconds a caught hand costs everywhere else in town rather than as being thrown off the roof. A real failed-watch state — noticed, chased off the rooftops, unable to try again for a while — is not a thing this grammar has.
 
 // The pair the reporter hands over rather than sells — cut fine enough to turn

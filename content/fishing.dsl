@@ -53,9 +53,10 @@ title: Casting Speed
 base: 6
 group: core.skilling
 
-// How well a strip of bait survives the fish that took it. Nothing reads this yet -- what a cast
-// consumes is written in the cast rather than rolled against a stat -- so a point spent here buys
-// nothing until `spend-bait` can be made to ask.
+// How well a strip of bait survives the fish that took it, weighed against a hundred in the row
+// `spend-bait` opens with, so it reads as near enough the times in a hundred a strip comes back on
+// the hook. No water names it: what a cast consumes is one droptable's business and every water
+// rolls that, so a point spent here is worth the same in the shallows and off the sturgeon hole.
 # stat bait-persistance
 title: Bait
 group: core.skilling
@@ -195,12 +196,20 @@ take: 1 steel-line
 // The one thing two waters both do, and the only part of a cast that is neither the fish nor the
 // water: a rod eats a strip every time it goes out. The two deep waters roll this rather than
 // restating it, and the two net waters do not roll it at all.
+//
+// The first row is what a fisherman can buy against it: `bait-persistance` is weighed against the
+// hundred the second row carries, so a strip survives roughly that many times in a hundred and one,
+// and a player carrying none of it spends every time. Nothing here says which bait — that is the
+// second row's business, and the row that keeps a strip does not have to know what it kept.
 # droptable spend-bait
-if has wrigglers:
-  3 in 4:
-    take: 1 wrigglers
-if not has wrigglers:
-  take: 1 dried-fish-bait
+one of:
+  bait-persistance: nothing
+  100x:
+    if has wrigglers:
+      3 in 4:
+        take: 1 wrigglers
+    if not has wrigglers:
+      take: 1 dried-fish-bait
 
 // --- what comes out of the water ---
 
@@ -378,11 +387,11 @@ tackle, +20% max-line-health
 examine: A knot nobody can teach you and everybody claims to have invented.
 shape: ring
 open-connections: e
-passives: 1 keen-line, 2 drawn-out, 3 sure-hand, 4 unbreaking, 5 keen-line, 6 drawn-out
+passives: 1 keen-line, 2 drawn-out, 3 sure-hand, 4 unbreaking, 5 keen-line, 6 thrifty
 
 # item anglers-knot-jewel
 title: Angler's Knot
-examine: Six turns of something that is not quite line, and it does not come undone. @@@ It should also carry a chance not to spend the bait, which nothing in the language can say: what a cast consumes is written in the cast rather than read off a stat.
+examine: Six turns of something that is not quite line, and it does not come undone.
 cluster-jewel: anglers-knot
 
 // The knot above is the generalist and the three below are the ways of not being one: faster,
@@ -434,8 +443,8 @@ examine: A coil of line that has been wet a very long time and has not rotted.
 cluster-jewel: slack-water
 
 // Two positions and no way on: the cheapest thing in the catalogue and the only one that pays a
-// deep-water fisherman in what he actually spends. It is worth nothing at all until `spend-bait`
-// reads the stat, which is the note on the knot above.
+// deep-water fisherman in what he actually spends. What it pays in is the row `spend-bait` opens
+// with, so it is worth the same off every water in the world.
 
 # passive thrifty
 tackle, +2 bait-persistance

@@ -34,8 +34,11 @@ export function declaredSeconds(source: BuffSource): number {
   return source.tags.find((tag): tag is Extract<TagClause, { kind: 'duration' }> => tag.kind === 'duration')?.seconds ?? 0;
 }
 
-export function applyDeclared(state: GameState, actorId: string, source: BuffSource, now: number): void {
-  grantBuff(state, actorId, source, now + secondsToMs(declaredSeconds(source)));
+// How long a granted buff is held for, which the thing granting it may say instead of the buff
+// itself: whatever stands here is the whole of the stretch rather than something added to the
+// declared one, and a stretch worn down past nothing is over the moment it is given.
+export function applyDeclared(state: GameState, actorId: string, source: BuffSource, now: number, seconds = declaredSeconds(source)): void {
+  grantBuff(state, actorId, source, now + secondsToMs(Math.max(0, seconds)));
 }
 
 export function grantBuff(state: GameState, actorId: string, source: BuffSource, expiresAt: number): void {

@@ -76,25 +76,20 @@ level 2 a trunk would fall in one swing where it now takes four.
 *Moves when: he names a stat, or `none`. It is one word in `content/core.dsl` and the
 derived proof in `stat.test.ts` follows it with nothing else edited.*
 
-## A number inside a result cannot read a stat, and three asks now want it to
+## Whether a stretch may be composed of two numbers rather than named by one
 
-The Angler's Knot was asked to carry a chance not to spend the bait. What a cast consumes
-is written in the cast — `if has wrigglers: 3 in 4: take: 1 wrigglers` — and nothing reads
-a stat there, so a jewel cannot move it.
+`inflict: <buff> for <duration>` now takes a stat, and it is read off whoever the buff
+lands on. That is one number, so a mark's own grip and a thief's nerve cannot both be in
+it: what ships instead is two stats a mark picks between — `thieving.daze-length` at three
+seconds and `thieving.collar-length` at ten — and two nerve passives that take a
+percentage off **both**, because a hand hard to hold on to is hard for a townsman and a
+knight alike.
 
-Two more of the same shape have since arrived, both named in the starting-town brief and
-neither buildable. **`bait-persistance`** is that chance, as a stat. **`daze-resistance`**
-would shorten the daze a caught hand costs, and a buff's duration is written on the buff
-as a literal — so the only way one mark differs from another is by carrying its own buff
-item, which is what `thieving.collared` is. Two tiers of daze is tolerable; a number per
-mark is not, and neither is a player stat that shortens all of them.
+The cost is that "nerve shortens every hold" is written once per hold. A third stretch —
+a gaoler, a mantrap — is two more clauses on `brazen` and `hard-faced`, and nothing says
+so if they are forgotten.
 
-There is one feature under all three: **a number in a result that reads a stat** — a
-chance, a duration, a count. Two `@@@` carry them, on the Angler's Knot and on
-`thieving.collared`, each written where the thing should have been, so `npm run notes`
-reads them out. `bait-persistance` is the jewel's note said as a stat rather than a
-third one.
-
-*Moves when: he says whether a result's numbers may name a stat. It is one shape in the
-result grammar and it would serve at least these three; the notes are honest without it,
-and the workarounds shipped are honest too, so nothing is broken while it waits.*
+*Moves when: he says whether that is a rule or a choice. If a wheel is meant to be able to
+shorten one hold and not another it is already right and this line goes. If it is meant to
+shorten all of them, the number wants two sides — `for their grip less my nerve`, the shape
+`accuracy:` already has — and that is a bigger build than the one just done.*

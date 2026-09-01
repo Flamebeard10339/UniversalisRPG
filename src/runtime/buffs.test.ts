@@ -70,6 +70,22 @@ on hit: inflict: accelerated-vigor
 slot: mainhand
 on hit: inflict: flash-tonic
 
+# stat hold
+base: 5
+
+# item pinning-blade
+slot: mainhand
+on hit: inflict: venom on them for 5s
+
+# item measured-blade
+slot: mainhand
+on hit: inflict: venom on them for attack
+
+# item slack-blade
+slot: mainhand
+-9 hold
+on hit: inflict: flash-tonic for hold
+
 # item war-cry
 food, +3 attack per stack of accelerated-vigor, 60s
 
@@ -299,6 +315,33 @@ describe('an inflicted buff is granted by the declaration it names', () => {
     resolve(state, registry, secondsToMs(40));
     expect(buffsOf(state, PLAYER).length).toBe(1);
     resolve(state, registry, secondsToMs(42));
+    expect(buffsOf(state, PLAYER)).toEqual([]);
+  });
+
+  it('is held for the stretch the result names, over whatever its own declaration says', () => {
+    const registry = loaded();
+    const state = swinging(registry, 'pinning-blade');
+
+    expect(buffsOf(state, 'giant-rat')).toEqual([{ source: 'venom', tags: itemOf(registry, 'venom').tags, expiresAt: secondsToMs(6) }]);
+  });
+
+  it('reads a stat standing in that stretch off whoever it lands on, not off whoever brought it', () => {
+    const registry = loaded();
+    const state = swinging(registry, 'measured-blade');
+
+    // The rat swings at five and the player at ten, so the stretch is the rat's; and venom
+    // takes four off that same stat once it lands, so the stretch is read as it is given rather than after.
+    expect(statValue('attack', state, registry, PLAYER)).toBe(10);
+    expect(buffsOf(state, 'giant-rat')[0]!.expiresAt).toBe(secondsToMs(1 + 5));
+  });
+
+  it('is never held at all where that stat has been worn down past nothing', () => {
+    const registry = loaded();
+    const state = swinging(registry, 'slack-blade');
+    endAction(state, TEST_REASON);
+    resolve(state, registry, secondsToMs(2));
+
+    expect(statValue('hold', state, registry, PLAYER)).toBeLessThan(0);
     expect(buffsOf(state, PLAYER)).toEqual([]);
   });
 
