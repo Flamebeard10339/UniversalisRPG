@@ -3,6 +3,10 @@ import { isBase } from '../content/sections/item';
 import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import type { Directive } from '../content/sections/test';
+import { parseModuleSource } from '../content/universe';
+import { loadUniverseWithDiagnostics } from '../content/load';
+import { formatModuleDiagnostic } from '../content/registry';
+import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
 
 // What is wrong with a world that the loader will still take. A refusal stops the game; these do
@@ -122,10 +126,33 @@ function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] 
   ];
 }
 
+// A pack is what a player installs and turns on as one thing, so a module that declares none is one
+// nobody can turn off — it draws a row of its own on the portal under its own id, which is a pack of
+// one that its author did not mean to make.
+function unpacked(sources: readonly ModuleSource[]): Remark[] {
+  return sources.flatMap((source) => {
+    const info = parseModuleSource(source).info;
+    return info.pack === undefined ? [{ where: `# info ${info.id}`, says: 'declares no pack:, so the settings page offers it as a collection of one under its own id. Name the collection it ships in.' }] : [];
+  });
+}
+
+// A module nothing loads before it has nothing to lean on, so it has to load alone or it cannot load
+// at all — and a world is written from its roots outward, so one that will not is a module the next
+// module written on top of cannot be started either.
+function rootless(sources: readonly ModuleSource[]): Remark[] {
+  const byId = new Map(sources.map((source) => [parseModuleSource(source).info.id, source]));
+  return rootModules(sources).flatMap((id) => {
+    const source = byId.get(id);
+    if (source === undefined) return [];
+    const said = loadUniverseWithDiagnostics([source]).diagnostics.map(formatModuleDiagnostic);
+    return said.length === 0 ? [] : [{ where: `# info ${id}`, says: `leans on nothing and will not load on its own: ${said[0]!}` }];
+  });
+}
+
 // A rule that only wants the registry, and one that has to run the world to answer. Both are asked
 // of every world the oracle is pointed at, and each derives its own subjects.
 const RULES: readonly ((registry: Registry) => Remark[])[] = [stranded, unkept, pricedCoin, stackedBases, restated, unspoken];
-const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread];
+const WALKING_RULES: readonly ((sources: readonly ModuleSource[], registry: Registry) => Remark[])[] = [unread, (sources) => unpacked(sources), (sources) => rootless(sources)];
 
 export const remarksOn = (sources: readonly ModuleSource[], registry: Registry): readonly Remark[] => [
   ...RULES.flatMap((rule) => rule(registry)),
