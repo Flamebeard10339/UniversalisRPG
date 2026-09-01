@@ -144,7 +144,7 @@ in: raw-shrimp
 out: cooked-shrimp
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 5
+skill: cooking 1
 rate: core.cooking-rate
 say: The shrimp goes from grey to pink in about four seconds, and that is the whole of the skill.
 
@@ -154,7 +154,7 @@ in: raw-anchovies
 out: cooked-anchovies
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 6
+skill: cooking 2
 rate: core.cooking-rate
 say: They crisp in the pan all at once, which is the moment to take them off it.
 
@@ -164,7 +164,7 @@ in: herring
 out: cooked-herring
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 8
+skill: cooking 2
 rate: core.cooking-rate
 say: You grill the herring through, which is the only way it is worth eating.
 
@@ -174,7 +174,7 @@ in: combat.raw-chicken
 out: cooked-chicken
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 10
+skill: cooking 3
 rate: core.cooking-rate
 say: You turn it until the fat stops running clear.
 
@@ -184,7 +184,7 @@ in: raw-trout
 out: cooked-trout
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 14
+skill: cooking 4
 rate: core.cooking-rate
 say: You take the trout off the heat at the moment the eye goes white.
 
@@ -194,7 +194,7 @@ in: combat.raw-beef
 out: cooked-beef
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 17
+skill: cooking 5
 rate: core.cooking-rate
 say: You sear it hard on both sides and leave the middle alone.
 
@@ -204,7 +204,7 @@ in: raw-salmon
 out: cooked-salmon
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 22
+skill: cooking 6
 rate: core.cooking-rate
 say: The salmon takes longer than anything else on the range and punishes you for looking away.
 
@@ -214,7 +214,7 @@ in: raw-chestnut
 out: roasted-chestnut
 burnt: burnt-food
 accuracy: cooking
-skill: cooking 3
+skill: cooking 1
 rate: core.cooking-rate
 say: The shell splits along the score and the inside comes out soft.
 

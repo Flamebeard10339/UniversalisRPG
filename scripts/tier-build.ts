@@ -92,6 +92,10 @@ export function buildTier(registry: Registry, activity: Activity, level: number,
     // the table rather than known here: whatever appeared in it is what was handed over.
     const before = new Set(Object.keys(state.instances.byId));
     receiveItem(state, registry, item, count);
+    // A stock is not always something with a slot. Bait is worn and raw fish is not, and both are
+    // handed over for the same reason -- they are spent by doing the activity -- so a thing with
+    // nowhere to go on the body is carried and nothing is tried.
+    if (registry.items.get(item)?.slot === undefined) continue;
     const minted = Object.keys(state.instances.byId).find((id) => !before.has(id));
     const refused = equip(state, registry, minted ?? item);
     worn.push(refused === undefined ? { item } : { item, refused: String(refused) });

@@ -101,9 +101,10 @@ group: combat
 # stat max-health
 group: combat
 
-// Chestnuts per minute: 55/min is one about every 1.1 seconds.
+// Fish per minute: 6/min is one about every ten seconds, which is the pace the rest of the
+// skilling in the world was brought to. A second and a bit a fish was an idle game's kitchen.
 # stat cooking-rate
-base: 55
+base: 6
 group: skilling
 
 // The drop channel. Contested like any other roll, so a charm that reads

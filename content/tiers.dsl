@@ -22,6 +22,7 @@ pack: balance
 dependencies:
   core
   combat
+  cooking
   crafting
   fishing
   thieving
@@ -72,3 +73,19 @@ dependencies:
 
 # save thieving-tier-20
 {"version":13,"xp":{"thieving.thieving":5345}}
+
+// --- cooking ---
+
+// A cook's whole kitchen and nine hundred of everything anybody in Tulsa can put in a pan. Cooking
+// is the one activity here whose ceiling is not the room but the pack: in play it is bounded by
+// what the water and the pasture handed over, so a tier stocked to the brim is measuring the stove
+// rather than the supply, which is the same reason the fishing tiers carry bait by the thousand.
+
+# save cooking-tier-1
+{"version":13,"inventory":{"cooking.chefs-hat":1,"cooking.oven-mitts":1,"fishing.raw-shrimp":900,"fishing.raw-anchovies":900,"fishing.raw-trout":900,"fishing.raw-salmon":900,"combat.raw-chicken":900,"combat.raw-beef":900},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"cooking.cast-iron-pan","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}
+
+# save cooking-tier-10
+{"version":13,"inventory":{"cooking.chefs-hat":1,"fishing.raw-shrimp":900,"fishing.raw-anchovies":900,"fishing.raw-trout":900,"fishing.raw-salmon":900,"combat.raw-chicken":900,"combat.raw-beef":900},"xp":{"cooking.cooking":1382},"equipped":{"gloves":"cooking.oven-mitts","mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"cooking.cast-iron-pan","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}
+
+# save cooking-tier-20
+{"version":13,"inventory":{"fishing.raw-shrimp":900,"fishing.raw-anchovies":900,"fishing.raw-trout":900,"fishing.raw-salmon":900,"combat.raw-chicken":900,"combat.raw-beef":900},"xp":{"cooking.cooking":5345},"equipped":{"head":"cooking.chefs-hat","gloves":"cooking.oven-mitts","mainhand":"1"},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"cooking.cast-iron-pan","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":2617077404}

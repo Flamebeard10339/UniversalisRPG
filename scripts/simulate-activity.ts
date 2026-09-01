@@ -159,7 +159,10 @@ export function subjectsFrom(registry: Registry, save: string, narrow: Pick<Simu
     applyDirective(session, { kind: 'goto', location: at });
     readRoom(session);
     for (const choice of sessionStatus(session).choices) {
-      if (choice.kind !== 'action') continue;
+      // A craft is an offer like any other: it is a thing the engine puts in front of a player
+      // standing at a station, it fills time, and it pays a skill. Leaving it out made a whole
+      // skill invisible here — a stove offered nothing but a look at itself.
+      if (choice.kind !== 'action' && choice.kind !== 'craft') continue;
       const use = printDirective(choiceToDirective(choice));
       if (narrow.holds !== undefined && !use.includes(narrow.holds)) continue;
       found.push({ at, depth: depths.get(at), use });
