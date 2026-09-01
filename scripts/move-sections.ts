@@ -4,8 +4,9 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { registryDiff, type Rewriting } from '../src/content/registryDiff';
 import { splitSections } from '../src/grammar/structure';
+import { rewritingBetween } from './lib/idForms';
 import { blockOf, gap, landing, lineStarts } from './lib/sectionPlacement';
-import { corpusOf, occurrencesOf, readScope, SCOPE, sourceOf, type TextFile } from './rename-module';
+import { corpusOf, readScope, SCOPE, sourceOf, type TextFile } from './rename-module';
 
 export interface MoveReport {
   lines: string[];
@@ -35,20 +36,8 @@ interface Edit {
 const applyEdits = (text: string, edits: readonly Edit[]): string =>
   [...edits].sort((one, other) => other.start - one.start).reduce((out, edit) => out.slice(0, edit.start) + edit.text + out.slice(edit.end), text);
 
-const literally = (text: string): RegExp => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-
-// The forms a qualified id takes: written whole, which is what `occurrencesOf` matches and covers a DSL address, a `# save` key or value and a string literal under src; keyed as `<module>.<kind>.<id>` on a line the game says; and split into segments inside a condition's reference, which only a serialized value ever shows.
-//
-// A form missing from this list is a refusal rather than a silent pass — the value still reads under the old module, and the diff below reports it changed — so the list is what lets a correct move through and never what lets a wrong one through.
-export const rewritingOf = (from: string, to: string, headings: readonly Heading[]): Rewriting => {
-  const rules: (readonly [RegExp, string])[] = [];
-  for (const id of new Set(headings.map((heading) => heading.id))) {
-    rules.push([occurrencesOf(`${from}.${id}`), `${to}.${id}`]);
-    rules.push([literally(`"${from}","${id}"`), `"${to}","${id}"`]);
-  }
-  for (const { kind, id } of headings) rules.push([occurrencesOf(`${from}.${kind}.${id}`), `${to}.${kind}.${id}`]);
-  return (text) => rules.reduce((out, [pattern, replacement]) => out.replace(pattern, replacement), text);
-};
+export const rewritingOf = (from: string, to: string, headings: readonly Heading[]): Rewriting =>
+  rewritingBetween(headings.map((heading) => [{ module: from, ...heading }, { module: to, ...heading }] as const));
 
 export function moveSections(files: readonly TextFile[], from: string, to: string, headings: readonly Heading[]): MoveReport {
   if (from === to) return refused([`${from} and ${to} are the same id, so there is nothing to move.`]);

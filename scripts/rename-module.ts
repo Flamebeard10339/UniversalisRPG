@@ -5,7 +5,10 @@ import { formatModuleDiagnostic } from '../src/content/registry';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
 import { covers } from './lib/layers';
+import { occurrencesOf } from './lib/idForms';
 import { posix, trackedFiles } from './lib/sourceFiles';
+
+export { occurrencesOf };
 
 export const SCOPE: readonly string[] = [CORPUS_DIR, 'src', 'scripts', 'package.json'];
 
@@ -24,16 +27,11 @@ export interface RenameReport {
   moved: { from: string; to: string } | null;
 }
 
-// A module id is a token: it stands as the `# info` id, as the first segment of any address written whole, and as the stem of the file it lives in. Nothing that keys off it is spelled any other way, so one boundary rule reaches all three — and leaves `town-quests` and `old-town` alone.
-const EDGE = '[A-Za-z0-9_-]';
-
-export const occurrencesOf = (id: string): RegExp => new RegExp(`(?<!${EDGE})${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!${EDGE})`, 'g');
-
 const stemOf = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
 
 export const sourceOf = (file: TextFile): ModuleSource => ({ name: stemOf(file.path), text: file.text });
 
-export const corpusOf = (files: readonly TextFile[]): TextFile[] => files.filter((file) => covers(CORPUS, file.path) && file.path.endsWith(MODULE_EXTENSION));
+export const corpusOf = (files: readonly TextFile[], root: string = CORPUS): TextFile[] => files.filter((file) => covers(root, file.path) && file.path.endsWith(MODULE_EXTENSION));
 
 const refused = (lines: string[]): RenameReport => ({ lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [], moved: null });
 
