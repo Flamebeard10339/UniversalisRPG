@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
-import { loadUniverseWithDiagnostics } from '../content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { localizerFor } from '../runtime/localized';
 import type { ModuleSource } from '../content/universe';
@@ -16,12 +15,15 @@ import { clearingReaches, OPENING_CELLS } from '../runtime/openUniverseFixture';
 import type { UniverseProblem } from '../runtime/openUniverse';
 import { createDriver, REMEDIES, type Driver } from './driver';
 import { FaultBanner } from './FaultBanner';
+import { mapFixtureFor } from '../runtime/mapFixture';
 import { SHIPPED_SOURCES } from './shippedContent';
 import { wordsOf } from './words';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
 const words = wordsOf(localizerFor(loadInEnglish(''), 'en'));
+
+const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(SHIPPED_SOURCES);
 
 const pageSlots = (): SlotDriver => {
   const storage = pageStorage();
@@ -92,13 +94,10 @@ describe('a problem is never drawn as text with nothing beside it (c3, c7)', () 
   });
 });
 
-// Any real location proves the same rule; naming one by hand would go stale the day an author renamed it.
-const REAL_LOCATION = [...loadUniverseWithDiagnostics(SHIPPED_SOURCES).registry.locations.values()].find((location) => location.starting)!.id;
-
 function brokenLocal(): string {
   const driver = createDriver(SHIPPED_SOURCES, { slots: pageSlots(), ticker: () => () => undefined });
-  driver.send(`/dsl location ${REAL_LOCATION} x: 7, y: 7`);
-  return (driver.localChanges() ?? '').replace('x: 7, y: 7', 'x: sideways');
+  driver.send(MOVE_LINE);
+  return (driver.localChanges() ?? '').replace(MOVED_TO_FIELDS, 'x: sideways');
 }
 
 function shippedModules(directory: string, prefix: string): Array<{ file: string; text: string }> {
@@ -129,11 +128,11 @@ describe('taking a remedy changes the state it was taken from (c7)', () => {
     const driver = createDriver(SHIPPED_SOURCES, { slots, ticker: () => () => undefined });
     expect(driver.snapshot().problems.flatMap((problem) => problem.modules)).toEqual([LOCAL_CHANGES_MODULE_ID]);
 
-    store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal().replace('x: sideways', 'x: 7, y: 7'));
+    store.write(LOCAL_CHANGES_MODULE_ID, brokenLocal().replace('x: sideways', MOVED_TO_FIELDS));
     driver.reopen();
 
     expect(driver.snapshot().problems).toEqual([]);
-    expect(driver.snapshot().view.discovered.find((place) => place.id === REAL_LOCATION)).toMatchObject({ x: 7, y: 7 });
+    expect(driver.snapshot().view.discovered.find((place) => place.id === MOVED_PLACE)).toMatchObject(MOVED_TO);
   });
 
   it('offers the remedy that loads the page again, which is the only thing that re-reads a shipped module', () => {
