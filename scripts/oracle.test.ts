@@ -35,7 +35,6 @@ describe('a draft handed to the engine whole', () => {
     { name: 'island', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n') },
   ];
 
-  // A rule about two sections at once has no line of its own to be laid on, so a draft can be clean line by line and still be a draft the engine will not take.
   it('says what the world refuses about a draft that every line of is fine', () => {
     const said = takenLines(reading('glade.dsl', ['# location glade', 'x: 12, y: 4', 'starting'].join('\n'), WORLD)).join('\n');
 
@@ -56,7 +55,6 @@ describe('a draft handed to the engine whole', () => {
   });
 });
 
-// An author reaches for --at to edit a module as readily as to write a new one, and a module is which module it is by the id its own # info names, so where the file sits says nothing about which of the three this is.
 describe('which module a draft is', () => {
   const WORLD = [{ name: 'island.dsl', text: ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n') }];
   const EDITED = ['# info island', 'version: 1.0.1', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item lantern', 'title: Lantern'].join('\n');
@@ -64,7 +62,6 @@ describe('which module a draft is', () => {
   const UNDECLARED = ['# item lantern', 'title: Lantern'].join('\n');
   const declares = (read: { known: readonly { address: string }[] }, address: string): boolean => read.known.some((each) => each.address === address);
 
-  // Two copies of one module is exactly what the engine refuses, so a draft standing beside the module it is a version of answers about a world that could never be loaded.
   it('takes the place of the module whose id it declares, rather than standing beside it', () => {
     const read = reading('anywhere/at/all.dsl', EDITED, WORLD);
 
@@ -117,7 +114,6 @@ describe('a draft is answered against the world it declares, not only the one al
     expect(takenLines(read).join('\n')).toContain('lampp');
   });
 
-  // The one refusal that keeps a draft out is also what empties the world of everything the draft declares, so reporting both leaves the real error buried under its own consequences.
   it('says nothing about undeclared ids while the draft is out of the world, since none of what it declares is in it', () => {
     const typo = DRAFT.replace('give: 1 lamp', 'give: 1 lampp');
     const read = reading('hermitage.dsl', typo, WORLD);
@@ -128,7 +124,6 @@ describe('a draft is answered against the world it declares, not only the one al
   });
 });
 
-// A comment is whatever the engine drops, and the engine drops it wherever it is written — before the first heading, indented inside a block, at any depth. What it does not drop is a `//` with content in front of it, which is a line like any other and gets the answer any line gets.
 describe('which lines of a draft are answered for', () => {
   const KNOWN = [{ kind: 'location', address: 'tulsa.beach' }];
   const DRAFT = [
@@ -220,7 +215,6 @@ describe('what the oracle is asked for', () => {
     expect(parseArgs(['item', 'location'])).toEqual({ at: null, walk: false, line: null, kinds: ['item', 'location'] });
   });
 
-  // A kind is a word and a line is a number, so what follows --walk says on its own which of them it is.
   it('reads the one line a walk was asked about, however it was written', () => {
     expect(parseArgs(['--at=draft.dsl', '--walk', '738'])).toEqual({ at: 'draft.dsl', walk: true, line: 738, kinds: [] });
     expect(parseArgs(['--at=draft.dsl', '--walk=738'])).toEqual({ at: 'draft.dsl', walk: true, line: 738, kinds: [] });

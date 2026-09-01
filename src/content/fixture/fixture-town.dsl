@@ -1,13 +1,7 @@
-// Somewhere for the fixture world to stand: three places, a road between each pair, the player, a
-// keeper with a counter, and something hostile to swing at. See `core.dsl` for what this
-// world is and why it is not under `content/`.
-
 # info fixture-town
 version: 1.0.0
 pack: fixture
 dependencies: core
-
-// --- places ---
 
 # location green
 title: The Green
@@ -87,12 +81,8 @@ examine: Cold, and lower than the well.
 below store
 entities: keeper, wanderer
 
-// One shape on the map gathering the places under a roof, so a region has something to be, and two
-// rooms written off another rather than placed, so a floor above and a floor below are reachable.
 # region the-yard
 holds: shed, pump, loft, cellar
-
-// --- who is here ---
 
 # entity player
 title: You
@@ -123,8 +113,6 @@ respawn after: 10m
 on death:
   roll: vermin-drops
 
-// A skill of its own, so this module is a second activity beside the core's — an activity is a
-// module that declares skills, and a world with only one of them cannot say what two costs.
 # stat haggling-rate
 base: 10
 group: skilling
@@ -132,8 +120,6 @@ group: skilling
 # skill haggling
 stat: haggling-rate
 
-// Worn only by somebody who has climbed for it, which is the one shape that makes a tier's gear list
-// depend on the tier.
 # item ledger
 title: Ledger
 examine: Columns of figures in three hands, none of them tidy.
@@ -141,8 +127,6 @@ slot: main-hand
 requires: level.haggling >= 5
 value: 20
 +3 core.attack
-
-// --- what is said here ---
 
 # dialogue keeper
 owner = keeper
@@ -159,8 +143,6 @@ node greeting:
 node the-well:
   Rats. More of them than there were.
 
-// A second opener, so talking to the keeper puts up a list to pick out of rather than entering the
-// one thread there is. An entity with one voice and an entity with several are different beats.
 node about-the-town:
   when: time >= 0
   ask: How long have you kept this counter?
@@ -179,8 +161,6 @@ title: The Wanderer
 examine: Somebody who has walked further today than you have.
 faction: world
 
-// A stair is a free relocate to somewhere a road already reaches, which is the one shape that makes
-// the road beside it a second way to say the same thing.
 # entity stair
 title: The Stair
 faction: world
@@ -191,8 +171,6 @@ go down:
   instant
   relocate: cellar
 
-// A door that governs the road it stands beside: until the player has met it, the road is what
-// carries them out, and once they have, the door is.
 # entity side-door
 title: The Side Door
 examine: Bolted from this side, which means it opens from this side.
@@ -203,8 +181,6 @@ step through:
   hidden if: not side-door.unlocked
   relocate: gate
 
-// Somewhere a plane and the jewels for it come from in one action, so a route reaches a plane screen
-// without a save being written to put one in the player's hands.
 # entity chest
 title: The Chest
 faction: world
@@ -234,8 +210,6 @@ node greeting:
   always
   again: Three ways, still.
   Three ways out of a green is two more than most greens manage.
-
-// --- what may be bought ---
 
 # shop counter
 coin: copper-coin

@@ -191,7 +191,6 @@ node greeting:
   -> Say nothing.
 `;
 
-// Every modal the shipped corpus names, in both spellings the language writes it. Nothing declares a modal any more, so the lines themselves are the subjects, and a corpus that has stopped writing any is a failure rather than a pass.
 const NAMES_A_MODAL = /open[ -]modal:[ \t]*([a-z][a-z0-9-]*)/g;
 
 function modalsNamed(): { name: string; where: string }[] {
@@ -238,8 +237,6 @@ describe('the modal stack', () => {
     expect(v.player).toEqual({ name: { id: 'Rowan', label: 'Name', title: 'Rowan' }, race: null });
   });
 
-  // Every screen the engine knows, not only the ones a world may open by name: a frame the engine
-  // mints itself still reaches a player through the warning that closes it on a stale save.
   it('has words for every screen it knows, none of them the address it keys the screen by', () => {
     const localizer = localizerFor(loadInEnglish(STACKING_MODULE), DEFAULT_LANGUAGE);
 
@@ -854,7 +851,6 @@ describe('nothing a player answers with carries words', () => {
   const walked = new Set<string>();
   const leavable: { name: string; offers: boolean }[] = [];
 
-  // Whatever the fixture's first stat is, so the screen is walked without this naming one.
   const statId = (session: PlaySession): string => view(session).stats[0].id;
 
   const rows = (session: PlaySession): string[] => {
@@ -878,7 +874,6 @@ describe('nothing a player answers with carries words', () => {
       const open = view(session).modals;
       const top = open[open.length - 1];
       const asking = askedOption(open);
-      // A screen that names no way out is one there is no leaving early — character creation is answered, a dialogue menu is chosen — and says so by publishing none. A screen taking free text offers the way out by taking anything: there is no list for it to be missing from.
       if (top?.leaving && asking) leavable.push({ name: top.name, offers: asking.values === null || asking.values.some((choice) => choice.value === top.leaving) });
     };
 
@@ -950,7 +945,6 @@ describe('nothing a player answers with carries words', () => {
     expect(everyValue('es')).toEqual(everyValue('en'));
   });
 
-  // Clicking away from a screen answers it with the value it says it leaves by, so a screen that does not offer that value among the ones it is asking for cannot be left that way. The subjects are every screen the walk above opens, in every state it opens them in.
   it('offers the value it says it leaves by, in every state every screen is asked in', () => {
     everyValue('en');
 

@@ -76,7 +76,6 @@ describe('diffState', () => {
     expect(diffState(state, baseline)).toEqual({ inventory: { bread: 1 } });
   });
 
-  // Derived from what each record field declares its sparsest holding to be, so a record field added next month is covered here without an edit.
   it.each((Object.keys(SAVE_FIELDS) as SaveField[]).filter((field) => SAVE_FIELDS[field].shape === 'record'))('says nothing of a %s key held at its sparsest value', (field) => {
     const registry = loadInEnglish(MODULE);
     const baseline = initialState(registry);
@@ -142,8 +141,6 @@ describe('loadSave', () => {
     const target = createGameState();
     loadSave(target, saved, registry);
 
-    // The log and what the player was last told they carry are what a session holds rather than
-    // what a save does, and neither crosses the round trip.
     const { log: _targetLog, carriedTold: _targetTold, ...targetRest } = target;
     const { log: _stateLog, carriedTold: _stateTold, ...stateRest } = state;
     expect(targetRest).toEqual(stateRest);
@@ -381,9 +378,6 @@ describe('compareSave', () => {
     expect(compareSave(state, saved, registry)).toEqual(['flags.side-quest: true vs false']);
   });
 
-  // A path is what the player did, so what the numbers came to is not compared however a sheet
-  // names it. This is the whole of what keeps a balance pass out of the suite, so it is proved on
-  // a field that is not walked rather than left to the corpus to notice.
   it('is blind to a field a walked path is not made of, however loudly the save names it', () => {
     const registry = loadInEnglish(MODULE);
     const state = initialState(registry);
@@ -590,8 +584,6 @@ describe('a # save body is checked past its version', () => {
 });
 
 describe('a # save written over others', () => {
-  // A real item copy, because the ids are being followed through a load and pruning throws away a
-  // copy of a kind nothing claims before there is anything left to look at.
   const plane = { '0,0': { jewel: null, entry: null, roll: 0.5, allocatedPositions: [], allocatedSlots: [], effects: [] } };
   const copy = (id: string, template = 'helm') => ({ next: Number(id) + 1, byId: { [id]: { kind: 'item', template, payload: { roll: 0.5, plane } } } });
 
@@ -611,14 +603,7 @@ describe('a # save written over others', () => {
     expect(() => loadSave(createGameState(), { version: SAVE_VERSION, over: ['nowhere'], diff: {} }, registry)).toThrow(/written over nowhere, which nothing declares/);
   });
 
-  // Both layers were written by runs that minted from the same counter, so both call their own copy
-  // `1`. What is asked here is that the second one is dealt a fresh id and that every way its body
-  // names the copy follows it -- worn, in the pack, and under way -- while the first keeps the id it
-  // was written with.
   it('renumbers the second of two layers that each minted copies, and takes its references with it', () => {
-    // A second helm with an action of its own, because what is under way is pruned off a save that
-    // names an action nothing declares. It is aimed at the copy rather than owned by one: an
-    // `item.<copy>` owner is pruned on every load, which is a fault of its own and not this one's.
     const swinging = `${PRUNE_MODULE}\n# item swung-helm\nslot: head\nswing:\n  say: Thump.\n`;
     const registry = laid({ grown: { version: SAVE_VERSION, diff: { instances: copy('1'), equipped: { head: '1' } } } }, swinging);
     const state = createGameState();
@@ -907,8 +892,6 @@ describe('what checkSave accepts, loadSave can read, for every field there is', 
     });
   }
 
-  // A save written before a setting was declared holds nothing under its name. Refusing that would
-  // mean every setting added is a setting that shuts the saves written the month before it.
   it('opens a save written before any one setting there is was declared', () => {
     for (const missing of SETTING_NAMES) {
       const settings = Object.fromEntries(SETTING_NAMES.filter((name) => name !== missing).map((name) => [name, settingNamed(name).standing]));

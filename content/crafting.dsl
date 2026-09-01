@@ -1,15 +1,3 @@
-// Crafting — everything the town wears and uses that is not made of metal, made out of what came off
-// the things it was made of.
-//
-// Where smithing buys its stock over a counter, crafting is paid for by having been somewhere: hide
-// off the cattle, pelt off the wolves, feather off the chickens, gut off whatever was on the slab.
-// It needs no station at all — a knife and a lap is the whole of the workshop — so every recipe here
-// is one a player can run standing in the room they got the material in.
-//
-// It is also where fishing's tackle comes from, which is the one place two of these skills touch: a
-// line is a crafted thing that is spent by fishing, so a player who fishes either buys line forever
-// or learns to make it.
-
 # info crafting
 version: 1.0.0
 pack: skills
@@ -18,8 +6,6 @@ dependencies:
   combat
   fishing
 
-// The cadence every recipe here runs at, the way `smithing` is for the anvil. Nothing crafted can be
-// spoiled, so what the levels buy is the speed of the pile.
 # stat crafting
 title: Crafting
 base: 30
@@ -28,9 +14,6 @@ group: core.skilling
 # skill crafting
 title: Crafting
 stat: crafting
-
-
-// --- what a hide becomes on the way ---
 
 # item leather
 title: Leather
@@ -51,8 +34,6 @@ value: 40
 title: Quill
 examine: A cut feather. Fletchers want them by the hundred and so, it turns out, does anybody making a line.
 value: 2
-
-// --- the leathers, which are the tier below bronze ---
 
 # item leather-coif
 title: Leather Coif
@@ -94,8 +75,6 @@ requires: level.crafting >= 15
 value: 90
 item-level: 4-8
 armour, +2 core.defense, +4 core.max-health
-
-// --- turning what you killed into what you can use ---
 
 # recipe leather
 in: 1 combat.cowhide
@@ -159,8 +138,6 @@ out: 1 wolfskin-gloves
 skill: crafting 120
 rate: crafting
 say: Fur out, leather in the palm, and the seam hidden along the side of the finger.
-
-// --- the tackle, which is fishing's and is made here ---
 
 # recipe gut-line
 in: 2 sinew

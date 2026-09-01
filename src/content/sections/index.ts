@@ -34,7 +34,6 @@ import { station } from './station';
 import { test } from './test';
 import { variable } from './variable';
 
-// A thunk, not a const: a kind's file may reach this module, and a list built while one member is still loading holds an undefined.
 const declared = () => [stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
@@ -99,13 +98,10 @@ export const actionOwnerKinds = (): readonly SectionKind[] => kindsWhere((each) 
 
 export { isActionOwnerKind, isDebug, listedToPlayer, DEBUG_MARK, EVERY_SECTION } from './define';
 
-// Where a name of this kind is kept apart from the same word written in another module. A member kind's key hangs beneath the section that declared it, so it is scoped however that section's id is.
 export const idScopeOf = (kind: string): Ids => sectionFor(kind)?.ids ?? (MEMBER_KINDS.includes(kind) ? 'owned' : 'none');
 
-// A kind whose ids a module owns, so one written under it is qualified and one written at it is rewritten into the key the world holds it under.
 export const isOwnedKind = (kind: string): boolean => idScopeOf(kind) === 'owned';
 
-// A kind that answers for every name of it there is, so one nothing declared is refused where it is written.
 export const isCheckedKind = (kind: string): boolean => sectionFor(kind)?.vocabulary === 'declared' || MEMBER_KINDS.includes(kind);
 
 export const registryMapOf = (kind: string): string | null => sectionFor(kind)?.map ?? null;

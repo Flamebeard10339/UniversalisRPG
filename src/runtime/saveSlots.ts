@@ -10,9 +10,6 @@ export const AUTOSAVE_SLOT = 'autosave';
 
 export const MODULES_OFF_SLOT = 'modules-off';
 
-// A cadence is the least time to leave between autosaves, in seconds. Zero is not *never*: it is no
-// minimum at all, which is what writing after every action is. Never is a word of its own, because
-// a quantity of nothing and the absence of one are different answers.
 export const NEVER = 'never';
 
 export type Cadence = number | typeof NEVER;
@@ -62,9 +59,6 @@ export function liveHolding(save: SaveContext): SlotState {
   return stateOf(save.store, liveSlot(save));
 }
 
-// The cadence the store stands at, or null when the slot holds something this cannot read. A slot
-// nobody has written stands at the default, which is the whole of how a player who never asked for
-// a cadence gets one.
 export function cadenceOrUnreadable(save: SaveContext): Cadence | null {
   const state = stateOf(save.store, AUTOSAVE_SLOT);
   if (state.kind === 'empty') return DEFAULT_CADENCE;
@@ -74,10 +68,6 @@ export function cadenceOrUnreadable(save: SaveContext): Cadence | null {
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
-// The modules the player has turned off, by the name each source is loaded under. A slot nobody has
-// written turns nothing off, and one holding bytes this cannot read is read the same way: a world
-// that will not open is a worse answer to an unreadable preference than a world with everything in
-// it, and the portal is on the settings page either way so the choice can be made again.
 export function modulesTurnedOff(save: SaveContext): ReadonlySet<string> {
   const state = stateOf(save.store, MODULES_OFF_SLOT);
   if (state.kind !== 'held') return new Set();
@@ -102,8 +92,6 @@ function liveWrittenAt(save: SaveContext): number | null {
   return datable(save.store, liveSlot(save))?.writtenAt ?? null;
 }
 
-// A cadence nothing can read stops the autosaving rather than raising: this is asked under every
-// action, and a slot that has stopped parsing would otherwise raise under every one of them.
 export function autosaveDue(save: SaveContext): boolean {
   const cadence = cadenceOrUnreadable(save);
   if (cadence === null || cadence === NEVER) return false;

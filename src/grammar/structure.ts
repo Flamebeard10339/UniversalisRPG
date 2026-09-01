@@ -17,6 +17,10 @@ export interface RawSection {
 
 const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
+export const COMMENT_MARK = '//';
+
+export const isCommentLine = (line: string): boolean => line.trim().startsWith(COMMENT_MARK);
+
 export const hasBlock = (line: RawLine): boolean => line.children.length > 0;
 
 const TAKEN = new WeakSet<RawLine>();
@@ -78,7 +82,7 @@ export function splitSections(source: string): RawSection[] {
       stack = [];
       continue;
     }
-    if (textLine.trim() === '' || textLine.trim().startsWith('//')) continue;
+    if (textLine.trim() === '' || isCommentLine(textLine)) continue;
     if (!current)
       throw new DslError(`content before first section: ${textLine}`, {
         start: textLineStart,

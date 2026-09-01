@@ -34,9 +34,6 @@ export interface Seat {
 export interface Cadence {
   progress: number;
   attemptsMade: number;
-  // The attempt these milliseconds were counted against, which is not always the attempt the actor
-  // would make now: a pace taken to nothing leaves no live span to divide by, and this is the one
-  // the clock stopped on. A clock that has counted nothing has none.
   span?: number;
 }
 
@@ -88,7 +85,6 @@ export interface Deficit {
 
 export type Populations = Record<string, Record<string, Deficit>>;
 
-// What a shop currently holds, and the moment those counts were last settled. Between trades nothing is written: the counts a shop holds now are `at` plus however much replenishing the clock has since paid for.
 export interface ShopStock {
   readonly at: number;
   readonly counts: Readonly<Record<string, number>>;
@@ -123,27 +119,12 @@ export interface GameState extends RngCursor {
   visits: Record<string, number>;
   xp: Record<string, number>;
   log: Localized[];
-  // Why what was last under way stopped, in the words the player reads, written by whoever ends it.
   endedBecause: Localized | null;
-  // What took the fight to the player of its own accord since the span opened, or null where nothing
-  // did. `endedBecause` cannot answer this: the fight that follows an aggressor ends the span in turn
-  // and writes its own reason over the interruption's. Not saved: a span is a sitting, not a world.
   engagedBy: string | null;
-  // What the player was last told they are holding. Not saved and not compared: it is what makes a
-  // change news exactly once, and coming back to a save is not news.
   carriedTold: string | null;
   time: number;
-  // How many times something under way has come round since this world was opened — a swing that
-  // felled what it was aimed at, an ore prised loose, a loaf out of the oven. Counted rather than
-  // saved: it is read as the difference across a span, and what a span was made of is a question
-  // about the sitting rather than about the world.
   cyclesDone: number;
-  // The earliest instant anything standing here may come at the player. Arriving somewhere and
-  // felling something both push it forward, so a room is quiet for a beat before the next thing
-  // finds you. Not saved: a world picked up again is one you have just walked back into.
   engagesAt: number;
-  // Which of the debug switches this route asked for. Not saved and not cleared by loading one: a
-  // route says the word once, and everything after it is walked that way.
   debug: DebugSheet;
   activeAction: ActiveAction | null;
   journey: Journey | null;
@@ -159,12 +140,6 @@ export interface GameState extends RngCursor {
   modals: readonly ModalFrame[];
 }
 
-// The player's own sheet: for each field, the kind whose id it holds — or null where the field is the
-// player's own writing and is already the words — and the words the field is called by, which are the
-// words the question that filled it was asked in. The sheet's fields are these keys, so a field added
-// here cannot reach the state without answering both, and everything that reads one out to somebody —
-// a sentence, a view, a save that drops what the world stopped declaring — derives the answer here
-// rather than knowing about race.
 export const PLAYER_SHEET = {
   name: { names: null, asked: 'engine.modal.name' },
   race: { names: 'race', asked: 'engine.modal.race' },
@@ -176,8 +151,6 @@ export type PlayerSheet = Record<PlayerField, string>;
 
 export const PLAYER_FIELDS = Object.keys(PLAYER_SHEET) as PlayerField[];
 
-// The switches a run has been asked to walk under. Sparse: a switch nobody asked for is a key that
-// is not there, so the standing run says nothing about debugging at all.
 export type DebugSheet = Partial<Record<DebugSwitch, true>>;
 
 export const debugging = (state: GameState, which: DebugSwitch): boolean => state.debug[which] === true;

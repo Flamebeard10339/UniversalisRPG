@@ -33,9 +33,6 @@ export function isStanding(state: GameState, registry: Registry, location: Locat
   return standing(state, registry, location).some((entry) => entry.entity === templateOf(entityId));
 }
 
-// Somewhere other than here, which only an entity the world puts somewhere can be. One it puts
-// nowhere is not elsewhere — there is no room it is missing from — so *where is it, then* is a
-// question with no answer to give about it rather than one answered "not here".
 export function isElsewhere(state: GameState, registry: Registry, location: Location, entityId: string): boolean {
   return entitiesStood(registry.locations).has(templateOf(entityId)) && !isStanding(state, registry, location, entityId);
 }

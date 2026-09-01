@@ -4,10 +4,6 @@ import { NOTE_FIELDS, parseDirectiveLine, printDirective } from '../content/sect
 import { createGameState } from './runtime';
 import { runTest, startSession, testSteps, view, walkTest } from './session';
 
-// A recorded playtest is a `# test` and a `# test` is a recorded playtest — the difference is only
-// whether the replay is expected to match the record. These are the lines a recording writes that
-// an authored proof never did, and what running one over them means.
-
 const WORLD = ['# location shore', 'x: 0, y: 0', 'starting', '', '# location cove', 'x: 1, y: 0', '', '# entity miki', 'title: Miki'].join('\n');
 
 const ran = (...lines: string[]) => runTest('recorded', loadInEnglish([WORLD, '', '# test recorded', ...lines].join('\n')), createGameState());
@@ -37,8 +33,6 @@ describe('refused', () => {
     expect(ran('goto: cove', 'refused').failure).toContain('goto: cove was not refused');
   });
 
-  // Refused at load rather than at run: a mark about nothing reads exactly like a mark about
-  // something, and an author who wrote one should hear about it where they wrote it.
   it('is refused outright standing first, with nothing above it to be about', () => {
     expect(() => ran('refused')).toThrow('nothing stands there');
   });
@@ -57,9 +51,6 @@ describe('refused', () => {
   });
 });
 
-// The suite, the REPL and the app's replay all drive a `# test`. They drive it through one walk,
-// because a replay that stepped a test differently from the way the suite runs it would prove
-// something about the replay rather than about the game.
 describe('walking a test one step at a time', () => {
   const world = (...lines: string[]) => loadInEnglish([WORLD, '', '# test recorded', ...lines].join('\n'));
   const walking = (registry: ReturnType<typeof loadInEnglish>, upTo?: number) => walkTest(startSession(registry), testSteps('recorded', registry), upTo);
@@ -80,8 +71,6 @@ describe('walking a test one step at a time', () => {
     expect(walking(registry, 0).walked).toEqual([]);
   });
 
-  // Going to step N walks from the start again. Nothing in the engine has to undo anything, and a
-  // scrub backwards costs exactly what a scrub forwards does.
   it('lands in the same place walking to a step directly as walking past it and back', () => {
     const registry = world('goto: cove', 'goto: shore');
     const once = startSession(registry);
@@ -109,8 +98,6 @@ describe('walking a test one step at a time', () => {
   });
 });
 
-// A driver watching a run steps a little at a time, so that what each step said reaches the screen
-// on the step that said it. Walking a range has to land where walking the whole thing lands.
 describe('walking a range of a test', () => {
   const world = (...lines: string[]) => loadInEnglish([WORLD, '', '# test recorded', ...lines].join('\n'));
 
@@ -133,8 +120,6 @@ describe('walking a range of a test', () => {
     expect(walkTest(startSession(registry), steps, 3, 1).walked.map(printDirective)).toEqual(['goto: shore', 'goto: cove']);
   });
 
-  // The mark is read off the whole record, not off the range, so a range ending between a line and
-  // its mark does not report the line as an unclaimed refusal.
   it('knows a refusal is claimed even where the mark falls outside the range', () => {
     const registry = world('choose: 0', 'refused', 'goto: cove');
     const steps = testSteps('recorded', registry);

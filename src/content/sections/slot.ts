@@ -3,9 +3,6 @@ import { number } from '../../grammar/values';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
-// Where on the body a slot is drawn, counted from the top left of whatever grid the slots that
-// declare an `at:` describe between them. Nothing declares the size of that grid: it is as wide and
-// as tall as the furthest slot reaches, so adding a slot to the far side widens the body by itself.
 export interface Place {
   column: number;
   row: number;
@@ -29,7 +26,6 @@ export const place: Parser<Place> = {
   examples: ['1 1', '3 2'],
 };
 
-// A `# slot` is optional — the vocabulary is the union of every `equipment-slots:`, and this only supplies display words and where they are drawn.
 export interface Slot {
   id: string;
   title: string;

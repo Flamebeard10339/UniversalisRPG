@@ -15,9 +15,6 @@ import { createGameState } from '../src/runtime/state';
 import { MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
 import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
-// The state a run is walked against, taken off the thing that makes one. Naming the type instead
-// would put the whole of the engine's state on the surface `published.test.ts` audits, and a sweep
-// reaches for none of it: what it reads is a clock, a place and two tallies.
 type Walked = ReturnType<typeof createGameState>;
 
 export const DEFAULT_SEEDS = 4;
@@ -131,14 +128,8 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
   return args;
 }
 
-// One thing that can be done somewhere, addressed exactly as a `# test` line addresses it. `use` is
-// what the engine offered a player standing there, printed back, so nothing about which mechanics
-// exist is written down here.
 export interface Subject {
   at: string;
-  // How far the map's roads put this place from where a game begins, or undefined where none reach
-  // it. It is what orders the sweep, so an offer's depth and the difficulty a player meets it at
-  // are the same reading.
   depth?: number;
   use: string;
 }
@@ -146,9 +137,6 @@ export interface Subject {
 const byReach = (one: Subject, other: Subject): number =>
   (one.depth ?? Infinity) - (other.depth ?? Infinity) || one.at.localeCompare(other.at) || one.use.localeCompare(other.use);
 
-// Everything a player who loaded this save could take, anywhere. The engine is asked rather than the
-// registry read: a room's offers are what `sessionStatus` says they are, and a thing standing there
-// unlooked-at is looked at first, because an unread foe offers nothing but a look.
 export function subjectsFrom(registry: Registry, save: string, narrow: Pick<SimulationArgs, 'holds' | 'at'> = {}): Subject[] {
   const depths = roadDepths(registry);
   const found: Subject[] = [];
@@ -159,9 +147,6 @@ export function subjectsFrom(registry: Registry, save: string, narrow: Pick<Simu
     applyDirective(session, { kind: 'goto', location: at });
     readRoom(session);
     for (const choice of sessionStatus(session).choices) {
-      // A craft is an offer like any other: it is a thing the engine puts in front of a player
-      // standing at a station, it fills time, and it pays a skill. Leaving it out made a whole
-      // skill invisible here — a stove offered nothing but a look at itself.
       if (choice.kind !== 'action' && choice.kind !== 'craft') continue;
       const use = printDirective(choiceToDirective(choice));
       if (narrow.holds !== undefined && !use.includes(narrow.holds)) continue;
@@ -171,18 +156,12 @@ export function subjectsFrom(registry: Registry, save: string, narrow: Pick<Simu
   return found.sort(byReach);
 }
 
-// Where the world's clock stands on the save every run of a sweep starts from. The window runs from
-// there, so the far end of it is one number for the whole sweep and every offer is walked between
-// the same two readings of the clock.
 export function clockOn(registry: Registry, save: string): number {
   const session = startSession(registry);
   applyDirective(session, { kind: 'load', save });
   return secondsToMs(sessionStatus(session).time);
 }
 
-// What the character every run starts from stands at. A rate is read against the level of the skill
-// it paid into, so this is the whole of what the sheet's ratio column is quoted for — and it is a
-// property of the save rather than of the world, which is why the column names the build.
 export function levelsOn(registry: Registry, save: string): Levels {
   const state = createGameState();
   applyDirective(sessionOver(registry, state), { kind: 'load', save });
@@ -191,8 +170,6 @@ export function levelsOn(registry: Registry, save: string): Levels {
 
 const decimalsOf = (value: number): number => String(value).split('.')[1]?.length ?? 0;
 
-// The window said the way a `# test` line says it. What stops the loop is the world's own clock
-// reaching the far end, so the terminator is the denominator rather than a count this tool picked.
 function windowTerminator(endMs: number): Condition {
   const seconds = msToSeconds(endMs);
   return { kind: 'comparison', left: { path: [TIME] }, operator: '>=', right: { value: seconds, places: decimalsOf(seconds) } };
@@ -203,11 +180,6 @@ export const PROBE_MODULE = 'simulation-probe';
 export const standTest = (index: number): string => `${PROBE_MODULE}.stand-${index}`;
 export const runTestId = (index: number): string => `${PROBE_MODULE}.run-${index}`;
 
-// A module carrying two `# test` sections per subject: where the run starts from, and the one line
-// being measured. They are split so the rng cursor can be set between them — `load:` restores the
-// one the save was written with, and a seed set before it would be the save's seed and not the
-// one asked for. Both are marked DEBUG, which is what lets the sweep stand somewhere no player is
-// meant to find: measuring a place is not putting a player in it.
 export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number): ModuleSource {
   const lines = [`# info ${PROBE_MODULE}`, 'version: 1.0.0', 'dependencies:', ...dependencies.map((id) => `  ${id}`)];
   const until = printTerminator(windowTerminator(endMs));
@@ -218,8 +190,6 @@ export function probeSource(dependencies: readonly string[], subjects: readonly 
   return { name: PROBE_MODULE, text: `${lines.join('\n')}\n` };
 }
 
-// What a run put in the player's hands, one tally at a time — a skill and an item by one path, so
-// neither is the special case.
 export interface Gain {
   kind: string;
   id: string;
@@ -228,16 +198,9 @@ export interface Gain {
 
 export interface Run {
   seed: number;
-  // The engine's own sentence about why the offer stopped before the window closed, or nothing where
-  // it was still going when the window closed. Death, a full pack and an empty room are told apart
-  // here, in the words a player would have read.
   stoppedBy?: string;
-  // What came at the player of its own accord while the window was open, if anything did. The window
-  // is the one they lived through whoever swung in it, so this names the fight and hides nothing.
   engagedBy?: string;
   cycles: number;
-  // How much of the window the offer itself ran for. What is left of the window was spent standing
-  // wherever the world put them, and counts against every figure here just the same.
   worked: number;
   gains: Gain[];
 }
@@ -247,9 +210,6 @@ export interface Measured {
   runs: Run[];
 }
 
-// The seeds a sweep samples: the world's own, then wherever its own generator goes next. Seeds a
-// step apart would be a sample of nothing — the first is what a `# test` runs at, and the rest are
-// as far from it as the world's own rolls are from each other.
 export function seedsFrom(count: number): number[] {
   const cursor = { rng: DEFAULT_RNG_SEED };
   const seeds = [DEFAULT_RNG_SEED];
@@ -264,8 +224,6 @@ type Counts = Readonly<Record<string, number>>;
 
 type Tallies = Record<string, Counts>;
 
-// The counts a run is read out of. Both are running totals the state keeps, so what an offer paid is
-// the difference across one and nothing here has to know what a mechanic hands over.
 const tallies = (state: { xp: Counts; inventory: Counts }): Tallies => ({ xp: state.xp, item: state.inventory });
 
 function since(was: Tallies, now: Tallies): Gain[] {
@@ -281,23 +239,12 @@ function since(was: Tallies, now: Tallies): Gain[] {
 
 const snapshot = (state: { xp: Counts; inventory: Counts }): Tallies => Object.fromEntries(Object.entries(tallies(state)).map(([kind, counts]) => [kind, { ...counts }]));
 
-// Whether the line being measured can be taken up again exactly where it is being measured, by a
-// player holding what they are now holding. The place is half the question because it is half the
-// subject: a sweep asks what an offer pays *there*, and a run carried off somewhere else — by a
-// faint, by anything — would have to walk back, which is a different action and another row's
-// measurement. What is left is the engine's to answer: the offer is on the sheet the room hands
-// back or it is not, and what would put it back there is the world's business rather than a shape
-// this file knows.
 function standsHere(session: PlaySession, state: Walked, subject: Subject): boolean {
   if (state.location !== subject.at) return false;
   readRoom(session);
   return sessionStatus(session).choices.some((choice) => choice.kind === 'action' && printDirective(choiceToDirective(choice)) === subject.use);
 }
 
-// Wait out whatever the world will put right on its own — a fallen thing back on its feet, a daze
-// worn off — one due moment at a time, until the offer is on the sheet again. A moment the world has
-// nothing due at is the world being done with it, and what is left needs the player to go and do
-// something else: buy bait, mend a line, walk back to where the target was. That is where a run ends.
 function waitForOffer(session: PlaySession, state: Walked, registry: Registry, subject: Subject, endMs: number): boolean {
   for (;;) {
     if (standsHere(session, state, subject)) return true;
@@ -320,9 +267,6 @@ function walk(registry: Registry, index: number, subject: Subject, seed: number,
     const session = sessionOver(registry, state);
     let worked = 0;
     let stoppedBy: string | undefined;
-    // The state forgets who came at the player each time a span opens, and a window holds as many
-    // spans as the offer was taken up. The question the sheet asks is about the whole window, so it
-    // is kept here — read at every seam a span is about to open at, and once more at the end.
     let engagedBy: string | undefined;
     const noteAggression = (): void => {
       engagedBy ??= state.engagedBy ?? undefined;
@@ -333,14 +277,9 @@ function walk(registry: Registry, index: number, subject: Subject, seed: number,
       stoppedBy = runTest(runTestId(index), registry, state).failure;
       worked += state.time - from;
       if (stoppedBy === undefined || state.time >= endMs) break;
-      // An attempt that spent no time at all would spend none again, and there is no waiting out a
-      // run that never started.
       if (state.time === from) break;
       if (!waitForOffer(session, state, registry, subject, endMs)) break;
     }
-    // The rest of the window, once nothing the player could keep doing is left. A player who is
-    // killed lands wherever the corpus lands them and the hour goes on around them, so the world
-    // keeps running here and what it does to them in what is left is part of what standing there paid.
     if (state.time < endMs) applyDirective(session, { kind: 'wait', seconds: msToSeconds(endMs - state.time) });
     noteAggression();
     return {
@@ -360,11 +299,6 @@ export function measure(registry: Registry, subjects: readonly Subject[], seeds:
   return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, subject, seed, endMs)) }));
 }
 
-// An offer that put nothing in anybody's hands under any seed. It is hidden by default because a
-// sweep of a whole world is mostly doors and benches, and it is a measurement rather than a
-// judgement about which mechanics count — a door that turns out to pay appears. An offer nothing
-// could be measured at is not one of these however empty it came back: that is a finding about the
-// place, and hiding it would hide the reason its neighbours read the way they do.
 export const paidNothing = ({ runs }: Measured): boolean => runs.every((run) => run.gains.length === 0 && run.engagedBy === undefined);
 
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -381,9 +315,6 @@ const spread = (values: readonly number[]): string => {
   return low === high ? round(low) : `${round(low)}–${round(high)}`;
 };
 
-// A ratio is read across four orders of magnitude on one sheet, so it is printed to the precision it
-// has rather than to a fixed one: `0` where a row pays a four-hundredth of target says the row paid
-// nothing, which is a different finding.
 const times = (ratio: number): string => {
   if (!Number.isFinite(ratio)) return '—';
   if (ratio >= 10) return String(Math.round(ratio));
@@ -400,12 +331,8 @@ export const WHILE_IT_RAN = 'while it ran';
 
 const XP = 'xp';
 
-// The skill an `xp <id>` tally is for, and nothing for a tally that is not one. Items have no curve
-// to be read against — what a drop is worth is a question about a shop and not about the climb.
 const skillIn = (of: string): string | undefined => (of.startsWith(`${XP} `) ? of.slice(XP.length + 1) : undefined);
 
-// What one offer paid into one skill, meant against the level the build stands at in it. The mean
-// across seeds and not the best of them, for the reason `meanRate` gives.
 const againstTheCurve = (of: string, rates: readonly number[], levels: Levels): string => {
   const skill = skillIn(of);
   if (skill === undefined) return '';
@@ -413,10 +340,6 @@ const againstTheCurve = (of: string, rates: readonly number[], levels: Levels): 
   return ` · ${times(ratioOf(against))}× the level-${String(against.level)} target`;
 };
 
-// Every seed answers, because every seed was given the same window and every seed spent all of it.
-// The window is the divisor whatever the run did with it, so there is nothing here to say about
-// which seeds counted. Beside it, wherever the offer did not last the window out, the pace inside
-// the time it did last — the two are the same figure where it lasted, and only one is printed then.
 function paidLines(runs: readonly Run[], windowMs: number, levels: Levels): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
@@ -428,8 +351,6 @@ function paidLines(runs: readonly Run[], windowMs: number, levels: Levels): stri
     .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}${againstTheCurve(of, rates, levels)}`);
 }
 
-// Every offer's pace into every skill it paid, which is what the two readings below the sheet are
-// taken over. One offer paying two skills is on both their sheets, because it is two answers.
 export function paidInto(measured: readonly Measured[], windowMs: number): Paid[] {
   const hours = windowMs / MS_PER_HOUR;
   const paid: Paid[] = [];
@@ -443,10 +364,6 @@ export function paidInto(measured: readonly Measured[], windowMs: number): Paid[
   return paid;
 }
 
-// The two readings the frontier ruling needs. The first is what the pace target actually binds on:
-// the best offer within reach, and how far off target it is. The second is there because the first
-// permits a dead world — a level with one good thing to do and two hundred worthless ones satisfies
-// the frontier completely, and "the city feels alive" is why the ruling was made.
 export function curveLines(measured: readonly Measured[], windowMs: number, levels: Levels): string[] {
   const found = frontiers(paidInto(measured, windowMs), levels);
   if (found.length === 0) return [];
@@ -468,9 +385,6 @@ function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Le
   ];
   const took = runs.map((run) => run.engagedBy).find((by) => by !== undefined);
   if (took !== undefined) lines.push(`      ${took} took a fight inside the window`);
-  // The shortest run's ending, because that is the one an author has to answer for. How many other
-  // endings there were is said rather than listed: the same death told twice with a different tally
-  // in it is one finding, and reading it as two is what sends someone looking for a second bug.
   const short = runs.filter((run) => run.stoppedBy !== undefined).sort((one, other) => one.worked - other.worked);
   const endings = new Set(short.map((run) => run.stoppedBy));
   if (short.length > 0) {
@@ -481,8 +395,6 @@ function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Le
   return [...lines, ...paidLines(runs, windowMs, levels)];
 }
 
-// Said once, above everything it is about, because the two figures on a line are not equally solid
-// and a reader who takes them for one another has the error the window was put there to remove.
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
 export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'>, levels: Levels = {}): string[] {
@@ -502,8 +414,6 @@ export function simulationLines(measured: readonly Measured[], args: Pick<Simula
   }
   const lines = [...head, ...(body.some((line) => line.includes(WHILE_IT_RAN)) ? [CEILING] : []), ...body];
   if (!args.all) lines.push('', `${String(measured.length - shown.length)} offer(s) paid nothing at all and are not listed; --all shows them.`);
-  // Taken over everything measured rather than over what is shown: an offer hidden for paying
-  // nothing pays nothing into the count either way, and one hidden by --all's absence still paid.
   return [...lines, ...curveLines(measured, windowMs, levels)];
 }
 
@@ -512,8 +422,6 @@ export interface SimulationReport {
   ok: boolean;
 }
 
-// The shipped world with the named packs and modules turned off, which is how an hour is measured
-// in a town that has no quests in it. The names are the settings page's own.
 export function worldOff(names: readonly string[]): readonly ModuleSource[] {
   const shipped = shippedSources();
   if (names.length === 0) return shipped;

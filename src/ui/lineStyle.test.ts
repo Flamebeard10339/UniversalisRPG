@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fillOf, inkOf, SHAPE_CLASS, TONE_CLASS, VOICE_CLASS } from './lineStyle';
 
-// The subjects are whatever the two records hold, so a line kind or a tone added next month is held
-// to the same separation with nothing edited here.
 const voices = Object.entries(VOICE_CLASS);
 const tones = Object.entries(TONE_CLASS);
 
@@ -66,9 +64,6 @@ describe('what a title is lettered in', () => {
   });
 });
 
-// The whole point of there being two of them: an element handed both would be saying one fact twice,
-// and an element handed each of two groups would be saying two facts that could not be told apart.
-// So the two never write the same property, whatever colour either is handed.
 describe('the two channels a group\'s colour reaches a player on', () => {
   it('never write the same thing, so neither can quietly take the other\'s meaning', () => {
     const group = { colour: '#fbbf24' };

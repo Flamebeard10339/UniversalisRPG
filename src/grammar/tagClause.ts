@@ -6,7 +6,6 @@ export type BonusAmount = { percent: false; amount: Range } | { percent: true; a
 
 export type Counter = { kind: 'resource'; id: string } | { kind: 'stack'; id: string } | { kind: 'level'; id: string };
 
-// What a counter's id names, and how it is written. A counter kind added here does not compile until it says both, so nothing downstream keeps a second list of the kinds.
 export const COUNTERS: Readonly<Record<Counter['kind'], { names: string; written: (id: string) => string }>> = {
   resource: { names: 'resource', written: (id) => id },
   stack: { names: 'item', written: (id) => `stack of ${id}` },
@@ -15,10 +14,6 @@ export const COUNTERS: Readonly<Record<Counter['kind'], { names: string; written
 
 export type TagClause = { kind: 'keyword'; value: string } | ({ kind: 'stat-bonus'; statId: string; per?: Counter } & BonusAmount) | { kind: 'duration'; seconds: number };
 
-// A keyword the engine reads rather than carries: what it does, and what it is written on — the action
-// itself, which writes it out under its own heading, or the thing that carries the tag. Every word the
-// engine acts on stands here and nowhere else, so the page prints all of them and a word that is not here
-// is decoration the engine never looks at.
 export const KEYWORDS = {
   instant: { on: 'action', does: 'over the moment it is taken, so it fills no time and is never under way' },
   continuous: { on: 'action', does: 'begins its next cycle as soon as one ends, until something stops it' },
@@ -28,12 +23,10 @@ export const KEYWORDS = {
 
 export type Keyword = keyof typeof KEYWORDS;
 
-// The keywords written on one thing, as a type, so a site that reads them names no word of its own.
 export type KeywordOn<Where extends string> = { [K in Keyword]: (typeof KEYWORDS)[K]['on'] extends Where ? K : never }[Keyword];
 
 export const keywordsOn = <Where extends string>(where: Where): readonly KeywordOn<Where>[] => (Object.keys(KEYWORDS) as Keyword[]).filter((word) => KEYWORDS[word].on === where) as KeywordOn<Where>[];
 
-// Which of the keywords a site reads stand among these tags, in the order the site named them, and the words standing beside them that it does not read.
 export function keywordsIn<Read extends Keyword>(tags: readonly TagClause[], read: readonly Read[]): { taken: Read[]; beyond: string[] } {
   const written = tags.flatMap((tag) => (tag.kind === 'keyword' ? [tag.value] : []));
   const asked: readonly string[] = read;
@@ -42,7 +35,6 @@ export function keywordsIn<Read extends Keyword>(tags: readonly TagClause[], rea
 
 export const carries = (tags: readonly TagClause[], keyword: Keyword): boolean => keywordsIn(tags, [keyword]).taken.length > 0;
 
-// The tags left once the keywords a site has already written out are taken away, which is what a printer lifting one onto a line of its own writes after it.
 export function withoutKeywords(tags: readonly TagClause[], read: readonly Keyword[]): TagClause[] {
   const lifted: readonly string[] = read;
   return tags.filter((tag) => tag.kind !== 'keyword' || !lifted.includes(tag.value));
@@ -137,7 +129,6 @@ function printAmount(value: BonusAmount): string {
 
 const printCounter = (value: Counter): string => COUNTERS[value.kind].written(value.id);
 
-// The keywords written on whatever carries the tag, which are the ones this grammar shows: a word read off the action is written under `# action` and is no shape a carrier takes.
 const CARRIED_KEYWORDS = keywordsOn('carrier');
 
 export const tagClause: Parser<TagClause> = {
@@ -172,7 +163,6 @@ export const tagClause: Parser<TagClause> = {
   },
 };
 
-// A bonus written as a range has to be rolled, and a carrier that is only ever held has no moment to roll it in. The carrier says why it has none.
 export function unrolledProblem(tags: readonly TagClause[], noMoment: string): string | undefined {
   for (const tag of tags) {
     if (tag.kind === 'stat-bonus' && !tag.percent && tag.amount.min !== tag.amount.max) return `${tagClause.print(tag)} is a range; ${noMoment}, so its payload must be one value`;

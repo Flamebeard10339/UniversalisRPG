@@ -36,6 +36,7 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run layer-check
+      - run: npm run comment-check
       # The corpus's whole verdict: every line the engine has something to say
       # about, whether it loads, whether it prints back to itself, whether every
       # route it holds still walks, and anything it takes that an author probably

@@ -46,7 +46,7 @@ export function layerOf(path: string): Layer | null {
 
 export function importedPaths(fromFile: string, source: string): string[] {
   const directory = posix(fromFile).replace(/\/[^/]*$/, '');
-  return [...stripComments(source).join('\n').matchAll(IMPORT_PATTERN)].map(([, , specifier]) => posix(join(directory, specifier)));
+  return [...stripComments(source, posix(fromFile)).join('\n').matchAll(IMPORT_PATTERN)].map(([, , specifier]) => posix(join(directory, specifier)));
 }
 
 export function sweptFiles(tracked: readonly string[], exists: (file: string) => boolean = existsSync): string[] {

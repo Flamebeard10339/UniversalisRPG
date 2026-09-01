@@ -10,9 +10,6 @@ import { COUNTERS, TagClause } from '../grammar/tagClause';
 
 export const INFLICT_SITE = 'inflict:';
 
-// The same line where it says how long it holds. It is a site of its own because that is the whole
-// difference the buff it names cares about: a line that says the stretch answers for it, so the buff
-// need not declare one, and whoever checks that reads which site this is rather than asking again.
 export const TIMED_INFLICT_SITE = `${INFLICT_SITE} … for:`;
 
 export const WEIGHT_SITE = 'one of: row';
@@ -42,10 +39,6 @@ export function putCarried<T extends object>(holder: T, key: keyof T & string, w
   put(holder, key, 'item', where, visit);
 }
 
-// A site that names a location the engine will stand the player in, which may spell the name the
-// engine answers instead of one a module declares. That spelling is left whole for the engine to
-// answer against whatever registry is loaded then; a road cannot be walked this way, because an edge
-// to wherever a world happens to start is no map.
 export function putLocation<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
   if ((holder as Loose)[key] === STARTING_LOCATION) return;
   put(holder, key, 'location', where, visit);

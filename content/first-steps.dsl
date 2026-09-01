@@ -8,20 +8,6 @@ dependencies:
   fishing
   thieving
 
-// The whole of the tutorial quest: what the journal reads at each stage, what
-// Miki says while the quest stands there, and what moving on does. Nothing else
-// in the world knows this quest exists — take this module out and the house
-// still loads, Miki still has a word for a traveller, and the mirror, the oven
-// and the rats are all still there to be found.
-//
-// The quest owns no flags. A stage is a flag, so `finding-your-feet.bake-bread`
-// is what anything else would ask about; `mirror-done` and `rats-killed` belong
-// to the mirror and the rats, which are what set them.
-//
-// Every stage is left by a line Miki says rather than by a `done when:`, so
-// reaching one is a thing that happened and not a thing that is worked out: the
-// flag is really set, and a save carries it.
-
 # quest finding-your-feet
 title: Finding Your Feet
 log: I woke in a house that is not mine. They say whoever keeps it takes newcomers in hand.
@@ -79,9 +65,6 @@ stage bake-bread:
     give: core.wooden-shield
     Downstairs in the basement you'll find giant rats. Put three of them down and watch your stats work, then come back up here and tell me it's done.
     One thing first: they do nothing sat in your pack. Open up what you're carrying, have a look at the pair of them, and put them on - your stats move the moment you do.
-    // Last, so the screen lands under the conversation rather than over it: a
-    // node's results run before what it says is put up, so the pack is what the
-    // player finds on reading Miki out, and no line of his is talked over.
     open modal: carried-items
     goto clear-the-rats
 
@@ -115,9 +98,6 @@ stage snubbed:
       goto apologised
     -> Not a chance.
       goto snubbed
-  // Crossing routes is acknowledged: a player who snubbed Miki and killed the
-  // rats anyway does not get the straight clear-the-rats line, since that one
-  // lives in a stage this branch never reaches — they get this instead.
   first-steps.miki says:
     when: first-steps.rats-killed >= 3
     sticky
@@ -132,12 +112,6 @@ stage snubbed:
 
 stage apologised:
   log: I went back and apologised. Miki took it, and put a price on it: a second level in something, anything at all. He lent me a net and pointed at the pond behind his house.
-  // Not sticky: the node hands over a net, and sticky replays a node whole, so
-  // a player who talked this through four times walked away with four nets.
-  // `again:` is the other half of that pair — the offer is made once, and what
-  // every talk after it gets is Miki pointing at the net in the pack. It may say
-  // the net is theirs already because it is only ever reached while it is: the
-  // node below stands in front of it for the whole of the time it is not.
   first-steps.miki says:
     always
     ask: About squaring it with you.
@@ -145,12 +119,6 @@ stage apologised:
     give: fishing.small-fishing-net
     set: first-steps.miki.net-lent
     Take the net and get it on your hand - it does nothing rolled up in your pack. There's a pond out the back, and shrimp in it. Get good enough at something to have a second level in it - fishing, or whatever else you find - and I'll call us square.
-  // The net he lends is a regular net, and a regular net parts. This is what he has
-  // to say to a player who comes back without one, and it is sticky for the same
-  // reason the node above is not: the thread stands only while there is no net in
-  // the pack, so it can lend again after a second parting and can never lend twice
-  // over. `net-lent` is what keeps it out of the way until the first offer is taken
-  // — before that, a player has no net either, and this is not the line for them.
   first-steps.miki says:
     when: first-steps.miki.net-lent and not has fishing.small-fishing-net
     sticky
@@ -165,9 +133,6 @@ stage apologised:
     set: first-steps.front-door.unlocked
     goto sendoff
 
-// Last, because every other stage goes here and none goes on: a quest stands on
-// the last stage it has reached in the order they are written, so the stage that
-// ends one has to be written after every stage that reaches it.
 stage sendoff:
   log: Miki says he has nothing left to teach me, and that the way off is out the front door and up the road.
   complete
@@ -177,24 +142,6 @@ stage sendoff:
     ask: Anything else before I go?
     Still here? Out the door and up the road. I've nothing else for you.
 
-// Every route out of the house lands here, and the joke is that it never
-// leaves. Which line plays back is the choice outliving the house — a flag no
-// route sets on purpose, only as a side effect of which way out it took.
-//
-// The door route's trigger is market-square.touched rather than
-// front-door.unlocked itself: a quest's stage only ever advances when the
-// entity its dialogue is pinned to is talked to, and the door's own unlock
-// happens while Miki can still be talked to, one talk before a player has
-// anywhere to travel to. `touched` and not `discovered`, because standing
-// anywhere puts its neighbours on the map: unlocking the door puts the market
-// on it, and Miki would say you had found it to someone still standing in his
-// front room. Gating on having stood there means Miki still gives his ordinary
-// sendoff on the way out.
-//
-// The lockpick upstairs and the window beside it both reach the market with the
-// lesson still open, so every line here has to stand for a player Miki is in the
-// middle of teaching as well as one he is finished with: nothing said here may
-// send anybody off or call anything his last word.
 # quest leave-tutorial-island
 title: Leave Tutorial Island
 log: Up the road there is a town, and it goes on a while. Miki still calls this an island.
@@ -215,15 +162,12 @@ stage adrift:
     Went through my dresser, did you. Keep them - they'll get you further than I would have. I'll be here.
     goto adrift
 
-// --- tests ---
-
 # test quest-offered
 talk: first-steps.miki
 choose: Sounds good. Teach me.
 choose: continue
 assert: finding-your-feet.name-yourself
 
-// Opens on a save so the route is walked with the pools a played game has.
 # test miki-route-full
 load: miki-route-start
 run: quest-offered
@@ -241,16 +185,8 @@ craft: bread
 assert: has core.bread
 talk: first-steps.miki
 choose: continue
-// Reading Miki out leaves the pack he opened standing, which is the whole of
-// what his handover line buys. Shut it and go down the stairs; nothing on this
-// route is worn, so what the screen was for is proved by its being there and
-// not by anything taken in it.
 submit-modal: item=close
 assert: finding-your-feet.clear-the-rats
-// A fight is bounded by its location, so the rats are fought where they stand
-// rather than through the floor. One Fight clears the cellar: melee is
-// continuous, so it re-arms on the next rat still standing, and the tally
-// below is what says it did.
 use: entity.stairs.descend
 use: melee-combat on giant-rat until done
 assert: first-steps.rats-killed >= 3
@@ -260,10 +196,6 @@ choose: continue
 assert: finding-your-feet.sendoff
 assert: first-steps.front-door.unlocked
 travel: market-square
-// Same second-talk shape as the apology route below: the eternal quest only
-// picks up once the market district has been stood in, so a talk had while
-// still inside the house — where unlocking the door only puts the market on
-// the map — would repeat the ordinary sendoff instead.
 travel: guide-house
 talk: first-steps.miki
 choose: leave-tutorial-island.adrift.miki.0.said
@@ -271,18 +203,7 @@ choose: continue
 assert: leave-tutorial-island.adrift
 travel: market-square
 expect only: left-mikis-house
-// This route's own sheet, on top of the ground all three converge on: the rats'
-// drops, the visits, the xp, the pools, the clock and the rng cursor. A scalar
-// field a save names is compared whole either way, so the clock and the cursor
-// are pinned here as firmly as `expect:` pinned them; what `expect only:` lets
-// go is the keys this sheet never named.
-// Regenerate with npm run probe -- content --record first-steps.miki-route-full
-// when the route's content changes on purpose.
 expect only: miki-route-end
-
-// --- thieving route: snub Miki, take the lockpick, fail the door, take the
-// window instead. Costs 5 health on landing and leaves Miki angry — a fact
-// the door itself can't carry (see the commit message), so it lives on Miki.
 
 # test thieving-route-full
 talk: first-steps.miki
@@ -291,14 +212,9 @@ use: entity.stairs.ascend
 use: entity.dresser.search-drawer
 assert: has core.lockpick
 use: entity.stairs-down.descend
-// Reaching Miki with the lockpick already in hand is what the snubbed stage
-// reads to get angry; declining to apologise is what closes that
-// conversation back up, since a test (like a player) can't leave one hanging.
 talk: first-steps.miki
 choose: Not a chance.
 assert: first-steps.miki.angered
-// A second, separate talk: same as the door route above, a quest whose own
-// condition just turned true does not pick it up until asked again.
 talk: first-steps.miki
 choose: leave-tutorial-island.adrift.miki.1.said
 choose: continue
@@ -307,24 +223,7 @@ use: entity.stairs.ascend
 use: entity.window.climb-out
 assert: not first-steps.front-door.unlocked
 expect only: left-mikis-house
-// Regenerate with npm run probe -- content --record first-steps.thieving-route-full
-// when this route's content changes on purpose. See thieving-route-full-end for
-// why this isn't miki-route-end.
 expect only: thieving-route-full-end
-
-// --- apology route: snub Miki, apologise, take the net, work the pond behind the
-// house until a skill has a second level in it, and the door opens the ordinary
-// way. Converges on Miki's usual sendoff, since that line no longer says which
-// route earned it.
-//
-// Miki asks for a level and not for a catch, so the pond is one answer and not the
-// answer: this route walks the one the net is handed over for, and the door would
-// open the same for a player who levelled anything else.
-//
-// The net and the water are both the world's own, so this route is also the claim
-// that the tackle Miki lends works on the shoals the rest of the game is built
-// out of: the shoal's `cast` refuses anyone without one of the two nets, and it is
-// Miki's that answers for it here.
 
 # test apology-route-full
 talk: first-steps.miki
@@ -334,24 +233,12 @@ choose: Actually - sorry. Show me the ropes after all.
 talk: first-steps.miki
 choose: continue
 assert: has fishing.small-fishing-net
-// The flag the save below stands on, earned here rather than written down: it is
-// what tells a talk after a parting from the talk that made the offer in the first
-// place, and without it Miki would be offering a net to a player he has never met.
 assert: first-steps.miki.net-lent
-// Talked through twice more before going fishing. The offer stands as long as
-// the catch is owed, so the line keeps being reachable; what it must not do is
-// keep paying out, which is what the count below is here for.
 talk: first-steps.miki
 choose: continue
 talk: first-steps.miki
 choose: continue
 assert: inventory.fishing.small-fishing-net = 1
-// Miki says to put it on, so the route puts it on. A net in the pack grants no
-// line at all, so this is also what says the pool the shoal wears down is there
-// to be worn down on the path the tutorial actually teaches. The net names a
-// level of its own, so what Miki hands over is a copy under an id the world
-// minted, and it goes on by that id — `1`, because it is the first thing this
-// walk was handed.
 equip: 1
 assert: stat.max-line-health >= 1
 use: entity.back-door.step-out-back
@@ -363,9 +250,6 @@ choose: continue
 assert: finding-your-feet.sendoff
 assert: first-steps.front-door.unlocked
 travel: market-square
-// Miki's ordinary sendoff is what a talk gets on the way out (see the door
-// route's test); this quest is what stepping back in for one more word gets
-// instead, now that there is somewhere to have come back from.
 travel: guide-house
 talk: first-steps.miki
 choose: leave-tutorial-island.adrift.miki.0.said
@@ -373,43 +257,18 @@ choose: continue
 assert: leave-tutorial-island.adrift
 travel: market-square
 expect only: left-mikis-house
-// Regenerate with npm run probe -- content --record first-steps.apology-route-full
-// when this route's content changes on purpose. See apology-route-full-end for
-// why this isn't miki-route-end.
 expect only: apology-route-full-end
 
-// --- back in the front room with no net ---
-//
-// The route above ends holding the net, as every route through this house did until
-// this one: nothing was ever walked back to Miki empty-handed, which is how his
-// standing offer came to point at a net a player might not have.
-//
-// It opens on a save rather than fishing the net to pieces on the way. What a run of
-// misses costs is fishing's to decide and `tulsa.player`'s `on line-parted:` to carry
-// out, so a route that netted shrimp until the line gave would be this file passing
-// or failing on the shoal's odds — and it is a long wait besides. What belongs here
-// is the other end of it: the word Miki has for someone who comes back without one.
 # test miki-lends-another-net-to-a-player-who-has-none
 load: a-parted-net-and-a-level-still-owed
 assert: not has fishing.small-fishing-net
-// The standing offer has been said once and says nothing to a list, so with no net
-// in the pack the thread that lends one is the only word Miki has: a net arriving on
-// a bare `continue` is what says which of the two answered.
 talk: first-steps.miki
 choose: continue
 assert: has fishing.small-fishing-net
-// And now it is the other way round. The lending thread stands only while there is
-// no net to stand on, so taking the replacement closed it, and the standing offer is
-// what a talk falls back to — which is a line and not a second net.
 talk: first-steps.miki
 choose: continue
 assert: inventory.fishing.small-fishing-net = 1
 
-// bake-bread is left by a line Miki says and not by a `done when:`, so one
-// stage stands over two beats: bake the loaf, then carry it back. The two
-// `assert:` lines are the beats. The `journal:` lines are what the player is
-// reading across both of them — the stage's own `log:`, still the line they are
-// standing on, with everything behind it crossed off.
 # test bake-bread-spans-two-beats
 load: miki-route-start
 run: quest-offered
@@ -425,15 +284,6 @@ craft: bread
 assert: finding-your-feet.bake-bread and has core.bread and not finding-your-feet.clear-the-rats
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
-// --- the window into the apology ---
-//
-// The one way through the house nobody had walked, and the one that made the
-// list of threads matter: snub him, refuse again, drop out of the window into
-// the market, and walk back in through his front room. Both quests have
-// something to say by then, so from here on every talk is a list — and the line
-// carrying the apology is in it, which is the whole claim. It is proved out here
-// and not on the ordinary apology route, because that route makes it up with him
-// before it ever leaves the house.
 # test the-apology-survives-going-out-of-the-window
 talk: first-steps.miki
 choose: I'd rather find my own way.
@@ -461,10 +311,6 @@ choose: finding-your-feet.apologised.miki.2.said
 choose: continue
 assert: finding-your-feet.sendoff and first-steps.front-door.unlocked
 
-// The first look at the mirror is free and every look after it is a thousand
-// coin. The claim is the difference across the second look — a purse of a
-// thousand is untouched by the first and empty after the second — so a price
-// that moved would fail here rather than pass inside a band.
 # test the-mirror-charges-nothing-once-and-a-thousand-coin-after
 load: at-the-mirror-with-a-thousand-coin
 use: entity.mirror.look-in
@@ -477,10 +323,6 @@ submit-modal: race=core.orc
 assert: inventory.coin = 0
 expect only: renamed-at-the-mirror
 
-// What a player who cannot pay sees. The action stays on the mirror rather
-// than hiding itself, because a mirror that vanishes is what a playtester
-// reads as a broken save; it takes the look, says what is missing, and leaves
-// the purse and the character exactly as they were.
 # test a-purse-a-coin-short-is-turned-away-and-charged-nothing
 load: at-the-mirror-one-coin-short
 use: entity.mirror.look-in
@@ -490,9 +332,6 @@ use: entity.mirror.look-in-again
 assert: inventory.coin = 999 and player.name and player.race
 expect only: named-once-with-nine-hundred-and-ninety-nine-coin
 
-// The name is asked first and the race second, which this proves by answering
-// them in that order: the race screen has no `name` to answer, so a run that
-// asked in the other order refuses the first line here rather than passing.
 # test the-name-screen-is-answered-before-the-race-screen
 load: at-the-mirror-with-a-thousand-coin
 use: entity.mirror.look-in
@@ -500,17 +339,6 @@ submit-modal: name=Rowan
 submit-modal: race=core.orc
 assert: player.name and player.race
 
-// The drawer's contested roll over shipped content. On the default seed this
-// search comes up empty behind the lockpick, so an assertion over inventory
-// alone would also hold in a world where the drawer never rolls at all — which
-// is the shape of test this branch's audit caught. The whole sheet is what tells
-// the two apart: `<stat> vs 60` and the table behind it move the rng cursor
-// whether or not they yield anything, and `expect:` is what pins that.
-// Regenerate with npm run probe -- content --record first-steps.dresser-trinket
-// when the drawer's odds change on purpose.
-// The landing is not on the map until it has been stood in, so the stairs are
-// how a fresh game first gets to it — which is the same first climb a player
-// makes, and the reason this line is not a `travel:`.
 # test dresser-trinket
 use: entity.stairs.ascend
 use: entity.dresser.search-drawer
@@ -518,9 +346,6 @@ assert: has lockpick
 assert: dresser.searched
 expect: dresser-trinket-end
 
-// The two words for a place, told apart on the one line where the engine
-// makes the difference: picking the lock opens the road into town, which puts
-// the market on the map without anyone walking into it.
 # test a-lockpick-opens-the-front-door
 run: dresser-trinket
 travel: guide-house
@@ -531,14 +356,6 @@ assert: not market-square.touched
 assert: guide-house.touched
 assert: xp.thieving > 0
 
-// --- the town found in the middle of the lesson ---
-//
-// The other three routes make their peace with Miki, one way or the other, before
-// they ever see the market. This one does not: the lock comes off the front door
-// with the dough still unbaked, so the eternal quest picks up while Miki is in the
-// middle of teaching, and from then on his island line stands in a list beside the
-// lesson he is still waiting on. Both are here at the end, which is what says
-// neither of them may talk as if the other were over.
 # test the-town-is-found-before-the-lesson-is-over
 run: quest-offered
 use: entity.mirror.look-in
@@ -562,23 +379,12 @@ choose: finding-your-feet.bake-bread.miki.0.said
 choose: continue
 journal: finding-your-feet says Miki gave me water and flour. The two of them make dough, and dough wants an oven.
 
-// The house is walked into and not read off the map: a room of it reaches the
-// map by being stood in and not before, which is why every road out of the front
-// room carries a clause. The landing stands for all of them — the clause is the
-// mechanism and it is the same one on the cellar and the yard, so a room this
-// house grows next is covered by copying the line rather than by editing this.
-// A fresh game therefore opens with the front room on the map and nothing else.
 # test a-room-of-this-house-reaches-the-map-by-being-stood-in
 load: miki-route-start
 assert: guide-house.discovered and not guide-house-upstairs.discovered
 use: entity.stairs.ascend
 assert: guide-house-upstairs.discovered
 
-// Miki's oven is a stove as well as an oven, so the shrimp that comes out of the
-// pond behind his house is cooked on it by the world's own recipe, at the same
-// station the tavern's bar stove opens. What the contest then makes of it is
-// cooking's business; that the raw shrimp is spent at all is what says the
-// station answered.
 # test the-tutorial-oven-cooks-what-the-tutorial-catches
 load: shrimp-at-mikis-oven
 craft: cooked-shrimp
@@ -589,9 +395,6 @@ load: explored-and-unlocked
 assert: front-door.unlocked
 assert: market-square.discovered
 
-// Things can die. A foe whose pool is emptied is gone and its `on death:` ran,
-// which is what `dummies-felled` counts; one swing does it because the hammer
-// says it does, and a million is more than any pool this file could be given.
 # test one-swing-of-a-million-attack-hammer-fells-a-dummy
 DEBUG
 load: armed-with-a-million-attack-hammer
@@ -599,13 +402,6 @@ equip: million-attack-hammer
 use: melee-combat on practice-dummy
 assert: first-steps.dummies-felled = 1
 
-// The stages of a fight. A `use:` that finds its own action already under way
-// against the same target advances a cycle of the fight in progress; one that
-// re-armed would snapshot the dummy at full health every time, so at eight a
-// swing against twenty no run of them, however long, would ever empty the pool.
-// Two swings are sixteen and three are twenty-four, so the third is the one that
-// lands the kill and the second must not. Both numbers are the dummy's own, so
-// what fails here is a change to how `use:` advances and never a balance pass.
 # test two-eight-health-swings-leave-a-dummy-up-and-the-third-puts-it-down
 DEBUG
 load: armed-with-an-eight-a-swing-hammer
@@ -616,16 +412,6 @@ assert: first-steps.dummies-felled = 0
 use: melee-combat on practice-dummy
 assert: first-steps.dummies-felled = 1
 
-// --- saves ---
-
-// What all three routes out of the house genuinely land on, named once
-// instead of asserted three times: the same square, the same front room, the
-// same quest picked up. No other room of the house is in it — a room reaches
-// the map by being stood in, and the three routes stand in three different
-// ones. `finding-your-feet.sendoff` and `front-door.unlocked` are each true
-// for two of the three routes and false for the third — the thief never gets
-// the ordinary sendoff — so those two stay proven by each route's own
-// `assert:` instead.
 # save left-mikis-house
 {"version":13,"location":"tulsa.market-square","flags":{"first-steps.guide-house.discovered":true,"first-steps.finding-your-feet.offered":true,"tulsa.market-square.discovered":true,"tulsa.market-square.touched":true,"first-steps.leave-tutorial-island.adrift":true}}
 
@@ -635,22 +421,12 @@ assert: first-steps.dummies-felled = 1
 # save miki-route-end
 {"version":13,"inventory":{"core.bread":1,"core.rat-bone":5},"flags":{"first-steps.guide-house.touched":true,"first-steps.guide-house.discovered":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.name-yourself":true,"first-steps.mirror-done":true,"first-steps.finding-your-feet.bake-bread":true,"first-steps.finding-your-feet.clear-the-rats":true,"first-steps.basement.touched":true,"first-steps.basement.discovered":true,"first-steps.rats-killed":3,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.riverside.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.name-yourself.miki.1.said":1,"first-steps.finding-your-feet.bake-bread.miki.1.said":1,"first-steps.finding-your-feet.clear-the-rats.miki.1.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"cooking.cooking":6,"combat.attack":6,"combat.health":27},"resources":{"core.health":27321},"resourceRateRemainders":{"core.health":20000},"location":"tulsa.market-square","instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"populations":{"first-steps.basement":{"first-steps.giant-rat":{"down":3,"due":[]}}},"time":39200,"rng":3974845897,"player":{"name":"Rowan","race":"core.elf"}}
 
-// The thief's own closing sheet — not the door route's. A route that never
-// bakes or fights lands on different holdings, a different clock and a
-// different rng cursor from one that does both, so the three routes get three
-// sheets; what genuinely converges across all of them is left-mikis-house,
-// which each of them also closes on.
 # save thieving-route-full-end
 {"version":13,"inventory":{"core.lockpick":1},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.guide-house-upstairs.touched":true,"first-steps.guide-house-upstairs.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.dresser.searched":true,"first-steps.guide-house.touched":true,"first-steps.miki.angered":true,"first-steps.leave-tutorial-island.adrift":true,"tulsa.market-square.touched":true,"tulsa.market-square.discovered":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.riverside.discovered":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.leave-tutorial-island.adrift.miki.1.said":1},"resources":{"core.health":26310},"location":"tulsa.market-square","time":9000,"rng":2617077404}
 
-// The apology route's own closing sheet, same reasoning as the thief's above.
 # save apology-route-full-end
 {"version":13,"inventory":{"fishing.raw-shrimp":34},"flags":{"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.miki.net-lent":true,"first-steps.backyard.touched":true,"first-steps.backyard.discovered":true,"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true,"first-steps.finding-your-feet.sendoff":true,"tulsa.market-square.touched":true,"tulsa.market-row.discovered":true,"tulsa.tavern-street.discovered":true,"tulsa.castle-gate.discovered":true,"tulsa.kings-road.discovered":true,"tulsa.swamp-edge.discovered":true,"tulsa.riverside.discovered":true,"tulsa.kelsa-farmhouse.discovered":true,"first-steps.leave-tutorial-island.adrift":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":3,"first-steps.finding-your-feet.apologised.miki.2.said":1,"first-steps.leave-tutorial-island.adrift.miki.0.said":1},"xp":{"fishing.fishing":102},"resources":{"fishing.line-health":38700},"resourceRateRemainders":{"core.health":40000,"fishing.line-health":40000},"equipped":{"mainhand":"1"},"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"fishing.small-fishing-net","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"time":415000,"rng":2398428564}
 
-// Standing in the front room in the state a parted line leaves: Miki has lent the
-// net, the water has had it, and the second level he asked for is still owed. The
-// route above walks on from here; the walk up to here is the apology route's, which
-// earns every flag in this body rather than taking this file's word for it.
 # save a-parted-net-and-a-level-still-owed
 {"version":13,"location":"first-steps.guide-house","flags":{"first-steps.guide-house.discovered":true,"first-steps.guide-house.touched":true,"first-steps.finding-your-feet.offered":true,"first-steps.finding-your-feet.snubbed":true,"first-steps.finding-your-feet.apologised":true,"first-steps.miki.net-lent":true},"visits":{"first-steps.finding-your-feet.offered.miki.0.said":1,"first-steps.finding-your-feet.snubbed.miki.0.said":1,"first-steps.finding-your-feet.apologised.miki.0.said":1}}
 
@@ -660,19 +436,12 @@ assert: first-steps.dummies-felled = 1
 # save explored-and-unlocked
 {"version":13,"flags":{"first-steps.front-door.unlocked":true,"tulsa.market-square.discovered":true}}
 
-// Standing at the oven with something to roast. Nothing in the world grants a
-// raw chestnut, so this save is the only way cooking's chestnut recipe is
-// reached at all.
 # save chestnuts-in-hand
 {"version":13,"inventory":{"core.raw-chestnut":3}}
 
-// Standing at the oven with the pond's own catch in hand, which is what says the
-// oven is a stove: the shrimp came out of the water behind the house.
 # save shrimp-at-mikis-oven
 {"version":13,"location":"first-steps.guide-house","inventory":{"fishing.raw-shrimp":1}}
 
-// A purse with the price of a second look in it, and a purse a coin short of
-// one, standing in the room the mirror is in.
 # save at-the-mirror-with-a-thousand-coin
 {"version":13,"location":"first-steps.guide-house","inventory":{"core.coin":1000}}
 
@@ -693,13 +462,6 @@ DEBUG
 DEBUG
 {"version":13,"location":"first-steps.practice-yard","inventory":{"first-steps.eight-a-swing-hammer":1}}
 
-// Two hammers whose numbers this file declares, so that what the tests swinging
-// them prove is proved about the engine rather than about what the last balance
-// pass did to base attack or to the rat's sheet: a million is more than any of
-// that will ever move, and `-100% attack` scales the whole stat — base, bonuses
-// and all — to nothing, so the second hammer's own swing is worth the least the
-// engine lets a landed hit be worth and the eight it drains is the whole of what
-// it does.
 # item million-attack-hammer
 DEBUG
 slot: mainhand
@@ -712,12 +474,6 @@ weapon, -100% attack, +1000000 accuracy
 on hit:
   drain: 8 health from them
 
-// And the thing they are swung at. A hammer that is worth eight a swing says
-// nothing on its own: what it is worth is only legible against a pool, so the
-// pool is written here beside it rather than taken from whatever the tutorial's
-// rat is worth this month. Twenty is two swings up and three swings down, and
-// it is owned by the two tests below. The dummy carries no attack and no
-// evasion, so neither what it does back nor whether a swing lands is in play.
 # entity practice-dummy
 DEBUG
 stats: attack 0, defense 0, max-health 20, attack-rate 16, accuracy 0, evasion 0
@@ -728,17 +484,12 @@ on death:
 
 # flag dummies-felled
 
-// Three of them, so a Fight that re-arms on the next one standing has somewhere
-// to prove it. Nothing a player reaches names this yard; the saves above stand
-// in it directly.
 # location practice-yard
 DEBUG
 x: 0, y: 0, z: -9
 entities:
   3 practice-dummy
 
-// Miki has a word for a traveller whatever else is loaded. A quest that wants
-// more of him gives him more to say; this is what is left when none is.
 # dialogue miki
 owner = miki
 
@@ -798,8 +549,6 @@ look in again:
 examine: A stone oven, its coals still glowing. The top of it is flat and takes a pan, which is the whole difference between an oven and a kitchen.
 stations: oven, stove
 
-// A flight of stairs is a leg of the journey and is paid for like one, at the
-// same three seconds the road out of the house costs.
 # entity stairs
 title: Stairs
 ascend:
@@ -851,8 +600,6 @@ search drawer:
   luck vs 60:
     roll: trinket
 
-// The only way out that never runs through Miki. A player who has burned the
-// front door still has this — a straight drop with a cost, not a puzzle.
 # entity window
 examine: A casement over the water, its latch worn bright by somebody's thumb. It is a long drop to the sand and nothing on the way down to slow it.
 climb out:
@@ -861,9 +608,6 @@ climb out:
   drain: 5 health
   say: You get a leg over the sill, hang off it as long as your arms will have it, and let go. The sand takes most of the drop and your ankles take the rest, and the road into town is right there.
 
-// 20 health against the player's 10 a hit is two hits, ~2.5 swings at 80%, so a
-// rat falls in about six seconds and lands a bite or two on the way out. It
-// swings back because it `uses:` an action, not because a tag says so.
 # entity giant-rat
 title: Giant Rat
 examine: A hunched rat claws at an overturned crate, eyes red in the dark.
@@ -878,9 +622,6 @@ on death:
     1 in 3:
       roll: trinket
 
-// Tulsa opens on its own square, and a player who has this module has the
-// tutorial to walk out of first. Both lines are here so that turning the module
-// off leaves exactly one place marked starting rather than none.
 # location tulsa.market-square
 -starting
 
@@ -889,16 +630,9 @@ x: 6, y: 0
 starting
 examine: A cluttered but cozy cottage. Miki's guide house.
 adjacent:
-  // This house is walked into rather than read off the map. Without these three
-  // clauses a player who has not moved yet has the landing, the cellar and the
-  // yard on the map already; the stairs and the back door are how each is first
-  // reached, and the map is what has them from then on.
   guide-house-upstairs while guide-house-upstairs.touched
   basement while basement.touched
   backyard while backyard.touched
-  // The road back in is this same edge read from the far end, so it carries this
-  // same condition: without the second clause, dropping out of the window with the
-  // door still shut would leave the house unreachable from the square.
   market-square while front-door.unlocked or market-square.touched
 entities:
   miki, front-door, stairs, mirror, oven, back-door
@@ -919,9 +653,6 @@ adjacent:
 entities:
   3 giant-rat, stairs-up
 
-// The water the tutorial teaches on is the same water the rest of the world has:
-// the shoal standing here is the one the riverside stands on, so a net that works
-// in this yard works in the river and a net that does not works in neither.
 # location backyard
 x: 5, y: 0
 examine: A strip of grass behind the house, walled on three sides, with a pond at the end of it deeper than it has any business being.

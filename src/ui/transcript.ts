@@ -81,8 +81,6 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
       return output.blocks.flat().map((text) => noted('detail', 'plain', text));
     case 'status':
     case 'choices':
-    // The map has a pane of its own drawing the same sheet, so putting it in the transcript would be
-    // saying it twice, in a shape the transcript cannot draw.
     case 'map':
       return [];
     default: {

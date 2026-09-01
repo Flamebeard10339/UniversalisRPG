@@ -14,10 +14,8 @@ export type StatFrame = Extract<ModalFrame, { name: 'stat-breakdown' }>;
 
 export const statFrame = (stat = ''): StatFrame => ({ name: 'stat-breakdown', answers: {}, stat });
 
-// Which stat the open screen is reading, where it is reading one. The shares themselves are already published on `PlayView.stats`, so this says which row to look at and nothing else.
 export const statFocus = (frame: { stat: string }): { kind: 'stat'; stat: Answer } | undefined => (frame.stat === '' ? undefined : { kind: 'stat', stat: frame.stat as Answer });
 
-// Opened on nothing the screen asks which stat; opened on one it asks only to be closed, and what it is showing is read off the view's own row.
 export function statOptions(frame: { stat: string }, state: GameState, registry: Registry): readonly ModalOption[] {
   const localizer = localizerOf(registry, state);
   if (frame.stat !== '') return [{ key: LEAVE, label: localizer.engine('engine.stat.reading'), values: [{ value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
@@ -35,10 +33,6 @@ export const sameStat = (a: { stat: string }, b: { stat: string }): boolean => a
 
 export const holdsStat = (value: Record<string, unknown>): boolean => typeof value.stat === 'string';
 
-// What a stat is made of, share by share: every share the engine folded, named and signed, in the
-// order the engine folded them. A share that moves nothing still stands — the base of a stat nothing
-// touches is the whole answer to where its number came from. It lives here rather than beside either
-// surface because the screen and the scrollback have to say the same thing about the same stat.
 export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; worth: string }> {
   return shares.map((share) => {
     const said = amounts(share.added, share.increased);
@@ -46,6 +40,5 @@ export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; 
   });
 }
 
-// A stat the world has stopped declaring leaves the screen standing over nothing, so the frame goes the way any other stale one does.
 export const statStale = (frame: { stat: string }, state: GameState, registry: Registry): Localized | null =>
   frame.stat === '' || registry.stats.has(frame.stat) ? null : localizerOf(registry, state).engine('engine.modal.stale.unknown');

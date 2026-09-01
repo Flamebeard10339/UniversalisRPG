@@ -920,8 +920,6 @@ on dried:
 `);
     const state = createGameState();
     initResources(state, registry);
-    // A carried remainder no run reaches — the engine keeps one under a minute's worth — which is
-    // what it takes to make a resource ask for a boundary in the past at all.
     (state.resources as Record<string, number>)['pool'] = toMilliUnits(1);
     state.resourceRateRemainders['pool'] = -30000;
 

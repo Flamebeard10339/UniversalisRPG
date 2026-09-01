@@ -1,25 +1,3 @@
-// Tulsa — the starting town, and effectively the whole region the early game
-// happens in. Read off `.planning/starting-town-outline.md` and the ten notes
-// in `.planning/planning_quests/`.
-//
-// This module is the town STANDING: its places, the roads between them, the
-// people who live there and what they sell, and the things that are already
-// hostile. It holds no quest, and the game does not begin here — a quest module
-// above it is what marks a # location starting. Every quest named in the notes
-// gets a module of its own that gives these entities more to say — take those
-// modules away and Tulsa still loads, and everyone here still has a word for a
-// traveller. Kelsa is the one exception and is meant to be: the only thing she
-// ever said was the preamble to being hired, so it went where the hiring is.
-//
-// It depends on core for that furniture: the stat bases, the health pool, the
-// death event, the factions, the player, and melee-combat.
-//
-// The archetype pack is optional and named that way: it is a list of jewels and
-// items that stands nowhere, so the town is what says where the crate holding it
-// sits and what is worth swinging at beside it. Take that pack out and the yard
-// is still here — the crate, the urchin and the routes that walk them prune
-// themselves, which is what an optional dependency is for.
-
 # info tulsa
 version: 1.0.0
 pack: tulsa
@@ -32,11 +10,6 @@ dependencies:
   crafting
   ? combat-expansion
 
-// --- flags ---
-//
-// World state no single prop owns. A flag that belongs to one door or one
-// person is declared on that door or that person instead.
-
 # flag heard-of-the-back-way
 
 # flag sewer-toll-paid
@@ -45,20 +18,11 @@ dependencies:
 
 # flag wurm-defeated
 
-// How many of Kelsa's hives have been gone through, and on which of her two hive
-// grounds the third one was. Every hive adds to the count and hides itself
-// afterwards, so three is all three; whichever one takes the count to three
-// marks the ground it stands on, and only ever one of them does, so nothing here
-// has to be cleared. A hive on a third ground is a fourth marker beside these
-// and a line on that hive, and neither of the two below has to be read to write
-// it.
 # flag hives-searched
 
 # flag the-third-search-was-in-the-field
 
 # flag the-third-search-was-at-the-mouth
-
-// --- items ---
 
 # item bottle-of-vodka
 title: Bottle of Vodka
@@ -68,12 +32,6 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
 
-// --- drop tables ---
-
-// The smallest orb in the world, off the smallest thing in Tulsa worth swinging at, because the
-// first one a player ever sees should come out of the room they are already standing in. Ten percent
-// of a beginner's arm is barely a point, and finding out that it is spent on a cluster rather than
-// drunk is the whole of what it is for.
 # droptable feral-rat-remains
 give: 1-2 rat-pelt
 1 in 3: give: 1-4 coin
@@ -89,39 +47,10 @@ one of:
   3x: give: 1 mollusk-venom
   1x: give: 1-3 coin
 
-// --- locations ---
-//
-// Tulsa is a walled town on a grid. Four roads meet at the market and each of
-// them ends at a gate, which is why the square is where every road in town runs
-// through and why a stranger who wants out has to walk back to it first. Inside
-// the wall are the streets and the houses on them; outside are the fields, the
-// pines, the marsh and the road north.
-//
-// Every road is written from both ends so that a place's own `adjacent:` reads
-// as the whole list of its exits; the engine answers a road from both ends
-// either way. Walking one is a flat three seconds whatever it draws, so the town
-// is laid out to be read rather than to be paced: a lane and its houses are a
-// short walk apart on the map because that is what they look like, not because
-// the engine charges less for it.
-//
-// `x` runs east and `y` runs south, which is how the map draws them, so north is
-// the smaller `y` and a place written `north of` another lands above it. Every
-// place writes both, because a relative step moves exactly one unit and resolves
-// through whatever it names, which walks a chain of them into an occupied square
-// easily — and the loader refuses two places on one square, naming both.
-
-// --- inside the wall ---
-
-// Where the four gate roads cross. Everything a new arrival can reach is one
-// road from here, which is what a market square is for and why the town crier
-// stands in it.
 # location market-square
 x: 7, y: 0
 title: Market Square
 examine: Four roads meet under the awnings, and you can see three of the town's gates from where you are standing. There is a sewer grate set into the cobbles with a boy hunched over it.
-// The town has to be able to open on its own, so the square is where a player
-// arrives when nothing else says otherwise. A tutorial takes this line back and
-// puts `starting` on its own front room; see `first-steps`.
 starting
 adjacent:
   market-row
@@ -153,8 +82,6 @@ lift an axe off the rack:
   give: 1 hand-axe
   say: You take the end axe off the rack while the woodcutter is counting somebody else's coin, and you are two stalls away before the gap in it shows.
 
-// The roof layer the outline asks for, and the only way onto it is a climb.
-// What it overlooks is a quest's business rather than the town's.
 # location market-rooftops
 above market-row
 title: Market Rooftops
@@ -172,9 +99,6 @@ adjacent:
 entities:
   bladesmiths-son, anvil, smithing.forge-counter
 
-// The yard the smiths test what they have made in, and it is the town's rather
-// than any expansion's: a walled fixture off the forge that is here whatever
-// else is loaded.
 # location proving-ground
 x: 11, y: -1
 title: Proving Ground
@@ -223,8 +147,6 @@ adjacent:
   sewer-junction
 entities:
   broken-wall, oolgas-sacks, groundwurm
-
-// --- the castle, at the top of the town ---
 
 # location castle-gate
 x: 5, y: -2
@@ -302,11 +224,6 @@ examine: Casks, cold air, and a drain in the floor carrying the noise of running
 adjacent:
   castle-hall
 
-// The castle is seven rooms on three floors and a wall around all of it. The
-// region draws that wall: nothing in the engine reads it, and a room inside it
-// is exactly as far from the square as its coordinates say it is. What it buys
-// is a map somebody can read — the castle is one thing on it, and which of its
-// rooms you are looking at is a question you only ask once you are inside.
 # region castle
 title: The Castle
 holds:
@@ -319,21 +236,11 @@ holds:
   castle-cellar
   guard-barracks
 
-// Two rooms and a ladder between them, which is a house rather than a building,
-// and is here because the shape has to hold for the small case as well as the
-// grand one.
 # region oolga-house
 title: Oolga's
 holds:
   oolga-house
   oolga-basement
-
-// --- the lanes, and the people who live on them ---
-//
-// Two lanes of ordinary houses, one either side of the town, and they are where
-// Tulsa is actually lived in. Each house is a room with somebody's kitchen in
-// it, somebody in the kitchen, and a door that is not locked, which is the whole
-// of why a thief walks these rather than the square.
 
 # location well-lane
 x: 4, y: 1
@@ -386,9 +293,6 @@ adjacent:
 entities:
   doss-house-fire, 7 civilian
 
-// Under the doss house, which is the one building in Tulsa where nobody asks who anybody is. The
-// town gives it a floor and a door; who is standing on that floor is whatever skill has a use for a
-// room like this, and the town has no opinion about it.
 # location rogue-den
 x: 3, y: 2, z: -1
 title: The Rogue Den
@@ -435,11 +339,6 @@ adjacent:
   kiln-lane
 entities:
   aggie, aggies-stove, spoon-crock, 2 civilian
-
-// --- the wall, and the four ways through it ---
-//
-// Each gate is a road out written from the square, so a player standing in the
-// market has all four on the map at once and can see which way the town ends.
 
 # location kings-road
 x: 8, y: -1
@@ -491,8 +390,6 @@ adjacent:
   tunnel-mouth
   pasture
 
-// --- Kelsa's steading, in the east corner of the wall ---
-
 # location kelsa-farmhouse
 x: 9, y: 1
 title: Kelsa's Farmhouse
@@ -503,8 +400,6 @@ adjacent:
   bee-gate
 entities:
   kelsa, george
-
-// --- outside the wall ---
 
 # location apiary-field
 x: 10, y: 3
@@ -553,13 +448,6 @@ adjacent:
 entities:
   6 feral-rat
 
-// Where combat goes after the tenth level, and the only room in Tulsa sized for a character in
-// iron: six of them, a hundred and fifteen health apiece, on a ninety-second respawn.
-//
-// Nothing here is aggressive, which is a decision and not an oversight. They are massing rather
-// than patrolling, and a war camp does not break formation to chase one person down a tunnel — so
-// a beginner who walks in has a look at what is coming and walks out again, and a fight here is
-// one somebody started on purpose.
 # location the-muster
 x: 16, y: 13, z: -1
 title: The Muster
@@ -616,8 +504,6 @@ adjacent:
 entities:
   fishing.trout-run, fishing.salmon-pool
 
-// The far end of the river and the far end of the ladder: two waters that are shut to a hand which
-// has not put the hours in, so what stands here for a beginner is a walk and a look at it.
 # location the-narrows
 x: 6, y: 6
 title: The Narrows
@@ -626,13 +512,6 @@ adjacent:
   deep-water
 entities:
   fishing.pike-reach, fishing.sturgeon-hole
-
-// --- the sewers ---
-//
-// Two ways in, and which one you took is the difference between arriving in a
-// clean room and arriving among the rats. Larry's hatch lands you in the
-// entrance; Oolga's fallen wall lands you in the junction, which is where the
-// rats are.
 
 # location sewer-entrance
 x: 9, y: -1, z: -1
@@ -671,12 +550,6 @@ adjacent:
   sewer-outfall
 entities:
   2 ratman, key-table, sewer-shelf
-
-// --- the cast ---
-//
-// Everyone the quest notes lean on, and nothing they do not. Each carries what
-// is true of them whatever else is loaded; the lines they say while a quest
-// stands are that quest's to add.
 
 # entity mouse
 title: Mouse
@@ -748,11 +621,6 @@ title: Border Guard
 faction: world
 examine: A soldier of Yanodonin on the last piece of it, and not glad to be.
 
-// The five the lanes belong to. None of them wants anything and none of them is
-// anybody's quest: they are here so that a door on a lane has somebody behind
-// it, and what each says is the one thing they would actually say to a stranger
-// who walked into their kitchen.
-
 # entity mott
 title: Mott
 faction: world
@@ -777,12 +645,6 @@ examine: Very old and entirely comfortable, in the chair nearest the fire, with 
 title: Hask
 faction: world
 examine: The cooper, a barrel between his knees, tapping a hoop down the last quarter-inch it has left to go.
-
-// --- the stores ---
-//
-// A store is a # shop the entity behind the counter keeps. What it stocks is
-// what it has when nobody has been in; every one of them will take anything
-// tradable off you, because none of them says otherwise.
 
 # shop general-store
 coin: coin
@@ -835,14 +697,6 @@ ask after her wares:
   instant
   say: Oolga looks at the shelves, then at you, and puts her back to them. Nothing behind her is for sale, and she does not say what would change that.
 
-// --- stations and props ---
-
-// The only way back from a bad fight, and there is one in the square and one at
-// every gate — a player who has just been beaten is never more than a room from
-// sitting down, which is the whole reason a town is somewhere you come back to.
-// Sitting is worth ten regeneration for as long as you stay sat, on top of the
-// one core gives everybody, so the bench does not restore a pool of its own and
-// anything else that adds to that stat adds to this too.
 # entity bench
 title: Bench
 examine: A bench worn shiny down the middle by people waiting on somebody.
@@ -914,10 +768,6 @@ take the key:
   set: taken
   say: You pocket the key.
 
-// The other half of the room's own examine, and the best thing on the wrong side of the only door in
-// Tulsa that has to be opened rather than walked through. Twelve positions and two ways out of it is
-// more plane than anything a beginner is carrying can spend, which is the point of it: it is the
-// first thing in the game a player holds and has to grow into rather than put straight on.
 # entity sewer-shelf
 title: Shelf
 examine: A plank shelf on two spikes driven into the brick, with a lamp, a whetstone, and a flat iron thing at the back of it under a cloth.
@@ -946,11 +796,6 @@ stations: stove
 title: Castle Range
 examine: A range the length of the wall, and one cook who will let you use the end of it.
 stations: stove
-
-// Every fire in Tulsa somebody will let you stand at, one to a kitchen. A recipe
-// asks the room for a station and takes the first thing standing in it that has
-// one, so what these say about themselves is the whole of what makes each of
-// them worth walking to rather than the one nearest the square.
 
 # entity motts-oven
 title: Mott's Oven
@@ -982,8 +827,6 @@ title: The Doss House Fire
 examine: A grate at the end of the long room with eleven people's suppers on it and no agreement about whose is whose.
 stations: stove
 
-// The town's water, and the reason the lane it stands on is the one everybody
-// walks down. Free, slow, and it is what makes flour the only thing dough costs.
 # entity the-well
 title: The Well
 examine: Deep enough that the bucket is out of sight before you hear it land.
@@ -994,9 +837,6 @@ draw water:
   on success:
     say: You wind the bucket up and fill a jug off it.
 
-// Two things a light hand takes off a lane rather than off a person, and each is
-// a one-off: the flag is what its own `hidden if:` reads, so neither is a second
-// helping.
 # entity washing-line
 title: Washing Line
 examine: Somebody's whole week strung across the lane at head height, and it has been there since before it rained.
@@ -1019,8 +859,6 @@ take one off the sill:
   give: 1 core.bread
   say: You take the end one and put the gap in the middle of the row, which buys you about a minute.
 
-// The one thing in the castle worth more than what is on the range. Whoever it belonged to is not
-// here and the cook does not say where they went.
 # entity range-drawer
 title: The End Drawer
 examine: The drawer at the cold end of the range, which sticks, and which nobody has opened in a while.
@@ -1031,9 +869,6 @@ work it open:
   set: emptied
   give: 1 cooking.a-cooks-hands-jewel
   say: The drawer comes out crooked and almost entirely empty. What is in it is a ring of blackened iron, and it is warm.
-
-// The other two kitchens each keep one, and each keeps the one that kitchen would have worn out:
-// the bar cooked fast for a great many people and Aggie has never burnt anything in her life.
 
 # entity pass-rail
 title: The Pass Rail
@@ -1057,11 +892,6 @@ look through the spoons:
   give: 1 cooking.a-steady-hand-jewel
   say: One of them is burnt black along a single edge and nowhere else, which takes a steadier hand than most people have.
 
-// Going through a hive frame by frame, and the one action all three of Kelsa's
-// hives hang off. What a hive adds to it is its own: the words for what is in
-// that one, and which ground it stands on if it turns out to be the third gone
-// through. The count and the sentence for the third are here so that no hive has
-// to know how many others there are.
 # action search-the-comb
 title: Search The Comb
 time: 8
@@ -1104,9 +934,6 @@ harvest comb:
   give: 1 honeycomb
   say: You cut what you came for and step back before they mind.
 
-// The one at the end of the row, standing in its own room because that is where
-// the row ends. Nothing about the search knows that: it is a hive like the two
-// above and it marks its own ground like they mark theirs.
 # entity chewed-hive
 title: The Chewed Hive
 examine: The comb at the mouth of this one is cut through in galleries no bee cut, and the edges of them are still wet.
@@ -1120,12 +947,6 @@ search-the-comb:
     if hives-searched >= 3:
       set: the-third-search-was-at-the-mouth
 
-// The one thing in town that takes more than one swing and is not a fight.
-// `damage:` with no `depletes:` counts down a whole of the action's own, so a
-// swing is a quarter of a trunk and the log comes at the end of four of them.
-// Continuous, so a pack is filled by standing there rather than by asking
-// again — which is also the only place in the corpus that lights the live
-// countdown a driver draws beside the progress bar.
 # entity dead-alder
 title: Dead Alder
 examine: An alder leaning out over the water, dead and dry all the way through. Someone has already had the low branches.
@@ -1150,8 +971,6 @@ pull root:
   time: 6
   give: 1 fen-root
   say: The root comes out of the mud with a sound you would rather not have heard.
-// One hummock and three plants, and it pays about the same by the minute
-// whichever is taken: the leaf is worth twice the root and is twice the work.
 take the leaf:
   time: 12
   give: 1 adders-tongue
@@ -1160,13 +979,6 @@ take the leaf:
 # entity dumped-crates
 title: Dumped Crates
 examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a scatter of insect eggs, broken and badly wrong.
-
-// --- the townsfolk, and what happens when you pick on them ---
-//
-// A townsman, a guardsman and a knight are three rungs of one ladder: each is worth more to hit and
-// hits back harder. None of them starts it — the town is not hostile until you make it hostile —
-// and what each of them is worth to a hand rather than to an arm is written where that hand is,
-// which is not here.
 
 # entity civilian
 title: Townsman
@@ -1203,8 +1015,6 @@ on death:
     roll: knights-purse
     1 in 10: give: 1 combat.iron-helmet
 
-// --- what is already hostile ---
-
 # entity feral-rat
 title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
@@ -1229,9 +1039,6 @@ on death:
   credit:
     roll: ratman-remains
 
-// The second band's foe, and the only thing in Tulsa with enough health in it to pay a character in
-// iron by the hour. Slower than a wolf and far harder to put down, so what it is worth is its own
-// pool rather than the speed of the room.
 # entity ratkin-warrior
 title: Ratkin Warrior
 examine: A head taller than the ones in the sewer and put together properly, in scale somebody cut and fitted rather than found. It watches you the whole way in.
@@ -1244,7 +1051,6 @@ on death:
     roll: ratman-remains
     give: 8-20 core.coin
     1 in 20: give: 1 combat.iron-dagger
-    // The orb the jewel wants, behind the harder room, so sustain is bought in two steps.
     1 in 25: give: 1 core.orb-of-renewal
 
 # entity drone-bee
@@ -1256,9 +1062,6 @@ faction: world
 aggressive
 respawn after: 2m
 
-// The one thing in the mire that stands there and takes it, which is what its own sheet says and
-// what comes off it: eight defense behind a shell nobody can hurry, and the orb that multiplies
-// whatever a plane already puts into stopping a blow.
 # entity swamp-mollusk
 title: Swamp Mollusk
 examine: A shell the size of a shield, and the foot under it is wet with something you would not touch.
@@ -1282,17 +1085,7 @@ respawn after: 5m
 on death:
   credit:
     roll: swamp-pickings
-    // The wheel that multiplies rather than adds, out of the water rather than off a counter, and
-    // worth nothing to a player who has not stacked something flat for it to work on first. The
-    // mire is where a character who has been building for a while comes to find that out.
     1 in 12: give: 1 core.tempered-will-jewel
-
-// --- what stands in the proving ground ---
-//
-// The crate is stencilled for somebody who never came, and what is in it is the
-// archetype pack's list of jewels; the post and the urchin are what the yard is
-// for. None of the three is an expansion's business — an expansion is a list of
-// jewels and items, and where they sit in the world is the town's to say.
 
 # entity armourers-chest
 title: Armourer's Chest
@@ -1305,30 +1098,17 @@ open:
   set: emptied
   say: Six jewels and a plain blade with room in it for one of them.
 
-// Deep enough to survive a fight long enough to watch a pool fill, and it
-// swings nothing back, so what a test reads off the player came from what the
-// player is carrying.
 # entity proving-post
 title: Proving Post
 examine: A banded post, chest high, and it has taken worse than you.
 stats: max-health 2000, defense 0, evasion 0, accuracy 0
 
-// Carries a passive and declares no action at all. Whatever hits it is hurt by
-// hitting it, which is the whole of what an actor-carried persistent effect is
-// for.
 # entity spined-urchin
 title: Spined Urchin
 examine: A knot of black spines around something that has not moved in years.
 stats: max-health 2000, defense 0, evasion 0, accuracy 0
 passives: combat-expansion.retribution
 
-// --- what stands in no room at all ---
-
-// It stands in no room, so nobody can reach it. It stays because the two
-// recorded growth tests below need every shape in the catalogue and every orb
-// in one pair of hands at once, which no room in a town anybody plays is ever
-// going to hold, and a DEBUG section is how the engine keeps that out of a
-// player's hands.
 # entity smiths-chest
 DEBUG
 flags: emptied
@@ -1338,22 +1118,6 @@ open:
   roll: smiths-cache
   set: emptied
 
-// --- the player ---
-
-// The player is an entity like any other, and declares everything that measures it. The global
-// `# stat` bases in core are what something that names none falls back to; they stopped being this
-// sheet.
-//
-// It is here rather than in core because of one line: a character's skills are a fact about the
-// world they live in, one module each, and this is the module that can see them. Core is the
-// furniture a region stands on and cannot see any of them from where it sits. A skill that reaches
-// the other way writes itself onto this sheet instead of being named on it, and thieving does.
-//
-// The swing varies because the arm does, not because the weapon does: `attack`
-// is a range here for the same reason the rat writes `attack 6-8` on its own
-// sheet, and an unarmed player is as uneven as an armed one. Every level of
-// `melee` shifts both ends by one, and a weapon's `+n attack` shifts both ends
-// again, so *base plus level* reads straight off this line.
 # entity player
 title: You
 faction: core.player
@@ -1361,11 +1125,6 @@ stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evas
 skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, smithing.smithing, crafting.crafting
 equipment-slots: mainhand, offhand, head, body, legs, gloves, boots
 uses: core.melee-combat
-// Waking up is the market square once the market square has been stood in, and
-// the house the game begins in before that. `starting` may only be on one
-// location and it stays on the tutorial's, so this branch is the whole of what
-// content can say about where a faint puts you — and a player who has left that
-// island should not be walked back onto it.
 on death:
   say: You slump to the floor, spent, and come to a long while later somewhere you did not lie down. (You should have eaten something.)
   set: core.fainted
@@ -1378,17 +1137,11 @@ on death:
   if not market-square.touched:
     relocate: starting-location
   stop
-// A pool going empty is the player's, so the handler for it is the player's; what an emptied line
-// costs is fishing's, and `fishing.parted-tackle` is where fishing says it. A seventh net is added
-// beside the other six and nothing here is touched.
 on line-parted:
   say: The line goes slack in your hands, and what was on the end of it is somewhere under the water with the fish.
   restore: fishing.line-health
   roll: fishing.parted-tackle
 
-// The corner of the cellar the examine text already points at — "something
-// has been at the sacks in the corner" is tulsa.dsl's own line, and this is
-// what that something was doing there.
 # entity oolgas-sacks
 title: The Sacks
 examine: Feed sacks stacked in the corner, gnawed through in a dozen places, and a smell coming off them that is not doing Oolga any favours.
@@ -1401,9 +1154,6 @@ slather with poison:
   say: You work the poison into every corner the rats have been at, thick as paint. For a moment the scrabbling in the walls stops dead, which is everything Sunny promised.
   say: Then something a great deal larger than a rat starts moving in the earth behind the wall, and it is not leaving the way it came.
 
-// What the poison actually draws. Bigger than anything else written for this
-// basement, and it does not respawn — killed once is killed for good, which is
-// the whole of what "dealt with" means to Oolga.
 # entity groundwurm
 title: Groundwurm
 examine: A ridge of packed earth moving under the cellar floor, and something pale and segmented shouldering up through the middle of it.
@@ -1416,9 +1166,6 @@ on death:
   set: wurm-defeated
   say: The ground stops moving, and the cellar is quiet in a way it has not been since you came down here.
 
-// A princess bee is a fight rather than a harvest, unlike the two ordinary
-// hives at the front of the property — which is the whole reason Sunny sends
-// the player after this one and not after a slab of honeycomb.
 # entity princess-bee
 title: Princess Bee
 examine: Half again the size of a drone and it does not buzz so much as hum, a note that sits wrong in your teeth.
@@ -1430,14 +1177,8 @@ respawn after: 5m
 on death:
   credit:
     give: 1 royal-jelly
-    // The jelly is what a princess is for and the orb is what she costs: the one fight on Kelsa's
-    // land that is a fight, paying in the thing that scales a pool rather than an edge.
     1 in 8: give: 1 core.orb-of-vitality
 
-// --- recipes ---
-
-// What Sunny mixes for Oolga's rats, over any stove in town rather than her own
-// — the bar is where the asking happens and not where the work has to be done.
 # recipe sunnys-poison
 station: stove
 in: royal-jelly, mollusk-venom, bottle-of-vodka
@@ -1445,21 +1186,6 @@ out: sunnys-poison
 skill: cooking.cooking 2
 time: 4
 say: You mix the jelly, the venom and the vodka together over the heat. What comes off it is worse than any one of the three on its own, which is rather the point.
-
-// --- dialogue ---
-//
-// One node each, and the town's own word rather than any quest's. An unnamed
-// node is what somebody says when no thread of theirs is open, so the first
-// quest to give them a line takes it away — permanently, in every world that
-// loads that quest. Anybody a quest is ever going to speak through is therefore
-// written with an `ask:` here: a named thread stands in the list beside whatever
-// the quest opens instead of being replaced by it. Whoever is left bare is
-// nobody a quest has ever wanted, and giving them one is the first line of
-// giving them a quest.
-
-// The three the town is made of. None of them is anybody in particular, so none of them has a name
-// or a second thing to say — what they are for is that a player can talk to a townsman, rob a
-// townsman and fight a townsman, and find out which of the three the town minds.
 
 # dialogue civilian
 owner = civilian
@@ -1513,10 +1239,6 @@ node the-back-way:
   Everyone wants in the front. There is a wall down in the old witch's cellar and nobody minding it.
   set: heard-of-the-back-way
 
-// Three threads rather than one line, which is what a bar is for. Each is
-// named, so all three stand in the list at once and a quest that gives her a
-// fourth stands in it beside them. Sticky, because a barmaid answers the same
-// question as often as it is asked.
 # dialogue sunny
 owner = sunny
 
@@ -1608,10 +1330,6 @@ node at-the-stakes:
   again: Same as before. We watch. We do not go in.
   Past the stakes is theirs. We watch it. We do not go in.
 
-// The lanes. Each of the five says one thing, and the thing each says is about
-// the town rather than about the player, because a stranger in your kitchen is
-// not news and the price of flour is.
-
 # dialogue mott
 owner = mott
 
@@ -1652,57 +1370,30 @@ node over-the-barrel:
   again: Still hoops. Still the whole of it.
   Staves, hoops, and a bottom. That is the whole of it, and it has fed four of us for thirty years.
 
-// --- saves ---
-
 # save in-town
 {"version":13,"location":"tulsa.market-square"}
 
-// What a new arrival walks into town holding and nothing takes back off them,
-// standing in the row that would buy either. Both are the copies the sendoff
-// handed over, lifted whole out of miki-route-end with the rolls they came out
-// with: each names a level of its own, so each stands in a row of its own.
 # save in-town-with-a-sword-and-a-shield
 {"version":13,"location":"tulsa.market-row","instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// A pocket of curios out of a new arrival's first fights, which is what they
-// have to trade with and the whole of the town's on-ramp to money. About this
-// many is what walks in.
 # save in-town-with-bent-coins
 {"version":13,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
 
-// Out of a fight and back in the square with eleven of thirty left, which is
-// about what the three playtest runs walked into town holding.
 # save hurt-in-town
 {"version":13,"location":"tulsa.market-square","resources":{"core.health":11000}}
 
-// Down the back way with a lockpick, which is what anybody who came here for
-// the barred door would be carrying.
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
-// The axe off the rack, standing where the dead alder is. It names a level of
-// its own, so what a lift leaves in the pack is the copy the engine minted and
-// not a stack of one — which is what the alder asks after by template anyway.
 # save axe-at-the-swamp-edge
 {"version":13,"location":"tulsa.swamp-edge","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// A netful out of the water at the bottom of Well Lane, which is what somebody
-// walking up that lane is carrying.
 # save a-netful-on-well-lane
 {"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}
 
-// Down past the wall with the rod the stall sells, the bait it sells by the
-// hundred and a line to lose, and enough water behind them to be standing here
-// rather than at the shingle. What the shop stocks is what this holds: the deep
-// water is reached by buying tackle, not by being given any. The rod and the
-// line each name a level of their own, so each stands as a copy under an id —
-// `1` the rod, `2` the line — and the bait, which names none, stacks.
 # save rodded-up-at-the-deep-water
 {"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// At the anvil with the hammer a smith never spends and enough coin to buy bar
-// stock over the counter beside it. Nothing here is a jewel: what the route this
-// stands under asks is whether a player who has found none can still grow one.
 # save at-the-forge-with-coin
 {"version":13,"location":"tulsa.forge","inventory":{"core.coin":200,"smithing.hammer":1}}
 
@@ -1715,52 +1406,27 @@ node over-the-barrel:
 # save growing-through-the-inventory-screen-end
 {"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
 
-// What somebody arrived carrying and where the world has got to, named together
-// and written neither place: the sword and shield a new arrival walks in with,
-// and the junction the back way leaves them standing at with a lockpick. Both
-// halves are the saves that already say them, so a third of these costs a line
-// rather than a body, and moving either half moves it here too.
 # save armed-at-the-sewer-junction
 over: in-town-with-a-sword-and-a-shield, at-the-sewer-junction
 {"version":13}
 
-// A build somebody grew and a state a run of theirs was left standing in, laid
-// down together — which is the pairing a tier build and a progress state make,
-// and the one this could not do. Both were minted by runs whose counters started
-// at one, so both call a copy `1`. The upper layer is dealt fresh ids and every
-// way its body names the copy goes with them, the blade in its hand included.
 # save the-grown-blades-and-the-one-in-hand
 over: growing-a-heartwood-blade-end, rage-rises-as-swings-land-end
 {"version":13}
-
-// --- the player, proved ---
 
 # item deaths-door
 DEBUG
 step-through:
   drain: 1000 core.health
 
-// The stuff itself. Sunny mixes it in her own bar and it works exactly as
-// advertised — rats want nothing to do with it. What it draws instead is not
-// hers to have known about.
 # item sunnys-poison
 title: Sunny's "Poison"
 examine: A jar of royal jelly, mollusk venom and good vodka, mixed until it stops smelling like any of the three. Nothing sane would go near it.
 
-// Every shape a holding takes: a stack, two things standing alone, a rolled
-// blade in a row of its own, and a second blade on the arm rather than in the
-// pack. The two are one template and neither joins the other: a level is rolled
-// per copy, and that is the whole of why a base does not stack.
 # save four-rows-and-a-blade-worn
 DEBUG
 {"version":13,"inventory":{"core.bent-coin":2,"core.rats-eye-gem":1,"tulsa.deaths-door":1},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.25,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.75,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// The difference hardcore makes, stated as a difference: the same faint down the
-// same handler leaves all five holdings standing with it off and none of them
-// with it on. A run that asserted only the empty pack would pass in a world
-// where fainting always emptied it. What the faint restores the pool to is the
-// engine's to prove and balance's to move, so it is not read here. `inventory.<item>` counts a stack, a grown copy and a worn one
-// alike, so the two blades are the one in the pack and the one on the arm.
 # test hardcore-death-empties-five-holdings-a-plain-faint-leaves-standing
 DEBUG
 load: four-rows-and-a-blade-worn
@@ -1776,15 +1442,6 @@ assert: inventory.core.rats-eye-gem = 0
 assert: inventory.core.iron-sword = 0
 assert: inventory.deaths-door = 0
 
-// --- tests ---
-
-// The town is walkable end to end, and the shape it is walked in is the claim:
-// out of the square by each of the four gates in turn and back, so a wall with a
-// way through it in every direction is what this fails on if a gate stops being
-// reachable. The corners are what the route ends on — the wall-walk, the top of
-// the castle and the far side of Kelsa's land — because a place three roads deep
-// is the kind that quietly loses its way in. That every place has a way in at all
-// is dsl.test.ts's claim over the corpus, made without naming anybody.
 # test walking-the-town
 load: in-town
 travel: market-row
@@ -1833,16 +1490,6 @@ assert: hive-mouth.discovered
 assert: doss-house.discovered
 assert: pinewood.discovered
 
-// The economy, end to end and in the smallest amount that closes: a curio the
-// a new arrival's first fights leave behind becomes coin, coin becomes a herring, and the herring
-// becomes the thing Larry's nose is pointed at.
-// --- what a minute is worth, which is what every room in the world is sized against ---
-
-// The post is the one thing in the world that takes a swing and never returns one, which makes it
-// the only place the two halves of a fight come apart. So this is the complement of the sewer route
-// below: there, standing somewhere that hits back pays both; here, swinging at something that does
-// not pays one and leaves the other where it was. No number — how much a minute is worth is a
-// balance question and is answered by running the world, not by an assertion.
 # test a-minute-at-the-post-trains-the-arm-and-not-the-hide
 load: at-the-proving-ground
 use: core.melee-combat on proving-post
@@ -1850,10 +1497,6 @@ wait: 60
 assert: xp.combat.attack > 0
 assert: xp.combat.health = 0
 
-// The other half of the same minute, and the reason there are two skills rather than one: standing
-// somewhere that hits back pays for both, and what a room can pay in Health is capped by the pool
-// the player has to spend rather than by the room. Nothing here is a number — that a rat trains both
-// at all is the claim, and how fast is what a playtest is for.
 # test the-sewer-pays-a-beginner-in-both-halves-of-a-fight
 load: at-the-sewer-junction
 wait: 20
@@ -1861,11 +1504,6 @@ assert: xp.combat.attack > 0
 assert: xp.combat.health > 0
 assert: not core.fainted
 
-// The tutorial's own route through a counter and a stove. What it holds now that it did not before
-// is the other half of a contested recipe: the herring is either dinner or it is a lump of charcoal,
-// and the fish is gone either way. A purse that walked in empty and stands above nothing is the
-// whole of what the counter is asked for: what six curios fetch is the store's rate over a `value:`,
-// and both may move without this route moving.
 # test a-bent-coin-becomes-a-cooked-herring
 load: in-town-with-bent-coins
 travel: market-row
@@ -1885,19 +1523,6 @@ travel: sha-dynastys
 craft: cooking.cooked-herring
 assert: not has core.herring
 
-// A weapon base is a good like any other, which is a thing the counter can only
-// say by paying for one: a shop takes anything tradable it is offered, and what
-// makes these tradable is the `value:` each declares. What the pair fetches is
-// the store's own rate over those two values, and none of the three is written
-// down here: a purse that walked in empty standing above nothing is the whole
-// of the claim, and a rate or a `value:` that moves leaves it standing.
-//
-// Both name a level of their own, so each is a grown copy standing in a row of
-// its own and is answered for at the counter by its id rather than by its item,
-// which is what the two `sell:` lines name. Neither row is asked for a figure,
-// because a copy fetches what its base is worth and not what its plane holds,
-// and that is a rate rather than a path. A stack sold by its item is the other
-// kind of row, and `a-bent-coin-becomes-a-cooked-herring` above walks that one.
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-a-sword-and-a-shield
 shop: general-store
@@ -1910,19 +1535,6 @@ assert: inventory.coin > 0
 assert: not has core.iron-sword
 assert: not has core.wooden-shield
 
-// Kelsa's corner of the wall, and what is the town's about it rather than a
-// quest's. Her own word about the bees was a preamble to being hired and left
-// with the hiring; what stays here is the apiary past the postern — two hives
-// working and handing over comb to anybody who walks up to them, and all three
-// there to be gone through by anybody who wants to.
-//
-// George is not walked here, though he is the town's too. How many threads he
-// has open is a count of the quests loaded beside him, so a route that picks one
-// out of his list is a route about those quests; the one that does it stands in
-// the module that opens the second thread.
-//
-// Unkillable because the drones in that field are aggressive and what they cost
-// is not what this is asking.
 # test kelsas-corner-is-the-towns-rather-than-a-quests
 unkillable
 load: in-town
@@ -1932,20 +1544,9 @@ travel: apiary-field
 use: entity.first-hive.harvest-comb until done
 use: entity.second-hive.harvest-comb until done
 assert: has core.honeycomb
-// The count is the town's and moves without anybody having been hired. That a
-// hive gone through hides itself afterwards — so that one of them cannot stand
-// for all three — is a refusal, and `refuse:` takes slot, allocate, unallocate
-// and apply and no `use:`, so no route can ask for it.
 use: entity.first-hive.search-the-comb until done
 assert: hives-searched = 1
 
-// A kitchen on a lane is a kitchen. What makes a room somewhere a player can
-// cook is a thing standing in it that opens a station, and nothing about which
-// room that is — so the fire in a stranger's front room answers a recipe exactly
-// as the bar's stove does, and scattering the skill is a word on a location's
-// own line rather than anything the skill has to be told. Both houses are walked
-// to from the same lane, so what this separates is the two kitchens and not the
-// two walks.
 # test the-lanes-are-where-the-cooking-is
 load: a-netful-on-well-lane
 travel: hasks-house
@@ -1956,10 +1557,6 @@ craft: cooking.cooked-shrimp
 assert: inventory.fishing.raw-shrimp = 2
 assert: xp.cooking.cooking > 0
 
-// The other half of a kitchen, and the reason Well Lane is the one everybody
-// walks down: water is drawn rather than bought, so the only thing dough costs
-// is flour. Two turns of the windlass rather than one, because a claim on one
-// would also hold in a world where the well handed over its whole day at once.
 # test the-well-is-where-the-water-is
 load: a-netful-on-well-lane
 travel: town-well
@@ -1968,11 +1565,6 @@ assert: inventory.core.jug-of-water = 1
 use: entity.the-well.draw-water
 assert: inventory.core.jug-of-water = 2
 
-// The water below the wall, and the half of fishing a net never reaches. Both
-// waters are walked because they are two waters and the town owns both — the
-// shingle inside the gate is nets and no bait, and this is a rod and a strip
-// spent every cast whether the fish comes up or not, which is what the last
-// line is for.
 # test the-deep-water-is-fished-with-a-rod-and-bait
 load: rodded-up-at-the-deep-water
 equip: 1
@@ -1984,9 +1576,6 @@ use: entity.fishing.salmon-pool.cast until has fishing.raw-salmon
 assert: has fishing.raw-salmon
 assert: inventory.fishing.dried-fish-bait < 40
 
-// Charlie's back way. The wall in Oolga's cellar is the second entrance the
-// notes say several people know about, and it puts you in among the rats
-// rather than in Larry's swept room.
 # test the-wall-in-oolgas-cellar-is-the-back-way
 load: in-town
 travel: market-row
@@ -1996,21 +1585,12 @@ use: entity.broken-wall.squeeze-through
 assert: heard-of-the-back-way
 assert: sewer-junction.discovered
 
-// A feral rat is aggressive, so arriving is the whole of starting the fight.
-// Nothing is under way the instant a save is loaded, though, so the first tick
-// of the clock is what lets the rat open it and `wait: done` runs it from
-// there — without anybody guessing how long a rat takes.
 # test a-feral-rat-picks-the-fight-itself
 load: at-the-sewer-junction
 wait: 10
 assert: resource.core.health < 31.31
 assert: not core.fainted
 
-// The walk somebody hurt takes: stand about in the square a while, find the
-// bench, and stay on it. The eleven is the save's own record read back. What
-// the sitting pays is not this route's question — the bench is continuous, so
-// the second minute is had by staying put and not by sitting down again, and
-// that is the whole of what the walking proves.
 # test the-bench-is-where-health-comes-back
 load: hurt-in-town
 assert: resource.core.health = 11
@@ -2018,12 +1598,6 @@ wait: 60
 use: entity.bench.sit-down
 wait: 60
 
-// The only action in the corpus that takes more than one swing without being a
-// fight, and that it takes more than one is the claim: an assertion on the log
-// alone would also hold in a world where a single swing felled the tree. How
-// many swings it costs is read off `felling`, and how long each takes off
-// `time:`, so the clock is asked only to have run past a single swing rather
-// than to read the four of them multiplied out.
 # test a-log-costs-four-swings-of-an-axe
 load: axe-at-the-swamp-edge
 use: entity.dead-alder.chop-a-log
@@ -2031,13 +1605,6 @@ assert: time > 3
 assert: inventory.core.log = 1
 assert: xp.core.woodcutting > 0
 
-// Sunny keeps three threads open at once, so talking to her is the list and
-// not a line, and a thread taken stays open because each is sticky — the third
-// talk still finds all three there, which is what taking three named ones off
-// three consecutive lists proves. Each is named rather than counted to: the
-// list is ordered by the words a player reads, so the three stand in a
-// different order in every language, and this route is replayed in a
-// translated universe. That ordering is `conversation.test.ts`'s to pin.
 # test sunny-has-three-things-to-say
 load: in-town
 travel: tavern-street
@@ -2055,10 +1622,6 @@ assert: sunny.the-stove.visits = 1
 assert: sunny.the-bottle.visits = 1
 assert: sunny.the-animals.visits = 1
 
-// Two ways past the barred door, and the door is the same door either way. The
-// key comes off the table with both ratmen still standing on it: taking it is
-// instant and gated on nothing, and nobody who got this far on what the rats
-// leave behind wins that fight.
 # test the-key-opens-the-barred-door
 load: at-the-sewer-junction
 travel: sewer-outfall
@@ -2069,11 +1632,6 @@ travel: sewer-locked-room
 use: entity.key-table.take-the-key
 assert: has sewer-key
 
-// A build and a place, laid down in that order. What the arrival was carrying
-// survives being stood somewhere else — the sword is a rolled copy and the
-// shield a stack, and neither layer says a word about the other's. Where the run
-// stands is the last layer's, since only one of the two can be answered: no
-// condition names where the player is, so the walk off the junction says it.
 # test what-two-layers-of-a-save-each-keep
 load: armed-at-the-sewer-junction
 assert: inventory.core.iron-sword = 1
@@ -2082,10 +1640,6 @@ assert: inventory.core.lockpick = 1
 assert: heard-of-the-back-way
 travel: sewer-outfall
 
-// The same, where both layers grew something. Taking the blade off is what asks
-// the question: if the upper layer's `equipped` were still calling its copy `1`
-// it would be naming the lower layer's heartwood blade, and the wrong thing —
-// or nothing at all — would come off the arm.
 # test a-build-and-a-run-that-each-grew-something-keep-both
 load: the-grown-blades-and-the-one-in-hand
 unequip: mainhand
@@ -2093,14 +1647,6 @@ assert: inventory.combat-expansion.proving-blade = 1
 assert: inventory.core.heartwood-blade = 1
 assert: inventory.core.iron-sword = 1
 
-// --- growing an item ---
-
-// The plane a player reaches without ever having found anything: coin over the forge counter, a
-// blade and a blank off the anvil, and the point that opens the blade's own east slot spent on the
-// blank. Every other route below starts at a chest that stands in no room, so this is the one that
-// says a plane is a thing the world offers rather than a thing the engine can do. It asks nothing
-// about what the blank is worth — a causeway pays on one node and that is a balance question — only
-// that the road from a counter to a socketed cluster is open end to end.
 # test the-forge-is-a-way-onto-a-plane
 load: at-the-forge-with-coin
 shop: smithing.forge-supplies
@@ -2114,39 +1660,11 @@ allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with core.causeway-jewel
 assert: not has core.causeway-jewel
 
-//
-// Core's cluster planes, walked from the DEBUG smith's chest, which is the only
-// thing left that puts a jewel in anyone's hands and stands in no location.
-//
-// Recorded from a live session, so what follows is what a player types and the
-// closing sheet is where that session ended: both grown copies, their planes,
-// every allocation, and the effects each cluster carries. Regenerate the sheet
-// with `npm run probe -- content --record tulsa.growing-a-heartwood-blade` when
-// this content changes on purpose.
-//
-// What this route claims is written as its refusals — each one names a growth
-// the plane must not take, and there are six of them. The plane itself is what
-// no condition can name, so the sheet keeps it: `instances` is compared whole
-// even under `expect only:`, so every hex, jewel, point and orb below is still
-// pinned exactly — and so is every roll, which is how a recorded run proves a
-// level is drawn once and never drawn again.
-//
-// The chest hands out two blades, and each arrives already a copy of its own
-// with its level rolled: the Heartwood Blade is 1 and the Iron Sword is 2, and
-// neither was ever in a stack to be lifted out of one.
-//
-// The Heartwood Blade's origin is a spindle whose root, position 1, is
-// allocated from the start and free. Both of its jewel slots hang off position
-// 3, so either one costs two points to reach before the slot itself.
 # test growing-a-heartwood-blade
 DEBUG
 load: growing-a-heartwood-blade-start
 use: entity.smiths-chest.open
-// A template names no copy: the points belong to the id the chest handed
-// over, and an item id is not one of them.
 refuse: allocate heartwood-blade at 0,0 position 2
-// Out of adjacency: position 3 touches only position 2 and the two slots,
-// and the point to pay for it is in hand.
 refuse: allocate 1 at 0,0 position 3
 allocate: 1 at 0,0 position 2
 allocate: 1 at 0,0 position 3
@@ -2154,10 +1672,7 @@ allocate: 1 at 0,0 slot ne
 slot: 1 at 0,0 ne with keen-edge-jewel
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with crossroads-jewel
-// Slotting is permanent: a filled slot refuses a second jewel forever.
 refuse: slot 1 at 0,0 e with causeway-jewel
-// Allocation is permanent too, and this is asked with points still spare so
-// that having none cannot be the reason.
 refuse: allocate 1 at 0,0 position 2
 allocate: 1 at 1,-1 position 1
 allocate: 1 at 1,-1 position 2
@@ -2165,45 +1680,18 @@ allocate: 1 at 1,-1 position 3
 allocate: 1 at 1,-1 position 4
 allocate: 1 at 1,-1 position 5
 allocate: 1 at 1,0 position 1
-// The junction's nw edge faces the ring slotted a moment ago, and one hex
-// holds one cluster: that direction is foreclosed for good. Asked with a
-// point in hand and its own position allocated, so blocking is the only
-// answer left — and the ne edge of the same hex, two lines down, takes the
-// point the nw edge would not.
 refuse: allocate 1 at 1,0 slot nw
 refuse: slot 1 at 1,0 nw with causeway-jewel
 allocate: 1 at 1,0 slot ne
 apply: 1 at 1,-1 with orb-of-the-edge
 apply: 1 at 1,-1 with lesser-orb-of-the-edge
-// Two effects naming one stat pool to 35% rather than compounding to 37.5%.
-// A second copy of one orb is refused by identity, a third orb by capacity.
 refuse: apply 1 at 1,-1 with orb-of-the-edge
 refuse: apply 1 at 1,-1 with orb-of-the-bulwark
-// The origin's only allocated payload is a percent one, so this is an orb
-// scaling the increased channel rather than the added one.
 apply: 1 at 0,0 with orb-of-vitality
-// The ordinary base, whose hex (0,0) is the bare east slot every base falls
-// back to. It came out of the same chest, with a level rolled the same way.
 allocate: 2 at 0,0 slot e
 slot: 2 at 0,0 e with causeway-jewel
 expect only: growing-a-heartwood-blade-end
 
-// --- growing an item through the inventory screen ---
-//
-// The same growth the test above spells as directives, walked the way a player
-// reaches it: every line below is a screen being answered. Recorded from a live
-// session; regenerate the sheet with `npm run probe -- content --record
-// tulsa.growing-through-the-inventory-screen` when this content changes on
-// purpose.
-//
-// It opens the inventory, opens the Iron Sword's plane, slots a jewel into the
-// bare east slot every base has, walks out to the hexagon that jewel put there
-// and to the one slotted beyond that, allocates on both, leaves the plane for
-// the inventory it was opened from, and equips the copy it just grew.
-//
-// The chest handed the sword over as a copy already, so the inventory names it
-// by id: the row the player opens is 2, and the points it spends below were
-// rolled when the chest was opened rather than bought afterwards.
 # test growing-through-the-inventory-screen
 DEBUG
 load: growing-a-heartwood-blade-start
@@ -2223,61 +1711,22 @@ submit-modal: plane=back
 submit-modal: verb=equip
 open-modal: carried-items
 submit-modal: item=close
-// The claim is that the whole growth is reachable through the screen a player actually
-// uses: the blade is out of the chest, grown, and on the arm at the end of it, having
-// been driven there by nothing but modal submissions. A worn item's plane folds into the
-// wearer's stats, and what that fold comes to is stats.ts's to prove rather than this
-// route's. The sheet it closes on is what the view-parity sweep loads to draw a plane
-// with points spent on it.
 assert: has core.heartwood-blade
 expect only: growing-through-the-inventory-screen-end
-
-// --- the archetype routes, walked in the proving ground ---
-//
-// The jewels are combat-expansion's list and stand nowhere; the yard, the crate
-// and the two things in it are this module's, so a route that walks one is
-// written here. Every route below opens on the save under it or on a copy of
-// it, because a save is the smallest thing that puts a player in front of the
-// crate.
 
 # save at-the-proving-ground
 {"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true}}
 
-// Recorded from live sessions, so what each route spells is what a player typed
-// and the closing sheet is where that session ended. Regenerate a sheet with
-// `npm run probe -- content --record tulsa.<the route below it>` when this
-// content changes on purpose.
-//
-// The sheets close on `expect only:`, which compares just the keys the save
-// names, and what each route actually claims is written above it as `assert:`.
-// A buff held by the struck party and an enemy's pool are the two things no
-// condition can name — those stay the sheet's to say.
-//
-// Every route grows the same plain blade, and the crate hands it over already
-// a copy of its own with its level rolled: the base's bare east slot takes the
-// jewel, and what differs between the routes is which positions the points
-// were spent on.
-
-// The berserker's resource. Rage is granted only by a landed swing and bled
-// back only by the passive that grants it, so the whole of what the closing
-// sheet records about the pool came from the hexagon this route allocated.
 # test rage-rises-as-swings-land
 load: at-the-proving-ground
 use: entity.armourers-chest.open
 allocate: 1 at 0,0 slot e
 slot: 1 at 0,0 e with combat-expansion.wrath-jewel
-// Position 1 is the entry the slot put the jewel's root on; the hub is one
-// step from it and is where the signature passive sits.
 allocate: 1 at 1,0 position 1
 allocate: 1 at 1,0 position 7
 equip: 1
 use: core.melee-combat on proving-post
 wait: 30
-// The claim is the one this route is named for: rage is granted by a landed swing and
-// by nothing else, so a pool standing above empty after thirty seconds of swinging is
-// the swings. What it came to is read off the state this route leaves, by the archetype
-// tests in integration.test.ts, and against the ceiling asked for there rather than
-// pinned here — a pass over the jewel moves the number and must not redden the walk.
 assert: resource.combat-expansion.rage > 0
 expect only: rage-rises-as-swings-land-end
 
@@ -2285,21 +1734,12 @@ expect only: rage-rises-as-swings-land-end
 DEBUG
 {"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.vigor-tally","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
-// The gate is a wrapper and the payload stacks, so what a minute of swinging
-// leaves the player holding is several instances of one declaration, each on
-// its own clock, rather than one that keeps being refreshed. `quickening` is
-// allocated beside `spurred` and reads how many are held; the two are separate
-// passives on separate points, which is what makes them separable. The tally
-// names a level of its own and so stands in the save as copy `1`; what the
-// chest hands over is the next id the world mints, which is `2`.
 # test accelerated-vigor-stacks-behind-its-gate
 DEBUG
 load: at-the-proving-ground-with-a-tally
 use: entity.armourers-chest.open
 allocate: 2 at 0,0 slot e
 slot: 2 at 0,0 e with combat-expansion.wrath-jewel
-// Round the outer ring rather than across the hub, so the rage passive is not
-// allocated and nothing in this sheet came from it.
 allocate: 2 at 1,0 position 1
 allocate: 2 at 1,0 position 2
 allocate: 2 at 1,0 position 6
@@ -2308,11 +1748,6 @@ equip: 2
 equip: 1
 use: core.melee-combat on proving-post
 wait: 60
-// The tally is worth one evasion a stack and nothing else on this route touches that
-// stat, so a reading above nothing is stacks being held behind the gate — which is what
-// the route is named for. How many, and what the count is worth against what a stack
-// pays, is separated out by the archetype tests in integration.test.ts, which read it
-// off the state this route leaves rather than off a number pinned here.
 assert: stat.evasion > 0
 expect only: accelerated-vigor-stacks-behind-its-gate-end
 
@@ -2326,46 +1761,22 @@ allocate: 1 at 1,0 position 7
 equip: 1
 use: core.melee-combat on proving-post
 wait: 10
-// The swinger's own regeneration is untouched. Venom is -30 on a stat whose
-// base is 1, so a swinger holding its own venom would read well under zero;
-// this is the half of "on them" that the player's sheet can say. That the post
-// holds it, and that its health is falling faster than the swings took it, is
-// the closing sheet's to say — no condition names another actor's buffs.
 assert: stat.regeneration > 0
 expect only: poison-holds-the-struck-enemy-end
 
-// Nothing refreshes it once the swinging stops, and the duration on the
-// declaration is the only thing that says when it ends.
-//
-// `expect:` and not `expect only:`, because the claim is an absence: the post
-// no longer holds the venom. `expect only:` compares just the keys a save
-// names, and a sheet recorded after the buff lifted has stopped naming it —
-// which would leave this passing in a world where poison never expires. Only
-// the whole sheet can say a thing is gone. No assertion can stand in either:
-// the buff is on the struck party and the condition roots read the player.
 # test poison-lifts-when-its-own-duration-runs-out
 run: poison-holds-the-struck-enemy
 cancel
 wait: 30
 expect: poison-lifts-when-its-own-duration-runs-out-end
 
-// Thorns, carried by something that swings nothing and declares no action at
-// all. The urchin never attacks, so nothing but the thorns can have taken any
-// health off the player.
 # test striking-a-thorned-enemy-costs-the-striker
 load: at-the-proving-ground
-// The thorns are the urchin's and not the player's: the jewel of the same name
-// is still in the crate. Naming it is also what ties this route to the pack the
-// urchin's passive comes from, so a world without that pack drops the route
-// rather than replaying it against an urchin that has stopped being thorned.
 assert: not has combat-expansion.retribution-jewel
 use: core.melee-combat on spined-urchin
 wait: 10
 expect only: striking-a-thorned-enemy-costs-the-striker-end
 
-// The take-back rule walked from shipped content rather than only from a unit
-// test: a leaf comes back for its point, a node something still stands on is
-// refused, and a socket is refused whatever else is true of it.
 # test a-plane-unwinds-from-its-leaves-and-never-out-from-under-a-jewel
 DEBUG
 load: at-the-proving-ground
@@ -2378,8 +1789,6 @@ allocate: 1 at 1,0 position 2
 refuse: unallocate 1 at 1,0 position 1
 unallocate: 1 at 1,0 position 2
 unallocate: 1 at 1,0 position 1
-
-// --- the sheets those routes ended on ---
 
 # save rage-rises-as-swings-land-end
 {"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":381},"resources":{"combat-expansion.rage":19800},"equipped":{"mainhand":"1"},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1809706,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":3953799810}

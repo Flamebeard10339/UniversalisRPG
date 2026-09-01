@@ -44,6 +44,8 @@ and neither one's gate answers for the other.
 | reads | the corpus, and `npm run oracle` | anything |
 | its gate | `npm run oracle -- --at content` | `npm test`, `tsc`, `npm run layer-check` |
 
+`npm run comment-check` gates both, because both are written without comments.
+
 **No test may read a line of `content/`.** A contributor editing the world inside the
 game cannot run vitest, so a suite that could go red on their edit is a gate nobody
 can answer. The suite stands on `src/content/fixture/` — a world the engine owns and
@@ -146,9 +148,7 @@ file.
 `settled.md` that reached 1463 lines — and every fact in it was already in the code.
 A decision about the game is a **test**. A rule about the work is a line in this
 file. A workflow discovery is a memory, kept short and actionable. Why any of them
-was decided is the commit message. **Never write a settled decision into a code
-comment**: the *Comments* section already refuses it, and a folder of them is what
-this paragraph replaced.
+was decided is the commit message.
 
 So a test that blocks the task in hand is one of two things, and both have the same
 answer. Either the author decided that behaviour, in which case it stands and the
@@ -168,17 +168,14 @@ live in the folder of the layer they drive.
 
 # Comments
 
-Comments are scarce by principle. Keep one only if the fact is **owned by this
-file**, **not derivable from reading it**, and expressible as neither a name, a
-type, nor a test. Otherwise it has a destination — rename it, type it, test it,
-or leave it in the commit message. Deleting it loses nothing; git holds every
-word.
+No comments. `npm run comment-check` is a gate: a `//` or `/* */` under `src/`
+or `scripts/`, or a `//` line under `content/`, fails CI.
 
-Never describe another module's contract: that comment drifts the moment its
-owner changes, and the owner is the ground truth a reader should go to instead.
-Never write down what a past decision was, what was measured on some date, or
-what the rejected alternative was — that is what commit messages are for. A file
-drifting toward heavy commenting is a design signal: it needs a seam.
+A fact you were about to comment has a destination — rename it, type it, test
+it, or put it in the commit message.
+
+`@@@` in a `.dsl` body is the one mark that stands: it is a note to the author,
+and `npm run notes` reads it.
 
 # Testing
 
@@ -248,6 +245,10 @@ Prefer adding a claim there over writing a new per-kind test file. Write a
 focused test when the thing under test is a refusal — the error an author sees
 for malformed input is the language's contract and the corpus cannot exercise it.
 
+One more gate, which the *Comments* section owns:
+
+- `npm run comment-check` — every `//` and `/* */` under `src/` and `scripts/`, and every `//` line in a `.dsl`, named by file and line. It reads what a comment is off the TypeScript compiler, so a slash in a string, a URL or a regex is not one, and it leaves a line holding `@@@` alone. It exits non-zero on anything else, and CI runs it
+
 Tools, none of which are gates:
 
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
@@ -279,5 +280,5 @@ before handing over.
 
 Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`).
 Android: Capacitor sync + Gradle release build, APK signed and attached to the release.
-CI runs `tsc --noEmit`, `npm test` and `npm run layer-check`.
+CI runs `tsc --noEmit`, `npm test`, `npm run layer-check` and `npm run comment-check`.
 

@@ -153,8 +153,6 @@ describe('a fight pool emptied by a result, not by the hit that opened the segme
   });
 });
 
-// Two foes and one blow. The brute has a hundred to lose and the wisp was never above nothing, so
-// the pair asks whether the killing blow gets its own answer about what emptying is.
 const STILLBORN = `
 # stat attack
 base: 5

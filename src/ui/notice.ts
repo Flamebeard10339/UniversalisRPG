@@ -4,8 +4,6 @@ import { signed } from './format';
 import { crossings } from './levelling';
 import type { Words } from './words';
 
-// The key is what merging goes by and nothing else: two happenings under one key count up into a
-// single line, so whoever raises one chooses how coarse its counting is.
 export interface Notice {
   key: Answer;
   count: number;
@@ -21,20 +19,10 @@ export const NOTICE_LIFETIME_MS = 2000;
 
 export const sayingOf = (notice: Notice): string => (notice.count === 0 ? notice.words : `${signed(notice.count)} ${notice.words}`);
 
-// A key is minted here and read back here, so what a watcher writes into one and what a fold reads
-// out of one are the same rule rather than two spellings of it.
 export const noticeKey = (under: string, id: Answer): Answer => `${under}:${id}`;
 
 const under = (notice: Notice): string => notice.key.slice(0, notice.key.indexOf(':'));
 
-// Gains that landed together and are the same size read as one line naming all of them: +5 Attack
-// and +5 Defence is +5 Attack, Defence. The count is not summed — a player who gained five of each
-// gained five, and +10 would say they gained ten of something there is no ten of.
-//
-// Held to one namespace as well as one count, because a run that hands over an item and the xp for
-// taking it raises both at once: roasting one chestnut is +1 of the chestnut and +1 of cooking, and
-// counting alone would say `+1 Roast Chestnut, Cooking`, which is a sentence about nothing. A
-// notice counting nothing is a whole sentence of its own and never folds.
 export function saidLines(shown: readonly Shown[]): { at: Shown; text: string }[] {
   const lines: { at: Shown; text: string }[] = [];
   for (const notice of shown) {
@@ -68,8 +56,6 @@ function climbed<Row extends { id: Answer }>(before: readonly Row[], after: read
 
 const standingOf = (entry: PlayView['journal'][number]): string => `${entry.stage}/${entry.standing}`;
 
-// Every happening that has words for the player. A notification is a line here and nothing else:
-// nothing downstream asks what raised one, so removing a line removes a notification whole.
 const RAISED_BY: readonly Watcher[] = [
   (before, after) => climbed(before.xp, after.xp, 'xp', (row) => row.value, (row) => row.title),
   (before, after) => climbed(before.carried, after.carried, 'item', (row) => row.count, (row) => row.name),

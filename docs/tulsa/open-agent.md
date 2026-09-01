@@ -72,9 +72,8 @@ takes the net, the other net and every spare line out of the pack at once rather
 the one that parted. Seen on the sheet: a tier-1 fishing build at the shrimp shoal lost
 `small-fishing-net`, `large-fishing-net` and `gut-line` on one parting, `-6/h` each.
 
-The table's own comment says why it is written out — nothing in the language selects an
-item by the keyword it carries — but that explains the enumeration, not the taking of
-all six. It predates this branch and the line pools are five times what they were, so
+It is written out because nothing in the language selects an item by the keyword it
+carries — but that explains the enumeration, not the taking of all six. It predates this branch and the line pools are five times what they were, so
 it now costs a great deal more when it fires.
 
 *Closes when:* a parting takes the piece that parted. If the language cannot say

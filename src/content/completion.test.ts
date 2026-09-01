@@ -149,7 +149,6 @@ describe('a line as the engine takes it', () => {
     expect(amissIn(RECIPE('oven'), known).flatMap((each) => each.undeclared)).toEqual([]);
   });
 
-  // A line the engine will not take standing alone says why in the engine's own words, carried as its own note, so what the page says beside a line and what it refuses that line for cannot come apart.
   it.each(sections().map((each) => each.kind))('%s refuses none of the lines it writes out, but for one that says what it wants beside it', (kind) => {
     const owner = sectionFor(kind)!;
     for (const line of owner.grammar) {
@@ -220,7 +219,6 @@ describe('a half-written line', () => {
 
   const CHAT = ['# dialogue core.chat', 'node greet:', '  A traveller, out here?', '  goto NODE'].join('\n');
 
-  // A goto reaches only inside its own dialogue, so the page can rule on it with nothing else loaded — and does, because the kind's own file is where that rule is written.
   it('says a goto names no node of this dialogue, which is a rule the section carries by itself', () => {
     expect(refused(amissIn(CHAT.replace('NODE', 'nowhere'), KNOWN)).map((each) => [each.line, each.refused])).toEqual([[1, '# dialogue core.chat: node greet goto names an unknown node: nowhere']]);
     expect(refused(amissIn(`${CHAT.replace('NODE', 'farewell')}\n\nnode farewell:\n  Safe travels.`, KNOWN))).toEqual([]);

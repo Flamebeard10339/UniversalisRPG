@@ -58,9 +58,6 @@ describe('the journal as a screen the engine opens', () => {
   });
 });
 
-// Clicking away from a screen answers it with the value it says it leaves by, which
-// is why that value has to be one of the ones it offers. What holds of every screen
-// is held to in modals.test.ts; this is that the journal's two halves both offer it.
 describe('leaving the journal', () => {
   const leaves = (session: ReturnType<typeof opened>): boolean => {
     const modal = view(session).modals[view(session).modals.length - 1]!;

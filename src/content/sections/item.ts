@@ -38,7 +38,6 @@ export interface Item extends AuthoredItem {
   clusterJewel?: string;
 }
 
-// Which jewel this item is: the one it names, or the one it carries, which stands at the item's own id.
 const jewelIdOf = (item: AuthoredItem): string | undefined => (typeof item.jewel === 'string' ? item.jewel : item.jewel?.id);
 
 const jewelCarriedBy = (item: AuthoredItem): ClusterJewel | undefined => (typeof item.jewel === 'object' ? item.jewel : undefined);
@@ -140,13 +139,9 @@ export const item = section<AuthoredItem, never, 'actions'>()({
     actions(held.actions, where, visit);
     hooks(held, where, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
-    // A jewel written out here holds names of its own, and reading them is the jewel's own business.
     if (held.jewel !== null && typeof held.jewel === 'object') clusterJewelSection.visit(held.jewel as ClusterJewel, `${where} cluster-jewel:`, visit);
   },
   prune: (value, at, where) => {
-    // A wear requirement is a gate, and a gate nobody can read is not a gate: an item asking for a
-    // skill the world has stopped declaring goes the way an entity whose `hidden if:` lost its
-    // subject goes, rather than quietly becoming a thing anyone may put on.
     if (!at.intact(() => visitCondition(value.requires, `${where} requires:`, at.visit))) return null;
     const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);

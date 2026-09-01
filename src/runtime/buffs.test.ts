@@ -329,8 +329,6 @@ describe('an inflicted buff is granted by the declaration it names', () => {
     const registry = loaded();
     const state = swinging(registry, 'measured-blade');
 
-    // The rat swings at five and the player at ten, so the stretch is the rat's; and venom
-    // takes four off that same stat once it lands, so the stretch is read as it is given rather than after.
     expect(statValue('attack', state, registry, PLAYER)).toBe(10);
     expect(buffsOf(state, 'giant-rat')[0]!.expiresAt).toBe(secondsToMs(1 + 5));
   });

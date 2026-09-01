@@ -25,10 +25,6 @@ export interface ShapeChange {
 
 export const noFieldMoved = (writtenFor: number): ShapeChange => ({ writtenFor, declared: 'no field moved', moved: (body) => body });
 
-// An item copy keeps the roll it dropped with where it kept experience, and so does every cluster
-// in its plane. A roll of 0 is the bottom of whatever range its item declares, which is the only
-// answer a rewrite can give: the level a fixture had was bought, and what it was bought towards is
-// gone.
 const rerolledCopies: ShapeChange = {
   writtenFor: 13,
   declared: 'every item copy and every cluster in its plane keeps a roll',

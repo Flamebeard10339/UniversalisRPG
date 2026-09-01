@@ -10,16 +10,11 @@ import { fromMilliUnits, msToSeconds } from './units';
 import { heldCount } from './itemInstance';
 import { localizerOf } from './localized';
 
-// Both questions a reference is asked, answered together: what it is, and — where that is an id
-// rather than a figure or the player's own writing — the kind the world titles it under. A
-// condition wants the first and a sentence a player reads wants the second, and a root answering
-// only one of them is how a machine name reaches a page.
 export interface Answered {
   value: boolean | number | string | undefined;
   names?: string;
 }
 
-// Exhaustive over the roots the grammar declares, so a root added there does not silently read as an undeclared flag.
 const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registry: Registry) => Answered>> = {
   time: (_id, state) => ({ value: msToSeconds(state.time) }),
   player: (id, state) => ({ value: state.player[id as PlayerField], names: PLAYER_SHEET[id as PlayerField]?.names ?? undefined }),
@@ -32,14 +27,12 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   stat: (id, state, registry) => ({ value: statValue(id, state, registry) }),
 };
 
-// A quest stage's flag stands for having reached it, and a stage left by a `done when:` is reached without anything setting one, so the flag alone is not the answer. The quest owns the rule and is asked for it here.
 function questReach(path: string[], registry: Registry): Condition | undefined {
   if (path.length < 2) return undefined;
   const quest = registry.quests.get(path.slice(0, -1).join('.'));
   return quest === undefined ? undefined : reachedByItself(quest, path[path.length - 1]!);
 }
 
-// A stage the quest arrives at by itself may be waiting on a stage of a quest waiting on this one, which is a circle rather than an answer, so the second time round it reads as its flag alone.
 const deriving = new Set<string>();
 
 export function answerReference(reference: Reference, state: GameState, registry: Registry): Answered {
@@ -64,9 +57,6 @@ export function resolveReference(reference: Reference, state: GameState, registr
   return answerReference(reference, state, registry).value;
 }
 
-// What a reference reads as in a sentence somebody reads, which is the id only where the world has
-// no word for it. An answer naming nothing — every figure, and the name the player typed — is
-// already the words, and an unanswered one is silence rather than the word for nothing.
 export function referenceWords(reference: Reference, state: GameState, registry: Registry): string {
   const { value, names } = answerReference(reference, state, registry);
   if (names === undefined || typeof value !== 'string' || value === '') return String(value ?? '');
@@ -102,10 +92,6 @@ export function evaluateCondition(condition: Condition, state: GameState, regist
 
 export const describeCondition = printCondition;
 
-// The item a condition wants the player holding, where not holding it is the whole of why the
-// condition does not stand. It answers a sentence somebody reads rather than a decision, so it
-// declines every shape it could only half-name: an `or` is satisfied by something else, and a `not`
-// is satisfied by putting the thing down.
 export function itemMissingFor(condition: Condition, state: GameState, registry: Registry): string | undefined {
   switch (condition.kind) {
     case 'has':

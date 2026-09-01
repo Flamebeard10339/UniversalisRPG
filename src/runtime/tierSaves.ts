@@ -7,14 +7,6 @@ import { itemInstance, itemLevel, itemTemplate } from './itemInstance';
 import { pointsSpent } from './clusterPlane';
 import { wearable } from './equipment';
 
-// A reference build: a `# save` written to stand for what a character of a given activity looks like
-// at a given tier, which `npm run tier-build` writes and a balance pass measures against. The name
-// is the corpus's convention rather than the engine's — `tiers.dsl` files them this way — and it is
-// read here rather than declared anywhere, so a world that files none has none of these.
-//
-// A trailing word names what the pool was grown toward rather than a second activity:
-// `combat-tier-20-sustain` is the combat tier at twenty that bought recovery instead of a bigger
-// swing, so it is read off and dropped.
 const TIER = /^(?:.+\.)?(.+)-tier-(\d+)(?:-[a-z]+)?$/;
 
 export interface TierSave {
@@ -34,11 +26,6 @@ export interface StaleTier {
   says: string;
 }
 
-// The three ways a stored build goes stale while the file on disk reads exactly as it did: the curve
-// under it moved, so it no longer stands where it says; a slot it left empty is one it is already
-// carrying something for; or it wears a thing with the whole of its plane untouched, which is a
-// character at a fraction of what its own gear allows and a rate measured for somebody who never
-// spent a point.
 export function staleTiers(registry: Registry): StaleTier[] {
   const held = new Map(activitiesIn(registry).map((each) => [each.id, each.skills]));
   return tierSavesIn(registry).flatMap(({ id, activity, level }) => {

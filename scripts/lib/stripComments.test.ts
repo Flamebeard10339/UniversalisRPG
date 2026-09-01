@@ -44,10 +44,15 @@ describe('stripComments', () => {
     expect(commentLines('/*\n * two\n */\nconst kept = 1;\n')).toBe(3);
   });
 
-  it('keeps directives, which are code wearing comment syntax', () => {
-    expect(commentLines('/// <reference types="vite/client" />\n')).toBe(0);
-    expect(commentLines('// @ts-expect-error deliberate\nconst bad = 1;\n')).toBe(0);
-    expect(codeOnly('import(/* @vite-ignore */ url);\n')).toEqual(['import(/* @vite-ignore */ url);']);
+  it('blanks a directive too, which wears comment syntax and is a comment', () => {
+    expect(commentLines('/// <reference types="vite/client" />\n')).toBe(1);
+    expect(commentLines('// @ts-expect-error deliberate\nconst bad = 1;\n')).toBe(1);
+    expect(codeOnly('import(/* @vite-ignore */ url);\n').map((line) => line.replace(/ +/g, ' '))).toEqual(['import( url);']);
+  });
+
+  it('reads a file by its extension, so JSX and a generic each parse as written', () => {
+    expect(codeOnly('const view = <p>a / b</p>; // gone\n', 'sample.tsx')).toEqual(['const view = <p>a / b</p>;']);
+    expect(codeOnly('const last = <T>(list: T[]): T => list[0]; // gone\n', 'sample.ts')).toEqual(['const last = <T>(list: T[]): T => list[0];']);
   });
 });
 

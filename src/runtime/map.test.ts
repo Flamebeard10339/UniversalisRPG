@@ -91,8 +91,6 @@ describe('one floor of the map', () => {
   });
 });
 
-// A floor you cannot get to from where you stand is not a floor of this place, and offering it is
-// offering to look through the floor.
 describe('the floors a player may look at', () => {
   it('is the one they stand on and the ones a road out of here reaches', () => {
     expect(sheet(HOUSE, 'hall').planes).toEqual([-1, 0, 1]);
@@ -123,9 +121,6 @@ describe('the roads a sheet draws', () => {
     expect(sheet(oneEnd, 'ledge', 0).roads).toEqual([{ from: 'cliff', to: 'ledge', open: true, mutual: true }]);
   });
 
-  // A found place lists only the roads to places the player has found, so from the market square
-  // there is no edge to a room nobody has been in — and an author, who is shown both, would have been
-  // shown half their map as roads running one way that nobody wrote.
   it('draws the road to a place the player has not found from the end that still lists it', () => {
     const found = [place('hall', 0, 0, 0), place('shed', 1, 0, 0, 'hall')];
     const drawn = sheetOf({ ...status(found, 'hall'), discovered: [found[0]!], undiscovered: [found[1]!] }, 0, 'every');
@@ -156,8 +151,6 @@ describe('the roads a sheet draws', () => {
   });
 });
 
-// Which way a place lies is worked out from the coordinates and from `DIRECTION_VECTORS`, so a world
-// that turned its map over would turn every bearing with it and nothing here would need editing.
 describe('which way one place lies from another', () => {
   const from = { x: 0, y: 0, z: 0 };
 
@@ -180,9 +173,6 @@ describe('which way one place lies from another', () => {
     expect(bearingOf(from, { x: 10, y: -8, z: 0 })).toBe('north-east');
   });
 
-  // A world's own words and the map's own bearings have to agree, and they did not: a place written
-  // `north of` another was drawn below it. The subjects are the four the fixture writes one of each
-  // way round its green, so the four headings are each read off a line an author wrote.
   it('agrees with what a world calls the ways out of a place', () => {
     const places = loadUniverse([...fixtureSources()]).locations;
     const green = places.get('fixture-town.green')!;
@@ -263,8 +253,6 @@ describe('the nine squares a way out is offered in', () => {
   });
 });
 
-// A region is drawn and nothing else. Nothing in the engine reads one, so what there is to prove is
-// about the shape: that it goes round what the region holds, and that what it holds moves together.
 describe('the shape a region draws', () => {
   const HOUSE_REGION = { id: 'house', title: asLocalized('The House'), holds: ['hall', 'landing', 'cellar'] };
 
@@ -277,9 +265,6 @@ describe('the shape a region draws', () => {
       return (next.x - corner.x) * (point.y - corner.y) - (next.y - corner.y) * (point.x - corner.x) >= -1e-9;
     });
 
-  // Not the point a place is drawn at but the whole square it stands in: only one place can be at a
-  // coordinate, so the square is what a place occupies, and a shape that held only the middles left
-  // every room of the castle sitting half outside its own wall.
   const squareOf = (at: { x: number; y: number }): { x: number; y: number }[] =>
     [-1, 1].flatMap((across) => [-1, 1].map((down) => ({ x: at.x + across * REGION_PAD, y: at.y + down * REGION_PAD })));
 
@@ -314,8 +299,6 @@ describe('the shape a region draws', () => {
     }
   });
 
-  // The setting is the whole of the difference, so what there is to prove is that the map reads it
-  // and that the other shape still holds what the region holds.
   it('draws one rectangle round the lot for a run standing at the other shape', () => {
     const boxed = sheetOf({ ...status(HOUSE, 'hall'), regions: [HOUSE_REGION], settings: [{ name: 'regions', standing: 'box' }] }, 0).regions[0]!;
 
@@ -327,9 +310,6 @@ describe('the shape a region draws', () => {
     }
   });
 
-  // A building does not change shape while you are looking at it. Drawn round what the sheet was
-  // showing, the castle moved and resized every time a room of it was found — which is what an
-  // arrival inside one looked like from outside.
   it('draws the same shape however few of its places the sheet is showing', () => {
     const whole = withRegions([HOUSE_REGION]).regions[0]!;
     const one = sheetOf({ ...status(HOUSE, 'hall'), discovered: [HOUSE[0]!], undiscovered: HOUSE.slice(1), regions: [HOUSE_REGION] }, 0).regions[0]!;
@@ -339,9 +319,6 @@ describe('the shape a region draws', () => {
     expect(one.at).toEqual(whole.at);
   });
 
-  // A region is a building, and a building shows its rooms to somebody who is in it. From outside, the
-  // one room of it on the map is the one a road from here reaches — which is why a road into a region
-  // can never be left pointing at a room that is not drawn: the road is what draws it.
   it('shows the room a road from out here reaches, and keeps the rest of the building shut', () => {
     const outside = withRegions([HOUSE_REGION], 'beach');
 
@@ -349,8 +326,6 @@ describe('the shape a region draws', () => {
     expect(outside.regions[0]!.drawn).toEqual(['hall']);
   });
 
-  // Opening a region does not open the floors it reaches onto: a room overhead is drawn when a step
-  // from here would put you in it, region or no region, which is the rule this one is said beside.
   it('shows every room of it to somebody standing in one of them, on the floors they could step to', () => {
     expect(withRegions([HOUSE_REGION], 'hall').regions[0]!.drawn.sort()).toEqual(['cellar', 'hall', 'landing']);
     expect(withRegions([HOUSE_REGION], 'cellar').regions[0]!.drawn.sort()).toEqual(['cellar', 'hall']);
@@ -388,9 +363,6 @@ describe('the shape a region draws', () => {
   });
 });
 
-// A place written `above castle-hall` is somewhere the moment the world loads, and it still says
-// what it hangs off — which is what prints it back the way it was written, and what tells a map that
-// moving the hall moves this too.
 describe('a place placed by how it stands to another', () => {
   const world = () =>
     loadUniverse([
@@ -412,8 +384,6 @@ describe('a place placed by how it stands to another', () => {
   });
 });
 
-// A map that draws only what a player has found is no use for putting the next place beside the
-// last one, so an author may ask for the whole floor. What has not been found says so.
 describe('the whole floor, for whoever is writing it', () => {
   const HIDDEN: Place[] = [place('hall', 0, 0, 0, 'vault'), place('vault', 1, 0, 0, 'hall'), place('attic', 2, 0, 1)];
 
@@ -436,9 +406,6 @@ describe('the whole floor, for whoever is writing it', () => {
     expect(both('every').roads.map((road) => [String(road.from), String(road.to)])).toEqual([['hall', 'vault']]);
   });
 
-  // A floor a step away is part of the room a player is standing in; it is not part of the floor an
-  // author is laying out, and drawing it there put rooms on the map that the floor being edited does
-  // not have on it.
   const STOREYED: Place[] = [place('hall', 0, 0, 0, 'cellar'), place('cellar', 0, 0, -1, 'hall'), place('attic', 2, 0, 1)];
 
   const storeys = (showing: 'found' | 'every', ghost: number | null = null): Sheet =>

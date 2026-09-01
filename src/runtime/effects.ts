@@ -29,15 +29,10 @@ export interface Segment {
   state: GameState;
   registry: Registry;
   deltas: PoolDeltas;
-  // Why the action is over, in the player's words, or null while it is not. A `stop` result and an
-  // event an action `stops on:` are the same fact to whoever was away — the moment named it — so
-  // both are written here by the code that fires the event rather than told apart afterwards.
   stopped: Localized | null;
   observers: readonly ResultObserver[];
   causedBy: Map<string, string>;
   credit?: string;
-  // The event whose handlers are running, so a `stop` inside one says what happened rather than
-  // that something did.
   firing?: Localized;
   parties?: { readonly [P in Party]: string };
 }
@@ -107,16 +102,9 @@ export function samplesPerApplication(results: readonly ActionResult[]): boolean
   });
 }
 
-// What the running action multiplies everything it hands over by, read off the player as a
-// percentage over what the lines say. Read here rather than carried in from wherever the action was
-// armed, so an amount is scaled by having been drawn at all: a `give:` of the action's own, a row of
-// a `one of:`, a table it rolls and a hook that fires under it all pass through one draw and none of
-// them has to know a stat is weighing it.
 function rewardScale(state: GameState, registry: Registry): number {
   if (!state.activeAction) return 1;
   const named = armedAction(state, registry).rewardScale;
-  // Nothing hands over less than none of a thing, so a stat driven under -100 pays nothing rather
-  // than taking what the player came with.
   return named === undefined ? 1 : Math.max(0, 1 + statValue(named, state, registry) / 100);
 }
 
@@ -176,9 +164,6 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
   }
 }
 
-// Standing somewhere is the only thing that touches a place, and the one road from touched to
-// discovered: a neighbour is put on the map without being touched, which is the whole difference
-// between a place heard of and a place been to.
 export function standWhereTheyAre(state: GameState, registry: Registry): void {
   const here = registry.locations.get(state.location);
   if (!here) return;
@@ -192,8 +177,6 @@ export function standWhereTheyAre(state: GameState, registry: Registry): void {
   }
 }
 
-// A name the engine answers is answered against the registry that is loaded now, so a world whose
-// starting mark moved while it ran moves what the name means with it.
 export function locationNamed(registry: Registry, location: string): string {
   if (location !== STARTING_LOCATION) return location;
   const starting = startingLocationId(registry);
@@ -236,9 +219,6 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return amount;
     }
     case 'give': {
-      // The one arrival that happens while the world is running on the player's behalf. A pack with
-      // no room for it does not swallow it quietly: `receiveItem` says so, and what is under way
-      // stops with a reason, because carrying on would produce nothing.
       const wanted = drawCount(state, registry, result.amount) * count;
       const moved = receiveItem(state, registry, result.item, wanted);
       announceCarried(segment, Math.abs(moved));
@@ -246,9 +226,6 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return moved;
     }
     case 'take': {
-      // Nothing partial and nothing silent: a hand-over the player cannot make takes none of what
-      // they do have and says so. It ends nothing — a take reached from a handler or from under a
-      // roll is a loss nobody could weigh beforehand, and only what an action names ends it.
       const wanted = (result.amount ?? 1) * count;
       const parting = HandOver.asked(state, result.item, wanted);
       if (!parting) {
@@ -307,9 +284,6 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const source = registry.items.get(result.buff);
       if (!source) throw new RuntimeError(`unknown buff source: ${result.buff}`);
       const subject = subjectOf(segment, result.party, actor);
-      // A stretch the result names is read off whoever the buff lands on, so a stat standing there
-      // is the subject's own: a mark holds every thief the same length of time and a thief who has
-      // bought the nerve for it shrugs some of that off.
       const lasts = result.lasts === undefined ? undefined : statSide(result.lasts, state, registry, subject);
       for (let i = 0; i < count; i++) applyDeclared(state, subject, source, state.time, lasts);
       return count;
@@ -353,11 +327,6 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
   if (segment.stopped) endAction(state, segment.stopped);
 }
 
-// A pool is held only while something grants it a ceiling — a line is not a fisherman's until there
-// is tackle on to lose it with, which is what `fishing.max-line-health` declares no base for. So a
-// pool whose ceiling stands at nothing is not recorded at all, and the moment a ceiling appears it
-// arrives full rather than at the nothing it would have been pinned to since the run began. A
-// resource writing its own `start:` has said what it holds and is left alone.
 export function initResources(state: GameState, registry: Registry): void {
   for (const resource of registry.resources.values()) {
     const held = state.resources[resource.id] !== undefined;
@@ -407,7 +376,6 @@ export function handlersFor(registry: Registry, actorId: string, eventId: string
   return (entity?.handlers ?? []).filter((handler) => handler.event === eventId).map((handler) => handler.results);
 }
 
-// The action under way is the player's, so the events that end it are the ones that happen to the player.
 function endingEvents(segment: Segment, actorId: string): readonly string[] {
   if (actorId !== PLAYER || !segment.state.activeAction) return NO_STOPPERS;
   return armedAction(segment.state, segment.registry).stopsOn ?? NO_STOPPERS;
@@ -435,13 +403,6 @@ export function fireEvents(segment: Segment, actorId: string, trigger: EventTrig
   }
 }
 
-// What the player carries changing is news, and news is an event. Nothing here asks who moved it or
-// what they moved: the fact is a difference between what the player holds and what they were last
-// told they hold, so a hand that reaches the inventory by a door nobody has built yet is still
-// news, and noticing twice over one act is not.
-// It counts things the way a batched swing counts hits: a cycle that settled ten completions at
-// once moved ten things, and ten cycles settled one at a time moved the same ten, so what an author
-// hangs on the event does not read differently for having been away.
 export function announceCarried(segment: Segment, moved = 1): void {
   const now = heldSignature(segment.state);
   if ((segment.state.carriedTold ?? NOTHING_HELD) === now) return;
@@ -449,8 +410,6 @@ export function announceCarried(segment: Segment, moved = 1): void {
   fireEvents(segment, PLAYER, 'inventory-changed', undefined, Math.max(1, moved));
 }
 
-// The same notice for whoever is not already inside a segment — a command the player gave rather
-// than a world running on their behalf.
 export function settleCarried(state: GameState, registry: Registry): void {
   const segment = newSegment(state, registry);
   announceCarried(segment);
@@ -489,25 +448,13 @@ function poolStores(state: GameState): PoolStore[] {
   return stores;
 }
 
-// A pool that has fallen under one whole unit is spent, and whoever holds it is down. The engine
-// counts in milli-units, so the threshold is a thousand of them. The level itself stays where it
-// fell: whether a pool is spent and what is left in it are different questions, and a pool nobody
-// binds an event to is an ordinary number that has to survive a span being split anywhere.
 export const SPENT_BELOW = MILLI_UNITS;
 
-// How much may still come off a pool before it is spent, so a planner asking when that happens and
-// a settle asking whether it has read the same threshold.
 export const spendable = (level: number): number => level - SPENT_BELOW + 1;
 
 export const isSpent = (level: number): boolean => spendable(level) <= 0;
 
 function setPoolLevel(segment: Segment, store: PoolStore, resource: Resource, current: number, raw: number, max: number): 'stored' | 'clamped' {
-  // A blow, a hook, a drain and a rate all come to rest here, so both switches that hold a pool of
-  // the player's up are read here and nowhere else, and every way one could fall is covered by
-  // saying it once. `lock-pools` holds it where it stands — a max that has dropped out from under a
-  // full pool still brings it down, because that is the pool shrinking rather than something taking
-  // from it. `unkillable` lets it be worn down to the last of it and no further, so nothing of
-  // theirs is ever spent and nothing bound to one emptying is ever reached.
   const mine = store.actorId === PLAYER;
   if (mine && debugging(segment.state, 'lock-pools') && raw < current) {
     store.levels[resource.id] = Math.min(current, max);

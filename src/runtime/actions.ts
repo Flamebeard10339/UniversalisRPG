@@ -26,11 +26,6 @@ export function resolvesPerAttempt(action: Action): boolean {
   return action.accuracy !== undefined || action.depletes !== undefined;
 }
 
-// Whether taking this action puts the player somewhere else — walking a road, or a door somebody
-// wrote as an action of its own. Nothing standing here can stop one: leaving is what an aggressive
-// thing holds you until you do, so an implementation that cancelled this held you forever. A
-// relocate buried inside a `one of:` is a risk the action carries rather than a way out, and is not
-// read here.
 export function leavesHere(action: Action): boolean {
   return actionResultLists(action).some((list) => list.some((result) => result.kind === 'relocate'));
 }
@@ -58,9 +53,6 @@ export function inputLimit(action: Action, state: GameState): InputLimit {
   return costLimit(itemCost(action.results), state);
 }
 
-// How many times over the player can pay what a list of results asks of them, and — when the answer
-// is none — why. Everything that has to know before it acts reads this: an action arming, a
-// dialogue node being offered, a line in a menu.
 export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): InputLimit {
   let completions = Infinity;
   let short: string | undefined;

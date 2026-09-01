@@ -20,9 +20,6 @@ const SPANISH: ModuleSource = {
 const base = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }]);
 const translated = (): Registry => loadUniverse([{ name: 'island', text: ISLAND }, SPANISH]);
 
-// A translation may move nothing but the locale table. The subjects derive themselves from a
-// loaded registry rather than being listed, so a map added next month is swept without an edit
-// here; `locales` is named because it is the exception, and `keyof Registry` still refuses a typo.
 const NOT_CONTENT: ReadonlySet<keyof Registry> = new Set<keyof Registry>(['locales']);
 
 const contentFields = (Object.keys(base()) as (keyof Registry)[]).filter((field) => !NOT_CONTENT.has(field));
@@ -132,7 +129,6 @@ describe('an action is keyed on what addresses it, not on what it says', () => {
   });
 
   it('names the line that minted an address, rather than the action nobody wrote, when an author keys as it too', () => {
-    // Under a module of its own, so the `# action` is `hall.examine` and the two only meet where the mirror offers both.
     const clashing = ['# info hall', 'version: 1.0.0', '', '# action examine', 'title: Give It A Long Look', 'instant', 'say: You look.', '', '# entity mirror', 'examine: A tall mirror.', 'uses: examine'].join('\n');
 
     expect(() => loadModule(clashing)).toThrow(/examine: already offers an action addressed examine, which "Give It A Long Look" keys as too/);
@@ -159,8 +155,6 @@ describe('an action declared once carries one key, however many owners perform i
   const performed = everyActionTable(island).flatMap(([kind, ownerId, actions]) => actions.filter((action) => kind !== 'action' && declaredId(action) !== undefined).map((action) => ({ kind, ownerId, action })));
   const declarationKey = (action: Action): string => localeKey(island.namespace.ownerOf('action', declaredId(action)!) ?? null, 'action', declaredId(action)!, actionAddress(action));
 
-  // A DEBUG declaration says nothing in any language, so the words it does not have are not a
-  // missing key: the two halves are asked their own question rather than one half being dropped.
   const spoken = performed.filter(({ action }) => !isDebug(island.actions.get(declaredId(action)!)));
   const silent = performed.filter(({ action }) => isDebug(island.actions.get(declaredId(action)!)));
 

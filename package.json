@@ -14,6 +14,7 @@
     "test:tools": "vitest run --configLoader runner --project tools",
     "open-tests": "vitest run --configLoader runner --project open",
     "layer-check": "tsx scripts/layer-check.ts",
+    "comment-check": "tsx scripts/comment-check.ts",
     "play": "tsx scripts/play-cli.ts",
     "playbot": "tsx scripts/playbot.ts",
     "authorbot": "tsx scripts/authorbot.ts",

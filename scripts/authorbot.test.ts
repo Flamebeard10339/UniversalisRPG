@@ -14,8 +14,6 @@ describe('what the run was asked for', () => {
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
-  // Not a convention this file invented: it is how every module is already named, so the module a
-  // brief writes is the one an author would have typed after --target.
   it('names the module the way a world names its modules', () => {
     for (const file of fixtureFiles()) expect(targetFor(path.join(FIXTURE_CORPUS_DIR, `${path.basename(file, '.dsl')}.md`))).toBe(path.basename(file));
   });

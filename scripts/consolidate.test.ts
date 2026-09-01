@@ -73,8 +73,6 @@ describe('a consolidation writes each section into the file that declared its id
     expect(localSectionHeadings(result.local)).toEqual(['# item gem']);
   });
 
-  // What closes the loop on a section written during a run: nothing declares it yet, and its id says
-  // which module it belongs to, so consolidation lands it there rather than leaving it staged.
   it('lands a section nothing declares yet in the file of the module its id names, among its own kind', () => {
     const result = consolidate(base(), local('# item base.lantern', 'title: Lantern'));
     expect(writable(result)).toBe(true);
@@ -112,9 +110,6 @@ describe('a consolidation writes each section into the file that declared its id
   });
 });
 
-// A staged section names the fields it means and no others, so what goes home is those fields. The
-// line the patch is silent about — `starting`, here, which is the whole reason the world still has
-// somewhere to begin — stays where its author wrote it.
 describe('a section staged as only part of itself goes home as only that part', () => {
   it('writes the fields it names and leaves the lines it did not name standing', () => {
     const result = consolidate(base(), local('# location base.camp', 'x: 4, y: -1'));
@@ -129,9 +124,6 @@ describe('a section staged as only part of itself goes home as only that part', 
     expect(written(result, 'base')).toBe(BASE);
   });
 
-  // An entry is placed by the label it carries and not by where it is written, so an edit that adds
-  // one action leaves every other line of the location standing. Before entry sites, any staged
-  // section holding an entry travelled whole and wrote itself over the rest of what was there.
   it('adds an action to a location without writing over the lines around it', () => {
     const result = consolidate(base(), local('# location base.camp', 'kick a stone:', '  time: 1', '  say: It skitters.'));
 
@@ -140,9 +132,6 @@ describe('a section staged as only part of itself goes home as only that part', 
     expect(written(result, 'base')).toBe(BASE.replace('starting', ['starting', 'kick a stone:', '  time: 1', '  say: It skitters.'].join('\n')));
   });
 
-  // The other answer, and the one the editing page leans on: an entry written where one of the same
-  // label already stands is merged with it key by key rather than replacing it, and no patcher can say
-  // that line by line — so the body goes home whole, which is what a body restating a whole section is.
   it('sends a body restating an entry the file already writes home whole', () => {
     const acting = ['# location camp', 'x: 0, y: 0', 'starting', 'kick a stone:', '  time: 1', '  say: It skitters.'].join('\n');
     const before = [{ name: 'base', text: BASE.replace('# location camp\nx: 0, y: 0\nstarting', acting) }];
@@ -229,7 +218,6 @@ function stage(tree: Tree, line: string): void {
   expect(result.output.filter((each) => each.kind === 'message' && each.tone === 'error')).toEqual([]);
 }
 
-// Copy and cleanup belong in hooks: a `-t` filtered run still runs these, and skips the `it` bodies.
 describe('the round trip is closed, on the content that ships', () => {
   let tree: Tree;
   let staged: Registry;
@@ -261,9 +249,6 @@ describe('the round trip is closed, on the content that ships', () => {
     for (const name of shippedNames().filter((each) => each !== 'core.dsl')) expect(written[name], name).toBe(tree.before[name]);
   });
 
-  // Consolidating is asked whether it changed any route's answer, not whether the routes pass:
-  // whether they pass is `integration.test.ts`'s question, answered there once. A route a balance
-  // pass broke is not a consolidation bug and must not be reported here as one.
   it('changes no # test verdict the tree declares', () => {
     expect(after.tests.size).toBeGreaterThan(0);
     for (const id of after.tests.keys()) expect(runTest(id, after, createGameState()), id).toEqual(runTest(id, staged, createGameState()));
@@ -290,9 +275,6 @@ describe('a consolidation whose result does not load writes nothing either', () 
 });
 
 describe('the command surface', () => {
-  // Where its default points is the corpus, which is the one thing about this tool that has to be
-  // said in the corpus's own words — so it is said as the shape of the answer rather than by naming
-  // the directory, which no test may do.
   it('defaults to every .dsl under one directory but the local file, and takes an override', () => {
     const defaults = [...contentFiles(parseArgs([]))];
     const directory = (file: string): string => file.replace(/\/[^/]*$/, '');
@@ -370,14 +352,10 @@ describe('the command surface', () => {
   });
 });
 
-// What a map edit stages, on the content that ships: one field, written home into one line of one
-// file. The round trip a drag takes is the whole point of staging a patch rather than a copy.
 describe('a section staged as one field goes home as one line', () => {
   it('changes the line it names and no other byte of the corpus', () => {
     const tree = copiedTree();
     try {
-      // A place written out at coordinates of its own rather than off another, since moving one of
-      // those rewrites the line it is written off and not an `x:`/`y:` pair.
       const place = [...loadUniverse(withEngineLocale(sourcesOf(tree))).locations.values()].find((each) => each.relative === undefined)!;
       const home = `${place.id.split('.')[0]}.dsl`;
       stage(tree, `/dsl location ${place.id} x: ${place.x + 3}, y: ${place.y - 2}`);

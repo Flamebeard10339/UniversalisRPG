@@ -43,8 +43,6 @@ one of:
 roll: spoils
 `;
 
-// Handlers that move pools: one empties a second pool, and one, when primed, feeds the pool that
-// fired it.
 const HANDLERS = `
 # stat max-health
 base: 20
@@ -224,8 +222,6 @@ describe('applyResults: watching what was applied', () => {
     expect(state.log).toEqual([]);
   });
 
-  // Subjects derived from the whole of what `open modal:` may name, so a screen the language opens
-  // next month is held to the same line with nothing edited here.
   it('tells a player a screen opened in the screen own words, for every screen a world may open', () => {
     expect(MODAL_SCREENS.length).toBeGreaterThan(0);
     for (const screen of MODAL_SCREENS) {
@@ -264,12 +260,6 @@ describe('applyResults: watching what was applied', () => {
   });
 });
 
-// The two words the engine has for a place, told apart over every location the fixture world
-// declares rather than over one that was easy to pick. Standing somewhere is the only thing that
-// touches it, and the same step puts every neighbour the roads open on the map without touching any
-// of them — so a `when:` asking whether the player has been here means something a `when:` asking
-// whether they have heard of it does not. A location added to the fixture is held to this with no
-// edit here.
 describe('standing in a place the fixture world declares', () => {
   const world = loadUniverseWithDiagnostics(fixtureSources()).registry;
   const everywhere = [...world.locations.keys()];
@@ -308,10 +298,6 @@ describe('standing in a place the fixture world declares', () => {
   });
 });
 
-// A row weighed by a stat is the only weight the load path cannot read, so this is where a weight
-// that is no quantity is met. Nothing is refused for reading nothing: a row held at zero is how a
-// stat turns one off, and a table every row of which is off draws nothing, exactly as one every row
-// of which is gated off does.
 describe('a one of: row weighed by a stat', () => {
   const CHEST = `
 # stat luck

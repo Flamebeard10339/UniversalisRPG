@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { inferRename, settled, type Change, type Heading, type RenameHistory } from './renameHistory';
 
-// Git works, and a test that runs it proves git rather than the reading below. So history is written
-// out here instead: `RenameHistory` is the whole of what the inference is handed, so a history
-// nobody ever committed exercises it exactly as a real one does.
-
 const FILE = 'content/thieving.dsl';
 
 const heading = (kind: string, id: string, title?: string): Heading => ({ file: FILE, kind, id, ...(title === undefined ? {} : { title }) });
 
 const commit = (sha: string, subject: string, removed: Heading[], added: Heading[]): Change => ({ sha, subject, removed, added });
 
-// Newest first, which is the order the seam promises.
 const history = (...changes: readonly Change[]): RenameHistory => ({
   removalsOf: (id) => changes.filter((change) => change.removed.some((each) => each.id === id)),
 });

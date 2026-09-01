@@ -39,7 +39,6 @@ const acceptsValue: Parser<Accepts> = {
 
 export const isTradable = (item: Item | undefined): boolean => item?.value !== undefined;
 
-// The level the author declared, which is what replenishing walks the current count back toward.
 export function declaredStock(shop: Shop): Record<string, number> {
   const levels: Record<string, number> = {};
   for (const entry of shop.stocks) levels[entry.item] = entry.amount ?? 1;
@@ -48,21 +47,17 @@ export function declaredStock(shop: Shop): Record<string, number> {
 
 export const stocksItem = (shop: Shop, itemId: string): boolean => shop.stocks.some((entry) => entry.item === itemId);
 
-// The shop pays a cut under an item's value and charges a cut over it, and coin is whole, so the rounding goes the shop's way on both sides. That is also what keeps a buy price above a sell price at every value, so nothing can be bought and sold back at a profit.
 export const buyPrice = (shop: Shop, item: Item | undefined): number | undefined => (item?.value === undefined ? undefined : Math.ceil(item.value * shop.buying));
 
 export const sellPrice = (shop: Shop, item: Item | undefined): number | undefined => (item?.value === undefined ? undefined : Math.floor(item.value * shop.selling));
 
-// The shop's own coin is what a price is counted in, so trading it for itself is the one thing no shop does, whatever an author gave it a value of.
 export const takesItem = (shop: Shop, item: Item | undefined): boolean => isTradable(item) && item!.id !== shop.coin && (shop.accepts === 'any' || stocksItem(shop, item!.id));
 
-// A shop can only put a price on what declares one, so the stock an author wrote has to be priceable before anyone stands in front of it.
 export function unpriceableStock(shop: Shop, items: ReadonlyMap<string, Item>): string | undefined {
   const found = shop.stocks.find((entry) => !isTradable(items.get(entry.item)));
   return found === undefined ? undefined : `# shop ${shop.id} stocks: names ${found.item}, which declares no value: and so is untradable`;
 }
 
-// How many units of replenishing have fallen due in an elapsed span, and what is left over. Settling to `at + steps * replenish` rather than to now is what keeps a shop traded with every few seconds from replenishing never.
 export function replenishSteps(shop: Shop, elapsed: number): number {
   if (elapsed < 0) return 0;
   return Math.floor(elapsed / shop.replenish);
@@ -70,7 +65,6 @@ export function replenishSteps(shop: Shop, elapsed: number): number {
 
 const toward = (from: number, to: number, steps: number): number => (from < to ? Math.min(to, from + steps) : Math.max(to, from - steps));
 
-// The counts a shop holds once `steps` units of replenishing have landed. Every item it holds or stocks moves one nearer its declared level per step — an unstocked one toward zero, where it stops being held at all.
 export function replenished(shop: Shop, counts: Readonly<Record<string, number>>, steps: number): Record<string, number> {
   const levels = declaredStock(shop);
   const moved: Record<string, number> = {};

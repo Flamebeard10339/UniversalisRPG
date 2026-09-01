@@ -82,10 +82,6 @@ function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = ()
   return { result };
 }
 
-// A walk that spends points round a ring, opens the socket at its one connection, puts a jewel
-// through it and steps onto the cluster that arrives — then wears what it grew. A slot is offered
-// only once the points between the origin and it have been spent, which is what the three
-// allocations before it are.
 const CRAFTING_ROUTE: ReadonlyArray<readonly [string, string]> = [
   ['verb', 'grow'],
   ['plane', 'allocate: position 2'],
@@ -160,12 +156,9 @@ describe('the two drivers cannot drift', () => {
     const { repl, gui } = bothDrivers();
     const at = (found: (choice: PlayChoice) => boolean): string => String(gui.snapshot().view.choices.findIndex(found) + 1);
 
-    // Nobody has read this room, so the only thing Miki offers either driver is the look that reads her.
     inStep(repl, gui, at((choice) => choice.of === 'entity.fixture-town.keeper'));
     inStep(repl, gui, at((choice) => choice.id === 'talk:fixture-town.keeper'));
 
-    // Two answers, and both go through the same table: the line taken out of Miki's menu, and then
-    // the beat it leaves him saying, which asks nothing but is still a screen somebody dismisses.
     for (const _ of [0, 1]) {
       const asked = gui.snapshot().view.modals[0].options[0];
       inStep(repl, gui, `submit-modal: ${asked.key}=${asked.values![0].value}`, () => gui.answer(asked.key, asked.values![0].value));
@@ -183,8 +176,6 @@ describe('the two drivers cannot drift', () => {
 
     expect(gui.snapshot().view.modals).toEqual([]);
     const grown = JSON.parse(gui.serialized()) as SerializedGrowth;
-    // The copy the blade arrived as, and the slot the world says it goes in: both read off what was
-    // grown rather than named, since which id the engine minted is the engine's business.
     const [minted] = Object.keys(grown.instances.byId);
     expect(Object.keys(grown.instances.byId[minted!]!.payload.plane)).toEqual(['0,0', '1,0']);
     expect(Object.values(grown.equipped)).toEqual([minted]);

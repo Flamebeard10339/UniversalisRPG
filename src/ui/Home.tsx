@@ -27,13 +27,6 @@ function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElem
   );
 }
 
-// The ways out, laid out the way they lie: north-east is the square at the top right, and the
-// square in the middle is the room the player is standing in. Which square a way belongs in is the
-// engine's judgement, read off the map's own sheet — the compass and the bubbles on the map pane are
-// pointing the same way because they are one answer, not two.
-//
-// Every row is the height of the tallest, so a row of nothing but empty squares still stands where
-// it lies: a compass whose top row collapses puts north where north-west was a moment ago.
 function Compass({ compass, here, onChoose }: { compass: ReturnType<typeof compassOf>; here: Localized; onChoose: (position: number) => void }): JSX.Element {
   return (
     <div data-drive="compass" className="mx-auto mt-3 grid max-w-2xl auto-rows-fr grid-cols-3 gap-2">
@@ -66,8 +59,6 @@ function Compass({ compass, here, onChoose }: { compass: ReturnType<typeof compa
 
 function Sheet({ view, words, onChoose }: { view: PlayView; words: Words; onChoose: (position: number) => void }): JSX.Element {
   const compass = compassOf(sheetOf(view, null).ways);
-  // A way out drawn in its own square is not drawn again among the rest; one that no square points
-  // at — a floor up or down, a second road the same way — falls through to the ordinary cells.
   const squared = new Set(compass.cells.filter((cell) => cell !== null).map((cell) => cell!.at));
   const offers = sheetOffers(view).filter((offer) => !squared.has(offer.position));
   if (drawsNothing(sheetOffers(view))) return <p className="px-3 py-6 text-center text-sm text-text-subtle">{words('sheet-empty')}</p>;

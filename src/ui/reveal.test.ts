@@ -6,14 +6,10 @@ import { fixtureSources } from '../content/worldFixture';
 
 const ROWS: readonly SettingRow[] = view(startSession(loadUniverseWithDiagnostics(fixtureSources()).registry)).settings;
 
-// One preference on its own, so what a row answers is about that row and not about what its
-// neighbours happen to stand at.
 const standingAt = (row: SettingRow, written: string): readonly SettingRow[] => [{ ...row, standing: written }];
 
 const TURNS_IT_ON = ROWS.filter((row) => row.choices.some((choice) => revealing(standingAt(row, choice.written))));
 
-// The subjects are the preferences the engine publishes rather than words written down here: the
-// page knows one setting by name and one of its choices by name, and both have to still be on offer.
 describe('the pace a beat is read at', () => {
   it('is one of the preferences the run is played by, and only one of them', () => {
     expect(ROWS.length, 'the shipped session publishes no settings at all').toBeGreaterThan(0);
@@ -41,8 +37,6 @@ describe('the pace a beat is read at', () => {
   });
 });
 
-// A character is what a reader sees, which is not what a string is indexed by. The pair below is one
-// character held as two code units, so a cut that counted units would hand a player half of one.
 const PAIR = '𐐷';
 
 describe('how much of a line has arrived', () => {

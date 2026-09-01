@@ -108,9 +108,6 @@ export function mutationsFrom(entries: readonly unknown[]): Mutation[] {
   });
 }
 
-// A mutation asked for on the command line is the same object a manifest holds one of: every
-// field is --<its own name>, and mutationsFrom refuses both by the same rules. There is no
-// second list of what may be given, and a field added to FIELDS is a flag with no edit here.
 const BY_BEING_THERE = 'all';
 const MAY_BE_GIVEN_TWICE = 'tests';
 
@@ -135,7 +132,6 @@ export function oneMutationFrom(args: readonly string[]): Mutation[] {
   for (const [field, values] of given) {
     entry[field] = field === BY_BEING_THERE ? true : field === MAY_BE_GIVEN_TWICE ? values : values[0];
   }
-  // A verdict is reported under a name, and the file it broke is the one worth reading here.
   entry.name ??= entry.file ?? 'the mutation asked for';
   return mutationsFrom([entry]);
 }
@@ -556,8 +552,6 @@ export function recoverFrom(entries: Record<string, string>, files: FileStore, a
 
 const NAME_PART = ' > ';
 
-// Every test in a file under the name a verdict reports it by: the path it lives in, the
-// suites it is nested in, then its own.
 function namedTests(file: RunnerTestFile): { task: RunnerTask; name: string }[] {
   const walk = (task: RunnerTask, above: readonly string[]): { task: RunnerTask; name: string }[] =>
     task.type === 'suite' ? task.tasks.flatMap((child) => walk(child, [...above, task.name])) : [{ task, name: [...above, task.name].join(NAME_PART) }];
@@ -581,7 +575,6 @@ export function tallyRun(files: readonly RunnerTestFile[], unhandled: readonly u
   };
 }
 
-// A test is named by a manifest as the words it was written under, not as a pattern.
 export const asLiteralPattern = (name: string): string => name.replace(/[$()*+.?[\\\]^{|}]/g, '\\$&');
 
 export interface WarmVitest {
@@ -590,9 +583,6 @@ export interface WarmVitest {
   close(): Promise<void>;
 }
 
-// A held module graph serves the file it already read, so writing a mutation and telling the
-// graph about it are one act. Anything measured through a store that is not this one measures
-// the tree as it stood before the mutation, and every mutation survives.
 export const watchedBy = (files: FileStore, invalidate: (file: string) => void): FileStore => ({
   read: (file) => files.read(file),
   write: (file, text) => {
@@ -601,14 +591,7 @@ export const watchedBy = (files: FileStore, invalidate: (file: string) => void):
   },
 });
 
-// Starting vitest costs about a second and a half before it reads a test, and a manifest pays
-// that once per measurement — twice per mutation, plus once per scope. One instance held open
-// across the whole run pays it once. What is held open is a module graph, so a file written
-// under a mutation has to be invalidated by hand: without that the next run serves the
-// unmutated module out of cache and every mutation survives.
 export async function warmVitest(root: string): Promise<WarmVitest> {
-  // A reporter with nothing to say. What a run reported is read back off its state, and the
-  // only thing this run prints is its own verdicts.
   const vitest: Vitest = await createVitest('test', { root, watch: false, reporters: [{}], configLoader: 'runner' });
   return {
     run: async (tests, test) => {
@@ -617,8 +600,6 @@ export async function warmVitest(root: string): Promise<WarmVitest> {
       const specs = await vitest.globTestSpecifications(tests === undefined ? [] : [...tests]);
       const ran = new Set(specs.map((spec) => spec.moduleId));
       await vitest.runTestSpecifications(specs, true);
-      // getFiles() keeps every file this instance has ever run, so a scope is read back by
-      // the specifications this run asked for and not by what the instance remembers.
       return tallyRun(vitest.state.getFiles().filter((file) => ran.has(file.filepath)), vitest.state.getUnhandledErrors());
     },
     invalidate: (file) => vitest.invalidateFile(path.resolve(root, file).split(path.sep).join('/')),

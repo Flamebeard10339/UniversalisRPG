@@ -190,9 +190,6 @@ describe('something arriving at a pack with no room', () => {
     expect(state.inventory.stone).toBe(4);
   });
 
-  // A full pack with no coin in it is exactly where selling matters most, and the row the goods
-  // leave is the row the coin lands in. The sale that pays for itself is the one that takes the
-  // whole of a row.
   it('takes the last of a row from a full pack holding no coin, and pays into the row it just emptied', () => {
     const registry = twoSlots();
     const state = standing(registry);
@@ -217,10 +214,6 @@ describe('something arriving at a pack with no room', () => {
     expect(packRows(state).length).toBe(2);
   });
 
-  // Grown gear takes a row like anything else, so a pack with none is a thing a player can walk into
-  // holding nothing but blades. What they are told has to be the same sentence anything else turned
-  // away gets, and putting one on has to be the way out of it — a row on the arm is not a row in the
-  // pack, so wearing one is what makes room for the next.
   it("says so in the player's own words when a blade cannot come, and takes it once one is worn and its row is free", () => {
     const registry = twoSlots();
     const state = standing(registry);
@@ -263,17 +256,12 @@ describe('a save holding more than the pack has room for', () => {
   });
 });
 
-// Whichever kind declares them: an entity's, a location's, an item's, a recipe's, a bare
-// `# action`. Nothing is listed here, so an action written next month is a subject of the claims
-// below with no edit.
 const everyTake = (registry: Registry): Array<{ obj: string; objId: string; action: Action }> =>
   everyActionTable(registry).flatMap(([obj, objId, actions]) => actions.filter((action) => itemCost(action.results).size > 0).map((action) => ({ obj, objId, action })));
 
 describe('every door the fixture world writes that takes something from the player', () => {
   const registry = loadUniverse(fixtureSources());
 
-  // A guard against the two claims below being about nothing, and not a count of the world: a meal
-  // or a recipe added next month is a door like the others and should not have to be counted here.
   it('is more than a handful of them, so the two claims below are about something', () => {
     expect(everyTake(registry).length).toBeGreaterThan(1);
   });
@@ -286,7 +274,6 @@ describe('every door the fixture world writes that takes something from the play
       try {
         armAction(obj, objId, actionAddress(action), registry, state);
       } catch {
-        // A door whose `requires:` or `hidden if:` has already closed it never reaches its inputs.
       }
       if (JSON.stringify(state.inventory) !== before) moved.push(`${obj}.${objId}.${actionAddress(action)}`);
     }

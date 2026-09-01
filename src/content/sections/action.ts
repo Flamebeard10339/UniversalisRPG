@@ -13,12 +13,7 @@ import { section, writtenWhole } from './define';
 
 export interface ActionDeclaration extends Action {
   id: string;
-  // The action this one is written over. Resolved where entities are linked, so what stands in the
-  // registry is the assembled action and what this module wrote is what prints back.
   extends?: string;
-  // The result lists this declaration wrote, kept where an overlay has folded another action's in
-  // beside them: a line an extending action inherited is the words of whoever wrote it, and keying
-  // it a second time here would give one written line an entry per action that extends into it.
   wrote?: ActionResult[][];
 }
 
@@ -27,11 +22,6 @@ export function actionAddress(action: Action): string {
   return id === undefined ? actionSlug(action.label) : lastSegment(id);
 }
 
-// The words a player reads off an action, and whether anybody wrote them. An action written as an
-// entry key is addressed by that key, which makes the key an address rather than writing, and what
-// it reads as is what `humanizeEn` makes of it. That is what
-// an unauthored `# action` title already is, so both answer here and a driver reading the table
-// cannot tell one from the other. Only a `title:` an author wrote reaches a player as written.
 export function actionWords(action: Action): { text: string; generated: boolean } {
   const generated = action.generatedLabel === true || declaredId(action) === undefined;
   return { text: generated ? humanizeEn(action.label) : action.label, generated };
@@ -44,7 +34,6 @@ export interface ActionTextOwner {
   field: string;
 }
 
-// The section an action's words are filed under. An action carrying an id of its own is a `# action` however it came to be written, so its label is that section's to hold rather than each thing that offers it; one without belongs to whatever nests it.
 export function actionTextSection(kind: string, ownerId: string, action: Action): { kind: string; id: string } {
   const declared = declaredId(action);
   return declared === undefined ? { kind, id: ownerId } : { kind: 'action', id: declared };
@@ -64,9 +53,6 @@ export const actionTextKey = (owner: ActionTextOwner): string => localeKey(owner
 const TITLE = /^title:[ \t]*/;
 const EXTENDS = /^extends:[ \t]*/;
 
-// A line this section reads rather than the action body under it, taken out before `actionBody` sees
-// the block: everything an action body does not recognise it takes for a tag, so a field of the
-// section's own has to be lifted off the lines first or it lands as one.
 function lifted(raw: RawSection, keyword: RegExp, written: string): { value?: string; span?: Span } {
   const found = raw.body.filter((line) => keyword.test(line.text));
   if (found.length > 1) throw new DslError(`# action ${raw.id}: ${written} is defined more than once`, found[1]!.span);

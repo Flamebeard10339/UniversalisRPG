@@ -137,12 +137,10 @@ nothing to home: whitespace, reflow, a typo. That is the whole exemption, and it
 is derived rather than listed on purpose — a list here would be shape 2, and the
 copy of it that has to live in the description would be shape 3.
 
-Four edits look exempt and are not. A **rename** is where a second home
-announces itself, which is why the move tools reach into fixtures. A
-**comment** is already governed by the home rule under another name —
-`CLAUDE.md` keeps one only when the fact is owned by this file and derivable
-from nowhere else. A **prose rewrite that changes no mechanic** can still
-restate one the world already declares. And a **fix confined to one file**
+Three edits look exempt and are not. A **rename** is where a second home
+announces itself, which is why the move tools reach into fixtures. A **prose
+rewrite that changes no mechanic** can still restate one the world already
+declares. And a **fix confined to one file**
 asserts the home line's answer as its precondition: that it is confined is the
 thing the line was going to tell you.
 

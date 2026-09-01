@@ -5,13 +5,6 @@ import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
 import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, measure, parseSimulationArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
-// One island with somewhere to stand, somewhere to walk to, a bush that pays for as long as anyone
-// picks it, and one wasp, which comes back a minute after it falls. Everything the tool answers is a
-// reading of a run through this, so a claim below moves one line and watches the answer change. The
-// bramble grows where the wasp is, so an offer nobody gets to take is one a sweep of this island
-// finds on its own. A bush grows in the hollow too, where the adder kills whoever picks it and a
-// faint puts them back on the shore — so an offer that goes on being on offer somewhere else is one
-// this island holds as well.
 const ISLAND = `# info island
 version: 1.0.0
 
@@ -123,7 +116,6 @@ uses: strike
 
 const island = (): ReturnType<typeof loadModule> => loadModule(ISLAND);
 
-// The world with a sweep's own module beside it, which is how the tool loads what it wrote.
 const beside = (probe: string): ReturnType<typeof loadModule> => {
   const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ISLAND }, { name: 'simulation-probe', text: probe }]);
   expect(loaded.diagnostics).toEqual([]);
@@ -132,7 +124,6 @@ const beside = (probe: string): ReturnType<typeof loadModule> => {
 
 const uses = (found: readonly Subject[]): string[] => found.map((subject) => subject.use);
 
-// Short of the minute the wasp takes to come back, so a run here is the offer and nothing else.
 const QUIET_WINDOW = secondsToMs(20);
 
 const SAVE = 'island.on-the-shore';
@@ -214,8 +205,6 @@ describe('the module a sweep writes to run itself', () => {
     expect(written.text).toContain('load: island.on-the-shore\ngoto: island.shore');
   });
 
-  // What stops the loop is the world's clock reaching the far end of the window, so every offer on
-  // the island is asked for the same span of game time and none of them is asked for a count.
   it('runs every offer until the clock reaches the far end of the window', () => {
     expect(written.text).toContain('use: entity.island.bush.pick until time >= 20');
     expect(written.text).not.toMatch(/until \d+ times/);
@@ -260,9 +249,6 @@ describe('what a run reports', () => {
     expect(simulationLines([stung], { save: 's', seeds: 2, window: 1, all: true }).join('\n')).toMatch(/stopped short in 2\/2 seeds: until time >= /);
   });
 
-  // The wasp is back on its feet a minute after it falls, and a run at it is over in seconds. A
-  // window with room for the wasp to come back has to hold more of the offer than one without: the
-  // run waits the minute out and takes it up again rather than idling the rest of the window away.
   it('takes the offer up again once the world puts it back, so a longer window holds more of it', () => {
     const alone = (found: Measured[]): Run => found[0]!.runs[0]!;
     const quiet = alone(swept('wasp'));
@@ -271,18 +257,12 @@ describe('what a run reports', () => {
     expect(long.cycles).toBeGreaterThan(quiet.cycles);
   });
 
-  // The wasp does not come back inside a window this short, and nothing else on the island will put
-  // it back, so the run ends rather than waiting the world out for ever.
   it('ends a run the world will not put back on its feet, and spends the rest of the window anyway', () => {
     const [stung] = swept('wasp');
     expect(stung.runs.every((run) => run.stoppedBy !== undefined)).toBe(true);
     expect(stung.runs.every((run) => run.worked < QUIET_WINDOW)).toBe(true);
   });
 
-  // The same bush grows on the shore and in the hollow, and a faint in the hollow carries the player
-  // to the shore — where that very offer is on the sheet again. Picking it there would be another
-  // row's hour, and a row that goes on measuring somewhere the player was carried off to reads the
-  // same under every place it is printed under.
   it('ends a run carried out of the place it is measuring, even where the offer stands where it lands', () => {
     const window = secondsToMs(300);
     const [shore] = swept('bush', window, 'island.shore');
@@ -292,9 +272,6 @@ describe('what a run reports', () => {
     expect(hollow.runs.every((run) => run.worked < shore.runs[0]!.worked)).toBe(true);
   });
 
-  // Every offer the island has, so an offer added to it answers this without an edit here. What ends
-  // a run says nothing about whether it is priced: a run that stopped short was given the same window
-  // as one that filled it, and spent all of it either way.
   it('gives a rate to every offer that paid anything, whatever ended the run', () => {
     const found = swept();
     expect(found.some((each) => each.runs.some((run) => run.stoppedBy !== undefined && run.gains.length > 0)), 'nothing on this island stops short holding anything').toBe(true);
@@ -316,8 +293,6 @@ describe('what a run reports', () => {
     expect(rate(1_000, 30)).not.toBe(rate(1_000, 60));
   });
 
-  // Two figures where the offer did not last the window out, one where it did — and where it did the
-  // two would be the same number, which is a column saying nothing twice.
   it('prints the pace inside the time the offer ran beside the window rate, and only where they differ', () => {
     const use = 'use: entity.island.bush.pick';
     const printed = (worked: number): string => {
@@ -329,9 +304,6 @@ describe('what a run reports', () => {
     expect(printed(secondsToMs(3600))).not.toContain('a ceiling');
   });
 
-  // The bramble grows where the wasp is, so a run at it measures a fight it never asked for. That is
-  // worth saying and it is not worth hiding an hour behind: the window is the one the player lived
-  // through whoever swung in it.
   it('names a fight something else took and prints what the window paid beside it', () => {
     const [thorned] = swept('bramble');
     const [stung] = swept('wasp');

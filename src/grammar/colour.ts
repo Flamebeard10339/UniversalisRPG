@@ -19,15 +19,10 @@ export const colour: Parser<string> = {
   examples: ['#22d3ee'],
 };
 
-// The placeholder a colour fills, read off the parser's own form. A surface that can draw a colour
-// asks here which hole to draw it in, so any field written with this parser gets that surface
-// without naming itself to it.
 export const COLOUR_HOLE = holeNames(colour.forms[0]!)[0]!;
 
 export const isColourHole = (hole: string | undefined): boolean => hole === COLOUR_HOLE;
 
-// What a picker opens on: the colour already written where it is standing, or one to start from
-// where nothing readable is written there, since a picker has no way to show no colour at all.
 const OPENS_ON = '#808080';
 
 export const colourStanding = (written: string): string => {

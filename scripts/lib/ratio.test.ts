@@ -30,8 +30,6 @@ describe('an offer speaks for itself with one number across its seeds', () => {
     expect(meanRate([])).toBe(0);
   });
 
-  // The whole reason it is a mean: a maximum over seeds climbs as seeds are added, so asking for
-  // more of them would drop every ratio on the sheet with nothing in the world having changed.
   it('does not move when the same offer is sampled more times around the same middle', () => {
     const few = frontiers([paid('a', 'one', meanRate([90, 110]))], {});
     const many = frontiers([paid('a', 'one', meanRate([70, 90, 110, 130]))], {});

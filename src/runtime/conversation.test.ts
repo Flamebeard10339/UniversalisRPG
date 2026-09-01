@@ -39,7 +39,6 @@ describe('what an entity has to say', () => {
   });
 });
 
-// The whole of the arbitration the engine still does: none. Two modules may both hand this entity something to say and the player is the one who settles which they hear.
 describe('every thread an entity holds open is put to the player at once', () => {
   const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
 
@@ -83,7 +82,6 @@ describe('every thread an entity holds open is put to the player at once', () =>
   });
 });
 
-// The list moves with the words in it; what an author writes to pick out of it must not.
 describe('picking an entry out of a list', () => {
   const both = ['# dialogue an-errand', 'owner = miki', '', 'node offer:', '  when: not asked', '  Since you are here — there is a thing I need.'].join('\n');
   const menu = ['# dialogue miki', 'owner = miki', '', 'node idle:', '  always', '  Fine weather for it.', '  -> Tell me more', '    goto more', '  -> Nothing.', '', 'node more:', '  There is not much more.'].join('\n');
@@ -97,9 +95,6 @@ describe('picking an entry out of a list', () => {
     }
   });
 
-  // A quest names the node it hands over `<quest>.<stage>.<entity>.<n>.said`, and that numeral is why
-  // the shape of the string cannot be read back to tell an id from a line somebody says. Every thread
-  // the shipped corpus offers is one of these.
   it('takes a thread a quest gave an entity by a tail, though its name carries a numeral', () => {
     const quest = ['# quest an-errand', 'title: An Errand', 'stage asking:', '  log: Asked.', '  miki says:', '    ask: About the thing.', '    There is a thing I need.', '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
     const state = createGameState();
@@ -127,10 +122,6 @@ describe('picking an entry out of a list', () => {
     expect(() => choose('more', cursor, registry, state)).toThrow(new RuntimeError('no choice matches "more": this list offers 0 "Tell me more", 1 "Nothing."'));
   });
 
-  // Two quests speaking through one entity name their threads apart only by the quest, so every tail
-  // short enough to leave the quest out fits both. Taking the first would take whichever the list drew
-  // first, and the list is drawn in the order of the words a player reads — so the same recording would
-  // take the other thread in another language and still pass.
   it('refuses a name that fits two threads rather than taking whichever the language put first', () => {
     const asking = (id: string, said: string) => [`# quest ${id}`, `title: ${id}`, '', 'stage opening:', `  log: ${id}.`, '  miki says:', `    ${said}`, '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
     const registry = loaded(asking('an-errand', 'There is a thing I need.'), asking('a-favour', 'And a favour, while you are here.'));
@@ -156,7 +147,6 @@ describe('picking an entry out of a list', () => {
   });
 });
 
-// A node said once and fallen silent is still a node whose `when:` holds, and offering the conversation anyway is how a player comes to click talk and watch the view redraw with nothing new in it.
 describe('a conversation with nothing left to say is not offered', () => {
   const spent = (...lines: string[]) => loaded(['# dialogue miki', 'owner = miki', '', 'node idle:', '  always', ...lines].join('\n'));
 
@@ -207,7 +197,6 @@ describe('a node reached whenever nothing further along is', () => {
   });
 });
 
-// What lets ordinary standing dialogue stand in the same list as the threads a quest hands out: naming a node is what makes it one of them.
 describe('a node the player is given a phrase for', () => {
   const bar = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  Well met.', '', 'node the-ale:', '  always', '  ask: What is on tap?', '  Whatever the brewery sends.'].join('\n');
 
@@ -226,9 +215,6 @@ describe('a node the player is given a phrase for', () => {
   });
 });
 
-// A quest is the thing the player is in the middle of, so its line is never the fallback and stands
-// ahead of whatever else the entity holds open. The rest of the list is ordered by the words a player
-// reads, so the two phrases below run the other way round under that ordering on its own.
 describe('a line a quest gives an entity', () => {
   const errand = ['# quest an-errand', 'title: An Errand', '', 'stage asking:', '  log: Asked.', '  miki says:', '    ask: What was that errand?', '    There is a thing I need.', '    goto done', '', 'stage done:', '  log: Done.', '  complete'].join('\n');
   const bar = ['# dialogue miki', 'owner = miki', '', 'node the-ale:', '  always', '  ask: About the ale.', '  Whatever the brewery sends.'].join('\n');
@@ -238,8 +224,6 @@ describe('a line a quest gives an entity', () => {
   });
 });
 
-// The equivalent of an action's `hidden if:`, written once in the `take:` itself rather than a
-// second time as a condition an author has to keep in step with it.
 describe('a node that would take what the player has not got', () => {
   const trade = ['# item blade', 'title: blade', 'value: 5', '', '# item coin', 'title: coin', '', '# dialogue swap', 'owner = miki', '', 'node deal:', '  always', '  ask: swap my blade', '  Done.', '  take: 1 blade', '  give: 3 coin'].join('\n');
 
@@ -295,10 +279,6 @@ describe('a node that would take what the player has not got', () => {
   });
 });
 
-// The other half of the same question, answered the other way on purpose. What the player has not
-// got is a durable fact they can act on and a line about it reads as a quest they have not started;
-// a full pack is a passing one, and an entity who goes silent over it tells them nothing they can
-// do something about.
 describe('a node that hands something over to a pack with no room for it', () => {
   const oneSlot = ['# variable inventory-slots', 'value: 1', '', '# item coin', 'title: coin', '', '# item pebble', 'title: pebble', '', '# dialogue gift', 'owner = miki', '', 'node here:', '  always', '  ask: anything for me?', '  Here, take this.', '  give: 1 coin'].join('\n');
 
@@ -315,9 +295,6 @@ describe('a node that hands something over to a pack with no room for it', () =>
   });
 });
 
-// The line the owner met as "the second dialogue with miki doesn't pop up a modal (because there
-// is no choice)": words that arrive with nothing to answer land in the log behind whatever the
-// player is looking at, and a click that visibly does nothing is what they read instead.
 describe('a node that says its piece and puts up no list', () => {
   const spoken = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  sticky', '  Fine weather for it.'].join('\n');
   const silent = ['# dialogue miki', 'owner = miki', '', 'node greeting:', '  always', '  Fine weather for it.', '  goto quietly', '', 'node quietly:', '  set: greeted'].join('\n');
@@ -338,9 +315,6 @@ describe('a node that says its piece and puts up no list', () => {
     expect(choose('0', talk('miki', registry, state)!, registry, state)).toBeNull();
   });
 
-  // A spent node holds back everything it says and still follows its goto, so a second visit can be
-  // offered and put nothing in front of anybody — and a screen carrying no words and asking no
-  // question is a click to dismiss over nothing.
   it('leaves nothing standing where the visit said nothing at all', () => {
     const registry = loaded(silent);
     const state = createGameState();

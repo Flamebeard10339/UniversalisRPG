@@ -10,7 +10,6 @@ export interface SpanStart {
   readonly state: GameState;
 }
 
-// Opening a span forgets why the last one ended: what stopped this one is what this one is told by.
 export function spanStart(state: GameState): SpanStart {
   state.endedBecause = null;
   state.engagedBy = null;
@@ -31,9 +30,6 @@ type SpanVoice = ((told: Told) => Localized[]) | Unsaid;
 
 const numbers = (record: Record<string, number>, id: string): number => record[id] ?? 0;
 
-// What the world did while it ran on the player's behalf, in the vocabulary the world itself
-// declares: a `# resource`, a `# skill` or an item added next month is reported with no edit here,
-// and a field added to the state does not compile until this says whether a span mentions it.
 const SPAN_VOICE: Record<SaveField, SpanVoice> = {
   location: ({ after, say }) => [say.engine('engine.span.moved', { location: say.title('location', after.location) })],
   inventory: ({ moved, before, after, say }) =>

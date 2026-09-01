@@ -254,10 +254,6 @@ describe('what the screen does with an answer', () => {
   });
 });
 
-// A prose field reaches a player only where something says it, and no driver names examine: they draw
-// the labels they are handed. So the claim is made where the panel mints one, over every item the
-// shipped corpus writes examine: on, and it is the published modal that is read rather than the
-// options the screen composed.
 describe('an item the corpus writes examine: on', () => {
   const shipped = loadUniverse(fixtureSources());
   const written = [...shipped.items.values()].filter((each) => each.examine !== undefined);

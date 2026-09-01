@@ -1,10 +1,6 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import type { ModuleSource } from '../content/universe';
 
-// Both homes the game loads from, in the browser's own way of reading them: the engine's modules
-// under `src/content/engine`, and the author's corpus under `content/`. `src/content/shipped.ts`
-// is the filesystem's answer to the same question, and `shippedContent.test.ts` holds them to
-// naming the same two directories.
 const BUNDLED = {
   ...(import.meta.glob('../content/engine/*.dsl', { query: '?raw', import: 'default', eager: true }) as Record<string, string>),
   ...(import.meta.glob('../../content/*.dsl', { query: '?raw', import: 'default', eager: true }) as Record<string, string>),
@@ -12,9 +8,6 @@ const BUNDLED = {
 
 const moduleName = (path: string): string => path.replace(/^.*\//, '').replace(/\.[^.]*$/, '');
 
-// The corpus does not open while the suite is running, here either. This is the second reading of
-// the same two directories — the browser's — and a test standing on it would go red for an author's
-// edit exactly as one standing on `shipped.ts` would. The rule is the same rule; see there.
 const shut = (): void => {
   if (process.env.VITEST !== undefined) {
     throw new Error('the shipped corpus does not open while the suite is running: stand on src/content/fixture instead (worldFixture.ts), and let `npm run oracle -- --at content` answer for content/');

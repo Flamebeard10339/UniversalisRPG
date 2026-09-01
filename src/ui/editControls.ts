@@ -51,7 +51,6 @@ export const rowsIn = (held: Pick<EditHeld, 'sections' | 'standing' | 'editing'>
   return offered.filter((section) => (kind === null || section.kind === kind) && search.holds(section));
 };
 
-// What a row wears before it is opened, which is the state the search would find it under, so a colour and an `is:` term are one question asked twice rather than two answers to keep in step. The engine's word comes first: a change it will not take is not a change yet.
 export const TONES: readonly (readonly [string, string])[] = [
   ['amiss', 'border-danger bg-panel text-danger'],
   ['changed', 'border-warning bg-panel text-warning'],
@@ -76,16 +75,12 @@ export const draftIn = (sections: readonly Section[], editing: Editing): string 
 
 export const offeringIn = (held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>): Offering => offeringAt(draftIn(held.sections, held.editing), held.editing.cursor, held.declared);
 
-// The colour the picker stands on, or null where the cursor is not in a hole a colour goes in. The
-// hole says so itself — any field written with the colour parser fills a `<colour>` — so the picker
-// is offered by the grammar rather than by a page that knows which field is which.
 export function colourIn(held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>): string | null {
   const offering = offeringIn(held);
   if (offering.filling === null || !isColourHole(offering.filling.hole)) return null;
   return colourStanding(draftIn(held.sections, held.editing).slice(offering.from + offering.filling.at, offering.to));
 }
 
-// Everything the engine has to say about the draft as a whole, which is what stands between it and being staged, wherever in it the cursor happens to be.
 export const amissWith = (held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>): Amiss[] => amissIn(draftIn(held.sections, held.editing), held.declared);
 
 export function editControls(held: Pick<EditHeld, 'sections' | 'declared' | 'editing'>, act: EditActs): EditControls {
@@ -113,9 +108,6 @@ export function editControls(held: Pick<EditHeld, 'sections' | 'declared' | 'edi
       const taken = applied(draftIn(sections, editing), offering, offer);
       act.move({ ...editing, draft: taken.text, cursor: taken.cursor });
     },
-    // A value stood in the hole the cursor is in, for a hole a control can answer outright rather
-    // than offer a list for. It is the same replacement `take` makes; what differs is that the words
-    // came from a control instead of from the grammar.
     fill: (value) => {
       const offering = offeringIn(held);
       if (offering.filling === null) return;

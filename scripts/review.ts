@@ -14,11 +14,9 @@ export interface Said {
   key: string;
   field: string;
   text: string;
-  // A hash of the whole line as the engine holds it, note and all. What a mark is written against, so nothing has to reconstruct the words later and be subtly wrong about them.
   hash: string;
   asked?: string;
   generated: boolean;
-  // Absent until the line has been read by a person. Held as a hash of what they read, so a line someone rewrites afterwards comes back rather than staying signed off against writing nobody saw.
   standing?: Standing;
 }
 
@@ -26,7 +24,6 @@ export type Standing = 'reviewed' | 'changed';
 
 export const LEDGER = 'content/reviewed.tsv';
 
-// What one sitting covers. The default of the sheet and of the mark alike, so a stint printed and a stint signed off cannot come to mean different amounts.
 export const STINT = 20;
 
 export const stamp = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 12);
@@ -92,13 +89,11 @@ export interface Sheet {
   module: string;
   source: string;
   sections: Spoken[];
-  // Lines the module says that no section header claims. Empty is the proof that the walk above reached everything; anything here is a line that would otherwise be reviewed by nobody.
   loose: Said[];
 }
 
 const HEADER = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[^\s]+))?[ \t]*$/;
 
-// A key names the module that says it in one of exactly two places: first for what a module declares of its own, second for what one module gives another's section. Any segment further in is part of an id, and a module whose name a section happened to be given — a `# group combat` under core — is not the one that has to review it.
 function saidBy(key: string, module: string): boolean {
   const segments = key.split('.');
   return segments[0] === module || segments[1] === module;
@@ -108,7 +103,6 @@ interface Header {
   kind: string;
   id: string;
   line: number;
-  // What this section says is not only what it declares: a section may give another kind an entry of its own, qualified under this id — a quest hands a dialogue to the entity it speaks through — and those lines are this section's to review. Asked of the kinds that hold maps rather than named, so a kind that starts giving next month is swept with no edit.
   prefixes: string[];
 }
 
@@ -142,7 +136,6 @@ function naturally(one: string, other: string): number {
   return left.length - right.length;
 }
 
-// A kind's own declared prose fields lead, in the order it declares them; everything a section grew for itself — a say, a choice, an action's label — follows in an order a reader can follow.
 function ordered(kind: string, said: Said[]): Said[] {
   const declared = textFieldsOf(kind) ?? [];
   const rank = (field: string): number => (declared.includes(field) ? declared.indexOf(field) : declared.length);
@@ -173,7 +166,6 @@ export function sheetFor(registry: Registry, module: string, source: string, tex
     else if (saidBy(key, module)) loose.push(one);
   }
 
-  // What a module declares outright, which is how the engine's own English arrives: a `# locale` section names its keys rather than growing them off a section's fields, so nothing above would ever reach them.
   for (const declared of moduleLocaleSections(registry.locales, module)) {
     const header = headers.find((each) => each.kind === 'locale' && each.id === declared.language);
     if (header === undefined) continue;
@@ -205,7 +197,6 @@ export const isLeft = (said: Said): boolean => said.standing !== 'reviewed';
 
 const keysOf = (sheet: Sheet): string[] => [...sheet.sections.flatMap((section) => section.said), ...sheet.loose].map((said) => said.key);
 
-// Rows the ledger holds that nothing says any more. A locale key that moves takes a person's "I read this" answer with it — the row does not come back CHANGED, it stops being about anything — so it is read off the same walk that writes the ledger, and wants every module's sheet rather than the ones a run asked to see.
 export const orphansIn = (everySheet: readonly Sheet[], held: ReadonlyMap<string, string>): string[] => {
   const said = new Set(everySheet.flatMap(keysOf));
   return [...held.keys()].filter((key) => !said.has(key)).sort();
@@ -246,7 +237,6 @@ export interface Stint {
   section: Spoken;
 }
 
-// Every section still holding a line nobody has read, in the order the corpus writes them: modules in the order they load, sections in the order their file writes them. A stint is the front of this queue and nothing else, which is why printing one and marking one can ask the same question and get the same batch without either of them writing the answer down.
 export const stintsLeft = (sheets: readonly Sheet[]): Stint[] => sheets.flatMap((sheet) => sheet.sections.filter((section) => section.said.some(isLeft)).map((section) => ({ sheet, section })));
 
 export const nextUp = (sheets: readonly Sheet[], size: number = STINT): Stint[] => stintsLeft(sheets).slice(0, size);
@@ -271,7 +261,6 @@ export const markedLines = (taken: readonly Stint[], marked: number, waiting: nu
   '',
 ];
 
-// The sections a `--read-through` covers: everything the module writes down to and including the one named. What "down to" means is the order the sheet is read in, which is the order the file is written in.
 export function through(sheet: Sheet, id: string): Spoken[] {
   const at = sheet.sections.findIndex((section) => section.id === id);
   if (at === -1) throw new Error(`${sheet.module} writes no section called ${id}. Its ids are the ones printed after the kind on each header line.`);

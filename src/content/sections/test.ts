@@ -13,23 +13,11 @@ import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
 import { lastSegment } from '../../grammar/values';
 
-// What a player is asked about the turn they have just taken, in both harnesses that ask: the app's
-// own sheet and the playbot's prompt. Each one is a body line a run writes under the turn it was
-// about, so this list is the whole of what a recorded run can say beyond what it did.
 export interface NoteField {
-  // As the body line spells it, as an entry carries it, and as the playbot's JSON schema names it.
   readonly name: 'note' | 'expected' | 'confusion' | 'blocked';
-  // What an author playing in the app is asked for it. The model is asked in the playbot's own
-  // prompt, at the length a prompt wants; the two agree about the field and not about the wording.
   readonly asks: EngineKey;
-  // What the line records, said as the hole an author writes it in. It is the whole of what tells the
-  // four apart, so it is what the page says of them and nothing else needs saying.
   readonly records: string;
-  // Whether a reply that does not carry it as a string is refused, and whether a turn that left it
-  // empty still says so where a run is read as prose.
   readonly required: boolean;
-  // Whether what is written here is the first read of the world — the thing a playtest produces
-  // that nothing else can. A commentary on the move and a signal that the run is over are neither.
   readonly reports: boolean;
 }
 
@@ -42,12 +30,6 @@ export const NOTE_FIELDS: readonly NoteField[] = [
 
 export type NoteName = NoteField['name'];
 
-// What a route may switch off while it walks, and what each one says of itself where the grammar is
-// printed. Every one of them is a word on its own line, a flag on the run from that line to the end
-// of it, and one place in the engine that reads it — so a fourth is this line and that place, and
-// nothing between here and there has to be told about it. They are debug tools: a route reaching for
-// none of them is the ordinary case, and one that reaches for all three is asking about its path and
-// nothing else.
 export const DEBUG_SWITCHES = {
   'lock-pools': "every pool of the player's stands where it is: what would have come off one comes off nothing, and what fills one still fills it",
   unkillable: "no pool of the player's is ever spent: it can be worn down to the last of it and no further, so nothing that empties one ends the run",
@@ -107,18 +89,12 @@ export type Directive =
 
 export type GrowthDirective = Extract<Directive, { kind: 'slot' | 'allocate' | 'unallocate' | 'apply' }>;
 
-// How many times what is under way comes round before the player is back. A run recorded off a live
-// session is written in these rather than in the seconds it took, because how long a cycle takes is
-// balance and how many of them a player sat through is the path they walked.
 export interface Cycles {
   readonly times: number;
 }
 
-// `done` is a fact about the action system — nothing is under way — not a fact about game state, so no engine root could ever spell it and it stays a word rather than a condition.
 export type Terminator = 'done' | Cycles | Condition;
 
-// What may stand after `wait:`, which is the half of a terminator that needs nothing under way to
-// have been started by the same line.
 export type WaitFor = 'done' | Cycles;
 
 export const isCycles = (value: Terminator): value is Cycles => typeof value === 'object' && 'times' in value;
@@ -499,13 +475,8 @@ export function printDirective(value: Directive): string {
   }
 }
 
-// The id under `use:` is of whatever kind the line itself opened with, and the action after it is keyed under that id rather than declared anywhere a name could be offered from.
 const USED = { names: { id: '<kind>', action: null } };
 
-// What the editing page says beside `refused` and what the engine refuses one for are the same
-// sentence, written once. Under a note, a page move or another `refused` the mark would be about
-// nothing at all, and a mark about nothing reads exactly like a mark about something.
-// The three shapes are one directive waited out three ways, so the page gathers them under it and says this once.
 const UNTIL_NOTE = 'performs the directive, then waits it out exactly as the matching `wait:` does';
 
 const REFUSED_STANDS_UNDER =

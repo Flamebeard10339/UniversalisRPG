@@ -40,8 +40,6 @@ describe('the rows the portal draws', () => {
     expect(packNamed(packNamed([], 'fixture').modules.map((module) => module.name), 'fixture').standing).toBe('none');
   });
 
-  // A name on the screen is the engine's to give, so the rows carry ids and the page asks the
-  // localizer for the words. Nothing here decides what a player reads.
   it('carry the id a module is known by and the name a toggle is sent under, and no words of their own', () => {
     const [pack] = packsOf([status({ moduleId: 'the-bars-crawl', pack: 'quests', sourceName: 'the-bars-crawl' })]);
 
@@ -73,8 +71,6 @@ describe('what a click leaves behind', () => {
   });
 });
 
-// The whole point of the portal, held against a whole world rather than against three hand-written
-// statuses: the pack the quests declare is one click, and what is left has to be a world that opens.
 describe('turning the quests off', () => {
   const quests = packNamed([], 'fixture-quests').modules.map((module) => module.name);
 

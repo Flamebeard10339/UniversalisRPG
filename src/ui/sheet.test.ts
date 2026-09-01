@@ -62,8 +62,6 @@ describe('the counted rows the engine publishes, as a sheet draws them', () => {
     ]);
   });
 
-  // Where a number came from is a screen of its own now, so the sheet row says the number and nothing
-  // else: a row that also carried the shares had to run them together into one line of small text.
   it('says the number and never what it is made of, however many shares the row carries', () => {
     const rows = [number('regeneration', 'Regeneration', 6, [share('Base', 1), share('Bread', 5)]), number('luck', 'Luck', 2, [share('Base', 2)])];
 

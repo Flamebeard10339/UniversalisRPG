@@ -12,13 +12,9 @@ export const DEFAULT_CONTEXT: HydrateContext = { language: DEFAULT_LANGUAGE };
 export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
 export interface FieldPrinting extends Filled {
-  // The section stands when what this field names is removed, and the field is cleared instead. A section written around a name it no longer has cannot stand; one that merely points at another does.
   standsWithout?: true;
   note?: string;
-  // One value of this field written out, where what the parser writes for any value of its shape would
-  // read as nonsense here: a `pack:` is an id and `rusty-sword` is an id, and neither is a pack.
   example?: string;
-  // What this line is for, said in the words an author is choosing between. Lines that share one are offered together, whether the kind declares them as fields, as keywords or in its own grammar.
   family?: string;
   printed?: PrintWhen;
   block?: true;
@@ -28,13 +24,12 @@ export interface FieldPrinting extends Filled {
 export interface Field<T, Self> extends FieldPrinting {
   parser: Parser<NonNullable<T>>;
   default?: (self: Self, context: HydrateContext) => T;
-  keyword?: string; // DSL surface keyword, when it differs from the field name
+  keyword?: string;
 }
 
 export interface MappedField<T, Self> extends FieldPrinting {
   parser: Parser<unknown>;
   hydrate(parsed: unknown, self: Self, context: HydrateContext): NonNullable<T>;
-  // The members this value was written as, or nothing where this value is not written as a block at all: a field whose grammar takes either one line or an indented body says so by answering here.
   dehydrate?: (held: NonNullable<T>) => unknown[] | undefined;
   default?: (self: Self, context: HydrateContext) => T;
   keyword?: string;
@@ -62,11 +57,6 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
-// Which fields writing these ones takes away. A kind's `exclusive` groups say that two fields are one
-// question asked two different ways — where a place is, or how it stands to another — and a section
-// holding both is refused. So an edit that answers the question one way strikes the other way rather
-// than folding home a section that will not load. Read off the same declaration that does the
-// refusing, so a kind that grows a third way of asking needs nothing edited here.
 export function clearedBy(schema: Pick<AnySchema, 'exclusive'>, written: Iterable<string>): string[] {
   if (schema.exclusive === undefined) return [];
   const said = new Set(written);
@@ -144,18 +134,10 @@ export function parseSection<H extends { id: string }, F extends keyof H = never
   return sectionParser((read: RawSection) => readSection(read, schema))(section);
 }
 
-// Where one field a section writes is written, as offsets into the source it was read from: from the
-// key through the end of its value, taking the block under it in. A field written beside another on
-// one line, one written as a block, and one written with a `+` are a site each, and none of them is
-// found by pattern — the parser that read the value says where it read it, so a kind that changes how
-// it is written moves its own sites with it.
 export interface FieldSite {
   field: string;
   start: number;
   end: number;
-  // The label a site that is an entry carries. Every entry a kind has lands in the one field its
-  // declaration names, so where it is written says which field but never which entry; the label is
-  // what tells two of them apart, and what an entry goes home by.
   label?: string;
 }
 
@@ -211,9 +193,6 @@ export function typoOf(key: string, known: readonly string[]): string | undefine
 
 const claimsTheBlock = (cursor: Cursor, line: RawLine): boolean => hasBlock(line) && cursor.rest().replace(/[ \t,]+$/, '') === '';
 
-// Where the block written under a line ends. A line's own span covers the words on it and never what
-// is indented beneath, so the end of a block is the end of its last line at whatever depth that lies:
-// a block whose last line opens a block of its own carries that one too.
 const blockEnd = (line: RawLine): number => (hasBlock(line) ? blockEnd(line.children[line.children.length - 1]!) : line.span.end);
 
 function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, string>, keywords: readonly string[], clauses: string | undefined, bare: string | undefined, entries: EntryConfig | undefined, kind: string, authored: Record<string, unknown>, sites: FieldSite[] | undefined): void {
@@ -247,7 +226,6 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
         const value = inline ? fields[name].parser.parse(cursor) : hasBlock(line) ? parseBlock(fields[name].parser, takeBlock(line), line.span) : undefined;
         if (inline && claimsTheBlock(cursor, line)) throw new DslError(`${kind} field ${key} is written inline and as a block; give it one`, keySpan);
         sites?.push({ field: name, start: keySpan.start, end: !inline && hasBlock(line) ? blockEnd(line) : cursor.abs(cursor.pos) });
-        // A key written with nothing after it is a line the author has begun and the engine reads no value from. It holds none, and it is still written, which is what a rule about the lines a section has is asked.
         if (value === undefined) {
           if (!(name in authored)) authored[name] = undefined;
           continue;
@@ -308,18 +286,12 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
           });
         const start = cursor.abs(cursor.pos);
         authored[bare] = fields[bare].parser.parse(cursor);
-        // A field written with no key of its own is still a field written somewhere. Left unsited, a
-        // patch could neither put one in nor take one out, which is what stopped `above hall` from
-        // being written or unwritten by anything but a hand.
         sites?.push({ field: bare, start, end: cursor.abs(cursor.pos) });
       } else {
         throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
       }
     }
 
-    // What follows on the same line is another thing this body holds, and a comma is what says so.
-    // Without one, whatever is left over is the tail of the value just read rather than a second
-    // value, and reading it as a clause is how `slot: head typo` became a keyword called typo.
     if (cursor.take(/[ \t]*,[ \t]*/) === null) {
       cursor.take(/[ \t]*/);
       if (!cursor.done) throw new DslError(`unexpected content: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(line.text.length) });
@@ -327,10 +299,8 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
   }
 }
 
-// The line an author writes for a field or a keyword, which is how a message about it names it.
 const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
 
-// A line a section wrote that stands on one it did not. Writing the word is enough to be held to it, so a line begun and not finished is asked the same question; what a default fills in is not written, so only a line an author gave a value to answers it.
 export function unmetNeed(authored: Record<string, unknown>, schema: AnySchema): string | undefined {
   for (const [name, needed] of Object.entries(schema.needs ?? {})) {
     if (!(name in authored) || authored[needed] !== undefined) continue;
@@ -392,9 +362,6 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   const value = held[name];
   if (value === undefined) return [];
   if (spec.generated && !context.authored(name)) return [];
-  // A body that only adds to and takes from the list already there holds the run of edits rather than
-  // a list, and is written back as the run: resolving it would need the list, which is in another
-  // module's file and is exactly what this body is not saying.
   if (isFieldEdits(value)) return writeEdits(schema, name, value);
 
   const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
@@ -414,13 +381,9 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   return label(printed);
 }
 
-// One field written in its kind's own hand, which is what a patcher lays over the lines it replaces.
 export const writeField = (schema: AnySchema, field: string, value: unknown, context: PrintContext): string[] =>
   fieldLines(schema, field, schema.fields[field]!, { [field]: value }, context);
 
-// A list field written as what it adds and takes away rather than as what it holds. Written inline
-// whatever the field's own layout is: a `+` line says the members it names and nothing about the
-// rest, and a block under it would read as the whole list.
 export function writeEdits(schema: AnySchema, field: string, edits: FieldEdits): string[] {
   const spec = schema.fields[field]!;
   const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
@@ -432,8 +395,6 @@ export function printSection(value: object, schema: AnySchema, context: PrintCon
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];
   for (const [name, spec] of Object.entries(schema.fields)) {
     lines.push(...fieldLines(schema, name, spec, held, context));
-    // A keyword the body took back is written as it was written, not left out: a body saying nothing
-    // about a keyword and a body taking one away are different lines over whatever is already there.
     if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => typeof held[word] === 'boolean').map((word) => (held[word] === true ? word : `-${word}`)));
   }
   const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);

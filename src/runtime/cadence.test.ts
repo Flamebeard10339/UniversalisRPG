@@ -276,8 +276,6 @@ describe('rate: as the per-minute cadence, to the millisecond', () => {
   });
 });
 
-// Five attempts to one completion, so the clock inside an attempt and the cycle a player watches
-// differ by a factor of five — which is the gap that pinned the drawn bar flat at nothing.
 const bell = (seconds: string): string =>
   ['# item note', 'examine: A note.', '# stat toll', 'base: 0.2', '# entity bell', 'ring:', '  continuous', `  time: ${seconds}`, '  damage: toll', '  give: 1 note'].join('\n');
 

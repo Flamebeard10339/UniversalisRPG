@@ -18,8 +18,6 @@ type Choice = NonNullable<Option['values']>[number];
 type Payload = GraphNode['payloads'][number];
 type Contribution = Plane['contributions'][number];
 
-// The jewel picker belongs to the lattice it is picking for, so it stays inside it rather than
-// taking the app: the node the player just pressed is still there to look at behind it.
 const PICKER: Declared = { over: 'pane' };
 
 const RING: Record<Standing, string> = {

@@ -169,19 +169,11 @@ export interface SectionArg {
   body: string;
 }
 
-// A section somebody is asking to read rather than to write. The kind is optional because an id is
-// what a view prints: an author who has just met `first-steps.guide-house` is asking about that,
-// and knowing it is a `# location` is half of what they were going to read the section to find out.
-// The id is optional the other way round: a kind alone is an author who cannot name anything yet,
-// which is the question that has to be answerable before reading a section is worth anything.
 export interface NamedSection {
   kind: string | null;
   id: string | null;
 }
 
-// Where a place is, said either way the language says it: outright, or as one step off another place.
-// One command because it is one question — and because answering it one way is what takes the other
-// answer away, which a second command would have had to know about this one.
 export type PlacingArg = { location: string; at: { x: number; y: number; z?: number } } | { location: string; off: Relative };
 
 export interface JoiningArg {
@@ -190,7 +182,6 @@ export interface JoiningArg {
   road: boolean;
 }
 
-// What one `/region` says: which places it gathers or lets go, or how far the whole of it moves.
 export type GatheringArg = { region: string; places: string[]; holding: boolean } | { region: string; by: { x: number; y: number } };
 
 interface ArgTypes {
@@ -214,9 +205,6 @@ export type ArgKind = keyof ArgTypes;
 
 export type CommandMatch = 'name' | 'blank' | 'directive' | 'choice';
 
-// 'player' is what an ordinary session may run; 'author' is the authoring workflow
-// (staging DSL, saves-as-fixtures, dev mode itself); 'cheat' is a power that skips the world's
-// own rules (only /goto today). DEV_TOKENS below is every 'cheat' entry, derived rather than listed.
 export type CommandAudience = 'player' | 'author' | 'cheat';
 
 export interface CommandHelp {
@@ -238,9 +226,6 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly argHint: string;
   readonly summary: string;
   readonly audience: CommandAudience;
-  // Whether running this stages a change to the world's content. Declared here rather than counted
-  // anywhere else, so a driver that has something to say about editing — the playbot, which will
-  // not let a bot fix what it has not first reported — asks the command and not a list of names.
   readonly edits: boolean;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
@@ -289,8 +274,6 @@ function refusal(ctx: CommandContext, problem: string | Said): CommandResult {
   return typeof problem === 'string' ? noted('error', problem) : said('error', say(sessionLocalizer(ctx.session), problem));
 }
 
-// The engine, not a harness, decides what a line refuses: an error-toned message is the one signal
-// every driver already gets, so this is not a second validation layer beside runLine.
 export const refusedLine = (result: CommandResult): boolean => result.output.some((output) => output.kind === 'message' && output.tone === 'error');
 
 export const outcomeOf = (result: CommandResult): TurnOutcome => (refusedLine(result) ? 'refused' : 'applied');
@@ -353,9 +336,6 @@ function openInventory(ctx: CommandContext, id: string): CommandResult {
   return { ...selected, recorded: [...opened.recorded, ...selected.recorded] };
 }
 
-// The breakdown opened on one stat, the same two lines the journal opens a quest with. A stat is
-// found by the id the view publishes or by the name its own module gave it, which is how every id a
-// player types is read.
 function openStat(ctx: CommandContext, stat: string): CommandResult {
   const found = ctx.view.stats.find((row) => row.id === stat || row.id.endsWith(`.${stat}`));
   if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.stat.unknown', { stat: sessionLocalizer(ctx.session).identifier(stat) }));
@@ -366,11 +346,7 @@ function openStat(ctx: CommandContext, stat: string): CommandResult {
   return { ...reading, recorded: [...opened.recorded, ...reading.recorded] };
 }
 
-// The journal opened on one quest, which is the screen opened and then answered — the same two lines a recording would replay.
 function openJournal(ctx: CommandContext, entries: readonly JournalEntry[], quest: string): CommandResult {
-  // A journal entry prints a quest's title and never its id, so the name a reader has for one is
-  // whatever half of the id they were handed — the module it is written in as readily as the id
-  // inside. Which words an address answers to is the editing page's rule, asked rather than made up.
   const found = entries.find((entry) => namesFrom(entry.quest, quest));
   if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.journal.unknown', { quest: sessionLocalizer(ctx.session).identifier(quest) }));
 
@@ -387,8 +363,6 @@ function nothingIsNamed(localizer: Localizer, id: string): Localized {
     : localizer.engine('engine.growth.no-worn', { slot: localizer.identifier(slot) });
 }
 
-// A prune is addressed to whoever asked for the load, in the ids the save is written in, so it
-// goes out as tool words beside the view rather than into what the game is saying to the player.
 function prunedNotes(pruned: readonly PruneWarning[] | undefined): ToolMessage[] {
   return (pruned ?? []).map((warning) => note('warn', warning.message));
 }
@@ -416,9 +390,6 @@ function runDirective(ctx: CommandContext, directive: Directive): CommandResult 
   }
 }
 
-// A turn is one line, so a line stands for the lines it holds: `|` is where one of them ends. It is
-// read once, before any command sees its arguments, which is what makes it end a token as well as a
-// line — an id written up against a `|` is an id at the end of its line and nothing more.
 export const LINE_BREAK = '|';
 
 const lineBroken = (line: string): string => line.split(LINE_BREAK).join('\n');
@@ -442,10 +413,6 @@ function localDiagnosticsFor(authoring: AuthoringContext, diagnostics: ReturnTyp
   return brought.length > 0 ? [...brought] : [...diagnostics];
 }
 
-// A refusal an author can write against next turn. The loader says what it stopped at; a line and
-// column into a file nobody here can open does not, so the line is quoted as it was typed and the
-// shapes the grammar would have taken there are set under it. Nothing is written when this is
-// answered with, which is what makes a draft worth typing to find out.
 function refusalLines(text: string, diagnostics: readonly ModuleDiagnostic[]): string[] {
   const written = text.split('\n');
   return diagnostics.flatMap((diagnostic) => {
@@ -550,9 +517,6 @@ function nearMissNote(ctx: CommandContext, section: LocalSection): string {
   return ` Nothing declared ${section.kind} ${section.id} before this, and ${near.join(' and ')} ${near.length === 1 ? 'is' : 'are'} one edit away: /local delete ${section.kind} ${section.id} takes it back.`;
 }
 
-// Sections written straight into the local changes, upserted together and adopted once. Every
-// author-facing edit lands here — a section typed at `/dsl`, a run the app files when its author
-// stops recording — so nothing has a load-and-adopt path of its own.
 export function stageLocalSections(ctx: CommandContext, sections: readonly string[]): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
@@ -573,8 +537,6 @@ export function stageLocalSections(ctx: CommandContext, sections: readonly strin
   }
 }
 
-// `/place a below b` is read with the parser that reads `below b` in a `# location`, so the command
-// line takes exactly what the language takes and the two cannot come to disagree about the wording.
 function writtenOff(rest: string): PlacingArg | undefined {
   const match = /^(?<location>\S+)[ \t]+(?<off>.+)$/.exec(rest)?.groups;
   if (!match) return undefined;
@@ -595,8 +557,6 @@ const joiningFrom =
     return match ? { from: match.from!, to: match.to!, road } : { problem: `${road ? '/link' : '/unlink'} requires <location> <location>` };
   };
 
-// A section named the way a player names one: whole, or by the last part of it where that names one
-// thing. The map hands whole addresses; somebody typing wants to write `market-square`.
 function addressIn(ids: Iterable<string>, written: string): string {
   const known = [...ids];
   if (known.includes(written)) return written;
@@ -608,8 +568,6 @@ const addressOf = (ctx: CommandContext, written: string): string => addressIn(ct
 
 const regionOf = (ctx: CommandContext, written: string): string => addressIn(ctx.session.registry.regions.keys(), written);
 
-// Every map edit takes the same road: work out the patches, stage them together, adopt once. A
-// refusal writes nothing, so a move that could not carry one room of a house moves none of it.
 function runMapEdit(ctx: CommandContext, edit: (registry: Registry, local: string) => Editing): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
@@ -622,9 +580,6 @@ function runMapEdit(ctx: CommandContext, edit: (registry: Registry, local: strin
 
 const addressed = (at: SectionAddress): string => `# ${at.kind} ${at.id}`;
 
-// Sections taken back out of the local changes together and adopted once — the counterpart of
-// stageLocalSections, and the only way anything leaves. What was filed as several sections is
-// dropped as several sections, so the registry never stands over half of one.
 export function dropLocalSections(ctx: CommandContext, sections: readonly SectionAddress[]): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
@@ -647,9 +602,6 @@ export function dropLocalSections(ctx: CommandContext, sections: readonly Sectio
   }
 }
 
-// What the local changes hold right now, for whatever is drawing a list of them. A file there is no
-// surface for, or one nothing here can read, holds nothing to list — the refusals belong to the
-// acts that edit it, and a list is not one.
 export function stagedSections(ctx: CommandContext): readonly LocalSection[] {
   const authoring = ctx.authoring;
   if (!authoring) return [];
@@ -665,21 +617,13 @@ const runSectionEdit = (ctx: CommandContext, section: SectionArg): CommandResult
 
 const asSource = (lines: readonly string[]): CommandResult => ({ output: [{ kind: 'source', words: 'tool', lines: [...lines] }], quit: false, recorded: [] });
 
-// What may be written, at the indentation it is written at. Asked with no kind it says which kinds
-// there are, because the whole grammar is tens of thousands of characters and nobody asked for all
-// of it at once — the kinds are the question a first ask is really putting.
 function runGrammar(_ctx: CommandContext, kinds: readonly string[]): CommandResult {
   if (kinds.length === 0) return asSource(['the kinds a section may be; /grammar <kind>... writes out what any of them holds:', ...sectionKinds().map((kind) => `  # ${kind}`)]);
   return asSource(grammarLines(kinds));
 }
 
-// Past this many rows a list is longer than the answer it is standing in for, and Tulsa writes a
-// hundred and twelve items: what an author does next with a list that long is narrow it, so that is
-// what a long one answers with instead of the whole of itself.
 const SCREENFUL = 24;
 
-// One line per id, or — where there are more of them than a screenful and they gather into fewer
-// families than there are ids — one line per family, since a family is what the next ask narrows to.
 function listedRows(addresses: readonly string[]): { rows: string[]; folded: boolean } {
   const ids = [...new Set(addresses)].sort();
   const families = new Map<string, string[]>();
@@ -688,19 +632,10 @@ function listedRows(addresses: readonly string[]): { rows: string[]; folded: boo
   return { rows: [...families].map(([family, held]) => (held.length === 1 ? `  ${held[0]}` : `  ${family} (${held.length})`)), folded: true };
 }
 
-// What a view prints beside whatever a section offers, under either of the ids that section answers
-// to. This is the half of a choice id that is not the action, so it is built the way the choice id
-// was built rather than recognised by shape.
 const ownerForms = (section: AddressedSection): string[] => [ownerRef(section.kind, section.address), ownerRef(section.kind, section.id)];
 
-// Every name the engine itself writes one section under: the id its author typed inside the module,
-// the address the loader files it at, and the owner a view prints. An author types one of the first
-// two and a player is handed the third, so all of them have to arrive here.
 const namesOf = (section: AddressedSection): string[] => [section.id, section.address, ...ownerForms(section)];
 
-// A choice id is an action on an owner, and the owner is the section the action is written in. The
-// engine composed that id out of the two, so its own reading of it is asked for rather than the id
-// taken apart again by shape.
 const ownerAsked = (id: string): string | null => {
   const use = parseUsePayload(id);
   return use === null ? null : ownerRef(use.obj, use.objId);
@@ -708,9 +643,6 @@ const ownerAsked = (id: string): string | null => {
 
 const wroteAs = (at: NamedSection): string => (at.kind === null ? String(at.id) : `# ${at.kind} ${at.id}`);
 
-// An id that names nothing is nearly always an id half-remembered, and the editing page already has
-// the rule for whether an address answers to a word somebody typed — it is asked here rather than
-// guessed at again, so a refusal points at exactly what a completion would have offered.
 function noSuchSection(at: NamedSection, loaded: readonly AddressedSection[]): CommandResult {
   const near = loaded.filter((section) => namesOf(section).some((name) => namesFrom(name, at.id!))).map((section) => section.address);
   const under = at.kind === null ? 'loaded' : `loaded as # ${at.kind}`;
@@ -722,19 +654,11 @@ function noSuchSection(at: NamedSection, loaded: readonly AddressedSection[]): C
   return noted('error', `nothing loaded is written as ${wroteAs(at)}`, [`${new Set(near).size} ${under} ${new Set(near).size === 1 ? 'is' : 'are'} named from ${at.id}:`, ...rows]);
 }
 
-// An id that is at once a section's own name and an action on a different section is an id whose
-// reader meant one of the two, and nothing in the id says which. Both readings are named rather
-// than one of them picked.
 function bothWays(at: NamedSection, named: readonly AddressedSection[], owning: readonly AddressedSection[]): CommandResult {
   const rows = (sections: readonly AddressedSection[], as: string): string[] => [...new Set(sections.map((section) => `  # ${section.kind} ${section.address} — ${as}`))].sort();
   return noted('error', `${at.id} reads two ways and nothing in it says which`, [...rows(named, 'a section written under that id'), ...rows(owning, 'the section an action of that id is written in')]);
 }
 
-// A section as its author wrote it, out of the file it was written in. The world is read for
-// examples far oftener than it is written to, and a printed section is not an example of anything:
-// it has already lost the comments and the `@@@` notes that say what the author was reaching for.
-// Asked with a kind and no id it says which of them there are, because an author who cannot name a
-// section cannot read one, and until this answered nothing did.
 function runSource(ctx: CommandContext, at: NamedSection): CommandResult {
   const authoring = ctx.authoring;
   if (!authoring) return noted('error', UNAVAILABLE);
@@ -809,9 +733,6 @@ function buildCreateTest(ctx: CommandContext, id: string, opts: { valid: boolean
   const registryOf = (at: SectionAddress): Map<string, unknown> => (at.kind === RUN_SECTION ? session.registry.tests : session.registry.saves);
   if (blocks.some(([at]) => registryOf(at).has(at.id))) return noted('error', `test '${id}' already exists`);
 
-  // The session that wrote a run holds it at once, so /test replays it without a reload. It lands
-  // section by section off the same list that goes out as text: nothing here decides which sections
-  // there are or what they are called.
   const landing: (() => void)[] = [];
   for (const [at, body] of blocks) {
     if (at.kind === RUN_SECTION) {
@@ -884,26 +805,17 @@ const UNREADABLE_SLOT = 'that slot holds bytes nothing here can read, so autosav
 
 const UNREADABLE_CADENCE = `the slot the cadence lives in does not hold one, so nothing is autosaved: /autosave <s> or /autosave ${NEVER} sets it again`;
 
-// A cadence is a least interval, so no interval at all is every action rather than none of them.
 const cadenceStanding = (cadence: Cadence | null): string =>
   cadence === null ? `— ${UNREADABLE_CADENCE}` : cadence === NEVER ? NEVER : cadence === 0 ? 'after every action' : `every ${cadence}s`;
 
 const WHY_NOT: Record<SlotWrites, string> = { yes: '', 'not-ours': ` — ${NOT_ADOPTED}`, unreadable: ` — ${UNREADABLE_SLOT}` };
 
-// What an opening says about the game it did or did not pick back up, in one place, so no driver
-// spells its own. A slot that was left alone is said in error words: it is the one thing here a
-// player cannot see for themselves, because the world in front of them looks like a new game.
 export function resumptionNotes(resumed: Resumption): ToolMessage[] {
   if (resumed.kind === 'new') return [];
   if (resumed.kind === 'kept') return [note('error', `slot ${resumed.slot} holds a game this build cannot open, so it was left alone and this is a new one: ${resumed.why}`, [UNREADABLE_SLOT])];
   return [note('ok', `Picked up slot ${resumed.slot}.`), ...prunedNotes(resumed.pruned)];
 }
 
-// Said only where the engine tried to write and could not. A slot it is deliberately leaving alone
-// is not a failure and is not said here: that is a standing fact `saveReport.writes` answers, which
-// `/slots` and `/state` read on demand, and whatever left the session unadopted — a game this build
-// could not open, dev mode letting go of one — said so once at the moment it did. Repeating it under
-// every action told a player who asked for nothing what an author who typed /autosave wanted to know.
 function autosaved(ctx: CommandContext): ToolMessage | null {
   if (!ctx.save) return null;
   try {
@@ -915,9 +827,6 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
   }
 }
 
-// An author's session shows a room as it is written. Set through the ordinary settings path, so it is
-// saved with the dev slot, comes back with it, and can be turned on again by anyone who wants to see
-// what a player sees.
 function unmasked(ctx: CommandContext, result: CommandResult): CommandResult {
   applyDirective(ctx.session, { kind: 'setting', setting: 'masking', value: 'off' });
   return { ...result, view: view(ctx.session) };
@@ -946,8 +855,6 @@ function devOff(ctx: CommandContext, save: SaveContext): CommandResult {
   return { ...result, output: [...result.output, note('warn', `Dev mode off, but this session could not be put back to what it was before dev, so it will not be written to a slot. Slot ${DEV_SLOT} still holds what dev did.`)] };
 }
 
-// Every setting, in the words the live view already publishes them in, so the terminal and the
-// settings page are reading one list rather than two.
 function settingStanding(ctx: CommandContext, row: SettingRow): PlayerMessage {
   const localizer = sessionLocalizer(ctx.session);
   return {
@@ -973,9 +880,6 @@ function requireId(name: string): (rest: string) => string | CommandProblem {
   return (rest) => (rest === '' ? { problem: `${name} requires an id` } : rest);
 }
 
-// Restating the shape tells somebody whose line already looks like the shape nothing at all. The
-// word the line was actually read down to is the one thing they cannot see by looking at what they
-// typed, so a refusal hands that back.
 const readAs = (head: string, at: number): string => {
   const word = head.split(/[ \t]+/).filter((each) => each !== '')[at];
   return word === undefined ? 'nothing' : JSON.stringify(word);
@@ -1229,9 +1133,6 @@ export const COMMANDS: readonly CommandSpec[] = [
     parse: (rest) => {
       const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
       if (!match) return { problem: '/source requires <kind>, <id> or <kind> <id>' };
-      // One word that is a kind is asking after the kind. An id spelled the same as a kind is still
-      // reachable, under the kind it is of — and a word that names nothing at all is worth more read
-      // as the question somebody could not otherwise ask than as an id that is going to be refused.
       if (match.kind === undefined && isSectionKind(match.id!)) return { kind: match.id!, id: null };
       return { kind: match.kind ?? null, id: match.id! };
     },
@@ -1249,7 +1150,6 @@ export const COMMANDS: readonly CommandSpec[] = [
       const [head = '', ...more] = rest.split('\n');
       const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(head)?.groups;
       if (!match?.kind || !match.id) return { problem: `/dsl requires <kind> <module>.<id> [body]; it read ${readAs(head, 0)} as the kind and ${readAs(head, 1)} as the id` };
-      // An id a module owns says which module, whether the section is one already there or one being written for the first time: that is the whole of how a section authored in a run has somewhere to go home to.
       const homeless = homelessId(match.kind, match.id);
       if (homeless !== null) return { problem: `/dsl ${match.kind} ${homeless}` };
       return { kind: match.kind, id: match.id, body: [match.body ?? '', ...more].join('\n') };
@@ -1495,9 +1395,6 @@ export interface ParsedCommand {
   arg: ArgTypes[ArgKind];
 }
 
-// A choice answers to the id it was published under as well as to where it sits in the list. A
-// driver that reads the list aloud can echo the id back and never construct a position; the
-// terminal keeps typing numbers, which is what a person at a keyboard wants.
 export function isChoiceLine(current: PlayView, line: string): number | null {
   const trimmed = line.trim();
   if (trimmed === '') return null;
@@ -1590,7 +1487,6 @@ export interface LivePool {
 
 export interface LiveProgress {
   label: Localized;
-  // Who is being fought, carried beside the label the same way the view carries it.
   detail?: Localized;
   active: boolean;
   time: number;
@@ -1662,19 +1558,11 @@ function driveChoice(ctx: CommandContext, index: number): CommandResult {
   return { view: opening, output: [], quit: false, recorded: [`begin: ${recordedForChoice(choice).replace(': ', ' ')}`], live: liveOver(ctx, opening) };
 }
 
-// Whatever is under way, picked up on the clock again. A driver that stopped ticking to run a line
-// asks for this afterwards: nothing comes back where the line ended what was going on, and the world
-// is what says which of those happened rather than the driver reading the line and guessing.
 export function liveAgain(ctx: CommandContext): LiveRun | null {
   const standing = sessionStatus(ctx.session);
   return standing.action === null ? null : liveOver(ctx, standing);
 }
 
-// What the player stood there for, written as a `# test` replays it. A loop that came round is
-// written in how many times it did and not in how long that took: a run is a record of a path
-// walked, and how many seconds a cycle costs is balance that moves under it. Nothing came round and
-// nothing finished leaves only the clock, which is the one case where the seconds are the whole of
-// what happened.
 function stood(ctx: CommandContext, final: PlayView, started: number, startedCycles: number, cancelled: boolean): string[] {
   const cycles = cyclesDone(ctx.session) - startedCycles;
   if (final.action === null && !cancelled) return ['wait: done'];

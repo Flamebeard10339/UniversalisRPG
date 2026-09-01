@@ -21,7 +21,6 @@ describe('what a folder has to say before a session hands it over', () => {
     expect(complaintsIn('open.md', item('**Empty prose is said as silence.**', '', '*Closes when: the engine refuses it.*'))).toEqual([]);
   });
 
-  // Without that clause a reader cannot tell an open question from a decision already taken, which is where invented work comes from.
   it('names an item that says what is wrong and never says what would settle it', () => {
     expect(complaintsIn('open.md', item('**Empty prose is said as silence**, and nobody has ruled on it.'))).toEqual([{ file: 'open.md', says: 'line 1 names nothing that would close it: ## The region wall' }]);
   });
@@ -34,7 +33,6 @@ describe('what a folder has to say before a session hands it over', () => {
     expect(folder({ open: ['open-agent.md'], missing: ['open-human.md'] }).join('\n')).toContain('no open-human.md');
   });
 
-  // The third file is the format growing back — a settled.md or a log, which is where the last one of these went.
   it('says a third file beside the open ones does not belong to this format', () => {
     expect(folder({ strays: ['settled.md'] }).join('\n')).toContain('settled.md stands beside them');
   });
@@ -43,7 +41,6 @@ describe('what a folder has to say before a session hands it over', () => {
     expect(folder({ items: 31 }).join('\n')).toContain('31 open item(s) between them');
   });
 
-  // The one thing a reader cannot see for themselves. Under the threshold it is reported and not complained about, because a doc written a few commits ago is current, not stale.
   it('counts the work that landed since the docs were last written, and only complains once it is a lot', () => {
     expect(folder({ since: 3 }).join('\n')).toContain('  ok 3 commit(s)');
     expect(folder({ since: 20 }).join('\n')).toContain('  -- 20 commit(s)');
@@ -62,7 +59,6 @@ describe('a line that hands its evidence over as a proof rather than a paragraph
     expect(declaredIn('open-tests.test.ts', ["describe('a-roll-settles-on-a-branch', () => {", "  it('does', () => {});"].join('\n'))).toEqual(['a-roll-settles-on-a-branch']);
   });
 
-  // Only what a line closes on: a proof mentioned in passing is prose about the work, and the citation has to be the clause or the two drift.
   it('reads the citation off the closing clause and nowhere else', () => {
     expect(citedIn(agent)).toEqual(['a-roll-settles-on-a-branch']);
     expect(citedIn('The route in `a-roll-settles-on-a-branch` is worth a read.')).toEqual([]);
@@ -72,7 +68,6 @@ describe('a line that hands its evidence over as a proof rather than a paragraph
     expect(proofComplaints([['open-tests.dsl', '# test a-roll-settles-on-a-branch']], [['open-agent.md', agent]])).toEqual([]);
   });
 
-  // A proof outliving the line it was written under is the stale comment this replaced, wearing a test's clothes.
   it('names a proof no open line stands on', () => {
     expect(proofComplaints([['open-tests.dsl', '# test a-roll-nobody-mentions']], [['open-agent.md', agent]]).map((each) => each.says)).toEqual(['a-roll-nobody-mentions stands under no open line — a proof is cited by the line it closes', expect.stringContaining('and no proof declares it')]);
   });
@@ -85,7 +80,6 @@ describe('a line that hands its evidence over as a proof rather than a paragraph
     expect(proofComplaints([['open-tests.dsl', '# info open-tests']], []).map((each) => each.says)).toEqual([expect.stringContaining('declares no proof')]);
   });
 
-  // The whole point of running them: red is the ordinary state here, and green is the finding.
   it('reports a proof that has gone green as a line that may already be closed', () => {
     const lines = folder({ proofs: ['open-tests.dsl'], ran: true, passing: [{ file: 'open-tests.dsl', id: 'a-roll-settles-on-a-branch', passes: true }] }).join('\n');
 

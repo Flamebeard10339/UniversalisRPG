@@ -63,7 +63,6 @@ export const SIDES: readonly Side[] = ['my', 'their'];
 
 const SIDE = /(?:my|their)(?![\w-])/;
 
-// A side is a closed set of words, and a set of words is a parser like any other, so what an author is offered is the set the engine reads.
 export const side: Parser<Side> = {
   parse(cursor) {
     const raw = cursor.take(SIDE);
@@ -92,7 +91,6 @@ function parseContest(cursor: Cursor): Contest {
   return { left, right: parseSided(cursor) };
 }
 
-// Half a contest, and a whole line where nothing stands opposite it: `vs` is what makes a line two-sided, so a line that leaves it out is a shape of its own rather than a half-written one.
 const sidedIn = (hole: string, examples: readonly string[]): Parser<Sided> => ({
   parse: parseSided,
   print: printSided,
@@ -113,7 +111,6 @@ const depleted = sidedIn('resource', ['their health', 'health']);
 
 type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
-// A condition written into an action is one shape, and what a condition may be is the `<condition>` hole's business — the rule a result list already keeps. A keyword with nothing after it holds nothing, which is how a block overlaying another clears what it inherited.
 const optionalCondition: Parser<Condition | undefined> = {
   parse: (cursor) => (cursor.done ? undefined : condition.parse(cursor)),
   print: (value) => (value === undefined ? '' : condition.print(value)),
@@ -157,7 +154,6 @@ const positiveCount: Parser<number> = {
   examples: ['3'],
 };
 
-// A placeholder is called after what it names, so the events an action ends on say so wherever the field is shown.
 const eventNamed: Parser<string> = { ...id, forms: ['<event>'], examples: ['level-up', 'core.level-up'] };
 
 const statNamed: Parser<string> = { ...id, forms: ['<stat>'], examples: ['luck'], names: { stat: 'stat' } };
@@ -166,7 +162,6 @@ const stoppers = list(eventNamed);
 
 const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => ('element' in parser ? (parser as ListParser<unknown>) : undefined);
 
-// A field reads its value with the parser that shows its shapes, so what an author is offered and what the engine takes are one thing said once. A parser holding a list takes an indented block in place of its inline value, which is a fact about lists rather than about any one field.
 function readsWith(written: string, parser: Parser<unknown>): ActionValue {
   const held = blockOf(parser);
   if (held === undefined) return (cursor, line, label) => named(written, label, line, () => parser.parse(cursor));
@@ -346,7 +341,6 @@ function refuseHookLabel(label: string, span: Span | undefined): void {
   if (problem !== undefined) throw new DslError(problem, span);
 }
 
-// A pace an action may be written at. Where the engine takes that word only alongside another line, its own refusal is what the page says beside it, and where it takes the word alone the page says what the word does. Filtering the word out instead left `continuous` in the corpus three times and on no page an author could read it off.
 const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => ({
   form: kind,
   example: kind,
@@ -354,12 +348,8 @@ const KIND_LINES: readonly Written[] = TAGGED_ACTION_KINDS.map((kind) => ({
   note: assembledActionProblem({ label: '', kind, results: [] }) ?? KEYWORDS[kind].does,
 }));
 
-// A bare clause on an action holds on whoever is performing it while it runs, which is what the part it stands under says. Which clauses those are is asked of `checkTags`, which is what refuses one, rather than listed here — so a clause an action starts or stops taking reaches the page with it.
 const CLAUSES = 'what it is worth to whoever performs it, while it is under way';
 
-// Which shapes of a tag an action will not take, asked of `checkTags`, which is what refuses one — so a
-// shape it starts or stops taking is said here without an edit. Said on the first shape that stands,
-// because that is the line the page keeps where it says `<tag>` in place of all of them.
 const untaken = (): string[] => paired(tagClause.forms, tagClause.examples).flatMap((example, at) => (example === undefined || takesClause(example) ? [] : [`\`${tagClause.forms[at]!}\``]));
 
 const CLAUSE_NOTE = (): string | undefined => {
@@ -388,14 +378,11 @@ const clauseLines = (): readonly Written[] =>
     } catch {
       return [];
     }
-    // The shapes are what tell a clause from a result where both may stand, so they are written out here; `of` says they are the one `<tag>` grammar, and the page says so rather than spelling it a second time.
     return [{ form: tagClause.forms[at]!, example, family: CLAUSES, of: 'tag', ...(at === firstTaken() ? { note: CLAUSE_NOTE() } : {}), ...filledBy(tagClause) }];
   });
 
-// What a field's parser reads is what its lines offer. The shapes are the parser's own, so a shape the engine takes and the page will not show is not a thing that can be written here.
 const actionFieldLines = (): readonly Written[] =>
   ACTION_FIELDS.flatMap((field) => {
-    // What the field says its placeholders hold stands over what the parser says, since one parser writes the values of fields that name different kinds.
     const said = { family: field.family, ...(field.note === undefined ? {} : { note: field.note }), ...filledBy(field.parser), ...filledBy(field) };
     const held = blockOf(field.parser);
     return [
@@ -413,7 +400,6 @@ export const actionLinesWritten = (): readonly Written[] => [
 
 export const actionBody: EntryBody = {
   grammar: [
-    // An action's label is the name it is given here, not one it looks up, so the placeholder that reads like a kind names nothing.
     { form: '<action>: <result>, …', example: 'chop-wood: give: log', family: 'an action', names: { action: null }, holds: () => ({ result: actionResult }) },
     { form: '<action>:', example: 'chop-wood:', family: 'an action', names: { action: null }, block: actionLinesWritten },
   ],

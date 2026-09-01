@@ -28,10 +28,8 @@ const CORPUS = fixtureSources();
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
-// A line may say one hole names whatever another one holds, written as that other hole.
 const POINTS = /^<[a-z][a-z0-9 -]*>$/;
 
-// Every line of every kind, under the lines and at the indentation an author writes it at. A block reached twice holds the same lines, so it is walked once.
 const GRAMMAR: { kind: string; line: Written; under: string; indent: number }[] = [];
 
 {
@@ -48,22 +46,18 @@ const GRAMMAR: { kind: string; line: Written; under: string; indent: number }[] 
   for (const owner of sections()) walk(owner.kind, owner.grammar, `# ${owner.kind} probe`, 0);
 }
 
-// Every placeholder of every one of those lines, with the line written out around it.
 const HOLES = GRAMMAR.flatMap((at) =>
   (holesIn(at.line.form, at.line.example) ?? []).map((hole) => ({
     ...at,
     hole,
-    // A line that opens a block and is handed over without one is refused for holding nothing, so the block's own first line goes under it.
     opens: at.line.block?.()[0]?.example,
     where: `# ${at.kind}${at.under.includes('\n') ? ` under ${at.under.split('\n').pop()!.trim()}` : ''}: ${at.line.form} <${hole.name}>`,
   })),
 );
 
-// The line with one value stood in the hole, sitting where an author writes it, which is the only form the engine can be asked about.
 const written = (at: (typeof HOLES)[number], value: string): string =>
   [at.under, ...indentLines([standingIn(at.line.example, at.hole, value)], at.indent), ...(at.opens === undefined ? [] : indentLines([at.opens], at.indent + 2))].join('\n');
 
-// What one hole of a line puts in another, which is how a line that says one hole names whatever another one holds is read.
 const beside = (at: (typeof HOLES)[number]) => (hole: string) => {
   const other = (holesIn(at.line.form, at.line.example) ?? []).find((each) => each.name === hole);
   return other === undefined ? undefined : valueIn(at.line.example, other);
@@ -89,7 +83,6 @@ describe('a hole of every line of every kind', () => {
     ).toEqual([]);
   });
 
-  // The kind file is the one authority on what a line names. This asks the engine the question the panel used to ask it — an id stood in the hole, the section handed over, and whichever reference kind comes back — and holds the line's own word to it.
   it('names what the engine reads where it stands', () => {
     const PROBE = 'zzprobezz';
     const engine = (at: (typeof HOLES)[number]): string[] => {
@@ -110,7 +103,6 @@ describe('a hole of every line of every kind', () => {
     };
     expect(
       HOLES.flatMap((at) => {
-        // A kind the section list does not declare has no ids to offer and nothing the panel could say about it.
         const read = [...new Set(engine(at))].filter((kind) => sectionFor(kind) !== undefined);
         const said = kindAt(at);
         return read.length === 1 && read[0] !== said ? [`${at.where} names ${said === undefined ? 'nothing' : `a # ${said}`}, where the engine reads a # ${read[0]}`] : [];
@@ -121,7 +113,6 @@ describe('a hole of every line of every kind', () => {
 
 describe('what the page offers where the cursor stands in a hole', () => {
   const NAMED = 'a-module.a-name';
-  // One line written under one other line is the same question wherever it is reached from, and the results grammar is reached from every kind there is.
   const asking = new Map(HOLES.filter((at) => kindAt(at) !== undefined).map((at) => [`${at.under.split('\n').pop()!}|${at.line.form}|${at.hole.name}`, at]));
   const naming = [...asking.values()];
 
@@ -134,7 +125,6 @@ describe('what the page offers where the cursor stands in a hole', () => {
         const draft = written(at, NAMED.slice(0, typed)).slice(0, at.under.length + 1 + at.indent + at.hole.start + typed);
         const offering = offeringAt(draft, draft.length, known);
         const said = offering.offers.filter((each) => each.form.includes(NAMED));
-        // Half a line may still be several shapes, and the page names the one it settled on; the claim is about the hole it says the cursor is in.
         const here = offering.filling?.form === at.line.form && offering.filling.hole === at.hole.name;
         if (here) asked += 1;
         if (here ? said.length !== 1 : said.length > 1) complaints.push(`${at.where} with ${JSON.stringify(NAMED.slice(0, typed))} typed offers ${said.length === 0 ? 'nothing' : said.map((each) => each.form).join(', ')}`);
@@ -160,7 +150,6 @@ describe('a field whose values are names', () => {
   const NAMED = sections().flatMap((owner) => owner.names.map((each) => ({ owner, each, where: `# ${owner.kind} ${each.site}` })));
   const PROBE = 'zzprobezz';
 
-  // The engine, asked to take one name out from under a section: what it names is gone, and nothing else is.
   const cutting = (kind: string) => {
     let missing = false;
     const visit = (asked: string, id: string): string => {
@@ -178,7 +167,6 @@ describe('a field whose values are names', () => {
     };
   };
 
-  // A section of that kind holding the probe in that field and nothing else of its own, filled out with whatever its fields default to.
   const holding = (owner: (typeof NAMED)[number]['owner'], each: (typeof NAMED)[number]['each']): { id: string } => {
     const written = `# ${owner.kind} probe\n${each.site} ${PROBE}`;
     const authored = owner.parse(splitSections(written)[0]!);
@@ -227,8 +215,6 @@ describe('a field whose values are names', () => {
   });
 });
 
-// The subjects are every kind that writes a group at all, read off its own declaration, so a kind
-// given a group next month is held to the same four claims with nothing edited here.
 describe('a kind that says what group it belongs to', () => {
   const GROUPED = sections().filter((owner) => owner.names.some((each) => each.kind === 'group'));
   const registry = (): Registry => loadUniverseWithDiagnostics(CORPUS).registry;
@@ -266,7 +252,6 @@ describe('a kind that says what group it belongs to', () => {
 });
 
 describe('what a reference is checked against', () => {
-  // A name is refused where nothing declares it only under a kind saying its vocabulary is declared, so a kind that something names while leaving its vocabulary open takes whatever an author writes and fails when a player reaches it. The subjects are every kind a schema field names and every kind the corpus's own references ask about, so neither a field nor a result site added next month can leave one unchecked.
   it('leaves no kind that anything names holding names nothing answers for', () => {
     const registry = loadUniverseWithDiagnostics(CORPUS).registry;
     const referenced = new Set(sections().flatMap((each) => each.names.map((named) => named.kind)));
@@ -278,7 +263,6 @@ describe('what a reference is checked against', () => {
     for (const kind of referenced) expect(isCheckedKind(kind), kind).toBe(true);
   });
 
-  // The two declarations are otherwise free of each other, but a module-scoped name has to be looked up to be written down: `resolve` rewrites one into the key the world holds it under, and there is no such key for a name nothing declared. A global name is already its own key, so it is the one that may be left open.
   it.each(sections().map((each) => each.kind))('%s does not own ids it declines to answer for', (kind) => {
     const owner = sectionFor(kind)!;
     if (owner.ids === 'owned') expect(owner.vocabulary).toBe('declared');
@@ -288,13 +272,11 @@ describe('what a reference is checked against', () => {
 describe('what a section is pruned by', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
 
-  // Every reference the shipped corpus makes, one for each site each kind writes: the site is what a section's own prune has to answer for, and the corpus writes them all.
   const sites = new Map<string, { kind: string; owner: Section; value: object; names: string; id: string; where: string }>();
   for (const [kind, primary] of contentSectionMaps()) {
     const owner = sectionFor(kind)!;
     for (const [id, value] of mapOf(registry, primary)) {
       owner.visit(value as never, `# ${kind} ${id}`, (names, named, where) => {
-        // A site is the same site whatever id it names there, so the ids and labels written into it are rubbed out.
         const at = `${kind} ${names} ${where.replace(/"[^"]*"/g, '<>').replace(`# ${kind} ${id}`, '')}`;
         if (!sites.has(at)) sites.set(at, { kind, owner, value: value as object, names, id: named, where: `# ${kind} ${id}` });
         return named;
@@ -302,7 +284,6 @@ describe('what a section is pruned by', () => {
     }
   }
 
-  // The engine taking one thing out from under the world: that name of that kind is gone, and nothing else is.
   const cutting = (kind: string, id: string) => {
     let missing = false;
     const visit = (asked: string, named: string): string => {
@@ -325,7 +306,6 @@ describe('what a section is pruned by', () => {
     expect(new Set([...sites.values()].map((each) => each.kind)).size).toBeGreaterThan(5);
   });
 
-  // A section says what it names twice — once walking, once pruning — and the second is not derived from the first. This holds them to each other: whatever a section is read as naming, taking that away has to change the section.
   it('is everything it is read as naming', () => {
     expect(
       [...sites.values()].flatMap(({ owner, value, names, id, where }) =>
@@ -336,7 +316,6 @@ describe('what a section is pruned by', () => {
 });
 
 describe('a line that only makes sense once another is written', () => {
-  // The keyword an author types for a field, which is what the grammar writes and so what an offer begins with.
   const keywordOf = (schema: { fields: Record<string, { keyword?: string }> }, name: string): string => schema.fields[name]?.keyword ?? name;
 
   const begins = (form: string, keyword: string): boolean => form === keyword || form.startsWith(`${keyword}:`);
@@ -377,7 +356,6 @@ describe('a line that only makes sense once another is written', () => {
 describe('a prose field of any kind', () => {
   const AUTHORED = loadUniverseWithDiagnostics(CORPUS).parsed.flatMap((module) => module.sections);
 
-  // The subjects are every field any kind calls prose, taken from the kinds themselves and filled from what the corpus actually wrote, so a kind or a prose field declared next month is held to this with no edit. A field an author cannot write a value into — a title a kind only ever generates — says so by not keeping the value it is handed.
   const WRITABLE = sections().flatMap((owner) =>
     owner.text.flatMap((field) => {
       const one = AUTHORED.find((each) => each.kind === owner.kind);
@@ -399,7 +377,6 @@ describe('a prose field of any kind', () => {
   }
 });
 
-// The four answers a DEBUG mark carries, asked of whatever the corpus marks rather than of the sections that first wanted one. A kind marked next month is held to all of this with no edit here.
 describe('a DEBUG section the corpus holds', () => {
   const { registry, parsed } = loadUniverseWithDiagnostics(CORPUS);
   const MARKED = parsed.flatMap((module) => module.sections.flatMap((section) => (isDebug(section.value) ? [{ module: module.info.id, kind: section.kind, id: (section.value as { id: string }).id }] : [])));
@@ -414,7 +391,6 @@ describe('a DEBUG section the corpus holds', () => {
     expect(everySaid(registry.locales).filter((said) => said.key.startsWith(beneath))).toEqual([]);
   });
 
-  // Words it does not have are what makes the claim above true rather than merely tidy: a row swept off the tables is a row the printer cannot tell from one nobody wrote and a key the terminal says in place of a line, so the words are refused where they are written instead. Asked of every field the marked section's own kind calls prose, so a prose field declared next month is held to this with no edit.
   const PROSE = MARKED.flatMap((each) => (textFieldsOf(each.kind) ?? []).map((field) => ({ ...each, field })));
 
   it('is written under a kind that has prose to refuse, so nothing below is vacuous', () => {
@@ -434,7 +410,6 @@ ${each.field}: Words a player would read.
     expect(problems(loadUniverseWithDiagnostics([...CORPUS, module])).join(' ')).toMatch(new RegExp(`# ${each.kind} ${each.id}: ${each.field}: "Words a player would read." is words a player reads`));
   });
 
-  // What stops a player finding one is that nothing they can reach names it, and the load refuses anything else — so the corpus loading clean is the proof, and this is the proof that the proof would fail.
   it('is refused wherever a section a player can reach names it', () => {
     const each = MARKED.find((one) => one.kind === 'item')!;
     const named = `# droptable a-lucky-find
@@ -452,7 +427,6 @@ DEBUG`) };
     expect(problems(loadUniverseWithDiagnostics([...CORPUS, marked]))).toEqual([]);
   });
 });
-// The corpus writes `over:` correctly, so what an author is told when they do not is only sayable here.
 describe('what # save refuses an over: line for', () => {
   const read = (body: string): (() => unknown) => () => sectionFor('save')!.parse(splitSections(`# save probe\n${body}`)[0]!);
 
@@ -477,7 +451,6 @@ describe('what # save refuses an over: line for', () => {
 describe('a name a value in the corpus carries', () => {
   const { registry } = loadUniverseWithDiagnostics(CORPUS);
 
-  // Every name every landed value carries, taken from the kinds that say they carry names and from the map each of those owns — so a kind that lands dialogues next month is held to this with no edit, whether it wrote them itself or was handed them.
   const CARRIED = contentSectionMaps().flatMap(([kind, primary]) => {
     const members = sectionFor(kind)!.members;
     if (members === undefined) return [];
@@ -495,7 +468,6 @@ describe('a name a value in the corpus carries', () => {
     expect(CARRIED.filter((each) => !registry.namespace.has(each.kind, each.key)).map((each) => `${each.where} carries ${each.kind} ${each.key}, which nothing declares`)).toEqual([]);
   });
 
-  // The namespace is settled before anything is built, so a kind landing into one of these maps has to land the same values from what an author wrote. A kind whose fields are a schema does not: its values arrive hydrated.
   it('is read off values their kinds land without hydrating first', () => {
     const bearing = new Set(contentSectionMaps().flatMap(([kind, primary]) => (sectionFor(kind)!.members === undefined ? [] : [primary])));
     expect(bearing.size).toBeGreaterThan(0);
@@ -509,15 +481,11 @@ const declaredKeys = (held: Namespace): { kind: string; key: string }[] =>
     .sort()
     .flatMap((kind) => held.declaredKeys(kind).sort().map((key) => ({ kind, key })));
 
-// Whether a declared key is namespaced under a module, which is a question about its prefix and not
-// about any word in it: a skill a module named after itself puts that module's own word at the tail
-// as well, and reading the tail would say a rename had failed when it had not.
 const names = (entry: { kind: string; key: string }, id: string): boolean => {
   const key = keyedUnderOwnerKind(entry.kind) ? entry.key.slice(entry.key.indexOf('.') + 1) : entry.key;
   return key === id || key.startsWith(`${id}.`);
 };
 
-// Every shape the page offers anywhere under an action, however deep the blocks go. A block reached twice holds the same lines, so it is walked once.
 const ACTION_SHAPES: readonly string[] = (() => {
   const seen = new Set<string>();
   const forms = new Set<string>();
@@ -541,11 +509,9 @@ describe('an action the corpus writes', () => {
     expect(actions.length).toBeGreaterThan(10);
   });
 
-  // What the page offers and what the engine takes are one claim, and they came apart where a field restated its own parser's shapes beside it: `damage:` offered the `vs` shape alone while `contest()` read the unsided one too, so the corpus's one writing of it was a line the page would not have written.
   it('prints back into shapes the page offers, so nothing the engine takes goes unoffered', () => {
     const unoffered = actions.flatMap(({ where, action }) =>
       actionLines(action)
-        // A `+` in front of a keyword says how a block overlaying another merges with it, which is not a shape anyone writes a value into. A `+` in front of a number is part of the clause.
         .map((line) => line.trim().replace(/^\+(?=[a-z][a-z ]*:)/, ''))
         .filter((line) => line !== '' && !ACTION_SHAPES.some((form) => matches(form, line)))
         .map((line) => `${where}: ${line}`),
@@ -555,14 +521,6 @@ describe('an action the corpus writes', () => {
   });
 });
 
-// A `one of:` row weight is a share of one total, so the mark's number and the player's stat are
-// written in the same units and the odds of the roll are their ratio. A percentage bonus to a stat
-// standing in such a row therefore multiplies those odds by that percentage outright, wherever the
-// numbers happen to stand — where a flat bonus moves them in the units the marks themselves are
-// written in. Both sides are read off the shipped corpus: every stat any kind names in a weight,
-// against every percentage an item carries, so a kind, a mark or a buff written next month is held
-// to this with no edit. The raise a `# skill` grants its own stat per level is the engine's rule and
-// nobody's tag, so it is no subject here and a level still tells.
 describe('a stat the corpus contests as a one of: row weight', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const contested = new Set<string>();
@@ -588,14 +546,6 @@ describe('a stat the corpus contests as a one of: row weight', () => {
   });
 });
 
-// A ceiling nobody is born with — no base of its own, and no entity writing it into `stats:` — makes
-// a pool a player has only while carrying what grants it, so emptying one costs them that thing.
-// Nothing in the language picks an item out by a stat it carries, so the table rolled when the pool
-// empties has to write those items out, and this is what holds the written list to them both ways.
-// Its subjects are the world's own wiring: the event says which pool ran out, the pool says which
-// stat is its ceiling, whatever handles the event says which table pays, and every item carrying
-// that stat is a subject — so a seventh piece of tackle is a section and a line in the module that
-// owns them, and nothing here is edited.
 describe('a pool a player only has while carrying what grants it', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const everyResult = (results: readonly ActionResult[]): ActionResult[] => results.flatMap((result) => [result, ...nestedResults(result).flatMap(everyResult)]);
@@ -624,12 +574,6 @@ describe('a pool a player only has while carrying what grants it', () => {
   });
 });
 
-// A name is offered to a player as a name — the title of a thing, or the label on an action — and it
-// begins the way the one casing function would begin it. The subjects are the registry's own action
-// tables and every entry filed under the field a title is generated at, so a kind, a field or a
-// label written next month is held to this with no edit here. Only the first letter is asked:
-// English title case lowers the minor words inside a name — `Orb of the Edge` — and `humanizeEn`
-// has no opinion about those, so asking after the first word would refuse writing that is right.
 describe('a name the corpus offers', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const begun = (name: string): string => humanizeEn(name.slice(0, 1)) + name.slice(1);
@@ -648,9 +592,6 @@ describe('a name the corpus offers', () => {
   });
 });
 
-// A prose field reaches a player only where something offers it, and the reach cannot be read off
-// the corpus by asking a renderer: every driver draws the choices it is handed and none of them
-// names examine. So the claim is made where the offer is minted, over every entity that writes one.
 describe('an entity the corpus writes examine: on', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const written = [...registry.entities.values()].filter((entity) => entity.examine !== undefined);
@@ -671,11 +612,6 @@ describe('an entity the corpus writes examine: on', () => {
   });
 });
 
-// A flag a kind mints for its own sections is state the engine owns and an author never writes, but
-// a `when:` may still read it and the editing page still offers it — which only holds because the
-// same declaration sweep that files an authored `flags:` entry files these. The subjects are every
-// flag every kind declares, crossed with every section of that kind the corpus holds, so a kind that
-// mints a flag next month is held to this with no edit here.
 describe('a flag a kind mints of its own', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const minted = sections().flatMap((section) => section.flags.map((flag) => ({ kind: section.kind, flag })));
@@ -693,10 +629,6 @@ describe('a flag a kind mints of its own', () => {
   });
 });
 
-// A quest's line is never the fallback and always stands in whatever list the entity puts up, so
-// two of them can be side by side, and a list naming each entry by the first thing it would say
-// reads as a wall of speech nobody has chosen yet. Its subjects come from the dialogues the quests
-// themselves minted, so a quest written next month is held to it with no edit here.
 describe('a line a quest gives an entity', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const given = [...registry.dialogues.values()].filter(givenByQuest);
@@ -759,7 +691,6 @@ describe('every section kind', () => {
         const held = line.block?.();
         const opened = held === undefined ? [] : indentLines([held[0]!.example], 2 * (under.length + 1));
         const written = [`# ${kind} probe`, ...under.map((each, deep) => indentLines([each], 2 * deep)[0]!), ...indentLines([line.example], 2 * under.length), ...opened].join('\n');
-        // A line the engine will not take standing alone says why in the engine's own words, carried as its own note, so what the page says beside a line and what the engine says about it cannot come apart.
         const refused = ((): string | undefined => {
           try {
             owner.parse(splitSections(written)[0]!);
@@ -769,7 +700,6 @@ describe('every section kind', () => {
           }
         })();
         expect(refused === undefined || (line.note !== undefined && refused.includes(line.note)), `${written}\n\n${refused}`).toBe(true);
-        // The shape shown and the line shown are the same claim written twice, and a reader who cannot read one off the other has been told nothing.
         expect(align(line.form, line.example)?.complete, `# ${kind}: ${JSON.stringify(line.form)} does not read ${JSON.stringify(line.example)}`).toBe(true);
         checked += 1;
         if (held !== undefined) walk(held, [...under, line.example]);
@@ -791,7 +721,6 @@ describe('a second body written at an id a first body already holds', () => {
   const AUTHORED = new Map<string, object[]>();
   for (const source of CORPUS) for (const section of parseModule(source.text)) AUTHORED.set(section.kind, [...(AUTHORED.get(section.kind) ?? []), section.value]);
 
-  // Every kind whose sections land somewhere a second one could overwrite. A kind that lands nowhere is never merged, and a kind that writes no line has no body, so a second one of it says nothing the first did not.
   const MAPPED = sections().filter((each) => Object.keys(each.maps).length > 0 && each.grammar.length > 0);
 
   const same = (one: unknown, other: unknown): boolean => {
@@ -803,7 +732,6 @@ describe('a second body written at an id a first body already holds', () => {
     }
   };
 
-  // Second bodies read off the kind's own grammar, one example line at a time, so what is written here follows a kind that gains or loses a line.
   const secondBodies = (owner: Section, id: string): object[] =>
     owner.grammar.flatMap((line) => {
       const opens = line.block?.()[0]?.example;
@@ -827,7 +755,6 @@ describe('a second body written at an id a first body already holds', () => {
     const seconds = secondBodies(owner, (first as { id: string }).id);
     expect(seconds.length, `# ${kind} writes out no example line that parses on its own`).toBeGreaterThan(0);
     const answers = seconds.map((second) => {
-      // A first body at an id nothing has written yet is never refused: what a kind may refuse is the second.
       expect(() => owner.merge(undefined, structuredClone(second))).not.toThrow();
       try {
         return same(owner.merge(structuredClone(first!), structuredClone(second)), first) ? 'kept' : 'answered';

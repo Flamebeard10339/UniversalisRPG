@@ -773,8 +773,6 @@ describe('condition grammar', () => {
   });
 
   it('leaves every operator agreeing on which side of the literal a value fell', () => {
-    // Each operator said in terms of which of <, = and > a value fell under, so one added to the
-    // grammar with no word here fails the claim rather than going unweighed.
     const derived: Record<ComparisonOperator, (fell: ComparisonOperator) => boolean> = {
       '<': (fell) => fell === '<',
       '=': (fell) => fell === '=',
@@ -1005,11 +1003,6 @@ const OPS = ['', '+', '-'];
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
   const fields = schemaFields();
   const blockCapable = fields.filter(takesABlock);
-  // The claim below is that a block is the field's own line written again, one value to a line, so it
-  // is asked of the fields whose block is exactly that: a list, whose element is what a block line
-  // holds. A field whose block is a grammar of its own — a body under a keyword rather than a list
-  // under it — is not the same text written twice, and answering for it here would be answering for
-  // a question nobody asked of it.
   const oneToALine = blockCapable.filter((field) => 'element' in field.parser);
 
   it('derives its subjects by the predicate the section engine decides a block by', () => {
@@ -1093,9 +1086,6 @@ describe('a block-form line carrying more than its parser read', () => {
   });
 });
 
-// `-<line>` is offered on every line of every section — the grammar page says so under *writing over
-// a body already there* — and a keyword is a line. What a keyword takes back is the word itself, so
-// the only thing left to pin is the refusal, which no body in the corpus can be written to provoke.
 describe('a keyword written over a body already there', () => {
   const bay =
     (...lines: string[]) =>

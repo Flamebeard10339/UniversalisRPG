@@ -6,9 +6,6 @@ import { startSession, view } from '../runtime/session';
 import { settingLine, standsAt } from './settingLines';
 import { fixtureSources } from '../content/worldFixture';
 
-// The page's only decisions: which line a choice sends, and which choice is the one it stands at.
-// Its subjects are every setting the engine publishes, so a preference declared next month is
-// covered here with nothing edited.
 describe('a settings control writes what a player would have typed', () => {
   const opened = () => {
     const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);

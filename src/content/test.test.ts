@@ -224,7 +224,6 @@ describe('open-modal: raises a screen by name', () => {
     expect(bad('open-modal:')).toThrow(/unexpected line in # test/);
   });
 
-  // The set is the language's, so the words the refusal names are read off it rather than written out here.
   it('refuses a name that is no screen the engine runs, and names the ones it does', () => {
     for (const screen of MODAL_SCREENS) expect(() => parseModule(['# test opening', `open-modal: ${screen}`].join('\n')), screen).not.toThrow();
     try {

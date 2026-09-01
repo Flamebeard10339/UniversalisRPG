@@ -66,16 +66,9 @@ export function drawnBox(box: Box, bubble: Size): Frame {
   };
 }
 
-// `pan` says where the sheet's own origin is drawn, measured from the middle of the frame. The
-// origin and not the middle of whatever happens to be drawn: a frame of reference read off the
-// things on the sheet moves when any one of them moves, which is how dragging one place slid every
-// other place across the map.
 export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan: Point; scale: number } {
   const drawn = drawnBox(box, bubble);
   const middle = centreOf(box);
-  // How far the drawing may be pushed from the frame before it counts as lost: a whole width of
-  // itself. Generous on purpose — the limit is here to stop a map being shoved off the edge and
-  // never to nudge one while an author is working near it.
   return {
     scale: zoom,
     pan: {
@@ -87,22 +80,13 @@ export function settled(pan: Point, zoom: number, box: Box, bubble: Size): { pan
 
 export const panOnto = (target: Point, zoom: number): Point => ({ x: 0 - target.x * zoom, y: 0 - target.y * zoom });
 
-// How much air is left between a place and the road out of it.
 export const EDGE_GAP = 5;
 
-// Which way one point lies from another, as a step of length one — or nowhere at all, for two points
-// drawn on top of each other. The one answer to "which way does this run", so a road and the arrow on
-// it cannot come to point different ways.
 export function heading(from: Point, to: Point): Point {
   const run = Math.hypot(to.x - from.x, to.y - from.y);
   return run === 0 ? { x: 0, y: 0 } : { x: (to.x - from.x) / run, y: (to.y - from.y) / run };
 }
 
-// Where a line drawn from the middle of one box towards another leaves that box. A road runs from
-// where one place stops to where the next one starts, so what is drawn is the road rather than the
-// part of it lying under a name. Never past the halfway point: two places close enough that their
-// labels overlap meet in the middle rather than swapping ends, which is what drew a short road
-// backwards and put the arrow on it the wrong way round.
 export function leaving(from: Point, to: Point, box: Size): Point {
   const along = heading(from, to);
   if (along.x === 0 && along.y === 0) return from;
@@ -112,5 +96,4 @@ export function leaving(from: Point, to: Point, box: Size): Point {
   return { x: from.x + along.x * reach, y: from.y + along.y * reach };
 }
 
-// The point of the sheet the middle of the frame is looking at.
 export const lookingAt = (pan: Point, zoom: number): Point => ({ x: 0 - pan.x / zoom, y: 0 - pan.y / zoom });

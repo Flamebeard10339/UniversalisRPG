@@ -142,10 +142,8 @@ const MODAL_LAYER = 'Modal.tsx';
 
 const MANNER_TABLE = 'modalManner.ts';
 
-// A screen announcing itself to a reader and to everything that reads a screen.
 const A_SCREEN = /role="dialog"|aria-modal/;
 
-// What a screen costs in pixels: the ground it covers and what it does to what is under it.
 const A_LAYER = /bg-scrim|inset-0 z-50/;
 
 
@@ -189,9 +187,6 @@ describe('the rules the driver is held to', () => {
     for (const source of SOURCES) expect(source.text, source.file).not.toContain('GameState');
   });
 
-  // Subjects derived by sweeping the tree, so a screen written next month is held to both rules
-  // without anybody adding it to a list. The two are apart because they have different owners: one
-  // component draws a screen, one module decides what a manner costs in pixels.
   it('draws every screen on the one layer, so none of them decides for itself what a tap beside it does', () => {
     const layer = SOURCES.filter((source) => source.file.endsWith(`/${MODAL_LAYER}`));
     expect(layer, `nothing under src/ui is ${MODAL_LAYER}`).toHaveLength(1);
@@ -306,10 +301,6 @@ describe('the rules the driver is held to', () => {
     }
   });
 
-  // The pack has an order its owner chose and `swap:` is the directive that writes it, so the one
-  // function that moves a row lives in runtime and every surface reaches it by saying so. A screen
-  // that reordered its own copy would draw a pack that the save it came from does not hold, and it
-  // would be the second authority on where a thing sits.
   it('moves a pack row by saying so, never by ordering a copy of its own', () => {
     const ordering = SHIPPED.filter((source) => /(?:swappedOrder|inPlayerOrder|packOrder)/.test(source.text));
 

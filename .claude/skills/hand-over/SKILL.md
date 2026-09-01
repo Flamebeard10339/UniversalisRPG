@@ -33,7 +33,7 @@ paragraph kept as the artefact.
 
 **It pins the behaviour the line asks for, never the behaviour it has.** A test
 asserting the bug goes red when someone fixes it, outside a suite where nobody is
-watching, and is then a stale comment wearing a test's clothes. A test asserting
+watching, and is then a stale claim wearing a test's clothes. A test asserting
 the intent goes **green** the day the line closes, and its red output — the
 expectation beside the actual, or the step the route stopped on — is the
 reproduction, free.
@@ -84,8 +84,7 @@ overrule.
 | why it was decided, and what lost | the **commit message** |
 | what is still wrong | one of the two files above |
 
-**Never a code comment.** `CLAUDE.md`'s *Comments* section already refuses it, and
-a settled decision written beside the code is the deleted file in a worse home.
+**Never a code comment.** There are none: `npm run comment-check` is a gate.
 
 The consequence, which a lane should not have to work out for itself: **a test that
 blocks the task in hand is either the author's decision, in which case it stands, or

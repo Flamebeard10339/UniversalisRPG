@@ -116,8 +116,6 @@ const standingIn = (view: PlayView): Standing => ({ location: view.location.id, 
 
 type Reading = NonNullable<PlayView['focus']>;
 
-// What a screen that is about something has to draw it with — the view it reads the subject out of,
-// and everything a screen of its own would need to stand on the app by itself.
 interface Drawing {
   readonly view: PlayView;
   readonly words: Words;
@@ -126,16 +124,11 @@ interface Drawing {
   readonly onAnswer: (key: string, value: string) => void;
 }
 
-// A subject is read either on a surface of its own, standing in place of the ordinary sheet, or as a
-// body inside it above the question. Neither, where the view no longer carries what the focus names.
 interface FocusScreen {
   readonly instead?: JSX.Element;
   readonly beside?: JSX.Element;
 }
 
-// Keyed by the kind the view publishes rather than tested for one kind at a time, so a focus the
-// engine grows next month does not compile until the app has something to draw for it — the same
-// answer the manner table and the terminal's own lines already have to give.
 type Draws<K extends Reading['kind']> = (focus: Extract<Reading, { kind: K }>, drawing: Drawing) => FocusScreen;
 
 const FOCUS_SCREEN: { [K in Reading['kind']]: Draws<K> } = {
@@ -174,13 +167,9 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
 
   const page = shellState(where, dev, editing.commandLine);
   useEffect(() => {
-    // A page the replay walked to is the record's own, not a move the author made, so it is not
-    // recorded back — a run watched while another is recording would otherwise write itself down.
     if (snapshot.playtest !== null && snapshot.replay === null) driver.playtest.moved(`${page.layer}/${page.subpage}`);
   }, [page.layer, page.subpage, snapshot.playtest === null, snapshot.replay === null]);
 
-  // Where the run was standing at this step. The page follows the cursor exactly as the game state
-  // does, so scrubbing back walks the app back with it.
   const watched = snapshot.replay;
   const standingOn = watched === null ? null : pageAt(watched.steps, watched.at);
   useEffect(() => {
@@ -226,8 +215,6 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   };
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
-  // Turning a row is turning the set the rows were drawn from, read back off those rows so the page
-  // and the harness are asking the same question of the same answer.
   const turnMods = (names: readonly string[], on: boolean): void => driver.turnModulesOff(turned(modulesOff(snapshot.mods), names, on));
 
   useTestSurface('mods', { packs: snapshot.mods, controls: { turn: turnMods } });

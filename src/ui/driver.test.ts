@@ -42,9 +42,6 @@ const LATHE = [engineLocale(), WORKSHOP];
 
 const SPINDLE = 'use:entity.workshop.lathe.turn-a-spindle';
 
-// A small world for driver-layer mechanics (choice indexing, modal answers)
-// that any dialogue and any modal-opening entity would prove just as well —
-// so a rename of a real entity like Miki cannot break them.
 const DRIVER_MODULE = {
   name: 'proving-ground',
   text: [
@@ -131,9 +128,6 @@ describe('the GUI driver', () => {
     expect(texts(driver).slice(before)).toEqual(shown(driver).said);
   });
 
-  // What a darkened screen draws above its choices is what the view it covers came with, and a screen
-  // the player opened for themselves came with nothing. The subjects are read off the shipped view —
-  // whatever it offers to look at, whatever quest it lists first — so neither is a name here.
   it('hands a screen the player opened no words, however much was said before it', () => {
     const driver = createDriver(fixtureSources());
     const examine = shown(driver).choices.find((choice) => choice.id.endsWith('.examine'))!;
@@ -146,17 +140,9 @@ describe('the GUI driver', () => {
     expect(shown(driver).said).toEqual([]);
   });
 
-  // The same claim of every screen the player opens for themselves, its subjects derived from what
-  // the shipped world puts in their hands and on their sheet rather than named here. What the app
-  // draws above a screen can no longer be anything but this: `Modal`'s `spoken` takes the view's own
-  // `Localized` lines, which the transcript's entries are not, so the guess that drew the tail of the
-  // chat over the item screen is refused by the compiler and not only by a test.
   it('hands every screen a player opens no words, whichever door they opened it by', () => {
     const driver = createDriver(fixtureSources());
-    // A pack with something in it, which is the one of the three doors a fresh session cannot open.
     driver.send('/dev on');
-    // A sheet with something in the pack, found rather than named: the pack is the one of the three
-    // doors a fresh session cannot open.
     driver.send(`/load ${carrying(loadUniverseWithDiagnostics(fixtureSources()).registry)}`);
     const opening: Array<[string, () => void]> = [
       ['quest-journal', () => driver.readQuest(shown(driver).journal[0]!.quest)],
@@ -346,12 +332,9 @@ const said = (driver: Driver): string[] => driver.snapshot().transcript.entries.
 
 const { MOVED_PLACE, MOVED_TO, MOVED_TO_FIELDS, MOVE_LINE } = mapFixtureFor(fixtureSources());
 
-// Every module that writes a section at this address, in the order the world loads them — a place a
-// second module adds an action to is written in two, and which two is a fact about the world.
 const writtenIn = (address: string): string[] =>
   fixtureSources().flatMap((source) => (new RegExp(`^# location (?:${address}|${address.split('.')[1]})\\b`, 'm').test(source.text) ? [source.name] : []));
 
-// A sheet that leaves the player carrying something, read off the world rather than named.
 const carrying = (registry: ReturnType<typeof loadUniverseWithDiagnostics>['registry']): string =>
   [...registry.saves.entries()].find(([, save]) => Object.keys((save.diff.inventory ?? {}) as Record<string, number>).length > 0)![0];
 
@@ -386,8 +369,6 @@ describe('the browser authors through the same door (c1, c9, c13, c16)', () => {
     reopened.send('/local list');
 
     expect(shown(reopened).discovered.find((place) => place.id === MOVED_PLACE)).toMatchObject(MOVED_TO);
-    // Which modules write the place is the world's business and not this claim's: what is being
-    // asked is that the second driver sees the staged edit and says where the place is also written.
     const also = writtenIn(MOVED_PLACE);
     expect(sourceLines(reopened)).toEqual([`# location ${MOVED_PLACE} — also in ${also.join(', ')}`, ...sourceLines(first)]);
     expect(reopened.localChanges()).toBe(first.localChanges());

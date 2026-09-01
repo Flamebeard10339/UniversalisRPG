@@ -16,7 +16,6 @@ const MODULE =
 
 const registry: Registry = loadInEnglish(MODULE);
 
-// Two quests left by nothing but a `done when:`, and a third pair each of which waits on the other.
 const QUESTS =
   FIXTURE_WORLD +
   `
@@ -87,8 +86,6 @@ describe('highest-level is a bound on any one skill', () => {
     expect(holds('highest-level >= 2', createGameState('camp'))).toBe(false);
   });
 
-  // The whole of why this root exists rather than a disjunction an author writes out: a skill the world
-  // gains after the condition was written is one the condition already counts.
   it('counts a skill the module asking about it never named', () => {
     expect(holds('highest-level >= 2', practised({ 'a-skill-written-next-month': xpForLevel(2) }))).toBe(true);
   });

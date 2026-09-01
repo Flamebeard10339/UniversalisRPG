@@ -19,7 +19,6 @@ import { Localized, Localizer, localizerOf } from './localized';
 import { emptyPlayerSheet, PLAYER, PLAYER_FIELDS, templateOf } from './state';
 import { isSettingName, isSettingSheet, standingChoice, standingSettings, type SettingSheet } from './settings';
 
-// Bumped on any shape change; there is no migration path, so a stale save is rejected.
 export const SAVE_VERSION = 13;
 
 export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'engagedBy' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'debug'>;
@@ -33,16 +32,8 @@ interface RecordPrune {
 
 type Prune = RecordPrune | 'pruned by a rule of its own' | 'holds no registry id';
 
-// Rewriting every minted id this field names, given what each is now called. A composition whose
-// layers each minted copies renumbers all but the first of them, and these answers are the whole of
-// where that renumbering reaches.
 type Renaming = (id: string) => string;
 
-// Where a copy the engine minted can be named in this field. There is no shape that says which
-// fields those are: `equipped` and `packOrder` hold a bare id, `activeAction` holds one inside an
-// `item.<id>` reference, and `inventory` — which is also keyed by item — never holds one at all,
-// because a grown copy is a row of its own. So the field answers for itself and `tsc` makes a field
-// added next month answer too.
 type Minted = 'the table the ids are keys of' | 'names no minted copy' | { rename(value: unknown, renamed: Renaming): unknown };
 
 interface SaveFieldRule {
@@ -51,11 +42,6 @@ interface SaveFieldRule {
   sparsest: unknown;
   prune: Prune;
   minted: Minted;
-  // Whether a `# test`'s `expect:` compares this field. A corpus test asks whether a path is still
-  // walkable and nothing else, so what the player did is compared and what the numbers came to is
-  // not: a balance pass moves xp, pools, the clock, the rng cursor, what the loot rolled and how
-  // far into a swing the fight had got, and none of that is the question the test asked. Written
-  // here, on the field, so the filter derives itself and a field added next month has to answer.
   walked: boolean;
 }
 
@@ -96,9 +82,6 @@ const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(val
 
 const isPlayer = (value: unknown): boolean => PLAYER_FIELDS.every((field) => at(value, field, isText));
 
-// A reference is either the id itself or the `<obj>.<id>` an action's owner and its roster seats are
-// written as, and `parseOwnerRef` is what reads the second — so this asks the same question of both
-// halves rather than knowing which half it was handed.
 const renamedRef = (ref: string, renamed: Renaming): string => {
   const { obj, objId } = parseOwnerRef(ref);
   return obj === '' ? renamed(ref) : ownerRef(obj, renamed(objId));
@@ -151,7 +134,6 @@ function fieldsOfShape(shape: 'record' | 'scalar'): SaveField[] {
 }
 
 const RECORD_FIELDS = fieldsOfShape('record');
-// The fields a walked path is made of. `expect:` compares these and is blind to the rest.
 const WALKED_FIELDS = new Set(SAVE_FIELD_NAMES.filter((field) => SAVE_FIELDS[field].walked));
 const SCALAR_FIELDS = fieldsOfShape('scalar');
 const RECORD_PRUNES = SAVE_FIELD_NAMES.map((field) => [field, SAVE_FIELDS[field].prune] as const).filter((entry): entry is [SaveField, RecordPrune] => typeof entry[1] !== 'string');
@@ -160,7 +142,6 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-// A key a record does not hold and a key it holds at its sparsest value are the same holding, so a save body says neither: a fixture listing an item at count zero reads as holdings the player does not have.
 const held = (record: Record<string, unknown>, key: string, sparsest: unknown): unknown => record[key] ?? sparsest;
 
 function diffRecord(field: SaveField, state: Record<string, unknown>, baseline: Record<string, unknown>): Record<string, unknown> | undefined {
@@ -229,9 +210,6 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   warnings.push(...pruneInstances(state, registry));
   warnings.push(...prunePopulations(state, registry));
 
-  // Where the player put a thing they no longer have is not a holding and is not worth a word: the
-  // order is settled against the pack every time one is rearranged anyway, and a name left in it
-  // draws nothing.
   state.packOrder = state.packOrder.filter((key) => registry.items.has(key) || key in state.instances.byId);
 
   if (state.location && !registry.locations.has(state.location)) {
@@ -290,9 +268,6 @@ export function pruneStateForRegistry(state: GameState, registry: Registry): Pru
   return warnings;
 }
 
-// A run is played by the settings it offers and no others: a name the engine has stopped declaring
-// goes, and a value it has stopped offering goes back to where the setting stands. Both are said, in
-// the save-key vocabulary the rest of a prune is written in.
 function settledSettings(held: SettingSheet, warnings: PruneWarning[], localizer: Localizer): SettingSheet {
   const settled = standingSettings();
   for (const [name, value] of Object.entries(held)) {
@@ -356,10 +331,6 @@ function checkSave(saved: ParsedSave): void {
   }
 }
 
-// The one field a save writes whose keys the engine mints rather than an author writing them, and
-// which the rest of a save points into. Every run mints from the same counter, so a copy in one
-// layer and a copy in another are the same id, and a composition of two such layers renumbers all
-// but the first — reaching wherever each field's `minted:` says it names one.
 const MINTS_IDS: SaveField = 'instances';
 
 const tableIn = (diff: Record<string, unknown>): InstanceTable | undefined => diff[MINTS_IDS] as InstanceTable | undefined;
@@ -368,8 +339,6 @@ const copyIdsIn = (diff: Record<string, unknown>): string[] => Object.keys(table
 
 const mintsCopies = (diff: Record<string, unknown>): boolean => copyIdsIn(diff).length > 0;
 
-// Ascending as numbers rather than as text, so ten follows nine and the ids a layer keeps read in
-// the order they were minted in.
 const inMintedOrder = (ids: readonly string[]): string[] => [...ids].sort((a, b) => Number(a) - Number(b));
 
 function renamedDiff(diff: Record<string, unknown>, renamed: Renaming): Record<string, unknown> {
@@ -386,10 +355,6 @@ function renamedDiff(diff: Record<string, unknown>, renamed: Renaming): Record<s
   return out;
 }
 
-// Every layer that minted copies after the first is dealt fresh ids continuing from the ones already
-// handed out, and its own body is rewritten to call them by their new names. The first keeps the ids
-// it was written with, so a composition of one minting layer -- which every save in the corpus is --
-// is left exactly as it was.
 function renumbered(layers: readonly SaveLayer[]): SaveLayer[] {
   if (layers.filter((layer) => mintsCopies(layer.saved.diff)).length < 2) return [...layers];
   let next = 1;
@@ -401,10 +366,6 @@ function renumbered(layers: readonly SaveLayer[]): SaveLayer[] {
   });
 }
 
-// The table itself is the one field composed by neither of the two rules below: it is written as a
-// scalar and a last-writer-wins would drop the copies every layer beneath the top one holds. So the
-// tables are merged, which renumbering has already made safe by leaving their keys disjoint, and the
-// counter stands one past the highest id handed out.
 function composedTable(layers: readonly SaveLayer[]): InstanceTable | undefined {
   const tables = layers.flatMap((layer) => { const table = tableIn(layer.saved.diff); return table ? [table] : []; });
   if (tables.length === 0) return undefined;
@@ -412,8 +373,6 @@ function composedTable(layers: readonly SaveLayer[]): InstanceTable | undefined 
   return { next: Math.max(...tables.map((table) => table.next), ...Object.keys(byId).map((id) => Number(id) + 1)), byId };
 }
 
-// The name a layer is reported under where a composition is refused. The save being loaded may have
-// come off a slot or a byte stream rather than out of the registry, so it answers for itself.
 const OWN_BODY = 'its own body';
 
 interface SaveLayer {
@@ -433,10 +392,6 @@ function layersOf(saved: ParsedSave, registry: Registry, name: string, under: re
   return layers;
 }
 
-// One diff out of the layers, by the rules `loadSave` lays a single diff over the initial state with:
-// a record takes the keys every layer writes, and anything else is taken from the last layer that
-// writes it. The fields come off SAVE_FIELDS, so a field declared next month layers by its own shape
-// with nothing here to remember.
 function composedDiff(under: readonly SaveLayer[]): Record<string, unknown> {
   const layers = renumbered(under);
   const diff: Record<string, unknown> = {};
@@ -452,8 +407,6 @@ function composedDiff(under: readonly SaveLayer[]): Record<string, unknown> {
   return diff;
 }
 
-// What a save says once the ones it is written over are laid down beneath it. Every layer answers to
-// `checkSave` on its own, so the field a body got wrong is named where it was written.
 function resolveSave(saved: ParsedSave, registry: Registry, name = OWN_BODY): ParsedSave {
   const layers = layersOf(saved, registry, name, [name]);
   for (const layer of layers) checkSave(layer.saved);
@@ -516,7 +469,6 @@ export function compareSave(state: GameState, saved: ParsedSave, registry: Regis
   return diffs;
 }
 
-// Only the keys a save names are compared: a field or record key the save is silent on holds whatever the live state gives it, unchecked.
 export function compareSaveOnly(state: GameState, saved: ParsedSave, registry: Registry): string[] {
   const expected = resolveSave(saved, registry).diff;
   const diffs: string[] = [];

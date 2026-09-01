@@ -5,10 +5,6 @@ import { readContent, type ContentFile } from './lib/saveFixtures';
 import type { Change, Heading, RenameHistory } from './lib/renameHistory';
 import { repair } from './repair-saves';
 
-// No test here runs git: the tool is handed a `RenameHistory` and the one that shells out is
-// `gitHistory.ts`, which holds no reasoning to prove. Nor does any read a line of `content/` — the
-// world below is written out here, and the one real corpus it stands beside is the fixture's.
-
 const ISLAND = 'island.dsl';
 
 const heading = (kind: string, id: string, title?: string): Heading => ({ file: ISLAND, kind, id, ...(title === undefined ? {} : { title }) });
@@ -56,8 +52,6 @@ const files = (...pairs: [string, string][]): ContentFile[] => pairs.map(([file,
 
 const rotted = (carried: string = stamped(CARRIES_A_GHOST)): ContentFile[] => files([ISLAND, island(carried)]);
 
-// `probe-island.old-coin` is what the body names and `probe-island.coin` is what the world declares,
-// so this is the rename that puts the recording back on its feet.
 const knows = history(RENAMED_COIN);
 
 const said = (report: { lines: string[] }): string => report.lines.join('\n');

@@ -82,9 +82,6 @@ export function carriesItem(state: GameState, id: string): boolean {
   return copiesOf(state, id).stack > 0;
 }
 
-// Every copy the player has falls in exactly one of these: a depth of the stack, a grown copy
-// wherever it is standing, or a plain one on the body. `grown` counts a worn one too, because what
-// makes a grown copy unspendable is the plane on it and not where it is being kept.
 export interface Copies {
   stack: number;
   grown: number;
@@ -116,10 +113,6 @@ export function copiesOf(state: GameState, itemId: string): Copies {
   return itemCopies(state).get(itemId) ?? NO_COPIES;
 }
 
-// A grown copy is a thing in its own right rather than a unit of anything, so it is never handed
-// over by name. A plain one is, wherever it is being kept: what is worn comes off to pay a cost the
-// pack alone cannot, which is the count `handOver` moves and the only count anything parting with an
-// item may ask for.
 export function spendable(copies: Copies): number {
   return copies.stack + copies.worn;
 }
@@ -133,9 +126,6 @@ export function heldCount(state: GameState, itemId: string): number {
   return stack + grown + worn;
 }
 
-// What the player is wearing is on them rather than in the pack, which is why the sheet draws worn
-// gear under a heading of its own and nothing here counts it. The rows come back in the order the
-// player has put their pack in.
 export function packRows(state: GameState): PackRow[] {
   const rows: PackRow[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
@@ -147,8 +137,6 @@ export function packRows(state: GameState): PackRow[] {
   return inPlayerOrder(rows, state.packOrder);
 }
 
-// How many of one item are in the pack, read off the rows rather than counted again beside them, so
-// whatever those rows come to hold is what this comes to count.
 export function packedCount(state: GameState, itemId: string): number {
   return packRows(state).reduce((total, row) => (row.template === itemId ? total + (row.kind === 'stack' ? row.count : 1) : total), 0);
 }
@@ -158,9 +146,6 @@ export function packHasRoom(state: GameState, registry: Registry): boolean {
   return slots === 0 || packRows(state).length < slots;
 }
 
-// Whether something landing in the pack has anywhere to land: a plain item joins the stack it
-// already has and needs no row, and anything else — a first copy, or a grown one, which never joins
-// a stack — needs one of its own.
 export function roomToPack(state: GameState, registry: Registry, id: string): boolean {
   if (!isGrownCopy(state, id) && copiesOf(state, id).stack > 0) return true;
   return packHasRoom(state, registry);
@@ -173,8 +158,6 @@ export function packFull(state: GameState, registry: Registry, itemId: string): 
   return refused;
 }
 
-// The one writer of the stack. Neither door below reaches it without having answered for what it
-// moves, and no third door exists.
 function writeStack(state: GameState, itemId: string, delta: number): number {
   const before = copiesOf(state, itemId).stack;
   const after = Math.max(0, before + delta);
@@ -182,11 +165,6 @@ function writeStack(state: GameState, itemId: string, delta: number): number {
   return after - before;
 }
 
-// The one arrival, so the one place an arrival can be turned away and the one place a base is
-// rolled: a stack that is already open takes any depth, and a first copy needs a row the pack may
-// not have. A base never joins a stack — the roll it arrives with is what makes two of them
-// different — so each one asks for a row of its own. Nothing is lost silently: what could not
-// arrive is said in the log, and the caller reads the count that moved.
 export function receiveItem(state: GameState, registry: Registry, itemId: string, count: number): number {
   if (count <= 0) return 0;
   const item = registry.items.get(itemId);
@@ -211,14 +189,7 @@ export function mintBase(state: GameState, item: Item): ItemInstance {
   return { roll: nextRandom(state), plane: basePlane(item, nextRandom(state))! };
 }
 
-// What `canHandOver` answered with, and the only thing `handOver` takes. Its constructor is private
-// to this class, so nothing anywhere else can make one and no departure from the pack can be
-// written that has not first asked whether the player can part with what it names. That is the
-// whole of the guarantee: the check is not a convention a caller has to remember, it is how the
-// write is spelled.
 export class HandOver {
-  // What it holds is private and its constructor is private with it, which is the whole of why an
-  // object of the same shape is not one and no caller can write itself the answer.
   private constructor(private readonly parting: { readonly item: string; readonly count: number }) {}
 
   static asked(state: GameState, itemId: string, count: number): HandOver | undefined {
@@ -235,16 +206,12 @@ export class HandOver {
   }
 }
 
-// The stack goes first and the body only for what the stack could not cover, so wearing the last one
-// is what it costs to keep it and never a way of losing it early.
 export function handOver(state: GameState, parting: HandOver): number {
   let gone = -writeStack(state, parting.item, -parting.count);
   while (gone < parting.count && destroyItem(state, parting.item).ok) gone += 1;
   return gone;
 }
 
-// What the player is holding, in the terms a change to it would have to move. Compared against what
-// they were last told, it is what makes `inventory-changed` news exactly once.
 export function heldSignature(state: GameState): string {
   const stacks = Object.entries(state.inventory).filter(([, count]) => count > 0);
   return JSON.stringify([stacks.sort(), Object.entries(grownItems(state)).sort(), Object.entries(state.equipped).sort()]);
@@ -296,10 +263,6 @@ export function destroyItem(state: GameState, id: string): Destruction {
   return { ok: true, item: template };
 }
 
-// Everything the player has, parted with through the doors that already exist: a stack leaves as one
-// hand-over it has been asked for, and a grown copy and a worn one each go whole the way the
-// inventory screen's own destroy does. Nothing here writes the stack itself, and the count it
-// answers with is how many holdings left.
 export function stripHoldings(state: GameState): number {
   let gone = 0;
   for (const row of packRows(state)) {
@@ -332,15 +295,11 @@ interface Growing {
   change(payload: ItemInstance, item: Item): Said | undefined;
 }
 
-// Every caller below has already been refused if the copy is not there, so the answer is never
-// undefined here — and it still has to be held before the stack can be written.
 const take = (state: GameState, itemId: string): void => {
   const parting = HandOver.asked(state, itemId, 1);
   if (parting) handOver(state, parting);
 };
 
-// A base is minted where it arrives, so everything below grows a copy that already stands: there is
-// no stack to lift one out of and no plane to invent on the way.
 export function growItem(state: GameState, registry: Registry, growing: Growing): Growth {
   const { target, consumes } = growing;
   const copy = named(state, target);
@@ -382,6 +341,4 @@ export function unallocate(state: GameState, registry: Registry, target: string,
   });
 }
 
-// What a player who has been told nothing has been told: they carry nothing, which is where every
-// state starts.
 export const NOTHING_HELD = heldSignature(createGameState());

@@ -137,9 +137,6 @@ describe('a grown copy is never spent', () => {
   });
 });
 
-// The other half of the rule above, and the reason it is about the plane rather than about the
-// slot: a plain thing on the body is held like anything else, so a cost the pack cannot cover takes
-// it off rather than turning the player away over something they are carrying.
 describe('a plain copy is spent wherever it is being kept', () => {
   it('pays a cost out of the slot when the pack holds none, and the slot is empty after', () => {
     const session = startSession(registry);

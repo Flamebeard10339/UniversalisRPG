@@ -48,11 +48,6 @@ export const FALLBACK_SOURCE: ModuleSource = {
   ].join('\n'),
 };
 
-// What the session handed back is standing on. A live slot with nothing in it is a new game and the
-// session is that slot's from here on; a slot holding a game this build can read is picked back up,
-// which is what makes closing the tab cost nothing. A slot holding one it cannot read is neither:
-// the game is new, the slot stays the player's — nothing will autosave over it — and `why` is what
-// they are told rather than losing it in silence.
 export type Resumption =
   | { readonly kind: 'new' }
   | { readonly kind: 'resumed'; readonly slot: Answer; readonly pruned: readonly PruneWarning[] }
@@ -61,8 +56,6 @@ export type Resumption =
 export interface OpenedUniverse {
   session: PlaySession;
   modules: readonly Answer[];
-  // Every module the load path was handed, whether it loaded or not, and why. What the mod portal
-  // draws its rows off, so a module added or a pack renamed reaches the page with nothing edited.
   statuses: readonly ModuleStatus[];
   problems: readonly UniverseProblem[];
   unmet: readonly RequirementId[];

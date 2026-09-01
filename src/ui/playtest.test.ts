@@ -42,8 +42,6 @@ describe('what the feedback sheet is about', () => {
     expect(feedbackOn([played(1, 'talk:miki', { note: 'asking again' })])?.held.note).toBe('asking again');
   });
 
-  // The sheet and the model's reply schema are one list. A field added to the run log arrives on
-  // the sheet with nothing edited here, and this is what says so.
   it('asks for every field a recorded turn carries, and for nothing else', () => {
     const about = feedbackOn([played(1, 'talk:miki')]);
     expect(Object.keys(about?.held ?? {}).sort()).toEqual(NOTE_FIELDS.map((field) => field.name).sort());
@@ -85,8 +83,6 @@ describe('the recorder', () => {
     ]);
   });
 
-  // The author is looking at the screen the words were said on. The model is not, so its own
-  // harness still records them and `turnRecord` tells the two apart by what it is handed.
   it('leaves the answer out entirely, where the playbot would have said nothing happened', () => {
     const { record } = recorder();
     record.start(NEW_GAME);
@@ -96,9 +92,6 @@ describe('the recorder', () => {
     expect(describeEntry(turnRecord(1, '/cancel', 'applied', ['cancel'], []))).toContain('result: nothing happened');
   });
 
-  // A player who begins something and stands there has taken one turn, and what that turn was made
-  // of is the beginning and the standing. Recorded as the beginning alone, a run replays as somebody
-  // who armed a loop and walked away from it.
   it('settles a run that came off the clock onto the turn that began it', () => {
     const { record } = recorder();
     record.start(NEW_GAME);
@@ -175,8 +168,6 @@ describe('the recorder', () => {
   });
 });
 
-// The deliverable, end to end and through the driver rather than the DOM: an author plays, says
-// what they thought, and what comes out is the `# test` that replays what they did.
 describe('a run an author played in the app', () => {
   const WORKSHOP = {
     name: 'workshop',
@@ -222,7 +213,6 @@ describe('a run an author played in the app', () => {
     driver.send('travel:nowhere-at-all');
 
     const [saved, run] = driver.playtest.written().split('\n\n');
-    // The save the run walks forward from, so the replay begins where the author pressed start.
     expect(saved.split('\n')[0]).toBe(`# save ${runId(PLAYED.at)}-start`);
     expect(JSON.parse(saved.split('\n')[1])).toHaveProperty('version');
 
@@ -230,13 +220,9 @@ describe('a run an author played in the app', () => {
     expect(heading).toBe(`# test ${runId(PLAYED.at)}`);
     expect(from).toBe(`load: ${runId(PLAYED.at)}-start`);
     expect(said).toMatch(new RegExp(`^note: played ${PLAYED.at} against \\S+$`));
-    // A line the engine refused settled into no directive, so the record writes what was tried and
-    // marks it refused — which is the whole of what makes a failed run replayable.
     expect(turns).toEqual(['use: entity.workshop.lathe.examine', 'travel: nowhere-at-all', 'refused']);
   });
 
-  // The whole of why a run is written this way: what the author did comes back as something the
-  // engine will do again, refusals and all.
   it('replays through the engine, including the turn that was refused', () => {
     const driver = playing();
     driver.playtest.start();
@@ -270,7 +256,6 @@ describe('a run an author played in the app', () => {
     expect(driver.playtest.written().split('\n')).not.toContain('1');
   });
 
-  // The deliverable the owner asked for: stop recording, reload, run through what you just did.
   it('lands in the game when the author stops it, so a reload finds the run in the registry', () => {
     const slots = memoryDriver();
     const driver = playingWith(slots);
@@ -283,7 +268,6 @@ describe('a run an author played in the app', () => {
     expect(filing.at).toBe(qualify(LOCAL_CHANGES_MODULE_ID, runId(PLAYED.at)));
     expect(driver.localChanges()).toContain(`# save ${startSaveId(runId(PLAYED.at))}`);
     expect(driver.localChanges()).toContain(`# test ${runId(PLAYED.at)}`);
-    // Only a filed run clears the slot, and this one filed.
     expect(driver.snapshot().playtest).toBeNull();
 
     const holds = (each: Driver): boolean => each.declared().some((declared) => declared.kind === 'test' && declared.address === filing.at);
@@ -294,8 +278,6 @@ describe('a run an author played in the app', () => {
   it('refuses a run the game could not be left holding, says why, and goes on recording it', () => {
     const driver = playingWith(memoryDriver());
     driver.playtest.start();
-    // A refused line is written as what was tried, so a run that reached for a location nobody
-    // declared is a run whose `# test` names one — and the module would not load with it in.
     driver.send('travel:nowhere-at-all');
 
     const filing = driver.playtest.stop();
@@ -331,9 +313,6 @@ describe('a run an author played in the app', () => {
   });
 });
 
-// The loop closing: an author plays, stops, and watches back what they just did. The tick that
-// paces a running replay is the author's to look at; what is proved here is that the cursor puts
-// the world where the record says it was.
 describe('watching a filed run back', () => {
   const WORKSHOP = {
     name: 'workshop',
@@ -373,8 +352,6 @@ describe('watching a filed run back', () => {
     expect(driver.snapshot().view.location.id).toBe('workshop.yard');
   });
 
-  // Scrubbing back walks forward from nothing rather than undoing anything, so the world at a step
-  // is the same world however the cursor arrived there.
   it('lands in the same world scrubbing back to a step as walking to it', () => {
     const driver = played();
     driver.replay.watching(filed);

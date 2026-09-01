@@ -8,9 +8,6 @@ import { useTestSurface } from './useTestSurface';
 
 const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
 
-// The raised panel a screen puts its words and its controls on. Every screen that is not the whole
-// surface is one or more of these, so the corners, the border and the width a column of text stops
-// at are settled once.
 export function ModalCard({ subject, title, children }: { subject?: string; title?: ReactNode; children: ReactNode }): JSX.Element {
   const risen = useMoment('rise', true, subject);
 
@@ -24,13 +21,6 @@ export function ModalCard({ subject, title, children }: { subject?: string; titl
 
 const SAID = `whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`;
 
-// The words the screen is answering, which the scrim behind it has taken away. Drawn in the voice
-// they were said in, so a line reads the same whether it is in the history or in front of it. This
-// is the one place the words are paced: the history behind the scrim is a record and comes to rest
-// at the line the turn began on, which is a line nobody has read yet if it is still arriving.
-//
-// The reading is state and not a delay handed to the stylesheet, because a reader who asked for less
-// motion is handed no animation at all and would have been handed the whole beat at once.
 function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean }): JSX.Element | null {
   const [reading, setReading] = useState(OPENS);
   const motionless = useMotionless();
@@ -72,9 +62,6 @@ function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean })
   );
 }
 
-// The one layer every screen in the app is drawn on. What it does with the surface it is over is the
-// manner the screen declared and nothing this decides; what a tap beside it does is whether the
-// screen published a way out, and nothing else may answer that.
 export function Modal({
   manner,
   asksNothing = false,
@@ -107,8 +94,6 @@ export function Modal({
       className={`${darkened} ${layerOf(held)}`}
     >
       {about}
-      {/* Keyed on the words, because a beat is read once: the same slot holding something else is a
-          new beat and one that never remounts would open where the last one was left. */}
       {showsTheBeat(held) ? <Beat key={spoken.join('\n')} lines={spoken} paced={paced} /> : null}
       {children}
     </div>

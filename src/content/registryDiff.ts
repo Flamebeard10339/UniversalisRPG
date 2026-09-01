@@ -15,12 +15,10 @@ function stable(value: unknown): unknown {
   return value;
 }
 
-// What the caller expects the ids in `before` to have been written as by the time `after` was built. The default is that nothing was rewritten, which is what asks whether two registries are the same universe.
 export type Rewriting = (text: string) => string;
 
 const asWritten = (text: string): string => text;
 
-// Applied before stabilising rather than after, because an id standing as an object key sorts under its new spelling: a rewrite over already-sorted text would leave the two sides ordered differently and every save that names a moved id would read as changed.
 const rewritten = (rewrite: Rewriting, value: unknown): unknown => (rewrite === asWritten ? value : JSON.parse(rewrite(JSON.stringify(value ?? null))));
 
 export const sameValue = (a: unknown, b: unknown, rewrite: Rewriting = asWritten): boolean =>

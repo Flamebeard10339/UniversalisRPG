@@ -161,10 +161,6 @@ describe('moving a section between modules', () => {
   });
 });
 
-// Two forms an id takes only once the loader has folded it into a value: a condition
-// holds its reference split into segments, and a line the game says is keyed under the
-// module that declared the thing saying it. Neither is written that way in any file, so
-// the move below can only come out clean if the proof knows about both.
 describe('an id inside a value', () => {
   it('is written under the new module where a condition holds it split into segments', () => {
     const rewrite = rewritingOf('probe-island', 'probe-town', [parseHeading('flag:lit')]);

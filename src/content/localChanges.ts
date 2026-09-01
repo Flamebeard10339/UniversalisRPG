@@ -102,9 +102,6 @@ function headerFor(source: string, modules: readonly string[]): string[] {
   return [`# info ${LOCAL_CHANGES_MODULE_ID}`, ...kept.slice(1, at), ...dependencyLines(merged), ...kept.slice(at)];
 }
 
-// A blank line between one section and the next. Nothing in the language needs it, and a reader
-// does: a file of one-line patches runs together into a wall without it, and reading local changes
-// is the whole of what they are for.
 function withBody(source: string, modules: readonly string[], sections: readonly LocalSection[]): string {
   const body = sections.map((section) => section.text.trim()).filter(Boolean);
   return [...headerFor(source, modules), '', ...body.flatMap((section, at) => (at === 0 ? [section] : ['', section]))].join('\n').trimEnd() + '\n';

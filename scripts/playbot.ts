@@ -20,10 +20,6 @@ import { formatFocus, formatOutput, printed } from './lib/replLines';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
 
-// A mode is one declaration and nothing else: the framing it plays under, which of the command
-// line's audiences it may run, and whether it is turned loose on the world or handed a job. The
-// vocabulary its prompt lists and the lines its replies may carry are both read off `audiences`,
-// so a mode cannot offer a command it would then refuse, or refuse one it offered.
 export interface PlaybotModeSpec {
   readonly framing: string;
   readonly audiences: readonly CommandAudience[];
@@ -48,8 +44,6 @@ function commandLine(spec: CommandSpec): string {
   return `- ${label} — ${spec.summary}`;
 }
 
-// Read off COMMANDS rather than written out, so a command's audience is the one place that
-// decides both what /help lists for an author and what this block tells the model exists.
 function vocabularyBlock(mode: PlaybotModeSpec): string {
   return vocabulary(mode).map(commandLine).join('\n');
 }
@@ -206,8 +200,6 @@ export interface TurnUsage {
 
 export interface ModelClient {
   send(request: TurnRequest): Promise<unknown>;
-  // What the last send billed, when the client is one that knows. A fake does not, and c2 keeps
-  // every test on a fake, so this is how a live run answers the half of c5 the suite cannot.
   lastUsage?(): TurnUsage | null;
 }
 
@@ -223,7 +215,6 @@ function renderEquipment(v: PlayView): string[] {
   return v.equipment.map((row) => (row.name === null ? String(row.title) : `${row.title}: ${row.name}`));
 }
 
-// One line to a quest, the way a person glancing at a shelf of notebooks gets the spines. The whole of what any of them says is what /quests answers with, which is where a terminal player reads it too.
 function renderJournal(v: PlayView): string[] {
   return v.journal.map((entry) => {
     const standing = standingLine(entry);
@@ -235,25 +226,16 @@ function renderDiscovered(v: PlayView): string[] {
   return v.discovered.map((each) => `${each.title}${each.adjacent.length === 0 ? '' : ` → ${each.adjacent.filter((edge) => edge.open).map((edge) => edge.to).join(' ')}`}`);
 }
 
-// A location holds a count of its kind and not a roster, so the foe standing after a kill wears the
-// id of the one that fell. Saying how many of its kind are left is what tells a player it is a new
-// one at full health rather than the old one healing — two runs reported that as a broken fight.
 function renderEncounter(v: PlayView): string[] {
   return v.encounter === null ? [] : v.encounter.foes.map((foe) => `${foe.title} ${foe.current}/${foe.max}${foe.remaining === null ? '' : ` (${foe.remaining} of its kind still standing here)`}`);
 }
 
-// The view decides which of an action's figures mean anything: `completion` arrives as null when
-// there is no such reading to give, and this says nothing rather than inventing one. Reading it as
-// a done-fraction had every turn of a fight printing "100% done" at a player who had just started.
 function renderAction(action: NonNullable<PlayView['action']>): string[] {
   const counted = action.completion === null ? [] : [`${Math.round(action.completion * 100)}% of this cycle still to count`];
   const named = action.detail === undefined ? String(action.label) : `${action.label} · ${action.detail}`;
   return [[named, `${action.attempts} attempts this cycle`, `${Math.round(action.progress * 100)}% through the next`, ...counted].join(', ')];
 }
 
-// Every line of a turn is labelled with the name the view itself gives the field, so that the
-// claim in scripts/playbot.test.ts can read what must appear off a live view rather than off a
-// second list of labels that would drift from it.
 function labelled(field: keyof PlayView, held: readonly string[]): string[] {
   return held.length === 0 ? [] : [`${field}: ${held.join(', ')}`];
 }
@@ -278,25 +260,14 @@ export function renderView(v: PlayView, localizer: Localizer): string {
 
   const asking = askedOption(v.modals);
   if (asking) {
-    // What the open screen is reading, where it is about something drawn beside the question
-    // rather than in it — a quest's own notebook page, a jewel plane. Drawn through the same
-    // function scripts/play-cli.ts draws it with, so a screen a player can read cannot be one
-    // this player reaches and finds blank.
     parts.push(...formatFocus(v, localizer).map(printed));
     parts.push(`open screen: ${v.modals[v.modals.length - 1].name} — ${String(asking.label)}, answered as ${asking.key}:`);
     if (asking.values) for (const choice of asking.values) parts.push(`  value=${choice.value} :: ${String(choice.shown)}`);
     else parts.push('  value=<free text>');
   } else if (v.choices.length > 0) {
-    // The same cut the app's sheet and the terminal's numbered list take: what is here and what is
-    // one step out. A player reads the rest off /map, and so does this one — a bot shown every
-    // discovered room is not playing the game a person plays, and a town of any size would spend
-    // most of a turn's context listing roads.
     const sheet = sheetOffers(v);
     if (sheet.length > 0) {
       parts.push('choices:');
-      // What the choice is offered by, which the terminal draws beside the label through
-      // `engine.repl.choice.owned`. Without it three things standing here that can each be looked at
-      // read as `Look`, `Look`, `Look`, told apart only by an id the model has to parse.
       for (const choice of sheet) parts.push(`  id=${choice.id} :: ${choice.detail === undefined ? '' : `${String(choice.detail)}: `}${String(choice.label)}`);
     }
     const further = v.choices.length - sheet.length;
@@ -326,18 +297,11 @@ export function commandIn(line: string): CommandSpec | undefined {
   return token === undefined ? undefined : findCommand(token);
 }
 
-// A command whose audience this mode does not run is not in the vocabulary its prompt offered, so
-// a line naming one is refused here rather than handed to runLine — the one place that
-// classification has to make a behavioural difference, not just a prompt-text one.
 function offMenuCommand(mode: PlaybotModeSpec, line: string): CommandSpec | undefined {
   const spec = commandIn(line);
   return spec && !mode.audiences.includes(spec.audience) ? spec : undefined;
 }
 
-// The first read is the thing this run produces that nothing else can, and a bot that may edit will
-// answer a gap with a diff instead — the half that can be re-derived from the other. So an edit
-// waits on a report: it is refused until the window the model is already being shown carries one.
-// Read off the log the same way stoppedBy is, with nothing stored and no field on the reply.
 const REPORTING_FIELDS = NOTE_FIELDS.filter((field) => field.reports);
 
 export const reportedIn = (log: readonly RunLogEntry[]): boolean =>
@@ -351,11 +315,6 @@ function unreportedEdit(line: string, log: readonly RunLogEntry[]): string | nul
 
 const DEMANDED = ['line', ...NOTE_FIELDS.filter((field) => field.required).map((field) => field.name)];
 
-// A field told to be empty comes back holding a written-out empty string often enough to matter: a
-// run was stopped on turn 44 by the two characters `""` in `blocked`. What every note field is for
-// is a sentence, so one carrying no letter and no digit is carrying no sentence, whatever
-// punctuation it spells that with — and the same reading keeps a stray quote from passing for the
-// report an edit is gated on.
 const reported = (said: string | undefined): string => (said !== undefined && /[\p{L}\p{N}]/u.test(said) ? said : '');
 
 export function parseReply(raw: unknown, mode: PlaybotModeSpec): { ok: true; reply: TurnReply } | { ok: false; error: string } {
@@ -377,18 +336,12 @@ function summarize(v: PlayView): string {
   return said.length > 0 ? said : `arrived at ${v.location.title}`;
 }
 
-// A view output is the only kind this reads nothing out of, because runTurn renders the view
-// itself at the top of the very next turn: printing it here as well would put a second copy of the
-// same screen into every entry the journal window carries.
 export const ANSWER_NOT_SHOWN: ReadonlyArray<{ kind: CommandOutput['kind']; why: string }> = [
   { kind: 'view', why: 'the screen the next turn opens with, which runTurn renders in full before the model is asked anything; a copy of it here would ride in the journal window for ten turns after' },
 ];
 
 const excusedKinds = new Set(ANSWER_NOT_SHOWN.map((each) => each.kind));
 
-// What the line answered with, in the same words a player at scripts/play-cli.ts reads. Silence
-// here is the capability gap this exists to close: a bot that types /quests and is told nothing
-// has strictly less to go on than a person at the same command line.
 export function answerLines(result: CommandResult, localizer: Localizer): string[] {
   const moved = result.view === undefined ? [] : [summarize(result.view)];
   return [...moved, ...result.output.flatMap((output) => (excusedKinds.has(output.kind) ? [] : formatOutput(output, localizer).map(printed)))];
@@ -414,15 +367,11 @@ export interface RunTurnDeps {
   readonly ctx: CommandContext;
   readonly read: ContentReader;
   readonly client: ModelClient;
-  // The mode, not the prompt it makes: the framing the model is shown and the lines its reply may
-  // carry are two readings of the one declaration, and passing them separately is how they drift.
   readonly mode: PlaybotMode;
   readonly brief: string;
   readonly log: readonly RunLogEntry[];
   readonly turn: number;
   readonly turns: number;
-  // What an edit mid-run dropped out of this session. It goes to whoever is reading the run, not
-  // into the turn's own entry: the player did not do it and has nothing to answer for it.
   readonly report: (line: string) => void;
 }
 
@@ -447,8 +396,6 @@ export async function runTurn(deps: RunTurnDeps): Promise<RunLogEntry> {
   const parsed = parseReply(raw, mode);
   if (!parsed.ok) return { turn: deps.turn, outcome: 'invalid-reply', detail: parsed.error, notes: NO_NOTES };
 
-  // Refused with the turn's own notes kept, not dropped: the player said something here, and what
-  // they said may be the report that lets the next turn through.
   const unreported = unreportedEdit(parsed.reply.line, deps.log);
   if (unreported !== null) return { turn: deps.turn, outcome: 'invalid-reply', detail: unreported, notes: parsed.reply };
 
@@ -463,12 +410,7 @@ export interface PlaybotOptions {
   readonly mode: PlaybotMode;
   readonly turns: number;
   readonly write: (line: string) => void;
-  // When the run is played, which names the `# test` it comes back as. Passed in rather than read
-  // off a clock here, so the caller owns the one instant the whole run is filed under.
   readonly at: string;
-  // Where an authoring command writes, asked for rather than given: a mode that runs none never
-  // calls this, so a reader run opens no staging file and the engine answers every authoring
-  // command the way it answers a terminal started without a local file.
   readonly authoring?: () => AuthoringContext;
   readonly brief?: string;
   readonly now?: () => number;
@@ -476,9 +418,6 @@ export interface PlaybotOptions {
 
 const totalOf = (billed: readonly TurnUsage[], pick: (usage: TurnUsage) => number): number => billed.reduce((sum, usage) => sum + pick(usage), 0);
 
-// What the run cost, summed off the turns already logged rather than tallied a second time
-// alongside them. A client that does not know what it billed leaves the tokens unsaid rather than
-// reporting four zeroes, which reads like a run that was free.
 function costLine(turns: number, seconds: number, billed: readonly TurnUsage[]): string {
   const tokens =
     billed.length === 0
@@ -487,9 +426,6 @@ function costLine(turns: number, seconds: number, billed: readonly TurnUsage[]):
   return `run of ${turns} turn(s) in ${seconds.toFixed(1)}s: ${tokens}`;
 }
 
-// A player that says it is stuck is believed at once. A player that does not say so is still cut
-// off, because the run measured on 2026-08-22 called its own bug severe and run-blocking on turn
-// twenty and went on asking for three more turns: saying so and stopping are not the same act.
 export const REFUSALS_BEFORE_STOPPING = 4;
 
 function stoppedBy(log: readonly RunLogEntry[]): string | null {
@@ -500,8 +436,6 @@ function stoppedBy(log: readonly RunLogEntry[]): string | null {
   return `${REFUSALS_BEFORE_STOPPING} turns in a row were refused, the last of them: ${tail[tail.length - 1].detail}`;
 }
 
-// The run and the save it started from, which is what the app's own recorder keeps too: a bot run
-// and an author's run are one kind of thing and come back written the same way.
 export async function runPlaybot(options: PlaybotOptions): Promise<KeptRun> {
   const clock = options.now ?? Date.now;
   const started = clock();
@@ -536,13 +470,8 @@ const REPLY_JSON_SCHEMA = {
 };
 
 const MODEL_ID = 'claude-sonnet-5';
-// A turn picks one of a handful of printed options and says why in a sentence. Deliberation buys
-// nothing here and is the difference between a run of five hundred turns and a run of fifty.
 const TURN_EFFORT = 'low';
 
-// The fourth opt-out c4 needs: settingSources/tools alone still leave a turn naming this
-// repository's own working directory, git status and CLAUDE.md, because those ride a section a
-// string systemPrompt does not remove. Only a cwd outside the repository takes them out.
 export function sdkOptionsFor(system: string, cwd: string): Options {
   return {
     systemPrompt: system,
@@ -581,21 +510,14 @@ export function createSdkModelClient(cwd: string): ModelClient {
 
 export const DEFAULT_SOURCES = [...SHIPPED_DIRS];
 
-// A run stages into a directory of its own unless an operator names a file, because the run that
-// found this could not say --local: `npx` on Windows drops every argument after a multi-line one,
-// and a default inside the checkout turns that into a second writer in somebody else's tree.
 export function localChangesFile(named: string | undefined): string {
   return named ?? path.join(isolatedDir(), 'local-changes.dsl');
 }
 
-// Whether the run authors at all, read off the mode rather than asked for separately: a mode that
-// offers no author command cannot reach an authoring context, so it is never handed one.
 export const authorsTheWorld = (mode: PlaybotMode): boolean => modeSpec(mode).audiences.includes('author');
 
 const DEFAULT_TURNS = 100;
 
-// A directory is expanded on every read, not once at startup, so a module authored while the run
-// is in flight arrives the same turn an edit to an already-named one does.
 export function fileContentReader(sources: readonly string[]): ContentReader {
   return () =>
     withEngineLocale(
@@ -640,9 +562,6 @@ interface CliArgs {
   readonly local: string | undefined;
 }
 
-// `author` named the exploratory framing and was also the only mode there was, so it now names two
-// things and neither of them is a mode. Saying so beats the general refusal below, which would
-// leave an operator to guess which of three replaced the one they typed.
 const RETIRED: Readonly<Record<string, string>> = {
   author: '--mode author is retired: it framed a run that only reads and named the only run there was. The framing is --mode reader, and a run that may write is --mode bughunter (sweep and repair) or --mode briefed (carry out a job)',
 };
@@ -659,8 +578,6 @@ function requireBrief(value: string | undefined): string {
   return value;
 }
 
-// A brief is what a briefed run is for and is nothing to any other, so neither half of the pair is
-// allowed to go missing quietly: a run turned loose under a brief nobody reads is a wasted run.
 function requireBriefedPair(mode: PlaybotMode, briefFile: string | undefined): string | undefined {
   if (modeSpec(mode).carriesBrief === (briefFile !== undefined)) return briefFile;
   throw new Error(modeSpec(mode).carriesBrief ? `--mode ${mode} carries a brief and none was given: name the file saying what is to be done with --brief` : `--mode ${mode} carries no brief, and one was given. The mode that does is ${PLAYBOT_MODE_NAMES.filter((each) => modeSpec(each).carriesBrief).join(', ')}`);
@@ -742,10 +659,6 @@ export function parseArgs(argv: readonly string[]): CliArgs {
   return { sources: sources.length > 0 ? sources : DEFAULT_SOURCES, mode, briefFile: requireBriefedPair(mode, briefFile), turns, save, local };
 }
 
-// The one place a save id becomes a fixture: read off registry.saves the same way the # test
-// directives that load one already do (session.ts), but naming what is available instead of a
-// bare "unknown save" — an operator picking a fixture by hand needs the list a directive script
-// never has to ask for.
 export function resolveSave(registry: Registry, id: string): ParsedSave {
   const saved = registry.saves.get(id);
   if (saved !== undefined) return saved;
@@ -758,8 +671,6 @@ export interface OpenedSession {
   readonly warnings: readonly PruneWarning[];
 }
 
-// Loading a save is setup, done once before the turn loop exists — runPlaybot and runTurn take
-// only the already-opened session and never learn whether one was loaded.
 export function openSession(registry: Registry, save: string | undefined): OpenedSession {
   const session = startSession(registry);
   if (save === undefined) return { session, warnings: [] };
@@ -800,9 +711,6 @@ async function main(): Promise<void> {
     brief,
     turns: args.turns,
     at,
-    // The same wiring the terminal authors through, over the same reader the turn loop reloads
-    // from, so a section this run stages is a section the next turn is standing in. Asked for
-    // once, by a mode that authors, and never by one that does not.
     authoring: () => {
       const file = localChangesFile(args.local);
       console.log(`staging local changes into ${file}`);
@@ -811,8 +719,6 @@ async function main(): Promise<void> {
     write: (line) => console.log(line),
   });
 
-  // The lines above are the run happening; this is the run. Paste it into a module and it replays,
-  // notes and refusals and all — which is the only reason to write a run down rather than read it.
   console.log('');
   for (const block of runAsSections(kept, { at, built: 'this working tree' })) console.log(`${block.join('\n')}\n`);
 

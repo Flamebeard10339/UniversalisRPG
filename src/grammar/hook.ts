@@ -6,7 +6,6 @@ export interface HookCarrier {
   whenHit: ActionResult[];
 }
 
-// A moment the carrier is written to answer, which is what a line naming an event is; that this pair is held in fields and a named event in the grammar is how the engine keeps them, not a difference an author is choosing between.
 export const HOOK_FAMILY = 'when something happens';
 
 export const HOOK_FIELDS: {

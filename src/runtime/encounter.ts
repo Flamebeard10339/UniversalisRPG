@@ -20,17 +20,12 @@ export function playerCadence(active: ActiveAction): Cadence {
   return (active.cadences[PLAYER] ??= newCadence());
 }
 
-// Where a clock stands, and the attempt it stands within — written together, because milliseconds
-// on their own are not a reading of anything. A clock at nothing has counted nothing against
-// anything, so it carries no span at all.
 export function standAt(cadence: Cadence, progress: number, span?: number): void {
   cadence.progress = progress;
   if (progress > 0 && span !== undefined) cadence.span = span;
   else delete cadence.span;
 }
 
-// How far into its attempt a clock stands. A pace taken to nothing has no span to divide by, so the
-// span the clock stopped on is what it is read against and the fraction holds where it stood.
 export function attemptFraction(cadence: Cadence, duration: number): number {
   const stopped = stalledPace(duration);
   const span = stopped ? (cadence.span ?? 0) : duration;
@@ -51,9 +46,6 @@ export function retaliation(state: GameState, registry: Registry, actorId: strin
   return undefined;
 }
 
-// Somebody joins the fight. Said only for those coming at the player, which is what naming who they
-// entered against already tells us: a foe's friends arrive against the player and the player's
-// against the foe, so nobody has to keep a second list of which side anyone is on.
 export function enterEncounter(active: ActiveAction, actorId: string, state: GameState, registry: Registry, attackerId: string): void {
   if (attackerId === PLAYER) state.log.push(localizerOf(registry, state).engine('engine.combat.started', { target: actorTitle(actorId, registry, state) }));
   const resources: Record<string, number> = {};
@@ -98,11 +90,6 @@ export interface EncounterFoe {
   current: number;
   max: number;
   cadence: number | null;
-  // How many of this foe's kind still stand where the player is — null for one that is no part of
-  // the location's population, such as an ally called in or a fight-scoped copy of one. A location
-  // holds a count and not a roster, so the rat now standing is the rat that died as far as any id
-  // goes, and without this a player watching a full-health foe replace a felled one reads it as a
-  // healing enemy. Two of them did.
   remaining: number | null;
 }
 

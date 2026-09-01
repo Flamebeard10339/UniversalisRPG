@@ -53,7 +53,6 @@ describe('a quest', () => {
     expect(menu.kind === 'menu' && menu.choices.map((choice) => choice.effects)).toEqual([[{ kind: 'set', variable: 'finding-your-feet.name-yourself' }], [{ kind: 'set', variable: 'finding-your-feet.snubbed' }]]);
   });
 
-  // Two lines from one entity at one stage — a word on arriving and a word on coming back — are two dialogues, and two dialogues under one id would be one dialogue.
   it("keeps a stage's second word to an entity apart from its first", () => {
     const twice = ['# quest an-errand', 'stage asking:', '  log: Asked.', '  complete', '  miki says:', '    always', '    A thing I need.', '  miki says:', '    when: mirror-done', '    You have it.'].join('\n');
     const registry = loaded(twice);
@@ -65,7 +64,6 @@ describe('a quest', () => {
     expect(loaded(QUEST, '# entity gate', 'title: Gate', 'open it:', '  requires: finding-your-feet.sendoff', '  say: It opens.')).toBeTruthy();
   });
 
-  // A stage's `done when:` is a reference like any other, so the walk reaches it and the page can say what it names that nothing declares.
   it('names what its `done when:` reads, so an undeclared flag there is not silently never true', () => {
     const draft = ['# quest a-quest', 'stage one:', '  done when: no-such-flag', '  goto two', '', 'stage two:', '  complete'].join('\n');
 
@@ -101,22 +99,15 @@ describe('what a quest is refused for', () => {
     expect(refusing('stage one:', '  complete', '', 'stage one:', '  complete')).toThrow(/stage one is written twice/);
   });
 
-  // A quest is a graph, and the engine walks it one way: it stands on the last stage it has reached
-  // in the order they are written. So a goto to a stage written earlier sets a flag and moves nothing,
-  // which is how the tutorial's apology route reached its `complete` stage and stood on `apologised`
-  // forever. Named where the author is standing, since what is wrong is either the goto or the order.
   it('a goto to a stage written before the one it is written in, which could never move the quest on', () => {
     expect(refusing('stage one:', '  goto two', '', 'stage two:', '  goto one')).toThrow(/stage two goes back to one, which is written before it/);
     expect(refusing('stage one:', '  complete', '', 'stage two:', '  goto one')).toThrow(/Write one after two/);
   });
 
-  // The other half of the same walk: every goto goes forward and none of them arrives anywhere that ends.
   it('a stage no `complete` can be reached from, however many stages lie between', () => {
     expect(refusing('stage one:', '  goto two', '', 'stage two:', '  goto three', '', 'stage three:', '  goto three')).toThrow(/cannot be completed from stage one/);
   });
 
-  // A stage naming itself is how *stay here* is written, so it is no move and no error either — but it
-  // cannot be the only way on, since a quest that can only stay where it is never reaches an end.
   it('a stage whose only way on is itself, though a stage with another way on may name itself freely', () => {
     expect(refusing('stage one:', '  goto one')).toThrow(/cannot be completed from stage one/);
     expect(refusing('stage one:', '  miki says:', '    always', '    Well?', '    -> Stay here.', '      goto one', '    -> Move on.', '      goto two', '', 'stage two:', '  complete')).not.toThrow();
@@ -134,7 +125,6 @@ describe('what a quest is refused for', () => {
     expect(refusing('stage one:', '  complete', '  nonsense: 3')).toThrow(/unexpected line in a quest stage: "nonsense: 3"/);
   });
 
-  // `hint:` was the journal's second voice and is gone; the journal reads out of `log:` alone, so a line still writing one is refused rather than quietly dropped.
   it('a hint: line, which the journal no longer has a reading for', () => {
     expect(refusing('stage one:', '  hint: Talk to Miki.', '  complete')).toThrow(/unexpected line in a quest stage: "hint: Talk to Miki."/);
     expect(refusing('hint: Talk to Miki.', 'stage one:', '  complete')).toThrow(/unexpected line in # quest: "hint: Talk to Miki."/);
@@ -149,8 +139,6 @@ describe('what a quest is refused for', () => {
   });
 });
 
-// The loop a quest is written in is: write it, walk it, see what is wrong, fix that part. That last
-// step is what a second body is for, so a body says what it means to change and nothing else.
 describe('a second body at a quest', () => {
   const ERRAND = [
     '# quest an-errand',
@@ -207,8 +195,6 @@ describe('a second body at a quest', () => {
     expect(quest.stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed']);
   });
 
-  // A stage's lines are told apart by the order they are written in and nothing else, so there is no
-  // name for a second body to lay one over: giving a stage a word is giving it every word it has there.
   it('writes all of a stage\u2019s speech when it writes any of it', () => {
     const quest = again('stage offered:', '  miki says:', '    always', '    Changed my mind.');
 
@@ -221,8 +207,6 @@ describe('a second body at a quest', () => {
     expect(again('-stage nowhere').stages.map((stage) => stage.name)).toEqual(['offered', 'sent', 'snubbed']);
   });
 
-  // Silently taking nothing out is safe because the quest is answered for whole once the bodies are in:
-  // a stage cannot be taken out from under a goto that still names it.
   it('is held to the quest the stages make once every body is in', () => {
     expect(() => again('-stage sent')).toThrow(/stage offered goes to sent, which is no stage of this quest/);
   });

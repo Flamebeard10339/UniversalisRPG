@@ -1,4 +1,5 @@
-/// <reference types="vite/client" />
+import 'vite/client';
 
-// The commit the bundle was built from, written in by vite.config.ts.
-declare const __BUILT_FROM__: string;
+declare global {
+  const __BUILT_FROM__: string;
+}

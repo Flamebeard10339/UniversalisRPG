@@ -1,13 +1,3 @@
-// Cooking — one attempt at every dish, and it is either dinner or it is a lump of charcoal.
-//
-// A recipe with an `accuracy:` gets one attempt and no more: win the contest and the outputs are
-// yours with the experience on them, lose it and the inputs are gone, the `burnt:` line is what you
-// are left holding, and nothing is paid. That is the whole mechanic, and the contest is the
-// player's `cooking` against nothing at all — the stat is the only thing that decides it, so gear
-// and levels are the only two ways to stop ruining food.
-//
-// It depends on fishing and combat because a kitchen cooks what somebody else caught and killed.
-
 # info cooking
 version: 1.0.0
 pack: skills
@@ -16,9 +6,6 @@ dependencies:
   fishing
   combat
 
-// Sixty is about one dish in five burnt with nothing on and no levels, and a little over one in
-// twenty at twenty levels in a full kitchen. Every dish is contested against the same nothing, so
-// what makes a salmon worth more than a shrimp is what it is worth, not what it risks.
 # stat cooking
 title: Cooking
 base: 60
@@ -28,16 +15,10 @@ group: core.skilling
 title: Cooking
 stat: cooking
 
-
-// One ruined thing rather than one per dish, because what is left of a burnt salmon and what is
-// left of a burnt shrimp is the same lump and telling them apart is a list somebody would have to
-// keep. It is worth one coin, which a counter rounds down to nothing on the way out.
 # item burnt-food
 title: Burnt Food
 examine: Black all the way through and welded to whatever it was cooked on. Somebody will take it off you for nothing, which is what it is worth.
 value: 1
-
-// --- the kitchen ---
 
 # item chefs-hat
 title: Chef's Hat
@@ -65,8 +46,6 @@ requires: level.cooking >= 5
 value: 60
 item-level: 6-12
 kitchen, +6 cooking
-
-// --- what a kitchen turns out ---
 
 # item cooked-anchovies
 title: Cooked Anchovies
@@ -138,11 +117,6 @@ eat:
   take: 1 cooked-beef
   say: You eat the beef standing up, which is a waste of good beef.
 
-// --- the recipes ---
-//
-// The two that came out of core with the skill. Neither is contested: kneading dough is not a thing
-// anybody burns, and the loaf is the tutorial's, so it is not where a player meets the burn rule.
-
 # recipe dough
 in: jug-of-water, pot-of-flour
 out: dough
@@ -157,8 +131,6 @@ out: bread
 skill: cooking 4
 time: 3
 say: The oven bakes your dough into a golden loaf.
-
-// Everything below is one attempt against the same stat, at the cadence core sets for a knack.
 
 # recipe cooked-shrimp
 station: stove
@@ -230,10 +202,6 @@ skill: cooking 6
 rate: core.cooking-rate
 say: The salmon takes longer than anything else on the range and punishes you for looking away.
 
-// The two the narrows hand over, and the only reason cooking has anything to do above the tenth
-// level: what a kitchen is worth is bounded by what the water gave you, so a water shut until
-// eleven is a dish shut until eleven.
-
 # recipe cooked-pike
 station: stove
 in: fishing.raw-pike
@@ -264,10 +232,6 @@ skill: cooking 1
 rate: core.cooking-rate
 say: The shell splits along the score and the inside comes out soft.
 
-// --- what a pan can be grown into ---
-//
-// The pan is the one thing in a kitchen a cook keeps, so it is the one thing with a plane in it.
-
 # passive seasoned
 kitchen, +4 cooking
 
@@ -288,10 +252,6 @@ title: A Cook's Hands
 examine: A ring of blackened iron, worn smooth on the inside by somebody who never took it off.
 cluster-jewel: a-cooks-hands
 
-// A kitchen has two numbers and the ring above only moves one of them. `core.cooking-rate` is on
-// every recipe in the file already, so a point spent here is a dish a minute rather than a dish
-// saved from the fire — which is the other kind of cook and, over an evening, the better one.
-
 # passive quick-hands
 kitchen, +1 core.cooking-rate
 
@@ -311,9 +271,6 @@ passives: 1 quick-hands, 2 seasoned, 3 short-order, 4 never-still, 5 quick-hands
 title: A Hot Pass
 examine: A brass tally worn through in one corner, off a kitchen that fed a great many people very fast.
 cluster-jewel: a-hot-pass
-
-// Two positions and no way on: the cheapest thing a cook can splice in, and the only one that pays
-// the burn back rather than the clock.
 
 # cluster-jewel a-steady-hand
 examine: Nothing in this kitchen has ever caught, and nobody has ever seen him hurry.

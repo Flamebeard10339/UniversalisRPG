@@ -66,9 +66,6 @@ function withStrike(): GameState {
 
 const clause = (source: string) => tagClause.parse(new Cursor(source));
 
-// What taking one skill to a level does to a world's stats: every stat the registry declares, read
-// before and after, and kept only where it moved. The subjects are the world's own, so a stat added
-// to it is weighed with nothing edited here.
 function movedByLevels(registry: Registry, skillId: string, level: number): Record<string, number> {
   const state = createGameState('');
   const before = [...registry.stats.keys()].map((statId) => [statId, statValue(statId, state, registry)] as const);
@@ -393,9 +390,6 @@ describe('the stat fold reads the seat, not offerability', () => {
   });
 });
 
-// The subjects are every skill the shipped player holds, read off the world rather than named here,
-// so a skill the player gains next month is held to the same claim with nothing edited; and each is
-// asked about every stat the world declares, so a grant landing anywhere else is what fails.
 describe('a skill of the shipped player', () => {
   const SHIPPED = loadUniverse(fixtureSources());
   const HELD = (actorEntity(SHIPPED, PLAYER)?.skills ?? []).map((id) => SHIPPED.skills.get(id)!);
@@ -410,11 +404,6 @@ describe('a skill of the shipped player', () => {
     expect(Object.keys(movedByLevels(SHIPPED, skill.id, LEVEL))).toEqual(skill.stat === undefined ? [] : [skill.stat]);
   });
 
-  // A level lands on both channels a bonus in this language has, and neither reading below needs the
-  // stat's base to see it: `(base + flat) x (1 + percent/100)` has one unknown, so the base a reading
-  // implies is the same at every level only when both channels are there and are the sizes the rule
-  // says. What the other skills naming the same stat put in is counted the same way, off the world,
-  // because they stand at level one throughout.
   const NAMED = HELD.filter((skill) => skill.stat !== undefined);
 
   const impliedBase = (skill: Skill, level: number): number => {
@@ -439,10 +428,6 @@ describe('a skill of the shipped player', () => {
     expect(at(LEVEL)).toBeGreaterThan(at(1));
   });
 
-  // The claims above read midpoints, which cannot see a spread at all. Where the stat the skill
-  // raises is one the player declares as a range, the grant has to carry both ends up or the
-  // player's swing would tighten as they trained — so the same subjects are asked again about the
-  // ends, and a stat the player writes flat drops out rather than being named here as an exception.
   it('shifts both ends of a stat the player swings unevenly, and widens it by nothing', () => {
     const at = (skillId: string, statId: string, level: number): Range => {
       const state = createGameState('');
@@ -463,8 +448,6 @@ describe('a skill of the shipped player', () => {
   });
 });
 
-// What a skill that names no stat does is the half of the rule the corpus need not always hold a
-// subject for, so both halves stand up here on a world of their own.
 describe('a skill weighed against one that names no stat', () => {
   const REGISTRY = loadModule(['# stat guile', 'base: 2', '', '# skill lockpicking', 'stat: guile', '', '# skill whistling', '', '# entity player', 'skills: lockpicking, whistling'].join('\n'));
 
@@ -480,12 +463,6 @@ describe('a skill weighed against one that names no stat', () => {
   });
 });
 
-// Where a stat's number came from, held to the number itself. The subjects derive twice over —
-// every `# save` the shipped corpus holds, against every stat the world declares — so a stat added
-// next month, or a save that puts a new kind of carrier on the player, is asked with nothing edited
-// here. The fold is written out again rather than borrowed, because borrowing `foldStat` would
-// prove only that it equals itself; what is worth proving is that the shares a player is shown are
-// the whole of what the engine added up.
 describe('the shares a stat publishes', () => {
   const SHIPPED = loadUniverse(fixtureSources());
 

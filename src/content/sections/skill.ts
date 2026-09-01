@@ -44,7 +44,6 @@ export const skill = section<Skill>()({
   },
 });
 
-// What anyone holding this skill carries because of it. The level grant is derived from the one thing the skill declares rather than written beside every skill, so a skill added next month is granted with nothing edited — and a skill with no stat of its own has nothing to raise, which is the whole of what it grants. It lands on both channels a bonus in this language has, so a level is worth a flat point of the stat and a point of the percentage that multiplies it.
 const perLevel = (skill: Skill, statId: string): readonly TagClause[] => {
   const per: Counter = { kind: 'level', id: skill.id };
   return [

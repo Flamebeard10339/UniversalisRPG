@@ -11,7 +11,6 @@ import { mapFixtureFor } from '../runtime/mapFixture';
 import type { Point } from './viewport';
 import { fixtureSources } from '../content/worldFixture';
 
-// Any grid proves the same rule; what the shipped world draws at is `# variable map-grid`.
 const GRID = 140;
 
 const opened = (): Driver => createDriver(fixtureSources(), { ticker: () => () => undefined });
@@ -58,8 +57,6 @@ describe('where a drag lets go is where the place is (c8)', () => {
   }
 });
 
-// The map pane says what happened; what it means is the command line's, and the same line typed by
-// hand does the same thing. A gesture that composed its own edit was an edit only a screen could make.
 describe('what a gesture on the map says', () => {
   it('puts a place where it was dropped', () => {
     expect(placeLine('fixture-town.green', { x: 8, y: -1 })).toBe('/place fixture-town.green 8 -1');
@@ -77,9 +74,6 @@ describe('what a gesture on the map says', () => {
     expect(joinLine('a', 'b', false)).toBe('/unlink a b');
   });
 
-  // Which way one place hangs off another is not asked of the author, because where the two stand
-  // already answers it. A floor between them is the only thing a relation can be — a heading keeps its
-  // floor — so a room and the cellar under it say `down of` however far apart their labels are drawn.
   it('works out which step the pin is from where the two places stand', () => {
     const places = [at('street', 4, 4, 0), at('sewer', 4, 4, -1), at('gate', 5, 4, 0), at('far', 9, 5, 0)];
 
@@ -137,8 +131,6 @@ describe('a new place is written where the map is looking', () => {
     expect(madeAt({ x: 0, y: 0 }, 2)).toBe(`/place ${MADE} 0 0 2`);
   });
 
-  // Where a room goes home is written in its id and nowhere else, so a bare name is written under the
-  // module of the room the author is standing beside — and a name they qualified is left as they wrote it.
   it('names the module the new room belongs to, or keeps the one the author wrote', () => {
     expect(addressFor('orchard', HERE)).toBe(MADE);
     expect(addressFor('elsewhere.orchard', HERE)).toBe('elsewhere.orchard');
@@ -175,8 +167,6 @@ describe('a new place is written where the map is looking', () => {
   });
 });
 
-// One case per drawn place: the map is a rule about all of them, and a corpus that grows a quarter is
-// covered with nothing here edited.
 describe('a drag is a section edit and nothing else (c8)', () => {
   const DRAWN = offeredBy(addressable(fixtureSources()), NOWHERE, 'map');
   const ABSOLUTE = DRAWN.filter((section) => REGISTRY_PLACES.get(section.address)?.relative === undefined);
@@ -210,8 +200,6 @@ describe('the point of a one-way road', () => {
     expect(points[0]![1]).toBe(-points[2]![1]!);
   });
 
-  // Two places drawn on top of each other leave no road between them to read a direction off, so the
-  // arrow takes the direction the places themselves lie in and stays an arrow.
   it('points nowhere rather than somewhere wrong when it is given nowhere', () => {
     expect(arrowAt({ x: 40, y: 0 }, { x: 60, y: 0 }, { x: 0, y: 0 })).toBe('50,0 50,0 50,0');
   });

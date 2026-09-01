@@ -58,8 +58,6 @@ describe('putting a place on the map', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.gate', { x: 4, y: -1 }))).toEqual(['# location keep.gate\nx: 4, y: -1']);
   });
 
-  // A room of a house is a place. Carrying its whole house was what stopped an author laying out the
-  // rooms inside one; a house is moved by its own shape, which is the gesture that says so.
   it('carries nothing but itself for a place a region holds', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.yard', { x: 5, y: 1 }))).toEqual(['# location keep.yard\nx: 5, y: 1']);
   });
@@ -76,8 +74,6 @@ describe('putting a place on the map', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.lane', { x: 1, y: 1, z: 2 }))).toEqual(['# location keep.lane\nx: 1, y: 1, z: 2']);
   });
 
-  // Saying where a place is is the other answer to the question `above hall` answers, so it takes that
-  // answer away: the drag that used to refuse now unpins.
   it('unpins a place written off another rather than refusing to move it', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.loft', { x: 1, y: 1 }))).toEqual(['# location keep.loft\nx: 1, y: 1, z: 1']);
   });
@@ -91,9 +87,6 @@ describe('putting a place on the map', () => {
     expect(why(pinning(registryOf(), NOTHING, 'keep.hall', 'down', 'keep.hall'))).toContain('itself');
   });
 
-  // Making one and moving one are the same command, because an id nothing declares yet is a place
-  // that does not exist yet. Which module it belongs to is written in the id and asked of nothing
-  // else, so an id saying no module is refused rather than staged where no file could take it back.
   it('makes a place of an id nothing declares, under the module the id names', () => {
     expect(patched(placing(registryOf(), NOTHING, 'keep.north-shore', { x: 4, y: 4 }))).toEqual(['# location keep.north-shore\nx: 4, y: 4']);
     expect(patched(pinning(registryOf(), NOTHING, 'keep.cellar', 'down', 'keep.hall'))).toEqual(['# location keep.cellar\nbelow hall']);
@@ -111,9 +104,6 @@ describe('putting a place on the map', () => {
   });
 });
 
-// The load path refuses two places on one square. So does the editor now, and it has to be the same
-// refusal rather than a second one that agrees today: the words come back from the load path's own
-// account of a stack, put to the world the edit would make instead of the world it read.
 describe('a map edit that would stand two places on one square', () => {
   const stackedByLoading = (): string => {
     const collided = { ...KEEP, text: KEEP.text.replace('# location lane\nx: 9, y: 9', '# location lane\nx: 0, y: 0') };
@@ -132,8 +122,6 @@ describe('a map edit that would stand two places on one square', () => {
     expect(why(shifting(registryOf(), NOTHING, 'keep.keep', { x: -2, y: 0 }))).toContain('keep.gate');
   });
 
-  // The question is what stands where once the edit lands, not whether the square named is taken, so
-  // a place that rides along without a line of its own is counted too.
   it('counts a place carried by the move that is written no line of its own', () => {
     const attic: ModuleSource = { name: 'attic', text: '# info attic\nversion: 1.0.0\ndependencies:\n  keep\n\n# location roost\nx: 7, y: 7, z: 1' };
 
@@ -184,8 +172,6 @@ describe('everything one move carries', () => {
   });
 });
 
-// A region is where its rooms are: it is gathered, let go and moved, and every one of those is a
-// patch over whatever the world already says, like every other map edit.
 describe('editing a region', () => {
   it('moves every place it holds by the same step, and none it does not', () => {
     expect(patched(shifting(registryOf(), NOTHING, 'keep.keep', { x: 3, y: -1 }))).toEqual(['# location keep.yard\nx: 5, y: -1', '# location keep.hall\nx: 5, y: 1']);
@@ -214,8 +200,6 @@ describe('editing a region', () => {
   });
 });
 
-// The claim the commands answer: a line typed at the command line is the same edit the map pane
-// makes with a finger, and it lands in local changes as a patch and nowhere else.
 describe('the map edited from the command line', () => {
   const opened = (): { ctx: () => CommandContext; local: () => string } => {
     const baseSources = [...fixtureSources()];
@@ -238,8 +222,6 @@ describe('the map edited from the command line', () => {
     expect(game.local()).toContain('# location fixture-town.well\nx: 20, y: 20');
   });
 
-  // The other half of a room drawn on the map: it is staged in local changes, and the module its id
-  // names is the file it goes home to when the changes are consolidated.
   it('makes a room the world holds under the module its id names, not under the changes it was staged in', () => {
     const game = opened();
 
@@ -282,8 +264,6 @@ describe('the map edited from the command line', () => {
     expect(game.local()).not.toContain('# location');
   });
 
-  // The whole round trip through the command line: a place written off another loses that when it is
-  // put somewhere, and can be written off one again.
   it('pins a place under another and looses it again', () => {
     const game = opened();
 

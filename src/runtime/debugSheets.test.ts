@@ -5,10 +5,6 @@ import { mapOf } from '../content/registry';
 import { contentSectionMaps, isDebug, isOwnedKind } from '../content/sections';
 import { sessionStatus, startSession } from './session';
 
-// A world with one DEBUG section of every kind that lands in a registry map, standing beside the
-// non-DEBUG minimum a session needs. Every kind is written out because a bare heading is not a
-// valid section of most of them; which kinds have to be here is not written down anywhere — it is
-// asked of the section list below, so a kind added next month fails this file until it is covered.
 const PROBED = `# info probe
 version: 0.0.0
 
@@ -163,8 +159,6 @@ const REGISTRY = loadUniverse([{ name: 'probe.dsl', text: PROBED }]);
 interface Section {
   kind: string;
   id: string;
-  // The name the id is written and keyed under inside its own module, which is both what a sheet
-  // publishes as an id and what stands in the middle of every locale key the section owns.
   local: string;
   debug: boolean;
 }
@@ -178,8 +172,6 @@ const DECLARED: Section[] = contentSectionMaps().flatMap(([kind, map]) =>
   })),
 );
 
-// Every string a sheet publishes, wherever it sits: a sheet added next month is read here without
-// this file learning its name, and so is a row that says an id somewhere other than under `id`.
 function said(status: unknown): string[] {
   if (typeof status === 'string') return [status];
   if (Array.isArray(status)) return status.flatMap(said);

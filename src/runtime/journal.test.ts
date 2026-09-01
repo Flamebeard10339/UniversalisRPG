@@ -42,7 +42,6 @@ const held = (...set: string[]): GameState => {
   return state;
 };
 
-// The condition a stage compiles to is derived and evaluated, never written down, so what is held to account here is where the quest stands rather than how that condition prints.
 const standing = (...set: string[]): string | undefined => stageNow(registry.quests.get('finding-your-feet')!, (asked) => evaluateCondition(asked, held(...set), registry))?.name;
 
 describe('where a quest stands', () => {
@@ -52,7 +51,6 @@ describe('where a quest stands', () => {
     expect(standing('finding-your-feet.offered', 'finding-your-feet.name-yourself')).toBe('name-yourself');
   });
 
-  // Nothing runs to move a quest on: a stage that says when it is done is simply no longer the one standing once that holds.
   it('leaves a stage on its own once that stage says it is done', () => {
     expect(standing('finding-your-feet.name-yourself')).toBe('name-yourself');
     expect(standing('finding-your-feet.name-yourself', 'mirror-done')).toBe('sendoff');
@@ -62,7 +60,6 @@ describe('where a quest stands', () => {
 describe('the journal', () => {
   const shown = (...set: string[]) => journal(registry, held(...set));
 
-  // Every quest the world declares is in the list, whether or not the player has touched it: that is how they learn there is one.
   it('holds a quest nobody has begun, saying so rather than reading out what has not happened', () => {
     expect(shown()).toEqual([{ quest: 'finding-your-feet', title: 'Finding Your Feet', stage: 'offered', standing: 'unstarted', lines: [] }]);
   });
@@ -96,7 +93,6 @@ describe('the journal', () => {
   });
 });
 
-// A stage left by a line an entity says stands over more than one beat — bake the loaf, then carry it back — so the line the player is standing on has to survive both.
 const TWO_BEATS = [
   '# quest fetch-the-loaf',
   'title: Fetch the Loaf',
@@ -126,12 +122,10 @@ describe('the line a quest is standing on', () => {
     expect(standingOn('fetch-the-loaf.baking', 'loaf-baked')).toBe('You said you would bake a loaf.');
   });
 
-  // A quest nobody has begun reads its own log, which has to survive until whatever begins it comes round.
   it("is the quest's own log before anything of it has happened", () => {
     expect(standingOn()).toBe('Someone in the house is asking after bread.');
   });
 
-  // A finished quest has everything crossed off, so there is no line left standing.
   it('is nothing once the quest is finished, because every line of it is crossed off', () => {
     expect(standingOn('fetch-the-loaf.baking', 'fetch-the-loaf.handed-over')).toBeNull();
   });
@@ -164,7 +158,6 @@ describe('journal: lets a # test claim what the journal currently reads', () => 
 });
 
 describe('a quest played through', () => {
-  // The whole route: the entity is spoken to, the quest's own lines are the ones reached, and taking a choice moves the quest and the journal with it.
   const PLAYED = [WORLD, QUEST, '', '# test takes-the-offer', 'talk: miki', 'choose: 0', 'assert: finding-your-feet.name-yourself'].join('\n\n');
 
   it("reaches the quest's lines through the entity it named, and moves on the choice taken", () => {
@@ -177,10 +170,6 @@ describe('a quest played through', () => {
   });
 });
 
-// The subjects are every standing the engine can publish, read off the declaration that names them,
-// so a fourth added next month is held to naming a group of its own and to being told apart from the
-// other three. What tells them apart is a colour a world authored, which is what makes this a claim
-// about the corpus rather than about whatever draws the journal.
 describe('where a quest stands reaches a surface as a group', () => {
   const world = loadUniverse(fixtureSources());
   const STANDINGS = [...QUEST_STANDINGS];
@@ -204,8 +193,6 @@ describe('where a quest stands reaches a surface as a group', () => {
     expect(entries.map((entry) => entry.group?.colour)).toEqual(entries.map((entry) => standingGroup(world.groups, entry.standing)!.colour));
   });
 
-  // The engine names no group of its own, so a world that says nothing draws no colour rather than
-  // reaching for one that is not there.
   it('draws nothing where a world says which group means nothing', () => {
     const silent = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace(/^stands for: .*$/gm, '') })));
     const state = createGameState();

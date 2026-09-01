@@ -47,8 +47,6 @@ function Sheet({ turn, line, held, words, localizer, onKeep, onDiscard }: { turn
   );
 }
 
-// Drawn only while a run is being recorded, which is the whole of what playtest mode is — there
-// is nothing to show a player who is not keeping one.
 export function PlaytestBar({ run, words, localizer, onAttach, onCopy, onStop }: { run: RecordedRun; words: Words; localizer: Localizer; onAttach: (turn: number, notes: RunNotes) => void; onCopy: () => void; onStop: () => void }): JSX.Element {
   const [asking, setAsking] = useState(false);
   const { log } = run;

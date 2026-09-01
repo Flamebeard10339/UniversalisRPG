@@ -1,10 +1,5 @@
 import type { Registry } from './registry';
 
-// An activity is a module that declares skills, and its skills are the ones it declares. Nothing
-// says so anywhere but here, and nothing has to: a module added next month is an activity by having
-// a `# skill` in it, and one whose skills move between modules moves with them. The alternative --
-// a list of activities and what each is made of -- is the one shape this repository has undone most
-// often.
 export interface Activity {
   id: string;
   skills: string[];

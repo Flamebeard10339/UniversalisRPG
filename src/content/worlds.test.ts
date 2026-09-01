@@ -3,9 +3,6 @@ import { rootModules, standingClosure, standingWithin, worldWithin } from './wor
 import { loadUniverseWithDiagnostics } from './load';
 import type { ModuleSource } from './universe';
 
-// Sources written to prove this and nothing else. The derivation used to be checked against a second
-// reading of the shipped corpus, which meant it could only be exercised on the shapes an author
-// happened to have written — and could go red because one of them changed.
 const module = (id: string, ...lines: string[]): ModuleSource => ({ name: id, text: [`# info ${id}`, 'version: 1.0.0', ...lines, ''].join('\n') });
 
 const needs = (...ids: string[]): string => `dependencies: ${ids.join(', ')}`;
@@ -39,16 +36,11 @@ describe('the standing world', () => {
     expect(standingWithin(sources).map((each) => each.name)).toEqual(['core', 'town']);
   });
 
-  // A module loading over another may take the keyword back and put it on a place of its own, which
-  // is how a tutorial opens somewhere the town it is written into does not. The minimum is then the
-  // smallest of the worlds that open, and the others are layers over it.
   it('is the smallest of them where more than one module opens somewhere, and the rest nest over it', () => {
     const sources = [module('core'), module('town', needs('core'), ...OPENS), module('tutorial', needs('town'), ...OPENS)];
     expect(standingWithin(sources).map((each) => each.name)).toEqual(['core', 'town']);
   });
 
-  // Derived rather than loaded above, so this is the claim that the derivation answers the question
-  // it is asked: what it names has somewhere to stand, and nothing smaller does.
   it('stands, and stops standing when any one of its modules is taken out', () => {
     const sources = [module('core'), module('town', needs('core'), ...OPENS), module('elsewhere')];
     const held = [...standingClosure(sources)];
@@ -68,8 +60,6 @@ describe('the standing world', () => {
     expect(() => standingClosure([module('core')])).toThrow(/no module declares a starting/);
   });
 
-  // Two that do not nest are two worlds rather than one world and a layer over it, and there is
-  // nothing here that could choose between them.
   it('refuses two openers whose worlds do not nest', () => {
     const sources = [module('north', ...OPENS), module('south', ...OPENS)];
     expect(() => standingClosure(sources)).toThrow(/do not nest/);

@@ -59,10 +59,6 @@ export function printSegments(values: readonly TextSegment[] | undefined): strin
 
 const FRAGMENT = /\{[^}]*\}/;
 
-// What a line the game says to a player may hold besides its words. Every spoken line takes the same
-// one — a line of dialogue, an `again:`, the label on a `->` choice — so it is written here once and
-// every site that takes one points at it. What a `{…}` names is what a condition names, and what is
-// held there is put into the line in the player's own language.
 export const fragment: Parser<TextSegment> = {
   parse: (cursor: Cursor) => {
     const at = cursor.pos;

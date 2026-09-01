@@ -1,9 +1,5 @@
 import { COMPASS, compassOf, type Road, type Sheet, type Way } from '../../src/runtime/map';
 
-// The map drawn as characters. Every fact in here comes off the sheet the engine built — which
-// places, on which floor, joined by which roads, and which way each way out lies — so a terminal and
-// the map pane are drawing one thing and can only disagree about how it looks.
-
 const LABEL = 14;
 const GAP = 3;
 const COLUMN = LABEL + GAP;
@@ -25,15 +21,9 @@ interface Cell {
 function labelOf(node: Sheet['nodes'][number]): string {
   const climb = node.climb === 0 ? '' : node.climb > 0 ? UP : DOWN;
   const numbered = node.goes === null ? '' : `${node.goes}:`;
-  // A place the player has not found is only ever drawn for an author, and is marked so that what is
-  // on the map and what is in the world are never read as the same thing.
   return cut(`${node.here ? HERE : ''}${node.found ? '' : UNFOUND}${numbered}${climb}${String(node.place.title)}`, LABEL);
 }
 
-// The lattice the drawn positions make, with the columns and rows nothing stands on taken out. A
-// terminal is eighty characters wide and a world is not, so what is kept is the order places stand in
-// and not how far apart they were written. Roads are drawn between them, so nothing here claims two
-// places touch — a square with no line to the square beside it is joined to nothing.
 function lattice(sheet: Sheet): { cells: Map<string, Cell>; columns: number[]; rows: number[]; crowded: string[] } {
   const columns = [...new Set(sheet.nodes.map((node) => node.at.x))].sort((low, high) => low - high);
   const rows = [...new Set(sheet.nodes.map((node) => node.at.y))].sort((low, high) => low - high);
@@ -65,9 +55,6 @@ const clear = (canvas: string[][], row: number, from: number, to: number): boole
   return true;
 };
 
-// A road drawn as one line: along the row two places share, down the column they share, or across the
-// corner between two a step apart each way. Nothing is written over anything already on the paper, so
-// a road with a place in its way is left for the writing underneath.
 function straight(canvas: string[][], road: Road, from: Cell, to: Cell): boolean {
   if (from.row === to.row) {
     const [left, right] = from.column < to.column ? [from, to] : [to, from];
@@ -90,10 +77,6 @@ function straight(canvas: string[][], road: Road, from: Cell, to: Cell): boolean
   return true;
 }
 
-// A road between two rows that touch and columns that do not, drawn bending: out of the place above,
-// along the line of paper the lattice leaves between the two rows, and into the place below. It is
-// tried only once every road that can be drawn straight has been, so a bend never takes the paper a
-// straight line wanted.
 function bent(canvas: string[][], road: Road, from: Cell, to: Cell): boolean {
   const [top, low] = from.row < to.row ? [from, to] : [to, from];
   if (low.row - top.row !== 1 || top.column === low.column) return false;
@@ -126,11 +109,7 @@ export function drawnMap(sheet: Sheet): string[] {
   for (const { road, from, to } of bending) if (!bent(canvas, road, from, to)) aside.push(named(road));
 
   const drawing = canvas.map((row) => row.join('').replace(/\s+$/, '')).filter((row, at, all) => row !== '' || all.slice(at + 1).some((rest) => rest !== ''));
-  // The one line of legend, and only where it is needed: a dotted road is a road nobody can walk
-  // today, which a reader has no way of guessing from the dots.
   const legend = sheet.roads.some((road) => !road.open) ? [`${SHUT.repeat(4)} a road that is shut`] : [];
-  // A shape has nothing to draw in characters, so a region says instead what it gathers. A reader who
-  // wants to know where the castle is looks at the rooms; this says which rooms are the castle.
   const shapes = sheet.regions.map((region) => `${String(region.title)}: ${region.drawn.map((held) => cells.get(String(held))?.label ?? String(held)).join(', ')}`);
   const under = [...legend, ...shapes, ...aside.map((line) => `also: ${line}`)];
   return under.length === 0 ? drawing : [...drawing, '', ...under];
@@ -138,9 +117,6 @@ export function drawnMap(sheet: Sheet): string[] {
 
 const CELL = 18;
 
-// The nine squares, drawn where they lie. Every way out that a heading points at sits in its own
-// square under the number that walks it; the rest are said underneath, because up, down and a road
-// that leads nowhere on the compass are not squares of a compass.
 export function drawnCompass(sheet: Sheet, said: (way: Way) => string): string[] {
   const { cells, rest } = compassOf(sheet.ways);
   if (sheet.ways.length === 0) return [];

@@ -11,8 +11,6 @@ import { buildTier, evenlySpent, handedOver, parseTierArgs, tierLines } from './
 
 const shipped = loadUniverseWithDiagnostics(fixtureSources()).registry;
 const activities = activitiesIn(shipped);
-// Read off the world rather than named: one activity of more than one skill, and one of exactly
-// one, which is the only difference any claim below is about.
 const combat = activities.find((each) => each.skills.length > 1)!;
 const fishing = activities.find((each) => each.skills.length === 1)!;
 
@@ -67,8 +65,6 @@ describe('what a tier has climbed', () => {
 describe('a build wears what the world lets it wear', () => {
   const KIT = ['core.jerkin', 'fixture-town.ledger'];
 
-  // The ledger asks for a level and the jerkin asks for nothing, so the same list at two tiers is
-  // the gate answering rather than anything here choosing.
   it('takes the gated piece only at the tier that has earned it, and says why where it does not', () => {
     const under = buildTier(shipped, fishing, 1, KIT);
     const over = buildTier(shipped, fishing, 10, KIT);
@@ -85,8 +81,6 @@ describe('a build wears what the world lets it wear', () => {
 });
 
 describe('a build spends the points its gear dropped with', () => {
-  // A blade with a plane in it, and two jewels that pull opposite ways. Which of them a build takes
-  // is the whole question --grow answers, and nothing in the tool knows which is which.
   const KIT = ['core.heavy-spade'];
   const JEWELS = ['core.keen-edge-jewel:20', 'core.stout-heart-jewel:20'];
 
@@ -116,8 +110,6 @@ describe('a build spends the points its gear dropped with', () => {
     expect(planesIn(buildTier(shipped, combat, 20, [...KIT, ...JEWELS], ['core.attack'])).some((plane) => planeClusters(plane).length > 1)).toBe(true);
   });
 
-  // Not that the order pays more -- that it is read at all. Two builds asked opposite questions of
-  // the same gear come back different, and neither is worse at its own question than the other is.
   it('reads the stats in the order they were named', () => {
     const forAttack = buildTier(shipped, combat, 20, [...KIT, ...JEWELS], ['core.attack', 'core.max-health']);
     const forHealth = buildTier(shipped, combat, 20, [...KIT, ...JEWELS], ['core.max-health', 'core.attack']);
@@ -126,8 +118,6 @@ describe('a build spends the points its gear dropped with', () => {
     expect(JSON.stringify(forAttack.grown!.after), 'asking the opposite question changed nothing').not.toEqual(JSON.stringify(forHealth.grown!.after));
   });
 
-  // Every point is accounted for, and the ones the greedy rule could not reach are said out loud
-  // rather than lost. Both sides are read off the save the tool prints, so neither can drift.
   it('accounts for every point the gear on the body dropped with', () => {
     const built = buildTier(shipped, combat, 20, [...KIT, ...JEWELS], ['core.attack']);
     const sheet = saved(built);
@@ -147,8 +137,6 @@ describe('the doors a build is put together through', () => {
   it('are the engine\'s own, so a build cannot hold what a player could not', () => {
     const state = initialState(shipped);
     receiveItem(state, shipped, 'core.heavy-spade', 1);
-    // A blade that drops with a plane arrives as a copy of its own, so it is worn under the id the
-    // engine minted for it and not under its template's -- which is what the id is asked for here.
     const [minted = 'core.heavy-spade'] = Object.keys(state.instances.byId);
     expect(String(equip(state, shipped, minted))).toMatch(/Heavy Spade/);
     expect(state.equipped['main-hand']).toBeUndefined();

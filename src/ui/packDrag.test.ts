@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { letGoOf, type CellBox } from './packDrag';
 
-// Three cells of a hundred pixels each, side by side with no gap, which is enough shape for every
-// question here: what a real grid settles on is measured, and nothing below reads a column count.
 const boxes: CellBox[] = [
   { key: 'bread', left: 0, top: 0, right: 100, bottom: 100 },
   { key: 'rope', left: 100, top: 0, right: 200, bottom: 100 },
@@ -25,9 +23,6 @@ describe('where a dragged cell was let go of', () => {
   });
 });
 
-// The bug this answers: a tap that drifted past the slop a drag starts at was read as a drag, landed
-// on nothing, and did nothing at all. Every way of coming to rest on nothing opens the thing, so no
-// press on a cell is ever swallowed.
 describe('a cell let go of on nothing', () => {
   it('opens the one put back down where it was, since it has swapped nothing', () => {
     expect(letGoOf(boxes, 'rope', { x: 0, y: 0 })).toEqual(open('rope'));

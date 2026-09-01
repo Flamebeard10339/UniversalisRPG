@@ -12,11 +12,8 @@ interface Drag {
   release: () => void;
 }
 
-// translate, never translate3d, and no `will-change`: a promoted layer is rastered once and the text on it goes soft.
 const restingAt = (index: number, columns: number): string => `translate(${(-index * 100) / columns}%, 0)`;
 
-// Mouse and touch events rather than pointer events: a browser cancels a pointer stream as soon as it
-// decides a scrollable element under the finger is scrolling, and a touch move can be refused instead.
 export function Pager({ index, onIndex, panes, columns = 1 }: { index: number; onIndex: (index: number) => void; panes: ReactNode[]; columns?: number }): JSX.Element {
   const pages = pagesIn(panes.length, columns);
   const strip = useRef<HTMLDivElement>(null);

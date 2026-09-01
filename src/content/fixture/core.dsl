@@ -1,16 +1,6 @@
-// The engine's own furniture. This world is not content: it ships to nobody, no author edits it,
-// and it changes only when the engine changes. It is what the suite stands on so that editing
-// anything under `content/` cannot redden a test — the corpus's own verdict is the oracle's, and
-// `docs/authoring-split/` says why.
-//
-// Keep it small and keep it complete. Every kind the engine has a rule about wants one section
-// here, because a rule with nothing to fire on in this world is a rule the suite cannot reach.
-
 # info core
 version: 1.0.0
 pack: fixture
-
-// --- variables ---
 
 # variable travel-seconds
 value: 3
@@ -26,8 +16,6 @@ value: 12
 
 # variable map-grid
 value: 140
-
-// --- groups ---
 
 # group thing
 title: Thing
@@ -63,8 +51,6 @@ colour: #f87171
 title: Skilling
 colour: #a78bfa
 
-// --- stats ---
-
 # stat attack
 base: 10
 
@@ -83,8 +69,6 @@ base: 60
 # stat max-health
 base: 30
 
-// Nobody mends by standing about in this world: a loaf or a bench is what mends you, so what either
-// is worth can be read off a pool that would otherwise have stood still.
 # stat regeneration
 base: 0
 
@@ -96,14 +80,9 @@ group: skilling
 base: 8-14
 group: skilling
 
-// A ceiling nobody is born with: a player has this pool only while carrying something that grants
-// it, and emptying it costs them that thing. Two items grant it, so the table that takes it back has
-// two to name.
 # stat line-strength
 base: 0
 group: skilling
-
-// --- pools ---
 
 # resource health
 max: max-health
@@ -128,19 +107,13 @@ take: 1 stout-twine
 # event inventory-changed
 trigger: inventory-changed
 
-// --- who is on whose side ---
-
 # faction world
 
 # faction player
 
 # faction vermin
 
-// --- what the player carries away from a beating ---
-
 # flag fainted
-
-// --- what may be worn ---
 
 # slot main-hand
 at: 1 1
@@ -151,23 +124,17 @@ at: 1 2
 # slot gloves
 at: 2 1
 
-// --- what may be trained ---
-
 # skill digging
 stat: digging-rate
 
 # skill scavenging
 stat: scavenging-rate
 
-// --- what a life is lived as ---
-
 # race human
 +5% max-health
 
 # race badger
 +5% defense
-
-// --- passives ---
 
 # passive hale
 +10 max-health
@@ -180,8 +147,6 @@ stat: scavenging-rate
 
 # passive fortune
 +2% max-health
-
-// --- items ---
 
 # item copper-coin
 title: Copper Coin
@@ -202,8 +167,6 @@ slot: main-hand
 value: 12
 +2 attack
 
-// A thing that arrives as a copy of its own, rolled once on arrival, so what is worn is a minted id
-// and not the base.
 # item leather-gloves
 title: Leather Gloves
 examine: Soft, and stained where the fingers go.
@@ -232,7 +195,6 @@ title: Stout Twine
 value: 6
 +9 line-strength
 
-// Written to prove the engine works, and refused wherever anything a player can reach names it.
 # item proving-token
 DEBUG
 
@@ -240,8 +202,6 @@ DEBUG
 title: Rope
 examine: Twelve feet of it, coiled and stiff.
 value: 5
-
-// --- a plane to spend points on ---
 
 # cluster-jewel keen-edge
 title: Keen Edge
@@ -257,8 +217,6 @@ shape: wheel
 open-connections: e, se
 passives: 1 warded, 2 hale, 3 fortune, 5 hale, 6 warded, 7 keen
 
-// A thing with a plane of its own, so points dropped with it have somewhere to be spent and a jewel
-// has a socket to go into.
 # cluster-jewel spade-core
 title: Spade Core
 examine: The haft is bored through, end to end.
@@ -285,8 +243,6 @@ title: Stout Heart Jewel
 examine: It does not add. It insists.
 cluster-jewel: stout-heart
 
-// A jewel that names none: the one it is is written out under it, stands at this item's own id, and
-// says these words.
 # item quiet-hour-jewel
 title: Quiet Hour Jewel
 examine: An hour nobody asked after, kept in iron.
@@ -295,8 +251,6 @@ cluster-jewel:
   shape: spindle
   open-connections: e
   passives: 1 hale, 2 keen, 3 warded
-
-// --- somewhere to make something ---
 
 # station bench
 
@@ -308,8 +262,6 @@ say: The tails twist up into something that will hold.
 skill: scavenging 10
 time: 2
 
-// --- what drops off a rat ---
-
 # droptable vermin-drops
 give: 1 rat-tail
 one of:
@@ -317,9 +269,6 @@ one of:
   scavenging-rate: give: 1 twine
   1x: nothing
 
-// --- the one action everything fights with ---
-
-// Written to prove the engine works and reachable by nobody, which is what DEBUG is for.
 # entity proving-dummy
 DEBUG
 faction: world

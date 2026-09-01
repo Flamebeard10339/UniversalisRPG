@@ -101,8 +101,6 @@ export function layerSpan(offsets: readonly number[], layer: number, dy: number)
   return toward === undefined ? 0 : Math.abs(toward - offsets[layer]);
 }
 
-// Where the player is, named the way every reader of it names one: the layer and the subpage
-// actually shown, which is not the same as the index held, since dev mode adds pages.
 export interface ShellState {
   layer: LayerId;
   subpage: LabelId;

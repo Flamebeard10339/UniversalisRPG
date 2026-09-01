@@ -3,9 +3,6 @@ import { splitSections } from '../grammar/structure';
 import { declaredKey } from './resolve';
 import type { ModuleSource } from './universe';
 
-// A section as its author wrote it rather than as the printer would write it back: a canonical
-// re-print drops the comments standing above a section, and an author handed one back to edit would
-// lose them on every pass.
 export interface WrittenSection {
   kind: string;
   id: string | undefined;
@@ -24,7 +21,6 @@ export function writtenSections(source: string): WrittenSection[] {
   }));
 }
 
-// The section a module is headed by, which is where its own name is written.
 export const HEADING_KIND = 'info';
 
 export interface AddressedSection {
@@ -39,11 +35,6 @@ export interface WrittenModule {
   sections: AddressedSection[];
 }
 
-// Everything one module wrote, at the address the loader files it under. A module is which module
-// its own heading names, and an id inside it is written module-local, so the loader's own answer for
-// what that id is addressed as is asked for rather than spelt out again. Reading a section out,
-// listing a kind, refusing an id and drawing the editing page all come off this one walk, so what
-// can be handed back and what it can be called are the same set and cannot say different things.
 export function addressedSections(source: ModuleSource): WrittenModule {
   const written = writtenSections(oneNewline(source.text));
   const module = written.find((section) => section.kind === HEADING_KIND)?.id ?? source.name;

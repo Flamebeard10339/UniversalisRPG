@@ -20,15 +20,17 @@ const SPANISH = { name: 'island-es', text: ['# info island-es', 'version: 1.0.0'
 const english = () => localizerFor(loadInEnglish(ISLAND), 'en');
 const spanish = () => localizerFor(loadUniverse([engineLocale(), { name: 'island', text: ISLAND }, SPANISH]), 'es');
 
-function unkeyedEngineTextDoesNotCompile(): void {
-  const localizer = english();
-  // @ts-expect-error c2: an engine string with no key
-  localizer.engine('You have died.');
-  // @ts-expect-error c2: a key one letter out
-  localizer.engine('engine.travel.too');
-}
+type EngineArgument = Parameters<ReturnType<typeof english>['engine']>[0];
+type RefusedByEngine<Candidate extends string> = Candidate extends EngineArgument ? false : true;
+
+const refusesAnEngineStringWithNoKey: RefusedByEngine<'You have died.'> = true;
+const refusesAKeyOneLetterOut: RefusedByEngine<'engine.travel.too'> = true;
 
 describe('the engine speaks in keys (c2)', () => {
+  it('takes a key, and no engine string that is not one', () => {
+    expect([refusesAnEngineStringWithNoKey, refusesAKeyOneLetterOut]).toEqual([true, true]);
+  });
+
   it('ships an English pattern for every key the union holds, and no other key', () => {
     const shipped = loadInEnglish('').locales.declared.get('en');
 
@@ -97,8 +99,6 @@ island.item.apple.examine: Verde, y sonrojada por un lado.`,
   });
 });
 
-void unkeyedEngineTextDoesNotCompile;
-
 describe('an id survives translation, and prose does not', () => {
   const ISLAND_WITH_GHOSTS = ['# info island', 'version: 1.0.0', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# item rope', 'title: Rope'].join('\n');
   const PRUNE_ES = [
@@ -159,10 +159,6 @@ describe('an action is displayed under the address it is identified by', () => {
   });
 });
 
-// Over the standing world rather than over core alone: a `# action` is a verb shared by whoever
-// brings it, and the two ends of that sharing — the player who swings and the thing swung at — are
-// not both declared in one module, so a world small enough to hold only one of them cannot say
-// anything about the other.
 describe('one line translates an action for every owner that performs it (c7)', () => {
   const world = fixtureSources();
   const english = loadUniverse([...world]);
@@ -170,9 +166,6 @@ describe('one line translates an action for every owner that performs it (c7)', 
   const locale = ['# info isla-es', 'version: 1.0.0', 'dependencies:', ...world.map((each) => `  ${each.name}`), '', '# locale es', ...declarations.map((id) => `${english.namespace.ownerOf('action', id) ?? ''}.action.${id.split('.').pop()}.${id.split('.').pop()}: ES ${id}`)];
   const registry = loadUniverse([...world, { name: 'isla-es', text: locale.join('\n') }]);
   const say = localizerFor(registry, 'es');
-  // Only the ones a `# action` declares: an action minted onto an owner — the examine every thing
-  // carries — is keyed under that owner rather than under a declaration, so it is not what a line
-  // shared between performers is about.
   const shared = new Set(declarations);
   const performed = everyActionTable(registry).flatMap(([kind, ownerId, actions]) =>
     actions.filter((action) => declaredId(action) !== undefined && shared.has(declaredId(action)!)).map((action) => ({ kind, ownerId, action })),
@@ -208,7 +201,6 @@ describe('a note an author left is dropped from every line the game says', () =>
     expect(localizer.title('item', 'island.rope')).toBe('Rope');
   });
 
-  // The subjects are every key the engine can say, taken from the registry, so a kind or a field added next month is proved here with no edit. What a key is measured against is the English with any note the author already left taken off it — a corpus that ships its own rough lines is the point of the mark, and comparing against the raw declaration would fail the moment one appeared.
   it('drops it from every key the shipped corpus can address, whatever shape that prose has', () => {
     const shipped = withEngineLocale([fixtureModule('core')]);
     const plain = loadUniverse(shipped);

@@ -1,44 +1,30 @@
-// The kind of thing a placeholder names, under the placeholder's own name. A placeholder is called after what it names — `<item>` names a # item — so only one that is not says so here, and `null` says one whose name reads like a kind names nothing.
 export type Names = Readonly<Record<string, string | null>>;
 
-// The parser that writes a placeholder's value, under the placeholder's own name, where the placeholder holds a grammar rather than a name. A thunk, because a grammar may be written out of itself.
 export type Holds = () => Readonly<Record<string, Parser<unknown>>>;
 
-// What a form's placeholders hold, which every form carries the same way whether it is one line an author writes or one value inside it.
 export interface Filled {
   names?: Names;
   holds?: Holds;
 }
 
-// A form is what an author is shown: literal text, `<a placeholder>`, `[an optional part]`, and a trailing `, …` for a list.
 export interface Parser<T> extends Filled {
   parse(cursor: Cursor): T;
   print(value: T): string;
   forms: readonly string[];
   examples: readonly string[];
-  // What an author calls this grammar where a line points at it rather than writing its shapes out. A grammar that has one is written out once under that name, and every line taking a value of it says `<name>`; one without is short enough to read where it stands.
   called?: string;
-  // What is said beside one of this parser's shapes, under the shape itself. A shape whose meaning a
-  // reader cannot get off its own letters says so here, where the shape is declared, rather than at
-  // each of the sites that take one.
   notes?: Readonly<Record<string, string>>;
 }
 
-// A block of lines that is one grammar wherever it is written, under the name an author calls it. Laid
-// on the array rather than on each line, because it is the block that is the grammar and a line of it
-// says nothing about where it stands; and read back by whatever writes the page out, so a block met a
-// second time is pointed at rather than written again however its site parameterised it.
 const CALLED = Symbol.for('grammar.block.called');
 
 export const calledBlock = (called: string, lines: Written[]): Written[] => Object.defineProperty(lines, CALLED, { value: called });
 
 export const blockCalled = (lines: readonly Written[]): string | undefined => (lines as { [CALLED]?: string })[CALLED];
 
-// One line an author may write. A `block` says what its indented lines hold, and is a thunk because a result block holds results.
 export interface Written extends Filled {
   form: string;
   example: string;
-  // The named grammar this shape is one of, where a site writes the shapes out because the engine needs them to tell this line from another. The page says the name instead, once, rather than spelling that grammar a second time.
   of?: string;
   family?: string;
   note?: string;

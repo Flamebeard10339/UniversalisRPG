@@ -8,19 +8,12 @@ export const MEMBER_KINDS: readonly string[] = [DIALOGUE_NODE, ACTION_MEMBER];
 
 export const qualify = (namespace: string | null, id: string): string => (namespace === null ? id : `${namespace}.${id}`);
 
-// Whether an id names the section a key holds. An id may be written whole or from any segment
-// boundary inward, so the shorter of the two is what the other has to end with.
 export const namesSection = (key: string, written: string): boolean => key === written || key.endsWith(`.${written}`);
 
-// Neither of two ids is known to be the fuller one: a view publishes a whole address and an author
-// writes as little of it as says which section, so either may be the short way of writing the other.
 export const sameSection = (one: string, other: string): boolean => namesSection(one, other) || namesSection(other, one);
 
 const OWNER_KINDED: ReadonlySet<string> = new Set([ACTION_MEMBER]);
 
-// Whether a key of this kind carries its module one segment in, under its owner's kind, rather than
-// as its own first word. Anything reading a module off a key has to know which of the two it is
-// looking at, and this is the one place that says.
 export const keyedUnderOwnerKind = (kind: string): boolean => OWNER_KINDED.has(kind);
 
 export const memberOwnerPrefix = (memberKind: string, ownerKind: string, owner: string): string => (OWNER_KINDED.has(memberKind) ? `${ownerKind}.${owner}` : owner);
@@ -29,10 +22,6 @@ export const memberKey = (memberKind: string, ownerKind: string, owner: string, 
 
 const SELF = 'self';
 
-// A written reference taken apart the way a lookup takes it apart: an author may lead with the kind
-// they are naming and may write `self` for the module they are standing in, and neither word is part
-// of the name being looked up. Anything asking what a reference names asks this rather than reading
-// the spellings off `resolve` again.
 export function spelledSegments(kind: string, raw: string, self: string | null): string[] {
   const segments = raw.split('.');
   if (segments[0] === kind && segments.length > 1) segments.shift();
@@ -80,10 +69,6 @@ export class Namespace {
     throw new DslError(`# ${kind} ${key} is already minted by ${from}, which keys its own words under that name: give this section another id`);
   }
 
-  // A section belongs to the module that wrote it, at the address it was written under: the two are
-  // separate answers, because an id naming another module addresses a section over there without
-  // moving this body into that module's file. Where two modules write at one address the first one
-  // to declare it owns it, and every later body is adding to what it declared.
   declare(kind: string, owner: string | null, key: string): string {
     const from = this.minted.get(`${kind} ${key}`);
     if (from !== undefined) this.refuseSquat(kind, key, from);
@@ -94,10 +79,6 @@ export class Namespace {
     return this.put(kind, owner, key);
   }
 
-  // A name the engine puts in a kind's id space on an author's behalf. Nothing may be authored there:
-  // the two would file their words under one key and whichever loaded last would silently win. It is
-  // held at the root where every section that mints it mints it the same way, and under a module where
-  // one section of that module is the whole of what stands there.
   mint(kind: string, id: string, from: string, owner: string | null = null): string {
     if (!this.minted.has(`${kind} ${id}`) && this.has(kind, id)) this.refuseSquat(kind, id, from);
     this.minted.set(`${kind} ${id}`, from);
@@ -118,10 +99,8 @@ export class Namespace {
     }
   }
 
-  // The same declarations under another module's name. What a key looks like is this class's to know, so renaming one is too — a caller that rewrote the registry's maps and left this behind would hold a registry whose two halves disagree about what exists.
   renamed(from: string, to: string): Namespace {
     const under = (key: string): string => (key === from ? to : key.startsWith(`${from}.`) ? `${to}${key.slice(from.length)}` : key);
-    // A member keyed under its owner's kind carries the module name one segment in, so the prefix a rename rewrites starts after that word.
     const beneath = (kind: string, key: string): string => {
       if (!OWNER_KINDED.has(kind)) return under(key);
       const at = key.indexOf('.');

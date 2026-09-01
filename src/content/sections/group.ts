@@ -14,8 +14,6 @@ export interface Group {
   standsFor?: QuestStanding;
 }
 
-// A section kind, written where a group says which kinds fall to it. Nothing declares one, so it is
-// not an id and the reference walk leaves it alone.
 export const kindName: Parser<string> = {
   parse: id.parse,
   print: id.print,
@@ -23,9 +21,6 @@ export const kindName: Parser<string> = {
   examples: ['item', 'entity'],
 };
 
-// Which of a quest's three standings this group means. The engine has no ids of its own for them —
-// what a journal fills a row with and what it calls that row are both read off whichever group says
-// it stands here, so a world names its own groups and the engine names none of them.
 const standingValue: Parser<QuestStanding> = {
   parse(cursor) {
     const start = cursor.pos;
@@ -64,8 +59,6 @@ export const group = section<Group>()({
   validate: (value) => (value.colour ? undefined : 'requires a colour:, which is what everything in the group is drawn in'),
 });
 
-// The site every kind that belongs to a group writes it at. Written once, so a kind that gains a
-// group gains its parser, its printer, its reference walk and its offers along with it.
 export const GROUP_FIELD = {
   parser: id,
   names: { id: 'group' },
@@ -75,9 +68,7 @@ export const GROUP_FIELD = {
 
 export const standardGroup = (groups: ReadonlyMap<string, Group>, kind: string): Group | undefined => [...groups.values()].find((each) => each.standardFor.includes(kind));
 
-// The group a world says means this standing of a quest, or none where it says nothing.
 export const standingGroup = (groups: ReadonlyMap<string, Group>, standing: QuestStanding): Group | undefined => [...groups.values()].find((each) => each.standsFor === standing);
 
-// The group a section belongs to: the one it names, or the one the world declared standard for its kind.
 export const groupOf = (groups: ReadonlyMap<string, Group>, kind: string, named: string | undefined): Group | undefined =>
   (named === undefined ? undefined : groups.get(named)) ?? standardGroup(groups, kind);

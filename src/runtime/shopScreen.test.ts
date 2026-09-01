@@ -50,8 +50,6 @@ const said = (state: GameState): string[] => state.log.map(String);
 const answered = (state: GameState, written: string) => countSubmit({ ...countFrame('stall', 'buy', 'nail'), answers: { count: written } }, state, registry);
 
 describe('what a counter does with what is written in its count box', () => {
-  // The screen has to be leavable without buying anything, and leaving is not a mistake. Every way of
-  // naming none of a thing comes back to the counter with nothing said at the player.
   it('comes back to the counter saying nothing when the player names none of it', () => {
     for (const written of [BACK, '', '   ', '0']) {
       const state = carrying({ coin: 40 });
@@ -88,8 +86,6 @@ describe('what a counter does with what is written in its count box', () => {
 describe('the two sides of a counter, as the screen publishes them', () => {
   const counter = (state: GameState) => shopOptions(shopFrame('stall'), state, registry)[0]!;
 
-  // The sides are what the rows name and nothing lists them, so a counter with nothing to sell back
-  // has one side and a counter with both has two, without either being written down anywhere.
   it('grows a side when a row names one, and has none where no row does', () => {
     const empty = carrying({ coin: 40 });
     expect(partsOf(counter(empty)).parts.map((part) => part.under)).toEqual(['buy']);
@@ -104,8 +100,6 @@ describe('the two sides of a counter, as the screen publishes them', () => {
     expect(partsOf(counter(state)).loose.map((each) => each.choice.value)).toEqual([LEAVE]);
   });
 
-  // What the grid draws in its three places, published as figures rather than as a sentence to be
-  // read back apart: the price and the count reach every surface as the numbers the engine folded.
   it('publishes each row as what the thing is, what it goes for and how many there are', () => {
     const state = carrying({ coin: 40, nail: 1 });
     const rows = partsOf(counter(state)).parts.flatMap((part) => part.choices.map((each) => each.choice.cell!));

@@ -82,7 +82,6 @@ export function rename(files: readonly TextFile[], from: string, to: string): Re
     return refused([`The corpus does not load once ${from} is written as ${to}.`, ...reloaded.diagnostics.map(formatModuleDiagnostic)]);
   }
 
-  // What the rename should have done to every key is the namespace's own to say, so the proof derives its subjects rather than listing the sites a module id reaches.
   const drift = differences(loaded.registry.namespace.renamed(from, to).snapshot(), reloaded.registry.namespace.snapshot());
   if (drift.length > 0) {
     return refused([`Renaming ${from} to ${to} did not leave the registry it should have.`, ...drift.slice(0, 20), ...(drift.length > 20 ? [`… and ${drift.length - 20} more`] : [])]);

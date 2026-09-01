@@ -21,7 +21,6 @@ import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } fr
 import { actionLinesWritten } from '../grammar/action';
 import { fixtureSources } from '../content/worldFixture';
 
-// The world the tutorial is played in: the engine's furniture and the town Miki's house stands in.
 const tutorial = (): Registry => loadUniverse(withEngineLocale(fixtureSources()));
 
 function primed(registry: Registry, diff: SaveDiff): PlaySession {
@@ -367,9 +366,6 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     expect(choiceIds).not.toContain('travel:fixture-town.cellar');
   });
 
-  // The road out of the green is `gate while side-door.unlocked`, so the door already governed it
-  // and was still only a thing to look at. Now the door is what the player walks through, and the
-  // room stops drawing a way out beside it that nothing in the room offers.
   it('hands the road out of the green to the side door once the door will open', () => {
     const registry = tutorial();
     const locked = ids(view(startSession(registry)));
@@ -377,8 +373,6 @@ describe('travel edges aliased by a free entity relocate are hidden', () => {
     expect(locked).not.toContain('travel:fixture-town.gate');
     expect(locked).not.toContain('use:entity.fixture-town.side-door.step-through');
 
-    // A masked thing offers nothing but the look that reads it, so the road stands until the
-    // player has met the door — which is the fallback that keeps a room from stranding anyone.
     const session = primed(registry, { flags: { 'fixture-town.side-door.unlocked': true } });
     expect(ids(view(session))).toContain('travel:fixture-town.gate');
     readRoom(session);
@@ -717,9 +711,6 @@ title: Mitten
 slot: hand
 `;
 
-// One of every shape an in-flight action comes in: contested and depleting, plain and timed, and
-// capped by attempts:. The claim below takes its subjects off what this world offers where the
-// player stands, so a shape added here is covered with no edit to the claim.
 const ACTION_SHAPES = `
 # stat attack
 base: 10
@@ -1161,8 +1152,6 @@ roast:
     expect(() => wait(session, 3)).not.toThrow();
   });
 
-  // The other half — an action aimed at nothing saying nothing — is the `midbake` claim below,
-  // whose `toEqual` holds the whole shape and so fails on a field appearing where none belongs.
   it('says who the action under way is aimed at, addressed and named the way a choice says what offers it', () => {
     const session = startSession(loadInEnglish(FIGHT_MODULE));
     view(session);
@@ -1173,7 +1162,6 @@ roast:
     expect(v.action!.detail).toBe('Dummy');
   });
 
-  // A seat carries an address, and not every address is an entity: walking a road seats the road.
   it('is aimed at nobody when what the seat holds is not an entity', () => {
     const road =
       FIXTURE_WORLD +
@@ -1492,8 +1480,6 @@ describe('a craft is one string with one key', () => {
   });
 });
 
-
-// A base drops as a copy of its own, so a fixture that wants one carried spells it as an instance.
 const aCopyOf = (template: string, jewel: string | null): Record<string, unknown> => ({
   kind: 'item',
   template,
@@ -1737,11 +1723,6 @@ describe('an entity puts the offer it mints second', () => {
 
   const world = (): Registry => loadUniverse(withEngineLocale(fixtureSources()));
 
-  // Every entity the shipped world stands anywhere, with the offers it makes where it stands and
-  // the id of the one it minted. The subjects come off the corpus and off `isMintedAction`, so an
-  // entity, an action or a second minted offer written next month is held to this with no edit
-  // here. One entity's offers are the choices carrying it as `detail` — the key the app groups a
-  // sheet by, and the run the terminals print it in.
   function groups(registry: Registry): Group[] {
     const found: Group[] = [];
     for (const location of registry.locations.values()) {
@@ -1775,9 +1756,6 @@ describe('an entity puts the offer it mints second', () => {
     }
   });
 
-  // Something fought reaches the offer list by a different road — the player's own two-sided
-  // actions, aimed at whatever is standing here — so a rule that only held for what an entity
-  // writes itself would pass the claim above and still put examine first on every rat.
   it('holds over something fought as well as something only acted on', () => {
     const registry = world();
     const subjects = speaking(registry);
@@ -1789,8 +1767,6 @@ describe('an entity puts the offer it mints second', () => {
   });
 });
 
-// The gates the grammar declares over whether an action is offered, read off its own field table
-// rather than listed here, so a third one added next month has to answer this claim.
 const OFFERED_WHEN = actionLinesWritten()
   .filter((line) => line.family === 'offered when')
   .map((line) => line.form.slice(0, line.form.indexOf(':')));
@@ -1810,8 +1786,6 @@ poke:
   say: The thing is poked.
 `;
 
-// `time` starts at zero, so one of these two stands and the other does not, whichever way a gate
-// reads its condition — which is what lets one claim ask every gate the same question.
 const STANDS = 'time < 100';
 const FAILS = 'time > 100';
 const POKE = 'use:entity.thing.poke';
@@ -1971,10 +1945,6 @@ hoist:
   say: The gate grinds up.
 `;
 
-// A fight reaches the engine two ways, and only one of them can name a foe that is not there. What
-// the room offers is built from who is standing in it, so a felled foe stops being offered at all —
-// nothing is hidden and nothing refuses. A directive names a foe outright, from a `# test` line or
-// the terminal, and reaches past the offer; that is the path with words to say.
 describe('a fight named on a foe that is not standing here', () => {
   const yard = (): PlaySession => startSession(loadInEnglish(YARD));
 
@@ -2023,10 +1993,6 @@ describe('a fight named on a foe that is not standing here', () => {
   });
 });
 
-// The same question of an entity's own action rather than of a foe, reached the same one way: the
-// room's offers are built from who stands in it, so only a directive names an entity that is not
-// there. What separates the winch from the troll is that no room stands the winch at all — it is
-// nowhere rather than somewhere else, which is what a lever a player can never walk up to is.
 describe('an entity action named on an entity that is not standing here', () => {
   const yard = (): PlaySession => startSession(loadInEnglish(YARD));
 
@@ -2072,12 +2038,6 @@ describe('an entity action named on an entity that is not standing here', () => 
     expect(use(yard(), 'winch', 'crank').said.map(String)).toEqual(['Something far off clunks and gives.']);
   });
 
-  // Where the thing is comes before whether the world offers this at all, and this pair is the whole
-  // of that ruling. `hidden if:` gates what a room offers, and a room the player is not standing in
-  // offers them nothing to be gated — so from over here the gate is not a fact about anything, and
-  // the answer they get is the one they can act on. Standing where it stands, the same gate is the
-  // world saying this was never on offer, and a directive naming it anyway is the directive's
-  // mistake rather than the player's.
   it('refuses a hidden action of an entity in another room in the player words, rather than raising', () => {
     expect(use(yard(), 'gate-troll', 'cross').said.map(String)).toEqual(['There is no Gate Troll here.']);
   });
@@ -2090,10 +2050,6 @@ describe('an entity action named on an entity that is not standing here', () => 
   });
 });
 
-// A place nests actions the same way an entity does and reaches the player the same one way — the
-// room they are standing in offers them, and only a directive can name one anywhere else. So it is
-// asked the same question, off the list that answers it for a room: a place is somewhere by being
-// itself, and every place the registry holds is one the player is either in or not.
 describe('an action named on a room the player is not standing in', () => {
   const yard = (): PlaySession => startSession(loadInEnglish(YARD));
 
@@ -2121,10 +2077,6 @@ describe('an action named on a room the player is not standing in', () => {
   });
 });
 
-// A fight opened on a foe no room stands anywhere. Nothing offers it, so only a directive reaches
-// here — and the loop asks where its foe is rather than whether this room stands it, because a
-// template the world never placed is not missing from this room and stopping the fight over that is
-// the room answering a question about something it was never going to hold.
 describe('a fight named on a foe no room stands', () => {
   it('goes on once the clock moves, rather than stopping the moment it is asked to run', () => {
     const session = startSession(loadInEnglish(YARD));
@@ -2137,9 +2089,6 @@ describe('a fight named on a foe no room stands', () => {
   });
 });
 
-// The subjects are the shipped world's own placements rather than a list, so an entity a room stands
-// next month is held to this with no edit — and the pair of claims is what makes the cut a rule
-// instead of a repair: being placed somewhere is what makes *not here* a thing that can be said.
 describe('every entity the shipped world places, named by a directive from a room that does not stand it', () => {
   const registry = loadUniverse(fixtureSources());
   const placed = entitiesStood(registry.locations);
@@ -2153,7 +2102,7 @@ describe('every entity the shipped world places, named by a directive from a roo
       const armed = armAction('entity', entityId, actionAddress(action), registry, state).armed;
       return { armed, said: state.log.length === 0 ? '' : String(state.log[state.log.length - 1]) };
     } catch {
-      return undefined; // Nothing should raise from over there, so this is a bucket the claim empties.
+      return undefined;
     }
   };
 
@@ -2178,8 +2127,6 @@ describe('every entity the shipped world places, named by a directive from a roo
     expect(told.length).toBe(doors.length);
   });
 
-  // Two of them in the shipped world, and the pair is the point: the entity the game is played as,
-  // and a DEBUG chest kept for the two growth recordings to name. Neither is anywhere to be missing from.
   it('arms just the same for an entity no room stands anywhere, which is what a directive-only lever is', () => {
     const nowhere = [...registry.entities.keys()].filter((entityId) => !placed.has(entityId));
     const refused: string[] = [];
@@ -2195,7 +2142,6 @@ describe('every entity the shipped world places, named by a directive from a roo
   });
 });
 
-// Three places in a line, walked out and back so the far end is on the map without being next door.
 const A_ROW = `
 # variable travel-seconds
 value: 1

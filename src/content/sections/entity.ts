@@ -19,7 +19,6 @@ export type { Action } from '../../grammar/action';
 
 export const declaredId = (action: Action): string | undefined => (action as { id?: string }).id;
 
-// `2 bandit` mints two fight-scoped copies; a bare name joins the one entity that already exists.
 export interface Ally {
   count?: number;
   entity: string;
@@ -62,15 +61,8 @@ export interface Entity extends AuthoredEntity {
   handlers: Handler[];
 }
 
-// The address an entity's `examine:` is minted at. A surface that has to pick that offer out of the
-// list — the sheet reads a thing by its cell rather than by a control of its own — asks here for the
-// address rather than writing the word down a second time.
 export const EXAMINE_FIELD = 'examine';
 
-// `examine:` is a thing a player does, not a field a surface has to know how to draw. It stands in
-// the entity's own action list, saying the words under the key the field already holds them at, so
-// every driver offers it the way it offers any other action — and it marks itself run, so nothing
-// else has to notice that it was.
 export function mintedActions(value: { id: string; examine?: string }, namespace: string | null): Action[] {
   if (value.examine === undefined) return [];
   const said: ActionResult = { kind: 'say', text: value.examine, key: localeKey(namespace, 'entity', value.id, EXAMINE_FIELD) };
@@ -80,14 +72,8 @@ export function mintedActions(value: { id: string; examine?: string }, namespace
 
 const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] => mintedActions(value, null).map((action) => ({ action, from: `${EXAMINE_FIELD}:` }));
 
-// Which of an entity's assembled actions it minted rather than its author writing. Asked of the
-// linked list, where an action no longer remembers where it came from.
 export const isMintedAction = (action: Action): boolean => declaredId(action) === EXAMINE_FIELD;
 
-// Whether walking up to this entity is worth a player's turn. `actions` is asked after linking, so
-// an entity's own blocks, what it `uses:` and what its `examine:` mints are one question here.
-// `requires:` and `hidden if:` are deliberately unread: something offered only once a flag is set
-// is still something.
 export function offersNothing(entity: Entity, dialogues: ReadonlyMap<string, Dialogue>, stoodIn: string): string | undefined {
   if (entity.actions.length > 0 || entity.shop !== undefined || entity.capabilities.length > 0) return undefined;
   if (Object.keys(entity.stats).length > 0 || spokenBy(dialogues, entity.id).length > 0) return undefined;
@@ -215,7 +201,6 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   },
 });
 
-// A block is pruned by everything walking it names, which is the walk itself asked one block at a time: a handler answering an event that is gone goes, and so does one whose results name what nothing declares any more.
 const pruneBlocks = (list: readonly EntityBlock[], where: string, at: Pruning): EntityBlock[] => list.filter((block) => at.intact(() => blocks([block], where, at.visit)));
 
 function blocks(list: unknown, where: string, visit: Visit): void {

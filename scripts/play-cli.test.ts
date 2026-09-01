@@ -68,8 +68,6 @@ function driver(text: string | readonly ModuleSource[], speed = 1, driving = fal
   return newContext(session, view(session), { recorder, speed, driving });
 }
 
-// /look re-reads what the context is holding, so a room read behind its back is read again here.
-// Reading one says what it reads, and those lines are drained so what comes next is the room.
 function read(ctx: CommandContext): CommandContext {
   readRoom(ctx.session);
   view(ctx.session);
@@ -92,17 +90,12 @@ describe('play-cli renders what a command result says happened', () => {
     expect(lines[0]).toBe('The Green (fixture-town.green)');
     expect(lines[1]).toBe('Cropped grass, a bench, and three ways out of it.');
     expect(lines[2]).toBe('Here: The Keeper, The Side Door, The Bench');
-    // A pool is drawn as its name, a bar and what it stands at over its ceiling. Nobody has been
-    // hurt yet, so the bar is full and the two figures read alike — which is the shape of the line
-    // rather than the figure the sheet of the day puts in it.
     expect(lines[3]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
     expect(lines).toContain('  1) [Presence] The Keeper: Talk');
     expect(lines).toContain('  2) [Presence] The Keeper: Examine');
     expect(lines[lines.length - 1]).toBe('[time: 0s]');
   });
 
-  // The mask is written into the view, so a terminal draws it without being taught to: the room
-  // arrives as a list of unknowns and the names come out of it one look at a time.
   it('names nothing here the player has not read, and every name once they have', () => {
     const ctx = driver(TUTORIAL);
     const unread = shown(runLine(ctx, '/look'))[2];
@@ -170,11 +163,6 @@ describe('play-cli renders what a command result says happened', () => {
     runLine(ctx, '/wait 7');
     const sheet = JSON.stringify(Object.fromEntries(sessionStatus(ctx.session).stats.map((row) => [`${row.title} (${row.id})`, row.value])));
     const state = shown(runLine(ctx, '/state'));
-    // Every line the readout is made of, and no other: seven of its own, a line for each pool the
-    // player has, and the count of what has been found. The pools are asked of the session rather
-    // than counted here, so a world that writes a second one is drawn the same way with nothing
-    // edited. What the world holds beyond the one room stood in here is its size rather than this
-    // readout's shape, so the line that counts it is read for its form.
     const pools = sessionStatus(ctx.session).resources.length;
     expect(pools).toBeGreaterThan(1);
     expect(state).toHaveLength(8 + pools);
@@ -184,29 +172,17 @@ describe('play-cli renders what a command result says happened', () => {
       'Flags: {"fixture-town.green.touched":true,"fixture-town.green.discovered":true,"fixture-town.well.discovered":true,"fixture-town.store.discovered":true,"fixture-town.lane.discovered":true}',
       'Inventory: {}',
     ]);
-    // Under the name the world gives a thing as well as the id it is addressed by: an id-only
-    // readout was the whole of what a player at this terminal ever saw of a skill or a stat. The
-    // shape is the claim rather than the list, so a skill the player picks up next month is drawn
-    // the same way with nothing edited here — and every skill they hold has to be on the line.
     expect(state[4]).toMatch(/^XP: \{("[^"]+ \([a-z][a-z0-9.-]*\)":\d+,?)+\}$/);
     for (const row of sessionStatus(ctx.session).xp) expect(state[4]).toContain(`(${row.id})":0`);
-    // Same claim as the line above, for the same reason: the shape, and then every slot the player
-    // actually has, asked of the session rather than written out. Listing them meant a slot the body
-    // grew reddened this file, which is a test naming its subjects rather than deriving them.
     expect(state[5]).toMatch(/^Equipped: \{("[^"]+ \([a-z][a-z0-9.-]*\)":null,?)+\}$/);
     for (const row of sessionStatus(ctx.session).equipment) expect(state[5]).toContain(`(${row.slot})":null`);
     expect(state[6]).toBe(`stats: ${sheet}`);
-    // The readout draws a pool the same way the room does: nobody has been hurt, so the bar is full
-    // and the two figures read alike. What they come to is the sheet's business and not this one's.
     expect(state[7]).toMatch(/^Health: █{10} (\d+(?:\.\d+)?)\/\1$/);
     expect(state[7 + pools]).toMatch(/^discovered: \d+ of \d+ found; not yet found: /);
     expect(state[7 + pools]).toContain('fixture-town.cellar');
     expect(shown(runLine(ctx, '/quit'))[0]).toBe('Location: fixture-town.green');
   });
 
-  // A road whose condition does not hold is still a road, and a map that drew it the same as an
-  // open one would be telling an author they can walk somewhere they cannot. The corpus has no
-  // shut road between two discovered places, so this branch is only reachable from a fixture.
   it('marks a road the map draws but the world will not let anyone walk', () => {
     const ctx = driver(
       FIXTURE_WORLD +
@@ -1533,8 +1509,6 @@ describe('nothing done in dev mode reaches the slot being played (c9)', () => {
     }
   }
 
-  // An author is shown every place on the floor they are looking at, found or not, so that putting
-  // the next place beside the last one is something they can actually see.
   it('draws the whole floor once dev is on, and only what was found before that', () => {
     const game = playing(SAVING_SOURCE + `
 # location shed

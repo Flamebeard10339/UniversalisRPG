@@ -1,28 +1,3 @@
-// The Rat Conspiracy — read off the quest brief handed down for it.
-// Kelsa has felt the ground moving under her land again and this time it has
-// taken a cow rather than turned a hive. She has found the hole and wants it
-// shut, but Tulsa does not let a farmer set a charge on her own say-so, so the
-// errand starts with the duke rather than with a shovel. He wants the hole
-// looked into before it is closed; Kelsa packs the charges anyway, in case
-// looking into it goes badly. It does: the tunnel is thick with feral rats
-// exactly as the sewers are, something bigger and foreign-collared is loose in
-// it besides, and a broken cage with a ratkin manifest in it is what proves
-// none of this got there on its own. The far end comes up on the ratkin
-// border, mustered for more than a border deserves, and that is what sends
-// the player running back to light the fuse rather than to ask more
-// questions.
-//
-// Everything this stands on is tulsa's and birds-and-the-bees': Kelsa, the
-// duke, the pasture, the tunnel mouth, the tunnels with their rats, and the
-// ratkin border past them are all declared in tulsa already; that Kelsa is
-// willing to hire again at all is birds-and-the-bees' own ending. What this
-// file adds is the errand, the charge, the evidence in the tunnel, the muster
-// beyond the border, and the shoring the charge is laid against — patched
-// onto tulsa's own rooms rather than housed in rooms of their own, because
-// unlike birds-and-the-bees' wasp none of it needs a door that only opens for
-// this quest: the rats, the hound and the cage all stand for anyone who walks
-// in, quest or no quest, exactly as tulsa's own feral rats do everywhere else.
-
 # info the-rat-conspiracy
 version: 0.1.0
 pack: quests
@@ -109,31 +84,14 @@ stage settled:
     ask: About the tunnel.
     again: Quiet under there now. However long that lasts.
 
-// --- flags this quest owns ---
-
-// Set once the broken cage in the tunnel gives up its manifest, which is what
-// `into-the-tunnels` is waiting on.
 # flag tunnels-searched
 
-// Set once the charge is laid against the shoring, which is what
-// `set-the-charges` is waiting on and what closes the road back into the
-// tunnel behind it.
 # flag tunnel-sealed
 
-// --- what this quest owes the world ---
-
-// What the charge actually is. Kelsa hands it over already made; nothing
-// here asks the player to gather for it or craft it, because she says
-// outright she started packing before anyone gave her leave to.
 # item blasting-charge
 title: Blasting Charge
 examine: An oilcloth roll packed tight and tied off, with a fuse laid into the seam. Kelsa's own mix, and there is exactly enough of it for one job.
 
-// Proof the tunnel was dug by hands rather than moles: a cage built to hold
-// something and broken from the inside, with a manifest in it that names a
-// schedule rather than an accident. Standing for anyone who walks into the
-// tunnel, same as tulsa's own feral rats do — this quest is what gives the
-// player a reason to search it, not what puts it there.
 # entity shattered-cage
 title: A Broken Cage
 examine: Iron bars bent outward rather than in, and the latch still carries tool marks that no smith in Tulsa left.
@@ -143,10 +101,6 @@ search the wreckage:
   set: tunnels-searched
   say: Under the straw is a scrap of oilskin with a manifest scratched into it in ratkin script — tallies of stock, a route, and a border crossing marked off in charcoal. Whoever is walking beasts into this tunnel is doing it on a schedule.
 
-// The other half of the evidence: not a rat, and not anything Tulsa's own
-// kennels put a collar on. Aggressive like every feral rat around it, so
-// arriving in the tunnel is the whole of starting the fight if the player does
-// not start it first.
 # entity loosed-hound
 title: Loosed Hound
 examine: Something houndish and too big for any kennel in Tulsa, a snapped chain dragging off a collar no smith here forged.
@@ -158,18 +112,10 @@ on death:
   credit:
     say: It goes down still snarling, and the chain comes off the collar in your hand — too fine a link for anything Tulsa forges, and stamped near the clasp with a mark no smith here would put there.
 
-// What the far end of the tunnel is for: more than a border post keeps this
-// side of it. No action beyond examine — this is what the player is meant to
-// see and run from, not fight.
 # entity ratkin-muster
 title: The Muster
 examine: Ranks of ratkin beyond the stakes, more than stand watch on any ordinary border, gear stacked in piles too orderly for a border post.
 
-// The shoring tulsa's own tunnel-mouth already describes as "shored with
-// timber by somebody who knew how" — this is that timber, and what the
-// charge goes against. Sealing the tunnel is written as the shoring's own
-// action rather than as something the charge item does on its own, because a
-// thing done to a place belongs on the place.
 # entity tunnel-shoring
 title: The Shoring
 examine: Timber propping the mouth of the tunnel open, load-bearing enough that pulling the wrong piece would do the job for you.
@@ -189,16 +135,9 @@ lay the charge:
 # location tulsa.ratkin-border
 +entities: ratkin-muster
 
-// The road in is cut once the charge is laid, same as the road into
-// birds-and-the-bees' hive closes behind that fight — except this one was
-// two-way to start with, so closing it is a patch on tulsa's own line rather
-// than a line written fresh: the plain entry is taken back out and a
-// conditional one stands in its place.
 # location tulsa.tunnel-mouth
 -adjacent: tunnels
 +adjacent: tunnels while not tunnel-sealed
-
-// --- tests ---
 
 # save ready-to-hear-the-rumblings
 {"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"birds-and-the-bees.kelsas-hives.settled":true}}

@@ -109,9 +109,6 @@ export const id: Parser<string> = {
   examples: ['rusty-sword', 'forest.clearing'],
 };
 
-// How long something lasts, either counted out on the line or read off a stat when the line runs: a
-// stat standing here is read in seconds, so a stretch that is shorter for one player than another is
-// a number they carry rather than a second shape of the thing that grants it.
 export const durationOrStat: Parser<number | string> = {
   called: 'duration',
   parse: (cursor) => (cursor.peek(/\d/) === null ? id.parse(cursor) : duration.parse(cursor)),
@@ -122,9 +119,6 @@ export const durationOrStat: Parser<number | string> = {
 
 export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
 
-// The one place a word is cased for a player to read. An address is written either way an
-// author is allowed to write one — a hyphenated id or a spaced entry label — so both separate
-// words here, which also makes this its own fixed point: humanizing what it returned returns it.
 export const humanizeEn = (id: string): string =>
   lastSegment(id)
     .split(/[\s-]+/)
@@ -132,9 +126,6 @@ export const humanizeEn = (id: string): string =>
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 
-// The whole of what the engine does when it has to put a name in front of a player and nobody
-// wrote one. Casing is English, so a world playing in another language is given the plain last
-// segment rather than words cased by the wrong rules.
 export const mintedName = (id: string, language: string): string => (language === DEFAULT_LANGUAGE ? humanizeEn(id) : lastSegment(id));
 
 export interface Quantified {
@@ -214,8 +205,6 @@ export const produced: Parser<Produced> = {
   examples: ['arrow', '5 arrow', '5-10 arrow'],
 };
 
-// What a `{…}` a call site fills looks like. Exported because the runtime substitutes into the same shape, and two readings of it would drift the moment either widened.
 export const PARAM = /\{([a-z][a-z0-9-]*)\}/g;
 
-// The parameters a pattern names, in the order it names them. A `{…}` is filled by whatever hands the pattern over, so a string nothing hands over names nothing it will get.
 export const parametersOf = (pattern: string): string[] => [...pattern.matchAll(PARAM)].map((match) => match[1]!);

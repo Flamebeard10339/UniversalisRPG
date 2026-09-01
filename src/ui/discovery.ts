@@ -16,8 +16,6 @@ export const drawnFor = (view: PlayView, asked: number | null, showing: Showing 
   return { plane: sheet.plane, here: sheet.here, sheet };
 };
 
-// Where a place is drawn, in the page's own pixels. The one thing the map pane knows that the sheet
-// does not: the sheet is a map, and a map is not made of pixels.
 export const spotOf = (node: Node, grid: number): Point => ({ x: node.at.x * grid, y: node.at.y * grid });
 
 export const mapBox = (nodes: readonly Node[], grid: number): Box => bounds(nodes.map((node) => spotOf(node, grid)));
@@ -27,9 +25,6 @@ export function walkLine(here: string, journey: PlayView['journey']): string[] {
   return [here, ...journey.legs];
 }
 
-// Which part of the journey a place is. A journey of one leg has the stop it is walking to and the
-// far end it set out for in the same place and says `target`: the far end is the fact the player
-// chose, and the road under their feet already says which way they are going.
 export type Walking = 'here' | 'next' | 'ahead' | 'target';
 
 export function walkingAt(line: readonly string[], node: Node): Walking | undefined {
@@ -40,10 +35,7 @@ export function walkingAt(line: readonly string[], node: Node): Walking | undefi
 }
 
 export interface Walked {
-  // Under the player's feet, or a stretch of the route still to come.
   stretch: 'now' | 'ahead';
-  // Whether the road is drawn the way it is walked. A road is drawn from whichever of its two ends
-  // sorts first, which has nothing to do with which end the player is at.
   along: boolean;
 }
 

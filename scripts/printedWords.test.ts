@@ -52,15 +52,10 @@ describe('no word of the engine is spelled in the source of either driver (c1, c
   });
 });
 
-// Casing a name is one decision, and a second function making it is how `ascend` came to stand
-// beside `Talk to Miki`. The subjects are every module the layer rule sweeps, so a file written next
-// month is asked without anybody remembering to add it here — which is the whole difference between
-// this and a test that names today's callers. Comments are stripped, so prose about the rule is not
-// mistaken for a breach of it.
 describe('one function cases a name for a player (c1, c2)', () => {
   const CASES_A_LETTER = /\.to(?:Locale)?UpperCase\s*\(/;
   const HOME = 'src/grammar/values.ts';
-  const stripped = (file: string): string => stripComments(readFileSync(file, 'utf8')).join('\n');
+  const stripped = (file: string): string => stripComments(readFileSync(file, 'utf8'), file).join('\n');
 
   it('is declared where the sweep exempts, and cases a letter there, so nothing below is vacuous', () => {
     expect(modules).toContain(HOME);
@@ -153,8 +148,6 @@ const SCRIPT: readonly string[] = [
     const bare = SHAPED[spec.name] ?? spec.name;
     return [bare, `${bare} 1`];
   }),
-  // A chest that hands over a thing with a plane and the jewels for it, so what follows reaches the
-  // plane screen without a sheet being written to put one in the player's hands.
   'goto: fixture-town.store',
   'use: entity.fixture-town.chest.open',
   '/inv 1',

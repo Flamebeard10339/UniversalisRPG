@@ -152,9 +152,6 @@ describe('equipment', () => {
     expect(statValue('core.attack', state, world)).toBe(bareAttack);
     expect(statValue('core.defense', state, world)).toBe(bareDefense);
 
-    // Carrying moves nothing and wearing moves both, which is the whole of what a slot is for. The
-    // sizes are the world's to say and are read off it rather than written here, so a fixture rebalanced
-    // next month still proves the same thing.
     equip(state, world, blade);
     equip(state, world, coat);
     expect(statValue('core.attack', state, world)).toBeGreaterThan(bareAttack);

@@ -11,11 +11,6 @@ import { formatPlane } from '../planeView';
 import { drawnCompass, drawnMap } from './mapText';
 import type { Sheet } from '../../src/runtime/map';
 
-// What a command answered with, written out as lines a player reads. Both drivers that put words
-// in front of a player one line at a time — the terminal in scripts/play-cli.ts and the model in
-// scripts/playbot.ts — say it through here, so a command cannot answer one of them and go silent
-// at the other.
-
 export interface PlayerLine {
   readonly words: 'player';
   readonly tone: MessageTone;
@@ -44,10 +39,6 @@ export const oneLine = (localizer: Localizer, parts: readonly Localized[], gap: 
 
 const shownLocations = new Set<string>();
 
-// A choice is answered by where it sits in the view's own list, so what is skipped here still
-// counts: the numbers a reader sees are the numbers the engine takes, with the ways out missing
-// from among them rather than renumbered away. The offer carries its own position for that reason,
-// and nothing here counts a list of its own — a shorter list counted again answers a different choice.
 function formatChoices(choices: readonly OfferedChoice[], localizer: Localizer): PlayerLine[] {
   return choices.map((choice) => {
     const numbered = choice.detail
@@ -84,11 +75,6 @@ function formatResources(resources: PlayView['resources'], localizer: Localizer)
   return lines;
 }
 
-// A location holds a count of its kind and not a roster, so the foe standing after a kill wears the
-// id of the one that fell. `×3` beside the bar is how a reader tells a fresh foe at full health from
-// the one they were hitting healing itself back up. It rides in as part of the meter because a
-// numeral is the same in every language the pool line is written in, and every meter a fight is
-// read off — the encounter view and the live tick both — asks withCount for it.
 export const withCount = (meter: string, remaining: number | null): string => (remaining === null ? meter : `${meter}  ×${remaining}`);
 
 const meterFor = (foe: EncounterFoe): string => withCount(fullBar(foe.current, foe.max), foe.remaining);
@@ -103,12 +89,6 @@ function formatEncounter(encounter: PlayView['encounter'], localizer: Localizer)
   return [...lines, say(oneLine(localizer, meters, '   '))];
 }
 
-// What the open screen is reading, where the view publishes it beside the question rather than in
-// it. Every focus the engine can publish is drawn here, so a screen that is about something is not
-// reached and then found to say nothing.
-// Keyed by the kind itself rather than walked through as a chain of tests, so a focus the engine
-// grows next month does not compile until this file has words for it — the same answer the app's
-// manner table has to give.
 type Drawn<K extends Focus['kind']> = (focus: Extract<Focus, { kind: K }>, v: PlayView, localizer: Localizer) => ReplLine[];
 
 const FOCUS_LINES: { [K in Focus['kind']]: Drawn<K> } = {
@@ -118,9 +98,6 @@ const FOCUS_LINES: { [K in Focus['kind']]: Drawn<K> } = {
     const lines = entry.lines.map((line) => say(line.struck ? localizer.engine('engine.repl.journal.struck', { said: line.said }) : line.said, 2));
     return [say(entry.title), ...(lines.length > 0 ? lines : [say(localizer.engine('engine.shell.journal.untouched'), 2)])];
   },
-  // The stat and where it stands, then one line per share the engine folded to reach it, through the
-  // same `madeOf` the app's screen draws — so the two surfaces cannot come to name different things
-  // as adding to a stat.
   stat: (focus, v, localizer) => {
     const row = v.stats.find((each) => each.id === focus.stat);
     if (!row) return [];
@@ -133,13 +110,10 @@ const FOCUS_LINES: { [K in Focus['kind']]: Drawn<K> } = {
     const plane = v.planes.find((each) => each.instance === focus.instance);
     if (!plane) return [];
     const blank = localizer.identifier('');
-    // What is being grown, named before the diagram of it: a plane drawn with nothing above it left
-    // a reader with a lattice and no word for the thing it belongs to.
     return [blank, plane.title, ...formatPlane(plane, v.equipment.some((row) => row.item === plane.instance), focus.hex, localizer), blank].map((line) => say(line));
   },
 };
 
-// Every kind of subject a screen may have, read off the table that has to answer for all of them.
 export const FOCUS_KINDS: readonly Focus['kind'][] = Object.keys(FOCUS_LINES) as Focus['kind'][];
 
 export function formatFocus(v: PlayView, localizer: Localizer): ReplLine[] {
@@ -167,9 +141,6 @@ function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
   lines.push(say(localizer.engine('engine.repl.modal.asking', { option: asking.label })));
   lines.push(...formatChosen(asking, localizer));
 
-  // A screen that offers no list offers no way out among one either, so the word it leaves by is
-  // written out the way anything typed at this terminal is. Asked of the option rather than of the
-  // screen's name, so any screen that grows a typed question with a way out is drawn with one.
   const leaving = v.modals[v.modals.length - 1]?.leaving;
   if (asking.values === null && leaving) {
     lines.push(note(localizer.engine('engine.repl.modal.leaving', { option: localizer.identifier(asking.key), leaving: localizer.identifier(leaving) }), 2));
@@ -177,9 +148,6 @@ function formatModals(v: PlayView, localizer: Localizer): ReplLine[] {
   return lines;
 }
 
-// The choices under the sides they stand in, where the option names sides, and one flat list where it
-// names none — the same shape the app draws as tabs. The number beside a choice is where it came out
-// of the engine, so grouping them for a reader never renumbers what a player types.
 function formatChosen(asking: PlayView['modals'][number]['options'][number], localizer: Localizer): ReplLine[] {
   if (!asking.values) return [note(localizer.engine('engine.repl.modal.free', { option: localizer.identifier(asking.key) }), 2)];
   const { parts, loose } = partsOf(asking);
@@ -213,19 +181,10 @@ type DumpKey = 'engine.repl.state.flags' | 'engine.repl.state.inventory' | 'engi
 const dumped = (localizer: Localizer, key: DumpKey, held: unknown): ToolLine =>
   note(localizer.engine(key, { [key.split('.').pop()!]: localizer.identifier(JSON.stringify(held)) }));
 
-// A /state line for a field the engine locale has no sentence of its own for is labelled with
-// that field's name out of PlayStatus, never with a second English word for it: the label is then
-// the key an author looks the field up under, and renaming the field stops this compiling.
 const field = (name: keyof PlayStatus, held: string, indent = 0): ToolLine => note(`${name}: ${held}`, indent);
 
-// Under the name the world gives a thing as well as the id it is addressed by. An id-only readout
-// left a player at this terminal never once shown the word `Attack`, which every other surface
-// says: what a thing is called is content, and dropping it is dropping half the sheet.
 const named = (title: Localized, id: string): string => `${title} (${id})`;
 
-// Who the player is, ahead of everything they are carrying. Each row is labelled with the words the
-// engine calls that field by rather than with a second English word for it, so a field the sheet
-// grows arrives here named with nothing edited.
 const formatSheet = (status: PlayStatus): ToolLine[] => {
   const rows = Object.values(status.player).flatMap((row) => (row === null ? [] : [`${row.label}: ${named(row.title, row.id)}`]));
   return rows.length === 0 ? [] : [field('player', rows.join(', '))];
@@ -236,16 +195,11 @@ function formatInventory(status: PlayStatus, localizer: Localizer): ToolLine[] {
   if (Object.keys(status.grown).length > 0) lines.push(dumped(localizer, 'engine.repl.state.grown', status.grown));
   if (status.carried.length > 0) lines.push(field('carried', status.carried.map((row) => `${grouped(localizer, row.group, row.shown)}${row.name === row.shown ? '' : ` [${row.name}]`} x${row.count}${row.worn ? ` worn:${row.worn.title}` : ''}`).join(', ')));
   lines.push(dumped(localizer, 'engine.repl.state.xp', Object.fromEntries(status.xp.map((row) => [named(row.title, row.id), row.value]))));
-  // Every slot, worn or bare — a slot printed only once something is in it leaves an empty-handed
-  // session with nothing to name when it wants to put something on.
   lines.push(dumped(localizer, 'engine.repl.state.equipped', Object.fromEntries(status.equipment.map((row) => [named(row.title, row.slot), row.name]))));
   lines.push(field('stats', JSON.stringify(Object.fromEntries(status.stats.map((row) => [named(row.title, row.id), row.value])))));
   return lines;
 }
 
-// What the player is in the middle of. The only other place a terminal names an action under way
-// is the live tick sheet, which exists only while a TTY is ticking one, so without this row a
-// session that is not ticking has no way to ask what it is doing.
 function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
   if (action === null) return [];
   const counting = action.completion === null ? '' : `, ${tidy(action.completion)} to count`;
@@ -253,9 +207,6 @@ function formatUnderWay(action: PlayStatus['action']): ToolLine[] {
   return [field('action', `${action.label}${aimedAt} ${tidy(action.progress)} after ${action.attempts}${counting}`)];
 }
 
-// How much of the world has been found, and no more. What has been found and how it is joined up is
-// `/map`, which draws the sheet the engine builds; a state dump that drew a second map of its own
-// was the third reading of one thing.
 function formatMap(status: PlayStatus): ToolLine[] {
   const unfound = status.undiscovered.map((each) => `${each.title} (${each.id})`);
   const every = status.discovered.length + unfound.length;
@@ -284,14 +235,9 @@ function formatHelp(entry: CommandHelp): ToolLine {
   return note(`${label.padEnd(HELP_COLUMN)} ${entry.summary}`, 2);
 }
 
-// The map, drawn. The floor being looked at, the floors that may be asked for, the places and the
-// roads between them, then the nine squares a way out is offered in. Nothing is worked out here that
-// the sheet does not already say.
 function formatDrawnMap(sheet: Sheet, localizer: Localizer): ToolLine[] {
   if (sheet.nodes.length === 0) return [note(String(localizer.engine('engine.travel.nowhere')))];
   const floors = sheet.planes.length > 1 ? ` of ${sheet.planes.join(', ')}` : '';
-  // A square says where it goes, not what the choice was called: the list of offers already reads
-  // "Travel to Market Row" out, and nine squares of that is nine copies of one word.
   const titles = new Map(sheet.nodes.map((node) => [String(node.place.id), String(node.place.title)]));
   const indented = (line: string): ToolLine => note(line, line === '' ? 0 : 2);
   return [
