@@ -28,7 +28,6 @@ dependencies:
   combat
   fishing
   cooking
-  thieving
   smithing
   crafting
   ? combat-expansion
@@ -45,10 +44,6 @@ dependencies:
 # flag corners-slathered
 
 # flag wurm-defeated
-
-// Set by the rooftop watch the town keeps for itself, so what is up there is worth
-// noticing once rather than by the hour.
-# flag castle-watched
 
 // How many of Kelsa's hives have been gone through, and on which of her two hive
 // grounds the third one was. Every hive adds to the count and hides itself
@@ -154,7 +149,6 @@ flags: axe-taken
 lift an axe off the rack:
   hidden if: axe-taken
   time: 5
-  xp: thieving.thieving 12
   set: axe-taken
   give: 1 hand-axe
   say: You take the end axe off the rack while the woodcutter is counting somebody else's coin, and you are two stalls away before the gap in it shows.
@@ -167,17 +161,6 @@ title: Market Rooftops
 examine: Tile and thatch over the stalls, the wall-walk one roof away, and the castle's upper windows across the town.
 adjacent:
   market-row
-// Paid once, because there is one thing up here to notice and noticing it twice is not a
-// second thing. Without the guard the view is eight seconds and five experience forever, and
-// with no quest in the world it was the best thieving in Tulsa — `attention-to-detail` writes
-// its own gated watch over this one, so the hole only ever showed with the quests turned off.
-// The roof itself stays: a player may lie on the tile and look as often as they like.
-watch the castle windows:
-  time: 8
-  if not castle-watched:
-    set: castle-watched
-    xp: thieving.thieving 5
-  say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against. It means something to somebody. It does not yet mean anything to you.
 
 # location forge
 x: 9, y: -1
@@ -229,7 +212,7 @@ adjacent:
   tavern-street
   oolga-basement
 entities:
-  oolga, oolgas-counter, house-chest
+  oolga, oolgas-counter
 
 # location oolga-basement
 below oolga-house
@@ -302,8 +285,6 @@ examine: The second floor: bedrooms along one side, and a sewing room at the end
 adjacent:
   castle-hall
   castle-solar
-entities:
-  2 house-chest
 
 # location castle-solar
 above castle-quarters
@@ -320,8 +301,6 @@ title: Castle Cellar
 examine: Casks, cold air, and a drain in the floor carrying the noise of running water.
 adjacent:
   castle-hall
-entities:
-  treasure-chest
 
 // The castle is seven rooms on three floors and a wall around all of it. The
 // region draws that wall: nothing in the engine reads it, and a room inside it
@@ -386,7 +365,7 @@ examine: One room and a loft over it, the fire banked low, and more chairs in it
 adjacent:
   well-lane
 entities:
-  nan, nans-hearth, house-chest, 2 civilian
+  nan, nans-hearth, 2 civilian
 
 # location hasks-house
 x: 5, y: 2
@@ -395,7 +374,7 @@ examine: A cooper's, and the front room is staves. Somewhere behind the staves a
 adjacent:
   well-lane
 entities:
-  hask, hasks-stove, house-chest, 2 civilian
+  hask, hasks-stove, 2 civilian
 
 # location doss-house
 x: 3, y: 2
@@ -408,19 +387,14 @@ entities:
   doss-house-fire, 7 civilian
 
 // Under the doss house, which is the one building in Tulsa where nobody asks who anybody is. The
-// town's second band of thieving, and the only place the picks and the jewel come from.
-//
-// Nothing here is aggressive. They are not going to start something in their own cellar over a hand
-// in a pocket, which is what lets a beginner walk down, try it, fail, and walk back up having
-// learned where the ceiling is — the vigilance is the gate, not a fight.
+// town gives it a floor and a door; who is standing on that floor is whatever skill has a use for a
+// room like this, and the town has no opinion about it.
 # location rogue-den
 x: 3, y: 2, z: -1
 title: The Rogue Den
 examine: A cellar under the beds with a good floor, better light than the room above it, and eleven people down here who are all facing the door.
 adjacent:
   doss-house
-entities:
-  4 thief, strongbox
 
 # location kiln-lane
 x: 11, y: 1
@@ -451,7 +425,7 @@ examine: A potter's, and the yard behind it is stacked with things that did not 
 adjacent:
   kiln-lane
 entities:
-  bel, bels-kiln, house-chest, 2 civilian
+  bel, bels-kiln, 2 civilian
 
 # location aggies-house
 x: 12, y: 0
@@ -696,7 +670,7 @@ examine: A dry room behind the water, kept by someone. A table, a shelf, and two
 adjacent:
   sewer-outfall
 entities:
-  2 ratman, key-table, sewer-shelf, treasure-chest
+  2 ratman, key-table, sewer-shelf
 
 // --- the cast ---
 //
@@ -886,7 +860,6 @@ flags: reached
 reach through the bars:
   hidden if: reached
   time: 6
-  xp: thieving.thieving 3
   set: reached
   give: 1 core.bent-coin
   say: The gap takes your arm to the elbow and the cold takes the rest of you. What your fingers close on is a bent coin and a great deal of grit. Whatever the boy lost went under the castle a long time ago.
@@ -920,7 +893,6 @@ pick lock:
   hidden if: unlocked
   requires: has core.lockpick
   time: 6
-  xp: thieving.thieving 15
   on success:
     set: unlocked
     say: The wards give one at a time, and the last one gives properly.
@@ -1032,7 +1004,6 @@ flags: taken
 lift a shirt off the line:
   hidden if: taken
   time: 5
-  xp: thieving.thieving 8
   set: taken
   give: 1 core.bent-coin
   say: You take a shirt off the line without breaking stride and find a bent coin knotted into the tail of it, which somebody put there on purpose and is going to miss.
@@ -1044,7 +1015,6 @@ flags: taken
 take one off the sill:
   hidden if: taken
   time: 4
-  xp: thieving.thieving 10
   set: taken
   give: 1 core.bread
   say: You take the end one and put the gap in the middle of the row, which buys you about a minute.
@@ -1193,192 +1163,45 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 
 // --- the townsfolk, and what happens when you pick on them ---
 //
-// A townsman, a guardsman and a knight are three rungs of one ladder: each is worth more to hit,
-// hits back harder, and carries more. None of them starts it — the town is not hostile until you
-// make it hostile — and each of them can be robbed instead, which is the other half of every sheet
-// below and the reason all three are the town's rather than combat's.
-//
-// The pockets are the contest `thieving.pick-pocket` runs, and what each mark brings to it is
-// one number on its own sheet. Each rung is watchful enough to be worth more than the one under it,
-// so a minute at any of them comes to about the same and what changes is whether you can stand there
-// at all.
-
-// One piece of somebody's washing, and never the same piece twice running. The store sells the
-// whole set to anybody with the coin; this is the other way, and it is the way a thief who has not
-// got the coin yet gets dressed.
-# droptable townsmans-wardrobe
-one of:
-  1x: give: 1 core.unassuming-cap
-  1x: give: 1 core.linen-shirt
-  1x: give: 1 core.linen-pants
-  1x: give: 1 core.simple-boots
+// A townsman, a guardsman and a knight are three rungs of one ladder: each is worth more to hit and
+// hits back harder. None of them starts it — the town is not hostile until you make it hostile —
+// and what each of them is worth to a hand rather than to an arm is written where that hand is,
+// which is not here.
 
 # entity civilian
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 20
-uses: core.melee-combat, thieving.pick-pocket
+stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
+uses: core.melee-combat
 faction: world
 respawn after: 45s
 on death:
   credit:
     roll: combat.purse
-pick-pocket:
-  give: 3 coin
-  xp: thieving.thieving 4
-  1 in 400:
-    give: 1 thieving.thieving-rate-jewel
-    say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
-  // What a townsman is carrying that a skiller wants is what a townsman is wearing, so the clothes
-  // come off the same pocket the coin does.
-  1 in 14:
-    roll: townsmans-wardrobe
-    say: They are carrying it rather than wearing it, which is somebody's washing and now it is yours.
-  +on unfinished:
-    say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
-    drain: 1 health
 
 # entity guardsman
 title: Guardsman
 examine: One of the duke's, in a coat of plates and a mood.
-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 55
-uses: core.melee-combat, thieving.pick-pocket
+stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
+uses: core.melee-combat
 faction: world
 respawn after: 70s
 on death:
   credit:
     roll: combat.purse
     1 in 8: give: 1 combat.bronze-helmet
-pick-pocket:
-  give: 7 coin
-  xp: thieving.thieving 7
-  +on unfinished:
-    say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
-    drain: 1 health
-    inflict: thieving.dazed for thieving.npc-daze-duration
 
 # entity knight
 title: Knight
 examine: Iron from the crown of his head to the soles of his feet, and he has been hit by better than you.
-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 80
-uses: core.melee-combat, thieving.pick-pocket
+stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
+uses: core.melee-combat
 faction: world
 respawn after: 100s
 on death:
   credit:
     roll: knights-purse
     1 in 10: give: 1 combat.iron-helmet
-pick-pocket:
-  hidden if: level.thieving < 11
-  give: 12 coin
-  xp: thieving.thieving 10
-  +on unfinished:
-    say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
-    drain: 1 health
-    inflict: thieving.dazed for thieving.npc-daze-duration
-
-// The second band's mark. Watchful enough that a hand which has not put the hours in comes away with
-// nothing all afternoon, and carrying the one thing in Tulsa worth taking off a person: a hand that
-// robs thieves for long enough ends up holding their picks.
-# entity thief
-title: Thief
-examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 100
-uses: core.melee-combat, thieving.pick-pocket
-faction: world
-respawn after: 80s
-on death:
-  credit:
-    roll: combat.purse
-    1 in 14: give: 1 thieving.steel-lockpicks
-pick-pocket:
-  hidden if: level.thieving < 11
-  give: 18 coin
-  xp: thieving.thieving 17
-  1 in 60: give: 1 thieving.fingerless-gloves
-  1 in 90:
-    give: 1 thieving.luck-jewel
-    say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
-  +on unfinished:
-    say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
-    drain: 1 health
-    inflict: thieving.dazed for thieving.npc-daze-duration
-
-// --- what is locked ---
-//
-// Two boxes, running `thieving.pick-the-lock` against the wards on each. Winning empties the box;
-// losing puts you on the step outside with the owner explaining it, and where that step is is the
-// town's business rather than the hand's.
-
-# entity house-chest
-title: Chest
-examine: A banded chest under the window with a lock on it older than the window.
-stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 60
-uses: thieving.pick-the-lock
-pick-the-lock:
-  roll: house-chest-contents
-  xp: thieving.thieving 20
-  say: The lock gives with a sound like a knuckle cracking.
-  +on unfinished:
-    say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
-    drain: 3 health
-    relocate: market-square
-
-# droptable house-chest-contents
-one of:
-  6x: give: 1 thieving.polished-buttons
-  3x: give: 1 thieving.gold-ring
-  1x: give: 1 thieving.gold-necklace
-
-# entity treasure-chest
-title: Treasure Chest
-examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 110
-uses: thieving.pick-the-lock
-pick-the-lock:
-  time: 10
-  roll: treasure-chest-contents
-  xp: thieving.thieving 55
-  say: The last ward turns over and the lid comes up on its own.
-  +on unfinished:
-    say: The runes light one after another and the cellar goes out from under you.
-    drain: 8 health
-    relocate: market-square
-
-# droptable treasure-chest-contents
-one of:
-  8x: give: 1 thieving.coloured-glass
-  5x: give: 1 thieving.topaz
-  3x: give: 1 thieving.sapphire
-  1x: give: 1 thieving.ruby
-
-// The best lock in Tulsa, in the one cellar where nobody will explain to you that it is not your
-// box — so this is the only lock in the world that does not end with a walk back from the market
-// square. It is where the boots and the quiet hour come from.
-# entity strongbox
-title: Strongbox
-examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: thieving.thieving-ability 0, thieving.thieving-rate 0, thieving.npc-thieving-difficulty 132
-uses: thieving.pick-the-lock
-pick-the-lock:
-  hidden if: level.thieving < 14
-  time: 14
-  roll: strongbox-contents
-  xp: thieving.thieving 90
-  say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.
-  +on unfinished:
-    say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
-    drain: 2 health
-    inflict: thieving.dazed for thieving.npc-daze-duration
-
-# droptable strongbox-contents
-one of:
-  9x: give: 1 thieving.sapphire
-  6x: give: 1 thieving.ruby
-  4x: give: 1 thieving.soft-toed-boots
-  2x: give: 1 thieving.fingerless-gloves
-  1x: give: 1 thieving.thieving-ability-jewel
-  1x: give: 1 thieving.thieving-utility-jewel
 
 // --- what is already hostile ---
 
@@ -1522,8 +1345,9 @@ open:
 // sheet.
 //
 // It is here rather than in core because of one line: a character's skills are a fact about the
-// world they live in, one module each, and this is the module that depends on every one of them.
-// Core is the furniture a region stands on and cannot see any of them from where it sits.
+// world they live in, one module each, and this is the module that can see them. Core is the
+// furniture a region stands on and cannot see any of them from where it sits. A skill that reaches
+// the other way writes itself onto this sheet instead of being named on it, and thieving does.
 //
 // The swing varies because the arm does, not because the weapon does: `attack`
 // is a range here for the same reason the rat writes `attack 6-8` on its own
@@ -1534,7 +1358,7 @@ open:
 title: You
 faction: core.player
 stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
-skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, thieving.thieving, smithing.smithing, crafting.crafting
+skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, smithing.smithing, crafting.crafting
 equipment-slots: mainhand, offhand, head, body, legs, gloves, boots
 uses: core.melee-combat
 // Waking up is the market square once the market square has been stood in, and
@@ -2035,34 +1859,6 @@ load: at-the-sewer-junction
 wait: 20
 assert: xp.combat.attack > 0
 assert: xp.combat.health > 0
-assert: not core.fainted
-
-// The two things in the market a light hand gets: one at the grate and one off the rack. Each sets
-// its own flag, which is what its own `hidden if:` reads, so neither is a second helping — and the
-// axe is the tool the dead alder wants, which is why the rack is worth a hand at all. What either
-// lift pays is the balance's; that the pair of them paid at all is this route's.
-# test the-market-is-two-lifts-to-a-light-hand
-load: in-town
-use: entity.sewer-grate.reach-through-the-bars
-assert: has core.bent-coin
-assert: sewer-grate.reached
-travel: market-row
-use: location.market-row.lift-an-axe-off-the-rack
-assert: has core.hand-axe
-assert: market-row.axe-taken
-assert: xp.thieving.thieving > 0
-
-// A hand going out over and over at the same pocket, which is the whole shape of thieving: the
-// player starts it, a lift pays, a catch costs health and stands them still for three seconds, and
-// then it goes again. The two lifts above are one-shot props and prove none of that — this is the
-// only route that walks the loop, and it walks it far enough that a catch has certainly happened
-// along the way. What a catch costs is not asserted, because that is stochastic and a number; that
-// the loop keeps going through one is what the last line is for.
-# test a-hand-goes-out-again-after-it-is-caught
-load: in-town
-use: entity.civilian.pick-pocket until xp.thieving.thieving >= 200
-assert: xp.thieving.thieving >= 200
-assert: has core.coin
 assert: not core.fainted
 
 // The tutorial's own route through a counter and a stove. What it holds now that it did not before
