@@ -1104,113 +1104,98 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 // make it hostile — and each of them can be robbed instead, which is the other half of every sheet
 // below and the reason all three are the town's rather than combat's.
 //
-// The pockets are one roll weighed between the player's thieving and how hard the mark is. Each rung
-// is slower and worth more than the one under it, so a minute at any of them comes to about the
-// same and what changes is whether you can stand there at all.
+// The pockets are the contest `thieving.pick-their-pocket` runs, and what each mark brings to it is
+// one number on its own sheet. Each rung is watchful enough to be worth more than the one under it,
+// so a minute at any of them comes to about the same and what changes is whether you can stand there
+// at all.
 
 # entity civilian
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
-uses: core.melee-combat
+stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 20
+uses: core.melee-combat, thieving.pick-their-pocket
 faction: world
 respawn after: 45s
 on death:
   credit:
     roll: combat.purse
-pick their pocket:
-  continuous
-  rate: thieving.thieving-rate
-  one of:
-    thieving:
-      give: 3 coin
-      xp: thieving.thieving 4
-    25x:
-      say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
-      drain: 1 health
-      inflict: thieving.dazed
+pick-their-pocket:
+  give: 3 coin
+  xp: thieving.thieving 4
+  +on unfinished:
+    say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
+    drain: 1 health
 
 # entity guardsman
 title: Guardsman
 examine: One of the duke's, in a coat of plates and a mood.
-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
-uses: core.melee-combat
+stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 55
+uses: core.melee-combat, thieving.pick-their-pocket
 faction: world
 respawn after: 70s
 on death:
   credit:
     roll: combat.purse
     1 in 8: give: 1 combat.bronze-helmet
-pick their pocket:
-  continuous
-  rate: thieving.thieving-rate
-  one of:
-    thieving:
-      give: 7 coin
-      xp: thieving.thieving 7
-    55x:
-      say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do.
-      drain: 3 health
-      inflict: thieving.dazed
+pick-their-pocket:
+  give: 7 coin
+  xp: thieving.thieving 7
+  +on unfinished:
+    say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do.
+    drain: 3 health
 
 # entity knight
 title: Knight
 examine: Iron from the crown of his head to the soles of his feet, and he has been hit by better than you.
-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
-uses: core.melee-combat
+stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45, thieving.thieving 0, thieving.thieving-rate 0, thieving.vigilance 80
+uses: core.melee-combat, thieving.pick-their-pocket
 faction: world
 respawn after: 100s
 on death:
   credit:
     roll: knights-purse
     1 in 10: give: 1 combat.iron-helmet
-pick their pocket:
-  continuous
-  rate: thieving.thieving-rate
-  one of:
-    thieving:
-      give: 12 coin
-      xp: thieving.thieving 11
-    90x:
-      say: There is a great deal of iron in the way and then a great deal of iron coming the other way.
-      drain: 6 health
-      inflict: thieving.dazed
+pick-their-pocket:
+  give: 12 coin
+  xp: thieving.thieving 11
+  +on unfinished:
+    say: There is a great deal of iron in the way and then a great deal of iron coming the other way.
+    drain: 6 health
 
 // --- what is locked ---
 //
-// Two boxes, and both are one attempt at a time rather than anything to stand at: winning empties
-// the box, losing puts you on the step outside with the owner explaining it. The roll is the
-// player's thieving weighed against how good the lock is, which is the number written beside it.
+// Two boxes, running `thieving.pick-the-lock` against the wards on each. Winning empties the box;
+// losing puts you on the step outside with the owner explaining it, and where that step is is the
+// town's business rather than the hand's.
 
 # entity house-chest
 title: Chest
 examine: A banded chest under the window with a lock on it older than the window.
-pick the lock:
-  time: 6
-  one of:
-    thieving.thieving:
-      roll: thieving.house-chest-contents
-      xp: thieving.thieving 20
-      say: The lock gives with a sound like a knuckle cracking.
-    60x:
-      say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
-      drain: 3 health
-      relocate: market-square
+stats: thieving.thieving 0, thieving.wards 60
+uses: thieving.pick-the-lock
+pick-the-lock:
+  roll: thieving.house-chest-contents
+  xp: thieving.thieving 20
+  say: The lock gives with a sound like a knuckle cracking.
+  +on unfinished:
+    say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
+    drain: 3 health
+    relocate: market-square
 
 # entity treasure-chest
 title: Treasure Chest
 examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-pick the lock:
+stats: thieving.thieving 0, thieving.wards 110
+uses: thieving.pick-the-lock
+pick-the-lock:
   time: 10
-  one of:
-    thieving.thieving:
-      roll: thieving.treasure-chest-contents
-      xp: thieving.thieving 55
-      say: The last ward turns over and the lid comes up on its own.
-    200x:
-      say: The runes light one after another and the cellar goes out from under you.
-      drain: 8 health
-      relocate: market-square
+  roll: thieving.treasure-chest-contents
+  xp: thieving.thieving 55
+  say: The last ward turns over and the lid comes up on its own.
+  +on unfinished:
+    say: The runes light one after another and the cellar goes out from under you.
+    drain: 8 health
+    relocate: market-square
 
 // --- what is already hostile ---
 

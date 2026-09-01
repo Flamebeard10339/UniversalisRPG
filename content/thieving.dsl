@@ -1,15 +1,20 @@
 // Thieving — taking things off people who are still using them, and out of boxes that are still
 // locked.
 //
-// Every theft is one roll weighed between two things: the player's `thieving` on one side and how
-// hard the mark is on the other, written as a plain number on the mark's own line. That roll is the
-// same roll every time it is taken: a caught hand costs health and stops the hand for three seconds,
+// Every theft is one contest between two things: the player's `thieving` on one side and how hard
+// the mark is on the other, carried on the mark's own sheet the way a water carries its depth. That
+// contest is the same contest every time it is taken: a caught hand stops the hand for three seconds
 // and it does not leave the next attempt harder than the first one was. A lock that loses puts the
 // player outside, which is the same idea with a longer walk.
 //
-// What is here is the skill itself: what it is measured in, what a caught hand costs, and what
-// comes out of a box. Who is worth stealing from is the town's, because a townsman is somebody two
-// skills both have a use for and only the region can see both of them.
+// One skill, two verbs. A pocket and a lock are not one mechanic, because what they cost when they
+// go wrong is not the same thing — a hand caught in a pocket is a daze on the spot, and a hand
+// caught in somebody's chest is the owner putting you on the step. So there are two `# action`s
+// here and every mark in the world hangs off one of them, declaring only what is its own.
+//
+// What is here is the skill itself: what it is measured in, the two hands, what a caught one costs,
+// and what comes out of a box. Who is worth stealing from is the town's, because a townsman is
+// somebody two skills both have a use for and only the region can see both of them.
 
 # info thieving
 version: 1.0.0
@@ -41,6 +46,17 @@ title: Thieving Speed
 base: 6
 group: core.skilling
 
+// The mark's half of the contest, and no player ever carries either: how much attention somebody is
+// paying, and how good a lock is. Two rather than one because the two hands are two, and a chest is
+// not watchful the way a townsman is — a number that had to mean both would mean neither.
+# stat vigilance
+title: Vigilance
+group: core.other
+
+# stat wards
+title: Wards
+group: core.other
+
 # skill thieving
 title: Thieving
 stat: thieving
@@ -55,6 +71,35 @@ stat: thieving
 title: Dazed
 examine: You are standing very still and hoping the moment passes.
 3s, -90% core.attack-rate, -100% thieving-rate
+
+// --- the two hands ---
+//
+// Every mark hangs off one of these the way every water hangs off `fishing.cast`: `my` reads off the
+// thief and `their` off whatever is being robbed, so one block is a townsman and a treasure chest
+// both. A mark declares its own sheet — how watchful it is, or how good its lock is — and, in the
+// block it overlays, what comes off it, what that is worth, and what it says when it beats you.
+// Nothing else is a mark's business, and a sixth one is those lines and no others.
+//
+// What a caught hand costs in health, and where a lock puts you when it throws you out, are the
+// mark's rather than the hand's: a knight hits harder than a townsman and a cellar is a longer walk
+// back than a front room. So the daze is here, because it is the same three seconds everywhere, and
+// the drain and the walk are written where they differ.
+
+# action pick-their-pocket
+title: Pick Their Pocket
+continuous
+attempts: 1
+rate: my thieving-rate
+accuracy: my thieving vs their vigilance
+on unfinished:
+  inflict: dazed
+
+# action pick-the-lock
+title: Pick The Lock
+continuous
+attempts: 1
+time: 6
+accuracy: my thieving vs their wards
 
 // --- what is worth taking ---
 
