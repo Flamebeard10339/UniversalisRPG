@@ -156,6 +156,18 @@ travel: well
 use: melee-combat on rat until done
 assert: clear-the-well.settled
 
+# test the-counter-takes-a-short-id-as-well-as-a-whole-one
+goto: green
+use: location.green.dig
+wait: done
+shop: counter
+submit-modal: item=buy:bread
+assert: has bread
+submit-modal: item=more:buy:bread
+submit-modal: count=1
+submit-modal: item=close
+assert: has 2 core.bread
+
 # test the-counter-sells-what-it-stocks
 goto: green
 use: location.green.dig
