@@ -355,7 +355,6 @@ one of:
 +entities: treasure-chest
 
 # location tulsa.rogue-den
-+adjacent: run-blades while stat.initiation-clock >= 1
 +entities: 4 thief, strongbox, the-fence, the-lurker, smirking-rogue, the-far-door
 
 # location tulsa.market-row
@@ -447,8 +446,6 @@ bundle
 # flag outfit-pieces
 
 # flag hauled-out
-
-# flag run-progress
 
 # flag initiated
 
@@ -694,21 +691,20 @@ if not stat.watch-gap >= 1:
     say: The slap arrives before the words do, open-handed and across the ear. "Second time. I have a good memory for faces and yours is not a hard one. Put it back."
   if times-caught = 3 or times-caught = 4:
     drain: 6 core.health
-    if not inventory.core.coin >= 1:
+    roll: purse-confiscated
+    if not count.confiscated >= 1:
       say: He goes through your pockets and finds nothing in them worth the walk, which does not improve his mood. "Nothing on you. Fine. The warden can have you instead."
       roll: sent-to-jail
-    if inventory.core.coin >= 1:
-      roll: purse-confiscated
-      say: "Right." The purse comes off your belt and he does not count it. "That goes up to the warden's box, and you can go and explain to him how you came by it, if you like. I would not."
+    if count.confiscated >= 1:
+      say: "Right." The pack comes off your shoulder, and then the boots, and then everything else on you with a buckle to it, and he does not look at any of it. "That goes up to the warden's box, and you can go and explain to him how you came by it, if you like. I would not."
   if times-caught >= 5:
     drain: 6 core.health
     roll: purse-confiscated
-    say: Nobody says anything this time. An arm each, and your feet do not touch the cobbles again until the barracks.
+    say: Nobody says anything this time. The pack goes to one of them and everything you are wearing that will come off goes to the other, and then it is an arm each, and your feet do not touch the cobbles again until the barracks.
     roll: sent-to-jail
 
 # droptable hauled-out
 set: hauled-out
-unset: run-progress
 shake off: the-sand-is-running
 say: You are on the floor and then you are not, because somebody has you under the arms and is walking you backwards fast, and then you are on the floor of the den with the lamps over you and a ring of faces round the lamps that are trying not to laugh.
 relocate: tulsa.rogue-den
@@ -718,7 +714,6 @@ title: The Market Watch
 examine: Two of the duke's men walking the stalls at the pace of people paid by the hour, one of them looking at the goods and the other at the hands near them.
 hidden if: stat.watch-gap >= 1
 wait for them to move on:
-  hidden if: stat.watch-gap >= 1
   time: 20
   inflict: the-watch-is-elsewhere for 3m
   say: They finish the row, turn up towards the castle, and do not look back. It will be a while before they are round again.
@@ -823,13 +818,7 @@ node passing:
 
 # entity street-urchins
 title: Street Urchins
-examine: Four children between the pear cart and the wall, none of them above your elbow, in clothes that were somebody else's first. They are watching the cart the way the cart's owner is watching the square.
-hidden if: the-fruit-stall.taught or the-fruit-stall.fed
-
-# entity well-fed-urchins
-title: The Urchins
-examine: Four children by the pear cart in clothes that fit them, and one of them is eating a pear without looking over her shoulder.
-hidden if: not the-fruit-stall.taught and not the-fruit-stall.fed
+examine: Four children between the pear cart and the wall, none of them above your elbow. {not the-fruit-stall.taught and not the-fruit-stall.fed: Their clothes were somebody else's first, and they are watching the cart the way the cart's owner is watching the square.}{the-fruit-stall.taught or the-fruit-stall.fed: Their clothes fit them, and one of them is eating a pear without looking over her shoulder.}
 
 # quest the-fruit-stall
 title: The Fruit Stall
@@ -861,7 +850,7 @@ stage hungry:
 stage taught:
   log: I showed the children by the pear cart how a hand goes into a pile. They will not go hungry, and Bess will not know why.
   complete
-  well-fed-urchins says:
+  street-urchins says:
     always
     ask: How is it going?
     again: The biggest one grins and turns out her pockets, and there is nothing in them, which is the point.
@@ -870,7 +859,7 @@ stage taught:
 stage fed:
   log: I fed the children by the pear cart out of my own pack until they stopped looking hungry.
   complete
-  well-fed-urchins says:
+  street-urchins says:
     always
     ask: How are you all?
     again: They wave. The smallest one is asleep in the sun.
@@ -1016,7 +1005,7 @@ hidden if: locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 45, npc-thieving-xp 35, npc-thieving-damage 1
 uses: pick-the-door
 pick-the-door:
-  hidden if: widows-door-open or locked-out.let-in-by-the-guard
+  hidden if: widows-door-open
   set: widows-door-open
   say: The lock is older than the bar and gives sooner, and the bar was never dropped. The door swings in on a room laid for one.
   relocate: widows-house
@@ -1030,7 +1019,7 @@ hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 120, npc-thieving-xp 90, npc-thieving-damage 2
 uses: pick-the-door
 pick-the-door:
-  hidden if: widows-door-open or not locked-out.let-in-by-the-guard
+  hidden if: widows-door-open
   set: widows-door-open
   say: The new lock is a good one and it takes everything you have, and then it turns, and the bar behind it has not been dropped, which is either forgetfulness or an invitation.
   relocate: widows-house
@@ -1043,7 +1032,6 @@ title: The Back Window
 examine: A small window at the back of the house, the shutter hooked open and the casement not quite shut, a little higher than is comfortable.
 hidden if: locked-out.let-in-by-the-guard
 climb in:
-  hidden if: locked-out.let-in-by-the-guard
   time: 8
   say: You get an elbow on the sill and the rest of you follows the elbow. It is a smaller window than it looked, and you go through it in the order you would have chosen if asked.
   relocate: widows-house
@@ -1055,7 +1043,6 @@ hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 100, npc-thieving-xp 75, npc-thieving-damage 3
 uses: pick-the-door
 pick-the-door:
-  hidden if: not locked-out.let-in-by-the-guard
   say: A blade under the latch, worked up a hair at a time until it lifts, and then the shutter, and then you.
   relocate: widows-house
   +on attempts exhausted:
@@ -1068,7 +1055,7 @@ hidden if: locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 20, npc-thieving-xp 25, npc-thieving-damage 1
 uses: pick-the-door
 pick-the-door:
-  hidden if: widows-cellar-open or locked-out.let-in-by-the-guard
+  hidden if: widows-cellar-open
   set: widows-cellar-open
   say: The padlock does not so much open as give up. The leaves come up on a stair going down.
   relocate: widows-cellar
@@ -1082,7 +1069,7 @@ hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 110, npc-thieving-xp 80, npc-thieving-damage 2
 uses: pick-the-door
 pick-the-door:
-  hidden if: widows-cellar-open or not locked-out.let-in-by-the-guard
+  hidden if: widows-cellar-open
   set: widows-cellar-open
   say: Steel, new, and fitted properly. It takes as long as a good lock should take, and then the leaves come up on a stair going down.
   relocate: widows-cellar
@@ -1254,7 +1241,6 @@ ring the bell:
   hidden if: stat.initiation-clock >= 1
   time: 4
   unset: hauled-out
-  unset: run-progress
   inflict: the-sand-is-running for 3m
   say: Somebody lifts the bar and somebody else turns a glass on a bracket beside it, and the den goes quiet the way a room does when everybody in it has done this. "Through to the end before the sand is out," a voice says. "Nobody is going to help you. Nobody helped us." The door shuts behind you.
   relocate: run-blades
@@ -1265,7 +1251,6 @@ examine: A rope running back along the ceiling the way you came, with a bell on 
 pull it:
   instant
   shake off: the-sand-is-running
-  unset: run-progress
   say: You pull, and somewhere behind you a bell rings, and a while after that the door behind you opens and nobody comes through it. You walk back on your own.
   relocate: tulsa.rogue-den
 
@@ -1277,7 +1262,6 @@ uses: cross
 cross:
   +on success:
     say: You go through on the count, low under the high one and over the low one, and the wall closes behind you with a sound like a knife going back into a drawer.
-    add: run-progress 1
     relocate: run-boulder
   +on attempts exhausted:
     if not resource.core.health > 12:
@@ -1294,7 +1278,6 @@ uses: cross
 cross:
   +on success:
     say: You find the trip by where the dust is not, and step over it, and go past the cradle without breathing.
-    add: run-progress 1
     relocate: run-fire
   +on attempts exhausted:
     if not resource.core.health > 20:
@@ -1311,7 +1294,6 @@ uses: cross
 cross:
   +on success:
     say: The pipes cough once as you go under them and the flame comes out behind you, which is where you are not.
-    add: run-progress 1
     relocate: run-pit
   +on attempts exhausted:
     if not resource.core.health > 16:
@@ -1328,7 +1310,6 @@ uses: cross
 cross:
   +on success:
     say: You cross with your eyes on the far end and not on the plank, which is the trick, and step off it a stride before it tips.
-    add: run-progress 1
     relocate: run-door
   +on attempts exhausted:
     if not resource.core.health > 25:
@@ -1347,7 +1328,6 @@ go through:
   set: has-the-word
   add: outfit-pieces 1
   shake off: the-sand-is-running
-  unset: run-progress
   xp: thieving 300
   say: The door is not locked. It never was. On the other side of it is the den, from the other end, and every face in it turned towards the door, and one of them says the words to you before you have asked, slowly, so that you will have them.
   if outfit-pieces = 1:
@@ -1369,7 +1349,6 @@ go through:
 hammer on it:
   hidden if: stat.initiation-clock >= 1
   instant
-  unset: run-progress
   say: The glass beside the door has run out. Nobody opens the door. After a while somebody opens the other one, behind you, and you walk back the way you came with the whole den watching, and nobody says anything, which is worse.
   relocate: tulsa.rogue-den
 
@@ -1522,7 +1501,7 @@ pick-the-lock:
       roll: wardens-lockbox-contents
       say: The box holds what the town's guard has taken off the town, in no order. You take what nobody who could say so is going to miss.
     if count.confiscated >= 1:
-      say: On top of everything else in the box is a purse with a paper tag tied to it, and the tag has a description on it that is not flattering and is not wrong.
+      say: On top of everything else in the box is a bundle with a paper tag tied to it: your pack, and everything that was on your back, rolled up in your own coat. The tag has a description on it that is not flattering and is not wrong.
       roll: purse-returned
   +on attempts exhausted:
     say: The pick binds in the last ward and you have to work it back out, which takes longer than getting it in did.
@@ -1677,8 +1656,6 @@ adjacent:
 x: 4, y: 3, z: -1
 title: The First Passage
 examine: A passage off the back of the den, lit at the far end and not at this one.
-adjacent:
-  run-boulder while run-progress >= 1
 entities:
   the-blades, the-rope
 
@@ -1686,8 +1663,6 @@ entities:
 x: 5, y: 3, z: -1
 title: The Second Passage
 examine: A passage that climbs, and the sound of something settling in timber at the top of it.
-adjacent:
-  run-fire while run-progress >= 2
 entities:
   the-boulder, the-rope
 
@@ -1695,8 +1670,6 @@ entities:
 x: 6, y: 3, z: -1
 title: The Third Passage
 examine: A short passage, warmer than the last, with a smell of oil in it.
-adjacent:
-  run-pit while run-progress >= 3
 entities:
   the-fire, the-rope
 
@@ -1704,8 +1677,6 @@ entities:
 x: 7, y: 3, z: -1
 title: The Fourth Passage
 examine: A passage that ends in the dark before the lamp does.
-adjacent:
-  run-door while run-progress >= 4
 entities:
   the-pit, the-rope
 
@@ -1724,7 +1695,6 @@ adjacent:
   tulsa.guard-barracks while not on-the-run
   jail-cells
   jail-mess
-  wardens-office while wardens-door.unlocked
 entities:
   jailer, street-door, wardens-door
 
@@ -1768,7 +1738,7 @@ entities:
   the-warden, wardens-lockbox, office-door-inside
 
 # location tulsa.market-square
-+entities: market-watch, pear-cart, bess, street-urchins, well-fed-urchins
++entities: market-watch, pear-cart, bess, street-urchins
 
 # location tulsa.castle-quarters
 +entities: jewellery-box
