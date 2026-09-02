@@ -426,3 +426,39 @@ The registry already holds the resolved body under `registry.saves`, which is wh
 says there is nothing to repair, with the fixture corpus carrying such a save so the
 claim is not vacuous.
 
+## What an entity says depends on what else it has to say, in two ways nobody wrote down
+
+`openersNow` (`src/runtime/dialogue-runtime.ts:133`) gathers every node an entity has
+open, ranks them `quest` 0, thread 1, plain `always` 2, and then keeps only the ranks
+below 2 when any of those stand:
+
+```ts
+const asked = open.filter((each) => each.standing < OTHERWISE);
+return (asked.length > 0 ? asked : open)...
+```
+
+And `talk` (`:148`) enters a single opener directly rather than listing it.
+
+Two complaints from the thieving authoring run are that one line. An `always` node laid
+over a dialogue from another module is never offered, because the entity already has a
+thread open and every plain node is dropped — that one has a proof standing,
+`an-always-node-laid-over-a-dialogue-is-offered` in
+`docs/thieving-expansion/open-tests.dsl`. And a quest-stage node attached to an entity
+is *said* the moment you talk to them rather than being offered as a thread, because it
+is the only opener left standing once the filter has run. Every route written with a
+thread line before the choice failed, and the refusal listed choices the author had not
+been given.
+
+The author's rule, taken on 2026-09-02: **one opener, say it; more than one, list them.**
+`talk` already does exactly that — what breaks it is the set being filtered before it
+gets there. So the question is whether `standing` should order the list or cull it.
+
+Culling has a reason nobody has written down either, which is why this is a line rather
+than a patch: a thread the player opened is more urgent than a greeting, and an entity
+with one of each probably should not make them pick. Establish that before deleting the
+filter, because the blast radius is every conversation in the corpus.
+
+*Closes when:* `an-always-node-laid-over-a-dialogue-is-offered` passes, a quest-stage
+node on an entity with something else to say is offered rather than said, and both
+readings are pinned by routes in the fixture rather than by this paragraph.
+
