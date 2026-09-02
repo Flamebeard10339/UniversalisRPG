@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { offering, spokenBy } from '../content/sections/dialogue';
+import { entitiesStood } from '../content/sections/location';
+import { ownerIsElsewhere } from './actions';
+import type { GameState } from './state';
 import { fixtureSources } from '../content/worldFixture';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { initialState } from './save';
@@ -8,19 +11,30 @@ import { menuChoices, openersNow, reachedNow, talk } from './dialogue-runtime';
 
 const { registry } = loadUniverseWithDiagnostics(fixtureSources());
 
-const owners = [...new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined))];
+const stood = entitiesStood(registry.locations);
+
+const standingBy = (owner: string): GameState => {
+  const state = initialState(registry);
+  const where = stood.get(owner);
+  if (where !== undefined) state.location = where;
+  return state;
+};
+
+const thereToBeMet = (owner: string): boolean => !ownerIsElsewhere('entity', owner, standingBy(owner), registry);
+
+const owners = [...new Set([...registry.dialogues.values()].map((each) => each.owner).filter((owner): owner is string => owner !== undefined))].filter(thereToBeMet);
 
 describe('an entity whose one word is the whole of talking to it', () => {
   const soleVoice = owners.filter((owner) => spokenBy(registry.dialogues, owner).flatMap((dialogue) => dialogue.nodes.filter(offering)).length === 1);
 
   it('is most of the fixture world, so the claim below is not vacuous', () => {
     expect(soleVoice.length).toBeGreaterThan(1);
-    expect(soleVoice.every((owner) => reachedNow(registry, initialState(registry), owner) !== null)).toBe(true);
+    expect(soleVoice.every((owner) => reachedNow(registry, standingBy(owner), owner) !== null)).toBe(true);
   });
 
   it('costs no click, because the one thread open is entered outright', () => {
     const clicked = soleVoice.filter((owner) => {
-      const state = initialState(registry);
+      const state = standingBy(owner);
       const only = openersNow(registry, state, owner)[0]!;
       talk(owner, registry, state);
       return state.visits[`${only.dialogue.id}.${only.node.name}`] !== 1;
@@ -32,7 +46,7 @@ describe('an entity whose one word is the whole of talking to it', () => {
 
 describe('everyone the fixture world writes a word for', () => {
   const saysSomethingTwice = (owner: string): boolean => {
-    const state = initialState(registry);
+    const state = standingBy(owner);
     for (let visit = 0; visit < 2; visit++) {
       const before = state.log.length;
       const cursor = talk(owner, registry, state);
@@ -83,6 +97,7 @@ node closing:
   it('is not said at all, rather than said blank', () => {
     const { registry } = loadUniverseWithDiagnostics([{ name: 'base', text: world }]);
     const state = initialState(registry);
+    state.location = 'base.tent';
 
     talk('base.oolga', registry, state);
 

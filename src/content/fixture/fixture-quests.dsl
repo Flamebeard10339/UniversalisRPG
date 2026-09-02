@@ -37,6 +37,16 @@ beckon:
   instant
   set: ghost-called
 
+# dialogue shy-ghost
+owner = shy-ghost
+
+node greeting:
+  always
+  A cold spot says something, and you are not sure it was words.
+
+# save the-ghost-is-abroad
+{"version":13,"location":"fixture-town.green","flags":{"fixture-quests.ghost-is-abroad":true}}
+
 # location fixture-town.green
 +entities: shy-ghost
 
@@ -188,6 +198,18 @@ goto: fixture-town.green
 use: entity.shy-ghost.beckon
 refused
 assert: not ghost-called
+
+# test an-entity-hidden-by-its-own-condition-refuses-a-talk-as-well
+goto: fixture-town.green
+talk: shy-ghost
+refused
+assert: shy-ghost.greeting.visits = 0
+
+# test the-same-entity-speaks-once-it-is-there-to-be-met
+load: the-ghost-is-abroad
+talk: shy-ghost
+choose: continue
+assert: shy-ghost.greeting.visits = 1
 
 # test the-green-is-where-a-game-begins
 assert: resource.health >= 30

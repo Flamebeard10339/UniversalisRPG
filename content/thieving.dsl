@@ -963,7 +963,7 @@ hidden if: not lookout.kept-watch
 owner = the-lurker
 
 node found-me:
-  when: lookout.kept-watch
+  when: always
   ask: Found you.
   again: "Still found," he says, and pushes the bottle an inch your way.
   He sees you on the stair and laughs, once, properly. "Well. Took you long enough. Or no time at all, I have lost track down here." He kicks a stool out from under the table with his foot. "Sit. You watched a street for me and you did not cough when you did not have to. That is rarer than you would think."
@@ -978,7 +978,7 @@ hidden if: not lookout.turned-him-in
 owner = the-man-from-the-alley
 
 node sour:
-  when: lookout.turned-him-in
+  when: always
   ask: About the alley.
   again: He has turned his face to the wall, and he keeps it there.
   He looks at you for a long moment before he speaks. "They gave you something for me, I expect. Out of my own bag. That is their little joke. They do it every time."
@@ -1515,7 +1515,7 @@ hidden if: stat.warden-away >= 1
 owner = the-warden
 
 node in-his-office:
-  when: not stat.warden-away >= 1
+  when: always
   sticky
   He does not ask how you got in. He looks at the door, and at you, and licks sugar off his thumb. "Well. You are in the right building for it."
   roll: sent-to-jail
@@ -1529,7 +1529,7 @@ hidden if: not stat.warden-away = 1
 owner = the-warden-below
 
 node at-the-cells:
-  when: stat.warden-away = 1
+  when: always
   sticky
   He turns from the singing and finds you standing in a passage that was supposed to be empty. He does not hurry. "And whose are you?"
   roll: sent-to-jail
@@ -1543,7 +1543,7 @@ hidden if: not stat.warden-away = 2
 owner = the-warden-eating
 
 node at-the-table:
-  when: stat.warden-away = 2
+  when: always
   sticky
   He does not look up from the doughnuts until he has finished the one he is on. "You are not one of mine." A pause. "You will be."
   roll: sent-to-jail

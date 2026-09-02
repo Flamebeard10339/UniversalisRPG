@@ -1,5 +1,5 @@
 import { RuntimeError } from './error';
-import { costLimit } from './actions';
+import { costLimit, ownerIsElsewhere } from './actions';
 import { ActionResult, itemCost } from '../grammar/actionResult';
 import { evaluateCondition, renderSegments, weighing } from './conditions';
 import { Choice, Dialogue, DialogueNode, givenByQuest, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
@@ -148,6 +148,8 @@ export function openersNow(registry: Registry, state: GameState, entityId: strin
 export const reachedNow = (registry: Registry, state: GameState, entityId: string): Opener | null => openersNow(registry, state, entityId)[0] ?? null;
 
 export function talk(entityId: string, registry: Registry, state: GameState): DialogueCursor | null {
+  const localizer = localizerOf(registry, state);
+  if (ownerIsElsewhere('entity', entityId, state, registry)) throw new RuntimeError(localizer.engine('engine.target.absent', { target: localizer.title('entity', entityId) }));
   const open = openersNow(registry, state, entityId);
   if (open.length === 0) {
     if (spokenBy(registry.dialogues, entityId).length === 0) throw new RuntimeError(`no dialogue owned by entity: ${entityId}`);
