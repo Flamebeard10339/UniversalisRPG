@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { gripFor, type Carried, type Grip, type Gripped } from './DragSheet';
 import { itemStyle } from './itemLook';
 import { fillOf } from './lineStyle';
 import { letGoOf, type CellBox } from './packDrag';
 import { LIFT_MS } from './gesture';
-import { PLUCKED } from './transient';
+import { PLUCKED, useMomentPlayer } from './transient';
 import type { Entry } from './sheet';
 import { doll, GRID, NAME, SLOTS, type Layout } from './sheetLayout';
 import type { Point } from './viewport';
@@ -67,18 +67,50 @@ interface Held {
   carried: Carried | null;
 }
 
+const A_HAIR = 0.5;
+
+const shifted = (was: CellBox, now: CellBox): boolean => Math.abs(was.left - now.left) > A_HAIR || Math.abs(was.top - now.top) > A_HAIR;
+
+const laidOutNow = (node: HTMLElement): number => node.offsetWidth;
+
 function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: string) => void): Held | null {
   const drawn = useRef(new Map<string, HTMLElement>());
   const holding = useRef<Gripped | null>(null);
   const laid = useRef<CellBox[]>([]);
+  const leftBehind = useRef<CellBox[]>([]);
   const [carried, setCarried] = useState<Carried | null>(null);
-  if (!onSwap) return null;
+  const settle = useMomentPlayer('settle');
 
   const boxes = (): CellBox[] =>
     [...drawn.current].map(([key, element]) => {
       const box = element.getBoundingClientRect();
       return { key, left: box.left, top: box.top, right: box.right, bottom: box.bottom };
     });
+
+  useLayoutEffect(() => {
+    const were = leftBehind.current;
+    if (were.length === 0) return;
+    const now = new Map(boxes().map((box) => [box.key, box]));
+    const travelled = were.filter((was) => {
+      const box = now.get(was.key);
+      return box !== undefined && shifted(was, box);
+    });
+    if (travelled.length === 0) return;
+    leftBehind.current = [];
+    for (const was of travelled) {
+      const node = drawn.current.get(was.key)?.parentElement;
+      const box = now.get(was.key)!;
+      if (!node) continue;
+      node.style.transition = 'none';
+      node.style.transform = `translate(${was.left - box.left}px, ${was.top - box.top}px)`;
+      laidOutNow(node);
+      node.addEventListener('transitionend', () => node.style.removeProperty('transition'), { once: true });
+      node.style.transition = settle(was.key);
+      node.style.transform = '';
+    }
+  });
+
+  if (!onSwap) return null;
 
   return {
     carried,
@@ -91,13 +123,15 @@ function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: st
         {
           hold: (next) => {
             if (holding.current?.id === key && laid.current.length === 0) laid.current = boxes();
+            leftBehind.current = [];
             setCarried(next);
           },
           rest: (report) => {
-            setCarried(null);
             const wasLaidOut = laid.current;
             laid.current = [];
             const asked = letGoOf(wasLaidOut, key, report?.by ?? null);
+            if (asked.kind === 'swap') leftBehind.current = boxes();
+            setCarried(null);
             if (asked.kind === 'swap') onSwap(asked.one, asked.other);
             if (asked.kind === 'open') onOpen?.(asked.one);
           },

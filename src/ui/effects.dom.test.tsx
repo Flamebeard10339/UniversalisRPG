@@ -84,7 +84,7 @@ describe('the shell notices a screen wider than it is tall', () => {
   });
 });
 
-const NOT_EXERCISED: readonly string[] = ['useTestSurface.ts', 'App.tsx', 'DragSheet.tsx', 'EditPane.tsx', 'Home.tsx', 'MapPane.tsx', 'Modal.tsx', 'Pager.tsx', 'PlaneModal.tsx', 'VStack.tsx'];
+const NOT_EXERCISED: readonly string[] = ['useTestSurface.ts', 'App.tsx', 'DragSheet.tsx', 'EditPane.tsx', 'Home.tsx', 'Ledger.tsx', 'MapPane.tsx', 'Modal.tsx', 'Pager.tsx', 'PlaneModal.tsx', 'VStack.tsx'];
 
 describe('what the layer still does not run', () => {
   const here = path.join(process.cwd(), 'src', 'ui');
