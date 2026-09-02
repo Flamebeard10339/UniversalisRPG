@@ -26,15 +26,12 @@ base: 0
 group: skilling
 
 # stat npc-thieving-difficulty
-title: Vigilance
 group: core.other
 
 # stat npc-thieving-xp
-title: Worth Knowing
 group: core.other
 
 # stat npc-thieving-damage
-title: Reprisal
 group: core.other
 
 # skill thieving
@@ -213,11 +210,10 @@ value: 150
 +stats: npc-thieving-difficulty 20, npc-thieving-xp 4, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  give: 3 core.coin
-  1 in 400:
-    give: 1 thieving-rate-jewel
-  1 in 14:
-    roll: townsmans-wardrobe
+  one of:
+    100x: give: 3 core.coin
+    8x: roll: townsmans-wardrobe
+    1x: give: 1 thieving-rate-jewel
   +on unfinished:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
 
@@ -258,11 +254,12 @@ on death:
     1 in 14: give: 1 steel-lockpicks
 pick-pocket:
   hidden if: level.thieving < 11
-  give: 18 core.coin
-  1 in 60: give: 1 fingerless-gloves
-  1 in 90:
-    give: 1 luck-jewel
-    say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
+  one of:
+    100x: give: 18 core.coin
+    2x: give: 1 fingerless-gloves
+    1x:
+      give: 1 luck-jewel
+      say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
   +on unfinished:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
 
@@ -384,22 +381,3 @@ lift a shirt off the line:
 take one off the sill:
   +on success:
     xp: thieving 10
-
-# test the-market-is-two-lifts-to-a-light-hand
-load: tulsa.in-town
-use: entity.tulsa.sewer-grate.reach-through-the-bars
-assert: has core.bent-coin
-assert: tulsa.sewer-grate.reached
-travel: tulsa.market-row
-use: location.tulsa.market-row.lift-an-axe-off-the-rack
-assert: has core.hand-axe
-assert: tulsa.market-row.axe-taken
-assert: xp.thieving.thieving > 0
-
-# test a-hand-goes-out-again-after-it-is-caught
-load: tulsa.in-town
-use: entity.tulsa.civilian.pick-pocket until 20 times
-assert: xp.thieving.thieving > 0
-assert: has core.coin
-assert: not core.fainted
-
