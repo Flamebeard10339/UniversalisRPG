@@ -126,7 +126,7 @@ export function VStack({
                 <div
                   key={`banner-${at}`}
                   ref={(node) => void (strips.current[at] = node)}
-                  className="flex w-full shrink-0 items-stretch overflow-hidden"
+                  className="relative flex w-full shrink-0 items-stretch"
                   style={bands.banners[at] ? { height: bands.banners[at] } : undefined}
                 >
                 <button
