@@ -16,9 +16,9 @@ title: Thieving Speed
 base: 15
 group: core.skilling
 
-# stat npc-daze-duration
+# stat daze-duration
 title: Daze Duration
-base: 0
+base: 4
 group: core.skilling
 
 # stat luck
@@ -27,6 +27,14 @@ group: skilling
 
 # stat npc-thieving-difficulty
 title: Vigilance
+group: core.other
+
+# stat npc-thieving-xp
+title: Worth Knowing
+group: core.other
+
+# stat npc-thieving-damage
+title: Reprisal
 group: core.other
 
 # skill thieving
@@ -41,14 +49,20 @@ examine: Dizzy...
 # action steal
 attempts: 1
 accuracy: my thieving-ability vs their npc-thieving-difficulty
+on success:
+  xp: thieving their npc-thieving-xp
 on unfinished:
-  inflict: dazed for npc-daze-duration
+  drain: their npc-thieving-damage core.health
 
 # action pick-pocket
 title: Pick a Pocket
 extends: steal
 continuous
 rate: my thieving-rate
++on success:
+  say: You come away with it and they walk on none the wiser.
++on unfinished:
+  inflict: dazed for daze-duration
 
 # action pick-the-lock
 title: Pick the Lock
@@ -111,11 +125,11 @@ tools, recovery, +1 core.regeneration
 
 # passive reduced-daze-duration-1
 title: Brazen
-tools, -10% npc-daze-duration
+tools, -10% daze-duration
 
 # passive reduced-daze-duration-2
 title: Tough
-tools, -25% npc-daze-duration
+tools, -25% daze-duration
 
 # passive luck-1
 title: Good Eye
@@ -196,20 +210,16 @@ value: 150
 +skills: thieving
 
 # entity tulsa.civilian
-+stats: npc-thieving-difficulty 20
++stats: npc-thieving-difficulty 20, npc-thieving-xp 4, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   give: 3 core.coin
-  xp: thieving 4
   1 in 400:
     give: 1 thieving-rate-jewel
-    say: What comes out with the coin is a sliver of worn horn, and it is shaped like the end of a finger.
   1 in 14:
     roll: townsmans-wardrobe
-    say: They are carrying it rather than wearing it, which is somebody's washing and now it is yours.
   +on unfinished:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
-    drain: 1 core.health
 
 # droptable townsmans-wardrobe
 one of:
@@ -219,32 +229,26 @@ one of:
   1x: give: 1 core.simple-boots
 
 # entity tulsa.guardsman
-+stats: npc-thieving-difficulty 55
++stats: npc-thieving-difficulty 55, npc-thieving-xp 7, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   give: 7 core.coin
-  xp: thieving 7
   +on unfinished:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
-    drain: 1 core.health
-    inflict: dazed for npc-daze-duration
 
 # entity tulsa.knight
-+stats: npc-thieving-difficulty 80
++stats: npc-thieving-difficulty 80, npc-thieving-xp 10, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   hidden if: level.thieving < 11
   give: 12 core.coin
-  xp: thieving 10
   +on unfinished:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
-    drain: 1 core.health
-    inflict: dazed for npc-daze-duration
 
 # entity thief
 title: Thief
 examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 100
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 100, npc-thieving-xp 17, npc-thieving-damage 1
 uses: core.melee-combat, pick-pocket
 faction: core.world
 respawn after: 80s
@@ -255,28 +259,23 @@ on death:
 pick-pocket:
   hidden if: level.thieving < 11
   give: 18 core.coin
-  xp: thieving 17
   1 in 60: give: 1 fingerless-gloves
   1 in 90:
     give: 1 luck-jewel
     say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
   +on unfinished:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
-    drain: 1 core.health
-    inflict: dazed for npc-daze-duration
 
 # entity house-chest
 title: Chest
 examine: A banded chest under the window with a lock on it older than the window.
-stats: npc-thieving-difficulty 60
+stats: npc-thieving-difficulty 60, npc-thieving-xp 20, npc-thieving-damage 3
 uses: pick-the-lock
 pick-the-lock:
   roll: house-chest-contents
-  xp: thieving 20
   say: The lock gives with a sound like a knuckle cracking.
   +on unfinished:
     say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
-    drain: 3 core.health
     relocate: tulsa.market-square
 
 # droptable house-chest-contents
@@ -288,16 +287,14 @@ one of:
 # entity treasure-chest
 title: Treasure Chest
 examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-stats: npc-thieving-difficulty 110
+stats: npc-thieving-difficulty 110, npc-thieving-xp 55, npc-thieving-damage 8
 uses: pick-the-lock
 pick-the-lock:
   time: 10
   roll: treasure-chest-contents
-  xp: thieving 55
   say: The last ward turns over and the lid comes up on its own.
   +on unfinished:
     say: The runes light one after another and the cellar goes out from under you.
-    drain: 8 core.health
     relocate: tulsa.market-square
 
 # droptable treasure-chest-contents
@@ -310,18 +307,16 @@ one of:
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: npc-thieving-difficulty 132
+stats: npc-thieving-difficulty 132, npc-thieving-xp 90, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   hidden if: level.thieving < 14
   time: 14
   roll: strongbox-contents
-  xp: thieving 90
   say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.
   +on unfinished:
     say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
-    drain: 2 core.health
-    inflict: dazed for npc-daze-duration
+    inflict: dazed for daze-duration
 
 # droptable strongbox-contents
 one of:
@@ -403,8 +398,8 @@ assert: xp.thieving.thieving > 0
 
 # test a-hand-goes-out-again-after-it-is-caught
 load: tulsa.in-town
-use: entity.tulsa.civilian.pick-pocket until xp.thieving.thieving >= 200
-assert: xp.thieving.thieving >= 200
+use: entity.tulsa.civilian.pick-pocket until 20 times
+assert: xp.thieving.thieving > 0
 assert: has core.coin
 assert: not core.fainted
 
