@@ -345,8 +345,10 @@ describe('dev mode moves which slot receives a write (c9, c10, c11, c12, c13)', 
     saveNow(save, 'authoring');
 
     const next = restarted();
+    expect(next.dev, 'the snapshot standing is what says the mode was on').toBe(true);
+    expect(liveSlot(next)).toBe(DEV_SLOT);
+    expect(next.store.read(DEV_SLOT)?.payload).toBe('authoring');
     expect(next.store.read(PLAYER_SLOT)?.payload).toBe('the player');
-    expect(liveSlot(next)).toBe(PLAYER_SLOT);
     expect(next.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify({ payload: 'the session being played', synced: PLAYER_SLOT }));
   });
 

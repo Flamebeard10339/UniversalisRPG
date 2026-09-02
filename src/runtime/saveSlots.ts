@@ -10,6 +10,14 @@ export const AUTOSAVE_SLOT = 'autosave';
 
 export const MODULES_OFF_SLOT = 'modules-off';
 
+export const EDITOR_SLOT = 'editor';
+
+export const TRANSCRIPT_SLOT = 'transcript';
+
+const PAGE_SLOTS: readonly string[] = [EDITOR_SLOT, TRANSCRIPT_SLOT];
+
+export const keptByThePage = (name: string): boolean => PAGE_SLOTS.includes(name);
+
 export const NEVER = 'never';
 
 export type Cadence = number | typeof NEVER;
@@ -24,7 +32,8 @@ export interface SaveContext {
 }
 
 export function createSaveContext(driver: SlotDriver, now: () => number): SaveContext {
-  const save: SaveContext = { store: slotStore(driver, now), now, dev: false, synced: null };
+  const store = slotStore(driver, now);
+  const save: SaveContext = { store, now, dev: stateOf(store, DEV_SNAPSHOT_SLOT).kind !== 'empty', synced: null };
   save.synced = entitledSlot(save);
   return save;
 }
@@ -188,7 +197,7 @@ export function saveReport(save: SaveContext): SaveReport {
     slot: liveSlot(save),
     writes: writesLive(save),
     autosave: cadenceOrUnreadable(save),
-    slots: save.store.list().map((name) => ({ name, writtenAt: standing(save.store, name) })),
+    slots: save.store.list().filter((name) => !keptByThePage(name)).map((name) => ({ name, writtenAt: standing(save.store, name) })),
   };
 }
 

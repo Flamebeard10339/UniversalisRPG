@@ -1088,7 +1088,8 @@ describe('dev mode moves which slot is written, through the same table (c9, c10,
     runLine(game.ctx, '/save');
     const restarted = game.restarted();
 
-    expect(restarted.dev).toBe(false);
+    expect(restarted.dev, 'the snapshot standing is what says the mode was on').toBe(true);
+    expect(restarted.store.read(DEV_SLOT)?.payload).toBe(serializeSession(game.ctx.session));
     expect(restarted.store.read(PLAYER_SLOT)?.payload).toBe(played);
     expect(restarted.store.read(DEV_SNAPSHOT_SLOT)?.payload).toBe(JSON.stringify({ payload: before, synced: PLAYER_SLOT }));
     expect(restarted.synced).toBeNull();
