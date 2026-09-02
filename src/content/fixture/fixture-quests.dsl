@@ -26,6 +26,26 @@ stage settled:
   log: The well is quiet again.
   complete
 
+# flag ghost-called
+
+# flag ghost-is-abroad
+
+# entity shy-ghost
+title: The Shy Ghost
+hidden if: not ghost-is-abroad
+beckon:
+  instant
+  set: ghost-called
+
+# location fixture-town.green
++entities: shy-ghost
+
+# test an-entity-hidden-by-its-own-condition-refuses-its-actions
+goto: fixture-town.green
+use: entity.shy-ghost.beckon
+refused
+assert: not ghost-called
+
 # test the-green-is-where-a-game-begins
 assert: resource.health >= 30
 

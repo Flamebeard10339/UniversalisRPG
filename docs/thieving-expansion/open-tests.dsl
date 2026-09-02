@@ -15,14 +15,6 @@ set: probe-set
 stop
 set: probe-not-set
 
-# entity probe-shadow
-title: Probe Shadow
-examine: Only here once set.
-hidden if: not probe-set
-touch:
-  instant
-  set: probe-not-set
-
 # entity probe-post
 title: Probe Post
 examine: A post.
@@ -34,7 +26,7 @@ sub:
   roll: probe-sub
 
 # location tulsa.market-square
-+entities: probe-post, probe-shadow
++entities: probe-post
 
 # location tulsa.doss-house
 -adjacent: tulsa.well-lane
@@ -47,12 +39,6 @@ node probe-always:
 
 # save probe-start
 {"version":13,"location":"tulsa.market-square"}
-
-# test an-entity-hidden-by-its-own-condition-refuses-its-actions
-load: probe-start
-use: entity.probe-shadow.touch
-refused
-assert: not probe-not-set
 
 # test stop-ends-a-droptable
 load: probe-start

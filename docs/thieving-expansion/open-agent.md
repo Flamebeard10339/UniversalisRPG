@@ -6,15 +6,15 @@ did. **A line is deleted the day it closes.** The proofs stand in `open-tests.ds
 
 ---
 
-## An entity's `hidden if` hides it from the screen and from nothing else
+## The thieving module carries every gate twice, where a pointer would do
 
-`# entity` takes `hidden if:`, and the page says the thing is *not there to be met or
-robbed* while it holds. A route can still `use:` its actions and they run. Only a
-`hidden if:` written on the action refuses. Every gated entity in the thieving module
-carries the condition twice for this reason — once on the entity for the screen and
-once on each action for the engine — which is a copy where a pointer would do.
+An entity's `hidden if:` refuses its actions now, so a gate written on the entity is
+the whole of it. The module was written before that was true: every gated entity
+carries the same condition again on each of its actions, once for the screen and once
+for the engine.
 
-*Closes when:* `an-entity-hidden-by-its-own-condition-refuses-its-actions` passes.
+*Closes when:* no action in `content/thieving.dsl` writes a `hidden if:` its own entity
+already writes, and every route through the module still walks.
 
 ## `stop` does not stop a droptable
 

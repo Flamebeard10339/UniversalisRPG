@@ -655,7 +655,7 @@ function grantActionFoodBuff(state: GameState, registry: Registry): void {
   grantFoodFor(state, registry, active.ownerRef, armedAction(state, registry), active.repeating);
 }
 
-export type ArmResult = { armed: true; firstUnit: number } | { armed: false };
+export type ArmResult = { armed: true; firstUnit: number } | { armed: false; refused?: Localized };
 
 function resolveFirstUnit(state: GameState, registry: Registry, firstUnit: number): void {
   resolve(state, registry, state.time + (Number.isFinite(firstUnit) ? Math.ceil(firstUnit) : 0));
@@ -706,9 +706,12 @@ function whyRefused(action: Action, registry: Registry, state: GameState, named?
 
 function refuseWith(action: Action, registry: Registry, state: GameState, because: Localized | undefined): ArmResult | undefined {
   if (because === undefined) return undefined;
-  if (action.onFailure) applyResultsNow(state, registry, action.onFailure);
-  else state.log.push(because);
-  return { armed: false };
+  if (action.onFailure) {
+    applyResultsNow(state, registry, action.onFailure);
+    return { armed: false };
+  }
+  state.log.push(because);
+  return { armed: false, refused: because };
 }
 
 function refuseArming(action: Action, named: NamedOn, written: string, registry: Registry, state: GameState): ArmResult | undefined {
@@ -797,15 +800,16 @@ export function useFight(actionId: string, targetId: string, registry: Registry,
   resolveFirstUnit(state, registry, armed.firstUnit);
 }
 
-export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): void {
+export function useAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): Localized | undefined {
   const active = state.activeAction;
   if (active?.ownerRef === ownerRef(obj, objId) && active.actionSlug === actionId) {
     advanceUnderWayCycle(state, registry);
-    return;
+    return undefined;
   }
   const armed = armAction(obj, objId, actionId, registry, state);
-  if (!armed.armed) return;
+  if (!armed.armed) return armed.refused;
   resolveFirstUnit(state, registry, armed.firstUnit);
+  return undefined;
 }
 
 export function armTravel(origin: string, dest: string, registry: Registry, state: GameState): ArmResult {

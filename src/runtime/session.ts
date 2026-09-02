@@ -786,9 +786,10 @@ function performDirective(session: PlaySession, directive: Directive): Directive
     case 'submit-modal':
       answerModal(state, registry, { [directive.key]: directive.value });
       return {};
-    case 'use':
-      useAction(directive.obj, directive.objId, directive.actionId, registry, state);
-      return {};
+    case 'use': {
+      const refused = useAction(directive.obj, directive.objId, directive.actionId, registry, state);
+      return refused ? { failure: refused } : {};
+    }
     case 'use-on':
       useFight(directive.action, directive.target, registry, state);
       return {};
