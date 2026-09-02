@@ -1,0 +1,35 @@
+{
+  "name": "universalis-dsl",
+  "publisher": "universalis",
+  "displayName": "Universalis DSL",
+  "description": "Syntax highlighting for the Universalis world language.",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "universalis-dsl",
+        "aliases": [
+          "Universalis DSL"
+        ],
+        "extensions": [
+          ".dsl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "universalis-dsl",
+        "scopeName": "source.dsl",
+        "path": "./syntaxes/dsl.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -25,3 +25,9 @@ npm run build
 The base universe lives in `public/content/universes/base/`. Contribution mode
 stores local drafts, validates them, previews them in the running game, and can
 package the generated JSON into a GitHub issue.
+
+## Editor
+
+Syntax highlighting for `.dsl` in VS Code lives in `editor/vscode/`, generated
+from the section declarations by `npm run tmgrammar`. Its README says how to
+link it.

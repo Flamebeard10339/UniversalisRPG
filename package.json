@@ -26,6 +26,7 @@
     "notes": "tsx scripts/notes.ts",
     "review": "tsx scripts/review.ts",
     "inspect": "tsx scripts/inspect.ts",
+    "tmgrammar": "tsx scripts/tmgrammar.ts",
     "mutate": "tsx scripts/mutate.ts",
     "friction": "tsx scripts/friction.ts",
     "migrate-saves": "tsx scripts/migrate-saves.ts",

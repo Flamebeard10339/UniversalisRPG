@@ -1,0 +1,1601 @@
+{
+  "name": "Universalis DSL",
+  "scopeName": "source.dsl",
+  "fileTypes": [
+    "dsl"
+  ],
+  "patterns": [
+    {
+      "name": "meta.section.stat.dsl",
+      "begin": "^(#)[ \\t]+(stat)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(group|title|base)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.skill.dsl",
+      "begin": "^(#)[ \\t]+(skill)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(title|stat|tags)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(gain[ \\t]+amount[ \\t]+experience[ \\t]+on|stacks|food|gain)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.race.dsl",
+      "begin": "^(#)[ \\t]+(race)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(title)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.passive.dsl",
+      "begin": "^(#)[ \\t]+(passive)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|discover|relocate|when[ \\t]+hit|examine|inflict|restore|become|credit|on[ \\t]+hit|one[ \\t]+of|drain|title|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.cluster-jewel.dsl",
+      "begin": "^(#)[ \\t]+(cluster-jewel)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(open-connections|mod-slots|passives|examine|shape|title)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.item.dsl",
+      "begin": "^(#)[ \\t]+(item)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(rewards[ \\t]+scaled[ \\t]+by|open-connections|origin-cluster|cluster-jewel|on[ \\t]+unfinished|item-level|on[ \\t]+failure|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|mod-slots|attempts|discover|passives|relocate|requires|stops[ \\t]+on|when[ \\t]+hit|examine|inflict|restore|become|credit|on[ \\t]+hit|one[ \\t]+of|drain|group|shape|title|unset|value|give|rate|roll|slot|take|time|add|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(continuous|instant|stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.shop.dsl",
+      "begin": "^(#)[ \\t]+(shop)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(replenish|selling|buying|stocks|coin)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.faction.dsl",
+      "begin": "^(#)[ \\t]+(faction)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.group.dsl",
+      "begin": "^(#)[ \\t]+(group)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(standard[ \\t]+for|colour|title)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.event.dsl",
+      "begin": "^(#)[ \\t]+(event)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(resource|title)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.action.dsl",
+      "begin": "^(#)[ \\t]+(action)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+unfinished|on[ \\t]+failure|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|attempts|discover|relocate|requires|stops[ \\t]+on|extends|inflict|restore|become|credit|one[ \\t]+of|drain|title|unset|give|rate|roll|take|time|add|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(continuous|instant|stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.entity.dsl",
+      "begin": "^(#)[ \\t]+(entity)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(rewards[ \\t]+scaled[ \\t]+by|equipment-slots|on[ \\t]+unfinished|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+failure|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|attempts|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|restore|allies|become|credit|on[ \\t]+hit|one[ \\t]+of|skills|drain|flags|group|stats|title|unset|give|rate|roll|take|time|uses|add|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(aggressive|continuous|instant|stop|if|on)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.location.dsl",
+      "begin": "^(#)[ \\t]+(location)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+unfinished|on[ \\t]+failure|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|adjacent|attempts|discover|entities|relocate|requires|stops[ \\t]+on|examine|inflict|restore|become|credit|one[ \\t]+of|drain|flags|title|unset|give|rate|roll|take|time|add|say|set|xp|x|y|z)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(continuous|north[ \\t]+of|south[ \\t]+of|starting|east[ \\t]+of|instant|west[ \\t]+of|above|below|stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.region.dsl",
+      "begin": "^(#)[ \\t]+(region)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(holds|title)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.station.dsl",
+      "begin": "^(#)[ \\t]+(station)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.recipe.dsl",
+      "begin": "^(#)[ \\t]+(recipe)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(accuracy|evasion|station|burnt|skill|rate|time|out|say|in)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.resource.dsl",
+      "begin": "^(#)[ \\t]+(resource)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(start|title|rate|max)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.droptable.dsl",
+      "begin": "^(#)[ \\t]+(droptable)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|discover|relocate|inflict|restore|become|credit|one[ \\t]+of|drain|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.dialogue.dsl",
+      "begin": "^(#)[ \\t]+(dialogue)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|discover|relocate|inflict|restore|become|credit|one[ \\t]+of|again|drain|unset|give|roll|take|when|add|ask|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(always|sticky|goto|node|stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(->)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.quest.dsl",
+      "begin": "^(#)[ \\t]+(quest)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|done[ \\t]+when|discover|relocate|inflict|restore|become|credit|one[ \\t]+of|again|drain|title|unset|give|roll|take|when|add|ask|log|say|set|xp)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(never[ \\t]+ends|complete|always|sticky|stage|goto|stop|if)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(->)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.flag.dsl",
+      "begin": "^(#)[ \\t]+(flag)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.slot.dsl",
+      "begin": "^(#)[ \\t]+(slot)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(title|at)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.variable.dsl",
+      "begin": "^(#)[ \\t]+(variable)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(value)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.locale.dsl",
+      "begin": "^(#)[ \\t]+(locale)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.save.dsl",
+      "begin": "^(#)[ \\t]+(save)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(over)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": ".+",
+          "name": "string.unquoted.opaque.dsl"
+        }
+      ]
+    },
+    {
+      "name": "meta.section.test.dsl",
+      "begin": "^(#)[ \\t]+(test)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(submit-modal|expect[ \\t]+only|open-modal|unallocate|confusion|allocate|expected|blocked|journal|setting|unequip|assert|choose|expect|refuse|travel|apply|craft|equip|goto|load|note|page|shop|slot|swap|talk|wait|run|use)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(instant-kill|lock-pools|unkillable|refused|cancel)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.info.dsl",
+      "begin": "^(#)[ \\t]+(info)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(dependencies|language|version|pack)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(!|\\?|\\+|~)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "meta.section.remove.dsl",
+      "begin": "^(#)[ \\t]+(remove)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "match": "^(#)[ \\t]+(\\S+)[ \\t]*(.*)$",
+      "captures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "invalid.illegal.unknown-kind.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      }
+    },
+    {
+      "include": "#note"
+    },
+    {
+      "include": "#refused"
+    }
+  ],
+  "repository": {
+    "note": {
+      "patterns": [
+        {
+          "match": "^[ \\t]*//.*@@@.*$",
+          "name": "comment.line.note.dsl"
+        },
+        {
+          "match": "@@@.*$",
+          "name": "comment.line.note.dsl"
+        }
+      ]
+    },
+    "refused": {
+      "patterns": [
+        {
+          "match": "^[ \\t]*//.*$",
+          "name": "invalid.illegal.comment.dsl"
+        }
+      ]
+    }
+  }
+}
