@@ -243,7 +243,7 @@ pick-pocket:
 
 # entity thief
 title: Thief
-examine: Sitting where they can see the stair, doing nothing in particular, and they have already counted what you are carrying.
+examine: A casual cloaked figure idly rolling a blade between their gloved hands. 
 stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 100, npc-thieving-xp 17, npc-thieving-damage 1
 uses: core.melee-combat, pick-pocket
 faction: core.world
