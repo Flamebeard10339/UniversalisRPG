@@ -40,6 +40,27 @@ beckon:
 # location fixture-town.green
 +entities: shy-ghost
 
+# flag sifted-once
+
+# flag sifted-twice
+
+# droptable sifting
+set: sifted-once
+stop
+set: sifted-twice
+
+# location fixture-town.loft
+sift:
+  instant
+  roll: sifting
+  set: sifted-twice
+
+# test stop-ends-the-body-it-stands-in-and-the-ones-around-it
+goto: fixture-town.loft
+use: location.fixture-town.loft.sift
+assert: sifted-once
+assert: not sifted-twice
+
 # test an-entity-hidden-by-its-own-condition-refuses-its-actions
 goto: fixture-town.green
 use: entity.shy-ghost.beckon

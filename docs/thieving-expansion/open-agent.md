@@ -16,16 +16,6 @@ for the engine.
 *Closes when:* no action in `content/thieving.dsl` writes a `hidden if:` its own entity
 already writes, and every route through the module still walks.
 
-## `stop` does not stop a droptable
-
-`stop` is listed under `<result>` and the player's `on death` in `content/tulsa.dsl`
-relies on it. Inside a `# droptable` rolled from an action the lines after it still
-run. The thieving module orders its `if` ladders so that no branch needs one, which is
-fragile: a purse-confiscation branch that ran before an empty-purse check would jail
-a player it had just robbed.
-
-*Closes when:* `stop-ends-a-droptable` passes.
-
 ## `-adjacent:` takes no road out
 
 The page says `-<line>` takes out of a body whatever the line writes. Written as

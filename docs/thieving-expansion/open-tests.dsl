@@ -10,20 +10,12 @@ dependencies:
 
 # flag probe-not-set
 
-# droptable probe-sub
-set: probe-set
-stop
-set: probe-not-set
-
 # entity probe-post
 title: Probe Post
 examine: A post.
 set it:
   instant
   set: probe-set
-sub:
-  instant
-  roll: probe-sub
 
 # location tulsa.market-square
 +entities: probe-post
@@ -39,12 +31,6 @@ node probe-always:
 
 # save probe-start
 {"version":13,"location":"tulsa.market-square"}
-
-# test stop-ends-a-droptable
-load: probe-start
-use: entity.probe-post.sub
-assert: probe-set
-assert: not probe-not-set
 
 # test a-minus-adjacent-line-takes-one-road-out
 load: probe-start

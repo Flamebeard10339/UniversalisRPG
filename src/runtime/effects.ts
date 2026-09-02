@@ -178,6 +178,7 @@ export function applyResults(segment: Segment, results: readonly ActionResult[],
   }
 
   for (const result of results) {
+    if (segment.stopped) return;
     const magnitude = applyOne(segment, result, actor, count, lead);
     if (magnitude === undefined) continue;
     for (const observer of segment.observers) observer(segment, { result, actor, magnitude, lead });

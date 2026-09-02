@@ -391,7 +391,13 @@ const LEAVES: readonly Leaf[] = [
     },
   },
   { opens: /roll:[ \t]*/, forms: ['roll: <droptable>'], examples: ['roll: common-drops'], read: (cursor) => ({ kind: 'roll', table: id.parse(cursor) }) },
-  { opens: /stop(?![\w-])/, forms: ['stop'], examples: ['stop'], read: () => ({ kind: 'stop' }) },
+  {
+    opens: /stop(?![\w-])/,
+    forms: ['stop'],
+    examples: ['stop'],
+    notes: { stop: 'nothing after this runs — not the rest of the body it stands in, not the rest of a `# droptable` it was rolled from, and not the body that rolled it — and the action under way ends there' },
+    read: () => ({ kind: 'stop' }),
+  },
 ];
 
 function parseResult(cursor: Cursor): ActionResult {
