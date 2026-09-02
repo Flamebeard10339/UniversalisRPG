@@ -4,7 +4,13 @@ This document details the thieving expansion. Most, if not all additions should 
 
 Match the style already present in thieving.dsl. Prefer descriptive examine text over dramatic descriptions. Prefer grounded dialogue over dramatic dialogue. This world is a realistic fantasy immersion, not a story book. Words said by the narrator/universe like examine have no opinion about the object or person being examined. Dialogue should always contain some sort of emotion or desire leaking through the words. 
 
-Note that some mechanics may not be expressible with the current grammar. Mark those with @@@. Most should be expressible, however. 
+Note that some mechanics may not be expressible with the current grammar. Mark those with @@@. Most should be expressible, however. Note that this is not a balance pass, implement roughly reasonable numbers and move on. 
+
+## Jewels and Additional thieving spots
+
+Expand the stealable objects in the city. Difficult jewelry boxes, lockboxes, pickpocket the Duke. There should be another class of jewels that provide specific, more powerful bonuses to thieving for higher level progression
+
+The Rogue's den contains a shop selling a higher level set of lockpicks that contain a large range of item-level. 
 
 ## Karma System and Miniquests
 
