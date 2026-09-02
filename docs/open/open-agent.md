@@ -458,7 +458,8 @@ than a patch: a thread the player opened is more urgent than a greeting, and an 
 with one of each probably should not make them pick. Establish that before deleting the
 filter, because the blast radius is every conversation in the corpus.
 
-*Closes when:* `an-always-node-laid-over-a-dialogue-is-offered` passes, a quest-stage
-node on an entity with something else to say is offered rather than said, and both
-readings are pinned by routes in the fixture rather than by this paragraph.
+*Closes when:* the rule is settled and written where an author meets it, a quest-stage
+node on an entity with something else to say is offered rather than said, and routes in
+the fixture pin both readings rather than this paragraph. The overlaid-`always` half
+closes with its own line in `docs/thieving-expansion/`, which is where its proof lives.
 
