@@ -148,15 +148,49 @@ export function closeAdjacency(locations: ReadonlyMap<string, Location>): Map<st
   return roads;
 }
 
-export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): string | undefined {
-  const standing = new Map<string, string>();
-  for (const location of placed) {
-    const square = `${location.x}, ${location.y}, ${location.z}`;
-    const already = standing.get(square);
-    if (already !== undefined) return `location '${location.id}' stands at ${square}, and so does '${already}'; two places on one square draw on top of each other`;
-    standing.set(square, location.id);
+export interface Spot {
+  x: number;
+  y: number;
+  z: number;
+}
+
+const NEWLINE = '\n';
+
+const squareOf = (at: Spot): string => `${at.x}, ${at.y}, ${at.z}`;
+
+const ringAround = (at: Spot, ring: number): Spot[] => {
+  const around: Spot[] = [];
+  for (let dx = -ring; dx <= ring; dx++)
+    for (let dy = -ring; dy <= ring; dy++)
+      if (Math.max(Math.abs(dx), Math.abs(dy)) === ring) around.push({ x: at.x + dx, y: at.y + dy, z: at.z });
+  return around.sort((one, other) => (one.x - at.x) ** 2 + (one.y - at.y) ** 2 - ((other.x - at.x) ** 2 + (other.y - at.y) ** 2) || one.y - other.y || one.x - other.x);
+};
+
+export function nearestFreeSquare(taken: ReadonlySet<string>, at: Spot): Spot {
+  for (let ring = 1; ; ring++) {
+    const free = ringAround(at, ring).find((spot) => !taken.has(squareOf(spot)));
+    if (free !== undefined) return free;
   }
-  return undefined;
+}
+
+export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): string | undefined {
+  const all = [...placed];
+  const standing = new Map<string, string>();
+  const stacked: { location: Spot & { id: string }; already: string }[] = [];
+  for (const location of all) {
+    const already = standing.get(squareOf(location));
+    if (already !== undefined) stacked.push({ location, already });
+    else standing.set(squareOf(location), location.id);
+  }
+  if (stacked.length === 0) return undefined;
+  const taken = new Set(all.map(squareOf));
+  return stacked
+    .map(({ location, already }) => {
+      const free = nearestFreeSquare(taken, location);
+      taken.add(squareOf(free));
+      return `location '${location.id}' stands at ${squareOf(location)}, and so does '${already}'; two places on one square draw on top of each other. The nearest square nothing stands on is ${squareOf(free)}`;
+    })
+    .join(NEWLINE);
 }
 
 export function refuseStackedLocations(locations: ReadonlyMap<string, Location>): void {
@@ -208,7 +242,12 @@ const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
     title: TITLE_FIELD,
     examine: { parser: text },
     entities: { parser: list(populationValue), default: () => [], block: true },
-    adjacent: { parser: list(edgeValue), default: () => [], block: true },
+    adjacent: {
+      parser: list(edgeValue),
+      default: () => [],
+      block: true,
+      note: 'a road out of here, and it answers from both ends: unless the place at the far end writes a road back of its own, the engine lays that road down there too, carrying whatever `while` this one carries. Writing it at either end is therefore enough, which is how a module reaches a place another module declared — and a far end that writes its own road back under a condition nothing sets is how a road is made one-way.',
+    },
     flags: { parser: list(id), default: () => [], block: true },
   },
   keywords: ['starting'],

@@ -63,7 +63,7 @@ export function isTagClause(value: unknown): boolean {
 
 const SECONDS_PER_MINUTE = 60;
 
-const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+)(?:-(?<hi>\d+))?(?<percent>%?)`;
+const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+(?:\.\d+)?)(?:-(?<hi>\d+(?:\.\d+)?))?(?<percent>%?)`;
 const NAME = String.raw`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*`;
 
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
@@ -156,7 +156,7 @@ export const tagClause: Parser<TagClause> = {
     }
   },
   forms: ['<keyword>', ...CARRIED_KEYWORDS, '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'],
-  examples: ['sharp', ...CARRIED_KEYWORDS, '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+1 attack per level of melee'],
+  examples: ['sharp', ...CARRIED_KEYWORDS, '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+0.5 attack per level of melee'],
   notes: {
     '<keyword>': 'a word of your own, carried and never read: the engine acts on the words below and on no other',
     ...Object.fromEntries(CARRIED_KEYWORDS.map((word) => [word, KEYWORDS[word].does])),
@@ -180,6 +180,6 @@ export const bonusAmount: Parser<BonusAmount> = {
     return parseAmount(groups, raw, span);
   },
   print: printAmount,
-  forms: ['+<number>', '-<number>', '+<percent>%', '+<least>-<most>'],
-  examples: ['+1', '-3', '+25%', '-10%', '+4-7', '-3-6'],
+  forms: ['+<float>', '-<float>', '+<percent>%', '+<least>-<most>'],
+  examples: ['+1', '-3', '+0.5', '+25%', '-10%', '+4-7', '-3-6'],
 };

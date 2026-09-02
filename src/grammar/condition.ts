@@ -60,9 +60,9 @@ const ROOTED_LINES = ENGINE_ROOT_NAMES.map((root): { form: string; example: stri
   const held = rooted(root);
   if (named(held)) {
     if (held.against === undefined) return { form: `${root}.<${held.kind}>`, example: `${root}.${held.stands}`, note: held.means };
-    return { form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}`, note: held.means };
+    return { form: `${root}.<${held.kind}> <comparison> <float>`, example: `${root}.${held.stands} >= ${held.against}`, note: held.means };
   }
-  if (bare(held)) return { form: `${root} <comparison> <number>`, example: `${root} >= ${held.against}`, note: held.means };
+  if (bare(held)) return { form: `${root} <comparison> <float>`, example: `${root} >= ${held.against}`, note: held.means };
   return { form: `${root}.<name>`, example: `${root}.${held.stands}` };
 });
 
@@ -144,8 +144,10 @@ function parseReference(cursor: Cursor): Reference {
   return { path: raw.split('.') };
 }
 
+const COUNTED_ITEM = /\d+[ \t]+[a-z]/;
+
 function parseHas(cursor: Cursor): Condition | null {
-  if (cursor.take(/has[ \t]+/) === null) return null;
+  if (cursor.take(/has[ \t]+/) === null && cursor.peek(COUNTED_ITEM) === null) return null;
   const hasCount = cursor.peek(/\d/) !== null;
   const count = hasCount ? number.parse(cursor) : 1;
   if (hasCount) cursor.take(/[ \t]+/);
@@ -239,7 +241,7 @@ export const condition: Parser<Condition> = {
   holds: () => ({ comparison, condition, 'engine state': engineState }),
   forms: [
     '<flag>',
-    '<flag> <comparison> <number>',
+    '<flag> <comparison> <float>',
     '<engine state>',
     'has <item>',
     'has <count> <item>',
@@ -260,5 +262,8 @@ export const condition: Parser<Condition> = {
     'has-key or has-rope',
     'a and b or c',
   ],
-  notes: { [ALWAYS]: `holds whatever the state of the world is, so \`not ${ALWAYS}\` is a line that never holds, which is how a body is shut off outright rather than by a flag nothing sets` },
+  notes: {
+    'has <count> <item>': 'the `has` may be left off — a condition opening on a count and an item is read as this — and either way it prints back with the `has` written in',
+    [ALWAYS]: `holds whatever the state of the world is, so \`not ${ALWAYS}\` is a line that never holds, which is how a body is shut off outright rather than by a flag nothing sets`,
+  },
 };

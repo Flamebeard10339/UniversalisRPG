@@ -84,7 +84,7 @@ export const save = section<SaveSection>()({
       example: 'over: in-town',
       note: OVER_LAYERS,
     },
-    { form: '{"version": <number>[, <the rest of a saved game>]}', example: '{"version": 1}' },
+    { form: '{"version": <int>[, <the rest of a saved game>]}', example: '{"version": 1}' },
   ],
   parse: parseSaveSection,
   print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, ...overLines(value.over), JSON.stringify({ version: value.version, ...value.diff })],

@@ -24,7 +24,7 @@ export const skillGrant: Parser<SkillGrant> = {
     };
   },
   print: (grant) => `gain ${grant.coefficient === 1 && grant.amount ? '' : String(grant.coefficient)}${grant.coefficient !== 1 && grant.amount ? ' * ' : ''}${grant.amount ? 'amount' : ''} experience on ${grant.event}`,
-  forms: ['gain <number> experience on <event>', 'gain amount experience on <event>', 'gain <number> * amount experience on <event>'],
+  forms: ['gain <float> experience on <event>', 'gain amount experience on <event>', 'gain <float> * amount experience on <event>'],
   examples: ['gain amount experience on rat-bitten', 'gain 4 * amount experience on rat-bitten', 'gain 4 experience on rat-bitten', 'gain 1 experience on rat-bitten'],
 };
 

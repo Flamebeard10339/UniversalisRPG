@@ -33,7 +33,7 @@ export const number: Parser<number> = {
     return Number(raw);
   },
   print: (value) => String(value),
-  forms: ['<number>'],
+  forms: ['<int>'],
   examples: ['0', '5', '-3'],
 };
 
@@ -51,7 +51,7 @@ export const decimal: Parser<number> = {
     return Number(raw);
   },
   print: (value) => String(value),
-  forms: ['<number>'],
+  forms: ['<float>'],
   examples: ['0', '5', '1.5', '-2.25'],
 };
 
@@ -61,8 +61,8 @@ export const numberOrStat: Parser<number | string> = {
     return raw === null ? id.parse(cursor) : Number(raw);
   },
   print: (value) => (typeof value === 'string' ? value : String(value)),
-  names: { number: 'stat' },
-  forms: ['<number>', '<stat>'],
+  names: { float: 'stat' },
+  forms: ['<float>', '<stat>'],
   examples: ['3', '1.5', 'attack-speed'],
 };
 
@@ -175,7 +175,7 @@ export const amount: Parser<Amount> = {
   parse: (cursor) => amountOrStat(cursor, decimalRange, 'an amount'),
   print: printAmount,
   holds: () => ({ side }),
-  forms: ['<number>', '<least>-<most>', '[<side> ]<stat>'],
+  forms: ['<float>', '<least>-<most>', '[<side> ]<stat>'],
   examples: ['5', '4-7', 'their vigilance'],
   notes: { '[<side> ]<stat>': STAT_AMOUNT_NOTE },
 };

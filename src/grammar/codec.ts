@@ -1,5 +1,5 @@
-import { matches, paired } from './form';
-import { Filled, Parser, Written, parseWhole } from './parser';
+import { holeNames, matches, paired } from './form';
+import { Filled, Names, Parser, Written, parseWhole } from './parser';
 
 export const filledBy = (parser: Filled): Filled => ({ ...(parser.names === undefined ? {} : { names: parser.names }), ...(parser.holds === undefined ? {} : { holds: parser.holds }) });
 
@@ -34,6 +34,15 @@ export function formFailures(name: string, forms: readonly string[], examples: r
 }
 
 export const shapeFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => formFailures(name, parser.forms, parser.examples));
+
+export function namedHoleFailures(name: string, forms: readonly string[], names: Names | undefined): string[] {
+  const holes = new Set(forms.flatMap((form) => holeNames(form)));
+  return Object.keys(names ?? {})
+    .filter((hole) => !holes.has(hole))
+    .map((hole) => `${name}: names <${hole}>, which stands in none of the shapes ${forms.join(' | ')}`);
+}
+
+export const nameFailures = (codecs: Map<Parser<unknown>, string>): string[] => [...codecs].flatMap(([parser, name]) => namedHoleFailures(name, parser.forms, parser.names));
 
 export const writtenFrom = (parser: Parser<unknown>): Written[] =>
   paired(parser.forms, parser.examples).map((example, at) => {

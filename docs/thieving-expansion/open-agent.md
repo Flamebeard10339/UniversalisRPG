@@ -45,26 +45,17 @@ is therefore a `when:` node, including two that would rather have been unconditi
 
 *Closes when:* `an-always-node-laid-over-a-dialogue-is-offered` passes.
 
-## `requires:` refuses the `<count> <item>` condition the page offers it
+## `run-progress` is a counter kept only to quiet a remark that is gone
 
-The condition page lists `has <item> | <count> <item>`. Under an action,
-`requires: 50 core.coin` is refused with *expected a reference*;
-`requires: inventory.core.coin >= 50` is taken. Either the parser or the page is wrong,
-and a route cannot pin a parse refusal, so this line has no proof beside it.
+The unreachable-room remark has been taken out of `src/runtime/worldRemarks.ts`: it read
+only `adjacent:`, so a room entered by `relocate:` looked stranded, and no reading of the
+roads can keep up with the ways a `relocate:` reaches one. The five passages of the den's
+initiation and the warden's office therefore still carry conditional roads that mirror
+their relocations (`run-progress`, `wardens-door.unlocked`) for a reader that no longer
+exists.
 
-*Closes when:* `npm run oracle -- --at` takes a draft carrying `requires: 50 core.coin`,
-or the condition page stops offering the form.
-
-## The unreachable-room remark does not see `relocate:`
-
-`npm run oracle -- --at content` remarks that no road reaches a location, and reads
-only `adjacent:` to say so. The five passages of the den's initiation and the warden's
-office are entered by `relocate:` on purpose. They now carry conditional roads that
-mirror the relocation (`run-progress`, `wardens-door.unlocked`) so the remark is quiet,
-which is a counter kept in step with the relocations by hand.
-
-*Closes when:* the remark counts a location that some `relocate:` names as reached, and
-`run-progress` can be deleted from `content/thieving.dsl` without a remark returning.
+*Closes when:* `run-progress` and the roads that mirror a `relocate:` are gone from
+`content/thieving.dsl` and `npm run oracle -- --at content` still passes every route.
 
 ## A stat used as a `one of:` weight is a raw ratio, and the page does not say so
 

@@ -1,6 +1,6 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, expect, it } from 'vitest';
-import { collectionFailures, formFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
+import { collectionFailures, formFailures, nameFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { kindNamed, offeringAt } from './completion';
 import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
@@ -70,6 +70,18 @@ describe('a hole of every line of every kind', () => {
   it('is asked about at all, over every kind there is', () => {
     expect(new Set(GRAMMAR.map((at) => at.kind)).size).toBe(sections().filter((each) => each.grammar.length > 0).length);
     expect(HOLES.filter((at) => kindAt(at) !== undefined).length).toBeGreaterThan(100);
+  });
+
+  it('names a hole some shape of its kind holds, so a hole renamed takes what it names with it', () => {
+    const held = new Map<string, Set<string>>();
+    for (const { kind, line } of GRAMMAR) held.set(kind, new Set([...(held.get(kind) ?? []), ...holeNames(line.form)]));
+    expect(
+      GRAMMAR.flatMap(({ kind, line }) =>
+        Object.keys(line.names ?? {})
+          .filter((hole) => !held.get(kind)!.has(hole))
+          .map((hole) => `# ${kind} ${line.form} names <${hole}>, which stands in no shape the kind offers`),
+      ),
+    ).toEqual([]);
   });
 
   it('says what it names outright, rather than a kind nothing declares', () => {
@@ -717,6 +729,7 @@ describe('every section kind', () => {
     expect(codecs.size).toBeGreaterThan(20);
     expect(collectionFailures(codecs)).toEqual([]);
     expect(shapeFailures(codecs)).toEqual([]);
+    expect(nameFailures(codecs)).toEqual([]);
   });
 });
 

@@ -329,7 +329,7 @@ const LEAVES: readonly Leaf[] = [
   { opens: /say:[ \t]*/, forms: ['say: <text>'], examples: ['say: the door is stuck'], read: (cursor) => ({ kind: 'say', text: cursor.take(/[^\n]*/) ?? '' }) },
   { opens: /set[: \t][ \t]*/, forms: ['set: <flag>'], examples: ['set: found-key'], read: (cursor) => ({ kind: 'set', variable: parseVariable(cursor) }) },
   { opens: /unset[: \t][ \t]*/, forms: ['unset: <flag>'], examples: ['unset: found-key'], read: (cursor) => ({ kind: 'unset', variable: parseVariable(cursor) }) },
-  { opens: /add:[ \t]*/, forms: ['add: <variable> <number>'], examples: ['add: gold 5', 'add: gold -3'], read: parseAdd },
+  { opens: /add:[ \t]*/, forms: ['add: <variable> <int>'], examples: ['add: gold 5', 'add: gold -3'], read: parseAdd },
   {
     opens: /give:[ \t]*/,
     forms: ['give: <item>', 'give: <count> <item>', 'give: <least>-<most> <item>'],

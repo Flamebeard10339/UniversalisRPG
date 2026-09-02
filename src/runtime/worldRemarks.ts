@@ -1,4 +1,3 @@
-import { isDebug } from '../content/sections';
 import { isBase } from '../content/sections/item';
 import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
@@ -21,24 +20,6 @@ export interface Remark {
 const REACHES: readonly Directive['kind'][] = ['load', 'run', 'expect', 'expect-only'];
 
 const SPELLS_IT_OUT: readonly Directive['kind'][] = ['assert', 'refuse', 'journal'];
-
-function stranded(registry: Registry): Remark[] {
-  const start = [...registry.locations.values()].find((location) => location.starting);
-  if (start === undefined) return [];
-  const seen = new Set([start.id]);
-  const frontier = [start.id];
-  while (frontier.length > 0) {
-    const here = frontier.pop()!;
-    for (const edge of registry.roads.get(here) ?? []) {
-      if (seen.has(edge.target)) continue;
-      seen.add(edge.target);
-      frontier.push(edge.target);
-    }
-  }
-  return [...registry.locations.values()]
-    .filter((location) => !isDebug(location) && !seen.has(location.id))
-    .map((location) => ({ where: `# location ${location.id}`, says: `no road reaches this from ${start.id}, where a new game begins, so nobody can walk to it. A road answers from both ends: write it at either.` }));
-}
 
 function unkept(registry: Registry): Remark[] {
   const kept = new Set([...registry.entities.values()].flatMap((entity) => (entity.shop === undefined ? [] : [entity.shop])));
@@ -156,7 +137,6 @@ function lopsided(registry: Registry): Remark[] {
 type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
 const RULES: readonly Rule[] = [
-  (_sources, registry) => stranded(registry),
   (_sources, registry) => unkept(registry),
   (_sources, registry) => pricedCoin(registry),
   (_sources, registry) => stackedBases(registry),
