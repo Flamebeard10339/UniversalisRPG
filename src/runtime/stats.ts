@@ -177,6 +177,10 @@ export function statRange(statId: string, state: GameState, registry: Registry, 
   return foldStat(statBreakdown(statId, state, registry, actorId));
 }
 
+export function statChanged(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): boolean {
+  return statBreakdown(statId, state, registry, actorId).parts.length > 0;
+}
+
 export function statValue(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
   return midpoint(statRange(statId, state, registry, actorId));
 }

@@ -16,6 +16,7 @@ group: core.skilling
 # stat depth
 title: Depth
 group: core.other
+hidden if: always
 
 # stat fishing-rate
 title: Casting Speed

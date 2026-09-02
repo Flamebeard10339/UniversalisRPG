@@ -27,12 +27,15 @@ group: skilling
 
 # stat npc-thieving-difficulty
 group: core.other
+hidden if: always
 
 # stat npc-thieving-xp
 group: core.other
+hidden if: always
 
 # stat npc-thieving-damage
 group: core.other
+hidden if: always
 
 # skill thieving
 title: Thieving

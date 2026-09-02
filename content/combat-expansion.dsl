@@ -5,10 +5,12 @@ dependencies: core
 
 # stat max-rage
 group: core.other
+hidden if: not changed.max-rage
 
 # stat rage-drain
 base: -30
 group: core.other
+hidden if: stat.max-rage <= 0
 
 # resource rage
 rate: rage-drain

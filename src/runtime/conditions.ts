@@ -5,7 +5,7 @@ import { reachedByItself } from '../content/sections/quest';
 import { GameState, PLAYER_SHEET, type PlayerField } from './state';
 import { isSettingName, settingStands } from './settings';
 import { highestSkillLevel, skillLevel } from './skills';
-import { statValue } from './stats';
+import { statChanged, statValue } from './stats';
 import { fromMilliUnits, msToSeconds } from './units';
 import { heldCount } from './itemInstance';
 import { localizerOf } from './localized';
@@ -25,6 +25,7 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   resource: (id, state) => ({ value: fromMilliUnits(state.resources[id] ?? 0) }),
   inventory: (id, state) => ({ value: heldCount(state, id) }),
   stat: (id, state, registry) => ({ value: statValue(id, state, registry) }),
+  changed: (id, state, registry) => ({ value: statChanged(id, state, registry) }),
 };
 
 function questReach(path: string[], registry: Registry): Condition | undefined {
@@ -83,6 +84,8 @@ export function evaluateCondition(condition: Condition, state: GameState, regist
       return condition.conditions.some((c) => evaluateCondition(c, state, registry));
     case 'has':
       return heldCount(state, condition.item) >= condition.count;
+    case 'always':
+      return true;
     default: {
       const unreached: never = condition;
       return unreached;

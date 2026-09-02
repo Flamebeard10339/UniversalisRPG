@@ -12,7 +12,8 @@ export const SETTING = 'setting';
 interface Rooted {
   kind: string;
   stands: string;
-  against: number;
+  against?: number;
+  means?: string;
 }
 
 interface Named {
@@ -34,6 +35,7 @@ export const ENGINE_ROOTS = {
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
   stat: { kind: 'stat', stands: 'attack', against: 1.5 },
+  changed: { kind: 'stat', stands: 'attack', means: 'whether that stat stands anywhere other than the base it was declared with, which is how a line asks whether anything has moved it without writing down what it started at' },
 } as const satisfies Readonly<Record<string, Rooted | Named | Bare>>;
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
@@ -56,9 +58,12 @@ export const rootedKind = (root: string): string | null => {
 
 const ROOTED_LINES = ENGINE_ROOT_NAMES.map((root): { form: string; example: string; note?: string } => {
   const held = rooted(root);
+  if (named(held)) {
+    if (held.against === undefined) return { form: `${root}.<${held.kind}>`, example: `${root}.${held.stands}`, note: held.means };
+    return { form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}`, note: held.means };
+  }
   if (bare(held)) return { form: `${root} <comparison> <number>`, example: `${root} >= ${held.against}`, note: held.means };
-  if (!named(held)) return { form: `${root}.<name>`, example: `${root}.${held.stands}` };
-  return { form: `${root}.<${held.kind}> <comparison> <number>`, example: `${root}.${held.stands} >= ${held.against}` };
+  return { form: `${root}.<name>`, example: `${root}.${held.stands}` };
 });
 
 export const engineState: Parser<string> = {
@@ -120,7 +125,12 @@ export type Condition =
       right: Threshold;
     }
   | { kind: 'has'; item: string; count: number }
+  | { kind: 'always' }
   | { kind: 'reference'; reference: Reference };
+
+export const ALWAYS = 'always';
+
+const ALWAYS_WRITTEN = new RegExp(`${ALWAYS}(?![\w-])`);
 
 const COMPARISON = /[ \t]*(>=|<=|!=|>|<|=)[ \t]*/;
 
@@ -152,6 +162,8 @@ function parseThreshold(cursor: Cursor): Threshold {
 export const printThreshold = (value: Threshold): string => value.value.toFixed(value.places);
 
 function parsePrimary(cursor: Cursor): Condition {
+  if (cursor.take(ALWAYS_WRITTEN) !== null) return { kind: 'always' };
+
   const has = parseHas(cursor);
   if (has !== null) return has;
 
@@ -195,6 +207,8 @@ export function printCondition(value: Condition): string {
       return `${printReference(value.left)} ${value.operator} ${printThreshold(value.right)}`;
     case 'has':
       return value.count === 1 ? `has ${value.item}` : `has ${number.print(value.count)} ${value.item}`;
+    case 'always':
+      return ALWAYS;
     case 'not':
       return `not ${printCondition(value.condition)}`;
     case 'and':
@@ -229,6 +243,7 @@ export const condition: Parser<Condition> = {
     '<engine state>',
     'has <item>',
     'has <count> <item>',
+    ALWAYS,
     'not <condition>',
     '<condition> and <condition>',
     '<condition> or <condition>',
@@ -239,9 +254,11 @@ export const condition: Parser<Condition> = {
     ROOTED_LINES[0]!.example,
     'has plank',
     'has 3 plank',
+    ALWAYS,
     'not has-key',
     'has-key and not has-rope',
     'has-key or has-rope',
     'a and b or c',
   ],
+  notes: { [ALWAYS]: `holds whatever the state of the world is, so \`not ${ALWAYS}\` is a line that never holds, which is how a body is shut off outright rather than by a flag nothing sets` },
 };

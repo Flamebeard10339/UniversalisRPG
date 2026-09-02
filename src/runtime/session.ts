@@ -511,7 +511,9 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     focus: modalFocus(state),
     equipment: wornRows(state, registry),
     xp: listedToPlayer(registry.skills.values()).map(({ id }) => skillRow(id, state.xp[id] ?? 0, localizer)),
-    stats: listedToPlayer(registry.stats.values()).map((stat) => statRow(stat.id, state, registry, localizer)),
+    stats: listedToPlayer(registry.stats.values())
+      .filter((stat) => stat.hiddenIf === undefined || !evaluateCondition(stat.hiddenIf, state, registry))
+      .map((stat) => statRow(stat.id, state, registry, localizer)),
     flags: { ...state.flags },
     ...publishPlaces(state, registry),
     mapGrid: mapGrid(registry),
