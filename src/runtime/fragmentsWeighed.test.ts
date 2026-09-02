@@ -142,6 +142,26 @@ describe('an id inside a fragment', () => {
     expect(ours).not.toBe(theirs);
   });
 
+  it('refuses them. where nothing is aimed at, rather than saying a line with a hole in it', () => {
+    const text = [
+      '# info nobody-probe',
+      'version: 1.0.0',
+      'pack: nobody-probe',
+      'dependencies:',
+      '  core',
+      '  fixture-town',
+      '',
+      '# location fixture-town.green',
+      'shout:',
+      '  instant',
+      '  say: Facing {them.attack}.',
+    ].join('\n');
+    const registry = loadUniverse(withEngineLocale([...fixtureSources(), { name: 'nobody-probe', text }]));
+    const session = startSession(registry);
+
+    expect(() => apply(session, 'use:location.fixture-town.green.shout')).toThrow(/reads a stat off what the action under way is aimed at, and this one is aimed at fixture-town.green, which carries no stats/);
+  });
+
   it('is left alone where the brace is written twice, which is how a line says one of its own', () => {
     const registry = standing('A statue in {{parentheses}.')();
 

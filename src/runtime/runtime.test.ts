@@ -697,10 +697,17 @@ describe('what an engine root reads', () => {
   it.each(ENGINE_ROOT_NAMES)('does not let a flag named after %s answer for it', (root) => {
     const state = createGameState();
     const path = [root, 'island', 'anything'];
-    const before = renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry);
+    const said = (): string => {
+      try {
+        return renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry);
+      } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+      }
+    };
+    const before = said();
     state.flags[path.join('.')] = 99;
 
-    expect(renderSegments([{ kind: 'interpolate', reference: { path } }], state, registry)).toBe(before);
+    expect(said()).toBe(before);
   });
 });
 
