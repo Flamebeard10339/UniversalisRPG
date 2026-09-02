@@ -7,7 +7,7 @@ import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner, actionWords, type ActionDeclaration } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
-import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
+import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unframedProblem, unsuppliedParameters } from './locale';
 import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
 import { closeAdjacency, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, isActionOwnerKind, isDebug, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
@@ -209,6 +209,8 @@ function localeValueProblem(locales: Locales, language: string, key: string, val
     }
     return undefined;
   }
+  const unframed = unframedProblem(value);
+  if (unframed !== undefined) return new DslError(`# locale ${language}: ${key} ${unframed}`);
   const unsupplied = unsuppliedParameters(locales, key, value);
   if (unsupplied.length === 0) return undefined;
   return new DslError(`# locale ${language}: ${key} names ${unsupplied.map((name) => `{${name}}`).join(', ')}, which nothing supplies`);

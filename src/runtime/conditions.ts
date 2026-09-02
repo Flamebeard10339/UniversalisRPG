@@ -2,7 +2,7 @@ import { Condition, type EngineRoot, holds, isEngineRoot, printCondition, Refere
 import { TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { reachedByItself } from '../content/sections/quest';
-import { GameState, PLAYER_SHEET, type PlayerField } from './state';
+import { GameState, PLAYER, PLAYER_SHEET, type PlayerField } from './state';
 import { isSettingName, settingStands } from './settings';
 import { highestSkillLevel, skillLevel } from './skills';
 import { statChanged, statValue } from './stats';
@@ -25,6 +25,11 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   resource: (id, state) => ({ value: fromMilliUnits(state.resources[id] ?? 0) }),
   inventory: (id, state) => ({ value: heldCount(state, id) }),
   stat: (id, state, registry) => ({ value: statValue(id, state, registry) }),
+  us: (id, state, registry) => ({ value: statValue(id, state, registry, PLAYER) }),
+  them: (id, state, registry) => {
+    const aimedAt = state.activeAction?.roster?.[PLAYER]?.target;
+    return { value: aimedAt === undefined ? undefined : statValue(id, state, registry, aimedAt) };
+  },
   changed: (id, state, registry) => ({ value: statChanged(id, state, registry) }),
 };
 

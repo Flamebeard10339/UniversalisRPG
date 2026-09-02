@@ -132,6 +132,16 @@ describe('an id inside a fragment', () => {
     expect(standing('A statue.{no-such-thing: Lit from the side.}')).toThrow(/names an unknown flag: no-such-thing/);
   });
 
+  it('reads the two sides of an action, so a line can say a stat of whoever acts and of what it is aimed at', () => {
+    const registry = standing('{us.attack}|{them.attack}')();
+    const session = startSession(registry);
+    const [ours, theirs] = String(apply(session, 'use:entity.id-probe.statue.examine').said[0]).split('|');
+
+    expect(Number(ours)).toBeGreaterThan(0);
+    expect(Number(theirs)).toBeGreaterThan(0);
+    expect(ours).not.toBe(theirs);
+  });
+
   it('is left alone where the brace is written twice, which is how a line says one of its own', () => {
     const registry = standing('A statue in {{parentheses}.')();
 

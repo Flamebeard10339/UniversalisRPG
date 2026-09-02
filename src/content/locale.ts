@@ -1,7 +1,7 @@
 import type {LocaleSection} from './sections/locale';
-import { parametersOf } from '../grammar/values';
+import { referencesIn, unframedProblem } from '../grammar/frame';
 
-export { parametersOf };
+export { referencesIn, unframedProblem };
 
 export const ENGINE_KEYS = [
   'engine.travel.to',
@@ -403,11 +403,11 @@ export const emptyLocales = (): Locales => ({
 
 export function unsuppliedParameters(locales: Locales, key: string, value: string): string[] {
   if (locales.prose.has(key)) return [];
-  if (!isEngineKey(key)) return parametersOf(value);
+  if (!isEngineKey(key)) return referencesIn(value);
   const english = locales.english.get(key);
   if (english === undefined) return [];
-  const known = new Set(parametersOf(english));
-  return parametersOf(value).filter((name) => !known.has(name));
+  const known = new Set(referencesIn(english));
+  return referencesIn(value).filter((name) => !known.has(name));
 }
 
 const DEFAULT_LOCALE = 'en';

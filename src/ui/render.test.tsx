@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { localizerFor, type Params } from '../runtime/localized';
-import { parametersOf } from '../content/locale';
+import { referencesIn } from '../content/locale';
 import { asLocalized } from '../runtime/localizedFixture';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { leaves } from '../runtime/viewLeaves';
@@ -69,7 +69,7 @@ const shellWord = wordsOf(localizerFor(loadInEnglish(''), 'en'));
 
 const SAID = loadInEnglish('');
 const NODE: Params = Object.fromEntries(
-  Object.values(LABELS).flatMap((key) => parametersOf(SAID.locales.english.get(key) ?? SAID.locales.base.get(key)?.text ?? '').map((name) => [name, asLocalized(name)])),
+  Object.values(LABELS).flatMap((key) => referencesIn(SAID.locales.english.get(key) ?? SAID.locales.base.get(key)?.text ?? '').map((name) => [name, asLocalized(name)])),
 );
 
 const SHELL_WORDS: readonly string[] = (Object.keys(LABELS) as LabelId[]).map((id) => shellWord(id, NODE));

@@ -58,11 +58,27 @@ describe('parameters are named and substituted (c4)', () => {
 
   it('refuses a pattern naming a parameter the call site did not supply', () => {
     expect(() => english().engine('engine.travel.to')).toThrow(RuntimeError);
-    expect(() => english().engine('engine.travel.to')).toThrow(/takes a \{destination\}/);
+    expect(() => english().engine('engine.travel.to')).toThrow(/names \{destination\}, which the line it stands in was handed nothing for/);
   });
 
   it('allows a parameter the pattern does not name, because another language need not use it', () => {
     expect(english().engine('engine.prune.nowhere', { unused: 1 })).toBe('(nowhere)');
+  });
+
+  it('weighs a conditional over what the call site handed it, which is how one line says two things', () => {
+    const said = (damage: number): string => english().engine('engine.combat.player.hit', { target: 'rat' as Localized, damage });
+    const loaded = loadUniverse([engineLocale(), { name: 'es', text: ['# info es', 'version: 1.0.0', 'dependencies:', '  engine-en', '', '# locale es', 'engine.combat.player.hit: Golpe{damage > 2: fuerte} a {target}.'].join('\n') }]);
+    const spoken = (damage: number): string => localizerFor(loaded, 'es').engine('engine.combat.player.hit', { target: 'rata' as Localized, damage });
+
+    expect(said(3)).toBe('You hit the rat for 3.');
+    expect(spoken(3)).toBe('Golpefuerte a rata.');
+    expect(spoken(1)).toBe('Golpe a rata.');
+  });
+
+  it('says a brace of its own where one is written twice', () => {
+    const loaded = loadUniverse([engineLocale(), { name: 'es', text: ['# info es', 'version: 1.0.0', 'dependencies:', '  engine-en', '', '# locale es', 'engine.travel.to: Ir a {{destination} {destination}'].join('\n') }]);
+
+    expect(localizerFor(loaded, 'es').engine('engine.travel.to', { destination: 'Tulsa' as Localized })).toBe('Ir a {destination} Tulsa');
   });
 });
 

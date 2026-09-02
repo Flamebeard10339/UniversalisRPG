@@ -28,7 +28,13 @@ export const locale = section<LocaleSection>()({
   kind: 'locale',
   ids: 'none',
   vocabulary: 'declared',
-  grammar: [{ form: '<key>: <text>', example: 'engine.shell.stage: Stage' }],
+  grammar: [
+    {
+      form: '<key>: <text>',
+      example: 'engine.shell.stage: Stage',
+      note: 'a line the engine says, keyed rather than written where it is used. A `<fragment>` in one reads only what the engine hands that line at the moment it is raised — the `{names}` the English already writes — and never the run: `{player.name}` and `{us.attack}` are the world, so they stand in a `<text>` an author writes and nowhere here',
+    },
+  ],
   parse: parseLocaleSection,
   print: (declared, { id }) => [`# locale ${id}`, ...declared.entries.map((entry) => `${entry.key}: ${entry.value}`)],
 });

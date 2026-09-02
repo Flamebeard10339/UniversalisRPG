@@ -586,6 +586,16 @@ describe('a translation of a spoken line is read by the grammar it was authored 
     expect(translated('deep.dialogue.guard-talk.greet.line.0: Bien hallado, {player.name.')).toThrow(/greet\.line\.0 is a spoken line, and unterminated fragment/);
   });
 
+  it('refuses an engine line whose fragment reads the run, which a keyed line has no hold of', () => {
+    expect(translated('deep.dialogue.guard-talk.greet.line.0: {has deep.charm: con encanto}')).not.toThrow();
+    expect(() =>
+      loadUniverse([
+        { name: 'deep', text: SPOKEN_EVERYWHERE },
+        { name: 'deep-es', text: ['# info deep-es', 'version: 1.0.0', 'dependencies:', '  deep', '', '# locale es', 'engine.travel.to: {has deep.charm: con encanto} Ir a {destination}'].join('\n') },
+      ]),
+    ).toThrow(/asks what is carried, which reads the run it is said in/);
+  });
+
   it('reads a brace in a say: as a fragment, in the authored text and in its translation alike', () => {
     expect(translated('deep.droptable.spoils.say.0: Algo brilla {aqui.')).toThrow(/spoils\.say\.0 is a spoken line, and unterminated fragment/);
     expect(() =>

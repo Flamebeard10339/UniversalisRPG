@@ -35,6 +35,8 @@ export const ENGINE_ROOTS = {
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
   stat: { kind: 'stat', stands: 'attack', against: 1.5 },
+  us: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whoever is acting, which is the player wherever no action is under way' },
+  them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at, and nothing at all while none is' },
   changed: { kind: 'stat', stands: 'attack', means: 'whether that stat stands anywhere other than the base it was declared with, which is how a line asks whether anything has moved it without writing down what it started at' },
 } as const satisfies Readonly<Record<string, Rooted | Named | Bare>>;
 

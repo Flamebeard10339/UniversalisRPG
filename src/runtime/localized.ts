@@ -5,7 +5,9 @@ import { EngineKey, isEngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { withoutNote } from '../grammar/note';
-import { mintedName, PARAM } from '../grammar/values';
+import { mintedName } from '../grammar/values';
+import { weighInFrame } from '../grammar/frame';
+import { DslError } from '../grammar/parser';
 
 declare const LOCALIZED: unique symbol;
 
@@ -19,11 +21,11 @@ export type Params = Readonly<Record<string, Localized | number>>;
 
 
 function substitute(pattern: string, key: string, params: Params): string {
-  return pattern.replace(PARAM, (_whole, name: string) => {
-    const value = params[name];
-    if (value === undefined) throw new RuntimeError(`${key} takes a {${name}} the call site did not supply`);
-    return typeof value === 'number' ? String(value) : value;
-  });
+  try {
+    return weighInFrame(parseSegments(pattern, 0), params, key);
+  } catch (error) {
+    throw error instanceof DslError ? new RuntimeError(error.message) : error;
+  }
 }
 
 const plainly = (words: string): string =>
