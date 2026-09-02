@@ -65,14 +65,16 @@ export function shopOptions(frame: ShopFrame, state: GameState, registry: Regist
   const shop = registry.shops.get(frame.shop);
   if (!shop) return [];
   const localizer = localizerOf(registry, state);
-  const buying = rows('buy', forSale(shop, state, registry), state, localizer);
-  const selling = rows('sell', wanted(shop, state, registry), state, localizer);
-  const standing = frame.side === 'sell' ? [...selling, ...buying] : [...buying, ...selling];
   return [
     {
       key: 'item',
       label: localizer.engine('engine.shop.counter', { coin: localizer.title('item', shop.coin), held: coinHeld(shop, state) }),
-      values: [...standing, { value: LEAVE, shown: localizer.engine('engine.shop.close') }],
+      standing: frame.side ?? 'buy',
+      values: [
+        ...rows('buy', forSale(shop, state, registry), state, localizer),
+        ...rows('sell', wanted(shop, state, registry), state, localizer),
+        { value: LEAVE, shown: localizer.engine('engine.shop.close') },
+      ],
     },
   ];
 }

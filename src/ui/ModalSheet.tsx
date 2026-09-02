@@ -55,7 +55,7 @@ function Cell({ cell, subject, onPick, onHold }: { cell: ChoiceCell; subject: st
 function Counter({ option, onAnswer }: { option: Option; onAnswer: (key: string, value: string) => void }): JSX.Element {
   const { parts, loose } = partsOf(option);
   const [picked, setPicked] = useState<string | null>(null);
-  const standing = partStanding(parts, picked);
+  const standing = partStanding(parts, picked, option.standing);
   const shown = parts.find((part) => part.under === standing);
 
   return (

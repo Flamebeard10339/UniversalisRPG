@@ -52,4 +52,17 @@ describe('which side is standing', () => {
     expect(partStanding(parts, 'barter')).toBe('buy');
     expect(partStanding([], 'buy')).toBeNull();
   });
+
+  it('stands on the side the screen offers before anything is picked, whatever order the sides are drawn in', () => {
+    expect(partStanding(parts, null, 'sell')).toBe('sell');
+    expect(partStanding(parts, null, 'buy')).toBe('buy');
+  });
+
+  it('lets what was picked here beat the side the screen came in offering', () => {
+    expect(partStanding(parts, 'buy', 'sell')).toBe('buy');
+  });
+
+  it('falls back to the first where the side offered is not one of them', () => {
+    expect(partStanding(parts, null, 'barter')).toBe('buy');
+  });
 });

@@ -21,6 +21,7 @@ export interface ModalOption {
   key: Answer;
   label: Localized;
   values: readonly ModalChoice[] | null;
+  standing?: Answer;
   takesMore?: boolean;
 }
 
@@ -55,5 +56,5 @@ export function partsOf(option: ModalOption): { parts: readonly ChoicePart[]; lo
   return { parts, loose };
 }
 
-export const partStanding = (parts: readonly ChoicePart[], picked: Answer | null): Answer | null =>
-  parts.find((part) => part.under === picked)?.under ?? parts[0]?.under ?? null;
+export const partStanding = (parts: readonly ChoicePart[], picked: Answer | null, offered?: Answer): Answer | null =>
+  parts.find((part) => part.under === picked)?.under ?? parts.find((part) => part.under === offered)?.under ?? parts[0]?.under ?? null;
