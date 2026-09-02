@@ -329,7 +329,7 @@ describe('the parameter check reaches every locale, English included', () => {
   });
 });
 
-describe('authored text may not name a parameter either', () => {
+describe('a brace in authored prose is a fragment and nothing else', () => {
   const authoring =
     (...lines: string[]) =>
     () =>
@@ -340,15 +340,20 @@ describe('authored text may not name a parameter either', () => {
         },
       ]);
 
-  it('refuses an authored examine that names one, naming the key and the parameter', () => {
-    expect(authoring('examine: The sign reads {open} and nothing else.')).toThrow(/# location isla.camp: examine: names \{open\}, which nothing supplies/);
+  it('refuses an examine naming something nothing declares, rather than saying it back with the braces on', () => {
+    expect(authoring('examine: The sign reads {open} and nothing else.')).toThrow(/# location isla.camp examine: names an unknown flag: open/);
   });
 
-  it('refuses an authored title that names one', () => {
-    expect(authoring('', '# item rope', 'title: Rope of {maker}')).toThrow(/# item isla.rope: title: names \{maker\}/);
+  it('refuses a title outright, since a name is not a line the game says', () => {
+    expect(authoring('', '# item rope', 'title: Rope of {maker}')).toThrow(/# item isla.rope: title: holds a fragment/);
   });
 
-  it('leaves text with no parameter in it alone', () => {
+  it('takes a brace of its own, written twice, in prose and in a title alike', () => {
+    expect(authoring('examine: The sign reads {{open} and nothing else.')).not.toThrow();
+    expect(authoring('', '# item rope', 'title: Rope of {{maker}')).not.toThrow();
+  });
+
+  it('leaves text with no brace in it alone', () => {
     expect(authoring('examine: The sign reads plainly.')).not.toThrow();
   });
 });
@@ -401,6 +406,7 @@ const SPOKEN_EVERYWHERE = [
   '# location camp',
   'x: 0, y: 0',
   'starting',
+  'examine: Ash, and a ring of stones.',
   'entities:',
   '  guard',
   'poke:',
@@ -493,11 +499,13 @@ describe('every line the DSL speaks carries an address (c6)', () => {
     expect(lines.filter((line) => typeof line.key !== 'string').map((line) => line.where)).toEqual([]);
   });
 
-  it('registers exactly the keys the lines carry, and nothing no line carries', () => {
+  it('registers every key a line carries, beside the prose fields that are read the same way', () => {
     const registry = deep();
     const carried = spokenLines(registry).map((line) => line.key as string);
+    const fields = [...registry.locales.prose.keys()].filter((key) => !carried.includes(key));
 
-    expect([...new Set(carried)].sort()).toEqual([...registry.locales.prose.keys()].sort());
+    expect([...new Set([...carried, ...fields])].sort()).toEqual([...registry.locales.prose.keys()].sort());
+    expect(fields).toEqual(['deep.location.camp.examine']);
     for (const key of carried) {
       expect(registry.locales.addressable.has(key)).toBe(true);
       expect(registry.locales.base.get(key)?.language).toBe('en');
@@ -505,29 +513,34 @@ describe('every line the DSL speaks carries an address (c6)', () => {
   });
 
   it('addresses each by the object that authored it and its place in that object', () => {
-    expect([...deep().locales.prose].sort()).toEqual(
+    expect([...deep().locales.prose.keys()].sort()).toEqual(
       [
-        ['deep.action.shove.say.0', 'verbatim'],
-        ['deep.action.shove.say.1', 'verbatim'],
-        ['deep.action.shove.say.2', 'verbatim'],
-        ['deep.dialogue.guard-talk.greet.again', 'segments'],
-        ['deep.dialogue.guard-talk.greet.choice.0', 'segments'],
-        ['deep.dialogue.guard-talk.greet.choice.1', 'segments'],
-        ['deep.dialogue.guard-talk.greet.line.0', 'segments'],
-        ['deep.dialogue.guard-talk.greet.say.0', 'verbatim'],
-        ['deep.dialogue.guard-talk.greet.say.1', 'verbatim'],
-        ['deep.droptable.spoils.say.0', 'verbatim'],
-        ['deep.entity.guard.say.0', 'verbatim'],
-        ['deep.entity.guard.say.1', 'verbatim'],
-        ['deep.entity.guard.say.2', 'verbatim'],
-        ['deep.entity.guard.say.3', 'verbatim'],
-        ['deep.item.charm.say.0', 'verbatim'],
-        ['deep.item.charm.say.1', 'verbatim'],
-        ['deep.item.charm.say.2', 'verbatim'],
-        ['deep.location.camp.say.0', 'verbatim'],
-        ['deep.recipe.stew.say.0', 'verbatim'],
+        'deep.action.shove.say.0',
+        'deep.action.shove.say.1',
+        'deep.action.shove.say.2',
+        'deep.dialogue.guard-talk.greet.again',
+        'deep.dialogue.guard-talk.greet.choice.0',
+        'deep.dialogue.guard-talk.greet.choice.1',
+        'deep.dialogue.guard-talk.greet.line.0',
+        'deep.dialogue.guard-talk.greet.say.0',
+        'deep.dialogue.guard-talk.greet.say.1',
+        'deep.droptable.spoils.say.0',
+        'deep.entity.guard.say.0',
+        'deep.entity.guard.say.1',
+        'deep.entity.guard.say.2',
+        'deep.entity.guard.say.3',
+        'deep.item.charm.say.0',
+        'deep.item.charm.say.1',
+        'deep.item.charm.say.2',
+        'deep.location.camp.examine',
+        'deep.location.camp.say.0',
+        'deep.recipe.stew.say.0',
       ].sort(),
     );
+  });
+
+  it('holds one shape, so nowhere a player reads prose reads its braces differently', () => {
+    expect([...new Set(deep().locales.prose.values())]).toEqual(['segments']);
   });
 
   it('keys an action an entity performs under the declaration that wrote it', () => {
@@ -573,17 +586,21 @@ describe('a translation of a spoken line is read by the grammar it was authored 
     expect(translated('deep.dialogue.guard-talk.greet.line.0: Bien hallado, {player.name.')).toThrow(/greet\.line\.0 is a spoken line, and unterminated fragment/);
   });
 
-  it('leaves a brace in a say: alone in both the authored text and its translation', () => {
-    const registry = translated('deep.droptable.spoils.say.0: Algo brilla {aqui}.')();
-
-    expect(registry.locales.declared.get('es')?.get('deep.droptable.spoils.say.0')).toBe('Algo brilla {aqui}.');
+  it('reads a brace in a say: as a fragment, in the authored text and in its translation alike', () => {
+    expect(translated('deep.droptable.spoils.say.0: Algo brilla {aqui.')).toThrow(/spoils\.say\.0 is a spoken line, and unterminated fragment/);
     expect(() =>
       loadUniverse([
         {
           name: 'deep',
-          text: SPOKEN_EVERYWHERE.replace('say: Something glints.', 'say: Something glints {here}.'),
+          text: SPOKEN_EVERYWHERE.replace('say: Something glints.', 'say: Something glints {no-such-flag}.'),
         },
       ]),
-    ).not.toThrow();
+    ).toThrow(/names an unknown flag: no-such-flag/);
+  });
+
+  it('takes a brace of its own in a say:, written twice', () => {
+    const registry = loadUniverse([{ name: 'deep', text: SPOKEN_EVERYWHERE.replace('say: Something glints.', 'say: Something glints {{here}.') }]);
+
+    expect(registry.locales.base.get('deep.droptable.spoils.say.0')?.text).toBe('Something glints {{here}.');
   });
 });

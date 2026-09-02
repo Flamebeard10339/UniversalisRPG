@@ -1,4 +1,6 @@
-import type { TextSegment } from '../grammar/segment';
+import { A_LITERAL_BRACE, fragment, OPENS_A_FRAGMENT, printSegments, type TextSegment } from '../grammar/segment';
+import { noteIn, withoutNote } from '../grammar/note';
+import { parseWhole } from '../grammar/parser';
 import { Action, Sided } from '../grammar/action';
 import { ActionResult, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
@@ -76,6 +78,27 @@ export function segments(list: TextSegment[] | undefined, where: string, visit: 
     if (segment.kind === 'conditional') condition(segment.condition, where, visit);
     if (segment.kind === 'interpolate') reference(segment.reference, where, visit);
   }
+}
+
+const FRAGMENT = /\{\{|\{[^}\n]*\}/g;
+
+export function writtenFragments(text: string, where: string, visit: Visit): string {
+  const said = noteIn(text);
+  const words = said === undefined ? text : withoutNote(text);
+  if (!words.includes(OPENS_A_FRAGMENT)) return text;
+  const resolved = words.replace(FRAGMENT, (whole) => {
+    if (whole === A_LITERAL_BRACE) return whole;
+    const held = parseWhole(fragment, whole, 0, where);
+    segments([held], where, visit);
+    return printSegments([held]);
+  });
+  return said === undefined ? resolved : `${resolved}${text.slice(words.length)}`;
+}
+
+export function prose(holder: Loose, key: string, where: string, visit: Visit): void {
+  const written = holder[key];
+  if (typeof written !== 'string') return;
+  holder[key] = writtenFragments(written, where, visit);
 }
 
 export function quantified(list: unknown, kind: ReferenceKind, where: string, visit: Visit): void {
@@ -169,6 +192,8 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
         break;
       case 'say':
+        prose(result as unknown as Loose, 'text', `${where} say:`, visit);
+        break;
       case 'open-modal':
       case 'stop':
       case 'strip':

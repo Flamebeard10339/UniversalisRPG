@@ -1,9 +1,9 @@
 import { HydrateContext } from '../../grammar/section';
 import { DslError, Span } from '../../grammar/parser';
 import { RawSection, splitSections } from '../../grammar/structure';
-import { Visit } from '../refs';
+import { prose, type Loose, type Visit } from '../refs';
 import { MEMBER_KINDS } from '../namespace';
-import { Ids, Maps, PrintContext, Section } from './define';
+import { Ids, Maps, NAMES_THE_SECTION, PrintContext, Section } from './define';
 
 import { action, type ActionTextOwner } from './action';
 import { clusterJewel } from './clusterJewel';
@@ -88,7 +88,15 @@ export const printSectionOf = (each: ModuleSection, context: PrintContext): stri
     .print(each.value as { id: string }, context)
     .join('\n');
 
-export const visitSection = (each: ModuleSection, where: string, visit: Visit): void => required(each.kind).visit(each.value as { id: string }, where, visit);
+export { NAMES_THE_SECTION };
+
+export const proseFieldsOf = (kind: string): readonly string[] => (sectionFor(kind)?.text ?? []).filter((field) => field !== NAMES_THE_SECTION);
+
+export const visitSection = (each: ModuleSection, where: string, visit: Visit): void => {
+  const owner = required(each.kind);
+  owner.visit(each.value as { id: string }, where, visit);
+  for (const field of proseFieldsOf(each.kind)) prose(each.value as unknown as Loose, field, `${where} ${field}:`, visit);
+};
 
 const kindsWhere = (holds: (each: Section) => boolean): readonly SectionKind[] => sections().filter((each) => holds(each as unknown as Section)).map((each) => each.kind);
 

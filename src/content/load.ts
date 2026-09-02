@@ -8,7 +8,7 @@ import { actionAddress, actionTextKey, actionTextOwner, actionWords, type Action
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unsuppliedParameters } from './locale';
-import { actionSlugProblem, textFieldsOf } from './sections';
+import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
 import { closeAdjacency, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, isActionOwnerKind, isDebug, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
@@ -97,8 +97,10 @@ function recordBaseText(registry: Registry, kind: string, authored: Record<strin
     const key = localeKey(namespace, kind, id, field);
     const authoredValue = authored[field];
     if (field === GENERATED_FIELD || typeof authoredValue === 'string') registry.locales.addressable.add(key);
-    if (typeof authoredValue === 'string') recordBase(registry, key, { text: authoredValue, language });
-    else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE)
+    if (typeof authoredValue === 'string') {
+      if (proseFieldsOf(kind).includes(field)) registry.locales.prose.set(key, 'segments');
+      recordBase(registry, key, { text: authoredValue, language });
+    } else if (field === GENERATED_FIELD && language === DEFAULT_LANGUAGE)
       recordBase(registry, key, {
         text: humanizeEn(id),
         language,
@@ -166,7 +168,7 @@ function stampSays(registry: Registry, owner: ProseOwner, lists: readonly (reado
   let index = 0;
   const walk = (list: readonly ActionResult[]): void => {
     for (const result of list) {
-      if (result.kind === 'say') result.key = recordProse(registry, owner, field(index++), result.text, 'verbatim');
+      if (result.kind === 'say') result.key = recordProse(registry, owner, field(index++), result.text, 'segments');
       for (const nested of nestedResults(result)) walk(nested);
     }
   };

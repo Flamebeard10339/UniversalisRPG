@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverse } from '../content/load';
+import type { Registry } from '../content/registry';
 import { sections } from '../content/sections';
 import { withEngineLocale } from '../content/engineLocale';
 import { parseSegments } from '../grammar/segment';
@@ -90,5 +91,50 @@ describe('a fragment written in prose the player reads', () => {
     const session = startSession(world);
     apply(session, 'use:entity.fragment-probe.statue.examine');
     expect(apply(session, 'use:entity.fragment-probe.statue.ring-the-bell').said).toEqual([`A bell, ${CLAUSE}`]);
+  });
+});
+
+describe('an id inside a fragment', () => {
+  const standing = (words: string): (() => Registry) => {
+    const text = [
+      '# info id-probe',
+      'version: 1.0.0',
+      'pack: id-probe',
+      'dependencies:',
+      '  core',
+      '  fixture-town',
+      '',
+      '# flag lamp-lit',
+      '',
+      '# entity statue',
+      'title: Statue',
+      `examine: ${words}`,
+      'ring-the-bell:',
+      '  instant',
+      `  say: ${words}`,
+      '',
+      '# location fixture-town.green',
+      '+entities: statue',
+    ].join('\n');
+    return () => loadUniverse(withEngineLocale([...fixtureSources(), { name: 'id-probe', text }]));
+  };
+
+  const storedIn = (registry: Registry, key: string): string | undefined => registry.locales.base.get(key)?.text;
+
+  it('is written out whole at load, wherever the words stand, so nothing downstream reads a short one', () => {
+    const registry = standing('A statue.{lamp-lit: Lit from the side.}')();
+
+    expect(storedIn(registry, 'id-probe.entity.statue.examine')).toBe('A statue.{id-probe.lamp-lit: Lit from the side.}');
+    expect(storedIn(registry, 'id-probe.entity.statue.say.0')).toBe('A statue.{id-probe.lamp-lit: Lit from the side.}');
+  });
+
+  it('is refused where nothing declares it, rather than standing as words that never hold', () => {
+    expect(standing('A statue.{no-such-thing: Lit from the side.}')).toThrow(/names an unknown flag: no-such-thing/);
+  });
+
+  it('is left alone where the brace is written twice, which is how a line says one of its own', () => {
+    const registry = standing('A statue in {{parentheses}.')();
+
+    expect(storedIn(registry, 'id-probe.entity.statue.examine')).toBe('A statue in {{parentheses}.');
   });
 });

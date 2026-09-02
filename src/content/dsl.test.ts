@@ -14,7 +14,7 @@ import { indentLines, splitSections } from '../grammar/structure';
 import { DEFAULT_CONTEXT, hydrateSection, type AnySchema } from '../grammar/section';
 import { BY_NAME, mergeFields, overwrittenField } from './merge';
 import { keyedUnderOwnerKind, memberKey, Namespace } from './namespace';
-import { TOUCHED } from './sections/define';
+import { NAMES_THE_SECTION, TOUCHED } from './sections/define';
 import { everyActionTable, formatModuleDiagnostic, mapOf, type Registry } from './registry';
 import { loadUniverseWithDiagnostics } from './load';
 import { everySaid, GENERATED_FIELD, localeKey } from './locale';
@@ -385,9 +385,20 @@ describe('a prose field of any kind', () => {
     expect(WRITABLE.length).toBeGreaterThan(12);
   });
 
+  it('holds a title on most kinds there are, so the refusals below are not vacuous', () => {
+    expect(WRITABLE.filter((each) => each.field === NAMES_THE_SECTION).length).toBeGreaterThan(12);
+  });
+
   for (const { kind, field, set } of WRITABLE) {
-    it(`# ${kind} refuses a ${field}: that names a parameter, since it is said as written and nothing hands it one`, () => {
-      expect(() => sectionFor(kind)!.build(set('A {thing} of note.'), DEFAULT_CONTEXT)).toThrow(/names \{thing\}, which nothing supplies/);
+    const names = field === NAMES_THE_SECTION;
+    it(`# ${kind} ${names ? 'refuses' : 'takes'} a fragment written in its ${field}:`, () => {
+      const built = (): unknown => sectionFor(kind)!.build(set('A {thing} of note.'), DEFAULT_CONTEXT);
+      if (names) expect(built).toThrow(/title: holds a fragment/);
+      else expect(built).not.toThrow();
+    });
+
+    it(`# ${kind} takes a brace of its own in its ${field}:, written twice`, () => {
+      expect(() => sectionFor(kind)!.build(set('A {{thing} of note.'), DEFAULT_CONTEXT)).not.toThrow();
     });
   }
 });

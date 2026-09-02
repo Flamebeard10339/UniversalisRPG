@@ -8,7 +8,7 @@ import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../gramma
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, put, strings } from '../refs';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
-import { parametersOf } from '../../grammar/values';
+import { A_LITERAL_BRACE, parseSegments } from '../../grammar/segment';
 
 export type { PrintContext };
 
@@ -41,6 +41,8 @@ export const EVERY_SECTION: readonly Written[] = [
     note: 'takes back out of that body whatever the line writes, and takes nothing out for what it has not got',
   },
 ];
+
+export const NAMES_THE_SECTION = 'title';
 
 export const TOUCHED = 'touched';
 
@@ -259,13 +261,9 @@ export const section =
       return (held ?? value) as V;
     };
     const unfillable = (value: V): string | undefined => {
-      for (const field of text) {
-        const written = (value as unknown as Loose)[field];
-        if (typeof written !== 'string') continue;
-        const named = parametersOf(written);
-        if (named.length > 0) return `${field}: names ${named.map((one) => `{${one}}`).join(', ')}, which nothing supplies`;
-      }
-      return undefined;
+      const written = (value as unknown as Loose)[NAMES_THE_SECTION];
+      if (typeof written !== 'string' || !parseSegments(written, 0).some((segment) => segment.kind !== 'literal')) return undefined;
+      return `${NAMES_THE_SECTION}: holds a fragment, and a name is not a line the game says. Write ${A_LITERAL_BRACE} for a brace of its own.`;
     };
     const built = (value: V, problem = unfillable(value) ?? validate?.(value)): V => {
       if (problem) throw new DslError(`# ${kind} ${value.id}: ${problem}`);

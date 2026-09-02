@@ -23,16 +23,30 @@ function parseFragment(raw: string, base: number): TextSegment {
   };
 }
 
+export const OPENS_A_FRAGMENT = '{';
+
+export const A_LITERAL_BRACE = '{{';
+
 export function parseSegments(text: string, base: number): TextSegment[] {
   const segments: TextSegment[] = [];
-  let literalStart = 0;
+  let literal = '';
   let i = 0;
+  const flush = (): void => {
+    if (literal !== '') segments.push({ kind: 'literal', text: literal });
+    literal = '';
+  };
   while (i < text.length) {
-    if (text[i] !== '{') {
+    if (text[i] !== OPENS_A_FRAGMENT) {
+      literal += text[i];
       i++;
       continue;
     }
-    if (i > literalStart) segments.push({ kind: 'literal', text: text.slice(literalStart, i) });
+    if (text.startsWith(A_LITERAL_BRACE, i)) {
+      literal += OPENS_A_FRAGMENT;
+      i += A_LITERAL_BRACE.length;
+      continue;
+    }
+    flush();
     const close = text.indexOf('}', i + 1);
     if (close === -1)
       throw new DslError(`unterminated fragment: ${text.slice(i)}`, {
@@ -41,16 +55,15 @@ export function parseSegments(text: string, base: number): TextSegment[] {
       });
     segments.push(parseFragment(text.slice(i + 1, close), base + i + 1));
     i = close + 1;
-    literalStart = i;
   }
-  if (literalStart < text.length) segments.push({ kind: 'literal', text: text.slice(literalStart) });
+  flush();
   return segments;
 }
 
 export function printSegments(values: readonly TextSegment[] | undefined): string {
   return (values ?? [])
     .map((segment) => {
-      if (segment.kind === 'literal') return segment.text;
+      if (segment.kind === 'literal') return segment.text.split(OPENS_A_FRAGMENT).join(A_LITERAL_BRACE);
       if (segment.kind === 'interpolate') return `{${printReference(segment.reference)}}`;
       return `{${condition.print(segment.condition)}: ${segment.text}}`;
     })
@@ -72,7 +85,8 @@ export const fragment: Parser<TextSegment> = {
   forms: ['{<held>}', '{<condition>: <words>}'],
   examples: ['{player.name}', '{has-key: The key is heavy in my pocket.}'],
   notes: {
-    '{<held>}': 'whatever the run holds under that name is put into the line here — an `<engine state>` path, a # flag or a # variable — and a thing the world declares arrives as its title',
+    '{<held>}':
+      'whatever the run holds under that name is put into the line here — an `<engine state>` path, a # flag or a # variable — and a thing the world declares arrives as its title. A fragment may stand in any line the game says to a player, whether that is a dialogue line, a `say:` or an `examine:`, and in none of the `title:` lines that name a section. Write `{{` for a brace of its own',
     '{<condition>: <words>}': 'those words are said only while the condition holds, and nothing stands in their place while it does not',
   },
 };

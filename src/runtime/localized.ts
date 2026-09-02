@@ -1,7 +1,7 @@
 import { RuntimeError } from './error';
 import { Action } from '../grammar/action';
 import { actionTextKey, actionTextOwner } from '../content/sections/action';
-import { EngineKey, localeKey, Locales } from '../content/locale';
+import { EngineKey, isEngineKey, localeKey, Locales } from '../content/locale';
 import { parseSegments, TextSegment } from '../grammar/segment';
 import { Registry } from '../content/registry';
 import { withoutNote } from '../grammar/note';
@@ -25,6 +25,11 @@ function substitute(pattern: string, key: string, params: Params): string {
     return typeof value === 'number' ? String(value) : value;
   });
 }
+
+const plainly = (words: string): string =>
+  parseSegments(words, 0)
+    .map((segment) => (segment.kind === 'literal' ? segment.text : ''))
+    .join('');
 
 function pattern(locales: Locales, language: string, key: string): string | undefined {
   const declared = locales.declared.get(language)?.get(key);
@@ -58,7 +63,8 @@ export function localizerFor(registry: Registry, language: string): Localizer {
   const { locales } = registry;
   const keyed = (key: string, params: Params): Localized => {
     const found = pattern(locales, language, key);
-    return (found === undefined ? key : substitute(found, key, params)) as Localized;
+    if (found === undefined) return key as Localized;
+    return (isEngineKey(key) ? substitute(found, key, params) : plainly(found)) as Localized;
   };
   const self: Localizer = {
     language,
@@ -67,7 +73,8 @@ export function localizerFor(registry: Registry, language: string): Localizer {
     words: (kind, id, field, params = {}) => {
       const key = contentKey(registry, kind, id, field);
       const found = pattern(locales, language, key);
-      return found === undefined ? undefined : (substitute(found, key, params) as Localized);
+      if (found === undefined) return undefined;
+      return (isEngineKey(key) ? substitute(found, key, params) : plainly(found)) as Localized;
     },
     title: (kind, id) => self.content(kind, id, 'title'),
     actionLabel: (kind, ownerId, action) => keyed(actionTextKey(actionTextOwner(registry.namespace, kind, ownerId, action)), {}),
