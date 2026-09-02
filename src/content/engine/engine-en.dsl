@@ -169,7 +169,7 @@ engine.stat.which: Which stat?
 engine.stat.reading: Stat
 engine.stat.close: Close
 engine.shell.journal: Journal
-engine.shell.journal.empty: You have taken nothing on yet.
+engine.shell.journal.empty: No quests loaded.
 engine.shell.sheet.empty: Nothing to do here.
 engine.shell.journal.untouched: You have not begun this quest.
 engine.shell.close: Close
@@ -264,7 +264,7 @@ engine.repl.modal.answered: [{modal}] (answered)
 engine.repl.modal.asking: {option}:
 engine.repl.modal.free: submit-modal: {option}=<text>
 engine.repl.modal.leaving: submit-modal: {option}={leaving} to step back
-engine.repl.journal.none: You have taken nothing on yet.
+engine.repl.journal.none: No quests loaded.
 engine.repl.journal.struck: (done) {said}
 engine.repl.journal.unknown: no quest is called {quest}
 engine.repl.stat: {stat} — {value}
