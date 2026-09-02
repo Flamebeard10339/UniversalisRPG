@@ -657,7 +657,8 @@ const RESULT: Holds = () => ({ result: actionResult });
 
 const ROW = 'one of these';
 
-const ROW_NOTE = 'one of these is picked, weighed against the rows beside it';
+const ROW_NOTE =
+  'one of these is picked, weighed against the rows beside it. A stat written as the weight stands as whatever it reads, beside the numbers around it — a stat reading 3 against a `100x` row is three in a hundred and three — so it shares a roll out rather than settling one, and a stat that starts low is all but unreachable. A check that is meant to be won or lost is `<stat> vs <stat>:`, which is a contest and is written as a wrapper inside the row';
 
 const WEIGHTED = { names: { weight: 'stat' }, holds: () => ({ condition, result: actionResult }) };
 
