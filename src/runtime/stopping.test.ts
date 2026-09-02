@@ -432,7 +432,7 @@ grind:
   time: 1
   damage: felling
   attempts: 2
-  on unfinished:
+  on attempts exhausted:
     set: gave-up
 `;
 

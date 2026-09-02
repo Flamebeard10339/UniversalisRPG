@@ -248,7 +248,7 @@ export function visitAction(action: Action, where: string, visit: Visit): void {
   strings(action as unknown as Loose, 'stopsOn', 'event', `${where} stops on:`, visit);
   condition(action.requires, `${where} requires:`, visit);
   condition(action.hiddenIf, `${where} hidden if:`, visit);
-  for (const group of [action.results, action.onSuccess, action.onFailure, action.onUnfinished]) results(group, where, visit);
+  for (const group of [action.results, action.onSuccess, action.onFailure, action.onAttemptsExhausted]) results(group, where, visit);
 }
 
 export function actions(list: unknown, where: string, visit: Visit): void {

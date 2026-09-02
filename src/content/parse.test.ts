@@ -477,7 +477,7 @@ describe('entity action modifiers', () => {
     ['hidden if: a', 'hidden if'],
     ['on success: say: a', 'on success'],
     ['on failure: say: a', 'on failure'],
-    ['on unfinished: say: a', 'on unfinished'],
+    ['on attempts exhausted: say: a', 'on attempts exhausted'],
     ['time: 1', 'time'],
     ['rate: quickness', 'rate'],
     ['accuracy: aim', 'accuracy'],

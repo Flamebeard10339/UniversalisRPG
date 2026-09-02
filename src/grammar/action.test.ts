@@ -133,10 +133,10 @@ describe('contests', () => {
 });
 
 describe('how an action ends', () => {
-  it('bounds an action at attempts: N and runs on unfinished: when it does not get there', () => {
-    const cooking = parse('accuracy: cooking-accuracy\nattempts: 1\non success:\n  give: 1 cooked-shrimp\non unfinished:\n  give: 1 burnt-shrimp');
+  it('bounds an action at attempts: N and runs on attempts exhausted: when it does not get there', () => {
+    const cooking = parse('accuracy: cooking-accuracy\nattempts: 1\non success:\n  give: 1 cooked-shrimp\non attempts exhausted:\n  give: 1 burnt-shrimp');
     expect(cooking.attempts).toBe(1);
-    expect(cooking.onUnfinished).toEqual([{ kind: 'give', item: 'burnt-shrimp', amount: { min: 1, max: 1 } }]);
+    expect(cooking.onAttemptsExhausted).toEqual([{ kind: 'give', item: 'burnt-shrimp', amount: { min: 1, max: 1 } }]);
   });
 
   it('leaves an action without attempts: unbounded', () => {
@@ -145,7 +145,7 @@ describe('how an action ends', () => {
 
   it('has deleted escape after and on escape:, and says what replaced each', () => {
     expect(refusal('escape after 20')).toContain('write `attempts: N`');
-    expect(refusal('on escape: give: 1 bread')).toContain('write `on unfinished:`');
+    expect(refusal('on escape: give: 1 bread')).toContain('write `on attempts exhausted:`');
   });
 
   it('says which of the two things attempts: does, in the same words wherever an author meets it', () => {

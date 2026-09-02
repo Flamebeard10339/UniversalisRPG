@@ -81,7 +81,7 @@ title: Tap
 time: 1
 attempts: 2
 damage: nibbling
-on unfinished:
+on attempts exhausted:
   say: Nothing budges.
 
 # stat nibbling

@@ -409,9 +409,9 @@ describe('respawn after: is the thing own fact, and the count is the place own',
 });
 
 describe('an overload bounds and ends the action it overlays', () => {
-  const patient = MODULE.replace('# entity player', ['# entity player', 'swing:', '  attempts: 2', '  on unfinished:', '    set: gave-up'].join(String.fromCharCode(10)));
+  const patient = MODULE.replace('# entity player', ['# entity player', 'swing:', '  attempts: 2', '  on attempts exhausted:', '    set: gave-up'].join(String.fromCharCode(10)));
 
-  it('reads attempts: and on unfinished: off the copy that swings', () => {
+  it('reads attempts: and on attempts exhausted: off the copy that swings', () => {
     const registry = loadInEnglish(patient);
     const overloaded = standing(registry, 'camp');
     armFightAction('swing', 'ogre', registry, overloaded);

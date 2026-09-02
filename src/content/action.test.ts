@@ -3,7 +3,7 @@ import { loadModule } from './load';
 
 const module = (...lines: string[]): string => ['# info thieving', 'version: 1.0.0', '', '# stat thieving', 'base: 0', '', '# skill thieving', 'title: Thieving', 'stat: thieving', '', '# stat vigilance', '', '# stat wards', '', ...lines].join('\n');
 
-const steal = ['# action steal', 'title: Steal', 'continuous', 'attempts: 1', 'rate: 15', 'on unfinished:', '  say: A hand closes on your wrist.'];
+const steal = ['# action steal', 'title: Steal', 'continuous', 'attempts: 1', 'rate: 15', 'on attempts exhausted:', '  say: A hand closes on your wrist.'];
 
 const stealing = (...lines: string[]): string => module(...steal, '', ...lines);
 
@@ -16,7 +16,7 @@ describe('# action extends:', () => {
     expect(action.kind).toBe('continuous');
     expect(action.attempts).toBe(1);
     expect(action.rate).toBe(15);
-    expect(action.onUnfinished).toEqual([{ kind: 'say', text: 'A hand closes on your wrist.', key: 'thieving.action.steal.say.0' }]);
+    expect(action.onAttemptsExhausted).toEqual([{ kind: 'say', text: 'A hand closes on your wrist.', key: 'thieving.action.steal.say.0' }]);
     expect(action.accuracy).toEqual({ left: { side: 'us', id: 'thieving.thieving' }, right: { side: 'them', id: 'thieving.vigilance' } });
   });
 
@@ -35,10 +35,10 @@ describe('# action extends:', () => {
   });
 
   it('replaces what it writes bare and adds to what it writes with +', () => {
-    const laid = declared(stealing('# action pick-the-lock', 'extends: steal', 'rate: 30', '+on unfinished:', '  say: The pick snaps.'), 'pick-the-lock');
+    const laid = declared(stealing('# action pick-the-lock', 'extends: steal', 'rate: 30', '+on attempts exhausted:', '  say: The pick snaps.'), 'pick-the-lock');
 
     expect(laid.rate).toBe(30);
-    expect(laid.onUnfinished?.map((result) => (result.kind === 'say' ? result.text : result.kind))).toEqual(['A hand closes on your wrist.', 'The pick snaps.']);
+    expect(laid.onAttemptsExhausted?.map((result) => (result.kind === 'say' ? result.text : result.kind))).toEqual(['A hand closes on your wrist.', 'The pick snaps.']);
   });
 
   it('lays one over another however deep the chain runs', () => {

@@ -28,7 +28,7 @@ cast:
     12x:
       drain: 3 line-health
       say: It comes up spined-side first and you let go of the line rather than the rod.
-  +on unfinished:
+  +on attempts exhausted:
     roll: spend-bait
     say: Something down there takes the bait off the hook and does not take the hook.
 

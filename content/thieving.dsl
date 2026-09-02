@@ -55,7 +55,7 @@ attempts: 1
 accuracy: us.thieving-ability vs them.npc-thieving-difficulty
 on success:
   xp: thieving them.npc-thieving-xp
-on unfinished:
+on attempts exhausted:
   drain: them.npc-thieving-damage core.health
 
 # action pick-pocket
@@ -65,7 +65,7 @@ continuous
 rate: us.thieving-rate
 +on success:
   say: You come away with it and they walk on none the wiser.
-+on unfinished:
++on attempts exhausted:
   inflict: dazed for daze-duration
 
 # action pick-the-lock
@@ -223,7 +223,7 @@ pick-pocket:
     100x: give: 3 core.coin
     8x: roll: townsmans-wardrobe
     1x: give: 1 thieving-rate-jewel
-  +on unfinished:
+  +on attempts exhausted:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
 
 # droptable townsmans-wardrobe
@@ -238,7 +238,7 @@ one of:
 +uses: pick-pocket
 pick-pocket:
   give: 7 core.coin
-  +on unfinished:
+  +on attempts exhausted:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
 
 # entity tulsa.knight
@@ -247,7 +247,7 @@ pick-pocket:
 pick-pocket:
   requires: level.thieving >= 11
   give: 12 core.coin
-  +on unfinished:
+  +on attempts exhausted:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
 
 # entity thief
@@ -269,7 +269,7 @@ pick-pocket:
     1x:
       give: 1 luck-jewel
       say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
-  +on unfinished:
+  +on attempts exhausted:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
 
 # entity house-chest
@@ -280,7 +280,7 @@ uses: pick-the-lock
 pick-the-lock:
   roll: house-chest-contents
   say: The lock gives with a sound like a knuckle cracking.
-  +on unfinished:
+  +on attempts exhausted:
     say: The wards catch, and somebody behind you says that is not your chest, and you are on the step before you have finished agreeing.
     relocate: tulsa.market-square
 
@@ -299,7 +299,7 @@ pick-the-lock:
   time: 10
   roll: treasure-chest-contents
   say: The last ward turns over and the lid comes up on its own.
-  +on unfinished:
+  +on attempts exhausted:
     say: The runes light one after another and the cellar goes out from under you.
     relocate: tulsa.market-square
 
@@ -320,7 +320,7 @@ pick-the-lock:
   time: 14
   roll: strongbox-contents
   say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.
-  +on unfinished:
+  +on attempts exhausted:
     say: A pick shears off in the third ward and somebody behind you says that one is theirs, in the tone of a person who is not going to say it twice.
     inflict: dazed for daze-duration
 
@@ -827,7 +827,7 @@ lift-from-the-stall:
       give: 1 apple
       add: fruit-stolen 1
       say: An apple off the near corner, and the pile settles to cover the gap.
-  +on unfinished:
+  +on attempts exhausted:
     roll: caught-at-the-stalls
 
 # entity tam
@@ -869,7 +869,7 @@ lift-from-the-stall:
       give: 1 pear
       add: fruit-stolen 1
       say: A pear from under the cloth, where she has not counted.
-  +on unfinished:
+  +on attempts exhausted:
     roll: caught-at-the-stalls
 
 # entity bess
@@ -1095,7 +1095,7 @@ pick-the-door:
   set: widows-door-open
   say: The lock is older than the bar and gives sooner, and the bar was never dropped. The door swings in on a room laid for one.
   relocate: widows-house
-  +on unfinished:
+  +on attempts exhausted:
     say: The wards bind. Somebody at the well turns to look at the noise, and then turns back.
 
 # entity widows-new-lock
@@ -1109,7 +1109,7 @@ pick-the-door:
   set: widows-door-open
   say: The new lock is a good one and it takes everything you have, and then it turns, and the bar behind it has not been dropped, which is either forgetfulness or an invitation.
   relocate: widows-house
-  +on unfinished:
+  +on attempts exhausted:
     say: The brass does not give. Whoever fitted it in a morning knew what they were about.
     inflict: dazed for daze-duration
 
@@ -1133,7 +1133,7 @@ pick-the-door:
   hidden if: not locked-out.let-in-by-the-guard
   say: A blade under the latch, worked up a hair at a time until it lifts, and then the shutter, and then you.
   relocate: widows-house
-  +on unfinished:
+  +on attempts exhausted:
     say: The blade slips and takes a piece of your thumb with it, and the latch does not move.
 
 # entity cellar-door
@@ -1147,7 +1147,7 @@ pick-the-door:
   set: widows-cellar-open
   say: The padlock does not so much open as give up. The leaves come up on a stair going down.
   relocate: widows-cellar
-  +on unfinished:
+  +on attempts exhausted:
     say: The rust in the padlock is doing more to keep it shut than the lock is.
 
 # entity cellar-new-lock
@@ -1161,7 +1161,7 @@ pick-the-door:
   set: widows-cellar-open
   say: Steel, new, and fitted properly. It takes as long as a good lock should take, and then the leaves come up on a stair going down.
   relocate: widows-cellar
-  +on unfinished:
+  +on attempts exhausted:
     say: The new padlock does not care what you think of it.
 
 # entity widows-door-inside
@@ -1354,7 +1354,7 @@ cross:
     say: You go through on the count, low under the high one and over the low one, and the wall closes behind you with a sound like a knife going back into a drawer.
     add: run-progress 1
     relocate: run-boulder
-  +on unfinished:
+  +on attempts exhausted:
     if not resource.core.health > 12:
       roll: hauled-out
     if resource.core.health > 12:
@@ -1371,7 +1371,7 @@ cross:
     say: You find the trip by where the dust is not, and step over it, and go past the cradle without breathing.
     add: run-progress 1
     relocate: run-fire
-  +on unfinished:
+  +on attempts exhausted:
     if not resource.core.health > 20:
       roll: hauled-out
     if resource.core.health > 20:
@@ -1388,7 +1388,7 @@ cross:
     say: The pipes cough once as you go under them and the flame comes out behind you, which is where you are not.
     add: run-progress 1
     relocate: run-pit
-  +on unfinished:
+  +on attempts exhausted:
     if not resource.core.health > 16:
       roll: hauled-out
     if resource.core.health > 16:
@@ -1405,7 +1405,7 @@ cross:
     say: You cross with your eyes on the far end and not on the plank, which is the trick, and step off it a stride before it tips.
     add: run-progress 1
     relocate: run-door
-  +on unfinished:
+  +on attempts exhausted:
     if not resource.core.health > 25:
       roll: hauled-out
     if resource.core.health > 25:
@@ -1458,7 +1458,7 @@ pick-the-lock:
   time: 9
   roll: jewellery-box-contents
   say: The lid comes up on a tray lined in velvet, and you take what will not be counted before morning.
-  +on unfinished:
+  +on attempts exhausted:
     say: The pick slips, the box goes over, and the maid in the next room stops humming. You are on the stair before she reaches the door and out of the hall before she reaches the stair.
     relocate: tulsa.castle-gate
 
@@ -1475,7 +1475,7 @@ pick-the-lock:
     2x: give: 1 tulsa.bottle-of-vodka
     1x: give: 1 the-ledger-jewel
   say: The chain lets the lid come up an inch, and an inch is enough for a hand.
-  +on unfinished:
+  +on attempts exhausted:
     say: Sunny does not stop drying the glass. "That is mine," she says, and the man on the end stool has you by the collar before you have stood up, and then you are in the street.
     drain: 3 core.health
     relocate: tulsa.tavern-street
@@ -1493,7 +1493,7 @@ pick-the-lock:
     2x: give: 1 pearl-earrings
     1x: give: 1 the-ledger-jewel
   say: The straps are for show and the lock is not, but it turns, and the chest is fuller than the guard would like the guard to know.
-  +on unfinished:
+  +on attempts exhausted:
     say: The captain does not look up from her report. "Lock-up," she says, to nobody in particular, and four men who were bored a moment ago are not any more.
     roll: sent-to-jail
 
@@ -1506,7 +1506,7 @@ pick-pocket:
     60x: give: 40-90 core.coin
     5x: give: 1 signet-ring
     1x: give: 1 long-look-jewel
-  +on unfinished:
+  +on attempts exhausted:
     say: He does not turn round. He says a name, not loudly, and the two men you did not see come in from the stair take an arm each.
     roll: sent-to-jail
 
@@ -1541,7 +1541,7 @@ slip-past:
   unset: on-the-run
   say: You wait for him to bend to the stove, and you are through the door and across the yard with the barracks between you and the desk before he straightens.
   relocate: tulsa.guard-barracks
-  +on unfinished:
+  +on attempts exhausted:
     say: He straightens too soon. "Oi." Not loud, and not needing to be.
     roll: sent-to-jail
 
@@ -1562,7 +1562,7 @@ pick-the-door:
     set: unlocked
     say: The lock is a good one and it takes its time, and then it does not. The room behind it is empty.
     relocate: wardens-office
-  +on unfinished:
+  +on attempts exhausted:
     say: A pick shears in the second ward, and the sound of it carries down the stair.
     1 in 3:
       say: The jailer is at the bottom of the stair looking up at you, and he has the keys in his hand already.
@@ -1599,7 +1599,7 @@ pick-the-lock:
     if confiscated >= 1:
       say: On top of everything else in the box is a purse with a paper tag tied to it, and the tag has a description on it that is not flattering and is not wrong.
       roll: purse-returned
-  +on unfinished:
+  +on attempts exhausted:
     say: The pick binds in the last ward and you have to work it back out, which takes longer than getting it in did.
 
 # entity the-warden
@@ -1655,7 +1655,7 @@ pick-the-door:
   set: on-the-run
   say: The lock has been picked before and it remembers how. The door swings in an inch, stops against the bucket, and you go out sideways round it.
   relocate: jail-cells
-  +on unfinished:
+  +on attempts exhausted:
     say: The pick catches, and the singing in the next cell stops for a moment, and then starts again louder, which is either kindness or the opposite.
 
 # entity cheerful-drunk

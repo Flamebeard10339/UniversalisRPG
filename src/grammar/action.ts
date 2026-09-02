@@ -29,7 +29,7 @@ export interface Action {
   results: ActionResult[];
   onSuccess?: ActionResult[];
   onFailure?: ActionResult[];
-  onUnfinished?: ActionResult[];
+  onAttemptsExhausted?: ActionResult[];
   time?: number;
   rate?: number | Sided;
   accuracy?: Contest;
@@ -145,7 +145,7 @@ function readsWith(written: string, parser: Parser<unknown>): ActionValue {
 }
 
 export const ATTEMPTS_BUDGET =
-  'a budget for one cycle: an action that runs once ends when it is spent, while a `continuous` one runs its `on unfinished:` and begins its next cycle';
+  'a budget for one cycle: an action that runs once ends when it is spent, while a `continuous` one runs its `on attempts exhausted:` and begins its next cycle';
 
 const WHILE_IT_RUNS =
   'read again on every cycle of an action already under way, not only when it is taken up — so an action gated on something its own body sets runs until it sets it and stops there, which is how a lock is picked until it opens';
@@ -167,9 +167,30 @@ const ACTION_FIELDS: readonly (Filled & {
     family: 'offered when',
     note: `the action is not offered at all while this holds, rather than offered and refused. ${WHILE_IT_RUNS}`,
   },
-  { written: 'on success', label: /on success:[ \t]*/, name: 'onSuccess', parser: results, family: 'and afterwards' },
-  { written: 'on failure', label: /on failure:[ \t]*/, name: 'onFailure', parser: results, family: 'and afterwards' },
-  { written: 'on unfinished', label: /on unfinished:[ \t]*/, name: 'onUnfinished', parser: results, family: 'and afterwards' },
+  {
+    written: 'on success',
+    label: /on success:[ \t]*/,
+    name: 'onSuccess',
+    parser: results,
+    family: 'and afterwards',
+    note: 'runs after the body of a cycle that completed, and the body runs with it — the two together are what completing means',
+  },
+  {
+    written: 'on failure',
+    label: /on failure:[ \t]*/,
+    name: 'onFailure',
+    parser: results,
+    family: 'and afterwards',
+    note: 'runs instead of the body where the action is turned away before it begins — a `requires:` that does not hold, a thing that is not here, an input it has not got — and writing it is what says those words in the world rather than the engine saying them plainly. A check inside the body falling the wrong way is not this',
+  },
+  {
+    written: 'on attempts exhausted',
+    label: /on attempts exhausted:[ \t]*/,
+    name: 'onAttemptsExhausted',
+    parser: results,
+    family: 'and afterwards',
+    note: 'runs where a cycle spends its `attempts:` without completing, and at no other ending: an action called off, or one ended by a gate of its own coming to hold, reaches none of these three',
+  },
   { written: 'time', label: /time:[ \t]*/, name: 'time', parser: seconds, family: 'how long it takes' },
   { written: 'rate', label: /rate:[ \t]*/, name: 'rate', parser: perMinute, family: 'how long it takes' },
   { written: 'accuracy', label: /accuracy:[ \t]*/, name: 'accuracy', parser: contest, family: 'what it is contested on' },
@@ -216,7 +237,7 @@ const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   },
   {
     label: /on escape:[ \t]*/,
-    message: 'on escape: was retired — write `on unfinished:`, which runs when `attempts:` ran out before the action completed',
+    message: 'on escape: was retired — write `on attempts exhausted:`, which runs when `attempts:` ran out before the action completed',
   },
   ...HOOK_FIELD_REFUSALS,
 ];
@@ -227,7 +248,7 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: st
   requireEnd(cursor, 'an action field');
 }
 
-const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on unfinished', 'stops on']);
+const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on attempts exhausted', 'stops on']);
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
@@ -412,7 +433,7 @@ export function actionLines(action: Action): string[] {
     action.tags?.length ||
     action.onSuccess?.length ||
     action.onFailure?.length ||
-    action.onUnfinished?.length ||
+    action.onAttemptsExhausted?.length ||
     (action.kind !== undefined && action.kind !== 'duration') ||
     action.time !== undefined ||
     action.rate !== undefined ||
@@ -442,10 +463,12 @@ export function actionLines(action: Action): string[] {
   if (action.stopsOn?.length) lines.push(`${at('stopsOn')}stops on: ${stoppers.print(action.stopsOn)}`);
   if (action.rewardScale !== undefined) lines.push(`  rewards scaled by: ${action.rewardScale}`);
   lines.push(...indentLines(action.results.flatMap(resultLines)));
-  printResultBlock(lines, `${at('onSuccess')}on success`, action.onSuccess, 4);
-  printResultBlock(lines, `${at('onFailure')}on failure`, action.onFailure, 4);
-  printResultBlock(lines, `${at('onUnfinished')}on unfinished`, action.onUnfinished, 4);
+  for (const name of ['onSuccess', 'onFailure', 'onAttemptsExhausted'] as const) {
+    printResultBlock(lines, `${at(name)}${writtenAs(name)}`, action[name], 4);
+  }
   return lines;
 }
 
-export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onUnfinished].filter((list): list is ActionResult[] => list !== undefined);
+const writtenAs = (name: keyof Omit<Action, 'label' | 'results'>): string => ACTION_FIELDS.find((field) => field.name === name)!.written;
+
+export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onAttemptsExhausted].filter((list): list is ActionResult[] => list !== undefined);

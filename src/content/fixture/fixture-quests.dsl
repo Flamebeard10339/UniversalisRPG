@@ -49,6 +49,14 @@ set: sifted-once
 stop
 set: sifted-twice
 
+# flag ran-body
+
+# flag ran-success
+
+# flag ran-failure
+
+# flag ran-unfinished
+
 # flag hidden-latch-open
 
 # flag required-latch-open
@@ -74,6 +82,28 @@ pick the required latch:
   requires: not required-latch-open
   1000 vs 0:
     set: required-latch-open
+finish the job:
+  time: 1
+  set: ran-body
+  on success:
+    set: ran-success
+  on failure:
+    set: ran-failure
+  on attempts exhausted:
+    set: ran-unfinished
+never finish the job:
+  continuous
+  time: 1
+  on attempts exhausted:
+    set: ran-unfinished
+turn away from the job:
+  time: 1
+  requires: ran-success
+  set: ran-body
+  on failure:
+    set: ran-failure
+  on attempts exhausted:
+    set: ran-unfinished
 try the shutter:
   instant
   core.digging-rate vs 1000:
@@ -92,6 +122,30 @@ assert: hidden-latch-open
 goto: fixture-town.loft
 use: location.fixture-town.loft.pick-the-required-latch until done
 assert: required-latch-open
+
+# test a-cycle-that-completes-runs-the-body-and-on-success-and-nothing-else
+goto: fixture-town.loft
+use: location.fixture-town.loft.finish-the-job until done
+assert: ran-body
+assert: ran-success
+assert: not ran-failure
+assert: not ran-unfinished
+
+# test an-action-turned-away-before-it-begins-runs-on-failure-in-place-of-its-body
+goto: fixture-town.loft
+use: location.fixture-town.loft.turn-away-from-the-job
+assert: ran-failure
+assert: not ran-body
+assert: not ran-unfinished
+
+# test an-action-called-off-reaches-none-of-the-three
+goto: fixture-town.loft
+begin: use location.fixture-town.loft.never-finish-the-job
+wait: 1
+cancel
+assert: not ran-unfinished
+assert: not ran-success
+assert: not ran-failure
 
 # test a-contest-the-player-would-lose-is-lost-when-nothing-settles-it
 goto: fixture-town.loft

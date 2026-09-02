@@ -47,7 +47,7 @@ continuous
 attempts: 1
 rate: us.fishing-rate
 accuracy: us.fishing vs them.depth
-on unfinished:
+on attempts exhausted:
   drain: 1 line-health
 
 # item small-fishing-net
@@ -187,7 +187,7 @@ cast:
   requires: has small-fishing-net or has large-fishing-net
   give: 1 raw-shrimp
   xp: fishing 3
-  +on unfinished:
+  +on attempts exhausted:
     say: The net comes up heavy with nothing in it, and something in the mesh gives.
 
 # entity anchovy-shoal
@@ -199,7 +199,7 @@ cast:
   requires: has small-fishing-net or has large-fishing-net
   give: 1 raw-anchovies
   xp: fishing 4
-  +on unfinished:
+  +on attempts exhausted:
     say: They go under the net as one animal, and a strand parts as you haul it back.
 
 # entity trout-run
@@ -216,7 +216,7 @@ cast:
   1 in 220:
     give: 1 quick-water-jewel
     say: A river stone comes up in the net with a thumb-groove worn into one face of it.
-  +on unfinished:
+  +on attempts exhausted:
     roll: spend-bait
     say: It takes the bait, turns once, and the line sings and then stops singing.
 
@@ -234,7 +234,7 @@ cast:
   1 in 200:
     give: 1 anglers-knot-jewel
     say: There is something wound into the gill plate that was not put there by a fish.
-  +on unfinished:
+  +on attempts exhausted:
     roll: spend-bait
     say: Something enormous takes it and simply keeps going.
 
@@ -253,7 +253,7 @@ cast:
   1 in 180:
     give: 1 slack-water-jewel
     say: There is a length of old line in its mouth, and whatever it was tied to is still down there.
-  +on unfinished:
+  +on attempts exhausted:
     roll: spend-bait
     say: It follows the bait almost to the bank, looks at you, and is not there any more.
 
@@ -272,7 +272,7 @@ cast:
   1 in 150:
     give: 1 a-full-tin-jewel
     say: It brings up somebody's tin with it, and there is still bait in the tin.
-  +on unfinished:
+  +on attempts exhausted:
     roll: spend-bait
     say: The rod goes over and stays over, and then there is nothing on the end of it at all.
 

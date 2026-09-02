@@ -79,7 +79,7 @@ export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): 
 }
 
 export function outcomeResults(action: Action, outcome: FightOutcome): ActionResult[] {
-  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onUnfinished ?? []);
+  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onAttemptsExhausted ?? []);
 }
 
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {

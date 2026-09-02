@@ -82,7 +82,7 @@ function compile(recipe: Recipe): ActionDeclaration {
       item: q.item,
       amount: q.amount,
     }));
-    action.onUnfinished = [...takes, ...burnt];
+    action.onAttemptsExhausted = [...takes, ...burnt];
   }
 
   return action;

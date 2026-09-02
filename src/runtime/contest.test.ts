@@ -255,7 +255,7 @@ test-escaper:
   rate: attack-rate
   damage: blow
   attempts: 2
-  on unfinished:
+  on attempts exhausted:
     set: fled
 `
     );
