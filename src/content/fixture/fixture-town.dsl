@@ -28,7 +28,7 @@ entities: 2 rat
 title: The Lane
 examine: Mud, and a row of backs of houses.
 south of green
-entities: carter
+entities: carter, drover
 feed the dogs:
   instant
   requires: has bread
@@ -203,6 +203,24 @@ node greeting:
   again: Still loading.
   The lane's soft this time of year. Mind the ruts.
 
+# entity drover
+title: The Drover
+examine: Somebody bringing four cows up a lane built for two.
+faction: world
+
+# dialogue drover
+owner = drover
+
+node greeting:
+  always
+  again: Still four of them.
+  Four cows, one lane. You work it out.
+
+node about-the-well:
+  when: well.touched
+  ask: Is the well as deep as they say?
+  Deeper. I have never had a bucket come back full.
+
 # dialogue wanderer
 owner = wanderer
 
@@ -218,3 +236,24 @@ buying: 1.5
 selling: 0.5
 accepts: stocked
 
+# test one-thing-open-is-said-outright-rather-than-put-in-a-list
+travel: lane
+talk: carter
+choose: continue
+assert: carter.greeting.visits = 1
+
+# test a-thread-open-beside-a-greeting-is-the-one-thing-open
+travel: well
+travel: green
+travel: lane
+talk: drover
+choose: continue
+assert: drover.about-the-well.visits = 1
+assert: drover.greeting.visits = 0
+
+# test more-than-one-thread-open-is-put-up-to-be-picked-from
+talk: keeper
+choose: keeper.about-the-rats
+choose: continue
+assert: keeper.about-the-rats.visits = 1
+assert: keeper.greeting.visits = 0

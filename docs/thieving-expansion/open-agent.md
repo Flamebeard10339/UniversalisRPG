@@ -2,7 +2,7 @@
 
 Every line here is a question the oracle did not answer while `content/thieving.dsl`
 was being written, found by building a scratch module and reading what the engine
-did. **A line is deleted the day it closes.** The proofs stand in `open-tests.dsl`.
+did. **A line is deleted the day it closes.**
 
 ---
 
@@ -15,15 +15,6 @@ for the engine.
 
 *Closes when:* no action in `content/thieving.dsl` writes a `hidden if:` its own entity
 already writes, and every route through the module still walks.
-
-## A dialogue laid over from another module cannot add an `always` node
-
-A `when:` node added under `# dialogue tulsa.guardsman` from thieving is offered as a
-thread. An `always` node added the same way is never offered: the guardsman speaks
-tulsa's own `always` line and lists nothing. Every overlay node in the thieving module
-is therefore a `when:` node, including two that would rather have been unconditional.
-
-*Closes when:* `an-always-node-laid-over-a-dialogue-is-offered` passes.
 
 ## `run-progress` is a counter kept only to quiet a remark that is gone
 

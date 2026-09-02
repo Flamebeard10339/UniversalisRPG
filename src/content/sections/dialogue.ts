@@ -83,7 +83,7 @@ const GOES = (goes: { hole: string; like: string }): Written => ({
 
 export const nodeGrammar = (goes = { hole: 'node', like: 'farewell' }): Written[] =>
   calledBlock('node', [
-  { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open' },
+  { form: 'always', example: 'always', family: 'reached when', note: 'what this entity says when no thread of theirs is open, and nothing they say while one is — a greeting, not a thread, and never put up in a list beside one. `when: always` is the other word and the opposite thing: a thread of its own that stands open whatever the state of the world, which is how a line is put up beside the rest unconditionally' },
   { form: 'when: <condition>', example: 'when: has-key', family: 'reached when', holds: () => ({ condition }), note: 'a thread of its own, open while this holds, and put up beside whatever else the entity has open then' },
   { form: 'ask: <text>', example: 'ask: About the bees.', family: 'reached when', note: 'what the player picks to open this thread; a thread with no `ask:` is named in the list by the first line it says' },
   { form: 'sticky', example: 'sticky', family: 'reached when', note: 'without this, a node is said once and falls silent on every visit after — sticky says it again in full every time' },
@@ -206,7 +206,11 @@ export const dialogue = section<Dialogue>()({
   says: (value) => value.nodes.map((node) => (node.ask === undefined ? [] : [node.ask])),
   members: (value) => value.nodes.map((node) => ({ kind: DIALOGUE_NODE, name: node.name })),
   grammar: [
-    { form: 'owner = <entity>', example: 'owner = guide' },
+    {
+      form: 'owner = <entity>',
+      example: 'owner = guide',
+      note: 'who speaks it, and every dialogue anyone has given them answers at once: talking to them puts up everything they hold open, whoever wrote it, and they pick. One thing open is said outright with no list to pick from, which is what a route reaches after a bare `talk:`. A plain `always` node is not one of those things — it is what they say when nothing else stands open — so an entity holding a thread says the thread and keeps the greeting to itself',
+    },
     { form: 'node <name>:', example: 'node greet:', over: 'by name', block: () => nodeGrammar() },
   ],
   parse: (raw) => {
