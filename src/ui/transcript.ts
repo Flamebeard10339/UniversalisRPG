@@ -116,8 +116,11 @@ export function appendOutputs(transcript: Transcript, outputs: readonly CommandO
   const entries: LogEntry[] = [...transcript.entries];
   for (const line of written) {
     const said = saidRecently(entries, line);
-    if (said >= 0) entries[said] = { ...entries[said]!, repeats: entries[said]!.repeats + 1 };
-    else entries.push({ ...line, id: nextId++, repeats: 1 } as LogEntry);
+    if (said < 0) entries.push({ ...line, id: nextId++, repeats: 1 } as LogEntry);
+    else {
+      const [held] = entries.splice(said, 1);
+      entries.push({ ...held!, repeats: held!.repeats + 1 });
+    }
   }
   return { entries, nextId, place: cursor.place, described: cursor.described };
 }

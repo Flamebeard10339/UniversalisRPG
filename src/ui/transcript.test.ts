@@ -92,15 +92,15 @@ describe('the narration column', () => {
     expect(transcript.nextId).toBe(2);
   });
 
-  it('counts a line coming back within earshot against the one already there, wherever it landed', () => {
+  it('counts a line coming back within earshot against the one already there, and puts it last, because last is what happened most recently', () => {
     const pops = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('a chestnut pops') } as const;
     const burns = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('one burns') } as const;
 
     const transcript = appendOutputs(appendOutputs(appendOutputs(emptyTranscript(), [pops, pops]), [burns]), [pops]);
 
     expect(transcript.entries.map((entry) => [entry.text, entry.repeats])).toEqual([
-      ['a chestnut pops', 3],
       ['one burns', 1],
+      ['a chestnut pops', 3],
     ]);
   });
 
