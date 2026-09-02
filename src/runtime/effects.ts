@@ -170,6 +170,13 @@ function requireDropTable(registry: Registry, id: string): DropTable {
   return table;
 }
 
+function contestSettled(state: GameState): boolean | null {
+  const sure = debugging(state, 'succeed-checks');
+  const thumbs = debugging(state, 'fail-checks');
+  if (sure && thumbs) throw new RuntimeError('succeed-checks and fail-checks both stand, and a contest cannot be settled both ways: a route asks for one of them');
+  return sure ? true : thumbs ? false : null;
+}
+
 export function applyResults(segment: Segment, results: readonly ActionResult[], actor: string, count = 1, lead = true): void {
   if (count <= 0) return;
   if (count > 1 && samplesPerApplication(results)) {
@@ -341,11 +348,13 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'chance':
       if (nextRandom(state) * result.denominator < result.numerator) applyResults(segment, result.results, actor, count);
       return undefined;
-    case 'contest':
-      if (nextRandom(state) < hitChance(statSide(result.left, state, registry), statSide(result.right, state, registry), registry)) {
+    case 'contest': {
+      const settled = contestSettled(state);
+      if (settled ?? nextRandom(state) < hitChance(statSide(result.left, state, registry), statSide(result.right, state, registry), registry)) {
         applyResults(segment, result.results, actor, count);
       }
       return undefined;
+    }
     case 'gate':
       if (evaluateCondition(result.condition, state, registry)) applyResults(segment, result.results, actor, count);
       return undefined;

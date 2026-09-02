@@ -34,6 +34,8 @@ export const DEBUG_SWITCHES = {
   'lock-pools': "every pool of the player's stands where it is: what would have come off one comes off nothing, and what fills one still fills it",
   unkillable: "no pool of the player's is ever spent: it can be worn down to the last of it and no further, so nothing that empties one ends the run",
   'instant-kill': "a blow of the player's lands rather than missing, and empties whatever it lands on",
+  'succeed-checks': "every `<stat> vs <stat>:` the player is weighed by goes their way, so a check that could have fallen either way is settled before it is rolled",
+  'fail-checks': "no `<stat> vs <stat>:` the player is weighed by goes their way, which is the other half of `succeed-checks` and refused beside it",
 } as const;
 
 export type DebugSwitch = keyof typeof DEBUG_SWITCHES;

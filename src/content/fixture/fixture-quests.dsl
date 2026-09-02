@@ -49,11 +49,53 @@ set: sifted-once
 stop
 set: sifted-twice
 
+# flag long-odds-came-in
+
+# flag short-odds-held
+
 # location fixture-town.loft
 sift:
   instant
   roll: sifting
   set: sifted-twice
+try the shutter:
+  instant
+  core.digging-rate vs 1000:
+    set: long-odds-came-in
+lean on the shutter:
+  instant
+  1000 vs core.digging-rate:
+    set: short-odds-held
+
+# test a-contest-the-player-would-lose-is-lost-when-nothing-settles-it
+goto: fixture-town.loft
+use: location.fixture-town.loft.try-the-shutter
+assert: not long-odds-came-in
+
+# test succeed-checks-settles-a-contest-the-player-would-lose
+succeed-checks
+goto: fixture-town.loft
+use: location.fixture-town.loft.try-the-shutter
+assert: long-odds-came-in
+
+# test a-contest-the-player-would-win-is-won-when-nothing-settles-it
+goto: fixture-town.loft
+use: location.fixture-town.loft.lean-on-the-shutter
+assert: short-odds-held
+
+# test fail-checks-settles-a-contest-the-player-would-win
+fail-checks
+goto: fixture-town.loft
+use: location.fixture-town.loft.lean-on-the-shutter
+assert: not short-odds-held
+
+# test the-two-settlements-are-refused-beside-each-other
+succeed-checks
+fail-checks
+goto: fixture-town.loft
+use: location.fixture-town.loft.try-the-shutter
+refused
+assert: not long-odds-came-in
 
 # test stop-ends-the-body-it-stands-in-and-the-ones-around-it
 goto: fixture-town.loft

@@ -51,6 +51,10 @@ stage paid:
 
 # flag overheard-the-captain
 
+# stat wall-watch
+title: Wall Watch
+base: 25
+
 # entity reporter
 title: The Reporter
 faction: world
@@ -65,15 +69,14 @@ watch the castle windows:
   hidden if: overheard-the-captain
   time: 8
   say: You lie flat on the warm tile and give the castle a long look. The second floor opens its shutters and leaves them open; one window on the third is shut against weather nobody else is shutting against.
-  one of:
-    thieving.thieving-ability:
-      set: overheard-the-captain
-      xp: thieving.thieving 40
-      say: The captain crosses the yard below and takes the stairs to the solar without being announced. The shutters are open for her. "Not yet," the duke says, plain enough to carry. "Not until the last of them is finished." The shutters swing to before you hear finished what.
-    100x:
-      drain: 2 core.health
-      inflict: thieving.dazed for thieving.daze-duration
-      say: Someone on the wall-walk turns your way a beat too long, and you go flat against the tile and very still. @@@ asked for a stealth mission where being spotted ends the attempt outright; the nearest the grammar gives for a watch that can fail is the weighted roll `pick their pocket` and the two chests already use, retried by hand, so that is what stands here instead. It carries no detection state: nobody comes looking, nothing escalates on a second or third catch, and "ends the attempt" is read as the dazed three seconds a caught hand costs everywhere else in town rather than as being thrown off the roof. A real failed-watch state — noticed, chased off the rooftops, unable to try again for a while — is not a thing this grammar has.
+  thieving.thieving-ability vs wall-watch:
+    set: overheard-the-captain
+    xp: thieving.thieving 40
+    say: The captain crosses the yard below and takes the stairs to the solar without being announced. The shutters are open for her. "Not yet," the duke says, plain enough to carry. "Not until the last of them is finished." The shutters swing to before you hear finished what.
+  if not overheard-the-captain:
+    drain: 2 core.health
+    inflict: thieving.dazed for thieving.daze-duration
+    say: Someone on the wall-walk turns your way a beat too long, and you go flat against the tile and very still. @@@ asked for a stealth mission where being spotted ends the attempt outright. Your hand against the watch on the wall is a contest now, so the odds move with the skill rather than being a fixed share, but it carries no detection state: nobody comes looking, nothing escalates on a second or third catch, and "ends the attempt" is read as the dazed three seconds a caught hand costs everywhere else in town rather than as being thrown off the roof. A real failed-watch state — noticed, chased off the rooftops, unable to try again for a while — is not a thing this grammar has.
 
 # item fine-lockpicks
 title: Fine Lockpicks
@@ -88,6 +91,7 @@ item-level: 2-5
 
 # test attention-to-detail-start-to-finish
 lock-pools
+succeed-checks
 load: at-market-row
 talk: reporter
 choose: I'll take a look.
