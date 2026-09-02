@@ -398,7 +398,7 @@ describe('a start condition that stops holding', () => {
     expect(state.activeAction).toBeNull();
   });
 
-  it('does not treat hidden if: as a reason to stop', () => {
+  it('ends one whose hidden if: has come to hold, the same as a requires: that has stopped', () => {
     const { registry, state } = started();
     armAction('entity', 'beacon', 'tend', registry, state);
 
@@ -407,8 +407,8 @@ describe('a start condition that stops holding', () => {
 
     state.flags['beacon.dawn'] = true;
     resolve(state, registry, secondsToMs(6));
-    expect(state.inventory['blessing']).toBe(6);
-    expect(state.activeAction).not.toBeNull();
+    expect(state.inventory['blessing']).toBe(3);
+    expect(state.activeAction).toBeNull();
   });
 });
 

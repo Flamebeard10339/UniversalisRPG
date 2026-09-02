@@ -42,6 +42,7 @@ export function actionStillValid(action: Action, active: ActiveAction, state: Ga
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   if (ownerIsElsewhere(obj, objId, state, registry)) return false;
   if (!requiresMet(action, state, registry)) return false;
+  if (!actionVisible(action, state, registry)) return false;
   return !active.repeating || inputLimit(action, state).completions > 0;
 }
 

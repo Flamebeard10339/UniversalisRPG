@@ -49,6 +49,10 @@ set: sifted-once
 stop
 set: sifted-twice
 
+# flag hidden-latch-open
+
+# flag required-latch-open
+
 # flag long-odds-came-in
 
 # flag short-odds-held
@@ -58,6 +62,18 @@ sift:
   instant
   roll: sifting
   set: sifted-twice
+pick the hidden latch:
+  continuous
+  time: 1
+  hidden if: hidden-latch-open
+  1000 vs 0:
+    set: hidden-latch-open
+pick the required latch:
+  continuous
+  time: 1
+  requires: not required-latch-open
+  1000 vs 0:
+    set: required-latch-open
 try the shutter:
   instant
   core.digging-rate vs 1000:
@@ -66,6 +82,16 @@ lean on the shutter:
   instant
   1000 vs core.digging-rate:
     set: short-odds-held
+
+# test a-hidden-if-an-action-sets-itself-ends-the-run
+goto: fixture-town.loft
+use: location.fixture-town.loft.pick-the-hidden-latch until done
+assert: hidden-latch-open
+
+# test a-requires-an-action-breaks-itself-ends-the-run
+goto: fixture-town.loft
+use: location.fixture-town.loft.pick-the-required-latch until done
+assert: required-latch-open
 
 # test a-contest-the-player-would-lose-is-lost-when-nothing-settles-it
 goto: fixture-town.loft

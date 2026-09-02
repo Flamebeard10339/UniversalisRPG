@@ -147,6 +147,9 @@ function readsWith(written: string, parser: Parser<unknown>): ActionValue {
 export const ATTEMPTS_BUDGET =
   'a budget for one cycle: an action that runs once ends when it is spent, while a `continuous` one runs its `on unfinished:` and begins its next cycle';
 
+const WHILE_IT_RUNS =
+  'read again on every cycle of an action already under way, not only when it is taken up — so an action gated on something its own body sets runs until it sets it and stops there, which is how a lock is picked until it opens';
+
 const ACTION_FIELDS: readonly (Filled & {
   written: string;
   label: RegExp;
@@ -155,8 +158,15 @@ const ACTION_FIELDS: readonly (Filled & {
   family: string;
   note?: string;
 })[] = [
-  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when' },
-  { written: 'hidden if', label: /hidden if:[ \t]*/, name: 'hiddenIf', parser: optionalCondition, family: 'offered when', note: 'the action is not offered at all while this holds, rather than offered and refused' },
+  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when', note: WHILE_IT_RUNS },
+  {
+    written: 'hidden if',
+    label: /hidden if:[ \t]*/,
+    name: 'hiddenIf',
+    parser: optionalCondition,
+    family: 'offered when',
+    note: `the action is not offered at all while this holds, rather than offered and refused. ${WHILE_IT_RUNS}`,
+  },
   { written: 'on success', label: /on success:[ \t]*/, name: 'onSuccess', parser: results, family: 'and afterwards' },
   { written: 'on failure', label: /on failure:[ \t]*/, name: 'onFailure', parser: results, family: 'and afterwards' },
   { written: 'on unfinished', label: /on unfinished:[ \t]*/, name: 'onUnfinished', parser: results, family: 'and afterwards' },
