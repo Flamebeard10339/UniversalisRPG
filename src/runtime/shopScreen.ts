@@ -15,7 +15,7 @@ export type Side = 'buy' | 'sell';
 export type ShopFrame = Extract<ModalFrame, { name: 'shop' }>;
 export type ShopCountFrame = Extract<ModalFrame, { name: 'shop-count' }>;
 
-export const shopFrame = (shop: string): ShopFrame => ({ name: 'shop', answers: {}, shop });
+export const shopFrame = (shop: string, side?: Side): ShopFrame => (side === undefined ? { name: 'shop', answers: {}, shop } : { name: 'shop', answers: {}, shop, side });
 
 export const countFrame = (shop: string, side: Side, item: string): ShopCountFrame => ({ name: 'shop-count', answers: {}, shop, side, item });
 
@@ -27,14 +27,21 @@ export const holdsShop = (value: Record<string, unknown>): boolean => typeof val
 
 export const holdsCount = (value: Record<string, unknown>): boolean => holdsShop(value) && typeof value.item === 'string' && (value.side === 'buy' || value.side === 'sell');
 
+export const MORE = 'more';
+
 export const rowAnswer = (side: Side, item: string): Answer => `${side}:${item}`;
 
-export function rowOf(answer: Answer | undefined): { side: Side; item: string } | undefined {
-  const at = answer?.indexOf(':') ?? -1;
-  if (answer === undefined || at <= 0) return undefined;
-  const side = answer.slice(0, at);
+export const moreAnswer = (side: Side, item: string): Answer => `${MORE}:${rowAnswer(side, item)}`;
+
+export function rowOf(answer: Answer | undefined): { side: Side; item: string; asked: boolean } | undefined {
+  if (answer === undefined) return undefined;
+  const asked = answer.startsWith(`${MORE}:`);
+  const written = asked ? answer.slice(MORE.length + 1) : answer;
+  const at = written.indexOf(':');
+  if (at <= 0) return undefined;
+  const side = written.slice(0, at);
   if (side !== 'buy' && side !== 'sell') return undefined;
-  return { side, item: answer.slice(at + 1) };
+  return { side, item: written.slice(at + 1), asked };
 }
 
 const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer: Localizer): ModalChoice[] =>
@@ -42,6 +49,7 @@ const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer:
     const item = heldName(state, localizer, trade.item);
     return {
       value: rowAnswer(side, trade.item),
+      held: moreAnswer(side, trade.item),
       shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item, price: trade.coin, count: trade.count }),
       cell: {
         under: side,
@@ -57,19 +65,27 @@ export function shopOptions(frame: ShopFrame, state: GameState, registry: Regist
   const shop = registry.shops.get(frame.shop);
   if (!shop) return [];
   const localizer = localizerOf(registry, state);
+  const buying = rows('buy', forSale(shop, state, registry), state, localizer);
+  const selling = rows('sell', wanted(shop, state, registry), state, localizer);
+  const standing = frame.side === 'sell' ? [...selling, ...buying] : [...buying, ...selling];
   return [
     {
       key: 'item',
       label: localizer.engine('engine.shop.counter', { coin: localizer.title('item', shop.coin), held: coinHeld(shop, state) }),
-      values: [...rows('buy', forSale(shop, state, registry), state, localizer), ...rows('sell', wanted(shop, state, registry), state, localizer), { value: LEAVE, shown: localizer.engine('engine.shop.close') }],
+      values: [...standing, { value: LEAVE, shown: localizer.engine('engine.shop.close') }],
     },
   ];
 }
 
-export function shopSubmit(frame: ShopFrame, _state: GameState, registry: Registry): ModalFrame | null {
-  if (!registry.shops.has(frame.shop)) return null;
+export function shopSubmit(frame: ShopFrame, state: GameState, registry: Registry): ModalFrame | null {
+  const shop = registry.shops.get(frame.shop);
+  if (!shop) return null;
   const row = rowOf(frame.answers.item);
-  return row === undefined ? null : countFrame(frame.shop, row.side, row.item);
+  if (row === undefined) return null;
+  if (row.asked) return countFrame(frame.shop, row.side, row.item);
+  const refusal = row.side === 'buy' ? buy(shop, state, registry, row.item, 1) : sell(shop, state, registry, row.item, 1);
+  if (refusal) state.log.push(refused(localizerOf(registry, state), refusal));
+  return shopFrame(frame.shop, row.side);
 }
 
 export function countOptions(frame: ShopCountFrame, state: GameState, registry: Registry): ModalOption[] {
@@ -83,7 +99,7 @@ export function countSubmit(frame: ShopCountFrame, state: GameState, registry: R
   if (!shop) return null;
   const refusal = tradeRefusal(shop, state, registry, frame.side, frame.item, frame.answers.count ?? '');
   if (refusal) state.log.push(refused(localizerOf(registry, state), refusal));
-  return shopFrame(frame.shop);
+  return shopFrame(frame.shop, frame.side);
 }
 
 function tradeRefusal(shop: Shop, state: GameState, registry: Registry, side: Side, item: string, written: string): Refusal | undefined {

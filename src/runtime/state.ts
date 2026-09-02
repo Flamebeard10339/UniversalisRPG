@@ -108,7 +108,7 @@ export type ModalFrame =
   | { readonly name: 'quest-journal'; readonly answers: ModalAnswers; readonly quest: string }
   | { readonly name: 'stat-breakdown'; readonly answers: ModalAnswers; readonly stat: string }
   | { readonly name: 'skill-breakdown'; readonly answers: ModalAnswers; readonly skill: string }
-  | { readonly name: 'shop'; readonly answers: ModalAnswers; readonly shop: string }
+  | { readonly name: 'shop'; readonly answers: ModalAnswers; readonly shop: string; readonly side?: 'buy' | 'sell' }
   | { readonly name: 'shop-count'; readonly answers: ModalAnswers; readonly shop: string; readonly side: 'buy' | 'sell'; readonly item: string }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 

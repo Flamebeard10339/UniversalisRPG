@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import type { PlayView } from '../runtime/session';
 import { partsOf, partStanding, type ChoiceCell, type ModalChoice } from '../runtime/modalOption';
 import { onlyLeaves } from './asking';
@@ -6,20 +6,44 @@ import { Modal, ModalCard } from './Modal';
 import type { Localized } from '../runtime/localized';
 import type { Declared } from './modalManner';
 import { tidy } from './format';
-import { GRID, NAME } from './sheetLayout';
+import { gripFor, type Gripped } from './DragSheet';
+import { LIFT_MS } from './gesture';
+import { SLOTS, NAME } from './sheetLayout';
 
 type Option = PlayView['modals'][number]['options'][number];
 
 const ROW = 'min-h-[48px] w-full rounded-xl border border-border bg-panel px-4 py-2 text-left transition-transform duration-75 active:scale-[0.99] active:bg-accent-strong active:text-accent-text';
 
-function Cell({ cell, onPick }: { cell: ChoiceCell; onPick: () => void }): JSX.Element {
+function Cell({ cell, subject, onPick, onHold }: { cell: ChoiceCell; subject: string; onPick: () => void; onHold?: () => void }): JSX.Element {
+  const holding = useRef<Gripped | null>(null);
+  const asked = useRef(false);
+  const grip = gripFor(
+    subject,
+    holding,
+    1,
+    {
+      hold: () => {
+        if (asked.current) return;
+        asked.current = true;
+        onHold?.();
+      },
+      rest: () => {
+        const already = asked.current;
+        asked.current = false;
+        if (!already) onPick();
+      },
+    },
+    LIFT_MS,
+  );
+
   return (
     <button
       data-drive="answer"
       type="button"
-      onClick={onPick}
+      {...(onHold ? grip : { onClick: onPick })}
+      style={{ touchAction: 'pan-y' }}
       aria-label={cell.title}
-      className="relative flex min-h-[5.5rem] flex-col items-center justify-center rounded-2xl border border-border bg-surface-raised px-2 py-2 text-center transition-transform duration-75 active:scale-[0.98] active:border-accent"
+      className="relative flex h-full flex-col items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised px-2 py-2 text-center transition-transform duration-75 active:scale-[0.98] active:border-accent"
     >
       <span className="absolute left-2 top-2 text-xs tabular-nums text-text-subtle">{tidy(cell.price)}</span>
       <span className={`w-full text-xs font-semibold ${NAME}`}>{cell.title}</span>
@@ -49,9 +73,15 @@ function Counter({ option, onAnswer }: { option: Option; onAnswer: (key: string,
           </button>
         ))}
       </div>
-      <div className={`unbarred max-h-[50vh] overflow-y-auto ${GRID}`}>
+      <div className={`unbarred max-h-[50vh] overflow-y-auto ${SLOTS}`}>
         {(shown?.choices ?? []).map(({ choice }) => (
-          <Cell key={choice.value} cell={choice.cell!} onPick={() => onAnswer(option.key, choice.value)} />
+          <Cell
+            key={choice.value}
+            cell={choice.cell!}
+            subject={choice.value}
+            onPick={() => onAnswer(option.key, choice.value)}
+            onHold={choice.held === undefined ? undefined : () => onAnswer(option.key, choice.held!)}
+          />
         ))}
       </div>
       {loose.map(({ choice }) => (

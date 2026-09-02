@@ -1,4 +1,4 @@
-import type { ModalOption } from './modalOption';
+import { offersAnswer, type ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModal } from './modalStack';
 import { choose, cursorProblem, menuChoices, standsAtWords } from './dialogue-runtime';
@@ -216,7 +216,7 @@ function isCursor(value: unknown): boolean {
 function optionRefusal(localizer: Localizer, options: readonly ModalOption[], key: string, value: string): Localized | null {
   const option = options.find((each) => each.key === key);
   if (!option) return localizer.engine('engine.modal.stale.no-option', { option: localizer.identifier(key) });
-  if (option.values && !option.takesMore && !option.values.some((choice) => choice.value === value)) return localizer.engine('engine.modal.stale.no-value', { option: localizer.identifier(key), value: localizer.identifier(JSON.stringify(value)) });
+  if (option.values && !option.takesMore && !offersAnswer(option, value)) return localizer.engine('engine.modal.stale.no-value', { option: localizer.identifier(key), value: localizer.identifier(JSON.stringify(value)) });
   return null;
 }
 

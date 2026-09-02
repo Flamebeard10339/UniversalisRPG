@@ -12,6 +12,7 @@ export interface ModalChoice {
   readonly value: Answer;
   readonly shown: Localized;
   readonly on?: Answer;
+  readonly held?: Answer;
   readonly subject?: Localized;
   readonly cell?: ChoiceCell;
 }
@@ -22,6 +23,10 @@ export interface ModalOption {
   values: readonly ModalChoice[] | null;
   takesMore?: boolean;
 }
+
+export const answeredBy = (choice: ModalChoice): readonly Answer[] => (choice.held === undefined ? [choice.value] : [choice.value, choice.held]);
+
+export const offersAnswer = (option: ModalOption, value: string): boolean => (option.values ?? []).some((choice) => (answeredBy(choice) as readonly string[]).includes(value));
 
 export interface NumberedChoice {
   readonly at: number;

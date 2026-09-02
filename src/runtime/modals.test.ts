@@ -916,6 +916,8 @@ describe('nothing a player answers with carries words', () => {
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'buy:forge.nail' });
     published();
+    applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'more:buy:forge.nail' });
+    published();
     applyDirective(session, { kind: 'submit-modal', key: 'count', value: '2' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'item', value: 'close' });

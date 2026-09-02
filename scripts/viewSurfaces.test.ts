@@ -102,6 +102,7 @@ const SCRIPT: readonly string[] = [
   'use:entity.fixture-town.keeper.examine',
   'shop:fixture-town.counter',
   'submit-modal: item=buy:core.bread',
+  'submit-modal: item=more:buy:core.bread',
   'submit-modal: count=back',
   'submit-modal: item=close',
   'talk:fixture-town.keeper',

@@ -1509,14 +1509,13 @@ assert: not core.fainted
 load: in-town-with-bent-coins
 travel: market-row
 shop: general-store
-submit-modal: item=sell:core.bent-coin
+submit-modal: item=more:sell:core.bent-coin
 submit-modal: count=6
 submit-modal: item=close
 assert: inventory.coin > 0
 assert: inventory.core.bent-coin = 2
 shop: fishing-supplies
 submit-modal: item=buy:core.herring
-submit-modal: count=1
 submit-modal: item=close
 assert: has core.herring
 travel: tavern-street
@@ -1528,9 +1527,7 @@ assert: not has core.herring
 load: in-town-with-a-sword-and-a-shield
 shop: general-store
 submit-modal: item=sell:1
-submit-modal: count=1
 submit-modal: item=sell:2
-submit-modal: count=1
 submit-modal: item=close
 assert: inventory.coin > 0
 assert: not has core.iron-sword
@@ -1651,7 +1648,7 @@ assert: inventory.core.iron-sword = 1
 # test the-forge-is-a-way-onto-a-plane
 load: at-the-forge-with-coin
 shop: smithing.forge-supplies
-submit-modal: item=buy:smithing.bronze-bar
+submit-modal: item=more:buy:smithing.bronze-bar
 submit-modal: count=3
 submit-modal: item=close
 craft: smithing.bronze-dagger

@@ -54,9 +54,11 @@ wait: done
 shop: counter
 assert: inventory.copper-coin >= 20
 submit-modal: item=buy:core.bread
+assert: has bread
+submit-modal: item=more:buy:core.bread
 submit-modal: count=1
 submit-modal: item=close
-assert: has bread
+assert: has 2 core.bread
 
 # test minting-the-dug-in-save
 goto: green
