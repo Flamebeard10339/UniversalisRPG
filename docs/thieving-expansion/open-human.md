@@ -8,14 +8,14 @@ deleted the day it closes**, and one you answer crosses to `open-agent.md`.
 
 ## What the jail takes off a player
 
-The brief takes the pack and every worn thing and holds them in a crate to be
-reclaimed. `take: everything` exists and nothing gives back what it took, so a
-jailing takes the purse and leaves the rest, and there is no crate. The `@@@` on
-`sent-to-jail` in `content/thieving.dsl` says so on the line.
+The crate exists now: `confiscated = take: everything` puts the pack and everything
+worn into a bundle and `give: everything in confiscated` hands it back, so the jailing
+in `content/thieving.dsl` strips a player whole and the warden's lockbox returns them
+whole. What is still his is whether it *should* — a stripping that takes the gear a
+player fought for is a different beat from one that takes their purse.
 
-*Moves when: he says whether jail is meant to strip a player at all. If no, the note
-is deleted and this closes. If yes, it is a language feature — a held set that comes
-back — and the line crosses to a lane with that shape.*
+*Moves when: he plays it and says whether jail taking everything is the game he wants.
+If not, the line in `sent-to-jail` narrows to the coin and this closes.*
 
 ## Whether the warden jails on sight or on speech
 
@@ -50,15 +50,14 @@ one line in `content/thieving.dsl` and every pocket and chest follows it.*
 
 ## What `take:` should do past what is held
 
-`take: 50 core.coin` against a purse of twenty leaves the twenty. The confiscation in
-`content/thieving.dsl` is a thirteen-rung binary ladder of `if inventory.core.coin >=
-n: take: n` because of it, mirrored by a second ladder that hands the purse back from
-the warden's box, and both stop counting at eight thousand and one hundred
-ninety-one coin.
+`take: 50 core.coin` against a purse of twenty leaves the twenty. The confiscation
+that made this hurt is gone — it is `confiscated = take: everything` now, with no rung
+and no ceiling — so what is left is the plain question, with nothing riding on it: a
+line that asks for more than is there does nothing at all, silently, and an author who
+meant *as much of this as you can get* has no way to write it.
 
-*Moves when: he says whether `take:` should take what is there. If yes it is an
-engine line and crosses; the ladders then collapse to `take: everything`-shaped
-lines once a stored count can be given back.*
+*Moves when: he says whether `take:` should take what is there. If yes it is an engine
+line and crosses.*
 
 ## What the rogue's outfit is meant to boost
 

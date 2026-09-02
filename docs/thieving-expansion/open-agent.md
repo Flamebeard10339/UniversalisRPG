@@ -39,24 +39,19 @@ form for a check that is meant to be passable at level 0.
 *Closes when:* the `<weight>` line of the page says the stat stands as a weight beside
 the numbers around it, and names the contest form as the shape for a check.
 
-## `attention-to-detail-start-to-finish` is red before this branch touched anything
-
-The route watches the castle windows once, on a `one of:` whose stat row is worth
-about one in a hundred at level 0 (the line above). It passed on an earlier seed and
-fails on the current one, so the corpus gate exits non-zero on a route the thieving
-expansion did not change.
-
-*Closes when:* `npm run oracle -- --at content` reports it PASSED — either by the
-watch being retried with `until`, or by the check moving to the contest form.
-
 ## The paired entities stand in for a fragment the engine now takes
 
 An `examine:` is a line the game says, so `{condition: words}` holds in one. The
-module was written before that was true: the urchins are two entities, ragged and
-fed, and the widow is two more, so that what the player sees of them can change on a
-flag. One entity each says the same thing now.
+module was written before that was true: `street-urchins` and `well-fed-urchins` are
+two entities standing in one location with complementary `hidden if:` lines, differing
+in nothing but the words of their `examine:`. One entity says that now.
 
-*Closes when:* the ragged and fed urchins are one entity, the two widows are one, what
-each says changes on the flag that used to pick between them, and every route through
+The two widows read like the same shape and are not: `the-widow-at-the-door` stands on
+`tulsa.well-lane` and `the-widow-inside` in `thieving.widows-house`, so they are one
+character in two rooms rather than one character in two states, and the fragment has
+nothing to say about which room she is in. Leave them.
+
+*Closes when:* the ragged and fed urchins are one entity whose `examine:` changes on
+the flag that used to pick between them, and every route through
 `content/thieving.dsl` still walks.
 
