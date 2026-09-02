@@ -1,7 +1,7 @@
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { RawLine, RawSection, sectionParser, takeBlock } from '../../grammar/structure';
-import { strings, type Loose } from '../refs';
+import { keyedBy, put, strings, type Loose, type Visit } from '../refs';
 import { section, writtenWhole } from './define';
 
 export interface ParsedSave {
@@ -70,6 +70,28 @@ export const parseSaveSection = sectionParser((raw: RawSection): SaveSection => 
   return { id: raw.id, version, ...(over.length > 0 ? { over } : {}), diff };
 });
 
+const asFarAsItGoes =
+  (visit: Visit): Visit =>
+  (kind, id, where) => {
+    try {
+      return visit(kind, id, where);
+    } catch (error) {
+      if (error instanceof DslError) return id;
+      throw error;
+    }
+  };
+
+export const SAVE_IDS: Readonly<Record<string, { kind: string; at: 'value' | 'key' }>> = {
+  location: { kind: 'location', at: 'value' },
+  inventory: { kind: 'item', at: 'key' },
+  flags: { kind: 'flag', at: 'key' },
+  visits: { kind: 'node', at: 'key' },
+  xp: { kind: 'skill', at: 'key' },
+  resources: { kind: 'resource', at: 'key' },
+  resourceRateRemainders: { kind: 'resource', at: 'key' },
+  shops: { kind: 'shop', at: 'key' },
+};
+
 export const save = section<SaveSection>()({
   kind: 'save',
   ids: 'owned',
@@ -84,9 +106,20 @@ export const save = section<SaveSection>()({
       example: 'over: in-town',
       note: OVER_LAYERS,
     },
-    { form: '{"version": <int>[, <the rest of a saved game>]}', example: '{"version": 1}' },
+    {
+      form: '{"version": <int>[, <the rest of a saved game>]}',
+      example: '{"version": 1}',
+      note: 'an id in here may be written short, as `bread`, and is written out whole when the world is read. One the world no longer holds is left as it stands and pruned when the save is loaded, which is what `npm run repair-saves` looks through history to mend',
+    },
   ],
   parse: parseSaveSection,
   print: (value, { moduleId, id }) => [`# save ${moduleLocalId(moduleId, id)}`, ...overLines(value.over), JSON.stringify({ version: value.version, ...value.diff })],
-  visit: (value, where, visit) => strings(value as unknown as Loose, 'over', 'save', `${where} over:`, visit),
+  visit: (value, where, visit) => {
+    strings(value as unknown as Loose, 'over', 'save', `${where} over:`, visit);
+    const diff = (value as unknown as { diff: Loose }).diff;
+    for (const [field, held] of Object.entries(SAVE_IDS)) {
+      if (held.at === 'value') put(diff, field, held.kind, `${where} ${field}`, asFarAsItGoes(visit));
+      else keyedBy(diff, field, held.kind, `${where} ${field}`, asFarAsItGoes(visit));
+    }
+  },
 });

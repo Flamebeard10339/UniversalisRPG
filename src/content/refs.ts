@@ -57,6 +57,14 @@ export function strings(holder: Loose, key: string, kind: ReferenceKind, where: 
   else if (Array.isArray(list)) rewrite(list);
 }
 
+export function keyedBy(holder: Loose, key: string, kind: ReferenceKind, where: string, visit: Visit): void {
+  const held = holder[key];
+  if (typeof held !== 'object' || held === null || Array.isArray(held)) return;
+  const walked: Record<string, unknown> = {};
+  for (const [id, value] of Object.entries(held as Record<string, unknown>)) walked[visit(kind, id, where)] = value;
+  holder[key] = walked;
+}
+
 export function reference(value: Reference | undefined, where: string, visit: Visit): void {
   if (!value) return;
   const rooted = rootedKind(value.path[0]);

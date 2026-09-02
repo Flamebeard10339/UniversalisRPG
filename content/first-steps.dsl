@@ -3,6 +3,7 @@ version: 1.0.0
 pack: quests
 dependencies:
   core
+  combat
   tulsa
   cooking
   fishing

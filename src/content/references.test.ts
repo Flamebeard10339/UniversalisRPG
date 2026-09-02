@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ENGINE_ROOT_NAMES, rootedKind } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
-import { loadModule } from './load';
+import { loadModule, loadUniverse } from './load';
 import { mapOf } from './registry';
 import { contentSectionMaps } from './sections';
 
@@ -453,5 +453,26 @@ describe('a DEBUG section', () => {
 
   it('takes no indented block, the way any line that holds nothing does not', () => {
     expect(() => loadModule(VALID.replace(HAMMER, `${HAMMER}\nDEBUG\n  slot: head`))).toThrow(/"DEBUG" takes no indented block/);
+  });
+});
+
+describe('an id inside a # save body', () => {
+  const SAVED = (body: string): string =>
+    ['# info isla', 'version: 1.0.0', '', '# item rope', 'title: Rope', '', '# flag lit', '', '# location shore', 'x: 0, y: 0', 'starting', '', '# save arrived', body].join('\n');
+
+  const arrived = (body: string): Record<string, unknown> => loadUniverse([{ name: 'isla', text: SAVED(body) }]).saves.get('isla.arrived')!.diff;
+
+  it('is written out whole, wherever the save writes one, so nothing downstream reads a short one', () => {
+    const diff = arrived('{"version":13,"location":"shore","inventory":{"rope":2},"flags":{"lit":true}}');
+
+    expect(diff.location).toBe('isla.shore');
+    expect(diff.inventory).toEqual({ 'isla.rope': 2 });
+    expect(diff.flags).toEqual({ 'isla.lit': true });
+  });
+
+  it('is taken as it stands where the world no longer holds it, which is what repair-saves is for', () => {
+    const diff = arrived('{"version":13,"inventory":{"isla.ghost":1}}');
+
+    expect(diff.inventory).toEqual({ 'isla.ghost': 1 });
   });
 });

@@ -1,10 +1,10 @@
 import { localeKey } from '../content/locale';
 import type { Registry } from '../content/registry';
-import { registryMapOf, sectionFor, sections } from '../content/sections';
+import { isDebug, registryMapOf, sectionFor, sections } from '../content/sections';
 import { actionAddress } from '../content/sections/action';
 import { parseUseChoiceId } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
-import type { ModuleSource } from '../content/universe';
+import { parseModuleSource, type ModuleSource } from '../content/universe';
 import { withoutNote } from '../grammar/note';
 import { carriedFrame } from './carried';
 import { MODAL_NAMES, publishModal } from './modals';
@@ -60,10 +60,10 @@ function soak(value: unknown, into: string[]): void {
 
 function probedUniverse(sources: readonly ModuleSource[], world: Registry): { registry: Registry; jewelBases: readonly string[]; standings: ReadonlyMap<string, string> } {
   const jewels = [...world.clusterJewels.keys()];
-  const locations = [...world.locations.keys()];
-  const owners = [...new Set([...jewels.map((id) => world.namespace.ownerOf('cluster-jewel', id)), ...locations.map((id) => world.namespace.ownerOf('location', id))])].filter((owner): owner is string => owner !== null);
+  const locations = [...world.locations.values()].filter((location) => !isDebug(location)).map((location) => location.id);
+  const owners = [...new Set(sources.map((source) => parseModuleSource(source).info.id))];
   const flat = (id: string): string => id.replace(/\./g, '-');
-  const inventory = Object.fromEntries([...world.items.keys()].map((id) => [id, 1]));
+  const inventory = Object.fromEntries([...world.items.values()].filter((item) => !isDebug(item)).map((item) => [item.id, 1]));
   const slot = [...world.entities.values()].flatMap((entity) => entity.equipmentSlots ?? [])[0];
   const text = [
     '# info prose-probe',
