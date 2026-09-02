@@ -21,10 +21,16 @@ export function Pager({ index, onIndex, panes, columns = 1 }: { index: number; o
   const dragged = useRef(false);
   const settle = useMomentPlayer('settle');
 
+  const shape = useRef({ pages, columns });
+
   useLayoutEffect(() => {
     const node = strip.current;
-    if (node) node.style.transform = restingAt(index, columns);
-  }, [index, columns]);
+    if (!node) return;
+    const reshaped = shape.current.pages !== pages || shape.current.columns !== columns;
+    shape.current = { pages, columns };
+    if (reshaped) node.style.transition = 'none';
+    node.style.transform = restingAt(index, columns);
+  }, [index, columns, pages]);
 
   const begin = (x: number, y: number, at: number, width: number, release: () => void): void => {
     dragged.current = false;
