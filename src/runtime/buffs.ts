@@ -22,6 +22,14 @@ export function clearBuffs(state: GameState, actorIds: readonly string[]): void 
   for (const actorId of actorIds) set(state, actorId, []);
 }
 
+export function shakeOffBuff(state: GameState, actorId: string, source: string): void {
+  set(
+    state,
+    actorId,
+    buffsOf(state, actorId).filter((buff) => buff.source !== source),
+  );
+}
+
 export function buffsOf(state: GameState, actorId: string): readonly BuffInstance[] {
   return state.buffs[actorId] ?? [];
 }

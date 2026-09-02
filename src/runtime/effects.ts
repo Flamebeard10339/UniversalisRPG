@@ -25,7 +25,7 @@ import { hitChance, statRange, statValue } from './stats';
 import { standInFor } from './population';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
-import { applyDeclared } from './buffs';
+import { applyDeclared, buffsOf, clearBuffs, shakeOffBuff } from './buffs';
 
 export interface Segment {
   state: GameState;
@@ -319,6 +319,13 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const lasts = result.lasts === undefined ? undefined : statSide(result.lasts, state, registry, subject);
       for (let i = 0; i < count; i++) applyDeclared(state, subject, source, state.time, lasts);
       return count;
+    }
+    case 'shake-off': {
+      const subject = subjectOf(segment, result.party, actor);
+      const held = buffsOf(state, subject).length;
+      if (result.buff === null) clearBuffs(state, [subject]);
+      else shakeOffBuff(state, subject, result.buff);
+      return held - buffsOf(state, subject).length;
     }
     case 'become': {
       const stood = segment.parties?.them;

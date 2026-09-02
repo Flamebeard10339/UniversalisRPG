@@ -6,6 +6,7 @@ import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
+import { buffsOf } from './buffs';
 import { roadsFrom } from './journey';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { applyResultsNow, createGameState, GameState, grantBuff, initResources, PLAYER } from './runtime';
@@ -396,5 +397,56 @@ describe('an amount that names a stat', () => {
     applyResults(segment, [{ kind: 'xp', skill: 'larceny', amount: { side: 'their', id: 'toll' } }], PLAYER);
 
     expect(state.xp['larceny']).toBe(1);
+  });
+});
+
+const MARKED = `
+# info marked
+version: 1.0.0
+
+# stat regeneration
+
+# stat attack-rate
+
+# item dazed
+title: Dazed
+examine: The floor is closer than it was.
+-30 regeneration, 20s
+
+# item hurried
+title: Hurried
+examine: The next one comes faster.
++2 attack-rate, 60s
+`;
+
+describe('shaking a mark back off whoever is carrying it', () => {
+  const carrying = (): { registry: Registry; state: GameState } => {
+    const held = fresh(MARKED);
+    for (const source of ['marked.dazed', 'marked.hurried']) grantBuff(held.state, PLAYER, held.registry.items.get(source)!, secondsToMs(30));
+    return held;
+  };
+
+  it('takes off the one it names and leaves the rest standing', () => {
+    const { registry, state } = carrying();
+
+    applyResults(newSegment(state, registry, []), [{ kind: 'shake-off', buff: 'marked.dazed' }], PLAYER);
+
+    expect(buffsOf(state, PLAYER).map((buff) => buff.source)).toEqual(['marked.hurried']);
+  });
+
+  it('takes off every mark at once where it names everything', () => {
+    const { registry, state } = carrying();
+
+    applyResults(newSegment(state, registry, []), [{ kind: 'shake-off', buff: null }], PLAYER);
+
+    expect(buffsOf(state, PLAYER)).toEqual([]);
+  });
+
+  it('leaves a mark nobody is carrying alone rather than refusing it', () => {
+    const { registry, state } = carrying();
+
+    applyResults(newSegment(state, registry, []), [{ kind: 'shake-off', buff: 'marked.hurried' }, { kind: 'shake-off', buff: 'marked.hurried' }], PLAYER);
+
+    expect(buffsOf(state, PLAYER).map((buff) => buff.source)).toEqual(['marked.dazed']);
   });
 });

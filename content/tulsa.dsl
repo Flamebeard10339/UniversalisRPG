@@ -1129,6 +1129,7 @@ on death:
   say: You slump to the floor, spent, and come to a long while later somewhere you did not lie down. (You should have eaten something.)
   set: core.fainted
   restore: core.health
+  shake off: everything
   if setting.hardcore:
     say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
     take: everything

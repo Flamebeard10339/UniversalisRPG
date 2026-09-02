@@ -52,6 +52,7 @@ export type ActionResult =
   | { kind: 'pool'; resource: string; delta: Amount; party?: Party }
   | { kind: 'fill'; resource: string; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party; lasts?: number | string }
+  | { kind: 'shake-off'; buff: string | null; party?: Party }
   | { kind: 'become'; entity: string; lasts: number | string }
   | { kind: 'stop' }
   | {
@@ -172,6 +173,12 @@ function parseInflict(cursor: Cursor): ActionResult {
     ...(party === undefined ? {} : { party }),
     ...(lasts === undefined ? {} : { lasts }),
   };
+}
+
+function parseShakeOff(cursor: Cursor): ActionResult {
+  const buff = cursor.take(EVERYTHING_TAKEN) !== null ? null : id.parse(cursor);
+  const party = parseParty('inflict', cursor);
+  return { kind: 'shake-off', buff, ...(party === undefined ? {} : { party }) };
 }
 
 const BECOME_NOTE =
@@ -373,6 +380,16 @@ const LEAVES: readonly Leaf[] = [
         'how long it is held for, standing over whatever the buff itself declares, so one mark holds longer than another with no second buff declared to hold it; a stat written there is read off whoever it lands on, which is how a stretch is shortened by something the player carries',
     },
   },
+  {
+    opens: /shake off:[ \t]*/,
+    forms: ['shake off: <buff item>[ on <me or them>]', `shake off: ${EVERYTHING}[ on <me or them>]`],
+    examples: ['shake off: dazed', `shake off: ${EVERYTHING}`],
+    read: parseShakeOff,
+    notes: {
+      'shake off: <buff item>[ on <me or them>]': 'takes that mark back off whoever is carrying it, with whatever it was doing to them, as though it had run out',
+      [`shake off: ${EVERYTHING}[ on <me or them>]`]: 'takes off every mark they are carrying at once, which is what a faint or a night in a bed does to them',
+    },
+  },
   { opens: /roll:[ \t]*/, forms: ['roll: <droptable>'], examples: ['roll: common-drops'], read: (cursor) => ({ kind: 'roll', table: id.parse(cursor) }) },
   { opens: /stop(?![\w-])/, forms: ['stop'], examples: ['stop'], read: () => ({ kind: 'stop' }) },
 ];
@@ -430,7 +447,7 @@ function readResultLine(line: RawLine): ActionResult[] {
 
 export function partyPhrase(result: ActionResult): string | undefined {
   if (result.kind === 'pool' && result.party !== undefined) return `${PREPOSITION[amountFalls(result.delta) ? 'drain' : 'restore']} ${result.party}`;
-  if (result.kind === 'inflict' && result.party !== undefined) return `${PREPOSITION.inflict} ${result.party}`;
+  if ((result.kind === 'inflict' || result.kind === 'shake-off') && result.party !== undefined) return `${PREPOSITION.inflict} ${result.party}`;
   return undefined;
 }
 
@@ -500,6 +517,10 @@ export function printResult(value: ActionResult): string {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
       const lasts = value.lasts === undefined ? '' : ` for ${durationOrStat.print(value.lasts)}`;
       return `inflict: ${value.buff}${party}${lasts}`;
+    }
+    case 'shake-off': {
+      const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
+      return `shake off: ${value.buff ?? EVERYTHING}${party}`;
     }
     case 'roll':
       return `roll: ${value.table}`;

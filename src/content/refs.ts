@@ -101,6 +101,8 @@ export function condition(value: Condition | undefined, where: string, visit: Vi
     case 'or':
       for (const inner of value.conditions) condition(inner, where, visit);
       return;
+    case 'always':
+      return;
     default: {
       const unreached: never = value;
       void unreached;
@@ -125,6 +127,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         put(result, 'lasts', 'stat', `${where} ${site}`, visit);
         break;
       }
+      case 'shake-off':
+        if (result.buff !== null) put(result, 'buff', 'item', `${where} shake off:`, visit);
+        break;
       case 'contest':
         for (const side of ['left', 'right'] as const) put(result, side, 'stat', `${where} vs:`, visit);
         break;
