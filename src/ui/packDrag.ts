@@ -21,9 +21,10 @@ function droppedOn(boxes: readonly CellBox[], dragged: string, by: Point): strin
   return onto === undefined || onto.key === dragged ? null : onto.key;
 }
 
-export type LetGo = { kind: 'swap'; one: string; other: string } | { kind: 'open'; one: string };
+export type LetGo = { kind: 'swap'; one: string; other: string } | { kind: 'open'; one: string } | { kind: 'stay'; one: string };
 
 export function letGoOf(boxes: readonly CellBox[], dragged: string, by: Point | null): LetGo {
-  const onto = by === null ? null : droppedOn(boxes, dragged, by);
-  return onto === null ? { kind: 'open', one: dragged } : { kind: 'swap', one: dragged, other: onto };
+  if (by === null) return { kind: 'open', one: dragged };
+  const onto = droppedOn(boxes, dragged, by);
+  return onto === null ? { kind: 'stay', one: dragged } : { kind: 'swap', one: dragged, other: onto };
 }

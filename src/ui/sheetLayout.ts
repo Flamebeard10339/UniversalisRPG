@@ -6,6 +6,8 @@ export type Layout = (typeof LAYOUTS)[number];
 
 export const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3';
 
+export const SLOTS = `${GRID} auto-rows-[6rem]`;
+
 export const NAME = 'whitespace-normal break-words';
 
 export interface Doll {

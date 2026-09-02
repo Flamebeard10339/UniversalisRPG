@@ -1,9 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import { gripFor, type Carried, type Grip } from './DragSheet';
-import { ZOOM_MAX, ZOOM_MIN, type Point } from './viewport';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { gripFor, type Gripped, type Carried, type Grip } from './DragSheet';
+import { LIFT_MS, LIFT_SLOP_PX } from './gesture';
+import { ZOOM_MAX, ZOOM_MIN } from './viewport';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 
@@ -59,8 +60,8 @@ function pressing(x: number, y: number): { clientX: number; clientY: number; sto
   return { clientX: x, clientY: y, stopPropagation: () => undefined, pointerId: 1, currentTarget: { setPointerCapture: () => undefined } };
 }
 
-function carrying(zoom = 1): { grip: Grip; held: { current: { id: string; from: Point } | null }; drawn: Array<Carried | null>; rested: Array<Carried | null> } {
-  const held: { current: { id: string; from: Point } | null } = { current: null };
+function carrying(zoom = 1): { grip: Grip; held: { current: Gripped | null }; drawn: Array<Carried | null>; rested: Array<Carried | null> } {
+  const held: { current: Gripped | null } = { current: null };
   const drawn: Array<Carried | null> = [];
   const rested: Array<Carried | null> = [];
   return { grip: gripFor('hall', held, zoom, { hold: (next) => void drawn.push(next), rest: (report) => void rested.push(report) }), held, drawn, rested };
@@ -129,7 +130,7 @@ describe('picking a thing up off the sheet and putting it down', () => {
 
   it('ignores a pointer that belongs to something else', () => {
     const carried = carrying();
-    carried.held.current = { id: 'beach', from: { x: 0, y: 0 } };
+    carried.held.current = { id: 'beach', from: { x: 0, y: 0 }, lifted: true };
 
     move(carried.grip, pressing(90, 90));
     lift(carried.grip, pressing(90, 90));
@@ -137,6 +138,97 @@ describe('picking a thing up off the sheet and putting it down', () => {
 
     expect(carried.drawn).toEqual([]);
     expect(carried.rested).toEqual([]);
-    expect(carried.held.current).toEqual({ id: 'beach', from: { x: 0, y: 0 } });
+    expect(carried.held.current).toEqual({ id: 'beach', from: { x: 0, y: 0 }, lifted: true });
+  });
+});
+
+function waiting(): { grip: Grip; held: { current: Gripped | null }; drawn: Array<Carried | null>; rested: Array<Carried | null> } {
+  const held: { current: Gripped | null } = { current: null };
+  const drawn: Array<Carried | null> = [];
+  const rested: Array<Carried | null> = [];
+  const grip = gripFor('hall', held, 1, { hold: (next) => void drawn.push(next), rest: (report) => void rested.push(report) }, LIFT_MS);
+  return { grip, held, drawn, rested };
+}
+
+describe('a press that must be held before it lifts', () => {
+  beforeEach(() => void vi.useFakeTimers());
+  afterEach(() => void vi.useRealTimers());
+
+  it('picks nothing up while the press is younger than the wait', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS - 1);
+
+    expect(carried.drawn).toEqual([]);
+  });
+
+  it('picks it up once the press has been held that long, without the finger moving', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS);
+
+    expect(carried.drawn).toEqual([{ id: 'hall', by: { x: 0, y: 0 } }]);
+  });
+
+  it('reads a press let go of before the wait as a press, which is what opens a thing', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS - 1);
+    lift(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS);
+
+    expect(carried.drawn).toEqual([]);
+    expect(carried.rested).toEqual([null]);
+  });
+
+  it('lets a finger that travelled first go, so the pane under it scrolls rather than dragging', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    move(carried.grip, pressing(0, LIFT_SLOP_PX + 1));
+    vi.advanceTimersByTime(LIFT_MS * 2);
+    lift(carried.grip, pressing(0, 90));
+
+    expect(carried.drawn).toEqual([]);
+    expect(carried.rested).toEqual([]);
+    expect(carried.held.current).toBeNull();
+  });
+
+  it('holds on through a wobble inside the slop, since a thumb is never still', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    move(carried.grip, pressing(LIFT_SLOP_PX, 0));
+    vi.advanceTimersByTime(LIFT_MS);
+
+    expect(carried.drawn).toEqual([{ id: 'hall', by: { x: 0, y: 0 } }]);
+  });
+
+  it('follows the finger once lifted, and reports where it was let go of', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS);
+    move(carried.grip, pressing(40, 20));
+    lift(carried.grip, pressing(40, 20));
+
+    expect(carried.drawn).toEqual([
+      { id: 'hall', by: { x: 0, y: 0 } },
+      { id: 'hall', by: { x: 40, y: 20 } },
+    ]);
+    expect(carried.rested).toEqual([{ id: 'hall', by: { x: 40, y: 20 } }]);
+  });
+
+  it('picks nothing up after the press is over, however late the wait comes round', () => {
+    const carried = waiting();
+
+    press(carried.grip, pressing(0, 0));
+    lift(carried.grip, pressing(0, 0));
+    vi.advanceTimersByTime(LIFT_MS * 4);
+
+    expect(carried.drawn).toEqual([]);
   });
 });

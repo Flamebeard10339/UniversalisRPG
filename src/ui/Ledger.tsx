@@ -1,19 +1,20 @@
 import { useRef, useState } from 'react';
-import { gripFor, type Carried, type Grip } from './DragSheet';
+import { gripFor, type Carried, type Grip, type Gripped } from './DragSheet';
 import { itemStyle } from './itemLook';
 import { fillOf } from './lineStyle';
 import { letGoOf, type CellBox } from './packDrag';
+import { LIFT_MS } from './gesture';
 import type { Entry } from './sheet';
-import { doll, GRID, NAME, type Layout } from './sheetLayout';
+import { doll, GRID, NAME, SLOTS, type Layout } from './sheetLayout';
 import type { Point } from './viewport';
 import { TOUCH_FLOOR } from './viewport';
 
-const OPENER = 'absolute inset-0 z-10 w-full';
+const OPENER = 'absolute inset-0 z-10 h-full w-full';
 
 function Opener({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => void; drag: Held | null }): JSX.Element | null {
   if (entry.id === undefined) return null;
   const key = entry.id;
-  if (drag) return <button data-drive="send" type="button" aria-label={entry.name} ref={drag.measure(key)} {...drag.grip(key)} className={OPENER} />;
+  if (drag) return <button data-drive="send" type="button" aria-label={entry.name} ref={drag.measure(key)} {...drag.grip(key)} style={{ touchAction: 'pan-y' }} className={OPENER} />;
   if (!onOpen) return null;
   return <button data-drive="send" type="button" aria-label={entry.name} onClick={() => onOpen(key)} className={OPENER} />;
 }
@@ -45,8 +46,8 @@ function Cell({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => 
         ...(entry.at === undefined ? {} : { gridColumn: entry.at.column, gridRow: entry.at.row }),
         ...(lifted ? { transform: `translate(${by.x}px, ${by.y}px)`, zIndex: 20 } : {}),
       }}
-      className={`relative flex flex-col justify-center rounded-2xl border border-border bg-surface-raised px-2 py-2 transition-transform duration-75 active:scale-[0.98] active:border-accent ${
-        lifted ? 'border-accent shadow-lg' : ''
+      className={`relative flex h-full min-w-0 flex-col justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised px-2 py-2 ${
+        lifted ? 'border-accent shadow-lg' : 'transition-transform duration-75 active:scale-[0.98] active:border-accent'
       }`}
     >
       <Opener entry={entry} onOpen={onOpen} drag={drag} />
@@ -67,7 +68,8 @@ interface Held {
 
 function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: string) => void): Held | null {
   const drawn = useRef(new Map<string, HTMLElement>());
-  const holding = useRef<{ id: string; from: Point } | null>(null);
+  const holding = useRef<Gripped | null>(null);
+  const laid = useRef<CellBox[]>([]);
   const [carried, setCarried] = useState<Carried | null>(null);
   if (!onSwap) return null;
 
@@ -81,15 +83,26 @@ function useHeld(onOpen?: (id: string) => void, onSwap?: (one: string, other: st
     carried,
     measure: (key) => (element) => void (element === null ? drawn.current.delete(key) : drawn.current.set(key, element)),
     grip: (key) =>
-      gripFor(key, holding, 1, {
-        hold: setCarried,
-        rest: (report) => {
-          setCarried(null);
-          const asked = letGoOf(boxes(), key, report?.by ?? null);
-          if (asked.kind === 'swap') onSwap(asked.one, asked.other);
-          else onOpen?.(asked.one);
+      gripFor(
+        key,
+        holding,
+        1,
+        {
+          hold: (next) => {
+            if (holding.current?.id === key && laid.current.length === 0) laid.current = boxes();
+            setCarried(next);
+          },
+          rest: (report) => {
+            setCarried(null);
+            const wasLaidOut = laid.current;
+            laid.current = [];
+            const asked = letGoOf(wasLaidOut, key, report?.by ?? null);
+            if (asked.kind === 'swap') onSwap(asked.one, asked.other);
+            if (asked.kind === 'open') onOpen?.(asked.one);
+          },
         },
-      }),
+        LIFT_MS,
+      ),
   };
 }
 
@@ -106,7 +119,7 @@ function Body({ entries, layout, onOpen, drag }: { entries: readonly Entry[]; la
 
   if (layout === 'grid') {
     return (
-      <dl className={`mx-auto max-w-2xl ${GRID}`}>
+      <dl className={`mx-auto max-w-2xl ${SLOTS}`}>
         {entries.map((entry) => (
           <Cell key={keyOf(entry)} entry={entry} onOpen={onOpen} drag={drag} />
         ))}

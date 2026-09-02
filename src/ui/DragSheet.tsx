@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { heldStill } from './gesture';
+import { heldStill, stillEnoughToLift } from './gesture';
 import { bounds, clampZoom, drawnBox, midpoint, panAfterZoom, settled, spanBetween, zoomByWheel, type Box, type Point, type Size } from './viewport';
 
 interface Grab {
@@ -44,31 +44,71 @@ const cameBy = (from: Point, at: Point, zoom: number): Point => ({ x: (at.x - fr
 
 const widest = (sizes: readonly Size[]): Size => ({ width: Math.max(0, ...sizes.map((each) => each.width)), height: Math.max(0, ...sizes.map((each) => each.height)) });
 
-export function gripFor(id: string, held: { current: { id: string; from: Point } | null }, zoom: number, carrier: Carrier): Grip {
+export interface Gripped {
+  id: string;
+  from: Point;
+  lifted: boolean;
+  waiting?: ReturnType<typeof setTimeout>;
+}
+
+export function gripFor(id: string, held: { current: Gripped | null }, zoom: number, carrier: Carrier, liftAfter = 0): Grip {
   const at = (event: { clientX: number; clientY: number }): Point => ({ x: event.clientX, y: event.clientY });
   const mine = (): boolean => held.current?.id === id;
+  const letGo = (): void => {
+    if (held.current?.waiting !== undefined) clearTimeout(held.current.waiting);
+    held.current = null;
+  };
 
   return {
     onPointerDown: (event) => {
       event.stopPropagation();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      held.current = { id, from: at(event) };
-      carrier.hold({ id, by: AT_REST });
+      const from = at(event);
+      if (liftAfter <= 0) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        held.current = { id, from, lifted: true };
+        carrier.hold({ id, by: AT_REST });
+        return;
+      }
+      const target = event.currentTarget;
+      const { pointerId } = event;
+      held.current = {
+        id,
+        from,
+        lifted: false,
+        waiting: setTimeout(() => {
+          const standing = held.current;
+          if (standing?.id !== id || standing.lifted) return;
+          held.current = { id, from: standing.from, lifted: true };
+          target.setPointerCapture(pointerId);
+          carrier.hold({ id, by: AT_REST });
+        }, liftAfter),
+      };
     },
     onPointerMove: (event) => {
       if (!mine()) return;
-      carrier.hold({ id, by: cameBy(held.current!.from, at(event), zoom) });
+      const by = cameBy(held.current!.from, at(event), zoom);
+      if (held.current!.lifted) {
+        carrier.hold({ id, by });
+        return;
+      }
+      if (!stillEnoughToLift(by.x * zoom, by.y * zoom)) letGo();
     },
     onPointerUp: (event) => {
       if (!mine()) return;
       const by = cameBy(held.current!.from, at(event), zoom);
-      held.current = null;
+      const lifted = held.current!.lifted;
+      letGo();
+      if (!lifted) {
+        carrier.rest(null);
+        return;
+      }
       carrier.rest(carriedFar(by, zoom) ? { id, by } : null);
     },
     onPointerCancel: () => {
       if (!mine()) return;
-      held.current = null;
-      carrier.rest(null);
+      const lifted = held.current!.lifted;
+      letGo();
+      if (lifted) carrier.rest(null);
     },
   };
 }
@@ -84,7 +124,7 @@ export interface SheetHold {
   gesture: { current: Grab | Pinch | null };
   travelled: { current: boolean };
   carried: Carried | null;
-  gripped: { current: { id: string } | null };
+  gripped: { current: Gripped | null };
   grip(id: string): Grip;
 }
 
@@ -102,7 +142,7 @@ export function useSheetHold(
 ): SheetHold {
   const gesture = useRef<Grab | Pinch | null>(null);
   const travelled = useRef(false);
-  const grip = useRef<{ id: string; from: Point } | null>(null);
+  const grip = useRef<Gripped | null>(null);
   const [carried, setCarried] = useState<Carried | null>(null);
   const [pan, setPan] = useState<Point>(opening?.pan ?? AT_REST);
   const [zoom, setZoom] = useState(opening?.zoom ?? 1);

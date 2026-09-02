@@ -56,6 +56,12 @@ export function splitFrom(start: number, dy: number, height: number): number {
   return splitHeld(start + dy / height);
 }
 
+export const LIFT_MS = 250;
+
+export const LIFT_SLOP_PX = 8;
+
+export const stillEnoughToLift = (dx: number, dy: number): boolean => Math.abs(dx) <= LIFT_SLOP_PX && Math.abs(dy) <= LIFT_SLOP_PX;
+
 export const VELOCITY_WINDOW_MS = 40;
 export const STILL_MS = 120;
 
