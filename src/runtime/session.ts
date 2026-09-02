@@ -31,6 +31,7 @@ import { truthy } from './conditions';
 import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
+import { socketsInto, verbsOffered } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { listedToPlayer } from '../content/sections';
 import { type ParsedSave } from '../content/sections/save';
@@ -146,7 +147,7 @@ export interface PlayStatus {
   modals: Modal[];
   inventory: AnswerTable<number>;
   grown: AnswerTable<Answer>;
-  carried: CarriedEntry[];
+  carried: CarriedRow[];
   planes: PlaneReport[];
   focus: Focus | null;
   equipment: WornRow[];
@@ -471,6 +472,15 @@ export function view(session: PlaySession): PlayView {
   return { ...status, said };
 }
 
+export interface CarriedRow extends CarriedEntry {
+  readonly verbs: readonly Answer[];
+  readonly sockets: boolean;
+}
+
+function carriedRows(state: GameState, registry: Registry): CarriedRow[] {
+  return carriedEntries(state, registry).map((entry) => ({ ...entry, verbs: verbsOffered(entry, state, registry), sockets: socketsInto(entry, state, registry) }));
+}
+
 export function sessionStatus(session: PlaySession): PlayStatus {
   const { registry } = session;
   const state = stateOf(session);
@@ -496,7 +506,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
     inventory: Object.fromEntries([...itemCopies(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),
     grown: grownItems(state),
-    carried: carriedEntries(state, registry),
+    carried: carriedRows(state, registry),
     planes: planeReports(registry, state),
     focus: modalFocus(state),
     equipment: wornRows(state, registry),

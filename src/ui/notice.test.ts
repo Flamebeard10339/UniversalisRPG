@@ -18,7 +18,7 @@ const row = (id: string, value: number): PlayView['xp'][number] => {
   return { id, title: asLocalized(named(id)), value, level, earned: value - foot, span: xpForLevel(level + 1) - foot };
 };
 
-const carried = (id: string, count: number): PlayView['carried'][number] => ({ id, name: asLocalized(named(id)), count, shown: asLocalized(`${id} x${count}`), grown: false });
+const carried = (id: string, count: number): PlayView['carried'][number] => ({ id, name: asLocalized(named(id)), count, shown: asLocalized(`${id} x${count}`), grown: false, verbs: ['destroy'], sockets: false });
 
 const quest = (id: string, stage: string, standing: PlayView['journal'][number]['standing'], said: string): PlayView['journal'][number] => ({
   quest: id,

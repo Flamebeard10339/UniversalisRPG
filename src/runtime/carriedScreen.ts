@@ -68,6 +68,11 @@ function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): re
   return VERBS.filter((verb) => verb.applies(item, entry, state, registry));
 }
 
+export const verbsOffered = (entry: CarriedEntry, state: GameState, registry: Registry): Answer[] => verbsFor(entry, state, registry).map((verb) => verb.value);
+
+export const socketsInto = (entry: CarriedEntry, state: GameState, registry: Registry): boolean =>
+  registry.items.get(itemTemplate(state, entry.id))?.clusterJewel !== undefined;
+
 function heading(localizer: Localizer, entry: CarriedEntry, state: GameState): Localized {
   const examine = itemExamine(localizer, itemTemplate(state, entry.id));
   return examine === undefined ? entry.name : localizer.engine('engine.examine.beside', { subject: entry.name, examine });

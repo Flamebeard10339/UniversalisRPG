@@ -15,13 +15,13 @@ const slot = (id: string, title: string): WornSlot => ({ slot: id, title: asLoca
 const EMPTY = asLocalized('Empty');
 type Plane = PlayStatus['planes'][number];
 
-const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, ...over });
+const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, verbs: ['destroy'], sockets: false, ...over });
 
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',
   template: 'blade',
   title: asLocalized('Blade'),
-  name: asLocalized('Modified Blade'),
+  name: asLocalized('Blade'),
   level: 3,
   spent: 1,
   remaining: 2,
@@ -78,19 +78,19 @@ describe('the counted rows the engine publishes, as a sheet draws them', () => {
 describe('what the player carries, as rows', () => {
   it('states the engine name and puts the count in the count column', () => {
     const rows = carried([row({ id: 'awl', name: asLocalized('Awl'), count: 3 })], [], localizer);
-    expect(rows).toEqual([{ id: 'awl', name: 'Awl', value: '3' }]);
+    expect(rows).toEqual([{ id: 'awl', name: 'Awl', value: '3', look: 'stuff', grown: false }]);
   });
 
   it('counts a grown copy as one, and never as the item it grew from', () => {
-    const rows = carried([row({ id: '1', name: asLocalized('Modified Blade'), count: 1, grown: true })], [], localizer);
+    const rows = carried([row({ id: '1', name: asLocalized('Blade'), count: 1, grown: true })], [], localizer);
     expect(rows[0].value).toBe('1');
-    expect(rows[0].name).toBe('Modified Blade');
+    expect(rows[0].name).toBe('Blade');
   });
 
   it('keeps the order the engine published, which is the order the player has put the pack in', () => {
     const two = [
-      row({ id: '3', name: asLocalized('Modified Blade'), grown: true }),
-      row({ id: '1', name: asLocalized('Modified Blade'), grown: true }),
+      row({ id: '3', name: asLocalized('Blade'), grown: true }),
+      row({ id: '1', name: asLocalized('Blade'), grown: true }),
       row({ id: 'awl', name: asLocalized('Awl') }),
     ];
     expect(carried(two, [], localizer).map((entry) => entry.id)).toEqual(['3', '1', 'awl']);
@@ -98,7 +98,7 @@ describe('what the player carries, as rows', () => {
   });
 
   it('states the stat summary beneath a grown copy, read from the plane the engine published', () => {
-    const grown = row({ id: '1', name: asLocalized('Modified Blade'), grown: true });
+    const grown = row({ id: '1', name: asLocalized('Blade'), grown: true });
     const published = plane({ instance: '1', contributions: [flat(15), { statId: 'mod.max-health', statTitle: asLocalized('Max Health'), added: { min: 0, max: 0 }, increased: 25 }] });
     expect(carried([grown], [published], localizer)[0].detail).toBe('+15 Attack, +25% Max Health');
   });
@@ -110,7 +110,7 @@ describe('what the player carries, as rows', () => {
   });
 
   it('leaves a grown copy whose plane is worth nothing without an empty line beneath it', () => {
-    const grown = row({ id: '1', name: asLocalized('Modified Blade'), grown: true });
+    const grown = row({ id: '1', name: asLocalized('Blade'), grown: true });
     expect(carried([grown], [plane({ instance: '1' })], localizer)[0].detail).toBeUndefined();
   });
 });
@@ -129,17 +129,17 @@ describe('a contribution, as words', () => {
 describe('what the player is wearing, as rows', () => {
   it('names the slot by its title and the thing in it by its name, never by an id', () => {
     const rows = [
-      row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } }),
+      row({ id: '1', name: asLocalized('Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } }),
       row({ id: 'worn:back', name: asLocalized('Cloak'), worn: { slot: 'back', title: asLocalized('Back') } }),
     ];
     expect(worn([slot('mainhand', 'Main Hand'), slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
-      { id: 'worn:back', name: 'Back', value: 'Cloak' },
-      { id: '1', name: 'Main Hand', value: 'Modified Blade' },
+      { id: 'worn:back', name: 'Back', value: 'Cloak', look: 'stuff', grown: false },
+      { id: '1', name: 'Main Hand', value: 'Blade', look: 'stuff', grown: true },
     ]);
   });
 
   it('states a worn grown copy’s contribution beneath its name', () => {
-    const rows = [row({ id: '1', name: asLocalized('Modified Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
+    const rows = [row({ id: '1', name: asLocalized('Blade'), grown: true, worn: { slot: 'mainhand', title: asLocalized('Main Hand') } })];
     const published = plane({ instance: '1', contributions: [flat(15)] });
 
     expect(worn([slot('mainhand', 'Main Hand')], rows, [published], localizer, EMPTY)[0].detail).toBe('+15 Attack');
@@ -157,7 +157,7 @@ describe('what the player is wearing, as rows', () => {
 
     expect(worn([slot('mainhand', 'Main Hand'), slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
       { name: 'Back', value: 'Empty' },
-      { id: '1', name: 'Main Hand', value: 'Blade' },
+      { id: '1', name: 'Main Hand', value: 'Blade', look: 'stuff', grown: false },
     ]);
   });
 
@@ -167,7 +167,7 @@ describe('what the player is wearing, as rows', () => {
 
     expect(worn([placed, slot('back', 'Back')], rows, [], localizer, EMPTY)).toEqual([
       { name: 'Back', value: 'Empty' },
-      { id: '1', name: 'Main Hand', value: 'Blade', at: { column: 1, row: 2 } },
+      { id: '1', name: 'Main Hand', value: 'Blade', look: 'stuff', grown: false, at: { column: 1, row: 2 } },
     ]);
   });
 
@@ -178,7 +178,7 @@ describe('what the player is wearing, as rows', () => {
     ];
 
     expect(carried(rows, [], localizer).map((entry) => entry.id)).toEqual(['blade']);
-    expect(worn([slot('mainhand', 'Main Hand')], rows, [], localizer, EMPTY)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade' }]);
+    expect(worn([slot('mainhand', 'Main Hand')], rows, [], localizer, EMPTY)).toEqual([{ id: 'worn:mainhand', name: 'Main Hand', value: 'Blade', look: 'stuff', grown: false }]);
   });
 });
 

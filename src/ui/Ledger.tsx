@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { gripFor, type Carried, type Grip } from './DragSheet';
+import { itemStyle } from './itemLook';
 import { fillOf } from './lineStyle';
 import { letGoOf, type CellBox } from './packDrag';
 import type { Entry } from './sheet';
@@ -40,7 +41,7 @@ function Cell({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => 
     <div
       style={{
         minHeight: TOUCH_FLOOR,
-        ...fillOf(entry.group),
+        ...(entry.look === undefined ? fillOf(entry.group) : itemStyle(entry.look, entry.grown === true)),
         ...(entry.at === undefined ? {} : { gridColumn: entry.at.column, gridRow: entry.at.row }),
         ...(lifted ? { transform: `translate(${by.x}px, ${by.y}px)`, zIndex: 20 } : {}),
       }}
