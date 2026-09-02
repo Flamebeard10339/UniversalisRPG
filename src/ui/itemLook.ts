@@ -23,9 +23,9 @@ const WASH: Record<ItemLook, string> = {
   stuff: '#94a3b8',
 };
 
-const SHEER = '20';
+const SHEER = '40';
 
-const EDGE = '55';
+const EDGE = '40';
 
 export function itemStyle(look: ItemLook, grown: boolean): CSSProperties {
   const colour = WASH[look];
