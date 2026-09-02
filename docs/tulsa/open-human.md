@@ -66,6 +66,13 @@ The arithmetic is unusually clean: ~4x target at 7% uptime, so **~25% uptime lan
 health on the curve** and nothing about any enemy, drop, rate or piece of gear has to
 change.
 
+Since this was measured, health is paid by every `drain:` in the game and not only by a
+swing that landed — a caught hand, a chest ward, anything that takes the pool. A minute
+of picking a townsman's pocket now reads 36 health xp beside 16 thieving. That widens
+the sources without touching the bound: regeneration still says how much damage an hour
+can hold, so the shapes below are unchanged and the figures above want re-running before
+either is acted on.
+
 *Moves when: he says what a faint costs. Content can name only a location and not
 "where you fell", so the shapes are: no relocate at all for a plain
 faint (dying costs the health bar and the interruption, nothing more); a respawn point

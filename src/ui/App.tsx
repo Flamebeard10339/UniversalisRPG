@@ -14,7 +14,6 @@ import { recorded, remembered, type Editing, type MapWhere } from './editorMemor
 import { Home } from './Home';
 import { JournalPane } from './JournalPane';
 import { Ledger } from './Ledger';
-import { LiveSheet } from './LiveSheet';
 import { LocationBanner } from './LocationBanner';
 import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
@@ -38,6 +37,7 @@ import { QuestBody } from './QuestBody';
 import { StatBody } from './StatBody';
 import { StatsPane } from './StatsPane';
 import { carried, worn } from './sheet';
+import { CancelUnderway } from './CancelUnderway';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
@@ -336,17 +336,13 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
             onLayer={(layer) => go((held) => toLayer(held, layer))}
             banners={[
               <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
-              <StatusBanner key="status" view={view} stirring={stirring(crossed)} />,
+              <StatusBanner key="status" view={view} live={snapshot.live} stirring={stirring(crossed)} />,
             ]}
+            beside={[null, snapshot.live === null ? null : <CancelUnderway key="cancel" label={snapshot.live.label} onCancel={driver.cancel} />]}
             bodies={bodies}
           />
           <Notices channel={driver.transient} />
         </main>
-        {snapshot.live === null ? null : (
-          <div className="shrink-0 border-t border-border bg-surface-raised">
-            <LiveSheet progress={snapshot.live} onCancel={driver.cancel} />
-          </div>
-        )}
         <TabBar
           words={words}
           tabs={here.shown}

@@ -454,7 +454,7 @@ describe('what the shell puts on the screen', () => {
     }
   });
 
-  it('draws the run below every page, without withdrawing the choices', () => {
+  it('draws the run a second time while it is under way, without withdrawing the choices', () => {
     const driver = stocked();
     const idle = driver.snapshot().view.choices;
     const running = idle.find((choice) => choice.id === ROAST)!.label;
@@ -462,18 +462,29 @@ describe('what the shell puts on the screen', () => {
 
     driver.choose(position(driver, ROAST));
     const under = engineRuns(renderToStaticMarkup(<App driver={driver} />));
-    const paged = driver.snapshot().view.stats.map((row) => row.title);
 
     expect(under).toContain(running);
     expect(under).toContain(other);
-    expect(paged.length).toBeGreaterThan(3);
     expect(under.indexOf(running)).toBeLessThan(under.lastIndexOf(running));
-    for (const word of paged) expect(under.lastIndexOf(running), word).toBeGreaterThan(under.lastIndexOf(word));
 
     driver.cancel();
     const stopped = engineRuns(renderToStaticMarkup(<App driver={driver} />));
 
     expect(stopped.indexOf(running)).toBe(stopped.lastIndexOf(running));
+  });
+
+  it('draws what is under way in the same band as the pools and what is being held, above them', () => {
+    const driver = stocked();
+    driver.choose(position(driver, ROAST));
+    const { view, live } = driver.snapshot();
+
+    const band = readable(renderToStaticMarkup(<StatusBanner view={view} live={live} stirring={false} />));
+
+    expect(live).not.toBeNull();
+    expect(view.resources.length).toBeGreaterThan(0);
+    expect(band[0]).toBe(String(live!.label));
+    expect(band.slice(1)).toEqual(view.resources.map((resource) => resource.title));
+    driver.cancel();
   });
 
   it('names where the player is, what time it is there and who is standing with them', () => {
@@ -489,7 +500,7 @@ describe('what the shell puts on the screen', () => {
   it('draws one meter per resource the view publishes, in the order it published them', () => {
     const view = createDriver(fixtureSources(), { ticker: noTicks }).snapshot().view;
 
-    const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} stirring={false} />));
+    const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} live={null} stirring={false} />));
 
     expect(view.resources.length).toBeGreaterThan(0);
     expect(drawn).toEqual(view.resources.map((resource) => resource.title));

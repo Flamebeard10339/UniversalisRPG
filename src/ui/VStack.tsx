@@ -10,7 +10,19 @@ interface Drag {
   release: () => void;
 }
 
-export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onLayer: (layer: number) => void; banners: ReactNode[]; bodies: ReactNode[] }): JSX.Element {
+export function VStack({
+  layer,
+  onLayer,
+  banners,
+  beside,
+  bodies,
+}: {
+  layer: number;
+  onLayer: (layer: number) => void;
+  banners: ReactNode[];
+  beside?: ReactNode[];
+  bodies: ReactNode[];
+}): JSX.Element {
   const frame = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const strips = useRef<Array<HTMLElement | null>>([]);
@@ -81,13 +93,12 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
           </div>,
           ...(at < banners.length
             ? [
+                <div key={`banner-${at}`} ref={(node) => void (strips.current[at] = node)} className="flex w-full shrink-0 items-stretch">
                 <button
-                  key={`banner-${at}`}
                   data-drive="shell.layer"
                   data-boundary={at}
-                  ref={(node) => void (strips.current[at] = node)}
                   type="button"
-                  className="block w-full shrink-0 touch-none text-left"
+                  className="block min-w-0 flex-1 touch-none text-left"
                   onClick={() => {
                     if (dragged.current) {
                       dragged.current = false;
@@ -128,7 +139,9 @@ export function VStack({ layer, onLayer, banners, bodies }: { layer: number; onL
                   }}
                 >
                   {banners[at]}
-                </button>,
+                </button>
+                {beside?.[at] ?? null}
+                </div>,
               ]
             : []),
         ])}
