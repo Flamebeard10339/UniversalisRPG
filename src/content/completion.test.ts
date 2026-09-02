@@ -72,11 +72,11 @@ describe('a namespace', () => {
 
 describe('a field', () => {
   it('shows the shape it takes rather than a value someone once wrote', () => {
-    expect(offered('# location tulsa.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent: <location> while <condition>, …', 'adjacent:']);
+    expect(offered('# location tulsa.beach\nadj|')).toEqual(['adjacent: <location>, …', 'adjacent: <location> while <condition>, …', 'adjacent: -<location>, …', 'adjacent:']);
   });
 
   it('offers itself bare, for the block it can be written as instead', () => {
-    expect(shapes('# location tulsa.beach\nadjacent:\n  |')).toEqual(['<location>', '<location> while <condition>']);
+    expect(shapes('# location tulsa.beach\nadjacent:\n  |')).toEqual(['<location>', '<location> while <condition>', '-<location>']);
   });
 
   it('hands over what its form spells out, and stops where the author must choose', () => {

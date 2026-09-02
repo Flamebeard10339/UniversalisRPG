@@ -20,9 +20,6 @@ set it:
 # location tulsa.market-square
 +entities: probe-post
 
-# location tulsa.doss-house
--adjacent: tulsa.well-lane
-
 # dialogue tulsa.guardsman
 node probe-always:
   always
@@ -31,12 +28,6 @@ node probe-always:
 
 # save probe-start
 {"version":13,"location":"tulsa.market-square"}
-
-# test a-minus-adjacent-line-takes-one-road-out
-load: probe-start
-goto: tulsa.doss-house
-travel: well-lane
-refused
 
 # test an-always-node-laid-over-a-dialogue-is-offered
 load: probe-start

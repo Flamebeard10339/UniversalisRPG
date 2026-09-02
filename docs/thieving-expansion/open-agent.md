@@ -16,16 +16,6 @@ for the engine.
 *Closes when:* no action in `content/thieving.dsl` writes a `hidden if:` its own entity
 already writes, and every route through the module still walks.
 
-## `-adjacent:` takes no road out
-
-The page says `-<line>` takes out of a body whatever the line writes. Written as
-`-adjacent: rogue-den` or `-adjacent: tulsa.rogue-den` under `# location
-tulsa.doss-house`, the road stays. The module replaces the whole `adjacent:` line
-instead, which restates `well-lane` from `content/tulsa.dsl` — a second home for one
-road, and the reason the den is now entered by the hatch rather than by a road.
-
-*Closes when:* `a-minus-adjacent-line-takes-one-road-out` passes.
-
 ## A dialogue laid over from another module cannot add an `always` node
 
 A `when:` node added under `# dialogue tulsa.guardsman` from thieving is offered as a

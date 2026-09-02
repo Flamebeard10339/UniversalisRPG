@@ -202,6 +202,28 @@ describe('a list key takes + and -', () => {
   });
 });
 
+describe('a road written out at one end is a road out no longer', () => {
+  const roadsFrom = (sources: ModuleSource[], id: string): string[] => loadUniverse(sources).roads.get(id)!.map((edge) => edge.target);
+  const BOTH_ENDS = module('base', '# location beach', 'x: 0, y: 0', 'starting', 'adjacent: dunes', '# location dunes', 'x: 1, y: 0', 'adjacent: beach');
+  const cut = patch('# location base.beach', '-adjacent: dunes');
+
+  it('stands against a far end that writes the road back of its own', () => {
+    expect(roadsFrom([BOTH_ENDS], 'base.beach')).toEqual(['base.dunes']);
+    expect(roadsFrom([BOTH_ENDS, cut], 'base.beach')).toEqual([]);
+    expect(roadsFrom([BOTH_ENDS, cut], 'base.dunes')).toEqual(['base.beach']);
+  });
+
+  it('is not kept where no road would have stood anyway', () => {
+    expect(loadUniverse([BASE, cut]).locations.get('base.beach')!.adjacent).toEqual([]);
+    expect(roadsFrom([BASE, cut], 'base.beach')).toEqual([]);
+  });
+
+  it('gives way to a later body that writes the road again', () => {
+    const again = module('zzz-again', 'dependencies:', '  base', '  patch', '# location base.beach', '+adjacent: dunes');
+    expect(roadsFrom([BOTH_ENDS, cut, again], 'base.beach')).toEqual(['base.dunes']);
+  });
+});
+
 describe('# remove takes out what omission cannot', () => {
   it('removes a section, and complains when it names nothing', () => {
     const registry = loadUniverse([BASE, patch('# location base.beach', '-adjacent: dunes', '# remove location.dunes')]);

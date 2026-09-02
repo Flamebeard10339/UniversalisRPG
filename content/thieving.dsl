@@ -1745,7 +1745,7 @@ adjacent:
 +entities: the-widow-at-the-door, widows-door, widows-new-lock
 
 # location tulsa.doss-house
-adjacent: tulsa.well-lane
+-adjacent: tulsa.rogue-den
 +entities: den-hatch
 
 # location run-blades

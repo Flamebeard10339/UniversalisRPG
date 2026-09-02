@@ -9,7 +9,7 @@ import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from '.
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unframedProblem, unsuppliedParameters } from './locale';
 import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
-import { closeAdjacency, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations } from './sections/location';
+import { closeAdjacency, dropUnansweredSeverances, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, isActionOwnerKind, isDebug, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
@@ -635,6 +635,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
 
   try {
     recursivelyResolveRelativeCoordinates(registry.locations);
+    dropUnansweredSeverances(registry.locations);
     refuseStackedLocations(registry.locations);
   } catch (error) {
     if (!(error instanceof DslError)) throw error;
