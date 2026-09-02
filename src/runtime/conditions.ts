@@ -8,6 +8,7 @@ import { isSettingName, settingStands } from './settings';
 import { highestSkillLevel, skillLevel } from './skills';
 import { statChanged, statValue } from './stats';
 import { fromMilliUnits, msToSeconds } from './units';
+import { bundleCount } from './bundle';
 import { heldCount } from './itemInstance';
 import { localizerOf, type Weighing } from './localized';
 
@@ -25,6 +26,7 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   'highest-level': (_id, state) => ({ value: highestSkillLevel(state.xp) }),
   resource: (id, state) => ({ value: fromMilliUnits(state.resources[id] ?? 0) }),
   inventory: (id, state) => ({ value: heldCount(state, id) }),
+  count: (id, state) => ({ value: bundleCount(state.bundles[id]) }),
   stat: (id, state, registry) => ({ value: statValue(id, state, registry) }),
   us: (id, state, registry) => ({ value: statValue(id, state, registry, PLAYER) }),
   them: (id, state, registry) => {

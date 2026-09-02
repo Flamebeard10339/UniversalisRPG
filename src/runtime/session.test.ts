@@ -1016,6 +1016,7 @@ describe('what the engine withholds', () => {
       time: 'published',
       cyclesDone: 'withheld',
       flags: 'published',
+      bundles: 'withheld',
       inventory: 'published',
       packOrder: 'published',
       equipped: 'published',

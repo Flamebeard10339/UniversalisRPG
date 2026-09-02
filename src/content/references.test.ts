@@ -6,6 +6,8 @@ import { mapOf } from './registry';
 import { contentSectionMaps } from './sections';
 
 const VALID = `
+# flag stashed
+
 # stat attack
 base: 10
 

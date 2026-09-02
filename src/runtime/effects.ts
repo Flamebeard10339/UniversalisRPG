@@ -14,6 +14,7 @@ import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem, stripHoldings } from './itemInstance';
+import { bundleCount, bundleHeld, bundleStack, bundleWholePack, pourOut } from './bundle';
 import { openModalNamed } from './modalStack';
 import { Localized, localizerOf } from './localized';
 import { nextRandom } from './rng';
@@ -272,6 +273,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
         return 0;
       }
       const gone = handOver(state, parting);
+      if (result.into !== undefined) bundleStack(state, result.into, result.item, gone);
       announceCarried(segment, gone);
       return -gone;
     }
@@ -316,9 +318,16 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return room;
     }
     case 'strip': {
-      const gone = stripHoldings(state);
+      const gone = result.into === undefined ? stripHoldings(state) : bundleWholePack(state, result.into);
       if (gone > 0) announceCarried(segment, gone);
       return -gone;
+    }
+    case 'empty': {
+      const wanted = bundleCount(bundleHeld(state, result.bundle));
+      const moved = pourOut(state, registry, result.bundle);
+      announceCarried(segment, moved);
+      if (moved < wanted) segment.stopped = localizerOf(registry, state).engine('engine.stopped.pack-full');
+      return moved;
     }
     case 'inflict': {
       const source = registry.items.get(result.buff);

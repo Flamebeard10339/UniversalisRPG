@@ -2,7 +2,7 @@ import { A_LITERAL_BRACE, fragment, OPENS_A_FRAGMENT, printSegments, type TextSe
 import { noteIn, withoutNote } from '../grammar/note';
 import { parseWhole } from '../grammar/parser';
 import { Action, Sided } from '../grammar/action';
-import { ActionResult, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
+import { ActionResult, EVERYTHING, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
@@ -15,6 +15,8 @@ export const INFLICT_SITE = 'inflict:';
 export const TIMED_INFLICT_SITE = `${INFLICT_SITE} … for:`;
 
 export const WEIGHT_SITE = 'one of: row';
+
+export const BUNDLE_SITES: readonly string[] = ['bound to', `give: ${EVERYTHING} in`];
 
 export type ReferenceKind = string;
 
@@ -144,6 +146,7 @@ export function condition(value: Condition | undefined, where: string, visit: Vi
 export function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
     for (const nested of nestedResults(result)) results(nested, where, visit);
+    put(result, 'into', 'flag', `${where} ${result.kind}: bound to`, visit);
     switch (result.kind) {
       case 'give':
       case 'take':
@@ -198,6 +201,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'unset':
       case 'add':
         put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
+        break;
+      case 'empty':
+        put(result, 'bundle', 'flag', `${where} give: ${EVERYTHING} in`, visit);
         break;
       case 'say':
         prose(result as unknown as Loose, 'text', `${where} say:`, visit);

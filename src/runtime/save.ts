@@ -3,6 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
+import { EMPTY_BUNDLE, isBundle } from './bundle';
 import { createGameState, GameState, ownerRef, parseOwnerRef, type ActiveAction, type InstanceTable, type Seat } from './state';
 import type { PruneWarning } from './pruning';
 import { initResources } from './effects';
@@ -109,6 +110,7 @@ export const SAVE_FIELDS: Record<SaveField, SaveFieldRule> = {
   inventory: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'item', loaded: (registry, id) => registry.items.has(id) } , walked: false, minted: 'names no minted copy' },
   packOrder: { shape: 'scalar', holds: (value) => Array.isArray(value) && value.every(isText), sparsest: [], prune: 'pruned by a rule of its own' , walked: true, minted: { rename: (value, renamed) => (value as string[]).map(renamed) } },
   flags: { shape: 'record', holds: (value) => typeof value === 'boolean' || isNumber(value), sparsest: false, prune: { of: 'flag', loaded: (registry, id) => registry.namespace.has('flag', id) } , walked: true, minted: 'names no minted copy' },
+  bundles: { shape: 'record', holds: isBundle, sparsest: EMPTY_BUNDLE, prune: { of: 'bundle', loaded: (registry, id) => registry.flags.get(id)?.bundle === true } , walked: false, minted: 'names no minted copy' },
   visits: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'dialogue node', loaded: (registry, id) => registry.namespace.has('node', id) } , walked: true, minted: 'names no minted copy' },
   xp: { shape: 'record', holds: isNumber, sparsest: 0, prune: { of: 'skill', loaded: (registry, id) => registry.skills.has(id) } , walked: false, minted: 'names no minted copy' },
   resources: { shape: 'record', holds: isInteger, sparsest: 0, prune: { of: 'resource', loaded: (registry, id) => registry.resources.has(id) } , walked: false, minted: 'names no minted copy' },

@@ -1195,6 +1195,17 @@
           "include": "#refused"
         },
         {
+          "match": "^[ \\t]*([+-]?)(bundle)\\b",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
           "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
           "captures": {
             "1": {

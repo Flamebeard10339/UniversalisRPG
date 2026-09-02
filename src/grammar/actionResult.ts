@@ -37,7 +37,9 @@ export const isModalScreen = (raw: string): raw is ModalScreen => (MODAL_SCREENS
 
 export const modalScreenRefusal = (raw: string): string => `a modal screen must be one of ${MODAL_SCREENS.join(', ')}, got ${JSON.stringify(raw)}`;
 
-export type ActionResult =
+export type ActionResult = ResultLine & { into?: string };
+
+type ResultLine =
   | { kind: 'say'; text: string; key?: string }
   | { kind: 'set'; variable: string }
   | { kind: 'unset'; variable: string }
@@ -45,6 +47,7 @@ export type ActionResult =
   | { kind: 'give'; item: string; amount?: Range }
   | { kind: 'take'; item: string; amount?: number }
   | { kind: 'strip' }
+  | { kind: 'empty'; bundle: string }
   | { kind: 'xp'; skill: string; amount: Amount }
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
@@ -117,6 +120,12 @@ function parseAdd(cursor: Cursor): ActionResult {
 export const EVERYTHING = 'everything';
 
 const EVERYTHING_TAKEN = new RegExp(`${EVERYTHING}(?![\\w-])`);
+
+const EMPTIED = new RegExp(`${EVERYTHING}[ \\t]+in[ \\t]+`);
+
+export const BUNDLE = 'bundle';
+
+const BOUND = /(?<name>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]*=[ \t]*/;
 
 const PREPOSITION = { drain: 'from', restore: 'to', inflict: 'on' } as const;
 const MOVES = {
@@ -323,6 +332,7 @@ interface Leaf {
   examples: readonly string[];
   read: (cursor: Cursor) => ActionResult;
   notes?: Readonly<Record<string, string>>;
+  yields?: string;
 }
 
 const LEAVES: readonly Leaf[] = [
@@ -332,15 +342,20 @@ const LEAVES: readonly Leaf[] = [
   { opens: /add:[ \t]*/, forms: ['add: <variable> <int>'], examples: ['add: gold 5', 'add: gold -3'], read: parseAdd },
   {
     opens: /give:[ \t]*/,
-    forms: ['give: <item>', 'give: <count> <item>', 'give: <least>-<most> <item>'],
-    examples: ['give: plank', 'give: 5 arrow', 'give: 5-10 arrow'],
-    read: (cursor) => parseGive(produced.parse(cursor)),
+    forms: ['give: <item>', 'give: <count> <item>', 'give: <least>-<most> <item>', `give: ${EVERYTHING} in <bundle>`],
+    examples: ['give: plank', 'give: 5 arrow', 'give: 5-10 arrow', `give: ${EVERYTHING} in confiscated`],
+    read: (cursor) => (cursor.take(EMPTIED) !== null ? { kind: 'empty', bundle: parseVariable(cursor) } : parseGive(produced.parse(cursor))),
+    notes: {
+      [`give: ${EVERYTHING} in <bundle>`]:
+        'pours a bundle into the pack, and whatever will not fit is left standing in the bundle rather than destroyed, so a give into a full pack can be given again once there is room',
+    },
   },
   {
     opens: /take:[ \t]*/,
     forms: ['take: <count> <item>', `take: ${EVERYTHING}`],
     examples: ['take: 3 plank', `take: ${EVERYTHING}`],
     read: (cursor) => (cursor.take(EVERYTHING_TAKEN) !== null ? { kind: 'strip' } : { kind: 'take', ...quantified.parse(cursor) }),
+    yields: BUNDLE,
   },
   {
     opens: /xp:[ \t]*/,
@@ -400,8 +415,15 @@ const LEAVES: readonly Leaf[] = [
   },
 ];
 
-function parseResult(cursor: Cursor): ActionResult {
-  for (const leaf of LEAVES) if (cursor.take(leaf.opens) !== null) return leaf.read(cursor);
+function parseResult(cursor: Cursor, into?: string): ActionResult {
+  const at = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) };
+  for (const leaf of LEAVES) {
+    if (cursor.take(leaf.opens) === null) continue;
+    const result = leaf.read(cursor);
+    if (into === undefined) return result;
+    if (leaf.yields === undefined) throw new DslError(`${leaf.forms[0]!.replace(/[ :].*/, '')} yields nothing, so there is nothing for ${into} to be`, at);
+    return { ...result, into };
+  }
   throw new DslError(`unrecognized action result: ${JSON.stringify(cursor.rest())}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
 }
 
@@ -420,11 +442,14 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
       start: cursor.abs(cursor.pos),
       end: cursor.abs(cursor.src.length),
     });
+    const at = { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) };
+    const into = binds(cursor);
     const wrapper = wrapperAt(cursor);
     if (wrapper === null) {
-      results.push(parseResult(cursor));
+      results.push(parseResult(cursor, into));
       continue;
     }
+    if (into !== undefined) throw new DslError(`a wrapper yields nothing, so ${into} = has nothing to stand for: bind the line inside it that does`, at);
     const start = cursor.pos;
     results.push(
       wrapper(cursor, line, {
@@ -439,7 +464,16 @@ function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
 
 const LEAF_RESULT = new RegExp(LEAVES.map((leaf) => leaf.opens.source).join('|'));
 
+function binds(cursor: Cursor): string | undefined {
+  const written = cursor.peek(BOUND);
+  if (written === null) return undefined;
+  cursor.take(BOUND);
+  return written.groups!.name;
+}
+
 export function startsResult(cursor: Cursor): boolean {
+  const trial = new Cursor(cursor.src, cursor.pos, cursor.base);
+  if (binds(trial) !== undefined) return trial.peek(LEAF_RESULT) !== null;
   return cursor.peek(LEAF_RESULT) !== null || cursor.peek(RANGED_SELECTOR) !== null || wrapperAt(cursor) !== null;
 }
 
@@ -484,6 +518,10 @@ const readResultBlock = (lines: readonly RawLine[]): ActionResult[] => lines.fla
 const printSide = (value: number | string): string => numberOrStat.print(value);
 
 export function printResult(value: ActionResult): string {
+  return value.into === undefined ? printResultLine(value) : `${value.into} = ${printResultLine(value)}`;
+}
+
+function printResultLine(value: ActionResult): string {
   switch (value.kind) {
     case 'say':
       return `say: ${value.text}`;
@@ -499,6 +537,8 @@ export function printResult(value: ActionResult): string {
       return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
     case 'strip':
       return `take: ${EVERYTHING}`;
+    case 'empty':
+      return `give: ${EVERYTHING} in ${value.bundle}`;
     case 'xp':
       return `xp: ${value.skill} ${printAmount(value.amount)}`;
     case 'relocate':
@@ -573,11 +613,22 @@ export const spansLines = (values: readonly ActionResult[] | undefined): boolean
 
 const printResults = (values: readonly ActionResult[]): string => values.map(printResult).join(', ');
 
-const LEAF_FORMS: readonly string[] = LEAVES.flatMap((leaf) => leaf.forms);
+const bound = (yields: string, written: string): string => `<${yields}> = ${written}`;
 
-const LEAF_EXAMPLES: readonly string[] = LEAVES.flatMap((leaf) => leaf.examples);
+const BINDING_NOTE =
+  'what the line moved is held under that name instead of being gone, and the name is a `# variable` marked `bundle`. Only a line that yields something may be bound — a wrapper yields nothing — and a bundle answers `count.<bundle>` and nothing else: it is poured back out rather than read into';
 
-const LEAF_NOTES: Readonly<Record<string, string>> = Object.assign({}, ...LEAVES.map((leaf) => leaf.notes ?? {}));
+const LEAF_FORMS: readonly string[] = LEAVES.flatMap((leaf) => (leaf.yields === undefined ? leaf.forms : [...leaf.forms, ...leaf.forms.map((form) => bound(leaf.yields!, form))]));
+
+const LEAF_EXAMPLES: readonly string[] = LEAVES.flatMap((leaf) =>
+  leaf.yields === undefined ? leaf.examples : [...leaf.examples, ...leaf.examples.map((example) => `${leaf.yields === BUNDLE ? 'confiscated' : leaf.yields} = ${example}`)],
+);
+
+const LEAF_NOTES: Readonly<Record<string, string>> = Object.assign(
+  {},
+  ...LEAVES.map((leaf) => leaf.notes ?? {}),
+  ...LEAVES.flatMap((leaf) => (leaf.yields === undefined ? [] : [Object.fromEntries(leaf.forms.map((form) => [bound(leaf.yields!, form), BINDING_NOTE]))])),
+);
 
 const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<string>> = {}): Parser<string> => ({
   parse: (cursor) => id.parse(cursor),
@@ -593,9 +644,9 @@ export const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: 
 export const modalScreen = oneOf('modal', MODAL_SCREENS);
 
 export const actionResult: Parser<ActionResult> = {
-  parse: parseResult,
+  parse: (cursor) => parseResult(cursor, binds(cursor)),
   print: printResult,
-  names: { variable: 'flag', duration: 'stat', amount: 'stat' },
+  names: { variable: 'flag', bundle: 'flag', duration: 'stat', amount: 'stat' },
   holds: () => ({ place, modal: modalScreen, duration: durationOrStat, amount }),
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,

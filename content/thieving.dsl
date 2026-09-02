@@ -428,6 +428,7 @@ examine: The glass beside the far door was turned when the bell rang, and it has
 # flag times-caught
 
 # flag confiscated
+bundle
 
 # flag fruit-stolen
 
@@ -666,90 +667,14 @@ unset: cell-open
 unset: on-the-run
 unset: wardens-door.unlocked
 shake off: dazed
-say: The walk to the lock-up is not a long one and nobody talks on it. A door, a stair, a second door, and the key turning behind you. @@@ asked for the pack and everything worn to be taken off the player and held in a crate to be reclaimed; `take: everything` exists but nothing in the grammar gives back what it took, so the guards take the purse and leave you the rest
+say: The walk to the lock-up is not a long one and nobody talks on it. A door, a stair, a second door, and the key turning behind you.
 relocate: jail-cell
 
 # droptable purse-confiscated
-if inventory.core.coin >= 4096:
-  take: 4096 core.coin
-  add: confiscated 4096
-if inventory.core.coin >= 2048:
-  take: 2048 core.coin
-  add: confiscated 2048
-if inventory.core.coin >= 1024:
-  take: 1024 core.coin
-  add: confiscated 1024
-if inventory.core.coin >= 512:
-  take: 512 core.coin
-  add: confiscated 512
-if inventory.core.coin >= 256:
-  take: 256 core.coin
-  add: confiscated 256
-if inventory.core.coin >= 128:
-  take: 128 core.coin
-  add: confiscated 128
-if inventory.core.coin >= 64:
-  take: 64 core.coin
-  add: confiscated 64
-if inventory.core.coin >= 32:
-  take: 32 core.coin
-  add: confiscated 32
-if inventory.core.coin >= 16:
-  take: 16 core.coin
-  add: confiscated 16
-if inventory.core.coin >= 8:
-  take: 8 core.coin
-  add: confiscated 8
-if inventory.core.coin >= 4:
-  take: 4 core.coin
-  add: confiscated 4
-if inventory.core.coin >= 2:
-  take: 2 core.coin
-  add: confiscated 2
-if inventory.core.coin >= 1:
-  take: 1 core.coin
-  add: confiscated 1
+confiscated = take: everything
 
 # droptable purse-returned
-if confiscated >= 4096:
-  give: 4096 core.coin
-  add: confiscated -4096
-if confiscated >= 2048:
-  give: 2048 core.coin
-  add: confiscated -2048
-if confiscated >= 1024:
-  give: 1024 core.coin
-  add: confiscated -1024
-if confiscated >= 512:
-  give: 512 core.coin
-  add: confiscated -512
-if confiscated >= 256:
-  give: 256 core.coin
-  add: confiscated -256
-if confiscated >= 128:
-  give: 128 core.coin
-  add: confiscated -128
-if confiscated >= 64:
-  give: 64 core.coin
-  add: confiscated -64
-if confiscated >= 32:
-  give: 32 core.coin
-  add: confiscated -32
-if confiscated >= 16:
-  give: 16 core.coin
-  add: confiscated -16
-if confiscated >= 8:
-  give: 8 core.coin
-  add: confiscated -8
-if confiscated >= 4:
-  give: 4 core.coin
-  add: confiscated -4
-if confiscated >= 2:
-  give: 2 core.coin
-  add: confiscated -2
-if confiscated >= 1:
-  give: 1 core.coin
-  add: confiscated -1
+give: everything in confiscated
 
 # droptable caught-at-the-stalls
 add: times-caught 1
@@ -1593,10 +1518,10 @@ pick-the-lock:
     say: The lid comes up and so does a voice from the doorway, which is where the warden is standing with a paper bag in his hand. "Leave it open. Saves me the key."
     roll: sent-to-jail
   if stat.warden-away >= 1:
-    if not confiscated >= 1:
+    if not count.confiscated >= 1:
       roll: wardens-lockbox-contents
       say: The box holds what the town's guard has taken off the town, in no order. You take what nobody who could say so is going to miss.
-    if confiscated >= 1:
+    if count.confiscated >= 1:
       say: On top of everything else in the box is a purse with a paper tag tied to it, and the tag has a description on it that is not flattering and is not wrong.
       roll: purse-returned
   +on attempts exhausted:
@@ -1864,7 +1789,7 @@ entities:
 {"version":13,"location":"tulsa.market-square","inventory":{"core.coin":400},"xp":{"thieving.thieving":1382}}
 
 # save in-the-lock-up-owed-a-purse
-{"version":13,"location":"thieving.lock-up","inventory":{"core.coin":40},"xp":{"thieving.thieving":5345},"flags":{"thieving.confiscated":200}}
+{"version":13,"location":"thieving.lock-up","inventory":{"core.coin":40},"xp":{"thieving.thieving":5345},"bundles":{"thieving.confiscated":{"stacks":{"core.coin":200},"copies":[]}}}
 
 # save in-the-den-at-the-bell
 {"version":13,"location":"tulsa.rogue-den","xp":{"thieving.thieving":30000},"flags":{"thieving.knows-the-den":true,"thieving.has-the-word":true}}
@@ -2010,7 +1935,7 @@ load: in-the-square-with-a-light-purse
 use: entity.pear-cart.lift-from-the-stall until jail-cell.touched
 assert: times-caught >= 3
 assert: inventory.core.coin = 0
-assert: confiscated >= 1
+assert: count.confiscated >= 1
 use: entity.cell-door.pick-the-door until cell-open
 assert: on-the-run
 travel: lock-up
@@ -2055,7 +1980,7 @@ travel: guard-barracks
 travel: lock-up
 use: entity.wardens-door.pick-the-door until wardens-office.touched
 assert: wardens-door.unlocked
-use: entity.wardens-lockbox.pick-the-lock until confiscated < 1
+use: entity.wardens-lockbox.pick-the-lock until count.confiscated < 1
 cancel
 assert: inventory.core.coin = 220
 use: entity.office-door-inside.let-yourself-out

@@ -57,6 +57,7 @@ const SPAN_VOICE: Record<SaveField, SpanVoice> = {
   activeAction: 'told by what stopped it',
   journey: 'told by what stopped it',
   flags: 'nothing a player counts',
+  bundles: 'nothing a player counts',
   packOrder: 'nothing a player counts',
   visits: 'nothing a player counts',
   resourceRateRemainders: 'nothing a player counts',

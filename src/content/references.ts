@@ -5,7 +5,7 @@ import { Directive, Test } from './sections/test';
 import { } from './namespace';
 import { isCheckedKind } from './sections';
 import { DEBUG_MARK, isActionOwnerKind, isDebug, registryMapOf, sectionOf, type ModuleSection } from './sections';
-import { INFLICT_SITE, Visit } from './refs';
+import { BUNDLE_SITES, INFLICT_SITE, Visit } from './refs';
 import { visitSection } from './sections';
 import { mapOf } from './registry';
 
@@ -22,10 +22,16 @@ export function validateSectionReferences(section: ModuleSection, id: string, re
       throw new DslError(`${where} names an unknown ${referenced}: ${target}`);
     }
     if (!debug) refuseDebugReference(referenced, target, where, registry);
+    if (BUNDLE_SITES.some((site) => where.endsWith(site))) refuseUnbundled(target, where, registry);
     if (where.endsWith(INFLICT_SITE)) refuseUntimedPayload(target, where, registry);
     return target;
   };
   visitSection(sectionOf(section.kind, { ...section.value }), `# ${section.kind} ${id}`, visit);
+}
+
+function refuseUnbundled(target: string, where: string, registry: Registry): void {
+  if (registry.flags.get(target)?.bundle === true) return;
+  throw new DslError(`${where} names ${target}, which holds a number rather than a bundle — write \`bundle\` under its \`# flag\` so it can hold what a line hands it`);
 }
 
 function refuseUntimedPayload(itemId: string, where: string, registry: Registry): void {

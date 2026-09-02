@@ -392,10 +392,12 @@ export function writeEdits(schema: AnySchema, field: string, edits: FieldEdits):
 
 export function printSection(value: object, schema: AnySchema, context: PrintContext, entryLines: (entry: never) => string[]): string[] {
   const held = value as Record<string, unknown>;
+  const keywordLines = (schema.keywords ?? []).filter((word) => typeof held[word] === 'boolean').map((word) => (held[word] === true ? word : `-${word}`));
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];
+  if (schema.keywordsAfter === undefined) lines.push(...keywordLines);
   for (const [name, spec] of Object.entries(schema.fields)) {
     lines.push(...fieldLines(schema, name, spec, held, context));
-    if (name === schema.keywordsAfter) lines.push(...(schema.keywords ?? []).filter((word) => typeof held[word] === 'boolean').map((word) => (held[word] === true ? word : `-${word}`)));
+    if (name === schema.keywordsAfter) lines.push(...keywordLines);
   }
   const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);
   for (const entry of entries) lines.push(...entryLines(entry));

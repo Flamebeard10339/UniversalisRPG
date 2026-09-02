@@ -34,6 +34,7 @@ export const ENGINE_ROOTS = {
   'highest-level': { means: 'the level of whichever skill stands highest, so a bound on it is a bound on any one skill', against: 2 },
   resource: { kind: 'resource', stands: 'health', against: 10 },
   inventory: { kind: 'item', stands: 'plank', against: 3 },
+  count: { kind: 'flag', stands: 'confiscated', against: 1, means: 'how much a bundle holds, all told — a `# variable` marked `bundle`. It is the only reading a bundle answers: what is inside it is moved rather than looked at' },
   stat: { kind: 'stat', stands: 'attack', against: 1.5 },
   us: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whoever is acting, which is the player wherever no action is under way' },
   them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at, so a line with no action under way — a dialogue — and one whose action is aimed at a place rather than an entity are both refused as they are said, rather than going quiet' },

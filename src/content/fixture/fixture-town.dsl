@@ -64,6 +64,7 @@ entities: stair, chest, keeper
 title: The Shed
 examine: Tools, most of them somebody else's.
 x: 1, y: -1
+entities: strongbox, hoard
 
 # location pump
 title: The Pump
@@ -229,6 +230,39 @@ node greeting:
   again: Three ways, still.
   Three ways out of a green is two more than most greens manage.
 
+# flag stash
+bundle
+
+# entity strongbox
+title: The Strongbox
+examine: An iron box with a lid that takes two hands and a key that takes none.
+faction: world
+put it all in:
+  instant
+  stash = take: everything
+tip it out:
+  instant
+  give: everything in stash
+
+# entity hoard
+title: The Hoard
+examine: Somebody's whole life in a heap, and nobody standing near it.
+faction: world
+help yourself:
+  instant
+  give: 1 bread
+  give: 1 spade
+  give: 1 rope
+  give: 1 twine
+  give: 1 stout-twine
+  give: 1 heavy-spade
+  give: 1 quiet-hour-jewel
+  give: 1 copper-coin
+  give: 1 leather-gloves
+  give: 1 jerkin
+  give: 1 keen-edge-jewel
+  give: 1 stout-heart-jewel
+
 # shop counter
 coin: copper-coin
 stocks: 5 bread, 2 rope
@@ -257,3 +291,26 @@ choose: keeper.about-the-rats
 choose: continue
 assert: keeper.about-the-rats.visits = 1
 assert: keeper.greeting.visits = 0
+
+# test a-bundle-holds-a-whole-pack-and-hands-it-back
+goto: green
+use: location.green.dig
+wait: done
+goto: shed
+use: entity.strongbox.put-it-all-in
+assert: not has rat-tail
+assert: count.stash >= 1
+use: entity.strongbox.tip-it-out
+assert: has rat-tail
+assert: count.stash < 1
+
+# test what-will-not-fit-is-left-standing-in-the-bundle
+goto: green
+use: location.green.dig
+wait: done
+goto: shed
+use: entity.strongbox.put-it-all-in
+use: entity.hoard.help-yourself
+use: entity.strongbox.tip-it-out
+assert: not has rat-tail
+assert: count.stash >= 1
