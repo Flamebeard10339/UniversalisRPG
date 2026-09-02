@@ -403,25 +403,3 @@ file about refusals inside a `# test` is also about.
 
 *Closes when:* a build failure whose owner cannot be found says so rather than naming a module
 that had nothing to do with it.
-
-## `repair-saves` reads a save body the loader no longer reads
-
-A `# save` body's ids are written out whole at load now — `src/content/sections/save.ts`
-walks `location`, `inventory`, `flags`, `visits`, `xp`, `resources`,
-`resourceRateRemainders` and `shops` — so `"location":"well"` is held as
-`fixture-town.well`, and an id the world no longer has is left standing for the pruner
-rather than refused, because mending one is what `npm run repair-saves` is for.
-
-That tool judges the body **as the file writes it**: `loadProblems`
-(`scripts/lib/saveFixtures.ts:114`) parses the raw JSON and calls `loadSave` straight,
-so it never sees the resolution. A save written short therefore loads clean and reads
-to `repair-saves` as rotted in every id it wrote short. Nothing in the corpus writes one
-short today, so nothing is currently mis-reported — the two readers simply disagree,
-and the first short id anyone writes will find it.
-
-The registry already holds the resolved body under `registry.saves`, which is what
-`repair-saves` should judge; it needs the file text only for the span it rewrites.
-
-*Closes when:* a `# save` written with short ids loads clean and `npm run repair-saves`
-says there is nothing to repair, with the fixture corpus carrying such a save so the
-claim is not vacuous.

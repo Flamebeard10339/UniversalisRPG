@@ -28,6 +28,7 @@ export interface Written {
   fixture: Fixture;
   over?: string[];
   body: SaveBody;
+  held: SaveBody;
   span: Span | null;
   spread: number;
 }
@@ -91,6 +92,7 @@ export function savesIn(files: readonly ContentFile[], loaded: LoadedContent): W
         fixture: { id, file: file.path, version: saved.version },
         ...(over ? { over: [...over] } : {}),
         body: saved.diff,
+        held: (loaded.registry.saves.get(id)?.diff as SaveBody | undefined) ?? saved.diff,
         span: written.length === 1 ? written[0]!.span : null,
         spread: written.length,
       });

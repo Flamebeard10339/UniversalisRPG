@@ -270,6 +270,9 @@ load: dug-in-and-fed
 assert: inventory.rat-tail >= 1
 assert: has bread
 
+# save at-the-well-written-short
+{"version":13,"flags":{"well.touched":true,"well.discovered":true,"green.discovered":true},"location":"well","inventory":{"spade":1}}
+
 # save at-the-well
 {"version":13,"flags":{"fixture-town.well.touched":true,"fixture-town.well.discovered":true,"fixture-town.green.discovered":true},"location":"fixture-town.well"}
 
@@ -282,3 +285,8 @@ assert: has bread
 # save dug-in-and-fed
 over: dug-in
 {"version":13,"inventory":{"core.bread":1}}
+
+# test a-save-body-written-short-stands-up-the-same-world
+load: at-the-well-written-short
+assert: well.touched
+assert: has core.spade

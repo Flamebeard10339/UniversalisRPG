@@ -1,17 +1,7 @@
 import { Registry } from '../content/registry';
 import { createInstance, removeInstance } from './instances';
-import { isItemInstance, ITEM_INSTANCE, ItemInstance, itemTemplate, packHasRoom, packRows, receiveItem, wornIn } from './itemInstance';
-import { GameState } from './state';
-
-export interface BundledCopy {
-  readonly template: string;
-  readonly payload: ItemInstance;
-}
-
-export interface Bundle {
-  readonly stacks: Readonly<Record<string, number>>;
-  readonly copies: readonly BundledCopy[];
-}
+import { isItemInstance, ITEM_INSTANCE, itemTemplate, packHasRoom, packRows, receiveItem, wornIn } from './itemInstance';
+import { Bundle, BundledCopy, GameState } from './state';
 
 export const EMPTY_BUNDLE: Bundle = { stacks: {}, copies: [] };
 

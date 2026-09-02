@@ -1,5 +1,4 @@
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import type { Bundle } from './bundle';
 import { standingSettings, type SettingSheet } from './settings';
 import type { TagClause } from '../grammar/tagClause';
 import { RuntimeError } from './error';
@@ -70,6 +69,16 @@ export interface Instance {
   readonly kind: string;
   readonly template: string;
   readonly payload: unknown;
+}
+
+export interface BundledCopy {
+  readonly template: string;
+  readonly payload: unknown;
+}
+
+export interface Bundle {
+  readonly stacks: Readonly<Record<string, number>>;
+  readonly copies: readonly BundledCopy[];
 }
 
 export interface InstanceTable {

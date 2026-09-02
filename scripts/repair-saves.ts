@@ -112,7 +112,7 @@ export function repair(files: readonly ContentFile[], history: RenameHistory, op
 
   const declared = declaredIn(loaded.registry);
   const rotted: Rotted[] = saves.flatMap((written) => {
-    const pruned = loadProblems([judge(written, bodyText(written, written.body))], loaded.registry);
+    const pruned = loadProblems([judge(written, bodyText(written, written.held))], loaded.registry);
     return pruned.length === 0 ? [] : [{ written, pruned }];
   });
 
@@ -130,7 +130,7 @@ export function repair(files: readonly ContentFile[], history: RenameHistory, op
   const asked = new Map<string, Inference>();
   let unreadable: string | null = null;
   for (const each of rotted) {
-    for (const id of danglingIn(each.written.body, declared)) {
+    for (const id of danglingIn(each.written.held, declared)) {
       if (asked.has(id) || authored.has(id)) continue;
       try {
         asked.set(id, inferRename(id, history, declared));
@@ -161,7 +161,10 @@ export function repair(files: readonly ContentFile[], history: RenameHistory, op
 
   const rewrites = rotted.map((each) => ({ written: each.written, text: bodyText(each.written, renamedIn(each.written.body, renames) as SaveBody) }));
   const spread = rewrites.filter((rewrite) => rewrite.written.span === null).map((rewrite) => `${rewrite.written.fixture.id}: its body is ${rewrite.written.spread} lines, and rewriting one in place needs exactly one`);
-  const stillPruned = loadProblems(rewrites.map((rewrite) => judge(rewrite.written, rewrite.text)), loaded.registry);
+  const stillPruned = loadProblems(
+    rewrites.map((rewrite) => judge(rewrite.written, bodyText(rewrite.written, renamedIn(rewrite.written.held, renames) as SaveBody))),
+    loaded.registry,
+  );
 
   const problems = [...collisions, ...spread, ...stillPruned];
   if (problems.length > 0) {
