@@ -160,7 +160,10 @@ export function statBreakdown(statId: string, state: GameState, registry: Regist
     parts.set(address, held === undefined ? { source: carrier.source, ...fold } : { source: held.source, added: addRanges(held.added, fold.added), increased: held.increased + fold.increased });
   }
 
-  return { base: actorEntity(registry, actorId)?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
+  const sheet = actorEntity(registry, actorId);
+  if (sheet === undefined && actorId !== PLAYER)
+    throw new RuntimeError(`${actorId} is asked for ${statId} and is no entity, so it carries no sheet to read one off — only the player is a side rather than a member of one`);
+  return { base: sheet?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
 }
 
 export function foldStat({ base, parts }: StatBreakdown): Range {

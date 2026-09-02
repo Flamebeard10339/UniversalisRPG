@@ -36,7 +36,7 @@ export const ENGINE_ROOTS = {
   inventory: { kind: 'item', stands: 'plank', against: 3 },
   stat: { kind: 'stat', stands: 'attack', against: 1.5 },
   us: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whoever is acting, which is the player wherever no action is under way' },
-  them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at. Only an action aimed at an entity has one, so a line said anywhere else — a dialogue, an action aimed at a place — is refused where it is said rather than going quiet' },
+  them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at, so a line with no action under way — a dialogue — and one whose action is aimed at a place rather than an entity are both refused as they are said, rather than going quiet' },
   changed: { kind: 'stat', stands: 'attack', means: 'whether that stat stands anywhere other than the base it was declared with, which is how a line asks whether anything has moved it without writing down what it started at' },
 } as const satisfies Readonly<Record<string, Rooted | Named | Bare>>;
 

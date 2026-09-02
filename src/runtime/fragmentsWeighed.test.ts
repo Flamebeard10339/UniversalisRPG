@@ -159,7 +159,7 @@ describe('an id inside a fragment', () => {
     const registry = loadUniverse(withEngineLocale([...fixtureSources(), { name: 'nobody-probe', text }]));
     const session = startSession(registry);
 
-    expect(() => apply(session, 'use:location.fixture-town.green.shout')).toThrow(/reads a stat off what the action under way is aimed at, and this one is aimed at fixture-town.green, which carries no stats/);
+    expect(() => apply(session, 'use:location.fixture-town.green.shout')).toThrow(/fixture-town.green is asked for core.attack and is no entity, so it carries no sheet to read one off/);
   });
 
   it('is left alone where the brace is written twice, which is how a line says one of its own', () => {

@@ -22,6 +22,8 @@ const MODULE = `
 # stat max-health
 base: 20
 
+# entity brute
+
 # flag lit
 
 # resource health

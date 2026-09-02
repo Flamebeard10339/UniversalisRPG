@@ -1,7 +1,6 @@
 import { Condition, type EngineRoot, holds, isEngineRoot, printCondition, Reference, visitedNode } from '../grammar/condition';
 import { TextSegment } from '../grammar/segment';
 import { RuntimeError } from './error';
-import { actorEntity } from './actionLookup';
 import { Registry } from '../content/registry';
 import { reachedByItself } from '../content/sections/quest';
 import { GameState, PLAYER, PLAYER_SHEET, type PlayerField } from './state';
@@ -30,11 +29,7 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   us: (id, state, registry) => ({ value: statValue(id, state, registry, PLAYER) }),
   them: (id, state, registry) => {
     const aimedAt = state.activeAction?.roster?.[PLAYER]?.target;
-    const sheet = aimedAt === undefined ? undefined : actorEntity(registry, aimedAt);
-    if (sheet === undefined)
-      throw new RuntimeError(
-        `them.${id} reads a stat off what the action under way is aimed at, and ${aimedAt === undefined ? 'no action is under way here' : `this one is aimed at ${aimedAt}, which carries no stats`} — only an action aimed at an entity has a them. to read, and every line has us.`,
-      );
+    if (aimedAt === undefined) throw new RuntimeError(`them.${id} reads a stat off what the action under way is aimed at, and no action is under way here — every line has us., and only one said inside an action has them.`);
     return { value: statValue(id, state, registry, aimedAt) };
   },
   changed: (id, state, registry) => ({ value: statChanged(id, state, registry) }),
