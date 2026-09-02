@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { asLocalized } from '../runtime/localizedFixture';
 import type { CommandOutput } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
-import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
+import { appendOutputs, emptyTranscript, WITHIN_EARSHOT, type Transcript } from './transcript';
 
 function viewAt(id: string, plain: string[] = [], description = ''): PlayView {
   const said = plain.map(asLocalized);
@@ -92,17 +92,26 @@ describe('the narration column', () => {
     expect(transcript.nextId).toBe(2);
   });
 
-  it('counts only what it was just told, so a line coming back after another is its own', () => {
+  it('counts a line coming back within earshot against the one already there, wherever it landed', () => {
     const pops = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('a chestnut pops') } as const;
     const burns = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('one burns') } as const;
 
     const transcript = appendOutputs(appendOutputs(appendOutputs(emptyTranscript(), [pops, pops]), [burns]), [pops]);
 
     expect(transcript.entries.map((entry) => [entry.text, entry.repeats])).toEqual([
-      ['a chestnut pops', 2],
+      ['a chestnut pops', 3],
       ['one burns', 1],
-      ['a chestnut pops', 1],
     ]);
+  });
+
+  it('lets a line said long enough ago stand on its own again', () => {
+    const pops = { kind: 'message', words: 'player', tone: 'plain', text: asLocalized('a chestnut pops') } as const;
+    const between = (at: number) => ({ kind: 'message', words: 'player', tone: 'plain', text: asLocalized(`line ${at}`) }) as const;
+
+    const far = appendOutputs(appendOutputs(emptyTranscript(), [pops]), [...Array.from({ length: WITHIN_EARSHOT }, (_, at) => between(at))]);
+    const transcript = appendOutputs(far, [pops]);
+
+    expect(transcript.entries.filter((entry) => entry.text === 'a chestnut pops')).toHaveLength(2);
   });
 
   it('tells a diagnostic from something the world said, however alike they read', () => {

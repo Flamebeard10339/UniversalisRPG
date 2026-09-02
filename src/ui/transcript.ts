@@ -93,6 +93,20 @@ function fromOutput(output: CommandOutput, cursor: Cursor): Written[] {
 const isRepeat = (held: LogEntry, line: Written): boolean =>
   held.words === line.words && held.kind === line.kind && held.tone === line.tone && held.text === line.text;
 
+export const WITHIN_EARSHOT = 6;
+
+const ARRIVING: readonly LogKind[] = ['place', 'describe'];
+
+const isArrival = (kind: LogKind): boolean => ARRIVING.includes(kind);
+
+function saidRecently(entries: readonly LogEntry[], line: Written): number {
+  const earshot = isArrival(line.kind) ? 1 : WITHIN_EARSHOT;
+  for (let at = entries.length - 1; at >= 0 && at >= entries.length - earshot; at -= 1) {
+    if (isRepeat(entries[at]!, line)) return at;
+  }
+  return -1;
+}
+
 export function appendOutputs(transcript: Transcript, outputs: readonly CommandOutput[]): Transcript {
   const cursor: Cursor = { place: transcript.place, described: [...transcript.described] };
   const written = outputs.flatMap((output) => fromOutput(output, cursor));
@@ -101,8 +115,8 @@ export function appendOutputs(transcript: Transcript, outputs: readonly CommandO
   let nextId = transcript.nextId;
   const entries: LogEntry[] = [...transcript.entries];
   for (const line of written) {
-    const held = entries[entries.length - 1];
-    if (held !== undefined && isRepeat(held, line)) entries[entries.length - 1] = { ...held, repeats: held.repeats + 1 };
+    const said = saidRecently(entries, line);
+    if (said >= 0) entries[said] = { ...entries[said]!, repeats: entries[said]!.repeats + 1 };
     else entries.push({ ...line, id: nextId++, repeats: 1 } as LogEntry);
   }
   return { entries, nextId, place: cursor.place, described: cursor.described };
