@@ -253,7 +253,7 @@ on death:
     roll: combat.purse
     1 in 14: give: 1 steel-lockpicks
 pick-pocket:
-  hidden if: level.thieving < 11
+  requires: level.thieving >= 11
   one of:
     100x: give: 18 core.coin
     2x: give: 1 fingerless-gloves
