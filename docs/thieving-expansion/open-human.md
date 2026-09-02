@@ -60,15 +60,6 @@ ninety-one coin.
 engine line and crosses; the ladders then collapse to `take: everything`-shaped
 lines once a stored count can be given back.*
 
-## Whether `examine:` should take fragments
-
-A `{condition: words}` fragment in an `examine:` line loads clean and is dropped when
-the line is read. The urchins are two entities — ragged and fed — so that what the
-player sees of them changes, and the widow is two entities for the same reason.
-
-*Moves when: he says whether an examine is a line the game says. If yes, it is a
-language feature and crosses; the paired entities then fold into one each.*
-
 ## What the rogue's outfit is meant to boost
 
 The brief says each piece boosts *thieving related stats of allocated passives by

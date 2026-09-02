@@ -77,3 +77,15 @@ expansion did not change.
 
 *Closes when:* `npm run oracle -- --at content` reports it PASSED — either by the
 watch being retried with `until`, or by the check moving to the contest form.
+
+## The paired entities stand in for a fragment the engine now takes
+
+An `examine:` is a line the game says, so `{condition: words}` holds in one. The
+module was written before that was true: the urchins are two entities, ragged and
+fed, and the widow is two more, so that what the player sees of them can change on a
+flag. One entity each says the same thing now.
+
+*Closes when:* the ragged and fed urchins are one entity, the two widows are one, what
+each says changes on the flag that used to pick between them, and every route through
+`content/thieving.dsl` still walks.
+
