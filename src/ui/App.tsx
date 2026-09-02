@@ -336,7 +336,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
             onLayer={(layer) => go((held) => toLayer(held, layer))}
             banners={[
               <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
-              <StatusBanner key="status" view={view} live={snapshot.live} stirring={stirring(crossed)} />,
+              <StatusBanner key="status" view={view} live={snapshot.live} speed={snapshot.speed} stirring={stirring(crossed)} />,
             ]}
             beside={[null, snapshot.live === null ? null : <CancelUnderway key="cancel" label={snapshot.live.label} onCancel={driver.cancel} />]}
             bodies={bodies}

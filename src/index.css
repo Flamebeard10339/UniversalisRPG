@@ -190,6 +190,31 @@ textarea {
   animation-direction: reverse;
 }
 
+/* Past a speed a fill cannot say where in a cycle it is: one tick covers more of
+   the cycle than the fill could travel, so it lurches and wraps rather than
+   filling. It goes whole and marches instead, which says what the road says —
+   this is under way — without claiming a position it does not know. The pattern
+   is 28 long, which is what the keyframe travels, so the stripes arrive where
+   the ones before them started and the march never jumps. */
+@keyframes racing {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28px 0;
+  }
+}
+
+.racing {
+  background-image: repeating-linear-gradient(
+    115deg,
+    var(--color-accent) 0 10px,
+    var(--color-accent-strong) 10px 18px,
+    var(--color-accent) 18px 28px
+  );
+  animation: racing 700ms linear infinite;
+}
+
 /* Twice over, so a second refusal on a count that has not moved still reads as
    an answer rather than as nothing happening. */
 .denied {
@@ -241,7 +266,8 @@ textarea {
   .denied,
   .stirring,
   .underway,
-  .marching {
+  .marching,
+  .racing {
     animation: none;
   }
 

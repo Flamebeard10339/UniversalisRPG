@@ -3,9 +3,10 @@ import type { PlayView } from '../runtime/session';
 import { fillPercent, remainingBadge } from './format';
 import { HeldStrip } from './HeldStrip';
 import { Meter } from './Meter';
-import { FILL_TRANSITION, STIRRING, useMoment } from './transient';
+import { marchesAt } from './pace';
+import { FILL_TRANSITION, RACING, STIRRING, useMoment } from './transient';
 
-function Underway({ live }: { live: LiveProgress }): JSX.Element {
+function Underway({ live, racing }: { live: LiveProgress; racing: boolean }): JSX.Element {
   const working = useMoment('underway', live.active, String(live.label));
   return (
     <div className="flex flex-col gap-1.5">
@@ -14,7 +15,11 @@ function Underway({ live }: { live: LiveProgress }): JSX.Element {
         {live.detail === undefined ? null : <span className="ml-2 text-xs font-normal text-text-subtle">{live.detail}</span>}
       </p>
       <div className="h-2 overflow-hidden rounded-full bg-panel">
-        <div data-live="fill" className={`${working} h-full bg-accent`} style={{ ...FILL_TRANSITION, width: `${fillPercent(live.progress, 1)}%` }} />
+        {racing ? (
+          <div data-live="hurrying" className={`${RACING} h-full w-full`} />
+        ) : (
+          <div data-live="fill" className={`${working} h-full bg-accent`} style={{ ...FILL_TRANSITION, width: `${fillPercent(live.progress, 1)}%` }} />
+        )}
       </div>
       {live.implicit ? (
         <div className="flex items-center gap-2">
@@ -29,10 +34,16 @@ function Underway({ live }: { live: LiveProgress }): JSX.Element {
   );
 }
 
-export function StatusBanner({ view, live, stirring }: { view: PlayView; live: LiveProgress | null; stirring: boolean }): JSX.Element {
+export function StatusBanner({ view, live, speed, stirring }: { view: PlayView; live: LiveProgress | null; speed: number; stirring: boolean }): JSX.Element {
   return (
-    <div data-stirring={stirring ? 'yes' : undefined} className={`flex min-h-[48px] flex-col justify-center gap-1.5 border-y border-border bg-surface px-4 py-2 ${stirring ? STIRRING : ''}`}>
-      {live === null ? null : <Underway live={live} />}
+    <div
+      data-stirring={stirring ? 'yes' : undefined}
+      className={`relative flex min-h-[48px] flex-col justify-center gap-1.5 border-y border-border bg-surface px-4 py-2 ${stirring ? STIRRING : ''}`}
+    >
+      <div className="pointer-events-none absolute bottom-full left-4 right-4 flex flex-col items-start justify-end pb-1">
+        <HeldStrip held={view.held} />
+      </div>
+      {live === null ? null : <Underway live={live} racing={marchesAt(speed)} />}
       {(view.encounter?.foes ?? []).map((foe) => (
         <div key={foe.id} className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
@@ -44,7 +55,6 @@ export function StatusBanner({ view, live, stirring }: { view: PlayView; live: L
       {view.resources.map((resource) => (
         <Meter key={resource.id} title={resource.title} current={resource.current} max={resource.max} readout={resource.display === 'full'} />
       ))}
-      <HeldStrip held={view.held} />
     </div>
   );
 }

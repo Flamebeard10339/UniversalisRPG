@@ -478,7 +478,7 @@ describe('what the shell puts on the screen', () => {
     driver.choose(position(driver, ROAST));
     const { view, live } = driver.snapshot();
 
-    const band = readable(renderToStaticMarkup(<StatusBanner view={view} live={live} stirring={false} />));
+    const band = readable(renderToStaticMarkup(<StatusBanner view={view} live={live} speed={1} stirring={false} />));
 
     expect(live).not.toBeNull();
     expect(view.resources.length).toBeGreaterThan(0);
@@ -500,7 +500,7 @@ describe('what the shell puts on the screen', () => {
   it('draws one meter per resource the view publishes, in the order it published them', () => {
     const view = createDriver(fixtureSources(), { ticker: noTicks }).snapshot().view;
 
-    const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} live={null} stirring={false} />));
+    const drawn = readable(renderToStaticMarkup(<StatusBanner view={view} live={null} speed={1} stirring={false} />));
 
     expect(view.resources.length).toBeGreaterThan(0);
     expect(drawn).toEqual(view.resources.map((resource) => resource.title));

@@ -32,6 +32,8 @@ export const STIRRING = 'stirring';
 
 export const MARCHING = 'marching';
 
+export const RACING = 'racing';
+
 export const MARCHING_BACK = 'marching marching-back';
 
 export interface Moment {
