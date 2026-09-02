@@ -2,9 +2,28 @@ import { Condition, condition } from './condition';
 import { writtenFrom } from './codec';
 import { ListParser } from './list';
 import { Cursor, DslError, Holds, Parser, Span, Written, calledBlock, requireEnd } from './parser';
-import { range, Range, scaleRange } from './range';
+import { Range } from './range';
 import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
-import { countRange, decimalRange, durationOrStat, id, numberOrStat, produced, Produced, quantified, refuseRange, REFERENCE } from './values';
+import {
+  Amount,
+  amount,
+  amountFalls,
+  amountOrStat,
+  countRange,
+  decimalRange,
+  durationOrStat,
+  fallingAmount,
+  id,
+  numberOrStat,
+  opensStatAmount,
+  printAmount,
+  produced,
+  Produced,
+  quantified,
+  refuseRange,
+  REFERENCE,
+  risingAmount,
+} from './values';
 
 export type Party = 'me' | 'them';
 
@@ -26,11 +45,11 @@ export type ActionResult =
   | { kind: 'give'; item: string; amount?: Range }
   | { kind: 'take'; item: string; amount?: number }
   | { kind: 'strip' }
-  | { kind: 'xp'; skill: string; amount: Range }
+  | { kind: 'xp'; skill: string; amount: Amount }
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
   | { kind: 'open-modal'; modal: ModalScreen }
-  | { kind: 'pool'; resource: string; delta: Range; party?: Party }
+  | { kind: 'pool'; resource: string; delta: Amount; party?: Party }
   | { kind: 'fill'; resource: string; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party; lasts?: number | string }
   | { kind: 'stop' }
@@ -118,20 +137,26 @@ function parseParty(verb: keyof typeof PREPOSITION, cursor: Cursor): Party | und
   return party;
 }
 
+const AMOUNT_THEN_RESOURCE = new RegExp(`(?:my|their)[ \\t]+${REFERENCE.source}|${REFERENCE.source}[ \\t]+(?!(?:from|to|on)(?![\\w-]))${REFERENCE.source}`);
+
+const carriesAnAmount = (cursor: Cursor): boolean => cursor.peek(/[0-9.]/) !== null || (opensStatAmount(cursor) && cursor.peek(AMOUNT_THEN_RESOURCE) !== null);
+
 function parsePool(sign: 1 | -1, cursor: Cursor): ActionResult {
-  if (sign > 0 && cursor.peek(/[0-9.]/) === null) {
+  if (sign > 0 && !carriesAnAmount(cursor)) {
     const resource = id.parse(cursor);
     const whole = parseParty('restore', cursor);
     return whole === undefined ? { kind: 'fill', resource } : { kind: 'fill', resource, party: whole };
   }
-  const delta = decimalRange(cursor, 'an amount and a resource, as in `drain: 5 health`');
+  const written = carriesAnAmount(cursor)
+    ? amountOrStat(cursor, decimalRange, 'an amount and a resource, as in `drain: 5 health`')
+    : decimalRange(cursor, 'an amount and a resource, as in `drain: 5 health`');
   cursor.take(/[ \t]+/);
   const resource = id.parse(cursor);
   const party = parseParty(sign < 0 ? 'drain' : 'restore', cursor);
   const pool = {
     kind: 'pool' as const,
     resource,
-    delta: scaleRange(delta, sign),
+    delta: sign < 0 ? fallingAmount(written) : written,
   };
   return party === undefined ? pool : { ...pool, party };
 }
@@ -305,7 +330,7 @@ const LEAVES: readonly Leaf[] = [
     read: (cursor) => {
       const skill = id.parse(cursor);
       cursor.take(/[ \t]+/);
-      return { kind: 'xp', skill, amount: countRange(cursor, 'an xp amount') };
+      return { kind: 'xp', skill, amount: amountOrStat(cursor, countRange, 'an xp amount') };
     },
   },
   { opens: /relocate:[ \t]*/, forms: ['relocate: <place>'], examples: ['relocate: camp'], read: (cursor) => ({ kind: 'relocate', location: id.parse(cursor) }) },
@@ -385,7 +410,7 @@ function readResultLine(line: RawLine): ActionResult[] {
 }
 
 export function partyPhrase(result: ActionResult): string | undefined {
-  if (result.kind === 'pool' && result.party !== undefined) return `${PREPOSITION[result.delta.max < 0 ? 'drain' : 'restore']} ${result.party}`;
+  if (result.kind === 'pool' && result.party !== undefined) return `${PREPOSITION[amountFalls(result.delta) ? 'drain' : 'restore']} ${result.party}`;
   if (result.kind === 'inflict' && result.party !== undefined) return `${PREPOSITION.inflict} ${result.party}`;
   return undefined;
 }
@@ -433,7 +458,7 @@ export function printResult(value: ActionResult): string {
     case 'strip':
       return `take: ${EVERYTHING}`;
     case 'xp':
-      return `xp: ${value.skill} ${range.print(value.amount)}`;
+      return `xp: ${value.skill} ${printAmount(value.amount)}`;
     case 'relocate':
       return `relocate: ${value.location}`;
     case 'discover':
@@ -441,10 +466,10 @@ export function printResult(value: ActionResult): string {
     case 'open-modal':
       return `open modal: ${value.modal}`;
     case 'pool': {
-      const magnitude = value.delta.max < 0 ? scaleRange(value.delta, -1) : value.delta;
-      const verb = value.delta.max < 0 ? 'drain' : 'restore';
+      const magnitude = risingAmount(value.delta);
+      const verb = amountFalls(value.delta) ? 'drain' : 'restore';
       const party = value.party === undefined ? '' : ` ${PREPOSITION[verb]} ${value.party}`;
-      return `${verb}: ${range.print(magnitude)} ${value.resource}${party}`;
+      return `${verb}: ${printAmount(magnitude)} ${value.resource}${party}`;
     }
     case 'fill': {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.restore} ${value.party}`;
@@ -522,8 +547,8 @@ export const modalScreen = oneOf('modal', MODAL_SCREENS);
 export const actionResult: Parser<ActionResult> = {
   parse: parseResult,
   print: printResult,
-  names: { variable: 'flag', duration: 'stat' },
-  holds: () => ({ place, modal: modalScreen, duration: durationOrStat }),
+  names: { variable: 'flag', duration: 'stat', amount: 'stat' },
+  holds: () => ({ place, modal: modalScreen, duration: durationOrStat, amount }),
   forms: LEAF_FORMS,
   examples: LEAF_EXAMPLES,
   notes: LEAF_NOTES,

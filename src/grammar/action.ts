@@ -8,16 +8,11 @@ import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './p
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { KEYWORDS, keywordsIn, keywordsOn, TagClause, tagClause, withoutKeywords, type KeywordOn } from './tagClause';
-import { decimal, DECIMAL, id, refuseRange } from './values';
+import { decimal, DECIMAL, id, parseSided, printSided, refuseRange, side, SIDES, sideOf, type Side, type Sided } from './values';
 
 export type ActionKind = 'duration' | KeywordOn<'action'>;
 
-export type Side = 'my' | 'their';
-
-export interface Sided {
-  side?: Side;
-  id: string;
-}
+export { side, SIDES, sideOf, type Side, type Sided };
 
 export interface Contest {
   left: Sided;
@@ -59,31 +54,7 @@ const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
 
 export const actionKind = (action: Action): ActionKind => action.kind ?? 'duration';
 
-export const SIDES: readonly Side[] = ['my', 'their'];
-
-const SIDE = /(?:my|their)(?![\w-])/;
-
-export const side: Parser<Side> = {
-  parse(cursor) {
-    const raw = cursor.take(SIDE);
-    if (raw === null) throw new DslError(`expected ${SIDES.join(' or ')}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
-    return raw as Side;
-  },
-  print: (value) => value,
-  forms: [...SIDES],
-  examples: [...SIDES],
-};
-
-const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
-
 const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${printSided(value.right)}`);
-
-function parseSided(cursor: Cursor): Sided {
-  const marker = cursor.take(SIDE);
-  if (marker === null) return { id: id.parse(cursor) };
-  cursor.take(/[ \t]+/);
-  return { side: marker as Side, id: id.parse(cursor) };
-}
 
 function parseContest(cursor: Cursor): Contest {
   const left = parseSided(cursor);
@@ -290,8 +261,6 @@ export function sidedFields(action: Action): { written: string; value: Sided }[]
   if (action.depletes) found.push({ written: 'depletes', value: action.depletes });
   return found;
 }
-
-export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
 
 export const isTwoSided = (action: Action): boolean => sidedFields(action).some((field) => field.value.side !== undefined);
 

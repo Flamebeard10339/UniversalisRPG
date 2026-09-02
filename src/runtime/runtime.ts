@@ -12,6 +12,7 @@ import {
   clearActorDeltas,
   emptyPoolNow,
   eventsFor,
+  facing,
   fireEvents,
   getDelta,
   isSpent,
@@ -26,6 +27,7 @@ import { armedAction, Participant, participants, seatOf } from './roster';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
+import { amountFalls, isStatAmount } from '../grammar/values';
 import { applyRespawns, downOne, isElsewhere, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/sections/action';
 import { Action, declaredId } from '../content/sections/entity';
@@ -120,8 +122,8 @@ function collectDrainSites(results: readonly ActionResult[], registry: Registry,
   for (const result of results) {
     if (result.kind === 'pool') {
       const resource = registry.resources.get(result.resource);
-      if (!resource || eventsFor(registry, resource.id, 'on empty').length === 0 || result.delta.min >= 0) continue;
-      if (nested || !isPoint(result.delta)) sites.unplannable.add(result.resource);
+      if (!resource || eventsFor(registry, resource.id, 'on empty').length === 0 || !amountFalls(result.delta)) continue;
+      if (nested || isStatAmount(result.delta) || !isPoint(result.delta)) sites.unplannable.add(result.resource);
       else sites.milliPerCompletion.set(result.resource, (sites.milliPerCompletion.get(result.resource) ?? 0) + toMilliUnits(-result.delta.min));
       continue;
     }
@@ -297,7 +299,7 @@ function applyOutcome(segment: Segment, action: Action, outcome: FightOutcome, t
   const batch = fightBatch(action, times, outcome);
   if (batch.count <= 0) return;
   segment.state.cyclesDone += batch.count;
-  applyResults(segment, batch.results, PLAYER, batch.count);
+  facing(segment, PLAYER, aimedAt(segment.state), () => applyResults(segment, batch.results, PLAYER, batch.count));
   fireEvents(segment, PLAYER, outcome === 'completion' ? 'completed' : 'unfinished', undefined, batch.count);
 }
 

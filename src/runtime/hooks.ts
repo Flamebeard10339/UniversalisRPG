@@ -1,6 +1,6 @@
 import { ActionResult } from '../grammar/actionResult';
 import { HookCarrier } from '../grammar/hook';
-import { applyResults, Segment } from './effects';
+import { applyResults, facing, Segment } from './effects';
 import { modifierCarriers } from './stats';
 import { GameState } from './state';
 import { Registry } from '../content/registry';
@@ -23,9 +23,8 @@ export function fireHooks(segment: Segment, swinger: string, struck: string): st
 function fireMoment(segment: Segment, moment: Moment, carrier: string, other: string, reached: string[]): void {
   const hooks = characterHooks(segment.state, segment.registry, carrier, moment);
   if (hooks.length === 0) return;
-  const outer = segment.parties;
-  segment.parties = { me: carrier, them: other };
-  for (const results of hooks) applyResults(segment, results, carrier);
-  segment.parties = outer;
+  facing(segment, carrier, other, () => {
+    for (const results of hooks) applyResults(segment, results, carrier);
+  });
   for (const actorId of [carrier, other]) if (!reached.includes(actorId)) reached.push(actorId);
 }

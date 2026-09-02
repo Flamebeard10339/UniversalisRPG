@@ -290,3 +290,35 @@ describe('credit:', () => {
     ]);
   });
 });
+
+describe('an amount written as a stat', () => {
+  const wrote = (line: string): ActionResult => parse(line).results![0]!;
+
+  const printsBack = (line: string): string => actionLines(parse(line))[0]!.replace(/^swing: /, '');
+
+  it('reads a side and a stat where xp: takes a number', () => {
+    expect(wrote('xp: larceny their toll')).toEqual({ kind: 'xp', skill: 'larceny', amount: { side: 'their', id: 'toll' } });
+    expect(wrote('xp: larceny toll')).toEqual({ kind: 'xp', skill: 'larceny', amount: { id: 'toll' } });
+    expect(wrote('xp: larceny 4-7')).toEqual({ kind: 'xp', skill: 'larceny', amount: { min: 4, max: 7 } });
+  });
+
+  it('reads one where drain: and restore: take a number, carrying which way the pool moves', () => {
+    expect(wrote('drain: their toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'their', id: 'toll', falls: true } });
+    expect(wrote('restore: their toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'their', id: 'toll' } });
+  });
+
+  it('leaves restore: <resource> meaning the whole pool, since one word is not an amount and a resource', () => {
+    expect(wrote('restore: health')).toEqual({ kind: 'fill', resource: 'health' });
+    expect(wrote('restore: health to me')).toEqual({ kind: 'fill', resource: 'health', party: 'me' });
+  });
+
+  it('prints back every one of those as it was written', () => {
+    for (const line of ['xp: larceny their toll', 'xp: larceny toll', 'drain: their toll health', 'restore: my toll health', 'restore: health', 'drain: 3 health']) {
+      expect(printsBack(line)).toBe(line);
+    }
+  });
+
+  it('says what it wanted where one word stands alone after drain:', () => {
+    expect(refusal('drain: health')).toContain('an amount and a resource');
+  });
+});

@@ -5,7 +5,7 @@ import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } f
 import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { mayBeInstanceId } from './instanceId';
-import { Quantified } from '../grammar/values';
+import { amountFalls, isStatAmount, Quantified } from '../grammar/values';
 import { COUNTERS, TagClause } from '../grammar/tagClause';
 
 export const INFLICT_SITE = 'inflict:';
@@ -139,14 +139,18 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
         break;
       case 'xp':
         put(result, 'skill', 'skill', `${where} xp:`, visit);
+        if (isStatAmount(result.amount)) put(result.amount, 'id', 'stat', `${where} xp:`, visit);
         break;
       case 'relocate':
       case 'discover':
         putLocation(result, 'location', `${where} ${result.kind}:`, visit);
         break;
-      case 'pool':
-        put(result, 'resource', 'resource', `${where} ${result.delta.max < 0 ? 'drain' : 'restore'}:`, visit);
+      case 'pool': {
+        const site = `${where} ${amountFalls(result.delta) ? 'drain' : 'restore'}:`;
+        put(result, 'resource', 'resource', site, visit);
+        if (isStatAmount(result.delta)) put(result.delta, 'id', 'stat', site, visit);
         break;
+      }
       case 'fill':
         put(result, 'resource', 'resource', `${where} restore:`, visit);
         break;

@@ -1,6 +1,7 @@
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
 import { ActionResult, DropRow, nestedResults, Party, STARTING_LOCATION } from '../grammar/actionResult';
+import { Amount, isStatAmount } from '../grammar/values';
 import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { DropTable } from '../content/sections/droptable';
@@ -20,7 +21,7 @@ import { armedAction } from './roster';
 import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { debugging, GameState, PLAYER } from './state';
-import { hitChance, statValue } from './stats';
+import { hitChance, statRange, statValue } from './stats';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
@@ -92,12 +93,14 @@ export function clearActorDeltas(deltas: PoolDeltas, actorId: string): void {
   deltas.delete(actorId);
 }
 
+const variesPerSubject = (value: Amount): boolean => isStatAmount(value) || !isPoint(value);
+
 export function samplesPerApplication(results: readonly ActionResult[]): boolean {
   return results.some((result) => {
     if (nestedResults(result).length > 0 || result.kind === 'roll') return true;
     if (result.kind === 'give') return result.amount !== undefined && !isPoint(result.amount);
-    if (result.kind === 'xp') return !isPoint(result.amount);
-    if (result.kind === 'pool') return !isPoint(result.delta);
+    if (result.kind === 'xp') return variesPerSubject(result.amount);
+    if (result.kind === 'pool') return variesPerSubject(result.delta);
     return false;
   });
 }
@@ -106,6 +109,13 @@ function rewardScale(state: GameState, registry: Registry): number {
   if (!state.activeAction) return 1;
   const named = armedAction(state, registry).rewardScale;
   return named === undefined ? 1 : Math.max(0, 1 + statValue(named, state, registry) / 100);
+}
+
+function readAmount(segment: Segment, value: Amount, actor: string): Range {
+  if (!isStatAmount(value)) return value;
+  const subject = value.side === 'their' ? (segment.parties?.them ?? actor) : actor;
+  const read = statRange(value.id, segment.state, segment.registry, subject);
+  return value.falls ? scaleRange(read, -1) : read;
 }
 
 function drawCount(state: GameState, registry: Registry, amount: Range | undefined): number {
@@ -194,6 +204,16 @@ function subjectOf(segment: Segment, party: Party | undefined, actor: string): s
   return party === undefined ? actor : segment.parties?.[party] ?? actor;
 }
 
+export function facing<T>(segment: Segment, me: string, them: string, run: () => T): T {
+  const outer = segment.parties;
+  segment.parties = { me, them };
+  try {
+    return run();
+  } finally {
+    segment.parties = outer;
+  }
+}
+
 function applyOne(segment: Segment, result: ActionResult, actor: string, count: number, lead: boolean): number | undefined {
   const { state, registry } = segment;
   switch (result.kind) {
@@ -238,7 +258,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return -gone;
     }
     case 'xp': {
-      const amount = drawCount(state, registry, result.amount) * count;
+      const amount = drawCount(state, registry, readAmount(segment, result.amount, actor)) * count;
       const before = state.xp[result.skill] ?? 0;
       state.xp[result.skill] = before + amount;
       const reached = skillLevel(state.xp[result.skill]);
@@ -261,7 +281,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       return 0;
     case 'pool': {
       requireResource(registry, result.resource);
-      const milliAmount = toMilliUnits(drawAmount(state, result.delta)) * count;
+      const milliAmount = toMilliUnits(drawAmount(state, readAmount(segment, result.delta, actor))) * count;
       addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
       return milliAmount;
     }

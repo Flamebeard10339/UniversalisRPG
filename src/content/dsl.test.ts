@@ -141,7 +141,9 @@ describe('what the page offers where the cursor stands in a hole', () => {
         .filter((at) => at.line.holds?.()[at.hole.name] === undefined)
         .flatMap((at) => {
           const draft = written(at, '').slice(0, at.under.length + 1 + at.indent + at.hole.start);
-          return offeringAt(draft, draft.length, []).filling?.holds === undefined ? [] : [at.where];
+          const filling = offeringAt(draft, draft.length, []).filling;
+          if (filling?.form !== at.line.form || filling.hole !== at.hole.name) return [];
+          return filling.holds === undefined ? [] : [at.where];
         }),
     ).toEqual([]);
   });

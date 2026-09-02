@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MODAL_SCREENS } from '../grammar/actionResult';
 import { point } from '../grammar/range';
-import { applyResults, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools, standWhereTheyAre } from './effects';
+import { applyResults, facing, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools, standWhereTheyAre } from './effects';
 import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { loadUniverseWithDiagnostics } from '../content/load';
@@ -342,5 +342,59 @@ open:
 
     expect(open).toThrow(/one of: row luck weighs -\d/);
     expect(state.inventory['gem'] ?? 0, 'and nothing was handed out on the way to saying so').toBe(0);
+  });
+});
+
+const TOLL = `
+# stat max-health
+base: 20
+
+# stat toll
+base: 1
+
+# resource health
+max: max-health
+
+# skill larceny
+title: Larceny
+
+# entity mark
+title: Mark
+stats: toll 7
+`;
+
+describe('an amount that names a stat', () => {
+  const paid = (amount: { side?: 'my' | 'their'; id: string }): { xp: number; drained: number } => {
+    const registry = loadInEnglish(TOLL);
+    const state = createGameState();
+    initResources(state, registry);
+    const segment = newSegment(state, registry, []);
+    facing(segment, PLAYER, 'mark', () =>
+      applyResults(segment, [
+        { kind: 'xp', skill: 'larceny', amount },
+        { kind: 'pool', resource: 'health', delta: { ...amount, falls: true } },
+      ], PLAYER),
+    );
+    return { xp: state.xp['larceny'] ?? 0, drained: getDelta(segment.deltas, PLAYER, 'health') };
+  };
+
+  it('reads it off the other party where the amount says their', () => {
+    expect(paid({ side: 'their', id: 'toll' })).toEqual({ xp: 7, drained: toMilliUnits(-7) });
+  });
+
+  it('reads it off whoever acts where the amount says my, or names no side at all', () => {
+    expect(paid({ side: 'my', id: 'toll' })).toEqual({ xp: 1, drained: toMilliUnits(-1) });
+    expect(paid({ id: 'toll' })).toEqual({ xp: 1, drained: toMilliUnits(-1) });
+  });
+
+  it('falls back to whoever acts where nothing else stands opposite', () => {
+    const registry = loadInEnglish(TOLL);
+    const state = createGameState();
+    initResources(state, registry);
+    const segment = newSegment(state, registry, []);
+
+    applyResults(segment, [{ kind: 'xp', skill: 'larceny', amount: { side: 'their', id: 'toll' } }], PLAYER);
+
+    expect(state.xp['larceny']).toBe(1);
   });
 });

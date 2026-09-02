@@ -1,5 +1,5 @@
 import { Cursor, DslError, Parser, Span } from './parser';
-import { range, Range } from './range';
+import { range, Range, scaleRange } from './range';
 import { DEFAULT_LANGUAGE } from './section';
 
 export function refuseRange(cursor: Cursor, complaint: string): void {
@@ -116,6 +116,75 @@ export const durationOrStat: Parser<number | string> = {
   forms: [...duration.forms, '<stat>'],
   examples: [...duration.examples, 'daze-length'],
 };
+
+export type Side = 'my' | 'their';
+
+export interface Sided {
+  side?: Side;
+  id: string;
+}
+
+export const SIDES: readonly Side[] = ['my', 'their'];
+
+const SIDE = /(?:my|their)(?![\w-])/;
+
+export const side: Parser<Side> = {
+  parse(cursor) {
+    const raw = cursor.take(SIDE);
+    if (raw === null) throw new DslError(`expected ${SIDES.join(' or ')}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
+    return raw as Side;
+  },
+  print: (value) => value,
+  forms: [...SIDES],
+  examples: [...SIDES],
+};
+
+export const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
+
+export function parseSided(cursor: Cursor): Sided {
+  const marker = cursor.take(SIDE);
+  if (marker === null) return { id: id.parse(cursor) };
+  cursor.take(/[ \t]+/);
+  return { side: marker as Side, id: id.parse(cursor) };
+}
+
+export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
+
+export interface StatAmount extends Sided {
+  falls?: true;
+}
+
+export type Amount = Range | StatAmount;
+
+export const isStatAmount = (value: Amount): value is StatAmount => 'id' in value;
+
+export const amountFalls = (value: Amount): boolean => (isStatAmount(value) ? value.falls === true : value.max < 0);
+
+export const risingAmount = (value: Amount): Amount =>
+  isStatAmount(value) ? (value.side === undefined ? { id: value.id } : { side: value.side, id: value.id }) : value.max < 0 ? scaleRange(value, -1) : value;
+
+export const fallingAmount = (value: Amount): Amount => (isStatAmount(value) ? { ...risingAmount(value), falls: true } : scaleRange(value, -1));
+
+export const printAmount = (value: Amount): string => (isStatAmount(value) ? printSided(value) : range.print(value));
+
+export const STAT_AMOUNT_NOTE =
+  'a stat written where an amount stands is read off the side it names, so `their vigilance` is the figure carried by whatever this is aimed at and `my luck` the one carried by whoever brought it — a stat naming no side reads off whoever acts';
+
+export const amount: Parser<Amount> = {
+  called: 'amount',
+  parse: (cursor) => amountOrStat(cursor, decimalRange, 'an amount'),
+  print: printAmount,
+  holds: () => ({ side }),
+  forms: ['<number>', '<least>-<most>', '[<side> ]<stat>'],
+  examples: ['5', '4-7', 'their vigilance'],
+  notes: { '[<side> ]<stat>': STAT_AMOUNT_NOTE },
+};
+
+export const opensStatAmount = (cursor: Cursor): boolean => cursor.peek(/[a-z]/) !== null;
+
+export function amountOrStat(cursor: Cursor, bounded: (cursor: Cursor, what: string) => Range, what: string): Amount {
+  return opensStatAmount(cursor) ? parseSided(cursor) : bounded(cursor, what);
+}
 
 export const lastSegment = (id: string): string => id.split('.').pop() ?? id;
 

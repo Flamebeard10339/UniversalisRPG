@@ -173,7 +173,7 @@ describe('a half-written line', () => {
 
   it('says what a hole holds and what it may name, and says only the one that is not the other', () => {
     expect(fillingWords(taken(`${under}  xp: |`).filling!)).toBe('<skill> — a # skill');
-    expect(fillingWords(taken(`${under}  xp: mining |`).filling!)).toBe('<amount> — like 4-7');
+    expect(fillingWords(taken(`${under}  xp: mining |`).filling!)).toBe('<amount> — like 4-7, or a # stat');
     expect(fillingWords(taken('# droptable probe\none of:\n  |').filling!)).toBe('<weight> — like 3x, or a # stat');
   });
 
@@ -183,7 +183,14 @@ describe('a half-written line', () => {
   });
 
   it('moves to the next hole once the one before it is written', () => {
-    expect(taken(`${under}  xp: mining |`).filling).toEqual({ form: 'xp: <skill> <amount>', hole: 'amount', at: 11, like: '4-7' });
+    expect(taken(`${under}  xp: mining |`).filling).toEqual({
+      form: 'xp: <skill> <amount>',
+      hole: 'amount',
+      at: 11,
+      like: '4-7',
+      kind: 'stat',
+      holds: { words: ['-', 'my', 'their'], names: [{ hole: 'stat', kind: 'stat' }] },
+    });
   });
 
   it('is not refused while a shape it could still become is unfinished', () => {

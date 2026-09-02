@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buffsOf, createGameState, GameState, grantBuff, PLAYER, resolve, sampleStat, statRange, statValue, useFight } from './runtime';
 import { restorePools } from './effects';
 import { isPoint } from '../grammar/range';
+import { isStatAmount } from '../grammar/values';
 import { populationCount } from '../content/sections/location';
 import { Registry } from '../content/registry';
 import { ownedSectionKinds } from '../content/sections';
@@ -147,8 +148,10 @@ describe('the four shapes a buff has, read off the routes the fixture walks', ()
     const regenerated = idle.resources['core.health']! - struck;
 
     const spine = registry.passives.get('fixture-combat.retribution')!.whenHit.find((effect) => effect.kind === 'pool')!;
-    expect(spine.delta.min).toBe(spine.delta.max);
-    expect(opening + regenerated - struck).toBe(toMilliUnits(-spine.delta.min) * landed);
+    const drained = spine.delta;
+    if (isStatAmount(drained)) throw new Error('fixture-combat.retribution drains a written amount, so this reads it as one');
+    expect(drained.min).toBe(drained.max);
+    expect(opening + regenerated - struck).toBe(toMilliUnits(-drained.min) * landed);
   });
 });
 
