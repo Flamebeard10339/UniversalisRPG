@@ -23,7 +23,7 @@ import { skillLevel } from './skills';
 import { debugging, GameState, PLAYER } from './state';
 import { hitChance, statRange, statValue } from './stats';
 import { engagementDelay } from './tuning';
-import { divideRateRemainder, MILLI_UNITS, toMilliUnits } from './units';
+import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
 
 export interface Segment {
@@ -91,6 +91,15 @@ export function getDelta(deltas: PoolDeltas, actorId: string, resourceId: string
 
 export function clearActorDeltas(deltas: PoolDeltas, actorId: string): void {
   deltas.delete(actorId);
+}
+
+export function poolFell(segment: Segment, actorId: string, resourceId: string, milliFall: number, count = 1): void {
+  if (milliFall <= 0 || count <= 0) return;
+  const store = poolStores(segment.state).find((each) => each.actorId === actorId);
+  const standing = store?.levels[resourceId];
+  const taken = standing === undefined ? milliFall : Math.min(milliFall, Math.max(standing, 0));
+  if (taken <= 0) return;
+  fireEvents(segment, actorId, 'damage-taken', resourceId, count, fromMilliUnits(taken));
 }
 
 const variesPerSubject = (value: Amount): boolean => isStatAmount(value) || !isPoint(value);
@@ -282,7 +291,9 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'pool': {
       requireResource(registry, result.resource);
       const milliAmount = toMilliUnits(drawAmount(state, readAmount(segment, result.delta, actor))) * count;
-      addDelta(segment.deltas, subjectOf(segment, result.party, actor), result.resource, milliAmount);
+      const subject = subjectOf(segment, result.party, actor);
+      addDelta(segment.deltas, subject, result.resource, milliAmount);
+      if (milliAmount < 0) poolFell(segment, subject, result.resource, -milliAmount / count, count);
       return milliAmount;
     }
     case 'fill': {

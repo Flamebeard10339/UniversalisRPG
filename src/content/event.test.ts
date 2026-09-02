@@ -53,7 +53,7 @@ describe("a trigger's arity is resource:, in either direction", () => {
 
   it('names the arity it violated rather than only the field', () => {
     expect(() => loadModule(withEvent('trigger: on empty'))).toThrow('trigger: on empty watches a pool, so it needs a resource: naming which one');
-    expect(() => loadModule(withEvent('trigger: damage-taken\nresource: health'))).toThrow('trigger: damage-taken watches no pool, so it takes no resource:');
+    expect(() => loadModule(withEvent('trigger: damage-dealt\nresource: health'))).toThrow('trigger: damage-dealt watches no pool, so it takes no resource:');
   });
 });
 

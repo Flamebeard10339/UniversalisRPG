@@ -14,6 +14,7 @@ import {
   eventsFor,
   facing,
   fireEvents,
+  poolFell,
   getDelta,
   isSpent,
   newSegment,
@@ -285,9 +286,8 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
       fireEvents(segment, self, 'missed');
       fireEvents(segment, struck, 'evaded');
     } else {
-      const landed = fromMilliUnits(Math.min(dealt, capacity ?? dealt));
-      fireEvents(segment, self, 'damage-dealt', undefined, 1, landed);
-      fireEvents(segment, struck, 'damage-taken', undefined, 1, landed);
+      fireEvents(segment, self, 'damage-dealt', undefined, 1, fromMilliUnits(Math.min(dealt, capacity ?? dealt)));
+      poolFell(segment, struck, action.depletes.id, dealt);
     }
   }
 

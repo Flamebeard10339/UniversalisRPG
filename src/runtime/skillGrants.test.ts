@@ -31,6 +31,7 @@ max: max-health
 trigger: damage-dealt
 
 # event got-bitten
+resource: health
 trigger: damage-taken
 
 # event swung-at-air

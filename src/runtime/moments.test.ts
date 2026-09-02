@@ -95,6 +95,12 @@ continuous
 time: 1
 give: 1 pebble
 
+# action stumble
+title: stumble
+continuous
+time: 1
+drain: 2 health
+
 # item pebble
 title: pebble
 
@@ -106,7 +112,7 @@ ${moment.content}
 faction: people
 stats: max-health 100000, attack 4, attack-rate 60, blind 0, uncanny 400, max-fury 5, max-stamina 10
 skills: tally, lore
-uses: swing, wild-swing, skirmish, forage, train, gather
+uses: swing, wild-swing, skirmish, forage, train, gather, stumble
 ${moment.playerBlock ?? ''}
 
 # entity rat
@@ -147,7 +153,10 @@ const MOMENTS: Record<string, Moment[]> = {
     { by: 'a landed swing', content: event('damage-dealt'), arm: fights('swing', 'rat'), seconds: 4, times: 4 },
     { by: 'a landed swing, weighed by the damage it dealt', content: event('damage-dealt', undefined, '4*amount'), arm: fights('swing', 'rat'), seconds: 4, times: 64 },
   ],
-  'damage-taken': [{ by: 'a swing that landed on it', content: event('damage-taken'), arm: fights('swing', 'rat'), seconds: 4, times: 4 }],
+  'damage-taken': [
+    { by: 'a swing that landed on it', content: event('damage-taken', 'health'), arm: fights('swing', 'rat'), seconds: 4, times: 4 },
+    { by: 'a drain: on the same pool, which no swing was behind', content: event('damage-taken', 'health'), arm: (state, registry) => armAction('action', 'stumble', 'stumble', registry, state), seconds: 6, times: 6 },
+  ],
   missed: [{ by: 'a swing that did not land', content: event('missed'), arm: fights('wild-swing', 'rat'), seconds: 4, times: 4 }],
   evaded: [{ by: 'a swing that did not land on it', content: event('evaded'), arm: fights('wild-swing', 'rat'), seconds: 4, times: 4 }],
   completed: [{ by: 'a continuous action settling a batch of completions', content: event('completed'), arm: (state, registry) => armAction('action', 'forage', 'forage', registry, state), seconds: 10, times: 10 }],

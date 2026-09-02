@@ -8,7 +8,7 @@ export const EVENT_TRIGGERS = {
   'on empty': 'pool',
   'on full': 'pool',
   'damage-dealt': 'none',
-  'damage-taken': 'none',
+  'damage-taken': 'pool',
   missed: 'none',
   evaded: 'none',
   completed: 'none',

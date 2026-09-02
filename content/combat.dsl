@@ -8,6 +8,7 @@ dependencies:
 trigger: damage-dealt
 
 # event damage-taken
+resource: core.health
 trigger: damage-taken
 
 # skill attack
