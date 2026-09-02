@@ -20,8 +20,9 @@ import { nextRandom } from './rng';
 import { armedAction } from './roster';
 import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
-import { debugging, GameState, PLAYER } from './state';
+import { debugging, GameState, PLAYER, templateOf } from './state';
 import { hitChance, statRange, statValue } from './stats';
+import { standInFor } from './population';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared } from './buffs';
@@ -318,6 +319,13 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       const lasts = result.lasts === undefined ? undefined : statSide(result.lasts, state, registry, subject);
       for (let i = 0; i < count; i++) applyDeclared(state, subject, source, state.time, lasts);
       return count;
+    }
+    case 'become': {
+      const stood = segment.parties?.them;
+      if (stood === undefined || stood === actor) return 0;
+      if (!registry.entities.has(result.entity)) throw new RuntimeError(`unknown entity to become: ${result.entity}`);
+      const seconds = statSide(result.lasts, state, registry, stood);
+      return standInFor(state, registry, state.location, templateOf(stood), result.entity, seconds) ? 1 : 0;
     }
     case 'stop':
       segment.stopped = segment.firing ?? localizerOf(registry, state).engine('engine.stopped.itself');

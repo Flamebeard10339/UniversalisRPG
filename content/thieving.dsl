@@ -38,6 +38,10 @@ group: core.other
 title: Thieving
 stat: thieving-ability
 
+# entity open-chest
+title: Open Chest
+examine: The lid is standing up and the tray under it is bare. Whatever settles back into it does so slowly.
+
 # item dazed
 title: Dazed
 examine: Dizzy...
@@ -66,6 +70,8 @@ title: Pick the Lock
 extends: steal
 continuous
 time: 6
++on success:
+  become: open-chest for 3s
 
 # item steel-lockpicks
 title: Steel Lockpicks
@@ -236,7 +242,7 @@ pick-pocket:
 +stats: npc-thieving-difficulty 80, npc-thieving-xp 10, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  hidden if: level.thieving < 11
+  requires: level.thieving >= 11
   give: 12 core.coin
   +on unfinished:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
@@ -307,7 +313,7 @@ examine: Banded twice over and set into the floor, and the lock is the newest th
 stats: npc-thieving-difficulty 132, npc-thieving-xp 90, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
-  hidden if: level.thieving < 14
+  requires: level.thieving >= 14
   time: 14
   roll: strongbox-contents
   say: The last ward goes over under your thumb and the lid lifts on a hinge somebody has kept oiled.

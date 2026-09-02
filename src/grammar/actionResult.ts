@@ -52,6 +52,7 @@ export type ActionResult =
   | { kind: 'pool'; resource: string; delta: Amount; party?: Party }
   | { kind: 'fill'; resource: string; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party; lasts?: number | string }
+  | { kind: 'become'; entity: string; lasts: number | string }
   | { kind: 'stop' }
   | {
       kind: 'chance';
@@ -171,6 +172,17 @@ function parseInflict(cursor: Cursor): ActionResult {
     ...(party === undefined ? {} : { party }),
     ...(lasts === undefined ? {} : { lasts }),
   };
+}
+
+const BECOME_NOTE =
+  'what the action is aimed at stands as this instead, where it stands, until the stretch is up and it is itself again. The thing it becomes is declared like anything else and is put in no `# location`: it is only ever where the thing it stood in for was';
+
+function parseBecome(cursor: Cursor): ActionResult {
+  const entity = id.parse(cursor);
+  if (cursor.take(/[ \t]+for[ \t]+/) === null) {
+    throw new DslError('become: says how long it stands, as in `become: open-chest for 3s`', { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.src.length) });
+  }
+  return { kind: 'become', entity, lasts: durationOrStat.parse(cursor) };
 }
 
 function parseGive(value: Produced): ActionResult {
@@ -345,6 +357,13 @@ const LEAVES: readonly Leaf[] = [
     notes: { 'restore: <resource>[ to <me or them>]': 'with no amount before it the pool is filled to whatever its ceiling stands at when this runs, which is the one thing a number cannot say: a race, an item or a buff may have moved it' },
   },
   {
+    opens: /become:[ \t]*/,
+    forms: ['become: <entity> for <duration>'],
+    examples: ['become: open-chest for 3s'],
+    read: parseBecome,
+    notes: { 'become: <entity> for <duration>': BECOME_NOTE },
+  },
+  {
     opens: /inflict:[ \t]*/,
     forms: ['inflict: <buff item>[ on <me or them>]', 'inflict: <buff item>[ on <me or them>] for <duration>'],
     examples: ['inflict: dazzled', 'inflict: dazzled for 10s'],
@@ -475,6 +494,8 @@ export function printResult(value: ActionResult): string {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.restore} ${value.party}`;
       return `restore: ${value.resource}${party}`;
     }
+    case 'become':
+      return `become: ${value.entity} for ${durationOrStat.print(value.lasts)}`;
     case 'inflict': {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
       const lasts = value.lasts === undefined ? '' : ` for ${durationOrStat.print(value.lasts)}`;

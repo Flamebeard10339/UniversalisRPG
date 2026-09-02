@@ -8,7 +8,8 @@ import { secondsToMs } from './units';
 
 const isDeficit = (value: unknown): boolean => {
   if (typeof value !== 'object' || value === null) return false;
-  const held = value as { down?: unknown; due?: unknown };
+  const held = value as { down?: unknown; due?: unknown; standingIn?: unknown };
+  if (held.standingIn !== undefined && typeof held.standingIn !== 'string') return false;
   return typeof held.down === 'number' && Number.isInteger(held.down) && held.down >= 0 && Array.isArray(held.due) && held.due.every((at) => Number.isInteger(at)) && held.due.length <= held.down;
 };
 
@@ -19,14 +20,21 @@ export function isPopulations(value: unknown): boolean {
 
 const deficitOf = (state: GameState, locationId: string, entityId: string): Deficit | undefined => state.populations[locationId]?.[entityId];
 
+function standingIn(state: GameState, location: Location): { entity: string; count: number }[] {
+  return Object.values(state.populations[location.id] ?? {}).flatMap((deficit) =>
+    deficit.standingIn === undefined || deficit.down <= 0 ? [] : [{ entity: deficit.standingIn, count: deficit.down }],
+  );
+}
+
 export function standing(state: GameState, registry: Registry, location: Location): { entity: string; count: number }[] {
-  return location.entities
+  const declared = location.entities
     .filter((entry) => {
       const gate = registry.entities.get(entry.entity)?.hiddenIf;
       return !gate || !evaluateCondition(gate, state, registry);
     })
     .map((entry) => ({ entity: entry.entity, count: populationCount(entry) - (deficitOf(state, location.id, entry.entity)?.down ?? 0) }))
     .filter((entry) => entry.count > 0);
+  return [...declared, ...standingIn(state, location)];
 }
 
 export function isStanding(state: GameState, registry: Registry, location: Location, entityId: string): boolean {
@@ -44,6 +52,17 @@ export function downOne(state: GameState, registry: Registry, locationId: string
   deficit.down += 1;
   const after = registry.entities.get(entityId)?.respawnAfter;
   if (after !== undefined) deficit.due.push(state.time + secondsToMs(after));
+}
+
+export function standInFor(state: GameState, registry: Registry, locationId: string, entityId: string, becomes: string, seconds: number): boolean {
+  if (!registry.locations.get(locationId)?.entities.some((entry) => entry.entity === entityId)) return false;
+  const byEntity = (state.populations[locationId] ??= {});
+  const deficit = (byEntity[entityId] ??= { down: 0, due: [] });
+  if (deficit.standingIn !== undefined && deficit.standingIn !== becomes) return false;
+  deficit.down += 1;
+  deficit.due.push(state.time + secondsToMs(Math.max(0, seconds)));
+  deficit.standingIn = becomes;
+  return true;
 }
 
 export function nextRespawn(state: GameState): number | undefined {
@@ -67,6 +86,7 @@ export function applyRespawns(state: GameState): boolean {
         changed = true;
       }
       if (deficit.down <= 0) delete byEntity[entityId];
+      else if (deficit.due.length === 0) delete deficit.standingIn;
     }
     if (Object.keys(byEntity).length === 0) delete state.populations[locationId];
   }
