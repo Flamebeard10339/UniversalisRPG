@@ -7,6 +7,7 @@ import { engineLocale, loadInEnglish, withEngineLocale } from '../content/engine
 import { ENGINE_KEYS } from '../content/locale';
 import { loadUniverse } from '../content/load';
 import { NOTE_MARK } from '../grammar/note';
+import { printSegments } from '../grammar/segment';
 import { everyKey, englishOf } from '../content/translation';
 import { hasNote, withoutNote } from '../grammar/note';
 import { itemExamine, localizerFor, type Localized } from './localized';
@@ -83,19 +84,19 @@ island.item.apple.examine: Verde, y sonrojada por un lado.`,
   it('are the words the author wrote, in the language asking for them', () => {
     const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND_WITH_EXAMINE }, SPANISH_EXAMINE]);
 
-    expect(itemExamine(localizerFor(registry, 'en'), 'island.apple')).toBe('Green, and one side of it blushing.');
-    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBe('Verde, y sonrojada por un lado.');
+    expect(itemExamine(localizerFor(registry, 'en'), 'island.apple', printSegments)).toBe('Green, and one side of it blushing.');
+    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple', printSegments)).toBe('Verde, y sonrojada por un lado.');
   });
 
   it('are nothing at all where the author wrote none, rather than a sentence the engine made up', () => {
-    expect(itemExamine(english(), 'island.rope')).toBeUndefined();
-    expect(itemExamine(spanish(), 'island.rope')).toBeUndefined();
+    expect(itemExamine(english(), 'island.rope', printSegments)).toBeUndefined();
+    expect(itemExamine(spanish(), 'island.rope', printSegments)).toBeUndefined();
   });
 
   it('are nothing at all in a language that has not been given them', () => {
     const registry = loadUniverse([engineLocale(), { name: 'island', text: ISLAND_WITH_EXAMINE }, SPANISH]);
 
-    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple')).toBeUndefined();
+    expect(itemExamine(localizerFor(registry, 'es'), 'island.apple', printSegments)).toBeUndefined();
   });
 });
 
@@ -132,7 +133,7 @@ describe('an id survives translation, and prose does not', () => {
 describe('authored prose answers by its address', () => {
   const SPANISH_ISLAND = ['# info isla', 'version: 1.0.0', 'language: es', '', '# location orilla', 'x: 0, y: 0', 'starting', '', '# entity puerta', 'abrir:', '  instant', '  say: se abre la puerta'].join('\n');
   const registry = loadUniverse([engineLocale(), { name: 'isla', text: SPANISH_ISLAND }]);
-  const said = (language: string): string => localizerFor(registry, language).spoken('isla.entity.puerta.say.0');
+  const said = (language: string): string => localizerFor(registry, language).line('isla.entity.puerta.say.0', printSegments);
 
   it('says the words to a player of the language the line was authored in', () => {
     expect(said('es')).toBe('se abre la puerta');
@@ -192,7 +193,7 @@ describe('a note an author left is dropped from every line the game says', () =>
 
     expect(localizer.title('entity', 'island.miki')).toBe('Miki');
     expect(localizer.content('entity', 'island.miki', 'examine')).toBe('A weathered guide.');
-    expect(localizer.spoken('island.dialogue.chat.greet.line.0')).toBe('A traveller, out here?');
+    expect(localizer.line('island.dialogue.chat.greet.line.0', printSegments)).toBe('A traveller, out here?');
   });
 
   it('leaves the line standing where the mark carries no words, which is all a rough line says', () => {
@@ -212,6 +213,6 @@ describe('a note an author left is dropped from every line the game says', () =>
 
     expect(keys.length).toBeGreaterThan(100);
     expect(keys.some((key) => hasNote(englishOf(plain.locales, key))), 'no shipped line carries a note, so this proves nothing about one that does').toBe(true);
-    expect(keys.filter((key) => spoken.spoken(key) !== said(key))).toEqual([]);
+    expect(keys.filter((key) => spoken.line(key, printSegments) !== said(key))).toEqual([]);
   });
 });

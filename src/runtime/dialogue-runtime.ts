@@ -1,7 +1,7 @@
 import { RuntimeError } from './error';
 import { costLimit } from './actions';
 import { ActionResult, itemCost } from '../grammar/actionResult';
-import { evaluateCondition, renderSegments } from './conditions';
+import { evaluateCondition, renderSegments, weighing } from './conditions';
 import { Choice, Dialogue, DialogueNode, givenByQuest, isThread, nodeEffects, NodeStep, offering, Spoken, spokenBy } from '../content/sections/dialogue';
 import { applyResultsNow } from './effects';
 import { BASE_LANGUAGE, Localized, Localizer, localizerFor, localizerOf } from './localized';
@@ -13,7 +13,7 @@ import { type DialogueCursor, GameState } from './state';
 
 function spokenLine(registry: Registry, state: GameState, line: Spoken): Localized {
   if (line.key === undefined) throw new RuntimeError(`a dialogue line reached the log with no address: ${JSON.stringify(renderSegments(line.segments, state, registry))}`);
-  return localizerOf(registry, state).line(line.key, (segments) => renderSegments(segments, state, registry));
+  return localizerOf(registry, state).line(line.key, weighing(state, registry));
 }
 
 function speak(registry: Registry, state: GameState, line: Spoken): void {
@@ -120,7 +120,7 @@ export interface Opener {
 
 export function openerShown(registry: Registry, state: GameState, node: DialogueNode): Localized {
   const localizer = localizerOf(registry, state);
-  if (node.ask?.key !== undefined) return localizer.spoken(node.ask.key);
+  if (node.ask?.key !== undefined) return localizer.line(node.ask.key, weighing(state, registry));
   const first = node.steps.find((step): step is Extract<NodeStep, { kind: 'say' }> => step.kind === 'say');
   return first ? spokenLine(registry, state, first) : localizer.identifier(node.name);
 }

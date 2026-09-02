@@ -9,7 +9,7 @@ import { EventTrigger, GameEvent } from '../content/sections/event';
 import { isPoint, Range, sampleCount, sampleRange, scaleRange } from '../grammar/range';
 import { Registry, startingLocationId } from '../content/registry';
 import { Resource } from '../content/sections/resource';
-import { evaluateCondition } from './conditions';
+import { evaluateCondition, weighing } from './conditions';
 import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
@@ -230,7 +230,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'say':
       if (!lead) return undefined;
       if (result.key === undefined) throw new RuntimeError(`a say: reached the log with no address: ${JSON.stringify(result.text)}`);
-      state.log.push(localizerOf(registry, state).spoken(result.key));
+      state.log.push(localizerOf(registry, state).line(result.key, weighing(state, registry)));
       return 0;
     case 'set':
       state.flags[result.variable] = true;

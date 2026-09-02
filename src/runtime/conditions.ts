@@ -8,7 +8,7 @@ import { highestSkillLevel, skillLevel } from './skills';
 import { statChanged, statValue } from './stats';
 import { fromMilliUnits, msToSeconds } from './units';
 import { heldCount } from './itemInstance';
-import { localizerOf } from './localized';
+import { localizerOf, type Weighing } from './localized';
 
 export interface Answered {
   value: boolean | number | string | undefined;
@@ -109,6 +109,11 @@ export function itemMissingFor(condition: Condition, state: GameState, registry:
       return undefined;
   }
 }
+
+export const weighing =
+  (state: GameState, registry: Registry): Weighing =>
+  (segments) =>
+    renderSegments(segments, state, registry);
 
 export function renderSegments(segments: TextSegment[], state: GameState, registry: Registry): string {
   return segments

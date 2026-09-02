@@ -2,6 +2,7 @@ import type { ModalChoice, ModalOption } from './modalOption';
 import { isBase, Item } from '../content/sections/item';
 import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
+import { weighing } from './conditions';
 import { equip, unequip, wearable } from './equipment';
 import { Answer, Localized, itemExamine, Localizer, localizerOf } from './localized';
 import { destroyItem, itemTemplate } from './itemInstance';
@@ -73,8 +74,8 @@ export const verbsOffered = (entry: CarriedEntry, state: GameState, registry: Re
 export const socketsInto = (entry: CarriedEntry, state: GameState, registry: Registry): boolean =>
   registry.items.get(itemTemplate(state, entry.id))?.clusterJewel !== undefined;
 
-function heading(localizer: Localizer, entry: CarriedEntry, state: GameState): Localized {
-  const examine = itemExamine(localizer, itemTemplate(state, entry.id));
+function heading(localizer: Localizer, entry: CarriedEntry, state: GameState, registry: Registry): Localized {
+  const examine = itemExamine(localizer, itemTemplate(state, entry.id), weighing(state, registry));
   return examine === undefined ? entry.name : localizer.engine('engine.examine.beside', { subject: entry.name, examine });
 }
 
@@ -91,7 +92,7 @@ export function carriedOptions(answers: ModalAnswers, state: GameState, registry
   if (!chosen) return [item];
 
   const applicable = verbsFor(chosen, state, registry);
-  const verb: ModalOption = { key: 'verb', label: heading(localizer, chosen, state), values: listed(localizer, applicable.map((each) => ({ value: each.value, shown: localizer.engine(each.shown) }))) };
+  const verb: ModalOption = { key: 'verb', label: heading(localizer, chosen, state, registry), values: listed(localizer, applicable.map((each) => ({ value: each.value, shown: localizer.engine(each.shown) }))) };
 
   const taking = applicable.find((each) => each.value === answers.verb);
   if (!taking?.confirms(chosen)) return [item, verb];

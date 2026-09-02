@@ -27,7 +27,7 @@ export type { HeldEffect } from './buffs';
 import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
 import { isFight } from '../grammar/action';
 import { standing } from './population';
-import { truthy } from './conditions';
+import { truthy, weighing } from './conditions';
 import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
@@ -495,8 +495,11 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     if (entity) entities.push({ id: entity.id, masked: masked.has(entity.id), title: offeredBy(registry, localizer, 'entity', entity.id, masked.has(entity.id)).detail });
   }
 
+  const description =
+    location.examine === undefined ? undefined : (localizer.prose('location', location.id, 'examine', weighing(state, registry)) ?? localizer.content('location', location.id, 'examine'));
+
   return {
-    location: { id: location.id, title: localizer.title('location', location.id), description: location.examine === undefined ? undefined : localizer.content('location', location.id, 'examine') },
+    location: { id: location.id, title: localizer.title('location', location.id), description },
     entities,
     choices: computeChoices(session),
     time: msToSeconds(state.time),

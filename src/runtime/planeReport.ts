@@ -10,6 +10,7 @@ import { isAllocated, neighbours, nodeKey, placementAt, Plane, planeClusters, po
 import { itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { grownItems, itemInstance, ItemInstance, itemLevel, itemTemplate, pointsRemaining } from './itemInstance';
 import { GameState } from './state';
+import { weighing } from './conditions';
 import { counterLevels } from './stats';
 
 export type Standing = 'allocated' | 'available' | 'unreached' | 'blocked';
@@ -105,7 +106,7 @@ function distance(hex: Hex): number {
   return (Math.abs(hex.q) + Math.abs(hex.r) + Math.abs(hex.q + hex.r)) / 2;
 }
 
-function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, hex: Hex): ClusterReport | undefined {
+function clusterReport(registry: Registry, state: GameState, localizer: Localizer, plane: Plane, hex: Hex): ClusterReport | undefined {
   const cluster = plane[hexKey(hex)];
   const placement = placementAt(registry, plane, hex);
   if (!cluster || !placement) return undefined;
@@ -158,7 +159,7 @@ function clusterReport(registry: Registry, localizer: Localizer, plane: Plane, h
     hex: hexKey(hex),
     jewel: jewel.id,
     title: declared ? localizer.title('cluster-jewel', jewel.id) : localizer.engine('engine.plane.base'),
-    examine: (declared ? localizer.words('cluster-jewel', jewel.id, 'examine') : undefined) ?? null,
+    examine: (declared ? localizer.prose('cluster-jewel', jewel.id, 'examine', weighing(state, registry)) : undefined) ?? null,
     shape: jewel.shape,
     entry,
     effects,
@@ -183,7 +184,7 @@ export function planeReport(registry: Registry, state: GameState, target: string
 
   const clusters = planeClusters(payload.plane)
     .sort((a, b) => distance(a.hex) - distance(b.hex) || a.hex.q - b.hex.q || a.hex.r - b.hex.r)
-    .flatMap(({ hex }) => clusterReport(registry, localizer, payload.plane, hex) ?? []);
+    .flatMap(({ hex }) => clusterReport(registry, state, localizer, payload.plane, hex) ?? []);
 
   return {
     instance: target,

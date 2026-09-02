@@ -42,11 +42,13 @@ export interface Localizer {
   words(kind: string, id: string, field: string, params?: Params): Localized | undefined;
   title(kind: string, id: string): Localized;
   actionLabel(kind: string, ownerId: string, action: Action): Localized;
-  spoken(key: string): Localized;
-  line(key: string, render: (segments: TextSegment[]) => string): Localized;
+  line(key: string, weigh: Weighing): Localized;
+  prose(kind: string, id: string, field: string, weigh: Weighing): Localized | undefined;
   identifier(id: string): Localized;
   minted(id: string): Localized;
 }
+
+export type Weighing = (segments: TextSegment[]) => string;
 
 export const BASE_LANGUAGE = 'en';
 
@@ -69,8 +71,11 @@ export function localizerFor(registry: Registry, language: string): Localizer {
     },
     title: (kind, id) => self.content(kind, id, 'title'),
     actionLabel: (kind, ownerId, action) => keyed(actionTextKey(actionTextOwner(registry.namespace, kind, ownerId, action)), {}),
-    spoken: (key) => (pattern(locales, language, key) ?? key) as Localized,
-    line: (key, render) => render(parseSegments(self.spoken(key), 0)) as Localized,
+    line: (key, weigh) => weigh(parseSegments(pattern(locales, language, key) ?? key, 0)) as Localized,
+    prose: (kind, id, field, weigh) => {
+      const found = pattern(locales, language, contentKey(registry, kind, id, field));
+      return found === undefined ? undefined : (weigh(parseSegments(found, 0)) as Localized);
+    },
     identifier: (id) => id as Localized,
     minted: (id) => mintedName(id, language) as Localized,
   };
@@ -83,4 +88,4 @@ export interface LanguageChoice {
 
 export const localizerOf = (registry: Registry, playing: LanguageChoice): Localizer => localizerFor(registry, playing.language);
 
-export const itemExamine = (localizer: Localizer, item: string): Localized | undefined => localizer.words('item', item, 'examine');
+export const itemExamine = (localizer: Localizer, item: string, weigh: Weighing): Localized | undefined => localizer.prose('item', item, 'examine', weigh);

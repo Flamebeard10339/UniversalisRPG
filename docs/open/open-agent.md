@@ -322,3 +322,26 @@ that budget starts to bite.
 *Closes when:* an author reading `npm run oracle -- location` is told that `relative:`
 and `x/y/z` displace each other, derived from `schema.exclusive`, with the no-kind page
 no longer than it is now.
+
+## A short id in a `{condition: words}` fragment never holds, and says nothing about it
+
+A fragment's condition is parsed twice: at load, off the authored line, where the
+reference walk qualifies its ids — and again at render, off the locale pattern, where
+nothing does. `Localizer.line` re-parses the stored words, so the load-time resolution
+is thrown away and the condition is evaluated against a bare id no flag is keyed by.
+Written `{queen-fell: …}` it silently never holds; written `{birds-and-the-bees.queen-fell: …}`
+it does. Measured by standing a probe module beside the fixture and reading the log
+both ways.
+
+The one conditional fragment the shipped world holds —
+`content/birds-and-the-bees.dsl:74`, what Sabina says about the queen — is written
+short, so those words have never once reached a player.
+
+Re-parsing at render is not itself the fault: a translated line carries its own
+fragments and they are only known then. What is missing is that the weigher is handed
+no namespace to read a short id against, and the key it is given (`birds-and-the-bees.dialogue.…`)
+names the owner it would need.
+
+*Closes when:* `{queen-fell: …}` in `content/birds-and-the-bees.dsl` holds when the flag
+is set, with the id left short, and an unresolvable id in a fragment is refused rather
+than quietly false.
