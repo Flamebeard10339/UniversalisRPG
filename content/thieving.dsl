@@ -52,17 +52,17 @@ examine: Dizzy...
 
 # action steal
 attempts: 1
-accuracy: my thieving-ability vs their npc-thieving-difficulty
+accuracy: us.thieving-ability vs them.npc-thieving-difficulty
 on success:
-  xp: thieving their npc-thieving-xp
+  xp: thieving them.npc-thieving-xp
 on unfinished:
-  drain: their npc-thieving-damage core.health
+  drain: them.npc-thieving-damage core.health
 
 # action pick-pocket
 title: Pick a Pocket
 extends: steal
 continuous
-rate: my thieving-rate
+rate: us.thieving-rate
 +on success:
   say: You come away with it and they walk on none the wiser.
 +on unfinished:
@@ -471,16 +471,16 @@ time: 8
 title: Lift From the Stall
 extends: steal
 continuous
-rate: my thieving-rate
+rate: us.thieving-rate
 
 # action cross
 title: Cross
 attempts: 1
 continuous
 time: 5
-accuracy: my thieving-ability vs their npc-thieving-difficulty
+accuracy: us.thieving-ability vs them.npc-thieving-difficulty
 on success:
-  xp: thieving their npc-thieving-xp
+  xp: thieving them.npc-thieving-xp
 
 # passive cutpurse
 title: Cutpurse

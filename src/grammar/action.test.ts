@@ -46,40 +46,40 @@ const hookRefusal = (body: string): string => {
 };
 
 const MELEE = `
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health
 `;
 
 describe('side markers', () => {
   it('reads every field of a two-sided action off the side it names', () => {
     expect(parse(MELEE)).toMatchObject({
-      rate: { side: 'my', id: 'attack-rate' },
+      rate: { side: 'us', id: 'attack-rate' },
       accuracy: {
-        left: { side: 'my', id: 'accuracy' },
-        right: { side: 'their', id: 'evasion' },
+        left: { side: 'us', id: 'accuracy' },
+        right: { side: 'them', id: 'evasion' },
       },
       damage: {
-        left: { side: 'my', id: 'attack' },
-        right: { side: 'their', id: 'defense' },
+        left: { side: 'us', id: 'attack' },
+        right: { side: 'them', id: 'defense' },
       },
-      depletes: { side: 'their', id: 'health' },
+      depletes: { side: 'them', id: 'health' },
     });
   });
 
   it('refuses a two-sided action whose stat, pool or skill field carries no marker', () => {
-    expect(refusal('accuracy: my accuracy vs evasion\ndepletes: their health')).toContain('accuracy: evasion names no side');
-    expect(refusal('rate: attack-rate\ndepletes: their health')).toContain('rate: attack-rate names no side');
-    expect(refusal('damage: my attack\ndepletes: health')).toContain('depletes: health names no side');
+    expect(refusal('accuracy: us.accuracy vs evasion\ndepletes: them.health')).toContain('accuracy: evasion names no side');
+    expect(refusal('rate: attack-rate\ndepletes: them.health')).toContain('rate: attack-rate names no side');
+    expect(refusal('damage: us.attack\ndepletes: health')).toContain('depletes: health names no side');
   });
 
   it('never defaults a missing marker, so the refusal names both spellings', () => {
-    expect(refusal('damage: my attack vs defense\ndepletes: their health')).toContain('my defense or their defense');
+    expect(refusal('damage: us.attack vs defense\ndepletes: them.health')).toContain('us.defense or them.defense');
   });
 
   it('has deleted retaliates, and says what replaced it', () => {
-    expect(refusal('retaliates\ndamage: my attack\ndepletes: their health')).toContain('"retaliates" was retired');
+    expect(refusal('retaliates\ndamage: us.attack\ndepletes: them.health')).toContain('"retaliates" was retired');
   });
 });
 
@@ -110,25 +110,25 @@ describe('side vocabulary is the whole declaration of kind', () => {
 
 describe('contests', () => {
   it('takes the right half as optional, absent meaning the neutral default', () => {
-    expect(parse('accuracy: my accuracy\ndepletes: their health').accuracy).toEqual({ left: { side: 'my', id: 'accuracy' } });
-    expect(parse('damage: my woodcutting\ndepletes: their wood').damage).toEqual({ left: { side: 'my', id: 'woodcutting' } });
+    expect(parse('accuracy: us.accuracy\ndepletes: them.health').accuracy).toEqual({ left: { side: 'us', id: 'accuracy' } });
+    expect(parse('damage: us.woodcutting\ndepletes: them.wood').damage).toEqual({ left: { side: 'us', id: 'woodcutting' } });
   });
 
   it('keeps exactly one spelling of each half, with no alias for the retired fields', () => {
     for (const [field, points] of [
-      ['evasion: evasion', 'accuracy: my accuracy vs their evasion'],
-      ['ability: attack', 'damage: my attack vs their defense'],
-      ['dr: defense', 'damage: my attack vs their defense'],
-      ['target: health', 'depletes: their <pool>'],
+      ['evasion: evasion', 'accuracy: us.accuracy vs them.evasion'],
+      ['ability: attack', 'damage: us.attack vs them.defense'],
+      ['dr: defense', 'damage: us.attack vs them.defense'],
+      ['target: health', 'depletes: them.<pool>'],
     ] as const) {
       expect(refusal(field)).toContain(points);
     }
   });
 
   it('takes a side-naming action with nothing to deplete, which counts down a whole of its own', () => {
-    expect(assembledActionProblem(parse('accuracy: my accuracy vs their evasion'))).toBeUndefined();
-    expect(assembledActionProblem(parse('damage: my felling vs their hardness'))).toBeUndefined();
-    expect(parse('accuracy: my accuracy vs their evasion').depletes).toBeUndefined();
+    expect(assembledActionProblem(parse('accuracy: us.accuracy vs them.evasion'))).toBeUndefined();
+    expect(assembledActionProblem(parse('damage: us.felling vs them.hardness'))).toBeUndefined();
+    expect(parse('accuracy: us.accuracy vs them.evasion').depletes).toBeUndefined();
   });
 });
 
@@ -177,14 +177,14 @@ describe('the table over an assembled action', () => {
     const compiled: Action = {
       label: 'Craft Bread',
       results: [],
-      damage: { left: { side: 'my', id: 'attack' } },
+      damage: { left: { side: 'us', id: 'attack' } },
     };
     expect(assembledActionProblem(compiled)).toBeUndefined();
     expect(assembledActionProblem({ ...compiled, depletes: { id: 'health' } })).toContain('depletes: health names no side');
     expect(
       assembledActionProblem({
         ...compiled,
-        depletes: { side: 'their', id: 'health' },
+        depletes: { side: 'them', id: 'health' },
       }),
     ).toBeUndefined();
   });
@@ -297,14 +297,14 @@ describe('an amount written as a stat', () => {
   const printsBack = (line: string): string => actionLines(parse(line))[0]!.replace(/^swing: /, '');
 
   it('reads a side and a stat where xp: takes a number', () => {
-    expect(wrote('xp: larceny their toll')).toEqual({ kind: 'xp', skill: 'larceny', amount: { side: 'their', id: 'toll' } });
+    expect(wrote('xp: larceny them.toll')).toEqual({ kind: 'xp', skill: 'larceny', amount: { side: 'them', id: 'toll' } });
     expect(wrote('xp: larceny toll')).toEqual({ kind: 'xp', skill: 'larceny', amount: { id: 'toll' } });
     expect(wrote('xp: larceny 4-7')).toEqual({ kind: 'xp', skill: 'larceny', amount: { min: 4, max: 7 } });
   });
 
   it('reads one where drain: and restore: take a number, carrying which way the pool moves', () => {
-    expect(wrote('drain: their toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'their', id: 'toll', falls: true } });
-    expect(wrote('restore: their toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'their', id: 'toll' } });
+    expect(wrote('drain: them.toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'them', id: 'toll', falls: true } });
+    expect(wrote('restore: them.toll health')).toEqual({ kind: 'pool', resource: 'health', delta: { side: 'them', id: 'toll' } });
   });
 
   it('leaves restore: <resource> meaning the whole pool, since one word is not an amount and a resource', () => {
@@ -313,7 +313,7 @@ describe('an amount written as a stat', () => {
   });
 
   it('prints back every one of those as it was written', () => {
-    for (const line of ['xp: larceny their toll', 'xp: larceny toll', 'drain: their toll health', 'restore: my toll health', 'restore: health', 'drain: 3 health']) {
+    for (const line of ['xp: larceny them.toll', 'xp: larceny toll', 'drain: them.toll health', 'restore: us.toll health', 'restore: health', 'drain: 3 health']) {
       expect(printsBack(line)).toBe(line);
     }
   });

@@ -87,22 +87,22 @@ when hit: drain: 5 health from them
 
 # action swing
 title: swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action sap
 title: sap
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their spirit
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.spirit
 
 # action feint
 title: feint
-rate: my attack-rate
-accuracy: my aim vs their dodge
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+accuracy: us.aim vs them.dodge
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 title: You

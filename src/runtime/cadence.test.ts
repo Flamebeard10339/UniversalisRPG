@@ -54,18 +54,18 @@ entities: giant-rat, punchbag
 # action fight
 title: fight
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 // First in the rat's uses: list, and reaching a pool the player does not
 // carry, so order alone would pick it and the pool rule is what does not.
 # action shell-crack
 title: shell-crack
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their carapace
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.carapace
 
 # entity player
 stats: attack 10, dr 0, max-health 100, attack-rate 25

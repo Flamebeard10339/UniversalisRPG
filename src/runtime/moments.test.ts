@@ -62,20 +62,20 @@ rate: leak
 # faction vermin
 
 # action swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action wild-swing
-rate: my attack-rate
-accuracy: my blind vs their uncanny
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+accuracy: us.blind vs them.uncanny
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action skirmish
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 attempts: 2
 
 # action forage

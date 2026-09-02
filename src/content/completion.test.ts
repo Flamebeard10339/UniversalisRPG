@@ -189,7 +189,7 @@ describe('a half-written line', () => {
       at: 11,
       like: '4-7',
       kind: 'stat',
-      holds: { words: ['-', 'my', 'their'], names: [{ hole: 'stat', kind: 'stat' }] },
+      holds: { words: ['-', '.', 'us', 'them'], names: [{ hole: 'stat', kind: 'stat' }] },
     });
   });
 
@@ -220,7 +220,7 @@ describe('a half-written line', () => {
   });
 
   it('lays a complaint about the whole section on the line the engine points at, and on no other', () => {
-    const said = amissIn('# action\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion', KNOWN);
+    const said = amissIn('# action\ntitle: Fight\nrate: us.attack-rate\naccuracy: us.accuracy vs them.evasion', KNOWN);
     expect(refused(said).map((each) => [each.line, each.refused!.includes('requires an id')])).toEqual([[1, true]]);
   });
 
@@ -242,7 +242,7 @@ describe('a half-written line', () => {
     const drafts = [
       THREE,
       '# entity tulsa.oven\nroast chestnuts:\n  continuous\n  rate: cooking-rate\n  nonsense: 3\n  also-nonsense: 4',
-      '# action core.swing\ntitle: Fight\nrate: my attack-rate\naccuracy: my accuracy vs their evasion',
+      '# action core.swing\ntitle: Fight\nrate: us.attack-rate\naccuracy: us.accuracy vs them.evasion',
       '# entity tulsa.oven\nstations: oven\nstations:\n  hearth\n  nonsense: 3',
     ];
     for (const draft of drafts) {

@@ -11,17 +11,17 @@ const declared = (source: string, id: string) => loadModule(source).actions.get(
 
 describe('# action extends:', () => {
   it('starts from the whole body of the action it names', () => {
-    const action = declared(stealing('# action pick-pocket', 'extends: steal', 'accuracy: my thieving vs their vigilance'), 'pick-pocket');
+    const action = declared(stealing('# action pick-pocket', 'extends: steal', 'accuracy: us.thieving vs them.vigilance'), 'pick-pocket');
 
     expect(action.kind).toBe('continuous');
     expect(action.attempts).toBe(1);
     expect(action.rate).toBe(15);
     expect(action.onUnfinished).toEqual([{ kind: 'say', text: 'A hand closes on your wrist.', key: 'thieving.action.steal.say.0' }]);
-    expect(action.accuracy).toEqual({ left: { side: 'my', id: 'thieving.thieving' }, right: { side: 'their', id: 'thieving.vigilance' } });
+    expect(action.accuracy).toEqual({ left: { side: 'us', id: 'thieving.thieving' }, right: { side: 'them', id: 'thieving.vigilance' } });
   });
 
   it('keeps its own name, which is what an entity overloading a shared action may not do', () => {
-    const source = stealing('# action pick-pocket', 'title: Pick a Pocket', 'extends: steal', 'accuracy: my thieving vs their vigilance');
+    const source = stealing('# action pick-pocket', 'title: Pick a Pocket', 'extends: steal', 'accuracy: us.thieving vs them.vigilance');
 
     expect(declared(source, 'pick-pocket').label).toBe('Pick a Pocket');
     expect(declared(source, 'steal').label).toBe('Steal');
@@ -42,11 +42,11 @@ describe('# action extends:', () => {
   });
 
   it('lays one over another however deep the chain runs', () => {
-    const action = declared(stealing('# action steal-quietly', 'extends: steal', 'rate: 30', '', '# action pick-pocket', 'extends: steal-quietly', 'accuracy: my thieving vs their vigilance'), 'pick-pocket');
+    const action = declared(stealing('# action steal-quietly', 'extends: steal', 'rate: 30', '', '# action pick-pocket', 'extends: steal-quietly', 'accuracy: us.thieving vs them.vigilance'), 'pick-pocket');
 
     expect(action.rate).toBe(30);
     expect(action.attempts).toBe(1);
-    expect(action.accuracy?.right).toEqual({ side: 'their', id: 'thieving.vigilance' });
+    expect(action.accuracy?.right).toEqual({ side: 'them', id: 'thieving.vigilance' });
   });
 
   it('is what an entity gets when it uses one, overload and all', () => {
@@ -54,7 +54,7 @@ describe('# action extends:', () => {
       stealing(
         '# action pick-pocket',
         'extends: steal',
-        'accuracy: my thieving vs their vigilance',
+        'accuracy: us.thieving vs them.vigilance',
         '',
         '# location square',
         'x: 0, y: 0',

@@ -47,9 +47,9 @@ x: 1, y: 0
 # action strike
 title: Strike
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 xp: brawling 2
 
 # entity player
@@ -87,16 +87,16 @@ describe('load-time reference resolution', () => {
   });
 
   it('names the section and the field it failed in', () => {
-    expect(loading('rate: my attack-rate', 'rate: my attack-rat')).toThrow(/# action strike rate: names an unknown stat: attack-rat/);
+    expect(loading('rate: us.attack-rate', 'rate: us.attack-rat')).toThrow(/# action strike rate: names an unknown stat: attack-rat/);
   });
 
   it.each([
-    ['rate: my attack-rate', 'rate: my nope', /unknown stat: nope/],
-    ['damage: my attack vs their dr', 'damage: my nope vs their dr', /unknown stat: nope/],
-    ['damage: my attack vs their dr', 'damage: my attack vs their nope', /unknown stat: nope/],
-    ['depletes: their health', 'depletes: their helth', /unknown resource: helth/],
-    ['depletes: their health', 'depletes: their health\naccuracy: my nope', /unknown stat: nope/],
-    ['depletes: their health', 'depletes: their health\naccuracy: my attack vs their nope', /unknown stat: nope/],
+    ['rate: us.attack-rate', 'rate: us.nope', /unknown stat: nope/],
+    ['damage: us.attack vs them.dr', 'damage: us.nope vs them.dr', /unknown stat: nope/],
+    ['damage: us.attack vs them.dr', 'damage: us.attack vs them.nope', /unknown stat: nope/],
+    ['depletes: them.health', 'depletes: them.helth', /unknown resource: helth/],
+    ['depletes: them.health', 'depletes: them.health\naccuracy: us.nope', /unknown stat: nope/],
+    ['depletes: them.health', 'depletes: them.health\naccuracy: us.attack vs them.nope', /unknown stat: nope/],
   ])('rejects %s → %s', (from, to, message) => {
     expect(loading(from, to)).toThrow(message);
   });
@@ -180,7 +180,7 @@ describe('load-time reference resolution', () => {
   });
 
   it('raises a DslError, the same failure kind the rest of load uses', () => {
-    expect(loading('depletes: their health', 'depletes: their helth')).toThrow(DslError);
+    expect(loading('depletes: them.health', 'depletes: them.helth')).toThrow(DslError);
   });
 });
 
@@ -309,7 +309,7 @@ describe('the performer declares every stat its action reads off it', () => {
   });
 
   it('asks nothing of an entity that empties no pool, because only the player ever swings that', () => {
-    const pinch = ['# action pinch', 'title: Pinch', 'continuous', 'rate: my attack-rate', 'accuracy: my attack vs their dr'].join('\n');
+    const pinch = ['# action pinch', 'title: Pinch', 'continuous', 'rate: us.attack-rate', 'accuracy: us.attack vs them.dr'].join('\n');
     expect(() => loadModule(`${VALID}\n${pinch}\n# entity training-dummy\n+uses: pinch\n`)).not.toThrow();
   });
 

@@ -42,9 +42,9 @@ title: Berry
 # action strike
 title: Strike
 continuous
-rate: my swing-rate
-damage: my attack vs their defence
-depletes: their life
+rate: us.swing-rate
+damage: us.attack vs them.defence
+depletes: them.life
 xp: fighting 3
 
 # action pick

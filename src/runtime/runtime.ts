@@ -32,7 +32,7 @@ import { amountFalls, isStatAmount } from '../grammar/values';
 import { applyRespawns, downOne, isElsewhere, nextRespawn, standing } from './population';
 import { actionAddress } from '../content/sections/action';
 import { Action, declaredId } from '../content/sections/entity';
-import { actionKind, isTwoSided } from '../grammar/action';
+import { actionKind, isTwoSided, type Sided } from '../grammar/action';
 import { fireHooks } from './hooks';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
 import { isPoint } from '../grammar/range';
@@ -262,7 +262,7 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   standAt(cadence, 0);
   cadence.attemptsMade++;
 
-  const half = (field: { side?: 'my' | 'their'; id: string } | undefined, read: typeof statValue, fallback: number): number =>
+  const half = (field: Sided | undefined, read: typeof statValue, fallback: number): number =>
     field === undefined ? fallback : read(field.id, state, registry, sideOf(field, self, other));
 
   const struck = action.depletes ? sideOf(action.depletes, self, other) : null;

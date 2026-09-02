@@ -44,9 +44,9 @@ trigger: on empty
 
 # action swing
 title: swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 faction: player
@@ -110,7 +110,7 @@ base: 40
 stats: max-health 1000, attack 4, attack-rate 60, hard-blow 40
 uses: swing
 swing:
-  damage: my hard-blow vs their dr
+  damage: us.hard-blow vs them.dr
   rate: 30
 
 # entity urchin
@@ -123,9 +123,9 @@ aggressive
 # action guarded
 title: guarded
 requires: truce
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity warden
 stats: max-health 8, attack 4, attack-rate 60
@@ -297,8 +297,8 @@ describe('an overload governs its own entity performance', () => {
     const declaration = registry.actions.get('swing')!;
     const overloaded = registry.entities.get('ogre')!.actions[0];
 
-    expect(declaration.damage).toEqual({ left: { side: 'my', id: 'attack' }, right: { side: 'their', id: 'dr' } });
-    expect(overloaded.damage).toEqual({ left: { side: 'my', id: 'hard-blow' }, right: { side: 'their', id: 'dr' } });
+    expect(declaration.damage).toEqual({ left: { side: 'us', id: 'attack' }, right: { side: 'them', id: 'dr' } });
+    expect(overloaded.damage).toEqual({ left: { side: 'us', id: 'hard-blow' }, right: { side: 'them', id: 'dr' } });
     expect(overloaded.depletes).toEqual(declaration.depletes);
   });
 
@@ -558,9 +558,9 @@ trigger: on empty
 
 # action swing
 title: swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 faction: player
@@ -637,9 +637,9 @@ trigger: on empty
 
 # action swing
 title: swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 faction: player
@@ -745,9 +745,9 @@ trigger: on empty
 # action swing
 title: swing
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # item pebble
 

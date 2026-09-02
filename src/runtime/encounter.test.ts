@@ -47,21 +47,21 @@ food, +50 attack, 60s
 title: strike
 continuous
 time: 1
-damage: my attack vs their dr
-depletes: their health
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action flail
 title: flail
 continuous
 time: 1
-damage: my wild-attack vs their dr
-depletes: their health
+damage: us.wild-attack vs them.dr
+depletes: them.health
 
 # action chip
 title: chip
 time: 1
-damage: my attack vs their dr
-depletes: their health
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 stats: max-health 30, attack 10, wild-attack 4-7

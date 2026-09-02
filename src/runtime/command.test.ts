@@ -846,10 +846,10 @@ display: full
 
 # action swing
 title: Swing
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health
 
 # location camp
 x: 0, y: 0

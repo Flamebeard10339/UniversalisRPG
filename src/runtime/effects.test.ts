@@ -14,7 +14,7 @@ import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
-import { mintedName } from '../grammar/values';
+import { mintedName, type Side } from '../grammar/values';
 
 const OPENING_ONE = mintedName('choose-name', DEFAULT_LANGUAGE);
 
@@ -365,7 +365,7 @@ stats: toll 7
 `;
 
 describe('an amount that names a stat', () => {
-  const paid = (amount: { side?: 'my' | 'their'; id: string }): { xp: number; drained: number } => {
+  const paid = (amount: { side?: Side; id: string }): { xp: number; drained: number } => {
     const registry = loadInEnglish(TOLL);
     const state = createGameState();
     initResources(state, registry);
@@ -379,12 +379,12 @@ describe('an amount that names a stat', () => {
     return { xp: state.xp['larceny'] ?? 0, drained: getDelta(segment.deltas, PLAYER, 'health') };
   };
 
-  it('reads it off the other party where the amount says their', () => {
-    expect(paid({ side: 'their', id: 'toll' })).toEqual({ xp: 7, drained: toMilliUnits(-7) });
+  it('reads it off the other party where the amount says them', () => {
+    expect(paid({ side: 'them', id: 'toll' })).toEqual({ xp: 7, drained: toMilliUnits(-7) });
   });
 
-  it('reads it off whoever acts where the amount says my, or names no side at all', () => {
-    expect(paid({ side: 'my', id: 'toll' })).toEqual({ xp: 1, drained: toMilliUnits(-1) });
+  it('reads it off whoever acts where the amount says us, or names no side at all', () => {
+    expect(paid({ side: 'us', id: 'toll' })).toEqual({ xp: 1, drained: toMilliUnits(-1) });
     expect(paid({ id: 'toll' })).toEqual({ xp: 1, drained: toMilliUnits(-1) });
   });
 
@@ -394,7 +394,7 @@ describe('an amount that names a stat', () => {
     initResources(state, registry);
     const segment = newSegment(state, registry, []);
 
-    applyResults(segment, [{ kind: 'xp', skill: 'larceny', amount: { side: 'their', id: 'toll' } }], PLAYER);
+    applyResults(segment, [{ kind: 'xp', skill: 'larceny', amount: { side: 'them', id: 'toll' } }], PLAYER);
 
     expect(state.xp['larceny']).toBe(1);
   });

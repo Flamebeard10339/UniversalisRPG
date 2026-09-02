@@ -56,15 +56,15 @@ gain 3 experience on slipped-it
 gain 2*amount experience on bit-something
 
 # action swing
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action wild-swing
-rate: my attack-rate
-accuracy: my blind vs their uncanny
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+accuracy: us.blind vs them.uncanny
+damage: us.attack vs them.dr
+depletes: them.health
 `;
 
 const arena = (playerAction: string, ratSkills: string, ratUses: string): string => `${SHEET}
@@ -238,9 +238,9 @@ gain 10 experience on job-done
 gain 6 experience on gave-up
 
 # action duel
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # action forage
 title: forage
@@ -248,9 +248,9 @@ continuous
 time: 1
 
 # action skirmish
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 attempts: 2
 
 # entity player

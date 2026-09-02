@@ -156,10 +156,10 @@ at: 2 4
 # action melee-combat
 title: Fight
 continuous
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health
 
 # item cooked-shrimp
 examine: A simple meal.

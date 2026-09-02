@@ -60,9 +60,9 @@ entities:
 # action hit
 title: hit
 continuous
-rate: my swings-per-minute
-damage: my attack
-depletes: their health
+rate: us.swings-per-minute
+damage: us.attack
+depletes: them.health
 
 # entity player
 stats: attack 1, max-health 10, swings-per-minute 60
@@ -729,9 +729,9 @@ max: max-health
 # action strike
 title: strike
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 stats: attack 10, dr 0, max-health 30, attack-rate 25
@@ -1072,9 +1072,9 @@ entities:
 # action hit
 title: hit
 continuous
-rate: my swings-per-minute
-damage: my attack
-depletes: their health
+rate: us.swings-per-minute
+damage: us.attack
+depletes: them.health
 
 # entity player
 stats: attack 1, max-health 12, swings-per-minute 60
@@ -1260,10 +1260,10 @@ entities: dummy
 # action hit
 title: hit
 continuous
-rate: my swings-per-minute
-accuracy: my accuracy vs their evasion
-damage: my attack
-depletes: their health
+rate: us.swings-per-minute
+accuracy: us.accuracy vs them.evasion
+damage: us.attack
+depletes: them.health
 
 # entity player
 stats: attack 0, max-health 1000000, accuracy 100, evasion 0, swings-per-minute 60
@@ -1904,8 +1904,8 @@ trigger: on empty
 title: swing
 continuous
 time: 1
-damage: my attack vs their dr
-depletes: their health
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 stats: max-health 30, attack 10

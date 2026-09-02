@@ -37,9 +37,9 @@ entities: target
 # action strike
 title: strike
 continuous
-rate: my attack-rate
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.defense
+depletes: them.health
 
 # entity player
 stats: max-health 100000, attack 10, attack-rate 60

@@ -41,20 +41,20 @@ entities: dummy, phantom, biter
 # action strike
 title: strike
 continuous
-rate: my attack-rate
-accuracy: my attack-skill vs their dodge
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+accuracy: us.attack-skill vs them.dodge
+damage: us.attack vs them.dr
+depletes: them.health
 
 // The same block from the other end: the rat reads its own accuracy stat where
 // the player reads its own, so uses: order is the whole difference.
 # action bite
 title: bite
 continuous
-rate: my attack-rate
-accuracy: my rat-skill vs their dodge
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+accuracy: us.rat-skill vs them.dodge
+damage: us.attack vs them.dr
+depletes: them.health
 
 # item ring-of-dodging
 food, +100 dodge, 60s
@@ -235,9 +235,9 @@ uses: strike, test-pool
 
 # action test-pool
 title: test-pool
-rate: my attack-rate
-damage: my blow
-depletes: their health
+rate: us.attack-rate
+damage: us.blow
+depletes: them.health
 
 # location arena
 +entities: test-fighter

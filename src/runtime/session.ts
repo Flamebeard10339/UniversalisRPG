@@ -263,7 +263,7 @@ function fightChoices(entityId: string, registry: Registry, state: GameState, lo
     const id = declaredId(action);
     if (id === undefined || !isFight(action)) continue;
     if (!actionVisible(action, state, registry)) continue;
-    if (action.depletes.side === 'their' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
+    if (action.depletes.side === 'them' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
     choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });
   }
   return choices;

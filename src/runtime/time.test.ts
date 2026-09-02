@@ -196,10 +196,10 @@ trigger: on empty
 
 # action swing
 continuous
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health
 
 # entity player
 stats: max-health 30, attack 10, attack-rate 25, accuracy 100

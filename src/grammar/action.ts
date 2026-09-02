@@ -8,7 +8,7 @@ import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './p
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { KEYWORDS, keywordsIn, keywordsOn, TagClause, tagClause, withoutKeywords, type KeywordOn } from './tagClause';
-import { decimal, DECIMAL, id, parseSided, printSided, refuseRange, side, SIDES, sideOf, type Side, type Sided } from './values';
+import { decimal, DECIMAL, id, parseSided, printSided, refuseRange, side, SIDE_MARK, SIDES, sideOf, type Side, type Sided } from './values';
 
 export type ActionKind = 'duration' | KeywordOn<'action'>;
 
@@ -66,7 +66,7 @@ const sidedIn = (hole: string, examples: readonly string[]): Parser<Sided> => ({
   parse: parseSided,
   print: printSided,
   holds: () => ({ side }),
-  forms: [`[<side> ]<${hole}>`],
+  forms: [`<${hole}>`, `<side>${SIDE_MARK}<${hole}>`],
   examples,
 });
 
@@ -74,11 +74,11 @@ const contest: Parser<Contest> = {
   parse: parseContest,
   print: printContest,
   holds: () => ({ side }),
-  forms: ['[<side> ]<stat>[ vs [<side> ]<stat>]'],
-  examples: ['attack vs defence', 'my attack vs their defence', 'felling'],
+  forms: ['[<side>.]<stat>[ vs [<side>.]<stat>]'],
+  examples: ['attack vs defence', 'us.attack vs them.defence', 'felling'],
 };
 
-const depleted = sidedIn('resource', ['their health', 'health']);
+const depleted = sidedIn('resource', ['health', 'them.health']);
 
 type ActionValue = (cursor: Cursor, line: RawLine, label: string) => unknown;
 
@@ -109,7 +109,7 @@ const perMinute: Parser<number | Sided> = {
   print: (value) => (typeof value === 'number' ? String(value) : printSided(value)),
   holds: () => ({ side }),
   names: { 'per minute': 'stat' },
-  forms: ['<per minute>', '[<side> ]<stat>'],
+  forms: ['<per minute>', '[<side>.]<stat>'],
   examples: ['12', 'attack-speed'],
 };
 
@@ -186,19 +186,19 @@ const RETIRED_ACTION_FIELDS: readonly { label: RegExp; message: string }[] = [
   },
   {
     label: /evasion:[ \t]*/,
-    message: 'evasion: was retired — it is the right half of one line, `accuracy: my accuracy vs their evasion`',
+    message: 'evasion: was retired — it is the right half of one line, `accuracy: us.accuracy vs them.evasion`',
   },
   {
     label: /ability:[ \t]*/,
-    message: 'ability: was retired — it is the left half of one line, `damage: my attack vs their defense`',
+    message: 'ability: was retired — it is the left half of one line, `damage: us.attack vs them.defense`',
   },
   {
     label: /dr:[ \t]*/,
-    message: 'dr: was retired — it is the right half of one line, `damage: my attack vs their defense`',
+    message: 'dr: was retired — it is the right half of one line, `damage: us.attack vs them.defense`',
   },
   {
     label: /target:[ \t]*/,
-    message: 'target: was retired — write `depletes: their <pool>` for the pool a landed hit reduces',
+    message: 'target: was retired — write `depletes: them.<pool>` for the pool a landed hit reduces',
   },
   {
     label: /escape after[ \t]+/,
@@ -280,7 +280,7 @@ export function assembledActionProblem(action: Action): string | undefined {
 
   if (!isTwoSided(action)) return undefined;
   const unmarked = sidedFields(action).find((field) => field.value.side === undefined);
-  if (unmarked) return `${unmarked.written}: ${unmarked.value.id} names no side — write ${SIDES.map((side) => `${side} ${unmarked.value.id}`).join(' or ')}, because this action already names one`;
+  if (unmarked) return `${unmarked.written}: ${unmarked.value.id} names no side — write ${SIDES.map((side) => `${side}${SIDE_MARK}${unmarked.value.id}`).join(' or ')}, because this action already names one`;
   return undefined;
 }
 

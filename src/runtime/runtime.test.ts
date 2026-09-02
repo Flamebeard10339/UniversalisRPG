@@ -716,14 +716,14 @@ examine: A fish.
 stats: depth 60
 cast:
   continuous
-  rate: their depth
+  rate: them.depth
   give: 1 fish
 
 # entity deep-water
 stats: depth 6
 cast:
   continuous
-  rate: their depth
+  rate: them.depth
   give: 1 fish
 `;
 
@@ -793,10 +793,10 @@ entities: giant-rat
 # action fight
 title: fight
 continuous
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health
 
 # entity player
 stats: attack 10, accuracy 50, evasion 10, defense 0, max-health 200, attack-rate 25

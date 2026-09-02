@@ -541,7 +541,7 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
 
 function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
   for (const field of sidedFields(action)) {
-    if (field.value.side !== 'my') continue;
+    if (field.value.side !== 'us') continue;
     const needed = field.written === 'depletes' ? registry.resources.get(field.value.id)?.max : field.value.id;
     if (needed === undefined || entity.stats[needed] !== undefined) continue;
     const because = field.written === 'depletes' ? `${field.value.id} is measured by ${needed}, which` : `${field.written}: reads ${needed}, which`;

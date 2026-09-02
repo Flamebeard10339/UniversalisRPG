@@ -45,9 +45,9 @@ trigger: on empty
 # action fight
 title: fight
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 stats: attack 10, dr 0, max-health 30, attack-rate 25
@@ -109,9 +109,9 @@ tend:
 title: drill
 continuous
 requires: permitted
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 give: 1 blessing
 
 # entity training-post
@@ -163,9 +163,9 @@ chant:
 # action spar
 title: spar
 continuous
-rate: my attack-rate
-damage: my attack vs their dr
-depletes: their health
+rate: us.attack-rate
+damage: us.attack vs them.dr
+depletes: them.health
 give: 1 rat-tail
 stop
 

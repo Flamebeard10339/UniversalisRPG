@@ -81,10 +81,10 @@ trigger: inventory-changed
 
 # action probe-action
 DEBUG
-rate: my attack
-accuracy: my attack vs their attack
-damage: my attack vs their attack
-depletes: their health
+rate: us.attack
+accuracy: us.attack vs them.attack
+damage: us.attack vs them.attack
+depletes: them.health
 
 # entity probe-entity
 DEBUG

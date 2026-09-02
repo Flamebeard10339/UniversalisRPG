@@ -123,7 +123,7 @@ function rewardScale(state: GameState, registry: Registry): number {
 
 function readAmount(segment: Segment, value: Amount, actor: string): Range {
   if (!isStatAmount(value)) return value;
-  const subject = value.side === 'their' ? (segment.parties?.them ?? actor) : actor;
+  const subject = value.side === 'them' ? (segment.parties?.them ?? actor) : actor;
   const read = statRange(value.id, segment.state, segment.registry, subject);
   return value.falls ? scaleRange(read, -1) : read;
 }

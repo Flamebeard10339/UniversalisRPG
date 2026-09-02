@@ -42,16 +42,16 @@ entities: 3 brute
 
 # action wear-down
 title: wear-down
-rate: my swing-rate
-damage: my attack
-depletes: their stamina
+rate: us.swing-rate
+damage: us.attack
+depletes: them.stamina
 
 # action grind-down
 title: grind-down
 continuous
-rate: my swing-rate
-damage: my attack
-depletes: their stamina
+rate: us.swing-rate
+damage: us.attack
+depletes: them.stamina
 give: trophy
 on success:
   drain: 12 vigor
@@ -174,9 +174,9 @@ trigger: on empty
 
 # action wear-down
 title: wear-down
-rate: my swing-rate
-damage: my attack
-depletes: their stamina
+rate: us.swing-rate
+damage: us.attack
+depletes: them.stamina
 
 # entity player
 stats: attack 5, swing-rate 60

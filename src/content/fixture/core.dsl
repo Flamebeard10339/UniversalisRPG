@@ -277,7 +277,7 @@ stats: max-health 1000, attack 0, accuracy 0, evasion 0, defense 0, attack-rate 
 # action melee-combat
 title: Attack
 continuous
-rate: my attack-rate
-accuracy: my accuracy vs their evasion
-damage: my attack vs their defense
-depletes: their health
+rate: us.attack-rate
+accuracy: us.accuracy vs them.evasion
+damage: us.attack vs them.defense
+depletes: them.health

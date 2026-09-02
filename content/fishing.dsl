@@ -45,8 +45,8 @@ stat: fishing
 title: Fish
 continuous
 attempts: 1
-rate: my fishing-rate
-accuracy: my fishing vs their depth
+rate: us.fishing-rate
+accuracy: us.fishing vs them.depth
 on unfinished:
   drain: 1 line-health
 

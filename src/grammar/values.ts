@@ -117,16 +117,20 @@ export const durationOrStat: Parser<number | string> = {
   examples: [...duration.examples, 'daze-length'],
 };
 
-export type Side = 'my' | 'their';
+export type Side = 'us' | 'them';
 
 export interface Sided {
   side?: Side;
   id: string;
 }
 
-export const SIDES: readonly Side[] = ['my', 'their'];
+export const SIDES: readonly Side[] = ['us', 'them'];
 
-const SIDE = /(?:my|their)(?![\w-])/;
+export const SIDE_MARK = '.';
+
+const SIDE = new RegExp(`(?:${SIDES.join('|')})`);
+
+const MARKED_SIDE = new RegExp(`(?:${SIDES.join('|')})\\${SIDE_MARK}`);
 
 export const side: Parser<Side> = {
   parse(cursor) {
@@ -139,16 +143,16 @@ export const side: Parser<Side> = {
   examples: [...SIDES],
 };
 
-export const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side} ${value.id}`);
+export const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side}${SIDE_MARK}${value.id}`);
 
 export function parseSided(cursor: Cursor): Sided {
-  const marker = cursor.take(SIDE);
-  if (marker === null) return { id: id.parse(cursor) };
-  cursor.take(/[ \t]+/);
-  return { side: marker as Side, id: id.parse(cursor) };
+  if (cursor.peek(MARKED_SIDE) === null) return { id: id.parse(cursor) };
+  const marker = side.parse(cursor);
+  cursor.take(new RegExp(`\\${SIDE_MARK}`));
+  return { side: marker, id: id.parse(cursor) };
 }
 
-export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'their' ? other : self);
+export const sideOf = (field: Sided, self: string, other: string): string => (field.side === 'them' ? other : self);
 
 export interface StatAmount extends Sided {
   falls?: true;
@@ -168,16 +172,16 @@ export const fallingAmount = (value: Amount): Amount => (isStatAmount(value) ? {
 export const printAmount = (value: Amount): string => (isStatAmount(value) ? printSided(value) : range.print(value));
 
 export const STAT_AMOUNT_NOTE =
-  'a stat written where an amount stands is read off the side it names, so `their vigilance` is the figure carried by whatever this is aimed at and `my luck` the one carried by whoever brought it — a stat naming no side reads off whoever acts';
+  'a stat written where an amount stands is read off the side it names, so `them.vigilance` is the figure carried by whatever this is aimed at and `us.luck` the one carried by whoever brought it — a stat naming no side reads off whoever acts. The two sides stand only where an action has aimed one at the other, which is why they are written nowhere a line is said to a player';
 
 export const amount: Parser<Amount> = {
   called: 'amount',
   parse: (cursor) => amountOrStat(cursor, decimalRange, 'an amount'),
   print: printAmount,
   holds: () => ({ side }),
-  forms: ['<float>', '<least>-<most>', '[<side> ]<stat>'],
-  examples: ['5', '4-7', 'their vigilance'],
-  notes: { '[<side> ]<stat>': STAT_AMOUNT_NOTE },
+  forms: ['<float>', '<least>-<most>', '[<side>.]<stat>'],
+  examples: ['5', '4-7', 'them.vigilance'],
+  notes: { '[<side>.]<stat>': STAT_AMOUNT_NOTE },
 };
 
 export const opensStatAmount = (cursor: Cursor): boolean => cursor.peek(/[a-z]/) !== null;

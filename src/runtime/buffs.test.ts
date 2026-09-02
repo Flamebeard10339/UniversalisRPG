@@ -93,8 +93,8 @@ food, +3 attack per stack of accelerated-vigor, 60s
 title: strike
 continuous
 time: 1
-damage: my attack vs their dr
-depletes: their health
+damage: us.attack vs them.dr
+depletes: them.health
 
 # entity player
 stats: max-health 30, attack 10
