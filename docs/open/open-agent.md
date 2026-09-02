@@ -322,3 +322,84 @@ that budget starts to bite.
 *Closes when:* an author reading `npm run oracle -- location` is told that `relative:`
 and `x/y/z` displace each other, derived from `schema.exclusive`, with the no-kind page
 no longer than it is now.
+
+## A `them.` amount is taken where no two sides stand
+
+`refuseParty` (`src/grammar/actionResult.ts:466`) is what enforces *the two sides stand
+only inside `on hit:` or `when hit:``, and `firstParty` beneath it walks the `party` field
+of `pool`, `inflict` and `shake-off` and nothing else. A `Sided` **amount** carries the same
+two words in a different field and is not walked, so half the rule is unenforced. Put
+through the real parser on 2026-09-02:
+
+```
+drain: them.attack health     PARSED  {"delta":{"side":"them","id":"attack","falls":true}}
+drain: 5 health from them     REFUSED `from them` names one of two parties…
+xp: mining them.attack        PARSED  {"amount":{"side":"them","id":"attack"}}
+```
+
+At runtime `readAmount` (`src/runtime/effects.ts:126`) reads
+`segment.parties?.them ?? actor`, so the line that got through silently reads **the actor's
+own stat** — a well-typed, plausible number, and no way downstream to tell it from the one
+that was meant. `values.ts:175` already says these are "written nowhere a line is said to a
+player", so the rule is stated and half-kept. `subjectOf` (`effects.ts:214`) carries the
+identical `?? actor` and is safe only because `refuseParty` does cover its field; `become`
+(`effects.ts:331`) is the shape to copy, returning 0 rather than falling back.
+
+This is the same rule c02d4bc0 made `them.` throw for in a condition, one place short.
+
+*Closes when:* a sided amount outside a hit list is refused where a sided party already is —
+the two reading off one declaration rather than two walks — and a `describe` in this folder's
+`open-tests.test.ts` pins the refusal, which is what a focused test is for.
+
+## `ownerOf` answers three things and eight callers hear two
+
+`Namespace.ownerOf` (`src/content/namespace.ts:138`) returns `string | null | undefined`, and
+the three cases are distinct: a module id, `null` for a kind whose ids are global and has no
+owner, and `undefined` for **an id nobody declared**. Eight callers write `?? null` and
+collapse the last two, then build a locale key under the wrong namespace — so a title or a
+line of prose comes back as its own key, or as unauthored, with nothing raised.
+
+`src/runtime/localized.ts:62`, `src/runtime/proseSaid.ts:40`, `src/content/load.ts:141`,
+`:225`, `:540`, `:831`, `src/content/references.ts:39`, `src/content/sections/action.ts:46`.
+
+`src/content/serialize.ts:84` is the one caller that does not: it asks
+`sectionFor(kind)!.ids === 'global'` first and only then takes `null`. That it had to is the
+evidence the distinction is load-bearing, and that the other eight do not is what makes this
+a line rather than a preference.
+
+*Closes when:* an undeclared id cannot be read as a global-id kind — the caller either asks
+the kind, as `serialize.ts` does, or `ownerOf` refuses a key it does not hold — and no site
+has to remember which of the three it is looking at.
+
+## `player.` and `setting.` take any word after the dot
+
+`reference` (`src/content/refs.ts:60-69`) resolves a rooted reference's tail only when the
+root declares a `kind`; `if (isEngineRoot(value.path)) return;` lets every other root past
+unchecked. `player` and `setting` in `ENGINE_ROOTS` declare `stands`, not `kind`, so
+`player.rase` and `setting.hadcore` load clean.
+
+They then answer `undefined` at runtime (`src/runtime/conditions.ts:21-22`), and the two
+readers of that answer both give it a plausible value: `Number(left ?? 0)` (`:84`) compares it
+as **0**, and `String(value ?? '')` (`:70`) prints it as **empty**. So a misspelt condition
+reads false for the life of the world and says nothing. The directive path already refuses the
+same mistake — `session.ts:863` throws naming `SETTING_NAMES` — so the two entrances to one
+question disagree about whether it has an answer.
+
+The `?? ''` at `:70` is correct for a declared-but-unset flag, which is why it has survived;
+what makes it dangerous is that the question reaching it can now be a bad one.
+
+*Closes when:* a rooted reference's tail is checked for every root that has one, derived from
+the root's own declaration rather than from a second list of which roots are checked, and a
+`describe` in this folder's `open-tests.test.ts` pins the refusal an author sees.
+
+## A build failure is reported against the first module in the world
+
+`compileModules` blames a failure on `sectionOwner(owners, kind, id) ?? modules[0]`
+(`src/content/load.ts:855`) and `byNamespace.get(declared.module) ?? modules[0]` (`:873`).
+Where the lookup fails the author is pointed at whichever module happens to be first, with
+nothing saying the attribution was guessed. It miscomputes nothing, and it costs the reader
+the same bisect as any wrong line number — which is the cost the neighbouring line in this
+file about refusals inside a `# test` is also about.
+
+*Closes when:* a build failure whose owner cannot be found says so rather than naming a module
+that had nothing to do with it.
