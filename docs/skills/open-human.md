@@ -78,18 +78,20 @@ derived proof in `stat.test.ts` follows it with nothing else edited.*
 
 ## Whether a stretch may be composed of two numbers rather than named by one
 
-`inflict: <buff> for <duration>` now takes a stat, and it is read off whoever the buff
-lands on. That is one number, so a mark's own grip and a thief's nerve cannot both be in
-it: what ships instead is two stats a mark picks between — `thieving.daze-length` at three
-seconds and `thieving.collar-length` at ten — and two nerve passives that take a
-percentage off **both**, because a hand hard to hold on to is hard for a townsman and a
-knight alike.
+`inflict: <buff> for <duration>` takes a stat, and it is read off whoever the buff lands
+on — which is the player. That is one number and it can only be the player's, so a mark's
+own grip cannot be in it at all: what ships is one `thieving.daze-duration` at four
+seconds, uniform across a townsman, a guardsman and a knight, with `brazen` and `tough`
+taking a percentage off it. Everything that varies by mark is now a `npc-` stat read off
+the mark — `npc-thieving-difficulty`, `npc-thieving-xp`, `npc-thieving-damage` — and the
+hold is the one thing that cannot be.
 
-The cost is that "nerve shortens every hold" is written once per hold. A third stretch —
-a gaoler, a mantrap — is two more clauses on `brazen` and `hard-faced`, and nothing says
-so if they are forgotten.
+`xp:` and `drain:` learned `[<side> ]<stat>` in the same pass, so the shape the answer
+wants already exists and reads `for their grip`; it is `durationOrStat` in
+`src/grammar/values.ts` that has not been given a side, beside the `amount` parser in the
+same file that has one. Half of "a bigger build than the one just done" is done.
 
-*Moves when: he says whether that is a rule or a choice. If a wheel is meant to be able to
-shorten one hold and not another it is already right and this line goes. If it is meant to
-shorten all of them, the number wants two sides — `for their grip less my nerve`, the shape
-`accuracy:` already has — and that is a bigger build than the one just done.*
+*Moves when: he says whether a knight is meant to hold a caught hand longer than a
+townsman does. If no, one duration is right and this line goes. If yes, `for <duration>`
+wants the side `<amount>` now has, and then whether a nerve passive still shortens a
+stretch read off somebody else is the question underneath it.*

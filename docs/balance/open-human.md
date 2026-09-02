@@ -5,6 +5,25 @@ crosses to `open-agent.md` carrying what was measured for it.
 
 ---
 
+## Whether a fresh character is meant to survive an hour of picking pockets
+
+`npm run simulate-activity -- tulsa.in-town pick-pocket` kills the starting character
+in **4 of 4 seeds**, at around 400s of the 3,600s window, having earned about 110
+thieving xp. It reads the same from every square in town. The pace while it runs is
+close to right — 945–998 xp/h against a level-1 curve asking 1,200 — so nothing is
+under-paying; the run simply ends. Thieving-ability opens at **1.01** against the
+civilian's vigilance of **20**, so most cycles are a catch, and a catch is one health
+against roughly four health a minute of regeneration. Nothing about this is new: the
+route `a-hand-goes-out-again-after-it-is-caught` walked to 200 xp and died doing it
+before the daze was ever landing, and it now asks a question it can answer instead.
+
+*Moves when: he says which of three it is. The opening ability is too low against a
+townsman; or the catch should cost less than a health; or a level-1 thief is supposed
+to pick two pockets and go and do something else, in which case the curve's 1,200/h at
+level 1 is not a target this skill is meant to meet on its own and the ladder in
+`docs/tulsa/` needs saying that way. Each is one number, and the sim re-answers it in
+a minute.*
+
 ## Where the line sits between a balance number and a path fact
 
 41 of the 66 numeric `assert:` lines in the corpus sit on roots a `# save` sheet is
