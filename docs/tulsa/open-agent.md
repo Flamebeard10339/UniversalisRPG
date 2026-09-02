@@ -45,14 +45,16 @@ sixth gate written next month is covered by having been written.
 
 ## Two rooms nobody has walked into
 
-The rogue den under the doss house and the muster past the tunnels are reachable
-only by reading the file. Every other room in the town is walked by something, and
-`walking-the-town` predates both. The two new dishes are in the same position: nothing
-in the corpus has ever cooked a pike.
+The muster past the tunnels is reachable only by reading the file. Every other room
+in the town is walked by something, and `walking-the-town` predates it. The two new
+dishes are in the same position: nothing in the corpus has ever cooked a pike.
 
-*Closes when:* `walking-the-town` reaches both rooms, and a `# test` in
-`content/tulsa.dsl` takes one offer at each — a pocket in the den, a swing at the
-muster — and one cooks a pike at a stove.
+The den is no longer a road: thieving 1.2.0 puts it behind a hatch in the doss house
+that opens to a password or a thousand coin, and two `locked-out` routes in
+`content/thieving.dsl` stand in it. Nothing yet picks a pocket there.
+
+*Closes when:* `walking-the-town` reaches the muster, and a `# test` takes one offer at
+each — a pocket in the den, a swing at the muster — and one cooks a pike at a stove.
 
 ## The thieving jewel has never been put in anything
 
