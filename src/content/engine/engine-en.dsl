@@ -254,6 +254,9 @@ engine.repl.here: Here: {entities}
 engine.repl.grouped: [{group}] {said}
 engine.repl.clock: [time: {time}s]
 engine.repl.pool: {resource}: {meter}
+engine.repl.held: Holding: {effects}
+engine.repl.held.effect: {effect} {left}
+engine.repl.held.stacked: {effect} ×{stacks}
 engine.repl.swing: Your swing {meter}
 engine.repl.choice: {index}) {choice}
 engine.repl.choice.owned: {index}) {owner}: {choice}

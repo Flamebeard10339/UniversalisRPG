@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { point } from '../grammar/range';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
-import { buffsOf, expireBuffs, grantBuff, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
+import { buffsOf, expireBuffs, grantBuff, heldEffects, nextBuffExpiry, pruneBuffs, stackCount } from './buffs';
 import { Item } from '../content/sections/item';
 import { createGameState, equip, GameState, initResources, PLAYER, resolve, statRange, statValue, useFight } from './runtime';
 import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
@@ -521,5 +521,40 @@ describe('a buff survives a save, or is pruned with a warning', () => {
       'Removed buff mint-tonic on player because its stat panache is not loaded.',
       'Removed every buff on wyvern because it is not a character this world has.',
     ]);
+  });
+});
+
+describe('what the player is shown they are holding', () => {
+  const shown = (grant: (registry: Registry, state: GameState) => void): ReturnType<typeof heldEffects> => {
+    const registry = loaded();
+    const state = initialState(registry);
+    grant(registry, state);
+    return heldEffects(state, registry, PLAYER);
+  };
+
+  it('names each source once, counts down the seconds it has left, and rounds a part-second up', () => {
+    expect(shown((registry, state) => grantBuff(state, PLAYER, itemOf(registry, 'steady-draught'), state.time + secondsToMs(60)))).toEqual([
+      { id: 'steady-draught', title: 'Steady Draught', stacks: 1, secondsLeft: 60 },
+    ]);
+    expect(shown((registry, state) => grantBuff(state, PLAYER, itemOf(registry, 'steady-draught'), state.time + 1))[0]!.secondsLeft).toBe(1);
+  });
+
+  it('gathers a stacking source into one row carrying how many are held and the longest of them', () => {
+    const rows = shown((registry, state) => {
+      grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), state.time + secondsToMs(10));
+      grantBuff(state, PLAYER, itemOf(registry, 'accelerated-vigor'), state.time + secondsToMs(40));
+    });
+
+    expect(rows).toEqual([{ id: 'accelerated-vigor', title: 'Accelerated Vigor', stacks: 2, secondsLeft: 40 }]);
+  });
+
+  it('reads nobody else\'s, and orders what is left by whichever goes first', () => {
+    const rows = shown((registry, state) => {
+      grantBuff(state, PLAYER, itemOf(registry, 'steady-draught'), state.time + secondsToMs(60));
+      grantBuff(state, PLAYER, itemOf(registry, 'mire-toxin'), state.time + secondsToMs(5));
+      grantBuff(state, 'wyvern', itemOf(registry, 'steady-draught'), state.time + secondsToMs(60));
+    });
+
+    expect(rows.map((row) => row.id)).toEqual(['mire-toxin', 'steady-draught']);
   });
 });

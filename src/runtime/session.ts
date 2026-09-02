@@ -22,6 +22,8 @@ import { armedAction } from './roster';
 import { foldStat, hasPool, statBreakdown } from './stats';
 import { midpoint } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
+import { heldEffects, type HeldEffect } from './buffs';
+export type { HeldEffect } from './buffs';
 import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
 import { isFight } from '../grammar/action';
 import { standing } from './population';
@@ -139,6 +141,7 @@ export interface PlayStatus {
   choices: PlayChoice[];
   time: number;
   resources: Array<{ id: Answer; title: Localized; current: number; max: number; display: ResourceDisplay }>;
+  held: HeldEffect[];
   encounter: EncounterView | null;
   modals: Modal[];
   inventory: AnswerTable<number>;
@@ -488,6 +491,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     choices: computeChoices(session),
     time: msToSeconds(state.time),
     resources: publishResources(state, registry),
+    held: heldEffects(state, registry, PLAYER),
     encounter: encounterView(state, registry),
     modals: state.modals.map((frame) => publishModal(frame, state, registry)),
     inventory: Object.fromEntries([...itemCopies(state)].flatMap(([id, { stack }]) => (stack > 0 ? [[id, stack] as const] : []))),

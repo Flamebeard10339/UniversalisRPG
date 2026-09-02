@@ -1,10 +1,10 @@
 import type { Registry } from '../content/registry';
 import type { Item } from '../content/sections/item';
 import { carries, isTagClause, type TagClause } from '../grammar/tagClause';
-import { localizerOf } from './localized';
+import { localizerOf, type Answer, type Localized } from './localized';
 import type { PruneWarning } from './pruning';
 import { type BuffInstance, type GameState } from './state';
-import { secondsToMs } from './units';
+import { MS_PER_SECOND, secondsToMs } from './units';
 
 export type BuffSource = Item;
 
@@ -28,6 +28,28 @@ export function buffsOf(state: GameState, actorId: string): readonly BuffInstanc
 
 export function stackCount(state: GameState, actorId: string, source: string): number {
   return buffsOf(state, actorId).filter((buff) => buff.source === source).length;
+}
+
+export interface HeldEffect {
+  readonly id: Answer;
+  readonly title: Localized;
+  readonly stacks: number;
+  readonly secondsLeft: number;
+}
+
+export function heldEffects(state: GameState, registry: Registry, actorId: string): HeldEffect[] {
+  const title = localizerOf(registry, state).title;
+  const rows = new Map<string, HeldEffect>();
+  for (const buff of buffsOf(state, actorId)) {
+    const held = rows.get(buff.source);
+    rows.set(buff.source, {
+      id: buff.source,
+      title: title('item', buff.source),
+      stacks: (held?.stacks ?? 0) + 1,
+      secondsLeft: Math.max(held?.secondsLeft ?? 0, Math.ceil(Math.max(0, buff.expiresAt - state.time) / MS_PER_SECOND)),
+    });
+  }
+  return [...rows.values()].sort((one, other) => one.secondsLeft - other.secondsLeft);
 }
 
 export function declaredSeconds(source: BuffSource): number {

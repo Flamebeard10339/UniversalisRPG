@@ -27,6 +27,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
       ],
       time: 12,
       resources: [{ id: 'energy', title: asLocalized('Energy'), current: 3, max: 5, display: 'full' }],
+      held: [],
       encounter: null,
       modals: [],
       journey: null,

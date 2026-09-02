@@ -75,6 +75,17 @@ function formatResources(resources: PlayView['resources'], localizer: Localizer)
   return lines;
 }
 
+function formatHeld(held: PlayView['held'], localizer: Localizer): PlayerLine[] {
+  if (held.length === 0) return [];
+  const drawn = held.map((effect) =>
+    localizer.engine('engine.repl.held.effect', {
+      effect: effect.stacks > 1 ? localizer.engine('engine.repl.held.stacked', { effect: effect.title, stacks: effect.stacks }) : effect.title,
+      left: localizer.identifier(`${effect.secondsLeft}s`),
+    }),
+  );
+  return [say(localizer.engine('engine.repl.held', { effects: oneLine(localizer, drawn, ', ') }))];
+}
+
 export const withCount = (meter: string, remaining: number | null): string => (remaining === null ? meter : `${meter}  ×${remaining}`);
 
 const meterFor = (foe: EncounterFoe): string => withCount(fullBar(foe.current, foe.max), foe.remaining);
@@ -169,6 +180,7 @@ export function formatView(v: PlayView, localizer: Localizer, reread = false): R
   }
   if (v.entities.length > 0) lines.push(say(localizer.engine('engine.repl.here', { entities: oneLine(localizer, v.entities.map((entity) => entity.title), ', ') })));
   lines.push(...formatResources(v.resources, localizer));
+  lines.push(...formatHeld(v.held, localizer));
   lines.push(...formatEncounter(v.encounter, localizer));
   lines.push(...formatModals(v, localizer));
   lines.push(...formatChoices(sheetOffers(v), localizer));
