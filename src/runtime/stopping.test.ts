@@ -81,6 +81,9 @@ on death:
   credit:
     give: 1 rat-tail
 
+# location shore
+x: 1, y: 0
+
 # entity shrine
 flags: moon-up
 chant:
@@ -88,6 +91,11 @@ chant:
   requires: moon-up
   time: 1
   give: 1 blessing
+slip:
+  continuous
+  time: 1
+  give: 1 blessing
+  relocate: shore
 
 # entity beacon
 flags: dawn
@@ -361,6 +369,32 @@ describe('a start condition that stops holding', () => {
     delete state.flags['training-post.permitted'];
     resolve(state, registry, secondsToMs(100));
     expect(state.inventory['blessing']).toBe(2);
+    expect(state.activeAction).toBeNull();
+  });
+
+  it('ends an action that walked the player out of the room it is in', () => {
+    const { registry, state } = started();
+    armAction('entity', 'shrine', 'slip', registry, state);
+
+    resolve(state, registry, secondsToMs(10));
+
+    expect(state.location, 'the relocate: landed').toBe('shore');
+    expect(state.inventory['blessing'], 'and paid for the one cycle it got').toBe(1);
+    expect(state.activeAction).toBeNull();
+  });
+
+  it('ends one whose owner is no longer standing where the player is, however they came to be apart', () => {
+    const { registry, state } = started();
+    state.flags['shrine.moon-up'] = true;
+    armAction('entity', 'shrine', 'chant', registry, state);
+
+    resolve(state, registry, secondsToMs(3));
+    expect(state.inventory['blessing']).toBe(3);
+
+    state.location = 'shore';
+    resolve(state, registry, secondsToMs(10));
+
+    expect(state.inventory['blessing']).toBe(3);
     expect(state.activeAction).toBeNull();
   });
 

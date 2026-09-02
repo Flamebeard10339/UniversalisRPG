@@ -7,6 +7,7 @@ import { actionAddress } from '../content/sections/action';
 import { Registry } from '../content/registry';
 import { findActionOwner } from './actionLookup';
 import { copiesOf, spendable } from './itemInstance';
+import { isElsewhere } from './population';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { type ActiveAction, GameState, parseOwnerRef } from './state';
 
@@ -22,15 +23,24 @@ export function findActiveAction(active: ActiveAction, registry: Registry): Acti
 
 export type FightOutcome = 'completion' | 'unfinished';
 
-export function resolvesPerAttempt(action: Action): boolean {
-  return action.accuracy !== undefined || action.depletes !== undefined;
-}
-
 export function leavesHere(action: Action): boolean {
   return actionResultLists(action).some((list) => list.some((result) => result.kind === 'relocate'));
 }
 
+export function resolvesPerAttempt(action: Action): boolean {
+  return action.accuracy !== undefined || action.depletes !== undefined;
+}
+
+export function ownerIsElsewhere(obj: string, id: string, state: GameState, registry: Registry): boolean {
+  if (obj === 'location') return registry.locations.has(id) && id !== state.location;
+  if (obj !== 'entity') return false;
+  const here = registry.locations.get(state.location);
+  return here !== undefined && isElsewhere(state, registry, here, id);
+}
+
 export function actionStillValid(action: Action, active: ActiveAction, state: GameState, registry: Registry): boolean {
+  const { obj, objId } = parseOwnerRef(active.ownerRef);
+  if (ownerIsElsewhere(obj, objId, state, registry)) return false;
   if (!requiresMet(action, state, registry)) return false;
   return !active.repeating || inputLimit(action, state).completions > 0;
 }

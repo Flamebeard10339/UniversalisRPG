@@ -1,7 +1,7 @@
 import { carries } from '../grammar/tagClause';
 import { endAction } from './actionEnd';
 import { RuntimeError } from './error';
-import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, leavesHere, outcomeResults, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
+import { actionStillValid, actionVisible, fightBatch, FightOutcome, inputLimit, leavesHere, outcomeResults, ownerIsElsewhere, requiresMet, resolvesPerAttempt, stopsOnOutcome } from './actions';
 import { ownerRef, parseOwnerRef } from './state';
 import { findActionOwner, travelAction, travelPair } from './actionLookup';
 import {
@@ -171,7 +171,7 @@ export function nextBoundary(state: GameState, registry: Registry, toTime: numbe
       const inFlight = (attemptsToResolve - player.attemptsMade) * attemptMs - player.progress;
       const completions = active.repeating
         ? Math.min(
-            stopsOnOutcome(action, outcome) ? 1 : Infinity,
+            stopsOnOutcome(action, outcome) || leavesHere(action) ? 1 : Infinity,
             inputLimit(action, state).completions,
             completionsBeforeDrain(action, state, registry, outcome),
           )
@@ -683,14 +683,10 @@ interface NamedOn {
 }
 
 function whereItIsNot(named: NamedOn, registry: Registry, state: GameState): Localized | undefined {
+  if (!ownerIsElsewhere(named.obj, named.id, state, registry)) return undefined;
   const localizer = localizerOf(registry, state);
-  const absent = (target: Localized): Localized => localizer.engine('engine.target.absent', { target });
-  if (named.obj === 'location') {
-    return registry.locations.has(named.id) && named.id !== state.location ? absent(localizer.title('location', named.id)) : undefined;
-  }
-  if (named.obj !== 'entity') return undefined;
-  const here = registry.locations.get(state.location);
-  return here && isElsewhere(state, registry, here, named.id) ? absent(actorTitle(named.id, registry, state)) : undefined;
+  const target = named.obj === 'location' ? localizer.title('location', named.id) : actorTitle(named.id, registry, state);
+  return localizer.engine('engine.target.absent', { target });
 }
 
 function whyRefused(action: Action, registry: Registry, state: GameState, named?: NamedOn): Localized | undefined {
