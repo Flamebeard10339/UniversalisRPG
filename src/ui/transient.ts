@@ -34,6 +34,8 @@ export const MARCHING = 'marching';
 
 export const RACING = 'racing';
 
+export const PLUCKED = 'plucked';
+
 export const MARCHING_BACK = 'marching marching-back';
 
 export interface Moment {

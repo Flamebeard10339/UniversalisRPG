@@ -118,6 +118,17 @@ textarea {
   }
 }
 
+@keyframes plucked {
+  from {
+    opacity: 0.65;
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
 @keyframes marching {
   to {
     stroke-dashoffset: -24;
@@ -258,6 +269,20 @@ textarea {
   animation: sprouted 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
+/* Runs once as the thing comes off the grid, so the hold that lifted it is
+   answered by something the eye catches before the finger has travelled. */
+.plucked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+  animation: plucked 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .risen,
   .darkened,
@@ -267,7 +292,8 @@ textarea {
   .stirring,
   .underway,
   .marching,
-  .racing {
+  .racing,
+  .plucked::after {
     animation: none;
   }
 

@@ -4,6 +4,7 @@ import { itemStyle } from './itemLook';
 import { fillOf } from './lineStyle';
 import { letGoOf, type CellBox } from './packDrag';
 import { LIFT_MS } from './gesture';
+import { PLUCKED } from './transient';
 import type { Entry } from './sheet';
 import { doll, GRID, NAME, SLOTS, type Layout } from './sheetLayout';
 import type { Point } from './viewport';
@@ -14,7 +15,7 @@ const OPENER = 'absolute inset-0 z-10 h-full w-full';
 function Opener({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => void; drag: Held | null }): JSX.Element | null {
   if (entry.id === undefined) return null;
   const key = entry.id;
-  if (drag) return <button data-drive="send" type="button" aria-label={entry.name} ref={drag.measure(key)} {...drag.grip(key)} style={{ touchAction: 'pan-y' }} className={OPENER} />;
+  if (drag) return <button data-drive="send" type="button" aria-label={entry.name} ref={drag.measure(key)} {...drag.grip(key)} data-still style={{ touchAction: 'pan-y' }} className={OPENER} />;
   if (!onOpen) return null;
   return <button data-drive="send" type="button" aria-label={entry.name} onClick={() => onOpen(key)} className={OPENER} />;
 }
@@ -47,7 +48,7 @@ function Cell({ entry, onOpen, drag }: { entry: Entry; onOpen?: (id: string) => 
         ...(lifted ? { transform: `translate(${by.x}px, ${by.y}px)`, zIndex: 20 } : {}),
       }}
       className={`relative flex h-full min-w-0 flex-col justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised px-2 py-2 ${
-        lifted ? 'border-accent shadow-lg' : 'transition-transform duration-75 active:scale-[0.98] active:border-accent'
+        lifted ? `border-accent shadow-lg ${PLUCKED}` : 'transition-transform duration-75 active:scale-[0.98] active:border-accent'
       }`}
     >
       <Opener entry={entry} onOpen={onOpen} drag={drag} />
