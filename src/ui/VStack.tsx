@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { landingIndex, motionFrom, pagerOffset, releaseVelocity, sampleVelocity, wasDragged, type Motion } from './gesture';
-import { useMomentPlayer } from './transient';
+import { RELAX_MS, useMomentPlayer } from './transient';
 import { across, bodyHeights, LAYERS, layerOffsets, layerSpan, type Bands } from './nav';
 
 interface Drag {
@@ -26,6 +26,7 @@ export function VStack({
   const frame = useRef<HTMLDivElement>(null);
   const column = useRef<HTMLDivElement>(null);
   const strips = useRef<Array<HTMLElement | null>>([]);
+  const shown = useRef<Array<HTMLElement | null>>([]);
   const drag = useRef<Drag | null>(null);
   const dragged = useRef(false);
   const [bands, setBands] = useState<Bands>({ height: 0, banners: banners.map(() => 0) });
@@ -34,21 +35,50 @@ export function VStack({
   const offsets = layerOffsets(bands);
   const heights = bodyHeights(bands);
   const restingAt = (at: number): string => `translate(0, ${-offsets[at]}px)`;
+  const standing = useRef(layer);
+  standing.current = layer;
+  const natural = useRef<number[]>([]);
+  const relaxing = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useLayoutEffect(() => {
     const node = frame.current;
     if (!node) return;
-    const read = (): void =>
+
+    const settleAt = (next: Bands): void => {
+      const held = column.current;
+      if (held) held.style.transform = `translate(0, ${-layerOffsets(next)[standing.current]}px)`;
+    };
+
+    const relax = (): void => {
+      relaxing.current = null;
       setBands((held) => {
-        const next = { height: node.clientHeight, banners: strips.current.map((strip) => strip?.offsetHeight ?? 0) };
-        const same = next.height === held.height && next.banners.every((value, at) => value === held.banners[at]);
-        return same ? held : next;
+        const next = { height: held.height, banners: [...natural.current] };
+        if (next.banners.every((value, at) => value === held.banners[at])) return held;
+        settleAt(next);
+        return next;
       });
+    };
+
+    const read = (): void => {
+      natural.current = shown.current.map((band) => band?.offsetHeight ?? 0);
+      setBands((held) => {
+        const next = { height: node.clientHeight, banners: natural.current.map((now, at) => Math.max(now, held.banners[at] ?? 0)) };
+        if (next.height === held.height && next.banners.every((value, at) => value === held.banners[at])) return held;
+        settleAt(next);
+        return next;
+      });
+      if (relaxing.current !== null) clearTimeout(relaxing.current);
+      relaxing.current = setTimeout(relax, RELAX_MS);
+    };
+
     read();
     const observer = new ResizeObserver(read);
     observer.observe(node);
-    for (const strip of strips.current) if (strip) observer.observe(strip);
-    return () => observer.disconnect();
+    for (const band of shown.current) if (band) observer.observe(band);
+    return () => {
+      observer.disconnect();
+      if (relaxing.current !== null) clearTimeout(relaxing.current);
+    };
   }, [banners.length]);
 
   useLayoutEffect(() => {
@@ -93,7 +123,12 @@ export function VStack({
           </div>,
           ...(at < banners.length
             ? [
-                <div key={`banner-${at}`} ref={(node) => void (strips.current[at] = node)} className="flex w-full shrink-0 items-stretch">
+                <div
+                  key={`banner-${at}`}
+                  ref={(node) => void (strips.current[at] = node)}
+                  className="flex w-full shrink-0 items-stretch overflow-hidden"
+                  style={bands.banners[at] ? { height: bands.banners[at] } : undefined}
+                >
                 <button
                   data-drive="shell.layer"
                   data-boundary={at}
@@ -138,7 +173,7 @@ export function VStack({
                     });
                   }}
                 >
-                  {banners[at]}
+                  <div ref={(node) => void (shown.current[at] = node)}>{banners[at]}</div>
                 </button>
                 {beside?.[at] ?? null}
                 </div>,

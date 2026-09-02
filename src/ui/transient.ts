@@ -5,6 +5,8 @@ import { useMedia } from './wide';
 
 export const SETTLE_MS = 220;
 
+export const RELAX_MS = 250;
+
 export type MomentKind = 'arrival' | 'rise' | 'darken' | 'settle' | 'sprout' | 'linger' | 'deny' | 'underway';
 
 const DRAWN_AS: Record<MomentKind, string> = {
