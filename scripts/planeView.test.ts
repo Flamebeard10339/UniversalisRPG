@@ -158,8 +158,8 @@ describe('formatPlane', () => {
   });
 
   it('heads a plane with the name the engine published and no id at all', () => {
-    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).toContain('Modified Blade —');
-    expect(formatPlane(plane({ name: asLocalized('Modified Blade') }), false, null, localizer)[0]).not.toContain('mod.blade');
+    expect(formatPlane(plane({ name: asLocalized('Blade') }), false, null, localizer)[0]).toContain('Blade —');
+    expect(formatPlane(plane({ name: asLocalized('Blade') }), false, null, localizer)[0]).not.toContain('mod.blade');
   });
 
   it('marks the hexagon in hand in the margin, and only that one', () => {

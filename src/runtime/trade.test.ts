@@ -210,12 +210,12 @@ describe('a grown copy sells for what its base is worth', () => {
     expect(copiesOf(state, 'honed-blade')).toEqual({ stack: 0, grown: 1, worn: 0 });
   });
 
-  it("draws the copy on the counter under the copy's own name, not its base's", () => {
+  it('draws the copy on the counter as its own row, answerable by the copy and not by the base', () => {
     const state = withGrownBlades(1);
     const [copy] = grownCopies(state);
     const values = shopOptions(shopFrame('stall'), state, registry)[0]!.values!;
-    expect(values.map((choice) => choice.shown)).toContain('Sell Modified Honed Blade — 8 each, you carry 1');
-    expect(values.find((choice) => String(choice.shown).includes('Modified'))!.value).toBe(rowAnswer('sell', copy));
+    expect(values.map((choice) => choice.shown)).toContain('Sell Honed Blade — 8 each, you carry 1');
+    expect(values.map((choice) => choice.value)).toContain(rowAnswer('sell', copy));
   });
 
   it('offers the plain blades beside a base and pays 16 for two of them, the base untouched', () => {

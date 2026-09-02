@@ -53,14 +53,14 @@ describe('what the screen lists', () => {
 
     expect(carriedEntries(state, registry)).toEqual([
       { id: 'iron-sword', name: 'Iron Sword', count: 3, shown: 'Iron Sword x3', grown: false },
-      { id: '1', name: 'Modified Heartwood Blade', count: 1, shown: 'Modified Heartwood Blade', grown: true },
+      { id: '1', name: 'Heartwood Blade', count: 1, shown: 'Heartwood Blade', grown: true },
     ]);
   });
 
   it('names a grown copy under a descriptor and no id, whatever id minting gave it', () => {
     const grown = carriedEntries(withGrownBlade(), registry).find((entry) => entry.grown);
 
-    expect(grown?.name).toBe('Modified Heartwood Blade');
+    expect(grown?.name).toBe('Heartwood Blade');
     expect(grown?.name).not.toContain(grown?.id);
   });
 
@@ -81,7 +81,7 @@ describe('what the screen lists', () => {
     const state = carrying({ 'heartwood-blade': 2 });
     const copies = carriedEntries(state, registry).filter((entry) => entry.grown);
 
-    expect(copies.map((entry) => entry.name)).toEqual(['Modified Heartwood Blade', 'Modified Heartwood Blade']);
+    expect(copies.map((entry) => entry.name)).toEqual(['Heartwood Blade', 'Heartwood Blade']);
     expect(new Set(copies.map((entry) => entry.id)).size).toBe(2);
   });
 
@@ -104,8 +104,8 @@ describe('what the screen lists', () => {
     equip(state, registry, '1');
 
     expect(carriedEntries(state, registry)).toEqual([
-      { id: '2', name: 'Modified Heartwood Blade', count: 1, shown: 'Modified Heartwood Blade', grown: true },
-      { id: '1', name: 'Modified Heartwood Blade', count: 1, shown: 'Modified Heartwood Blade (Mainhand)', grown: true, worn: { slot: 'mainhand', title: 'Mainhand' } },
+      { id: '2', name: 'Heartwood Blade', count: 1, shown: 'Heartwood Blade', grown: true },
+      { id: '1', name: 'Heartwood Blade', count: 1, shown: 'Heartwood Blade (Mainhand)', grown: true, worn: { slot: 'mainhand', title: 'Mainhand' } },
     ]);
   });
 });
@@ -157,7 +157,7 @@ describe('what the screen asks', () => {
     const confirm = last(carriedOptions({ item: '1', verb: 'destroy' }, state, registry));
 
     expect(confirm?.key).toBe('confirm');
-    expect(confirm?.label).toBe('Destroy Modified Heartwood Blade for good?');
+    expect(confirm?.label).toBe('Destroy Heartwood Blade for good?');
     expect(confirm?.values?.map((choice) => choice.value)).toEqual([CONFIRMED, LEAVE]);
     expect(carriedOptions({ item: 'rope', verb: 'destroy' }, carrying({ rope: 1 }), registry).map((option) => option.key)).toEqual(['item', 'verb']);
   });

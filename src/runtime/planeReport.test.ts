@@ -130,7 +130,7 @@ describe('planeReport', () => {
   });
 
   it('names every copy it reports under the descriptor, since a base is never anything but a copy', () => {
-    expect(report(dropped('blade')).name).toBe('Modified Blade');
+    expect(report(dropped('blade')).name).toBe('Blade');
   });
 
   it('names an origin cluster with no entry and a slotted one by the slot it came through', () => {

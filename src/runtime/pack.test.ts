@@ -124,7 +124,7 @@ describe('how many things the pack holds', () => {
 
     const rows = packRows(state);
     expect(rows.length).toBe(3);
-    expect(shown(state, registry).slice(0, rows.length)).toEqual(['pebble x4', 'Modified blade', 'Modified blade']);
+    expect(shown(state, registry).slice(0, rows.length)).toEqual(['pebble x4', 'blade', 'blade']);
   });
 
   it('does not count what is worn, which the sheet draws under its own heading', () => {
@@ -136,7 +136,7 @@ describe('how many things the pack holds', () => {
 
     expect(equip(state, registry, '1')).toBeUndefined();
     expect(packRows(state).length).toBe(1);
-    expect(shown(state, registry)).toEqual(['pebble x1', 'Modified blade (Mainhand)']);
+    expect(shown(state, registry)).toEqual(['pebble x1', 'blade (Mainhand)']);
   });
 });
 

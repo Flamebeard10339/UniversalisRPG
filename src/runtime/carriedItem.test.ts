@@ -87,7 +87,7 @@ describe('a grown copy is still a carried blade', () => {
     const played = view(grownFrom('one-blade'));
     expect(played.inventory.blade).toBeUndefined();
     expect(played.grown).toEqual({ '1': 'blade' });
-    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
+    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Blade' }]);
   });
 
   it('still satisfies a requires: has gate', () => {
@@ -133,7 +133,7 @@ describe('a grown copy is never spent', () => {
     expect(played.said).toContain('Your Blade has grown a plane of its own, and a grown item is never spent.');
     expect(played.said).not.toContain('She quenches the blade and hands it back.');
     expect(played.grown).toEqual({ '1': 'blade' });
-    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Modified Blade' }]);
+    expect(played.equipment).toEqual([{ slot: 'mainhand', title: 'Mainhand', item: '1', name: 'Blade' }]);
   });
 });
 

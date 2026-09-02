@@ -851,17 +851,26 @@ describe('what the engine publishes', () => {
     expect(statValueOf(carried, 'might')).toBe(4);
 
     expect(carried.carried).toEqual([
-      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet', grown: true },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], sockets: false },
+      { id: grown.instance, name: 'Gauntlet', count: 1, shown: 'Gauntlet', grown: true, verbs: ['grow', 'equip', 'destroy'], sockets: false },
     ]);
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
     const armed = view(session);
-    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Modified Gauntlet' }]);
+    expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Gauntlet' }]);
     expect(statValueOf(armed, 'might')).toBe(7);
     expect(armed.carried).toEqual([
-      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false },
-      { id: grown.instance, name: 'Modified Gauntlet', count: 1, shown: 'Modified Gauntlet (Hand)', grown: true, worn: { slot: 'hand', title: 'Hand' } },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], sockets: false },
+      {
+        id: grown.instance,
+        name: 'Gauntlet',
+        count: 1,
+        shown: 'Gauntlet (Hand)',
+        grown: true,
+        worn: { slot: 'hand', title: 'Hand' },
+        verbs: ['grow', 'unequip', 'destroy'],
+        sockets: false,
+      },
     ]);
   });
 
@@ -1501,8 +1510,8 @@ describe('every screen a title reaches is played in one language', () => {
   };
 
   it('names what the player carries in the language being played', () => {
-    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Modified Blade']);
-    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['engine.item.modified']);
+    expect(carrying('en').carried.map((entry) => entry.name)).toEqual(['Blade']);
+    expect(carrying('es').carried.map((entry) => entry.name)).toEqual(['Espada']);
   });
 
   it('names the plane that copy carries the same way, and every title it reports', () => {
@@ -1540,8 +1549,8 @@ describe('a modal names what it is about in the language being played', () => {
   });
 
   it('heads the plane screen with the copy it is of, named in it', () => {
-    expect(grown('en').modals[0].options[0].label).toBe('Modified Blade at 0,0');
-    expect(grown('es').modals[0].options[0].label).toBe('engine.item.modified en 0,0');
+    expect(grown('en').modals[0].options[0].label).toBe('Blade at 0,0');
+    expect(grown('es').modals[0].options[0].label).toBe('Espada en 0,0');
   });
 });
 

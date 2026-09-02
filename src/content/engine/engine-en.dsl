@@ -26,7 +26,6 @@ engine.combat.started: You are fighting the {target}.
 engine.combat.felled: The {target} falls.
 engine.examine.beside: {subject} — {examine}
 engine.entity.unexamined: ?
-engine.item.modified: Modified {item}
 engine.carried.stack: {item} x{count}
 engine.carried.worn: {item} ({slot})
 engine.modal.name: Name

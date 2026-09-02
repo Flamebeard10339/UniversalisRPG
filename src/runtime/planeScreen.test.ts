@@ -209,7 +209,7 @@ describe('what the screen does with an answer', () => {
 
     const refused = walk(state, spent, ['allocate: position 1']);
     expect(refused).toEqual({ ...planeFrame('1', '1,0'), said: says('engine.plane.no-points', { node: says('engine.plane.node.position', { position: aCount(1), hex: anId('1,0') }) }) });
-    expect(label(refused as PlaneFrame, state)).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
+    expect(label(refused as PlaneFrame, state)).toBe('Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
     expect(values(refused as PlaneFrame, state)).toContain('allocate: position 1');
     expect(JSON.stringify(state)).toBe(before);
     expect(state.log).toEqual([]);
@@ -269,8 +269,8 @@ describe('what the heading says', () => {
     const state = carrying({ blade: 1, 'spark-jewel': 1 });
     const grown = plane(state, ['allocate: slot e', 'slot: e with spark-jewel']);
 
-    expect(label({ ...grown, hex: '1,0' }, state)).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire.');
-    expect(label(grown, state)).toBe('Modified Blade at 0,0');
+    expect(label({ ...grown, hex: '1,0' }, state)).toBe('Blade at 1,0 — A splinter of something that was recently on fire.');
+    expect(label(grown, state)).toBe('Blade at 0,0');
   });
 });
 
@@ -281,7 +281,6 @@ describe('a frame carries a key, not a sentence', () => {
     '',
     '# locale es',
     'item.blade.title: Hoja',
-    'engine.item.modified: {item} modificada',
     'engine.plane.heading: {plane} en {hex}',
     'engine.plane.heading.said: {heading} — {said}',
     'engine.plane.no-points: {node} cuesta un punto y no queda ninguno',
@@ -319,8 +318,8 @@ describe('a frame carries a key, not a sentence', () => {
   });
 
   it('renders a frame written by one player in the language of the other, both directions', () => {
-    expect(readIn('en', refusedIn('es'))).toBe('Modified Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
-    expect(readIn('es', refusedIn('en'))).toBe('Hoja modificada en 1,0 — posicion 1 de 1,0 cuesta un punto y no queda ninguno');
+    expect(readIn('en', refusedIn('es'))).toBe('Blade at 1,0 — A splinter of something that was recently on fire. — position 1 of 1,0 costs a point and none remain');
+    expect(readIn('es', refusedIn('en'))).toBe('Hoja en 1,0 — posicion 1 de 1,0 cuesta un punto y no queda ninguno');
   });
 });
 

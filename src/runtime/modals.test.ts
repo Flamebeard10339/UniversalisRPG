@@ -615,7 +615,7 @@ describe('the plane screen, as a frame like any other', () => {
     submitModal(session, { plane: 'allocate: position 2' });
     const refused = submitModal(session, { plane: 'allocate: position 3' });
     expect(modalNames(refused)).toEqual(['item-plane']);
-    expect(refused.modals[0].options[0].label).toBe('Modified Blade at 0,0 — position 3 of 0,0 costs a point and none remain');
+    expect(refused.modals[0].options[0].label).toBe('Blade at 0,0 — position 3 of 0,0 costs a point and none remain');
     expect(refused.said).toEqual([]);
   });
 
