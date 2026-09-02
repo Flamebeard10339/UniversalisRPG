@@ -18,7 +18,7 @@ import { sessionLocalizer, serializeSession, startSession, testSteps, view, walk
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { packsOf, type PortalPack } from '../content/packs';
-import { appendOutputs, emptyTranscript, type Transcript } from './transcript';
+import { appendOutputs, emptyTranscript, keptTranscript, TRANSCRIPT_SLOT, trimmedTranscript, type Transcript } from './transcript';
 import { createRecorder } from './playtest';
 import { createTransientChannel, type TransientChannel } from './transient';
 
@@ -149,6 +149,29 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let replay: ReplaySnapshot | null = null;
   let authoring!: AuthoringContext;
 
+  let logKept: Transcript | null = null;
+  let keepingTheLog = true;
+
+  function keepLog(): void {
+    const transcript = current.transcript;
+    if (!keepingTheLog || transcript === logKept) return;
+    logKept = transcript;
+    try {
+      save.store.write(TRANSCRIPT_SLOT, JSON.stringify(trimmedTranscript(transcript)));
+    } catch (error) {
+      keepingTheLog = false;
+      complain(`what is said here could not be kept, so this page is the last of it: ${because(error)}`);
+    }
+  }
+
+  const readLog = (): { text: string | null; complaints: CommandOutput[] } => {
+    try {
+      return { text: save.store.read(TRANSCRIPT_SLOT)?.payload ?? null, complaints: [] };
+    } catch (error) {
+      return { text: null, complaints: [warn(`what was said before could not be read back: ${because(error)}`)] };
+    }
+  };
+
   const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest' | 'replay'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run(), replay });
 
   const readLocal = (): { text: string; complaints: CommandOutput[] } => {
@@ -165,7 +188,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     return [warn(`${LOCAL_CHANGES_MODULE_ID} shadows ${found.length} shipped section(s), so editing the file will not change what is played`, found.map((each) => `# ${each.kind} ${each.address} — also in ${each.modules.join(', ')}`))];
   };
 
-  const openOnce = (before: Transcript): void => {
+  const openOnce = (before: Transcript, log: { text: string | null; complaints: CommandOutput[] } = { text: null, complaints: [] }): void => {
     const local = readLocal();
     const localSource: ModuleSource = { name: LOCAL_CHANGES_MODULE_ID, text: local.text };
     const held = local.text.trim() === '' ? shipped : [...shipped, localSource];
@@ -180,12 +203,14 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       readLocalChanges: stored,
     };
 
-    const said = [...local.complaints, ...(opened.modules.includes(LOCAL_CHANGES_MODULE_ID) ? shadowing(local.text) : [])];
+    const said = [...local.complaints, ...log.complaints, ...(opened.modules.includes(LOCAL_CHANGES_MODULE_ID) ? shadowing(local.text) : [])];
     const opening = open(opened, authoring, save, said);
+    const kept = log.text === null || opened.resumed.kind !== 'resumed' ? null : keptTranscript(log.text, sessionLocalizer(opening.context.session).identifier);
+    const carried = kept ?? before;
     context = opening.context;
     current = settled({
       view: opening.context.view,
-      transcript: appendOutputs(before, opening.output),
+      transcript: appendOutputs(carried, opening.output),
       live: null,
       problems: opened.problems,
       remedies: remediesFor(opened.problems, () => openWithLocalCleared(sources, authoring.dependencies)?.problems ?? null),
@@ -193,15 +218,16 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     });
   };
 
-  openOnce(emptyTranscript());
+  openOnce(emptyTranscript(), readLog());
 
   const ticker = options.ticker ?? createTicker();
   let running: LiveRun | null = null;
   let stopTicking: (() => void) | null = null;
 
-  const publish = (): void => {
+  function publish(): void {
+    keepLog();
     for (const listener of listeners) listener();
-  };
+  }
 
   const changing = (act: () => void): void => {
     act();
@@ -214,10 +240,10 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
-  const complain = (text: string): void => {
+  function complain(text: string): void {
     current = settled({ ...current, transcript: appendOutputs(current.transcript, [{ kind: 'message', words: 'tool', tone: 'warn', text }]) });
     publish();
-  };
+  }
 
   const unhook = (): LiveRun | null => {
     const run = running;

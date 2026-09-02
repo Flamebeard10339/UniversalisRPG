@@ -2,7 +2,7 @@ import { SURFACES, type SurfaceId } from './authoringSurface';
 import { SPLIT_DEFAULT, splitHeld } from './gesture';
 import type { Point } from './viewport';
 
-export const EDITOR_SLOT = 'editor';
+export { EDITOR_SLOT } from '../runtime/saveSlots';
 
 export interface MapWhere {
   pan: Point;

@@ -107,3 +107,47 @@ export function appendOutputs(transcript: Transcript, outputs: readonly CommandO
   }
   return { entries, nextId, place: cursor.place, described: cursor.described };
 }
+
+export { TRANSCRIPT_SLOT } from '../runtime/saveSlots';
+
+export const TRANSCRIPT_KEPT = 200;
+
+export function trimmedTranscript(transcript: Transcript): Transcript {
+  return transcript.entries.length <= TRANSCRIPT_KEPT ? transcript : { ...transcript, entries: transcript.entries.slice(-TRANSCRIPT_KEPT) };
+}
+
+const TONES: readonly MessageTone[] = ['plain', 'ok', 'warn', 'error'];
+
+const KINDS: readonly LogKind[] = ['said', 'place', 'describe', 'message', 'detail'];
+
+export type Minting = (text: string) => Localized;
+
+function readEntry(value: unknown, minted: Minting): LogEntry | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const { id, words, kind, tone, text, repeats } = value as Partial<LogEntry>;
+  if (typeof id !== 'number' || !Number.isFinite(id)) return null;
+  if (typeof repeats !== 'number' || !Number.isFinite(repeats)) return null;
+  if (typeof text !== 'string') return null;
+  if (!KINDS.includes(kind as LogKind) || !TONES.includes(tone as MessageTone)) return null;
+  if (words === 'player') return { id, words, kind: kind as LogKind, tone: tone as MessageTone, text: minted(text), repeats };
+  if (words === 'tool') return { id, words, kind: kind as LogKind, tone: tone as MessageTone, text, repeats };
+  return null;
+}
+
+export function keptTranscript(text: string | null, minted: Minting): Transcript | null {
+  if (text === null) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const { entries, nextId, place, described } = parsed as Partial<Transcript>;
+  if (!Array.isArray(entries) || typeof nextId !== 'number' || !Number.isFinite(nextId)) return null;
+  if (place !== null && typeof place !== 'string') return null;
+  if (!Array.isArray(described) || described.some((each) => typeof each !== 'string')) return null;
+  const read = entries.map((entry) => readEntry(entry, minted));
+  if (read.some((entry) => entry === null)) return null;
+  return trimmedTranscript({ entries: read as LogEntry[], nextId, place, described: described as string[] });
+}

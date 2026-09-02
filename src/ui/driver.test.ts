@@ -13,6 +13,7 @@ import { createDriver, REMEDIES, type Driver } from './driver';
 import { mapFixtureFor } from '../runtime/mapFixture';
 import { noStorage, pageStorage, REFUSING as BROWSER_REFUSALS } from './agent/pageStorage';
 import { EDITOR_SLOT, FORGOTTEN, recorded } from './editorMemory';
+import { TRANSCRIPT_SLOT } from './transcript';
 import { fixtureSources } from '../content/worldFixture';
 
 const WORKSHOP = {
@@ -403,10 +404,16 @@ describe('a store that refuses leaves the session playing (c13)', () => {
 
   const HEADER = ['# info local-changes', 'version: 0.0.0', ''].join('\n');
 
-  const MOMENTS: Record<string, { drive(driver: Driver): void; asks(store: ReturnType<typeof slotStore>): void }> = {
+  const MOMENTS: Record<string, { drive?(driver: Driver): void; asks(store: ReturnType<typeof slotStore>): void }> = {
     opening: {
-      drive: () => undefined,
       asks: (store) => void store.read('local-changes'),
+    },
+    recalling: {
+      asks: (store) => void store.read(TRANSCRIPT_SLOT),
+    },
+    keeping: {
+      drive: (driver) => driver.send('/look'),
+      asks: (store) => void store.write(TRANSCRIPT_SLOT, '{}'),
     },
     staging: {
       drive: (driver) => driver.send(MOVE_LINE),
@@ -439,8 +446,13 @@ const STORE_REACHES = [...readFileSync('src/ui/driver.ts', 'utf8').matchAll(/sav
   const through = (slots: SlotDriver): { driver: Driver; at: Record<string, string[]> } => {
     const driver = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
     const at: Record<string, string[]> = {};
-    let before: string[] = [];
+    const atOpening = said(driver);
+    let before = atOpening;
     for (const [moment, what] of Object.entries(MOMENTS)) {
+      if (what.drive === undefined) {
+        at[moment] = atOpening;
+        continue;
+      }
       what.drive(driver);
       const now = said(driver);
       at[moment] = now.slice(before.length);
@@ -671,5 +683,55 @@ describe('a local module that will not load never costs the session (c1)', () =>
       expect(listLocalSections(driver.localChanges() ?? ''), local).toEqual([]);
       expect(createDriver(fixtureSources(), { slots }).serialized(), local).toBe(fresh.serialized());
     }
+  });
+});
+
+describe('the page going away and coming back', () => {
+  const walked = (driver: Driver): string[] => Object.keys(shown(driver).flags).sort();
+
+  const staging = (driver: Driver): string => {
+    driver.send('1');
+    driver.send(MOVE_LINE);
+    return said(driver).find((line) => line.startsWith('Staged'))!;
+  };
+
+  const reopen = (slots: SlotDriver): Driver => createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
+
+  it('picks the game back up where it stood, with what was said still on the page', () => {
+    const slots = pageSlots();
+    const before = reopen(slots);
+    const staged = staging(before);
+
+    const after = reopen(slots);
+
+    expect(staged).toBeDefined();
+    expect(said(after), 'what was said before is still there').toContain(staged);
+    expect(walked(after)).toEqual(walked(before));
+    expect(shown(after).location.id).toBe(shown(before).location.id);
+  });
+
+  it('comes back in dev mode, so the slot it was writing is the slot it goes on writing', () => {
+    const slots = pageSlots();
+    const before = reopen(slots);
+    before.send('/dev on');
+    staging(before);
+
+    const after = reopen(slots);
+
+    expect(before.snapshot().dev).toBe(true);
+    expect(after.snapshot().dev, 'the dev snapshot standing is what says the mode was on').toBe(true);
+    expect(walked(after)).toEqual(walked(before));
+  });
+
+  it('leaves what was said behind when there is no game in the slot to pick up', () => {
+    const slots = pageSlots();
+    const before = reopen(slots);
+    const staged = staging(before);
+    slotStore(slots, () => 0).remove('player');
+
+    const after = reopen(slots);
+
+    expect(staged).toBeDefined();
+    expect(said(after)).not.toContain(staged);
   });
 });

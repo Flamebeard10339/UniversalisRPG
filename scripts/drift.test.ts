@@ -8,7 +8,7 @@ import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
 import { COMMANDS, runLine, type AuthoringContext, type CommandResult } from '../src/runtime/command';
-import { createSaveContext } from '../src/runtime/saveSlots';
+import { createSaveContext, keptByThePage } from '../src/runtime/saveSlots';
 import { serializeSession, type PlayChoice } from '../src/runtime/session';
 import { slotStore, type SlotDriver } from '../src/runtime/store';
 import { browserSlots } from '../src/ui/browserStore';
@@ -68,7 +68,12 @@ const bothDrivers = (): { repl: Repl; gui: Driver; slots: { repl: SlotDriver; gu
 
 function slotBytes(driver: SlotDriver): Record<string, unknown> {
   const store = slotStore(driver, () => STAMP);
-  return Object.fromEntries(store.list().map((name) => [name, store.read(name)]));
+  return Object.fromEntries(
+    store
+      .list()
+      .filter((name) => !keptByThePage(name))
+      .map((name) => [name, store.read(name)]),
+  );
 }
 
 function inStep(repl: Repl, gui: Driver, line: string, dispatch: () => void = () => gui.send(line)): { result: CommandResult } {
