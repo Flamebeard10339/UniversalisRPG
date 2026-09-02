@@ -753,6 +753,10 @@ describe('nothing a player answers with carries words', () => {
     'title: Vigour',
     'base: 4',
     '',
+    '# skill hammering',
+    'title: Hammering',
+    'stat: vigour',
+    '',
     '# location camp',
     'x: 0, y: 0',
     'starting',
@@ -853,6 +857,12 @@ describe('nothing a player answers with carries words', () => {
 
   const statId = (session: PlaySession): string => view(session).stats[0].id;
 
+  const offered = (session: PlaySession, key: string): string => {
+    const open = view(session).modals;
+    const values = (open[open.length - 1].options.find((option: { key: string }) => option.key === key)?.values ?? []) as ModalChoice[];
+    return values.map((choice) => choice.value).find((value) => value !== 'close')!;
+  };
+
   const rows = (session: PlaySession): string[] => {
     applyDirective(session, { kind: 'open-modal', modal: 'carried-items' });
     const open = view(session).modals;
@@ -923,6 +933,12 @@ describe('nothing a player answers with carries words', () => {
     applyDirective(session, { kind: 'open-modal', modal: 'stat-breakdown' });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'stat', value: statId(session) });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
+
+    applyDirective(session, { kind: 'open-modal', modal: 'skill-breakdown' });
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: 'skill', value: offered(session, 'skill') });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
     return values;

@@ -40,6 +40,7 @@ const AROUND: Record<About, Declared> = {
   plane: { place: 'fill' },
   quest: {},
   stat: {},
+  skill: {},
 };
 
 export const declaredFor = (focus: PlayView['focus']): Declared => (focus === null ? {} : AROUND[focus.kind]);

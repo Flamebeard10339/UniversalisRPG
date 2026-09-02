@@ -391,7 +391,7 @@ export function skillsSurface(held: AgentSurfaces['skills']): TestSurface {
       panels: held.panels.map((panel) => ({ id: panel.id, level: panel.level, total: panel.total, into: panel.into, span: panel.span, toNext: panel.toNext, filled: filled(panel) })),
     }),
     actions: {
-      open: (value) => held.controls.open(value === null ? null : skillNamed(held.panels, value)),
+      open: (value) => held.controls.open(skillNamed(held.panels, value)),
     },
   };
 }
@@ -433,6 +433,13 @@ export function beatSurface(held: AgentSurfaces['beat']): TestSurface {
   };
 }
 
+export function skillSurface(held: AgentSurfaces['skill']): TestSurface {
+  return {
+    state: () => ({ skill: held.panel.id, level: held.panel.level, total: held.panel.total, toNext: held.panel.toNext, rate: held.rate }),
+    actions: {},
+  };
+}
+
 export function statSurface(held: AgentSurfaces['stat']): TestSurface {
   return {
     state: () => ({ stat: held.row.id, value: held.row.value, from: held.row.from.map((share) => share.title) }),
@@ -456,7 +463,8 @@ export function questNamed(rows: readonly JournalRow[], value: unknown): Answer 
 export interface AgentSurfaces {
   shell: { where: Where; dev: boolean; commandLine: boolean; go: (where: Where) => void; showCommandLine: (shown: boolean) => void };
   map: { map: MapView; controls: MapControls };
-  skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer | null): void } };
+  skills: { panels: readonly SkillPanel[]; opened: Answer | null; greeted: readonly Answer[]; controls: { open(id: Answer): void } };
+  skill: { panel: SkillPanel; rate: number | null };
   plane: { plane: Plane; graph: PlaneGraph; chosen: Answer | null; picking: boolean; controls: { press(key: Answer): void; pick(open: boolean): void; settle(pan: Point, zoom: number): void } };
   journal: { rows: readonly JournalRow[]; controls: { open(id: Answer): void } };
   beat: { arriving: Arriving; controls: { press(): void } };
@@ -479,6 +487,7 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   quest: (held) => questSurface(held),
   stats: (held) => statsSurface(held),
   stat: (held) => statSurface(held),
+  skill: (held) => skillSurface(held),
   playtest: (held) => playtestSurface(held),
   replay: (held) => replaySurface(held),
   edit: (held) => editSurface(held),

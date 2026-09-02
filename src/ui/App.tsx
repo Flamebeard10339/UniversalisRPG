@@ -19,7 +19,7 @@ import { MapPane } from './MapPane';
 import { newlyFound, type Place } from './discovery';
 import { crossings, looked, nothingCrossed, noticed, stirring, type Crossings } from './levelling';
 import { modulesOff, turned } from '../content/packs';
-import { markOf, type XpMark } from './skillPanels';
+import { markOf, skillPanels, type XpMark } from './skillPanels';
 import { SkillsPane } from './SkillsPane';
 import { Notices } from './Notices';
 import { noticesBetween } from './notice';
@@ -34,6 +34,7 @@ import { pageAt } from './replay';
 import { revealing } from './reveal';
 import { PlaneModal } from './PlaneModal';
 import { QuestBody } from './QuestBody';
+import { SkillBody } from './SkillBody';
 import { StatBody } from './StatBody';
 import { StatsPane } from './StatsPane';
 import { carried, worn } from './sheet';
@@ -121,6 +122,7 @@ interface Drawing {
   readonly words: Words;
   readonly option: PlayView['modals'][number]['options'][number];
   readonly manner: Declared;
+  readonly first: XpMark | null;
   readonly onAnswer: (key: string, value: string) => void;
 }
 
@@ -144,6 +146,10 @@ const FOCUS_SCREEN: { [K in Reading['kind']]: Draws<K> } = {
     const row = view.stats.find((each) => each.id === focus.stat);
     return row === undefined ? {} : { beside: <StatBody row={row} /> };
   },
+  skill: (focus, { view, words, first }) => {
+    const panel = skillPanels(view.xp).find((each) => each.id === focus.skill);
+    return panel === undefined ? {} : { beside: <SkillBody panel={panel} first={first} now={markOf(view)} words={words} /> };
+  },
 };
 
 const focusScreen = (focus: PlayView['focus'], drawing: Drawing | null): FocusScreen =>
@@ -158,12 +164,12 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const localizer = driver.localizer();
   const words = wordsOf(localizer);
   const asking = askedOption(view.modals);
-  const screen = focusScreen(view.focus, asking ? { view, words, option: asking, manner: declaredFor(view.focus), onAnswer: driver.answer } : null);
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
   useNotices(view, words, driver.transient);
   const opened = useRef<XpMark | null>(null);
   if (opened.current === null) opened.current = markOf(view);
+  const screen = focusScreen(view.focus, asking ? { view, words, option: asking, manner: declaredFor(view.focus), first: opened.current, onAnswer: driver.answer } : null);
 
   const page = shellState(where, dev, editing.commandLine);
   useEffect(() => {
@@ -264,7 +270,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
       );
     }
     if (subpage.id === 'stats') return <StatsPane view={view} localizer={localizer} onOpen={driver.readStat} />;
-    if (subpage.id === 'skills') return <SkillsPane view={view} first={opened.current} crossed={crossed} words={words} />;
+    if (subpage.id === 'skills') return <SkillsPane view={view} crossed={crossed} onOpen={driver.readSkill} />;
     if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
     if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
     return <Ledger entries={carried(view.carried, view.planes, localizer)} layout="grid" onOpen={driver.open} onSwap={driver.swap} />;

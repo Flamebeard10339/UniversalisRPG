@@ -6,11 +6,16 @@ import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
 import { holdsStat, statFocus, statOptions, statStale, statSubmit, LEAVE as STAT_LEAVE } from './statScreen';
+import { holdsSkill, skillFocus, skillOptions, skillStale, skillSubmit, LEAVE as SKILL_LEAVE } from './skillScreen';
 import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, BACK as SHOP_BACK, LEAVE as SHOP_LEAVE } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
-export type Focus = PlaneFocus | { readonly kind: 'quest'; readonly quest: Answer } | { readonly kind: 'stat'; readonly stat: Answer };
+export type Focus =
+  | PlaneFocus
+  | { readonly kind: 'quest'; readonly quest: Answer }
+  | { readonly kind: 'stat'; readonly stat: Answer }
+  | { readonly kind: 'skill'; readonly skill: Answer };
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 import { Registry } from '../content/registry';
@@ -91,6 +96,14 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     stale: statStale,
     focus: statFocus,
     leaves: STAT_LEAVE,
+  },
+  'skill-breakdown': {
+    options: (frame, state, registry) => skillOptions(frame, state, registry),
+    submit: (frame) => skillSubmit(frame),
+    holds: holdsSkill,
+    stale: skillStale,
+    focus: skillFocus,
+    leaves: SKILL_LEAVE,
   },
   shop: {
     options: shopOptions,

@@ -216,6 +216,16 @@ describe('the rules the driver is held to', () => {
     }
   });
 
+  it('opens no screen of its own from a pane, so two cannot stand open at once', () => {
+    const panes = SOURCES.filter((source) => /Pane\.tsx$/.test(source.file));
+    expect(panes.length, 'nothing under src/ui is a pane, so this check holds vacuously').toBeGreaterThan(3);
+
+    for (const pane of panes) {
+      expect(pane.text, `${pane.file} draws a screen of its own rather than asking the stack for one`).not.toMatch(/<Modal[\s/>]/);
+      expect(pane.text, `${pane.file} keeps a screen open in its own state, where the stack cannot see it`).not.toMatch(/\bDeclared\b/);
+    }
+  });
+
   it("names each of the shell's own words in the table and nowhere else", () => {
     const table = SOURCES.filter((source) => source.file.endsWith('/labels.ts'));
     expect(table).toHaveLength(1);

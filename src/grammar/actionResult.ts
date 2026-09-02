@@ -29,7 +29,7 @@ export type Party = 'me' | 'them';
 
 export const STARTING_LOCATION = 'starting-location';
 
-export const MODAL_SCREENS = ['choose-name', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown'] as const;
+export const MODAL_SCREENS = ['choose-name', 'choose-race', 'carried-items', 'quest-journal', 'stat-breakdown', 'skill-breakdown'] as const;
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
 

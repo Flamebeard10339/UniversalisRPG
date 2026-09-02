@@ -87,6 +87,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     swap: (one, other) => void calls.push(`swap:${one}:${other}`),
     readQuest: (quest) => void calls.push(`quest:${quest}`),
     readStat: (stat) => void calls.push(`stat:${stat}`),
+    readSkill: (skill) => void calls.push(`skill:${skill}`),
     localizer: () => localizerFor(loadInEnglish(''), 'en'),
     cancel: () => void calls.push('cancel'),
     serialized: () => '',

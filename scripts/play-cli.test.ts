@@ -290,6 +290,10 @@ const LIVE_MODULE =
 # stat tap
 base: 0.2
 
+# skill tapping
+title: Tapping
+stat: tap
+
 # stat taps-per-minute
 base: 60
 
@@ -1397,6 +1401,7 @@ const ACTS_ON: Record<string, string> = {
   '/inventory': 'gold',
   '/quests': 'a-quest',
   '/stat': 'tap',
+  '/skills': 'tapping',
   '/goto': 'camp',
   '/place': 'camp 3 4',
   '/link': 'camp isle',

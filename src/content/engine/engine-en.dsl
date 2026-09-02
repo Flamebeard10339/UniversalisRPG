@@ -168,6 +168,9 @@ engine.journal.close: Close
 engine.stat.which: Which stat?
 engine.stat.reading: Stat
 engine.stat.close: Close
+engine.skill.which: Which skill?
+engine.skill.reading: Skill
+engine.skill.close: Close
 engine.shell.journal: Journal
 engine.shell.journal.empty: No quests loaded.
 engine.shell.sheet.empty: Nothing to do here.
@@ -269,6 +272,7 @@ engine.repl.journal.struck: (done) {said}
 engine.repl.journal.unknown: no quest is called {quest}
 engine.repl.stat: {stat} — {value}
 engine.repl.stat.unknown: no stat is called {stat}
+engine.repl.skill.unknown: no skill is called {skill}
 engine.repl.state.location: Location: {location}
 engine.repl.state.time: Elapsed simulated time: {time}s
 engine.repl.state.flags: Flags: {flags}

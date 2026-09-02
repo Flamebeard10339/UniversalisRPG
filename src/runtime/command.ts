@@ -346,6 +346,16 @@ function openStat(ctx: CommandContext, stat: string): CommandResult {
   return { ...reading, recorded: [...opened.recorded, ...reading.recorded] };
 }
 
+function openSkill(ctx: CommandContext, skill: string): CommandResult {
+  const found = ctx.view.xp.find((row) => row.id === skill || row.id.endsWith(`.${skill}`));
+  if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.skill.unknown', { skill: sessionLocalizer(ctx.session).identifier(skill) }));
+
+  const opened = runDirective(ctx, { kind: 'open-modal', modal: 'skill-breakdown' });
+  if (opened.recorded.length === 0) return opened;
+  const reading = runDirective(ctx, { kind: 'submit-modal', key: 'skill', value: found.id });
+  return { ...reading, recorded: [...opened.recorded, ...reading.recorded] };
+}
+
 function openJournal(ctx: CommandContext, entries: readonly JournalEntry[], quest: string): CommandResult {
   const found = entries.find((entry) => namesFrom(entry.quest, quest));
   if (!found) return said('error', sessionLocalizer(ctx.session).engine('engine.repl.journal.unknown', { quest: sessionLocalizer(ctx.session).identifier(quest) }));
@@ -1047,6 +1057,27 @@ export const COMMANDS: readonly CommandSpec[] = [
           words: 'player' as const,
           tone: 'plain' as const,
           text: grouped(localizer, row.group, localizer.engine('engine.repl.stat', { stat: row.title, value: Number(row.value.toFixed(2)) })),
+        })),
+        quit: false,
+        recorded: [],
+      };
+    },
+  }),
+  define({
+    name: '/skills',
+    arg: 'id',
+    argHint: '[<skill>]',
+    summary: 'list every skill and the level it stands at, or open one on what it is earning',
+    parse: (rest) => rest,
+    run: (ctx, skill) => {
+      const localizer = sessionLocalizer(ctx.session);
+      if (skill !== '') return openSkill(ctx, skill);
+      return {
+        output: ctx.view.xp.map((row) => ({
+          kind: 'message' as const,
+          words: 'player' as const,
+          tone: 'plain' as const,
+          text: localizer.engine('engine.repl.stat', { stat: row.title, value: row.level }),
         })),
         quit: false,
         recorded: [],

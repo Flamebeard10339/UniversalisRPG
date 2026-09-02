@@ -87,6 +87,7 @@ export interface Driver {
   swap(one: string, other: string): void;
   readQuest(quest: string): void;
   readStat(stat: string): void;
+  readSkill(skill: string): void;
   cancel(): void;
   localizer(): Localizer;
   serialized(): string;
@@ -402,6 +403,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     swap: (one, other) => send(`swap: ${one} with ${other}`),
     readQuest: (quest) => send(`/quests ${quest}`),
     readStat: (stat) => send(`/stat ${stat}`),
+    readSkill: (skill) => send(`/skills ${skill}`),
     localizer: () => sessionLocalizer(context.session),
     cancel: () => close(true),
     serialized: () => serializeSession(context.session),

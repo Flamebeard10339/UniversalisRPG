@@ -1,17 +1,11 @@
-import { useState } from 'react';
-import type { Answer, Localized } from '../runtime/localized';
+import type { Answer } from '../runtime/localized';
 import type { PlayView } from '../runtime/session';
-import { formatClock, tidy } from './format';
-import { Modal, ModalCard } from './Modal';
-import type { Declared } from './modalManner';
+import { tidy } from './format';
 import { GRID, NAME } from './sheetLayout';
-import { filled, perHour, skillPanels, untilNext, type SkillPanel, type XpMark } from './skillPanels';
+import { filled, skillPanels, type SkillPanel } from './skillPanels';
 import { useTestSurface } from './useTestSurface';
 import { useMoment } from './transient';
 import type { Crossings } from './levelling';
-import type { Words } from './words';
-
-const PANEL: Declared = { over: 'pane' };
 
 const RING_RADIUS = 17;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
@@ -39,15 +33,11 @@ function Ring({ panel, greeted }: { panel: SkillPanel; greeted: boolean }): JSX.
   );
 }
 
-export function SkillsPane({ view, first, crossed, words }: { view: PlayView; first: XpMark | null; crossed: Crossings; words: Words }): JSX.Element {
-  const [opened, setOpened] = useState<Answer | null>(null);
+export function SkillsPane({ view, crossed, onOpen }: { view: PlayView; crossed: Crossings; onOpen: (skill: string) => void }): JSX.Element {
   const panels = skillPanels(view.xp);
-  const shown = panels.find((panel) => panel.id === opened) ?? null;
-  const now = { at: view.time, totals: Object.fromEntries(view.xp.map((row) => [row.id, row.value])) };
-  const rate = shown === null || first === null ? null : perHour(first, now, shown.id);
-  const left = shown === null ? null : untilNext(shown, rate);
+  const opened = view.focus?.kind === 'skill' ? (view.focus.skill as Answer) : null;
 
-  useTestSurface('skills', { panels, opened, greeted: [...crossed.greeted], controls: { open: setOpened } });
+  useTestSurface('skills', { panels, opened, greeted: [...crossed.greeted], controls: { open: onOpen } });
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -59,7 +49,7 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
               data-drive="skills.open"
               data-skill={panel.id}
               type="button"
-              onClick={() => setOpened(panel.id)}
+              onClick={() => onOpen(panel.id)}
               className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised px-3 py-3 transition-transform duration-75 active:scale-[0.98] active:border-accent"
             >
               <span className={`w-full text-center text-sm font-semibold ${NAME}`}>{panel.title}</span>
@@ -68,30 +58,6 @@ export function SkillsPane({ view, first, crossed, words }: { view: PlayView; fi
           ))}
         </div>
       </div>
-
-      {shown === null ? null : (
-        <Modal manner={PANEL} subject={shown.id} onDismiss={() => setOpened(null)}>
-          <ModalCard subject={shown.id}>
-            <p className="text-base font-semibold">{shown.title}</p>
-            <dl className="mt-2 flex flex-col gap-1">
-              <Fact name={words('level')} value={tidy(shown.level)} />
-              <Fact name={words('experience')} value={tidy(shown.total)} />
-              <Fact name={words('to-next')} value={tidy(shown.toNext)} />
-              <Fact name={words('an-hour')} value={rate === null ? '—' : tidy(Math.round(rate))} />
-              <Fact name={words('until-next')} value={left === null ? '—' : formatClock(Math.round(left))} />
-            </dl>
-          </ModalCard>
-        </Modal>
-      )}
-    </div>
-  );
-}
-
-function Fact({ name, value }: { name: Localized; value: string }): JSX.Element {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border pb-1 last:border-b-0">
-      <dt className="text-xs uppercase tracking-wide text-text-subtle">{name}</dt>
-      <dd className="text-sm tabular-nums">{value}</dd>
     </div>
   );
 }

@@ -86,6 +86,8 @@ const SCRIPT: readonly string[] = [
   'submit-modal: race=core.badger',
   '/stat core.attack',
   'submit-modal: close=close',
+  '/skills core.digging',
+  'submit-modal: close=close',
   '/goto fixture-town.store',
   'use:entity.fixture-town.chest.open-the-strongbox',
   '/look',

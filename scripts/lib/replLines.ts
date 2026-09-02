@@ -117,6 +117,15 @@ const FOCUS_LINES: { [K in Focus['kind']]: Drawn<K> } = {
       ...madeOf(row.from).map((share) => say(localizer.engine('engine.repl.stat', { stat: share.title, value: localizer.identifier(share.worth) }), 2)),
     ];
   },
+  skill: (focus, v, localizer) => {
+    const row = v.xp.find((each) => each.id === focus.skill);
+    if (!row) return [];
+    return [
+      say(localizer.engine('engine.repl.stat', { stat: row.title, value: localizer.identifier(tidy(row.value)) })),
+      say(localizer.engine('engine.repl.stat', { stat: localizer.engine('engine.shell.level'), value: localizer.identifier(tidy(row.level)) }), 2),
+      say(localizer.engine('engine.repl.stat', { stat: localizer.engine('engine.shell.points'), value: localizer.identifier(`${tidy(row.earned)}/${tidy(row.span)}`) }), 2),
+    ];
+  },
   plane: (focus, v, localizer) => {
     const plane = v.planes.find((each) => each.instance === focus.instance);
     if (!plane) return [];
