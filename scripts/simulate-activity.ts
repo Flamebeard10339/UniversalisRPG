@@ -9,7 +9,7 @@ import { withModulesOff, type ModuleSource } from '../src/content/universe';
 import { TIME, type Condition } from '../src/grammar/condition';
 import { roadDepths } from '../src/runtime/journey';
 import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
-import { nextBoundary } from '../src/runtime/runtime';
+import { nextBoundary, statValue } from '../src/runtime/runtime';
 import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession, type PlaySession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
 import { fromMilliUnits, MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
@@ -26,6 +26,10 @@ const usage = [
   '  --ideal         stand every run up under unkillable, instant-kill and succeed-checks, so what',
   '                  is read is the most an offer can pay and the least it can cost: the ceiling',
   '                  a build is measured against rather than what any build gets',
+  '  --stats         <stat>=<number>[,<stat>=<number>...] — stand the player at these stats, written',
+  '                  over the player\'s own base through the world\'s own door, so a sweep reads what',
+  '                  every offer pays at a rung of the stat ladder rather than at what one save holds.',
+  '                  The head says what the player actually stood at, gear and level included',
   '',
   '  <save>          a # save id to start every run from, as `load:` names one',
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
@@ -98,9 +102,24 @@ export interface SimulationArgs {
   window: number;
   all: boolean;
   ideal?: boolean;
+  stats?: readonly StatAsk[];
+}
+
+export interface StatAsk {
+  readonly id: string;
+  readonly value: number;
 }
 
 export const GOD_WORDS: readonly DebugSwitch[] = ['unkillable', 'instant-kill', 'succeed-checks'];
+
+export function parseStats(spec: string): StatAsk[] {
+  return spec.split(',').map((pair) => {
+    const [id, raw, ...more] = pair.split('=');
+    const value = Number(raw);
+    if (!id || raw === undefined || more.length > 0 || raw.trim() === '' || !Number.isFinite(value)) throw new Error(`--stats takes <stat>=<number> pairs separated by commas, and ${JSON.stringify(pair)} is not one`);
+    return { id: id.trim(), value };
+  });
+}
 
 const counted = (flag: string, raw: string | undefined): number => {
   const value = Number(raw);
@@ -116,6 +135,11 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
     if (arg === '--help' || arg === '-h') throw new Error(usage);
     else if (arg === '--all') args.all = true;
     else if (arg === '--ideal') args.ideal = true;
+    else if (arg === '--stats') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--stats wants <stat>=<number>[,<stat>=<number>...] after it');
+      args.stats = [...(args.stats ?? []), ...parseStats(spec)];
+    }
     else if (arg === '--at') {
       const at = raw[++i];
       if (at === undefined) throw new Error('--at wants a location id after it');
@@ -176,6 +200,13 @@ export function levelsOn(registry: Registry, save: string): Levels {
   return levelsIn(state.xp);
 }
 
+export function standingAt(registry: Registry, save: string, stats: readonly string[]): StatAsk[] {
+  if (stats.length === 0) return [];
+  const state = createGameState();
+  applyDirective(sessionOver(registry, state), { kind: 'load', save });
+  return stats.map((id) => ({ id, value: statValue(id, state, registry) }));
+}
+
 const decimalsOf = (value: number): number => String(value).split('.')[1]?.length ?? 0;
 
 function windowTerminator(endMs: number): Condition {
@@ -188,8 +219,14 @@ export const PROBE_MODULE = 'simulation-probe';
 export const standTest = (index: number): string => `${PROBE_MODULE}.stand-${index}`;
 export const runTestId = (index: number): string => `${PROBE_MODULE}.run-${index}`;
 
-export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number, ideal = false): ModuleSource {
+export interface Stood {
+  readonly player: string;
+  readonly stats: readonly StatAsk[];
+}
+
+export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number, ideal = false, stood?: Stood): ModuleSource {
   const lines = [`# info ${PROBE_MODULE}`, 'version: 1.0.0', 'dependencies:', ...dependencies.map((id) => `  ${id}`)];
+  if (stood !== undefined && stood.stats.length > 0) lines.push('', `# entity ${stood.player}`, `+stats: ${stood.stats.map((each) => `${each.id} ${String(each.value)}`).join(', ')}`);
   const until = printTerminator(windowTerminator(endMs));
   subjects.forEach((subject, index) => {
     lines.push('', `# test stand-${index}`, DEBUG_MARK, `load: ${save}`, ...(ideal ? GOD_WORDS : []), `goto: ${subject.at}`);
@@ -407,10 +444,11 @@ function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Le
 
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
-export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'> & { ideal?: boolean }, levels: Levels = {}): string[] {
+export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'> & { ideal?: boolean; standing?: readonly StatAsk[] }, levels: Levels = {}): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
   const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time${args.ideal ? `, under ${GOD_WORDS.join(', ')}: the most an offer can pay and the least it can cost` : ''}`];
+  if (args.standing !== undefined && args.standing.length > 0) head.push(`standing at ${args.standing.map((each) => `${each.id} ${round(each.value)}`).join(', ')}, gear and level included`);
   if (shown.length === 0) return [...head, 'nothing on offer paid anything under any seed. --all lists what was tried.'];
 
   const body: string[] = [];
@@ -453,12 +491,19 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
     return { lines: [`${args.save}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
   }
 
+  const asked = args.stats ?? [];
+  const unknown = asked.filter((each) => !base.registry.stats.has(each.id));
+  if (unknown.length > 0) return { lines: [`--stats names no # stat under: ${unknown.map((each) => each.id).join(', ')}. Write the id whole, as thieving.thieving-ability.`], ok: false };
+  if (asked.length > 0 && base.registry.player === undefined) return { lines: ['--stats has no player to stand: the world declares no # entity player'], ok: false };
+
   const endMs = clockOn(base.registry, args.save) + args.window * MS_PER_MINUTE;
   const dependencies = base.parsed.map((module) => module.info.id);
-  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs, args.ideal)]);
+  const stood: Stood | undefined = asked.length > 0 ? { player: base.registry.player!.id, stats: asked } : undefined;
+  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs, args.ideal, stood)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args, levelsOn(base.registry, args.save)), ok: true };
+  const standing = standingAt(loaded.registry, args.save, asked.map((each) => each.id));
+  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), { ...args, standing }, levelsOn(base.registry, args.save)), ok: true };
 }
 
 function main(): void {

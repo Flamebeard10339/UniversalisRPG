@@ -3,7 +3,7 @@ import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
-import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
+import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
 const ISLAND = `# info island
 version: 1.0.0
@@ -168,6 +168,33 @@ describe('the ideal case', () => {
     for (const word of GOD_WORDS) expect(plain).not.toContain(word);
     expect(ideal).toMatch(new RegExp(`load: ${SAVE}\\n${GOD_WORDS.join('\\n')}\\ngoto: `));
     beside(ideal);
+  });
+});
+
+describe('a sweep at a rung of the stat ladder', () => {
+  it('reads <stat>=<number> pairs off one flag, repeatably, and refuses a pair that is not one', () => {
+    expect(parseSimulationArgs(['s', '--stats', 'island.attack=40,island.swing-rate=90']).stats).toEqual([
+      { id: 'island.attack', value: 40 },
+      { id: 'island.swing-rate', value: 90 },
+    ]);
+    expect(parseSimulationArgs(['s', '--stats', 'a=1', '--stats', 'b=2']).stats).toEqual([{ id: 'a', value: 1 }, { id: 'b', value: 2 }]);
+    expect(() => parseSimulationArgs(['s', '--stats', 'island.attack'])).toThrow(/<stat>=<number>/);
+    expect(() => parseSimulationArgs(['s', '--stats', 'island.attack=lots'])).toThrow(/<stat>=<number>/);
+  });
+
+  it('stands the player at the pair through the world\'s own door, and reads back what they actually stood at', () => {
+    const stood = { player: 'island.player', stats: [{ id: 'island.attack', value: 40 }] };
+    const probe = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW, false, stood).text;
+    expect(probe).toContain('# entity island.player\n+stats: island.attack 40');
+    const registry = beside(probe);
+    expect(standingAt(registry, SAVE, ['island.attack'])).toEqual([{ id: 'island.attack', value: 40 }]);
+    expect(standingAt(island(), SAVE, ['island.attack'])[0]!.value).not.toBe(40);
+  });
+
+  it('refuses a stat the world does not declare rather than standing the player at nothing', () => {
+    const { lines, ok } = simulate([{ name: 'island', text: ISLAND }], { save: SAVE, seeds: 1, window: 1, all: false, stats: [{ id: 'island.stealth', value: 5 }] });
+    expect(ok).toBe(false);
+    expect(lines[0]).toMatch(/--stats names no # stat under: island.stealth/);
   });
 });
 
