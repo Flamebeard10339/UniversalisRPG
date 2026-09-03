@@ -3,7 +3,7 @@ import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
-import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
+import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, stood, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
 const ISLAND = `# info island
 version: 1.0.0
@@ -195,6 +195,34 @@ describe('a sweep at a rung of the stat ladder', () => {
     const { lines, ok } = simulate([{ name: 'island', text: ISLAND }], { save: SAVE, seeds: 1, window: 1, all: false, stats: [{ id: 'island.stealth', value: 5 }] });
     expect(ok).toBe(false);
     expect(lines[0]).toMatch(/--stats names no # stat under: island.stealth/);
+  });
+});
+
+describe('a sweep that starts where a route ends', () => {
+  const ROUTE = `${ISLAND}\n# test to-the-thicket\ntravel: thicket\n`;
+  const walked = (): ReturnType<typeof island> => {
+    const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ROUTE }]);
+    expect(loaded.diagnostics).toEqual([]);
+    return loaded.registry;
+  };
+
+  it('is asked for by --after in place of a save, with the loose word still the offer to hold', () => {
+    expect(parseSimulationArgs(['--after', 'island.to-the-thicket', 'wasp'])).toMatchObject({ after: 'island.to-the-thicket', holds: 'wasp', save: '' });
+    expect(() => parseSimulationArgs(['--after'])).toThrow(/--after wants/);
+    expect(() => parseSimulationArgs(['--after', 'x', 'a', 'b'])).toThrow(/at most one loose argument/);
+  });
+
+  it('stands the player where the route left them, on the route\'s own clock, and the probe module runs the route to get there', () => {
+    const registry = walked();
+    const start = { after: 'island.to-the-thicket' };
+    expect(stood(registry, start).state.location).toBe('island.thicket');
+    expect(clockOn(registry, start)).toBe(stood(registry, start).state.time);
+    expect(probeSource(['island'], subjectsFrom(registry, start), start, QUIET_WINDOW).text).toContain('run: island.to-the-thicket\ngoto: ');
+  });
+
+  it('refuses a route that does not walk rather than measuring from wherever it stopped', () => {
+    const registry = loadUniverseWithDiagnostics([{ name: 'island', text: `${ISLAND}\n# test nowhere\nassert: has berry\n` }]).registry;
+    expect(() => stood(registry, { after: 'island.nowhere' })).toThrow(/does not walk/);
   });
 });
 

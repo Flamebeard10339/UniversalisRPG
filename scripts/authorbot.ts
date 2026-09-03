@@ -169,11 +169,12 @@ The tools you have:
     npm run probe -- ${corpus} --test <id>
                                          run one \`# test\` and report PASSED or FAILED
     npm run simulate-activity -- <save> [<word>] [--ideal] [--stats <stat>=<n>,...]
-                                         what every offer in front of a player standing on that save
-                                         pays an hour and what it costs them, and whether the loop it
-                                         was asked for finished. --ideal reads the most it can pay and
-                                         the least it can cost, under the god words; --stats stands the
-                                         player at a rung of the stat ladder first
+    npm run simulate-activity -- --after <test> [<word>] ...
+                                         what every offer in front of a player standing on that save,
+                                         or where that route ends, pays an hour and what it costs them,
+                                         and whether the loop it was asked for finished. --ideal reads
+                                         the most it can pay and the least it can cost, under the god
+                                         words; --stats stands the player at a rung of the stat ladder
     npm run notes -- ${corpus}
                                          every \`@@@\` held by the corpus you are writing into,
                                          your own included. Bare, it reads the shipped corpus
