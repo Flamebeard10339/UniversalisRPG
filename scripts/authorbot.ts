@@ -109,7 +109,16 @@ const engineUnder = (repo: string, written: string): boolean => {
 
 const WRITES = new Set(['write', 'edit', 'notebookedit']);
 
-export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | { reaching: true; why: 'elsewhere' };
+export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | { reaching: true; why: 'elsewhere' } | { reaching: true; why: 'checkout' };
+
+const BARE_CORPUS_ARG = /(?:^|[\s"'=])content(?:[\s"'/\\]|$)/;
+
+const namesCheckoutCorpus = (command: string, repo: string): boolean => {
+  const corpus = path.resolve(repo, CORPUS_DIR);
+  const spelled = [corpus, corpus.replace(/\\/g, '/')].map((each) => each.toLowerCase());
+  const lowered = command.toLowerCase();
+  return spelled.some((each) => lowered.includes(each)) || BARE_CORPUS_ARG.test(command);
+};
 
 export function verdictOf(tool: string, input: Record<string, unknown>, repo: string, workdir: string): Verdict {
   const written = input.file_path;
@@ -117,15 +126,21 @@ export function verdictOf(tool: string, input: Record<string, unknown>, repo: st
     const inside = path.resolve(written).toLowerCase().startsWith(path.resolve(workdir).toLowerCase());
     if (!inside) return { reaching: true, why: 'elsewhere' };
   }
-  if (tool === 'Bash') return ENGINE_TEXT.test(String(input.command ?? '')) ? { reaching: true, why: 'engine' } : { reaching: false };
+  if (tool === 'Bash') {
+    const command = String(input.command ?? '');
+    if (namesCheckoutCorpus(command, repo)) return { reaching: true, why: 'checkout' };
+    return ENGINE_TEXT.test(command) ? { reaching: true, why: 'engine' } : { reaching: false };
+  }
   const named = [input.file_path, input.path, input.pattern].filter((each): each is string => typeof each === 'string');
   return named.some((each) => engineUnder(repo, each) || ENGINE_TEXT.test(each)) ? { reaching: true, why: 'engine' } : { reaching: false };
 }
 
-export const refusalFor = (why: 'engine' | 'elsewhere', draft: string): string =>
+export const refusalFor = (why: 'engine' | 'elsewhere' | 'checkout', draft: string): string =>
   why === 'elsewhere'
     ? `this run writes only ${draft}, and nothing else anywhere.`
-    : "the engine's source is off limits in this run. What may be written in the language is printed by `npm run oracle` — ask it instead, and say in your next message what you were hoping to find there.";
+    : why === 'checkout'
+      ? `the world this run works on is ${path.dirname(draft)}, a copy of its own. The checkout's content/ is not this run's to read or write through a shell: point every command at the copy — \`npm run oracle -- --at ${path.dirname(draft)}\` is the gate, and \`npm run probe -- ${path.dirname(draft)} --test <id>\` walks a route.`
+      : "the engine's source is off limits in this run. What may be written in the language is printed by `npm run oracle` — ask it instead, and say in your next message what you were hoping to find there.";
 
 export function systemFor(asked: Asked, corpus: string, draft: string): string {
   return `You are authoring content for Universalis RPG, a text game. Its content is written in a small line-based DSL: a file is a sequence of sections, each headed \`# <kind> <id>\`.
@@ -345,14 +360,14 @@ async function run(asked: Asked): Promise<number> {
     const args = held ?? {};
     const target = String(args.file_path ?? args.path ?? args.pattern ?? args.command ?? JSON.stringify(args)).slice(0, 300);
     const verdict = verdictOf(tool, args, repoRoot, workdir);
-    const refuse = verdict.reaching && (verdict.why === 'elsewhere' || !asked.open);
+    const refuse = verdict.reaching && (verdict.why !== 'engine' || !asked.open);
     seen(tool, target, !verdict.reaching ? 'allow' : refuse ? 'deny' : 'engine');
     say(`  ${!verdict.reaching ? '[tool]  ' : refuse ? '[refused]' : '[engine]'} ${tool} ${target.replace(/\n/g, ' ; ')}`);
     return {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: refuse ? 'deny' : 'allow',
-        ...(refuse ? { permissionDecisionReason: refusalFor((verdict as { why: 'engine' | 'elsewhere' }).why, draft) } : {}),
+        ...(refuse ? { permissionDecisionReason: refusalFor((verdict as { why: 'engine' | 'elsewhere' | 'checkout' }).why, draft) } : {}),
       },
     };
   };
@@ -379,7 +394,7 @@ async function run(asked: Asked): Promise<number> {
     maxTurns: asked.turns,
     hooks: { PreToolUse: [{ hooks: [preToolUse] }], PostToolUse: [{ hooks: [postToolUse] }] },
     settingSources: [],
-    disallowedTools: ['Task', 'WebSearch', 'WebFetch'],
+    disallowedTools: ['Task', 'WebSearch', 'WebFetch', 'Artifact'],
     abortController: abort,
   };
 

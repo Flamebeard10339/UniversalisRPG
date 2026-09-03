@@ -122,6 +122,16 @@ describe('a call the run makes', () => {
     expect(reaching('Edit', { file_path: path.join(WORK, 'content', 'tulsa.dsl') })).toEqual({ reaching: false });
   });
 
+  it('is reaching for the checkout wherever a command names its world rather than the copy, since a shell can write as well as read', () => {
+    expect(reaching('Bash', { command: `cp "${path.join(WORK, 'content', 'thieving.dsl')}" "${path.join(REPO, 'content', 'thieving.dsl')}"` })).toEqual({ reaching: true, why: 'checkout' });
+    expect(reaching('Bash', { command: `cp x "${path.join(REPO, 'content', 'thieving.dsl').replace(/\\/g, '/')}"` })).toEqual({ reaching: true, why: 'checkout' });
+    expect(reaching('Bash', { command: 'npm run oracle -- --at content' })).toEqual({ reaching: true, why: 'checkout' });
+    expect(reaching('Bash', { command: 'npm run probe -- content --test a-route' })).toEqual({ reaching: true, why: 'checkout' });
+    expect(reaching('Bash', { command: `npm run oracle -- --at ${path.join(WORK, 'content')}` })).toEqual({ reaching: false });
+    expect(reaching('Bash', { command: 'grep -n "table of contents" notes.md' })).toEqual({ reaching: false });
+    expect(refusalFor('checkout', '/work/content/x.dsl')).toContain('/work/content');
+  });
+
   it('is told what to do instead, since a refusal that only says no teaches the run nothing', () => {
     expect(refusalFor('engine', '/work/content/x.dsl')).toContain('npm run oracle');
     expect(refusalFor('elsewhere', '/work/content/x.dsl')).toContain('/work/content/x.dsl');
