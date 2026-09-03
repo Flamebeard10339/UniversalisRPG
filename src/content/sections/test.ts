@@ -284,7 +284,7 @@ function parseBegin(text: string, verb: string, rest: string): Directive {
   throw new DslError(`unknown begin: verb (expected use, travel, or craft): ${text}`);
 }
 
-export function parseDirectiveLine(text: string): Directive | null {
+export function parseDirectiveLine(text: string, base = 0): Directive | null {
   const run = RUN.exec(text)?.groups;
   if (run) return { kind: 'run', test: run.id };
 
@@ -306,7 +306,7 @@ export function parseDirectiveLine(text: string): Directive | null {
   if (until) {
     const terminator = parseTerminator(until.terminator);
     if (terminator !== null) {
-      const inner = parseDirectiveLine(until.rest);
+      const inner = parseDirectiveLine(until.rest, base);
       if (inner) return { kind: 'until', inner, until: terminator };
     }
   }
@@ -341,7 +341,7 @@ export function parseDirectiveLine(text: string): Directive | null {
   if (assert)
     return {
       kind: 'assert',
-      condition: parseWhole(condition, assert.cond, 0, 'an assert condition'),
+      condition: parseWhole(condition, assert.cond, base + text.length - assert.cond.length, 'an assert condition'),
     };
 
   const journal = JOURNAL.exec(text)?.groups;
@@ -522,6 +522,15 @@ function heldByTest(): readonly Written[] {
   return test.grammar;
 }
 
+function whereItWasWritten<T>(line: RawLine, read: () => T): T {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof DslError && error.span === undefined) throw new DslError(error.message, line.span);
+    throw error;
+  }
+}
+
 function parseLines(lines: readonly RawLine[]): Directive[] {
   const directives: Directive[] = [];
   for (const line of lines) {
@@ -532,7 +541,7 @@ function parseLines(lines: readonly RawLine[]): Directive[] {
       continue;
     }
     if (hasBlock(line)) throw new DslError(`${OPENS_A_BLOCK}: ${line.text}`, line.span);
-    const directive = parseDirectiveLine(line.text);
+    const directive = whereItWasWritten(line, () => parseDirectiveLine(line.text, line.span.start));
     if (!directive) throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
     if (directive.kind === 'refused') refusalStands(directives[directives.length - 1], line.span);
     directives.push(directive);
