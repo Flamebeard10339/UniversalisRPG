@@ -19,7 +19,7 @@ export interface Participant {
 export function armedAction(state: GameState, registry: Registry): Action {
   const active = state.activeAction!;
   const seat = active.roster?.[PLAYER];
-  return (seat && seatedAction(seat, registry, PLAYER)) ?? findActiveAction(active, registry);
+  return (seat && seatedAction(seat, registry, PLAYER, state)) ?? findActiveAction(state, registry);
 }
 
 export function participants(state: GameState, registry: Registry): Participant[] {
@@ -28,7 +28,7 @@ export function participants(state: GameState, registry: Registry): Participant[
   for (const [actorId, cadence] of Object.entries<Cadence>(active.cadences)) {
     const seat = active.roster?.[actorId];
     if (!seat) continue;
-    const action = seatedAction(seat, registry, actorId);
+    const action = seatedAction(seat, registry, actorId, state);
     if (action && performable(action, state, registry)) list.push({ self: actorId, other: seat.target, action, cadence });
   }
   return list;

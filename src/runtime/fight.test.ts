@@ -9,8 +9,9 @@ import { diffState, initialState, loadSave, SAVE_VERSION } from './save';
 import { logSwing } from './encounter';
 import { isSpent } from './effects';
 import { declaredId } from '../content/sections/entity';
+import { actionAddress } from '../content/sections/action';
 import { localizerOf } from './localized';
-import { isPopulations, standing as standingIn } from './population';
+import { isPopulations, standing as standingIn, stoodHere } from './population';
 import { secondsToMs, toMilliUnits } from './units';
 
 const MODULE =
@@ -91,15 +92,20 @@ uses: swing
 swing:
   +hidden if: truce
 
-# entity open-shell
+# guise open-shell
 title: Open Shell
+examine: The shell is standing open and there is nothing left in it worth the reaching.
+without: prise
+
+# action prise
+title: prise
+give: 1 token
+stands: open-shell for 3s
 
 # entity clam
 title: Clam
 stats: max-health 8
-prise:
-  give: 1 token
-  become: open-shell for 3s
+uses: prise
 
 // The same declaration, performed differently: this one hits for its own
 // hard-blow stat and swings at its own pace, and neither is on # action swing.
@@ -350,36 +356,40 @@ describe('respawn after: is the thing own fact, and the count is the place own',
     expect(state.populations['shore']?.['crab']?.down ?? 0).toBe(0);
   });
 
-  it('stands one thing where another was, and puts it back when the stretch is up', () => {
+  it('stands the same thing changed while the guise is on, and puts it back when the stretch is up', () => {
     const registry = loaded();
     const state = standing(registry, 'tidal-flat');
-    const here = (): string[] =>
-      standingIn(state, registry, registry.locations.get('tidal-flat')!)
-        .flatMap((row) => Array.from({ length: row.count }, () => row.entity))
-        .sort();
+    const here = registry.locations.get('tidal-flat')!;
+    const worn = (): string | undefined => standingIn(state, registry, here).find((row) => row.entity === 'clam')?.guise;
+    const offered = (): string[] => stoodHere(state, registry, here).flatMap((stood) => (stood.id === 'clam' ? stood.offers.actions.map((action) => actionAddress(action)) : []));
 
-    expect(here()).toEqual(['clam', 'clam']);
+    expect(standingIn(state, registry, here)).toEqual([{ entity: 'clam', count: 2 }]);
+    expect(worn()).toBeUndefined();
 
     useAction('entity', 'clam', 'prise', registry, state);
-
     expect(state.inventory['token']).toBe(1);
-    expect(here(), 'one clam is an open shell, the other is still a clam').toEqual(['clam', 'open-shell']);
+    expect(worn(), 'one of two is open, so the pair still offers a clam to prise').toBeUndefined();
+    expect(offered()).toContain('prise');
+
+    useAction('entity', 'clam', 'prise', registry, state);
+    expect(worn(), 'now every clam here is open').toBe('open-shell');
+    expect(offered(), 'and there is nothing left to prise').not.toContain('prise');
+    expect(standingIn(state, registry, here), 'both are still clams, and still two').toEqual([{ entity: 'clam', count: 2, guise: 'open-shell' }]);
 
     resolve(state, registry, state.time + secondsToMs(2));
-    expect(here()).toEqual(['clam', 'open-shell']);
+    expect(worn()).toBe('open-shell');
 
     resolve(state, registry, state.time + secondsToMs(2));
-    expect(here(), 'and it shuts on its own').toEqual(['clam', 'clam']);
+    expect(worn(), 'and they shut on their own').toBeUndefined();
+    expect(offered()).toContain('prise');
     expect(state.populations['tidal-flat']).toBeUndefined();
   });
 
-  it('leaves the shell out of every place but the one it stood in for', () => {
+  it('keeps the guise out of the entities the world declares, so nothing stands in for a clam', () => {
     const registry = loaded();
 
-    expect(registry.entities.has('open-shell')).toBe(true);
-    for (const location of registry.locations.values()) {
-      expect(location.entities.map((entry) => entry.entity), location.id).not.toContain('open-shell');
-    }
+    expect(registry.guises.has('open-shell')).toBe(true);
+    expect(registry.entities.has('open-shell')).toBe(false);
   });
 
   it('draws no randomness at spawn time', () => {

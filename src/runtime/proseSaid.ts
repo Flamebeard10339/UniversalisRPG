@@ -2,6 +2,8 @@ import { localeKey } from '../content/locale';
 import type { Registry } from '../content/registry';
 import { isDebug, registryMapOf, sectionFor, sections } from '../content/sections';
 import { actionAddress } from '../content/sections/action';
+import { guiseDrops } from '../content/sections/guise';
+import { populationCount } from '../content/sections/location';
 import { parseUseChoiceId } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
 import { parseModuleSource, type ModuleSource } from '../content/universe';
@@ -58,13 +60,45 @@ function soak(value: unknown, into: string[]): void {
   for (const each of Object.values(value as Record<string, unknown>)) soak(each, into);
 }
 
-function probedUniverse(sources: readonly ModuleSource[], world: Registry): { registry: Registry; jewelBases: readonly string[]; standings: ReadonlyMap<string, string> } {
+const WORN_UNTIL = 1_000_000_000;
+
+interface Worn {
+  location: string;
+  entity: string;
+  guise: string;
+  count: number;
+}
+
+function everyGuiseWorn(world: Registry): Worn[] {
+  const worn: Worn[] = [];
+  for (const guise of world.guises.values()) {
+    for (const location of world.locations.values()) {
+      if (isDebug(location)) continue;
+      for (const entry of location.entities) {
+        const entity = world.entities.get(entry.entity);
+        if (entity === undefined || !entity.actions.some((action) => guiseDrops(guise, action))) continue;
+        worn.push({ location: location.id, entity: entry.entity, guise: guise.id, count: populationCount(entry) });
+      }
+    }
+  }
+  return worn;
+}
+
+const wornSave = (each: Worn, inventory: Record<string, number>): object => ({
+  version: SAVE_VERSION,
+  location: each.location,
+  inventory,
+  populations: { [each.location]: { [each.entity]: { down: 0, due: [], wearing: each.guise, until: Array.from({ length: each.count }, () => WORN_UNTIL) } } },
+});
+
+function probedUniverse(sources: readonly ModuleSource[], world: Registry): { registry: Registry; jewelBases: readonly string[]; standings: readonly string[] } {
   const jewels = [...world.clusterJewels.keys()];
   const locations = [...world.locations.values()].filter((location) => !isDebug(location)).map((location) => location.id);
   const owners = [...new Set(sources.map((source) => parseModuleSource(source).info.id))];
   const flat = (id: string): string => id.replace(/\./g, '-');
   const inventory = Object.fromEntries([...world.items.values()].filter((item) => !isDebug(item)).map((item) => [item.id, 1]));
   const slot = [...world.entities.values()].flatMap((entity) => entity.equipmentSlots ?? [])[0];
+  const worn = everyGuiseWorn(world);
   const text = [
     '# info prose-probe',
     'version: 1.0.0',
@@ -75,22 +109,23 @@ function probedUniverse(sources: readonly ModuleSource[], world: Registry): { re
     'value: 0',
     ...jewels.flatMap((id, at) => ['', `# item base-${at}`, ...(slot === undefined ? [] : [`slot: ${slot}`]), 'item-level: 4', `origin-cluster: ${id}`]),
     ...locations.flatMap((id) => ['', `# save at-${flat(id)}`, JSON.stringify({ version: SAVE_VERSION, location: id, inventory })]),
+    ...worn.flatMap((each, at) => ['', `# save worn-${at}`, JSON.stringify(wornSave(each, inventory))]),
   ].join('\n');
   return {
     registry: loadUniverse([...sources, { name: 'prose-probe', text }]),
     jewelBases: jewels.map((_id, at) => `prose-probe.base-${at}`),
-    standings: new Map(locations.map((id) => [id, `prose-probe.at-${flat(id)}`])),
+    standings: [...locations.map((id) => `prose-probe.at-${flat(id)}`), ...worn.map((_each, at) => `prose-probe.worn-${at}`)],
   };
 }
 
-function standing(registry: Registry, standings: ReadonlyMap<string, string>): string[] {
+function standing(registry: Registry, standings: readonly string[]): string[] {
   const said: string[] = [];
   const session = startSession(registry);
   const mints = (obj: string, objId: string, actionId: string): boolean => {
     const value = mapOf(registry, obj)?.get(objId);
     return value !== undefined && (sectionFor(obj)?.mintedActions?.(value as never) ?? []).some((one) => actionAddress(one.action) === actionId);
   };
-  for (const save of standings.values()) {
+  for (const save of standings) {
     const stand = (): void => void applyDirective(session, { kind: 'load', save });
     stand();
     const opening = view(session);

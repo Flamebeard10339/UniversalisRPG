@@ -24,9 +24,9 @@ import { midpoint } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
 import { heldEffects, type HeldEffect } from './buffs';
 export type { HeldEffect } from './buffs';
-import { declaredId, Entity, isMintedAction } from '../content/sections/entity';
+import { declaredId, isMintedAction } from '../content/sections/entity';
 import { isFight } from '../grammar/action';
-import { standing } from './population';
+import { stoodHere, type StoodHere } from './population';
 import { truthy, weighing } from './conditions';
 import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
@@ -229,10 +229,9 @@ function isFreeTravelAction(action: Action, target: string): boolean {
 }
 
 function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
-  return standingHere(registry, state, location).some((entityId) => {
-    const entity = registry.entities.get(entityId);
-    if (!entity || masked.has(entityId)) return false;
-    return availableActions(entity, state, registry).some((action) => isFreeTravelAction(action, target) && requiresMet(action, state, registry));
+  return stoodHere(state, registry, location).some((stood) => {
+    if (masked.has(stood.id)) return false;
+    return availableActions(stood.offers, state, registry).some((action) => isFreeTravelAction(action, target) && requiresMet(action, state, registry));
   });
 }
 
@@ -240,19 +239,23 @@ function maskedHere(registry: Registry, state: GameState, location: Location): R
   if (settingStands(state.settings, 'masking') !== true) return new Set();
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const masked = new Set<string>();
-  for (const entityId of standingHere(registry, state, location)) {
-    if (truthy(state.flags[`${entityId}.${TOUCHED}`]) || fighting.has(entityId)) continue;
-    if (registry.entities.get(entityId)?.actions.some(isMintedAction)) masked.add(entityId);
+  for (const stood of stoodHere(state, registry, location)) {
+    if (truthy(state.flags[`${stood.id}.${TOUCHED}`]) || fighting.has(stood.id)) continue;
+    if (stood.offers.actions.some(isMintedAction)) masked.add(stood.id);
   }
   return masked;
 }
 
-const standingHere = (registry: Registry, state: GameState, location: Location): string[] => standing(state, registry, location).map((entry) => entry.entity);
+function stoodTitle(registry: Registry, localizer: Localizer, stood: StoodHere, masked: boolean): { of: Answer; detail: Localized; group?: GroupRow } {
+  const source = offeredBy(registry, localizer, 'entity', stood.id, masked);
+  if (masked || stood.guise?.title === undefined) return source;
+  return { ...source, detail: localizer.words('guise', stood.guise.id, 'title') ?? source.detail };
+}
 
 export function shopkeeperHere(registry: Registry, state: GameState, shopId: string): string | undefined {
   const location = registry.locations.get(state.location);
   if (!location) return undefined;
-  return standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.shop === shopId);
+  return stoodHere(state, registry, location).find((stood) => stood.entity.shop === shopId)?.id;
 }
 
 function fightChoices(entityId: string, registry: Registry, state: GameState, localizer: Localizer): PlayChoice[] {
@@ -274,8 +277,9 @@ interface Offered {
   minted: boolean;
 }
 
-function entityOffers(entity: Entity, entityId: string, registry: Registry, state: GameState, localizer: Localizer, masked: boolean): Offered[] {
-  const source = offeredBy(registry, localizer, 'entity', entityId, masked);
+function entityOffers(stood: StoodHere, registry: Registry, state: GameState, localizer: Localizer, masked: boolean): Offered[] {
+  const { id: entityId, entity } = stood;
+  const source = stoodTitle(registry, localizer, stood, masked);
   const offers: Offered[] = [];
   if (!masked && reachedNow(registry, state, entityId) !== null) {
     offers.push({ choice: { id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: source.detail }), ...source }, minted: false });
@@ -283,7 +287,7 @@ function entityOffers(entity: Entity, entityId: string, registry: Registry, stat
   if (!masked && entity.shop !== undefined && registry.shops.has(entity.shop)) {
     offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
   }
-  for (const action of availableActions(entity, state, registry)) {
+  for (const action of availableActions(stood.offers, state, registry)) {
     if (masked && !isMintedAction(action)) continue;
     const slug = actionAddress(action);
     offers.push({
@@ -312,10 +316,8 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   const masked = maskedHere(registry, state, location);
   const choices: PlayChoice[] = [];
 
-  for (const entityId of standingHere(registry, state, location)) {
-    const entity = registry.entities.get(entityId);
-    if (!entity) continue;
-    choices.push(...mintedSecond(entityOffers(entity, entityId, registry, state, localizer, masked.has(entityId))));
+  for (const stood of stoodHere(state, registry, location)) {
+    choices.push(...mintedSecond(entityOffers(stood, registry, state, localizer, masked.has(stood.id))));
   }
 
   for (const action of availableActions(location, state, registry)) {
@@ -335,7 +337,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   for (const recipe of listedToPlayer(registry.recipes.values())) {
     if (!recipeCraftable(recipe, registry, state)) continue;
     const station = recipe.requiresCapability
-      ? standingHere(registry, state, location).find((entityId) => registry.entities.get(entityId)?.capabilities.includes(recipe.requiresCapability!))
+      ? stoodHere(state, registry, location).find((stood) => stood.entity.capabilities.includes(recipe.requiresCapability!))?.id
       : undefined;
     if (station !== undefined && masked.has(station)) continue;
     const source = station === undefined ? {} : offeredBy(registry, localizer, 'entity', station);
@@ -490,9 +492,8 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   const localizer = localizerOf(registry, state);
   const masked = maskedHere(registry, state, location);
   const entities: PlayStatus['entities'] = [];
-  for (const entityId of standingHere(registry, state, location)) {
-    const entity = registry.entities.get(entityId);
-    if (entity) entities.push({ id: entity.id, masked: masked.has(entity.id), title: offeredBy(registry, localizer, 'entity', entity.id, masked.has(entity.id)).detail });
+  for (const stood of stoodHere(state, registry, location)) {
+    entities.push({ id: stood.id, masked: masked.has(stood.id), title: stoodTitle(registry, localizer, stood, masked.has(stood.id)).detail });
   }
 
   const description =

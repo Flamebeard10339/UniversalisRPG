@@ -101,7 +101,7 @@ export interface EncounterView {
 export function encounterView(state: GameState, registry: Registry): EncounterView | null {
   const active = state.activeAction;
   if (!active) return null;
-  const action = findActiveAction(active, registry);
+  const action = findActiveAction(state, registry);
   if (!action.depletes) return null;
 
   const fractionOf = (cadence: Cadence, actorId: string, swing: Action, other: string): number => attemptFraction(cadence, attemptDuration(swing, state, registry, actorId, other));

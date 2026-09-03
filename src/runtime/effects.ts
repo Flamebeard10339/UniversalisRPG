@@ -23,7 +23,7 @@ import { experienceFor } from './skillGrants';
 import { skillLevel } from './skills';
 import { debugging, GameState, PLAYER, templateOf } from './state';
 import { hitChance, statRange, statValue } from './stats';
-import { standInFor } from './population';
+import { wearFor } from './population';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared, buffsOf, clearBuffs, shakeOffBuff } from './buffs';
@@ -345,12 +345,12 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       else shakeOffBuff(state, subject, result.buff);
       return held - buffsOf(state, subject).length;
     }
-    case 'become': {
+    case 'stands': {
       const stood = segment.parties?.them;
       if (stood === undefined || stood === actor) return 0;
-      if (!registry.entities.has(result.entity)) throw new RuntimeError(`unknown entity to become: ${result.entity}`);
+      if (!registry.guises.has(result.guise)) throw new RuntimeError(`unknown guise to stand in: ${result.guise}`);
       const seconds = statSide(result.lasts, state, registry, stood);
-      return standInFor(state, registry, state.location, templateOf(stood), result.entity, seconds) ? 1 : 0;
+      return wearFor(state, registry, state.location, templateOf(stood), result.guise, seconds) ? 1 : 0;
     }
     case 'stop':
       segment.stopped = segment.firing ?? localizerOf(registry, state).engine('engine.stopped.itself');

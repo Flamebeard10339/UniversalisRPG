@@ -15,6 +15,7 @@ engine.talk.to: Talk
 engine.requires.item: You need {item} for that.
 engine.requires.unmet: You cannot do that yet.
 engine.target.absent: There is no {target} here.
+engine.target.unoffered: The {target} is in no state for that just now.
 engine.inputs.short: You don't have enough {item}.
 engine.inputs.grown: Your {item} has grown a plane of its own, and a grown item is never spent.
 engine.combat.player.hit: You hit the {target} for {damage}.
@@ -141,6 +142,7 @@ engine.prune.instance.empty: Removed instance {instance} because nothing is left
 engine.prune.instance.repaired: Repaired instance {instance}: {repair}.
 engine.prune.population.location: Removed the population record for {entity} at {location} because its location {location} is not loaded.
 engine.prune.population.entity: Removed the population record for {entity} at {location} because its entity {entity} is not loaded.
+engine.prune.population.guise: {entity} at {location} is itself again because the guise {guise} it was wearing is not loaded.
 engine.command.invalid-choice: invalid choice: {choice}
 engine.command.speed: Speed set to {speed}x.
 engine.command.stopped: Stopped.

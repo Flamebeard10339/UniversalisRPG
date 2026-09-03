@@ -6,7 +6,8 @@ import { mapOf, Registry } from '../content/registry';
 import { isActionOwnerKind, registryMapOf } from '../content/sections';
 import { BASE_LANGUAGE, localizerFor, type Localized, type Localizer } from './localized';
 import { travelSeconds } from './tuning';
-import { parseOwnerRef, PLAYER, type Seat, templateOf } from './state';
+import { entityAsStood } from './wearing';
+import { type GameState, parseOwnerRef, PLAYER, type Seat, templateOf } from './state';
 
 export function actorEntity(registry: Registry, actorId: string): Entity | undefined {
   return actorId === PLAYER ? registry.player : registry.entities.get(templateOf(actorId));
@@ -56,12 +57,17 @@ export function travelAction(originId: string, destId: string, registry: Registr
   };
 }
 
-export function seatedAction(seat: Seat, registry: Registry, actorId: string): Action | undefined {
+export function actionOwnerAsStood(obj: string, objId: string, registry: Registry, state: GameState): { actions?: Action[] } | undefined {
+  if (obj === 'entity') return entityAsStood(state, registry, objId);
+  return findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+}
+
+export function seatedAction(seat: Seat, registry: Registry, actorId: string, state: GameState): Action | undefined {
   const { obj, objId } = parseOwnerRef(seat.ownerRef);
   if (obj === 'action') {
     const own = actorEntity(registry, actorId)?.actions.find((each) => declaredId(each) === objId);
     if (own) return own;
   }
-  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  const owner = actionOwnerAsStood(obj, objId, registry, state);
   return owner?.actions?.find((each) => actionAddress(each) === seat.actionSlug);
 }

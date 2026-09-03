@@ -91,7 +91,8 @@ export const createInstanceTable = (): InstanceTable => ({ next: 1, byId: {} });
 export interface Deficit {
   down: number;
   due: number[];
-  standingIn?: string;
+  wearing?: string;
+  until?: number[];
 }
 
 export type Populations = Record<string, Record<string, Deficit>>;

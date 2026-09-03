@@ -172,11 +172,22 @@ go down:
   instant
   relocate: cellar
 
+# action unbolt
+title: Unbolt the Door
+time: 1
+stands: standing-open for 5s
+
+# guise standing-open
+title: The Side Door, Open
+examine: The bolt is drawn and the door is standing open on the gate road, and it will swing back on its own.
+without: unbolt
+
 # entity side-door
 title: The Side Door
 examine: Bolted from this side, which means it opens from this side.
 faction: world
 flags: unlocked
+uses: unbolt
 step through:
   instant
   hidden if: not side-door.unlocked

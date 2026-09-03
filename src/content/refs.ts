@@ -176,9 +176,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
           condition(row.requires, `${where} ${WEIGHT_SITE} if`, visit);
         }
         break;
-      case 'become':
-        put(result, 'entity', 'entity', `${where} become:`, visit);
-        put(result, 'lasts', 'stat', `${where} become: … for:`, visit);
+      case 'stands':
+        put(result, 'guise', 'guise', `${where} stands:`, visit);
+        put(result, 'lasts', 'stat', `${where} stands: … for:`, visit);
         break;
       case 'xp':
         put(result, 'skill', 'skill', `${where} xp:`, visit);

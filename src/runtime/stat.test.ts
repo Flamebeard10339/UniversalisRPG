@@ -347,7 +347,7 @@ describe('the stat fold reads the seat, not offerability', () => {
     return { registry, state };
   }
 
-  const inTheSeat = (state: GameState, registry: Registry) => seatedAction(state.activeAction!.roster![PLAYER], registry, PLAYER)!;
+  const inTheSeat = (state: GameState, registry: Registry) => seatedAction(state.activeAction!.roster![PLAYER], registry, PLAYER, state)!;
 
   it('keeps a seated action contributing after the item its requires: names has been spent', () => {
     const { registry, state } = seated('duelist', 'sharpen');

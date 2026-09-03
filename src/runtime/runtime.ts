@@ -31,6 +31,8 @@ import { hasPool } from './stats';
 import { sideOf } from '../grammar/action';
 import { amountFalls, isStatAmount } from '../grammar/values';
 import { applyRespawns, downOne, isElsewhere, nextRespawn, standing } from './population';
+import { entityAsStood, guiseWorn } from './wearing';
+import { guiseDrops } from '../content/sections/guise';
 import { actionAddress } from '../content/sections/action';
 import { Action, declaredId } from '../content/sections/entity';
 import { actionKind, isTwoSided, type Sided } from '../grammar/action';
@@ -694,7 +696,7 @@ function whereItIsNot(named: NamedOn, registry: Registry, state: GameState): Loc
 function whyRefused(action: Action, registry: Registry, state: GameState, named?: NamedOn): Localized | undefined {
   const localizer = localizerOf(registry, state);
   const item = (id: string): Localized => localizer.title('item', id);
-  const absent = named && whereItIsNot(named, registry, state);
+  const absent = named && (whereItIsNot(named, registry, state) ?? takenByAGuise(named, action, registry, state));
   if (absent) return absent;
   if (action.requires && !requiresMet(action, state, registry)) {
     const missing = itemMissingFor(action.requires, state, registry);
@@ -717,15 +719,25 @@ function refuseWith(action: Action, registry: Registry, state: GameState, becaus
 }
 
 function refuseArming(action: Action, named: NamedOn, written: string, registry: Registry, state: GameState): ArmResult | undefined {
-  const away = refuseWith(action, registry, state, whereItIsNot(named, registry, state));
+  const away = refuseWith(action, registry, state, whereItIsNot(named, registry, state) ?? takenByAGuise(named, action, registry, state));
   if (away) return away;
   if (!actionVisible(action, state, registry)) throw new RuntimeError(`action hidden: ${written}`);
   return refuseWith(action, registry, state, whyRefused(action, registry, state, named));
 }
 
+function ownerAsStood(obj: string, objId: string, registry: Registry, state: GameState): { actions?: Action[] } | undefined {
+  if (obj === 'entity') return entityAsStood(state, registry, objId);
+  return findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+}
+
+function takenByAGuise(named: NamedOn, action: Action, registry: Registry, state: GameState): Localized | undefined {
+  if (named.obj !== 'entity' || !guiseDrops(guiseWorn(state, registry, state.location, named.id), action)) return undefined;
+  return localizerOf(registry, state).engine('engine.target.unoffered', { target: actorTitle(named.id, registry, state) });
+}
+
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
   const say = localizerFor(registry, BASE_LANGUAGE);
-  const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  const target = ownerAsStood(obj, objId, registry, state);
   if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
 
   const action = target.actions?.find((each) => actionAddress(each) === actionId);
@@ -772,7 +784,7 @@ export function actionProgress(state: GameState, registry: Registry): number {
 }
 
 export function actionFirstUnit(obj: string, objId: string, actionId: string, registry: Registry, state: GameState, other: string = objId): number {
-  const target = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  const target = ownerAsStood(obj, objId, registry, state);
   const action = target?.actions?.find((each) => actionAddress(each) === actionId);
   if (!action) return 0;
   return firstUnitSpan(action, state, registry, other);

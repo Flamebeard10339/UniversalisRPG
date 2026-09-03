@@ -90,6 +90,10 @@ depletes: them.health
 DEBUG
 stats: max-health 1
 
+# guise probe-guise
+DEBUG
+without: probe-action
+
 # location probe-location
 DEBUG
 x: 9, y: 9

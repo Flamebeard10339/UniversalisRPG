@@ -46,9 +46,18 @@ const PROBE = [
   '# entity statue',
   'title: Statue',
   `examine: A statue, {always: ${CLAUSE}}`,
-  'ring-the-bell:',
-  '  instant',
-  `  say: A bell, {always: ${CLAUSE}}`,
+  'uses: ring-the-bell',
+  '',
+  '# action ring-the-bell',
+  'title: ring the bell',
+  'instant',
+  `say: A bell, {always: ${CLAUSE}}`,
+  'stands: rung for 30s',
+  '',
+  '# guise rung',
+  'title: A Statue Mid-Peal',
+  `examine: A statue mid-peal, {always: ${CLAUSE}}`,
+  'without: ring-the-bell',
 ].join('\n');
 
 const PROBE_MODULE = 'fragment-probe';

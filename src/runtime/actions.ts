@@ -5,16 +5,19 @@ import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { Registry } from '../content/registry';
-import { findActionOwner } from './actionLookup';
+import { actionOwnerAsStood } from './actionLookup';
 import { copiesOf, spendable } from './itemInstance';
+import { guiseDrops } from '../content/sections/guise';
 import { isElsewhere } from './population';
+import { guiseWorn } from './wearing';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 import { type ActiveAction, GameState, parseOwnerRef } from './state';
 
-export function findActiveAction(active: ActiveAction, registry: Registry): Action {
+export function findActiveAction(state: GameState, registry: Registry): Action {
+  const active = state.activeAction!;
   const say = localizerFor(registry, BASE_LANGUAGE);
   const { obj, objId } = parseOwnerRef(active.ownerRef);
-  const owner = findActionOwner(obj, objId, registry) as { actions?: Action[] } | undefined;
+  const owner = actionOwnerAsStood(obj, objId, registry, state);
   if (!owner) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
   const action = owner.actions?.find((each) => actionAddress(each) === active.actionSlug);
   if (!action) throw new RuntimeError(say.engine('engine.action.stale.action', { action: say.identifier(active.actionSlug), owner: say.identifier(active.ownerRef) }));
@@ -38,9 +41,14 @@ export function ownerIsElsewhere(obj: string, id: string, state: GameState, regi
   return here !== undefined && isElsewhere(state, registry, here, id);
 }
 
+function ownerNoLongerOffers(obj: string, id: string, action: Action, state: GameState, registry: Registry): boolean {
+  return obj === 'entity' && guiseDrops(guiseWorn(state, registry, state.location, id), action);
+}
+
 export function actionStillValid(action: Action, active: ActiveAction, state: GameState, registry: Registry): boolean {
   const { obj, objId } = parseOwnerRef(active.ownerRef);
   if (ownerIsElsewhere(obj, objId, state, registry)) return false;
+  if (ownerNoLongerOffers(obj, objId, action, state, registry)) return false;
   if (!requiresMet(action, state, registry)) return false;
   if (!actionVisible(action, state, registry)) return false;
   return !active.repeating || inputLimit(action, state).completions > 0;

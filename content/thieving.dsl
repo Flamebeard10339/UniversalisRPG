@@ -41,9 +41,10 @@ hidden if: always
 title: Thieving
 stat: thieving-ability
 
-# entity open-chest
+# guise open-chest
 title: Open Chest
 examine: The lid is standing up and the tray under it is bare. Whatever settles back into it does so slowly.
+without: pick-the-lock
 
 # item dazed
 title: Dazed
@@ -74,7 +75,7 @@ extends: steal
 continuous
 time: 6
 +on success:
-  become: open-chest for 3s
+  stands: open-chest for 3s
 
 # item steel-lockpicks
 title: Steel Lockpicks
@@ -219,7 +220,7 @@ value: 150
 +stats: npc-thieving-difficulty 20, npc-thieving-xp 4, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  become: picked-townsman for 2m
+  stands: picked-townsman for 2m
   one of:
     100x: give: 3 core.coin
     8x: roll: townsmans-wardrobe
@@ -238,7 +239,7 @@ one of:
 +stats: npc-thieving-difficulty 55, npc-thieving-xp 5, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  become: picked-guardsman for 3m
+  stands: picked-guardsman for 3m
   give: 7 core.coin
   +on attempts exhausted:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
@@ -248,7 +249,7 @@ pick-pocket:
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 11
-  become: picked-knight for 4m
+  stands: picked-knight for 4m
   give: 12 core.coin
   +on attempts exhausted:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
@@ -266,7 +267,7 @@ on death:
     1 in 14: give: 1 steel-lockpicks
 pick-pocket:
   requires: level.thieving >= 11
-  become: picked-thief for 5m
+  stands: picked-thief for 5m
   one of:
     100x: give: 18 core.coin
     2x: give: 1 fingerless-gloves
@@ -1412,7 +1413,7 @@ pick-the-lock:
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 25
-  become: picked-duke for 15m
+  stands: picked-duke for 15m
   one of:
     60x: give: 40-90 core.coin
     5x: give: 1 signet-ring
@@ -1991,53 +1992,22 @@ assert: has rogues-hood
 assert: tulsa.rogue-den.touched
 assert: not stat.initiation-clock >= 1
 
-# entity picked-townsman
-title: Townsman
+# guise picked-townsman
 examine: Somebody about their day, patting at their belt for a purse that is not there any more, already deciding they must have left it at home.
-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
-uses: core.melee-combat
-faction: core.world
-respawn after: 45s
-on death:
-  credit:
-    roll: combat.purse
+without: pick-pocket
 
-# entity picked-guardsman
-title: Guardsman
+# guise picked-guardsman
 examine: One of the duke's, in a coat of plates and a worse mood than before, one hand checking an empty pocket as though it might change its mind.
-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
-uses: core.melee-combat
-faction: core.world
-respawn after: 70s
-on death:
-  credit:
-    roll: combat.purse
-    1 in 8: give: 1 combat.bronze-helmet
+without: pick-pocket
 
-# entity picked-knight
-title: Knight
+# guise picked-knight
 examine: Iron from the crown of his head to the soles of his feet, and a hand gone still at his belt where something used to hang.
-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
-uses: core.melee-combat
-faction: core.world
-respawn after: 100s
-on death:
-  credit:
-    roll: knights-purse
-    1 in 10: give: 1 combat.iron-helmet
+without: pick-pocket
 
-# entity picked-thief
-title: Thief
+# guise picked-thief
 examine: A cloaked figure with the blade put away for once, one glove checking a pocket that was full a moment ago and is not now.
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60
-uses: core.melee-combat
-faction: core.world
-respawn after: 80s
-on death:
-  credit:
-    roll: combat.purse
-    1 in 14: give: 1 steel-lockpicks
+without: pick-pocket
 
-# entity picked-duke
-title: The Duke
+# guise picked-duke
 examine: The duke of Tulsa, a hand resting a moment too long where a ring used to sit, and volunteering nothing about that either.
+without: pick-pocket

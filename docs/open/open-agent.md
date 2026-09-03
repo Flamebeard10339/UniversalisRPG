@@ -342,8 +342,8 @@ At runtime `readAmount` (`src/runtime/effects.ts:126`) reads
 own stat** — a well-typed, plausible number, and no way downstream to tell it from the one
 that was meant. `values.ts:175` already says these are "written nowhere a line is said to a
 player", so the rule is stated and half-kept. `subjectOf` (`effects.ts:214`) carries the
-identical `?? actor` and is safe only because `refuseParty` does cover its field; `become`
-(`effects.ts:331`) is the shape to copy, returning 0 rather than falling back.
+identical `?? actor` and is safe only because `refuseParty` does cover its field; `stands`
+(`effects.ts`, `case 'stands'`) is the shape to copy, returning 0 rather than falling back.
 
 This is the same rule c02d4bc0 made `them.` throw for in a condition, one place short.
 

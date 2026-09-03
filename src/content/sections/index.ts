@@ -14,6 +14,7 @@ import { event } from './event';
 import { faction } from './faction';
 import { flag } from './flag';
 import { group } from './group';
+import { guise } from './guise';
 import { info } from './info';
 import { item } from './item';
 import { locale } from './locale';
@@ -34,7 +35,8 @@ import { station } from './station';
 import { test } from './test';
 import { variable } from './variable';
 
-const declared = () => [stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
+const declared = () =>
+  [stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 
