@@ -567,7 +567,12 @@ export const test = section<Test>()({
     { form: 'use: <kind>.<id>.<action>', example: 'use: item.rusty-sword.swing', ...USED },
     { form: 'use: <action> on <entity>', example: 'use: chop on oak' },
     { form: 'travel: <location>', example: 'travel: camp' },
-    { form: 'goto: <place>', example: 'goto: camp', holds: () => ({ place }) },
+    {
+      form: 'goto: <place>',
+      example: 'goto: camp',
+      holds: () => ({ place }),
+      note: 'puts the player there outright — no road walked, no time passed — which is how a route sets its scene rather than how a player moves: `travel:` walks the road, and pays for every hop of it',
+    },
     { form: 'craft: <recipe>', example: 'craft: plank' },
     { form: 'shop: <shop>', example: 'shop: general-store' },
     { form: 'begin: use <kind>.<id>.<action>', example: 'begin: use item.rusty-sword.swing', ...USED },

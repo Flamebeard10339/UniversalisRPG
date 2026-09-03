@@ -6,6 +6,7 @@ export { referencesIn, unframedProblem };
 export const ENGINE_KEYS = [
   'engine.travel.to',
   'engine.travel.no-way',
+  'engine.travel.already-here',
   'engine.travel.nowhere',
   'engine.travel.unknown-origin',
   'engine.travel.unknown-destination',

@@ -367,6 +367,16 @@ describe('a walk the roads cannot make', () => {
     expect(at(view(session))).toBe('roads.camp');
   });
 
+  it('says the player is already there when the walk ends where it starts, rather than that no road leads there', () => {
+    const registry = universe(ISLANDS, 'roads');
+    const session = startSession(registry);
+
+    const outcome = applyDirective(session, { kind: 'travel', location: 'roads.camp' });
+
+    expect(outcome).toEqual({ failure: 'You are already standing in Camp.' });
+    expect(at(view(session))).toBe('roads.camp');
+  });
+
   it('fails the `# test` line that asked for it, rather than passing on to the next one', () => {
     const registry = universe(ISLANDS, 'roads');
 

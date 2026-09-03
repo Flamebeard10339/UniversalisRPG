@@ -6,21 +6,6 @@ what is below is what that plan does not already say to do next.
 
 ---
 
-## The speedrun runs had to learn four things by experiment that the oracle should say
-
-Two authorbot runs wrote routes to thieving 30 from the fresh start and reported what
-the oracle left them to find out by running it. The grammar's example reads
-`resource.health`, but a module other than core must write `resource.core.health`, and
-only probe says so. `core` had to be listed under `dependencies:` though pulled in
-transitively. `goto:` advances the clock by nothing while `travel:` pays every hop, and
-nothing on the page marks the first as an authoring convenience rather than a way to
-move. And `travel:` to the room already stood in is refused with *there is no way from
-here*, which reads as a missing road rather than a no-op.
-
-*Closes when: the page says each of the four — the resource example written whole, the
-dependency rule stated, `goto:` marked as costing no time, and the standing-here refusal
-saying what it means — and a speedrun brief no longer lists any of them.*
-
 ## `-<line>` should take a scalar back, and does not yet
 
 The grammar page offers `-<line>` on every line of every section, and it works on
