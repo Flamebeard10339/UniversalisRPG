@@ -69,7 +69,7 @@ function parseStage(name: string, source: RawLine): QuestStage {
     if (done) stage.doneWhen = parseWhole(condition, done.cond!, line.span.start, 'a done when');
     else if (goto) stage.goto = goto.name;
     else if (line.text === 'complete') stage.complete = true;
-    else if (says) stage.speech.push({ owner: says.owner!, node: parseNode('said', line) });
+    else if (says) stage.speech.push({ owner: says.owner!, node: parseNode(SAID_NODE, line) });
     else throw new DslError(`unexpected line in a quest stage: ${JSON.stringify(line.text)}`, line.span);
   }
   return stage;
@@ -158,7 +158,7 @@ function saidAt(quest: Quest, at: number, speech: QuestSpeech, said: number, rea
   const gone = (target: string | undefined): ActionResult[] => (target === undefined ? [] : [reaching(quest, target)]);
   const opening = at === 0 ? [{ kind: 'effect' as const, result: reaching(quest, stage.name) }] : [];
   return {
-    id: `${quest.id}.${stage.name}.${lastSegment(speech.owner)}.${said}`,
+    id: questThread(quest.id, stage.name, lastSegment(speech.owner), said),
     owner: speech.owner,
     fromQuest: quest.id,
     nodes: [
@@ -205,9 +205,15 @@ const stuckAt = (quest: Quest, at: number): string | undefined => {
   return target === undefined ? undefined : `stage ${stage.name} goes back to ${target}, which is written before it, and a quest only ever moves on to a stage written after the one it stands on, so reaching ${target} would leave it standing on ${stage.name}. Write ${target} after ${stage.name}`;
 };
 
+export const SAID_NODE = 'said';
+
+export const questThread = (quest: string, stage: string, entity: string, said: number | string): string => `${quest}.${stage}.${entity}.${String(said)}`;
+
+const THREAD = `${questThread('<quest>', '<stage>', '<entity>', '<n>')}.${SAID_NODE}`;
+
 const STAGE_NOTE = `a step of the quest, which declares the flag \`${flagOf({ id: '<quest>' }, '<stage>')}\`. The first stage written stands from the outset and nothing has to start the quest — speaking a line under that stage is what begins it. A quest only ever moves on to a stage written after the one it stands on, so write the stages in the order they happen`;
 
-const SAYS_NOTE = `what that entity says while the quest stands here; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies`;
+const SAYS_NOTE = `what that entity says while the quest stands here; where a stage gives one entity more than one, the line with no \`when:\` of its own is what they say while none of the others applies. Each mints a thread addressed \`${THREAD}\`, counting from 0 in the order they are written, which is the name a \`choose:\` in a # test calls for when a quest thread is open beside the entity's own`;
 
 const DONE_WHEN_NOTE = 'the quest leaves this stage on its own once this holds';
 

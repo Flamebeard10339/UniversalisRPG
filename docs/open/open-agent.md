@@ -108,22 +108,6 @@ rather than bringing a parallel geography of its own.
 
 *Closes when:* the two are written and merge with the suite green.
 
-## A refused line in a `# test` is reported against the next section header
-
-Met by the authoring run that wrote The Rat Conspiracy, and it cost that run real
-time: `assert: location = X` is not an engine state, and the refusal did not point at
-that line. The whole file's error collapsed onto the header of the section *after* the
-one holding the bad line, so the run bisected by hand to find which line it was about.
-
-This is the diagnostic half of what makes a world writable from the oracle alone. The
-same run's other stumble was the reverse — a form that exists and is not printed: the
-`<quest>.<stage>.<entity>.<n>.said` thread id a `talk:` needs when a quest thread is
-open beside a townsman's own is nowhere in `npm run oracle`, and was found by
-pattern-matching `kill-it-with-fire.dsl`. Both are the same cost paid two ways.
-
-*Closes when:* a refusal inside a `# test` body names the line it is about, and the
-thread-id form is printed off whatever declares it.
-
 ## A route that pins a gate cannot say which refusal it caught
 
 This line used to say that nothing can prove a `hidden if:` works, because `refuse:` takes
