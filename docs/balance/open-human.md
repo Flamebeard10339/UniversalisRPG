@@ -60,28 +60,66 @@ jewels, and it may never win one by design.
 
 *Moves when: the first matrix shows a jewel with no winning build at any tier.*
 
-## Which ladder is the reference, and how far above the curve its top may sit
+## How much of the ladder a shop may still be selling at level 30
 
-Levels 1 to 10 could not answer this and 11 to 30 cannot be balanced without it, because
-that is where the ladders part. Below 10 there is no thieving gear, so every thief is the
-same character. From 10 the lockpicks land, the climbing gloves at 16, the burglar's picks
-at 20, and the ability a full plane reaches runs **88 at level 11, 94 at 14, 133 at 16, 143
-at 20, 169 at 30** — against a thief with no gear at all, who stands at his level.
+Ruled 2026-09-03: the ladder is declared rather than derived, it stands at nothing on level
+one and rises seven a level, and a shop carries a character to **level 7** and no further —
+which fixes the shop's whole contribution at 41 and makes it 20% of the ladder at level 30.
 
-**Taken as: the reference is what the Fence sells**, on 2026-09-03 — the three tools, plus
-town clothes, plus jewels, because that is the only ladder a thief reaches by deciding to
-rather than by being lucky. Every difficulty this pass shipped is that ladder read at the
-mark's gate level, so a mark opens at about a coin toss for a thief who bought what the band
-sells, and pays about one in five to a thief in civilian clothes.
+What is not ruled is whether that 20% is held strictly. A shop line with tiers — the plan is
+that shops keep selling every slot, just a worse version of it than the world drops — grows
+its total by the difference between its own tiers, since a slot holds one item. If each tier
+is about three better than the last in its slot, the shop lands near 50 at level 30, which
+is 25% rather than 20%. Holding 20% exactly means the later shop tiers are close to
+cosmetic in stat terms: they fill a slot and give a jewel somewhere to sit, and almost
+nothing else.
 
-The consequence to sign off on is the size of the gap. That thief now earns **2.5× to 5.6×
-the curve** depending on how deep the mark is, and a thief with no gear at all earns about
-0.7×. The top of that range is not invented: the house chest the 1-10 pass shipped already
-pays 2.6× to 3.5× across this whole band, and a mark the band gates that did not beat it
-would be dead content.
+*Moves when: he says 20% strictly, or names the share he will take — that number sets how
+much room every shop tier above level 7 has.*
 
-*Moves when: he says the buyable ladder is the reference and what multiple its top should
-pay, or names another — in which case the nine marks are re-derived from the same rule.*
+## The jewels are not tiered, and they are where nearly all the power is
+
+There is no bronze-iron-steel jewel line. The four thieving jewels differ by what they do —
+ability, rate, utility, luck — and by shape, and nothing separates a beginner's from an
+endgame one. Meanwhile the audit says the shop's 66 at level 30 is almost all flat bonuses
+against 6 plane points spent, while the world's 176 is 43 plane points and three jewels. So
+a jewel is worth more than everything else put together, and **which jewels can be bought
+decides the shop's share by itself**: a Fence simply stocking the jewels that exist would
+take the shop from 20% to something near 80%.
+
+The material naming convention is what closes this — tier the jewels, sell the lowest, drop
+the rest — and it is the same decision as the one above rather than a second one.
+
+*Moves when: the jewel line is tiered, at which point the shop's share falls out of the
+mechanics rather than being a number anybody keeps.*
+
+## The top of the ladder has no gear to reach it
+
+Found gear must add 162 at level 30 and reaches 109 — **53 short**, and 22 short at level 25.
+Ruled 2026-09-03 that the answer is new gear at the top rather than a gentler slope, carrying
+three things: a material naming convention, a higher item-level than anything below it
+(which multiplies what a jewel is worth rather than adding to it), and a cluster-effect orb
+at level 30 that scales what thieving jewels give.
+
+The audit could not see an orb at all when this was ruled — `tier-build --grow` had no move
+for one — so the size of every piece of that tier is unsettled until it can.
+
+*Moves when: the orb is readable and the tier is sized against the residual rather than
+guessed. Then it is authoring rather than a ruling.*
+
+## Different stats may want different ladders
+
+One declared line covers every skill today and two skills say it should not. `combat.health`
+reads 476 against a ladder of 169, because `max-health` starts at a base of 30 and is a pool
+rather than an ability — it was never on this scale. `crafting` and `smithing` read identical
+at every rung, because no gear in the world reaches either stat at all: 78 against 203 at
+level 30.
+
+Ruled 2026-09-03: **not now — this pass is thieving only** — and that different stats may
+each want their own ladder rather than one line for all of them.
+
+*Moves when: a pass takes a skill that is not thieving. The shape of the answer is a ladder
+per stat, not a second constant on the one line.*
 
 ## The house chest keeps the band's first three marks off the frontier until level 16
 
@@ -95,6 +133,12 @@ The three level-11 marks are alive — 1.7× to 2.9× the curve, in new rooms wi
 but they are not the frontier at their own gate, and the reason is a level-1 number rather
 than anything in this band. Raising them to beat a saturated chest at 11 makes them
 dominate at 30; the arithmetic does not permit both.
+
+Every figure in the paragraph above was read against the derived ladder, before the ladder
+was declared. The nine marks have not been re-cut off the declared line yet — at seven a
+level the level-11 marks fall from difficulty 88 to 70 and the level-18 one from 138 to 119 —
+so the size of this problem will move, though not its shape: a saturated mark keeps paying
+its whole ceiling however the marks around it are numbered.
 
 *Moves when: he says whether the house chest may lose ceiling — it is 14 experience for six
 seconds, and it is the 1-10 pass's number, not this one's.*
@@ -141,8 +185,10 @@ defaults it to 100.
 
 It looked wrong because the marks were two to five times harder than the thief standing in
 front of them, which a wider denominator would have papered over. With the difficulties on
-the ladder instead, a thief who bought his kit is at a coin toss, one in civilian clothes at
-about one in five, and one with nothing at about one in ten. Widening to 200 halves that and
-makes gear worth much less, which is the opposite of the reading above.
+the ladder instead, a thief standing on his rung is at a coin toss and one a band below is
+well under it. The pair that matters is the ladder's slope over the spread, and nothing else:
+at seven a level against a spread of a hundred, a mark gated three levels above you is 1.62x
+odds against, where the old 5.17 made it 1.43x. So the slope ruling has already moved this
+knob once, in the direction of levels mattering more.
 
 *Moves when: play says the gap between a geared thief and an ungeared one is too wide.*
