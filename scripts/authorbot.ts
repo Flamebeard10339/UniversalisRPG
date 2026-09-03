@@ -12,8 +12,10 @@ export const repoRoot = path.join(import.meta.dirname, '..');
 export const DEFAULT_TURNS = 150;
 const DEFAULT_MODEL = 'claude-sonnet-5';
 
+export const GRACE_MINUTES = 2;
+
 const usage = [
-  'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--model <id>]',
+  'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--minutes <n>] [--model <id>]',
   '       npm run authorbot -- --watch [<brief>]',
   '',
   '  <brief>    the file saying what to write, named as a loose word or after --brief;',
@@ -25,6 +27,9 @@ const usage = [
   '             Without this, src/, scripts/, docs/ and every .ts are refused, and the refusal',
   '             says to ask the oracle',
   `  --turns    how many replies before the run is cut off (default ${String(DEFAULT_TURNS)})`,
+  '  --minutes  how many minutes of wall clock the run may take. With a minute left, the run is',
+  `             told so beside its next tool result, and ${String(GRACE_MINUTES)} minutes past the clock it is cut off`,
+  '             for good, report or no report. Without this the turn cap is the only limit',
   '  --model    which model plays the author (default claude-sonnet-5)',
   '  --watch    do not start anything: say where every authorbot run on this machine stands,',
   '             and go on saying it until they have all ended. With a brief, just that one',
@@ -39,6 +44,7 @@ export interface Asked {
   target: string | null;
   open: boolean;
   turns: number;
+  minutes: number | null;
   model: string;
   watch: boolean;
 }
@@ -65,7 +71,7 @@ const requireCount = (flag: string, value: string): number => {
 };
 
 export function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, model: DEFAULT_MODEL, watch: false };
+  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false };
   const named = (word: string): void => {
     if (asked.brief !== null) throw new Error(`the brief is named once, and ${JSON.stringify(word)} is a second\n\n${usage}`);
     asked.brief = word;
@@ -75,6 +81,7 @@ export function parseArgs(argv: readonly string[]): Asked {
     if (arg === '--brief') named(requireValue(arg, argv[++i]));
     else if (arg === '--target') asked.target = requireValue(arg, argv[++i]);
     else if (arg === '--turns') asked.turns = requireCount(arg, requireValue(arg, argv[++i]));
+    else if (arg === '--minutes') asked.minutes = requireCount(arg, requireValue(arg, argv[++i]));
     else if (arg === '--model') asked.model = requireValue(arg, argv[++i]);
     else if (arg === '--open') asked.open = true;
     else if (arg === '--watch') asked.watch = true;
@@ -85,6 +92,12 @@ export function parseArgs(argv: readonly string[]): Asked {
   if (asked.brief !== null && asked.target === null) asked.target = targetFor(asked.brief);
   return asked;
 }
+
+const LAST_MINUTE_MS = 60_000;
+
+export const inLastMinute = (startedAt: number, minutes: number | null, now: number): boolean => minutes !== null && startedAt + minutes * 60_000 - now <= LAST_MINUTE_MS;
+
+export const LAST_MINUTE = `One minute of wall clock is left on this run, and it is cut off for good ${String(GRACE_MINUTES)} minutes after that. Stop revising and write the report now, from what you already know: a report on what walked is worth everything, and one more attempt is worth nothing.`;
 
 const ENGINE_DIRS = ['src', 'scripts', 'docs', 'node_modules', 'dist'];
 const ENGINE_TEXT = /\b(src|scripts|docs)[/\\]|\.tsx?\b/i;
@@ -320,6 +333,9 @@ async function run(asked: Asked): Promise<number> {
     appendFileSync(calls, `${JSON.stringify(reach)}\n`);
   };
 
+  const started = Date.now();
+  let warned = false;
+
   const preToolUse = async (input: unknown): Promise<Record<string, unknown>> => {
     const { tool_name: tool, tool_input: held } = input as { tool_name: string; tool_input: Record<string, unknown> };
     const args = held ?? {};
@@ -337,36 +353,53 @@ async function run(asked: Asked): Promise<number> {
     };
   };
 
+  const postToolUse = async (): Promise<Record<string, unknown>> => {
+    if (warned || !inLastMinute(started, asked.minutes, Date.now())) return {};
+    warned = true;
+    say('  [clock]  one minute left, and the run has been told so');
+    return { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: LAST_MINUTE } };
+  };
+
   const system = systemFor(asked, corpus, draft);
-  writeFileSync(transcript, `# authorbot\n\nmodel: ${asked.model}, turns: ${asked.turns}, engine ${asked.open ? 'open' : 'off limits'}\n\n## system\n\n${system}\n\n## brief\n\n${brief}\n\n## run\n\n`);
-  say(`authorbot ${asked.model}: ${asked.brief!} → ${draft}, up to ${asked.turns} replies`);
+  const limit = asked.minutes === null ? '' : `, ${asked.minutes} minute(s)`;
+  writeFileSync(transcript, `# authorbot\n\nmodel: ${asked.model}, turns: ${asked.turns}${limit}, engine ${asked.open ? 'open' : 'off limits'}\n\n## system\n\n${system}\n\n## brief\n\n${brief}\n\n## run\n\n`);
+  say(`authorbot ${asked.model}: ${asked.brief!} → ${draft}, up to ${asked.turns} replies${limit}`);
   say(`while it runs: npm run authorbot -- --watch ${JSON.stringify(asked.brief!)}`);
 
+  const abort = new AbortController();
+  const cutOff = asked.minutes === null ? undefined : setTimeout(() => abort.abort(), (asked.minutes + GRACE_MINUTES) * 60_000);
   const options: Options = {
     systemPrompt: system,
     cwd: repoRoot,
     model: asked.model,
     maxTurns: asked.turns,
-    hooks: { PreToolUse: [{ hooks: [preToolUse] }] },
+    hooks: { PreToolUse: [{ hooks: [preToolUse] }], PostToolUse: [{ hooks: [postToolUse] }] },
     settingSources: [],
     disallowedTools: ['Task', 'WebSearch', 'WebFetch'],
+    abortController: abort,
   };
 
-  const started = Date.now();
   let usage: Record<string, number> | undefined;
   let ended = '(the run produced no result)';
-  for await (const message of query({ prompt: brief, options })) {
-    if (message.type === 'assistant') {
-      turn += 1;
-      for (const block of message.message.content as { type: string; text?: string }[]) {
-        if (block.type === 'text' && block.text?.trim()) say(`\n[${turn}] ${block.text.trim()}`);
+  try {
+    for await (const message of query({ prompt: brief, options })) {
+      if (message.type === 'assistant') {
+        turn += 1;
+        for (const block of message.message.content as { type: string; text?: string }[]) {
+          if (block.type === 'text' && block.text?.trim()) say(`\n[${turn}] ${block.text.trim()}`);
+        }
+        continue;
       }
-      continue;
+      if (message.type === 'result') {
+        usage = message.usage as unknown as Record<string, number>;
+        ended = message.subtype === 'success' ? message.result : `the run did not finish: ${message.subtype}`;
+      }
     }
-    if (message.type === 'result') {
-      usage = message.usage as unknown as Record<string, number>;
-      ended = message.subtype === 'success' ? message.result : `the run did not finish: ${message.subtype}`;
-    }
+  } catch (error) {
+    if (!abort.signal.aborted) throw error;
+    ended = `the run was cut off ${String(GRACE_MINUTES)} minutes past its ${String(asked.minutes)}-minute clock, still working`;
+  } finally {
+    if (cutOff !== undefined) clearTimeout(cutOff);
   }
 
   say(`\n${ended}`);

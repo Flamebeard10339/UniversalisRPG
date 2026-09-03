@@ -2,7 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
-import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
+import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, inLastMinute, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
 const WORK = path.resolve('/work');
@@ -10,7 +10,7 @@ const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseA
 
 describe('what the run was asked for', () => {
   it('is one loose word, since the brief and the module it writes were the same word twice', () => {
-    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, model: 'claude-sonnet-5', watch: false });
+    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false });
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
@@ -30,8 +30,19 @@ describe('what the run was asked for', () => {
 
   it('takes a count where a count is meant and says so where it is not', () => {
     expect(parseArgs(['b.md', '--turns', '12']).turns).toBe(12);
+    expect(parseArgs(['b.md', '--minutes', '10']).minutes).toBe(10);
     expect(() => parseArgs(['b.md', '--turns', 'lots'])).toThrow(/takes a count/);
     expect(() => parseArgs(['b.md', '--turns', '0'])).toThrow(/takes a count/);
+    expect(() => parseArgs(['b.md', '--minutes', '0'])).toThrow(/takes a count/);
+  });
+
+  it('knows the last minute of the clock, and never reaches one when no minutes were asked for', () => {
+    const started = 1_000_000;
+    const minute = 60_000;
+    expect(inLastMinute(started, null, started + 500 * minute)).toBe(false);
+    expect(inLastMinute(started, 10, started + 8 * minute)).toBe(false);
+    expect(inLastMinute(started, 10, started + 9 * minute)).toBe(true);
+    expect(inLastMinute(started, 10, started + 12 * minute)).toBe(true);
   });
 
   it('reads the other flags, and refuses one it does not know rather than guessing what it meant', () => {
