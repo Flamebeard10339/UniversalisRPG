@@ -1864,7 +1864,7 @@ kneel:
   instant
   requires: blessed
   say: Nothing answers.
-  on failure:
+  on refused:
     say: The stone is cold, and you are not ready for it.
 `;
 
@@ -1879,7 +1879,7 @@ describe('the words an unmet requires: refuses in', () => {
     expect(apply(kitchen(), 'use:entity.shrine.pray').said.map(String)).toEqual(['You cannot do that yet.']);
   });
 
-  it('stands aside for an author who wrote `on failure:`', () => {
+  it('stands aside for an author who wrote `on refused:`', () => {
     expect(apply(kitchen(), 'use:entity.altar.kneel').said.map(String)).toEqual(['The stone is cold, and you are not ready for it.']);
   });
 
@@ -2130,7 +2130,7 @@ describe('every entity the shipped world places, named by a directive from a roo
       const attempt = armedFrom(entityId, action, away(entityId));
       if (attempt === undefined) hidden.push(written);
       else if (attempt.armed) armed.push(written);
-      else if (action.onFailure || /^There is no .+ here\.$/.test(attempt.said)) told.push(written);
+      else if (action.onRefused || /^There is no .+ here\.$/.test(attempt.said)) told.push(written);
       else unsaid.push(`${written}: ${attempt.said}`);
     }
     expect(armed).toEqual([]);

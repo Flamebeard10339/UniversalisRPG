@@ -599,8 +599,6 @@ cast:
   give: 1 the-priest-jewel
   xp: fishing 3000
   say: It comes up slowly, and then all at once, and there is a very long silence on the bank afterwards. Whatever this is, it is not a sturgeon, or not only one.
-  on failure:
-    say: Anything short of dressed silk goes before the fish does.
   +on attempts exhausted:
     roll: spend-herring-strip
     say: It takes the bait and goes straight down, and the rod bends further than a rod should, and then does not bend any further, and then nothing.

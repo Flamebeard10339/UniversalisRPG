@@ -436,7 +436,7 @@ const SPOKEN_EVERYWHERE = [
   'say: You shove.',
   'on success:',
   '  say: It staggers.',
-  'on failure:',
+  'on refused:',
   '  say: You slip.',
   '',
   '# entity guard',

@@ -230,7 +230,7 @@ function availableActions(owner: Actable, state: GameState, registry: Registry):
 
 function movesTo(action: Action): string | undefined {
   const onlyMovement = action.results.every((r) => r.kind === 'relocate' || r.kind === 'say');
-  const noBranches = !action.onSuccess && !action.onFailure && !action.onAttemptsExhausted;
+  const noBranches = !action.onSuccess && !action.onRefused && !action.onAttemptsExhausted;
   if (!onlyMovement || !noBranches) return undefined;
   const relocate = action.results.find((r) => r.kind === 'relocate');
   return relocate?.kind === 'relocate' ? relocate.location : undefined;

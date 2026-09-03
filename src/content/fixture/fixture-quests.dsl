@@ -97,7 +97,7 @@ finish the job:
   set: ran-body
   on success:
     set: ran-success
-  on failure:
+  on refused:
     set: ran-failure
   on attempts exhausted:
     set: ran-unfinished
@@ -110,7 +110,7 @@ turn away from the job:
   time: 1
   requires: ran-success
   set: ran-body
-  on failure:
+  on refused:
     set: ran-failure
   on attempts exhausted:
     set: ran-unfinished

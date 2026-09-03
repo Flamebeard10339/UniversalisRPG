@@ -710,8 +710,8 @@ function whyRefused(action: Action, registry: Registry, state: GameState, named?
 
 function refuseWith(action: Action, registry: Registry, state: GameState, because: Localized | undefined): ArmResult | undefined {
   if (because === undefined) return undefined;
-  if (action.onFailure) {
-    applyResultsNow(state, registry, action.onFailure);
+  if (action.onRefused) {
+    applyResultsNow(state, registry, action.onRefused);
     return { armed: false };
   }
   state.log.push(because);

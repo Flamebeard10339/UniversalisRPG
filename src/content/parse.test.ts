@@ -476,7 +476,7 @@ describe('entity action modifiers', () => {
     ['requires: a', 'requires'],
     ['hidden if: a', 'hidden if'],
     ['on success: say: a', 'on success'],
-    ['on failure: say: a', 'on failure'],
+    ['on refused: say: a', 'on refused'],
     ['on attempts exhausted: say: a', 'on attempts exhausted'],
     ['time: 1', 'time'],
     ['rate: quickness', 'rate'],
@@ -493,23 +493,23 @@ describe('entity action modifiers', () => {
     expect(() => parseOne('# entity chest\nopen:\n  health: 3\n  say: hi', entity)).toThrow(/unrecognized tag clause/);
   });
 
-  it('parses on failure inline and as a block, and rejects it defined more than once', () => {
-    const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure: say: Not enough shrimp.', entity);
+  it('parses on refused inline and as a block, and rejects it defined more than once', () => {
+    const inline = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on refused: say: Not enough shrimp.', entity);
     expect(inline.blocks).toEqual([
       {
         label: 'open',
         results: [{ kind: 'take', item: 'cooked-shrimp', amount: 5 }],
-        onFailure: [{ kind: 'say', text: 'Not enough shrimp.' }],
+        onRefused: [{ kind: 'say', text: 'Not enough shrimp.' }],
       },
     ]);
 
-    const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on failure:\n    say: Not enough shrimp.\n    set: chest-jammed', entity);
-    expect((block.blocks?.[0] as Action).onFailure).toEqual([
+    const block = parseOne('# entity chest\nopen:\n  take: 5 cooked-shrimp\n  on refused:\n    say: Not enough shrimp.\n    set: chest-jammed', entity);
+    expect((block.blocks?.[0] as Action).onRefused).toEqual([
       { kind: 'say', text: 'Not enough shrimp.' },
       { kind: 'set', variable: 'chest-jammed' },
     ]);
 
-    expect(() => parseOne('# entity chest\nopen:\n  on failure:\n    say: a\n  on failure:\n    say: b', entity)).toThrow(/on failure is defined more than once/);
+    expect(() => parseOne('# entity chest\nopen:\n  on refused:\n    say: a\n  on refused:\n    say: b', entity)).toThrow(/on refused is defined more than once/);
   });
 
   it('surfaces result-related errors for malformed results, not tag errors', () => {

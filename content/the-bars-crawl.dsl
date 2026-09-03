@@ -88,7 +88,7 @@ stage offered:
     Same faces, same stools, same rounds, every night this year. I want something on the bar nobody's had before.
     There's a fish out past the shingle, in the deep water — blowfish, they call it, and it swells up like a bladder the second it's out of the water. The meat's poison until it's cooked exactly right, and the bones are worth more dissolved than the meat is worth eating.
     Charlie tried it raw once, back when he still had opinions about things. He's been on that floor since Tuesday.
-    Cook it wrong and the poison's still in the bones same as it was in the fish. Cook it right and it's gone. Bring the bones back clean and I'll see to the rest myself. @@@ a fumbled attempt should come back saying just that — that the poison stayed in — rather than the world's one generic burnt-food; a recipe has one `say:` for the attempt and no `on failure:` of its own to say anything else on
+    Cook it wrong and the poison's still in the bones same as it was in the fish. Cook it right and it's gone. Bring the bones back clean and I'll see to the rest myself. @@@ a fumbled attempt should come back saying just that — that the poison stayed in — rather than the world's one generic burnt-food; a recipe has one `say:` for the attempt and no `on refused:` of its own to say anything else on
     goto catching
 
 stage catching:

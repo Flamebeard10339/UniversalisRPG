@@ -167,8 +167,8 @@ describe('how an action ends', () => {
     expect(actionLines(trained)).toContain(`  ${written}`);
   });
 
-  it('leaves on failure: meaning what it means today, unmoved', () => {
-    expect(parse('take: 1 dough\non failure:\n  say: You have nothing to bake.').onFailure).toEqual([{ kind: 'say', text: 'You have nothing to bake.' }]);
+  it('leaves on refused: meaning what it means today, unmoved', () => {
+    expect(parse('take: 1 dough\non refused:\n  say: You have nothing to bake.').onRefused).toEqual([{ kind: 'say', text: 'You have nothing to bake.' }]);
   });
 });
 

@@ -232,7 +232,7 @@ offer:
   set: shrine-offered
   on success:
     say: The shrine glows.
-  on failure:
+  on refused:
     say: The shrine rejects your empty hands.
 
 # entity feast
@@ -263,7 +263,7 @@ open:
     expect(state.log).toEqual(['The brazier roars to life.']);
   });
 
-  it('fires an authored on failure, applies nothing else, and leaves inventory untouched when unaffordable', () => {
+  it('fires an authored on refused, applies nothing else, and leaves inventory untouched when unaffordable', () => {
     const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     state.inventory['cooked-shrimp'] = 1;
@@ -273,7 +273,7 @@ open:
     expect(state.log).toEqual(['The shrine rejects your empty hands.']);
   });
 
-  it('falls back to a generated message naming the item title when no on failure is authored', () => {
+  it('falls back to a generated message naming the item title when no on refused is authored', () => {
     const registry = loadInEnglish(TAKE_MODULE);
     const state = createGameState();
     useAction('entity', 'brazier', 'light', registry, state);

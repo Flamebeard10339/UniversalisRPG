@@ -543,7 +543,7 @@ look in again:
   open modal: choose-name
   on success:
     say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
-  on failure:
+  on refused:
     say: You need 1000 coin to perform this action.
 
 # entity oven

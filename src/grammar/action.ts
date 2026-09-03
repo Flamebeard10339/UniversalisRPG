@@ -30,7 +30,7 @@ export interface Action {
   tags?: TagClause[];
   results: ActionResult[];
   onSuccess?: ActionResult[];
-  onFailure?: ActionResult[];
+  onRefused?: ActionResult[];
   onAttemptsExhausted?: ActionResult[];
   time?: number;
   rate?: number | Sided;
@@ -182,12 +182,12 @@ const ACTION_FIELDS: readonly (Filled & {
     note: 'runs after the body of a cycle that completed, and the body runs with it — the two together are what completing means',
   },
   {
-    written: 'on failure',
-    label: /on failure:[ \t]*/,
-    name: 'onFailure',
+    written: 'on refused',
+    label: /on refused:[ \t]*/,
+    name: 'onRefused',
     parser: results,
     family: 'and afterwards',
-    note: 'runs instead of the body where the action is turned away before it begins — a `requires:` that does not hold, a thing that is not here, an input it has not got — and writing it is what says those words in the world rather than the engine saying them plainly. A check inside the body falling the wrong way is not this',
+    note: 'runs instead of the body where the action is turned away before it begins — a `requires:` that does not hold, a thing that is not here, an input it has not got — and writing it is what says those words in the world rather than the engine saying them plainly. A cast that missed, a lock that did not open, a check inside the body falling the wrong way: none of those is this, and `on attempts exhausted:` is the one that is',
   },
   {
     written: 'on attempts exhausted',
@@ -254,7 +254,7 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: st
   requireEnd(cursor, 'an action field');
 }
 
-const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on failure', 'on attempts exhausted', 'stops on']);
+const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on refused', 'on attempts exhausted', 'stops on']);
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
@@ -438,7 +438,7 @@ export function actionLines(action: Action): string[] {
     action.hiddenIf ||
     action.tags?.length ||
     action.onSuccess?.length ||
-    action.onFailure?.length ||
+    action.onRefused?.length ||
     action.onAttemptsExhausted?.length ||
     (action.kind !== undefined && action.kind !== 'duration') ||
     action.time !== undefined ||
@@ -469,7 +469,7 @@ export function actionLines(action: Action): string[] {
   if (action.stopsOn?.length) lines.push(`${at('stopsOn')}stops on: ${stoppers.print(action.stopsOn)}`);
   if (action.rewardScale !== undefined) lines.push(`  rewards scaled by: ${action.rewardScale}`);
   lines.push(...indentLines(action.results.flatMap(resultLines)));
-  for (const name of ['onSuccess', 'onFailure', 'onAttemptsExhausted'] as const) {
+  for (const name of ['onSuccess', 'onRefused', 'onAttemptsExhausted'] as const) {
     printResultBlock(lines, `${at(name)}${writtenAs(name)}`, action[name], 4);
   }
   return lines;
@@ -477,4 +477,4 @@ export function actionLines(action: Action): string[] {
 
 const writtenAs = (name: keyof Omit<Action, 'label' | 'results'>): string => ACTION_FIELDS.find((field) => field.name === name)!.written;
 
-export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onFailure, action.onAttemptsExhausted].filter((list): list is ActionResult[] => list !== undefined);
+export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onRefused, action.onAttemptsExhausted].filter((list): list is ActionResult[] => list !== undefined);
