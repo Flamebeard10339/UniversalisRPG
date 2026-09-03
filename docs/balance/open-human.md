@@ -5,25 +5,6 @@ crosses to `open-agent.md` carrying what was measured for it.
 
 ---
 
-## Whether a fresh character is meant to survive an hour of picking pockets
-
-`npm run simulate-activity -- tulsa.in-town pick-pocket` kills the starting character
-in **4 of 4 seeds**, at around 400s of the 3,600s window, having earned about 110
-thieving xp. It reads the same from every square in town. The pace while it runs is
-close to right — 945–998 xp/h against a level-1 curve asking 1,200 — so nothing is
-under-paying; the run simply ends. Thieving-ability opens at **1.01** against the
-civilian's vigilance of **20**, so most cycles are a catch, and a catch is one health
-against roughly four health a minute of regeneration. Nothing about this is new: the
-route `a-hand-goes-out-again-after-it-is-caught` walked to 200 xp and died doing it
-before the daze was ever landing, and it now asks a question it can answer instead.
-
-*Moves when: he says which of three it is. The opening ability is too low against a
-townsman; or the catch should cost less than a health; or a level-1 thief is supposed
-to pick two pockets and go and do something else, in which case the curve's 1,200/h at
-level 1 is not a target this skill is meant to meet on its own and the ladder in
-`docs/tulsa/` needs saying that way. Each is one number, and the sim re-answers it in
-a minute.*
-
 ## Where the line sits between a balance number and a path fact
 
 41 of the 66 numeric `assert:` lines in the corpus sit on roots a `# save` sheet is
@@ -41,20 +22,11 @@ rebalance moved it by two orders of magnitude, and it was rewritten to the claim
 is actually the post's — it trains the arm and leaves the hide alone. That is one test
 answered out of forty-one, and it took a judgement each time.
 
+He said on 2026-09-02 that he does not know the rule yet, and that the speedrun runs
+are the experiment that will find it. So this waits on data rather than on a ruling.
+
 *Moves when: he states the rule, or rules that the candidate is it. Then the sweep
 over all 41 is a lane's afternoon.*
-
-## Whether the five packs are the five packs
-
-Every shipped module now declares one: `engine` (core, engine-en), `skills` (the
-seven), `tulsa`, `quests` (the nine), `balance` (tiers). They were picked to make
-*turn every quest off* one click, which is what was asked for, and nothing else
-about them was decided by anything. A player who wants the town without thieving
-can reach in and turn thieving off under `skills`; whether that is a thing anyone
-should be offered is a judgement, not a fact.
-
-*Moves when: he reads the settings page and says whether the grouping is right. It
-is one `pack:` line per module and no code, so regrouping is an afternoon.*
 
 ## What a player loses by turning a pack off mid-game
 
@@ -66,20 +38,6 @@ toggle while a save is standing, or warning first.
 
 *Moves when: he says whether a portal toggle is a playtest lever that may eat a save,
 or a player-facing setting that may not. The first is what is built.*
-
-## Whether `-<line>` should work on a field that holds one value
-
-The grammar page offers `-<line>` on every line of every section. It now works on
-lists, on entries and on keywords. It is still refused on a field holding a single
-value — `-examine:` says *examine is not a list, so it cannot take -* — so the page
-promises more than the engine does by exactly that much.
-
-Both answers are defensible: unwriting a scalar is meaningful over another module's
-body, and a refusal with a clear message is not a bug. What is not defensible is the
-page and the parser disagreeing, which is what a reader is left with today.
-
-*Moves when: he says whether taking a scalar back is a thing the language should do.
-If yes it is a small parser change; if no it is a sentence in `EVERY_SECTION`.*
 
 ## What a tier's experience pool is worth, per activity
 
@@ -101,41 +59,3 @@ lane's call — `crossroads` is a connector whose whole function is reaching oth
 jewels, and it may never win one by design.
 
 *Moves when: the first matrix shows a jewel with no winning build at any tier.*
-
-## Whether a faint should cost anything
-
-The player's `on death:` in `content/tulsa.dsl` restores health, shakes every buff off,
-and puts the player back on the market square, and outside hardcore it takes nothing —
-not coin, not xp, not a minute of the clock. So the fastest thing a fresh thief can do
-is pick pockets until they faint and go again: that route reaches thieving 30 in 792
-game-minutes against the curve's 1363, with nothing bought, worn or sold. This subsumes
-the pick-pocket question above — a level-1 thief need not survive an hour, because
-dying is free.
-
-*Moves when: he says what a faint costs. Minutes, coin, a share of xp, or nothing by
-design. Each is one line in the handler, and the speedrun brief re-answers it in a run.*
-
-## Whether a house chest is meant to carry a whole skill
-
-`house-chest.pick-the-lock` carries no `requires:` at all, pays five times what a
-pocket does, and a miss costs three health and a walk back from the square. Oolga's
-chest is two hops from the square, so a route that does nothing but walk there and try
-it reaches thieving 30 in 523 game-minutes, the fastest walked so far. Every gated mark
-the expansion added — the lockbox at 18, the jewellery box at 22, the den's thief and
-strongbox — loses to it on time at every level up to 30, because their difficulty costs
-more in misses than their payout returns.
-
-*Moves when: he says whether a house chest gets a level gate, a lower payout, or a
-consequence for being caught. If the chest is meant to be the beginner's mark and the
-gated marks are meant to overtake it, the gated marks' difficulty is what moves.*
-
-## Whether a derived requirement is ever shown to a player
-
-§6.2 produces *"20 fishing, 50 combat"* for a quest, read off the lowest per-skill
-profile that completes it. There is nowhere to put it: `# quest` has no `requires:`
-field (`src/content/sections/quest.ts:33-41` — stages carry `done when:`
-conditions), and nothing authored can hold a derived profile. Whether this is a
-designer's instrument only, or something the player reads, changes what has to be
-built.
-
-*Moves when: he says whether a player ever sees it.*
