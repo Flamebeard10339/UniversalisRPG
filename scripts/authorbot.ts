@@ -182,11 +182,15 @@ The tools you have:
                                          your own included. Bare, it reads the shipped corpus
                                          instead and will not show you your own
 
-**Balance is not yours to settle.** Whether a number you wrote is a rat or a dragon is answered by
-running the world, in a pass of its own that is not this one. Write figures that read sensibly beside
-what the corpus already holds and go on; nobody will hold you to them, and no test may assert one.
+**Balance is yours, and it is read off a run rather than reckoned.** Whether a number you wrote is a
+rat or a dragon is answered by running the world — \`npm run simulate-activity\` above — and the brief
+says what the marks are. Write the figures, measure them, and say in your report what you measured
+and where it landed. A number nobody ran is a guess however sensible it reads beside the corpus.
 
-What your \`# test\` proves instead is that the path is walkable: that this sequence of actions, taken
+**No \`# test\` may assert a number a balance pass would move.** That is not a rule about care, it is
+what the routes are for: a rebalance next month must not redden a single one of them.
+
+What a \`# test\` proves instead is that the path is walkable: that this sequence of actions, taken
 in order, reaches the end it names. So a route that would otherwise stand or fall on a fight says so
 in one word — ${DEBUG_SWITCH_NAMES.map((name) => `\`${name}\``).join(', ')}, each on a line of its own in a \`# test\`, described where the rest of the
 kind is by \`npm run oracle -- test\`. Reach for those rather than buying past a fight with a \`# save\`
