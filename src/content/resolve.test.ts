@@ -124,6 +124,12 @@ describe('a reference may drop leading segments', () => {
     expect(() => loadUniverse([BASE, stranger, module('mod', '# entity gull', 'peck:', '  give: stranger.rope')])).toThrow(/names stranger.rope, but stranger is not this module or one of its dependencies/);
   });
 
+  it('does not reach a module only a declared dependency depends on, whole or short', () => {
+    const bridge = module('bridge', 'dependencies: base', '# item plank');
+    expect(() => loadUniverse([BASE, bridge, module('mod', 'dependencies: bridge', '# entity gull', 'peck:', '  give: base.rope')])).toThrow(/names base.rope, but base is not this module or one of its dependencies/);
+    expect(() => loadUniverse([BASE, bridge, module('mod', 'dependencies: bridge', '# entity gull', 'peck:', '  give: rope')])).toThrow(/names an unknown item: rope/);
+  });
+
   it('names both candidates rather than picking one', () => {
     expect(referring('rope')).not.toThrow();
     const shadowing = module('mod', 'dependencies: base', '# item rope', '# entity gull', 'peck:', '  give: rope');
