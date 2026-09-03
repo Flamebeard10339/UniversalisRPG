@@ -639,13 +639,13 @@ replenish: 10m
 coin: core.coin
 stocks:
   40 apple
-replenish: 5m
+replenish: 8s
 
 # shop pear-cart
 coin: core.coin
 stocks:
   30 pear
-replenish: 5m
+replenish: 10s
 
 # droptable jewellery-box-contents
 one of:
