@@ -35,6 +35,47 @@ and is the one place that rule is written.
 
 ---
 
+## Market Square is ruled legible, and still carries twelve entities
+
+Ruled 2026-09-03: **legible**. The square holds twelve entities and eight roads, and it is
+the room every road in town runs through by design, so it is the worst case for a screen a
+player has to read at a glance. The travel half is already capped — the sheet stops at one
+step out and the rest is on the map — and nothing caps the entity list.
+
+The lever is which entities stand there, not a number in the engine, so this is authoring:
+a brief that thins the square and says where each entity it moves now stands. Nothing may
+simply be deleted — a townsman who was the market square's is somewhere else afterwards, or
+the room he moved to is named.
+
+*Closes when:* the square reads at a glance, every entity taken off it stands somewhere a
+road reaches, and `walking-the-town` still walks.
+
+## Cooking, smithing and crafting still hang off the town rather than writing onto it
+
+Ruled 2026-09-03: **the thieving inversion is the pattern, not the exception**, and fishing
+is its own module on the same terms. Fishing is already off tulsa's `skills:` line
+(`content/tulsa.dsl:1101` names `core.woodcutting, combat.attack, combat.health,
+cooking.cooking, smithing.smithing, crafting.crafting`), so what is left is the three that
+are not.
+
+The move is the one `content/thieving.dsl` already makes and is four-ish lines per module:
+the skill's stat comes off tulsa's `skills:` line and goes back as a `+skills:` laid over
+`# entity tulsa.player` from the skill's own file, the skill takes `? tulsa` in its
+`dependencies:`, and every id tulsa names of that skill's becomes an addressed heading
+written from the skill's side. The verification is thieving's: `npm run probe -- content
+--off <skill>` loads clean and every one of tulsa's routes still passes, so the skill
+strips out and leaves a town behind.
+
+Two references are not the town's and are a separate call: `content/first-steps.dsl` hands
+out `fishing.small-fishing-net` and casts at `entity.fishing.shrimp-shoal`, and
+`content/the-bars-crawl.dsl:19` writes `uses: fishing.cast`. A quest naming a skill's id is
+not the same shape as a town declaring the skill on its player, and nothing above asks for
+those to move.
+
+*Closes when:* `npm run probe -- content --off cooking --off smithing --off crafting` loads
+clean with tulsa's routes passing, and tulsa's `skills:` line names only `core.woodcutting`
+and the two combat stats.
+
 ## Nobody has established that editing while playing is cheaper than reporting and fixing
 
 The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a

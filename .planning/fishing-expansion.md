@@ -30,6 +30,7 @@ Read `content/fishing.dsl` before adding anything — all of it is in there now.
 - Four cluster jewels, each dropping off one water. Bait is spent per cast by the `spend-bait` droptable against the `bait-persistance` stat.
 - Aggie, the fishwife on Kiln Lane, has one line and buys nothing; she is tulsa's, and anything fishing has to say through her is a `when:` node laid over her dialogue. The tackle stall on Market Row — the `fishing-supplies` shop and entity, both fishing's own — sells the gear and twenty herring on ice, and buys nothing. Sunny at Sha Dynasty's already runs the blowfish quest; she is spoken for.
 - The swamp beyond the Marsh Gate exists as `tulsa.swamp-mire`, and nothing in it is fished.
+- The tutorial leans on fishing and comes out lopsided. Miki's unlock asks the player to reach a second level in any skill, and the only skill in front of them is fishing: a shrimp pays 18 xp against 1000 for the first level, so the route takes **56 casts and 147 seconds of game time** and the apology route ends with fifty-six raw shrimp in the pack. That is a fishing number, so it is this expansion's to fix rather than the tutorial's. Three answers were on the table — the first level is too expensive for a tutorial, netting is too cheap, or Miki should be asking on a route where the rats are already levelling attack — and the first two are yours to pick between here. `npm run simulate-activity` reads it rather than reckons it.
 
 ## A short glossary, for an author who does not fish
 
@@ -100,15 +101,7 @@ The main goal of this expansion to make the world feel alive. This will be done 
 
 The main point is: track specific acts rather than a sum, make reactions local and witnessed, and show the reaction rather than the number. A visible meter turns ethics into a score to farm. A fully hidden one makes consequences feel arbitrary. The compromise most games landed on is that the NPC dialogue is the meter.
 
-Thieving has done this already. Learn from it. Concretely, from `docs/thieving-expansion/`:
-
-- A `hidden if:` on an entity is the whole gate; do not repeat it on the entity's actions.
-- A node laid over another module's dialogue from fishing must be a `when:` node; an `always` node laid over from outside is never offered.
-- There is no clock a location can read. Anything that "happens on its own" is either a buff's timer or a wait the player takes. Time of day is not a thing the engine has, so *dusk* below is a wait the player chooses, and the open question of whether the town should run a clock is already on thieving's `open-human.md`; do not reopen it here, mark it @@@ and move on.
-- What a person looks like can change on a flag inside one `examine:` with a `{flag: words}` fragment. Do not make two entities of one person.
-- `take:` does not take what is there when the count is short, so nothing below asks the player to hand over a counted heap of fish. Every weigh-in is judged on one fish.
-
-Who witnesses things on the water: the people on the shingle at the Water Gate (four of them, and they are there because it is where you go to be seen), Aggie on Kiln Lane, the tackle stallkeeper on Market Row, the guards on the Water Gate, and the new people below. Every consequence is a `when:` node on one of them.
+Thieving has done this already. Learn from it. Concretely, from `docs/thieving-expansion/` and `content/thieving.dsl`:
 
 ## Miniquests
 
