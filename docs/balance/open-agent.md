@@ -85,8 +85,18 @@ and a one-hop or three-hop eject cannot. `thieving-floor` therefore covers the t
 chest and the jewellery box and not the tavern lockbox, the pay chest or the duke.
 
 The treasure chest was thrown to the market square and now lands at the castle gate, which
-is what made its route writable; its payout was re-derived for the shorter walk in the same
-commit, so the change is worth nothing to a player.
+is what made its route writable, and its payout was set for the shorter walk.
 
 *Closes when: the three remaining marks have floor routes — which wants either a way for a
 route to name where it stands, or their misses landing two hops out like the others'.*
+
+## The floors for this band walk ungeared, which is not what the band was balanced for
+
+`cellar-chest-to-14`, `cellar-chest-to-22` and `jewellery-box-to-30` walk a thief who owns
+nothing — ability is his level and nothing else — against marks whose difficulties are the
+ladder a thief reaches by buying the Fence's three tools. So they read 0.96×, 1.24× and
+1.75× and the house chest route still reads 1.02×, and all four numbers are honest and none
+of them is the band's aim. They earn their place by proving the routes still walk.
+
+*Closes when: a floor route buys and wears the kit before it works the mark — which is what
+`gear-up` does for one rate jewel already, and what the step-2 speedrun owes.*

@@ -242,7 +242,7 @@ pick-pocket:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
 
 # entity tulsa.knight
-+stats: npc-thieving-difficulty 80, npc-thieving-xp 8, npc-thieving-damage 1
++stats: npc-thieving-difficulty 88, npc-thieving-xp 7, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 11
@@ -253,7 +253,7 @@ pick-pocket:
 # entity thief
 title: Thief
 examine: A casual cloaked figure idly rolling a blade between their gloved hands. 
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 104, npc-thieving-xp 16, npc-thieving-damage 1
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 88, npc-thieving-xp 8, npc-thieving-damage 1
 uses: core.melee-combat, pick-pocket
 faction: core.world
 respawn after: 80s
@@ -293,7 +293,7 @@ one of:
 # entity treasure-chest
 title: Treasure Chest
 examine: Iron under the wood, and somebody has cut runes into the band that are not decoration.
-stats: npc-thieving-difficulty 104, npc-thieving-xp 47, npc-thieving-damage 8
+stats: npc-thieving-difficulty 88, npc-thieving-xp 35, npc-thieving-damage 8
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 11
@@ -314,7 +314,7 @@ one of:
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: npc-thieving-difficulty 110, npc-thieving-xp 59, npc-thieving-damage 2
+stats: npc-thieving-difficulty 94, npc-thieving-xp 52, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 14
@@ -1357,7 +1357,7 @@ hammer on it:
 # entity jewellery-box
 title: Jewellery Box
 examine: A walnut box on the dressing table with a lock the size of a fingernail, and the key is not in it.
-stats: npc-thieving-difficulty 129, npc-thieving-xp 74, npc-thieving-damage 4
+stats: npc-thieving-difficulty 148, npc-thieving-xp 78, npc-thieving-damage 4
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 22
@@ -1371,7 +1371,7 @@ pick-the-lock:
 # entity tavern-lockbox
 title: Lockbox
 examine: An iron box under the end of the bar, chained to the leg of it, that holds the night's takings until Sunny carries them up.
-stats: npc-thieving-difficulty 119, npc-thieving-xp 59, npc-thieving-damage 3
+stats: npc-thieving-difficulty 138, npc-thieving-xp 60, npc-thieving-damage 3
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 18
@@ -1389,7 +1389,7 @@ pick-the-lock:
 # entity pay-chest
 title: Pay Chest
 examine: A strapped chest under the captain's table with the duke's mark burnt into the lid. The guard's wages sit in it between the castle and the guard.
-stats: npc-thieving-difficulty 124, npc-thieving-xp 117, npc-thieving-damage 2
+stats: npc-thieving-difficulty 143, npc-thieving-xp 116, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 20
@@ -1404,7 +1404,7 @@ pick-the-lock:
     roll: sent-to-jail
 
 # entity tulsa.the-duke
-+stats: npc-thieving-difficulty 136, npc-thieving-xp 65, npc-thieving-damage 2
++stats: npc-thieving-difficulty 156, npc-thieving-xp 50, npc-thieving-damage 2
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 25
@@ -1490,7 +1490,7 @@ let yourself out:
 # entity wardens-lockbox
 title: The Warden's Lockbox
 examine: An iron box bolted to the floorboards through its own base, with a lock on the front and a ledger number painted on the lid.
-stats: npc-thieving-difficulty 112, npc-thieving-xp 44, npc-thieving-damage 2
+stats: npc-thieving-difficulty 96, npc-thieving-xp 39, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 15

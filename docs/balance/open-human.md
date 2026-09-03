@@ -60,70 +60,89 @@ jewels, and it may never win one by design.
 
 *Moves when: the first matrix shows a jewel with no winning build at any tier.*
 
-## Which rung of the ladder is 1.0× the curve
+## Which ladder is the reference, and how far above the curve its top may sit
 
-Levels 1 to 10 could not answer this and levels 11 to 30 cannot be balanced without it,
-because that is exactly where the two ladders part. Below 10 there is no thieving gear, so
-a thief in civilian clothes with a full plane and a thief in the best kit he can wear are
-the same character — ability 19 at level 1 either way. From level 10 the lockpicks land,
-then the climbing gloves at 16 and the burglar's picks at 20, and by level 22 the two
-ladders read 50 and 129. That is a factor of six in the odds of every roll he makes.
+Levels 1 to 10 could not answer this and 11 to 30 cannot be balanced without it, because
+that is where the ladders part. Below 10 there is no thieving gear, so every thief is the
+same character. From 10 the lockpicks land, the climbing gloves at 16, the burglar's picks
+at 20, and the ability a full plane reaches runs **88 at level 11, 94 at 14, 133 at 16, 143
+at 20, 169 at 30** — against a thief with no gear at all, who stands at his level.
 
-So there were two coherent worlds and they want different numbers for every mark:
+**Taken as: the reference is what the Fence sells**, on 2026-09-03 — the three tools, plus
+town clothes, plus jewels, because that is the only ladder a thief reaches by deciding to
+rather than by being lucky. Every difficulty this pass shipped is that ladder read at the
+mark's gate level, so a mark opens at about a coin toss for a thief who bought what the band
+sells, and pays about one in five to a thief in civilian clothes.
 
-- the marks sit near the **civilian** ladder, everyone can rob everything, and gear is a
-  modest bonus on top; or
-- the marks sit near the **kitted** ladder, gear is the gate, and a level-22 thief who
-  never bought lockpicks is not getting into the jewellery box.
+The consequence to sign off on is the size of the gap. That thief now earns **2.5× to 5.6×
+the curve** depending on how deep the mark is, and a thief with no gear at all earns about
+0.7×. The top of that range is not invented: the house chest the 1-10 pass shipped already
+pays 2.6× to 3.5× across this whole band, and a mark the band gates that did not beat it
+would be dead content.
 
-**Taken as the second**, on 2026-09-03, on three grounds: the difficulties the module was
-written with (100 to 170) are the kitted ladder and nothing else; the gear is gated to
-arrive inside exactly this band, which is what gating it there is for; and "balancing
-roughly around the current gear and levels" was the instruction. Every number this pass
-shipped follows from it, and re-reading it the other way is a re-derivation of all nine
-marks rather than an adjustment.
+*Moves when: he says the buyable ladder is the reference and what multiple its top should
+pay, or names another — in which case the nine marks are re-derived from the same rule.*
 
-The consequence to sign off on is the size of the gear gap. A kitted thief now earns
-**about four times the curve** across the whole band, and the same thief with no gear at
-all earns about **0.7×**. The four is not invented: the house chest the 1–10 pass shipped
-already pays a kitted thief 3.9× at level 11, and a band mark that did not beat it would be
-dead content. If four is too much, the house chest is where it comes from and it is a
-level-1 mark, so that is a 1–10 question rather than an 11–30 one.
+## The house chest keeps the band's first three marks off the frontier until level 16
 
-*Moves when: he says the kitted ladder is the reference and roughly what multiple of the
-curve it should pay, or names the other ladder — in which case the nine marks are re-derived
-from the same rule and the same sheet.*
+A mark you have outgrown does not stop paying: the house chest is difficulty 25, so from
+about ability 90 a thief opens it every time and it pays its whole ceiling, 8,400 an hour.
+A new mark that opens at a coin toss has to have twice that ceiling merely to draw level.
+So at levels 11 to 15 the treasure chest pays 2.9× and the chest still pays 3.3×, and the
+band's marks only overtake it at 16 when the climbing gloves land.
+
+The three level-11 marks are alive — 1.7× to 2.9× the curve, in new rooms with new loot —
+but they are not the frontier at their own gate, and the reason is a level-1 number rather
+than anything in this band. Raising them to beat a saturated chest at 11 makes them
+dominate at 30; the arithmetic does not permit both.
+
+*Moves when: he says whether the house chest may lose ceiling — it is 14 experience for six
+seconds, and it is the 1-10 pass's number, not this one's.*
+
+## The speedrun that would price the gear did not finish
+
+Step 2 of the balance pass is an authorbot speedrun that checks the gear is reachable and
+the clock is honest. The run on 2026-09-03 spent most of its budget on a harness defect
+(now fixed, `--target`) and came back with no timings. So **nothing has measured how long
+it takes to earn the 1,400 coin for the three tools**, and the whole reference ladder rests
+on that being reasonable. What the run did establish, walked and recorded:
+
+- the rogue's den — and the Fence, the only shop selling any of the three tools — is
+  reachable at **level 1 in 35 seconds of game time**, through the lookout quest and the
+  widow's back window, with no thieving check anywhere on the path. So the tools are
+  gated by coin and by level, not by skill.
+- selling at the Fence returns 80% of an item's value.
+- pickpocketing civilians from level 1 kills an ungeared thief before level 10 unless it is
+  interleaved with rests on the market-square bench.
+
+*Moves when: a speedrun comes back with game-minutes to 20 and to 30 for a thief who buys
+his kit, and how many of those minutes went on the coin.*
 
 ## No thief can stand at any of these marks for an hour, and the pass did not price it
 
 Every run of every mark in this band ended in death or in being thrown out, never in the
-hour running down. `npc-thieving-damage` is a flat drain on the miss and the marks bleed a
-kitted thief between 150 and 1,100 health an hour — the strongbox 256, the jewellery box
-603, the treasure chest 1,108, which is eight health a miss and the highest in the module.
-A thief who has not levelled health has nothing like that to spend.
+hour running down. `npc-thieving-damage` is a flat drain on the miss and the marks bleed
+between 150 and 1,100 health an hour — the treasure chest eight health a miss, the highest
+in the module. A thief who has not levelled health has nothing like that to spend.
 
-Nothing was done about it, because §2 of the model rules that a mark is two knobs and that
-cost is not a third. But the numbers this pass shipped assume the mark is being worked, and
-a mark that empties the player in ninety seconds is not being worked. The two readings
-disagree and only one of them can be the design.
+Nothing was done about it, because the model rules that a mark is two knobs and cost is not
+a third. But the numbers assume the mark is being worked, and a mark that empties the player
+in ninety seconds is not being worked. Only one of those readings can be the design.
 
-*Moves when: he says whether the health drain is a knob the balance pass may move, or a
-thing the player answers by levelling health — and if the second, whether thieving is meant
-to require it.*
+*Moves when: he says whether the health drain is a knob a balance pass may move, or a thing
+the player answers by levelling health.*
 
 ## The accuracy denominator does not need moving, on this evidence
 
 Asked on 2026-09-03 whether `contest-spread` should go from 100 to 150 or 200. It is a
 `# variable` a world may write, not engine code, so it is a one-line change in `core.dsl`
-whenever it is wanted — `contestSpread` in `src/runtime/tuning.ts` defaults to 100 and
-nothing in `content/` writes it today.
+whenever it is wanted — nothing in `content/` writes it today and `src/runtime/tuning.ts`
+defaults it to 100.
 
-It looked wrong because the band's marks were two to five times harder than the thief
-standing in front of them, which a wider denominator would have papered over. With the
-difficulties sitting on the ladder instead, a kitted thief is at a coin toss, a
-civilian-clothed one at about one in five and a bare one at about one in ten, and that is a
-spread worth having. Widening to 200 halves it and makes gear worth much less, which is the
-opposite of the reading above.
+It looked wrong because the marks were two to five times harder than the thief standing in
+front of them, which a wider denominator would have papered over. With the difficulties on
+the ladder instead, a thief who bought his kit is at a coin toss, one in civilian clothes at
+about one in five, and one with nothing at about one in ten. Widening to 200 halves that and
+makes gear worth much less, which is the opposite of the reading above.
 
-*Moves when: play says the gap between a geared thief and an ungeared one is too wide, in
-which case this is the one line that closes it.*
+*Moves when: play says the gap between a geared thief and an ungeared one is too wide.*
