@@ -4,7 +4,6 @@ pack: skills
 dependencies:
   core
   combat
-  fishing
 
 # stat crafting
 title: Crafting
@@ -138,38 +137,3 @@ out: 1 wolfskin-gloves
 skill: crafting 120
 rate: crafting
 say: Fur out, leather in the palm, and the seam hidden along the side of the finger.
-
-# recipe gut-line
-in: 2 sinew
-out: 1 fishing.gut-line
-skill: crafting 14
-rate: crafting
-say: Two lengths of it twisted against each other, which is the whole of a gut line.
-
-# recipe braided-fiber-line
-in: 4 sinew, 1 quill
-out: 1 fishing.braided-fiber-line
-skill: crafting 40
-rate: crafting
-say: Four strands round a quill core, laid so no one of them ever takes the whole pull.
-
-# recipe horsehair-line
-in: 6 sinew, 3 quill, 1 leather
-out: 1 fishing.horsehair-line
-skill: crafting 96
-rate: crafting
-say: It takes an afternoon and one horse's worth of patience, and it will outlast three of anything else.
-
-# recipe small-fishing-net
-in: 6 sinew
-out: 1 fishing.small-fishing-net
-skill: crafting 22
-rate: crafting
-say: Knotted square, mesh by mesh, until it is the size of the fish you have in mind.
-
-# recipe large-fishing-net
-in: 14 sinew, 1 leather
-out: 1 fishing.large-fishing-net
-skill: crafting 70
-rate: crafting
-say: The same knot four hundred more times, and a leather edge so the weight of it does not tear the mesh.

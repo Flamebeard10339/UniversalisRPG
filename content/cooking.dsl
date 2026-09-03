@@ -3,7 +3,6 @@ version: 1.0.0
 pack: skills
 dependencies:
   core
-  fishing
   combat
 
 # stat cooking
@@ -47,56 +46,6 @@ value: 60
 item-level: 6-12
 kitchen, +6 cooking
 
-# item cooked-anchovies
-title: Cooked Anchovies
-examine: Crisped whole in a pan, eaten whole, bones and all.
-value: 6
-food, +2 core.regeneration, 45s
-eat:
-  instant
-  take: 1 cooked-anchovies
-  say: You eat them off your palm in two handfuls.
-
-# item cooked-trout
-title: Cooked Trout
-examine: The skin came away in one piece, which is the only way you can tell it went well.
-value: 20
-food, +7 core.regeneration, 90s
-eat:
-  instant
-  take: 1 cooked-trout
-  say: You eat the trout off the bone and feel considerably better about the afternoon.
-
-# item cooked-salmon
-title: Cooked Salmon
-examine: Pink through to the middle and still giving off heat.
-value: 36
-food, +11 core.regeneration, 120s
-eat:
-  instant
-  take: 1 cooked-salmon
-  say: You eat the salmon slowly, because it is worth eating slowly.
-
-# item cooked-pike
-title: Cooked Pike
-examine: Firm white flesh off a fish that fought about it, and picked clean of the bones that come with that.
-value: 46
-food, +11 core.regeneration, 120s
-eat:
-  instant
-  take: 1 cooked-pike
-  say: You eat it slowly, because of the bones, and it is worth eating slowly.
-
-# item cooked-sturgeon
-title: Cooked Sturgeon
-examine: Steaks off something that was swimming here before the walls went up.
-value: 84
-food, +16 core.regeneration, 150s
-eat:
-  instant
-  take: 1 cooked-sturgeon
-  say: There is more of it than one person should eat and you eat all of it.
-
 # item cooked-chicken
 title: Cooked Chicken
 examine: Turned on the spit until the skin went the colour it is supposed to go.
@@ -132,26 +81,6 @@ skill: cooking 4
 time: 3
 say: The oven bakes your dough into a golden loaf.
 
-# recipe cooked-shrimp
-station: stove
-in: raw-shrimp
-out: cooked-shrimp
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 1
-rate: core.cooking-rate
-say: The shrimp goes from grey to pink in about four seconds, and that is the whole of the skill.
-
-# recipe cooked-anchovies
-station: stove
-in: raw-anchovies
-out: cooked-anchovies
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 2
-rate: core.cooking-rate
-say: They crisp in the pan all at once, which is the moment to take them off it.
-
 # recipe cooked-herring
 station: stove
 in: herring
@@ -172,16 +101,6 @@ skill: cooking 3
 rate: core.cooking-rate
 say: You turn it until the fat stops running clear.
 
-# recipe cooked-trout
-station: stove
-in: raw-trout
-out: cooked-trout
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 4
-rate: core.cooking-rate
-say: You take the trout off the heat at the moment the eye goes white.
-
 # recipe cooked-beef
 station: stove
 in: combat.raw-beef
@@ -191,36 +110,6 @@ accuracy: cooking
 skill: cooking 5
 rate: core.cooking-rate
 say: You sear it hard on both sides and leave the middle alone.
-
-# recipe cooked-salmon
-station: stove
-in: raw-salmon
-out: cooked-salmon
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 6
-rate: core.cooking-rate
-say: The salmon takes longer than anything else on the range and punishes you for looking away.
-
-# recipe cooked-pike
-station: stove
-in: fishing.raw-pike
-out: cooked-pike
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 8
-rate: core.cooking-rate
-say: You cook the pike long and slow, which is the only way round the bones.
-
-# recipe cooked-sturgeon
-station: stove
-in: fishing.raw-sturgeon
-out: cooked-sturgeon
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 12
-rate: core.cooking-rate
-say: It takes up the whole range and it is worth the whole range.
 
 # recipe roasted-chestnut
 station: oven

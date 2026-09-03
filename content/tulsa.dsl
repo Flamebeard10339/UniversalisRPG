@@ -4,7 +4,6 @@ pack: tulsa
 dependencies:
   core
   combat
-  fishing
   cooking
   smithing
   crafting
@@ -73,7 +72,7 @@ adjacent:
   kiln-lane
   market-rooftops
 entities:
-  general-store, fishing-supplies, woodcutters-stall, 6 civilian
+  general-store, woodcutters-stall, 6 civilian
 flags: axe-taken
 lift an axe off the rack:
   hidden if: axe-taken
@@ -378,7 +377,7 @@ adjacent:
   well-lane
   deep-water
 entities:
-  fishing.shrimp-shoal, fishing.anchovy-shoal, bench, 4 civilian
+  bench, 4 civilian
 
 # location bee-gate
 x: 10, y: 2
@@ -501,8 +500,6 @@ examine: Downstream of the wall, past the last of the houses. The bank is underc
 adjacent:
   riverside
   the-narrows
-entities:
-  fishing.trout-run, fishing.salmon-pool
 
 # location the-narrows
 x: 6, y: 6
@@ -510,8 +507,6 @@ title: The Narrows
 examine: The valley closes in and the river goes quiet and fast between two shoulders of rock. Nobody has built anything down here and the path stops being a path.
 adjacent:
   deep-water
-entities:
-  fishing.pike-reach, fishing.sturgeon-hole
 
 # location sewer-entrance
 x: 9, y: -1, z: -1
@@ -660,25 +655,6 @@ stocks:
 title: General Store
 examine: Flour, water, rope, and a jar by the till for coins too bent to spend elsewhere.
 keeps shop: general-store
-
-# shop fishing-supplies
-coin: coin
-stocks:
-  20 herring
-  3 fishing.small-fishing-net
-  2 fishing.large-fishing-net
-  3 fishing.fishing-rod
-  200 fishing.dried-fish-bait
-  1 fishing.wrigglers
-  10 fishing.gut-line
-  6 fishing.braided-fiber-line
-  3 fishing.horsehair-line
-  4 fishing.steel-line
-
-# entity fishing-supplies
-title: Fishing Supplies
-examine: Nets on hooks, line on spools, and a crate of herring on ice at the front.
-keeps shop: fishing-supplies
 
 # shop woodcutters-stall
 coin: coin
@@ -1122,7 +1098,7 @@ open:
 title: You
 faction: core.player
 stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
-skills: core.woodcutting, combat.attack, combat.health, fishing.fishing, cooking.cooking, smithing.smithing, crafting.crafting
+skills: core.woodcutting, combat.attack, combat.health, cooking.cooking, smithing.smithing, crafting.crafting
 equipment-slots: mainhand, offhand, head, body, legs, gloves, boots
 uses: core.melee-combat
 on death:
@@ -1138,10 +1114,6 @@ on death:
   if not market-square.touched:
     relocate: starting-location
   stop
-on line-parted:
-  say: The line goes slack in your hands, and what was on the end of it is somewhere under the water with the fish.
-  restore: fishing.line-health
-  roll: fishing.parted-tackle
 
 # entity oolgas-sacks
 title: The Sacks
@@ -1392,9 +1364,6 @@ node over-the-barrel:
 # save a-netful-on-well-lane
 {"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}
 
-# save rodded-up-at-the-deep-water
-{"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
-
 # save at-the-forge-with-coin
 {"version":13,"location":"tulsa.forge","inventory":{"core.coin":200,"smithing.hammer":1}}
 
@@ -1505,24 +1474,6 @@ assert: xp.combat.attack > 0
 assert: xp.combat.health > 0
 assert: not core.fainted
 
-# test a-bent-coin-becomes-a-cooked-herring
-load: in-town-with-bent-coins
-travel: market-row
-shop: general-store
-submit-modal: item=more:sell:core.bent-coin
-submit-modal: count=6
-submit-modal: item=close
-assert: inventory.coin > 0
-assert: inventory.core.bent-coin = 2
-shop: fishing-supplies
-submit-modal: item=buy:core.herring
-submit-modal: item=close
-assert: has core.herring
-travel: tavern-street
-travel: sha-dynastys
-craft: cooking.cooked-herring
-assert: not has core.herring
-
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-a-sword-and-a-shield
 shop: general-store
@@ -1545,16 +1496,6 @@ assert: has core.honeycomb
 use: entity.first-hive.search-the-comb until done
 assert: hives-searched = 1
 
-# test the-lanes-are-where-the-cooking-is
-load: a-netful-on-well-lane
-travel: hasks-house
-craft: cooking.cooked-shrimp
-assert: inventory.fishing.raw-shrimp = 3
-travel: nans-house
-craft: cooking.cooked-shrimp
-assert: inventory.fishing.raw-shrimp = 2
-assert: xp.cooking.cooking > 0
-
 # test the-well-is-where-the-water-is
 load: a-netful-on-well-lane
 travel: town-well
@@ -1562,17 +1503,6 @@ use: entity.the-well.draw-water
 assert: inventory.core.jug-of-water = 1
 use: entity.the-well.draw-water
 assert: inventory.core.jug-of-water = 2
-
-# test the-deep-water-is-fished-with-a-rod-and-bait
-load: rodded-up-at-the-deep-water
-equip: 1
-equip: fishing.dried-fish-bait
-equip: 2
-use: entity.fishing.trout-run.cast until has fishing.raw-trout
-assert: has fishing.raw-trout
-use: entity.fishing.salmon-pool.cast until has fishing.raw-salmon
-assert: has fishing.raw-salmon
-assert: inventory.fishing.dried-fish-bait < 40
 
 # test the-wall-in-oolgas-cellar-is-the-back-way
 load: in-town

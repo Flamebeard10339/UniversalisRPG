@@ -3,6 +3,9 @@ version: 1.0.0
 pack: skills
 dependencies:
   core
+  cooking
+  crafting
+  ? tulsa
 
 # stat fishing
 title: Fishing
@@ -276,6 +279,151 @@ cast:
     roll: spend-bait
     say: The rod goes over and stays over, and then there is nothing on the end of it at all.
 
+# item cooked-anchovies
+title: Cooked Anchovies
+examine: Crisped whole in a pan, eaten whole, bones and all.
+value: 6
+food, +2 core.regeneration, 45s
+eat:
+  instant
+  take: 1 cooked-anchovies
+  say: You eat them off your palm in two handfuls.
+
+# item cooked-trout
+title: Cooked Trout
+examine: The skin came away in one piece, which is the only way you can tell it went well.
+value: 20
+food, +7 core.regeneration, 90s
+eat:
+  instant
+  take: 1 cooked-trout
+  say: You eat the trout off the bone and feel considerably better about the afternoon.
+
+# item cooked-salmon
+title: Cooked Salmon
+examine: Pink through to the middle and still giving off heat.
+value: 36
+food, +11 core.regeneration, 120s
+eat:
+  instant
+  take: 1 cooked-salmon
+  say: You eat the salmon slowly, because it is worth eating slowly.
+
+# item cooked-pike
+title: Cooked Pike
+examine: Firm white flesh off a fish that fought about it, and picked clean of the bones that come with that.
+value: 46
+food, +11 core.regeneration, 120s
+eat:
+  instant
+  take: 1 cooked-pike
+  say: You eat it slowly, because of the bones, and it is worth eating slowly.
+
+# item cooked-sturgeon
+title: Cooked Sturgeon
+examine: Steaks off something that was swimming here before the walls went up.
+value: 84
+food, +16 core.regeneration, 150s
+eat:
+  instant
+  take: 1 cooked-sturgeon
+  say: There is more of it than one person should eat and you eat all of it.
+
+# recipe cooked-shrimp
+station: core.stove
+in: raw-shrimp
+out: core.cooked-shrimp
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 1
+rate: core.cooking-rate
+say: The shrimp goes from grey to pink in about four seconds, and that is the whole of the skill.
+
+# recipe cooked-anchovies
+station: core.stove
+in: raw-anchovies
+out: cooked-anchovies
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 2
+rate: core.cooking-rate
+say: They crisp in the pan all at once, which is the moment to take them off it.
+
+# recipe cooked-trout
+station: core.stove
+in: raw-trout
+out: cooked-trout
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 4
+rate: core.cooking-rate
+say: You take the trout off the heat at the moment the eye goes white.
+
+# recipe cooked-salmon
+station: core.stove
+in: raw-salmon
+out: cooked-salmon
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 6
+rate: core.cooking-rate
+say: The salmon takes longer than anything else on the range and punishes you for looking away.
+
+# recipe cooked-pike
+station: core.stove
+in: raw-pike
+out: cooked-pike
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 8
+rate: core.cooking-rate
+say: You cook the pike long and slow, which is the only way round the bones.
+
+# recipe cooked-sturgeon
+station: core.stove
+in: raw-sturgeon
+out: cooked-sturgeon
+burnt: cooking.burnt-food
+accuracy: cooking.cooking
+skill: cooking.cooking 12
+rate: core.cooking-rate
+say: It takes up the whole range and it is worth the whole range.
+
+# recipe gut-line
+in: 2 crafting.sinew
+out: 1 gut-line
+skill: crafting.crafting 14
+rate: crafting.crafting
+say: Two lengths of it twisted against each other, which is the whole of a gut line.
+
+# recipe braided-fiber-line
+in: 4 crafting.sinew, 1 crafting.quill
+out: 1 braided-fiber-line
+skill: crafting.crafting 40
+rate: crafting.crafting
+say: Four strands round a quill core, laid so no one of them ever takes the whole pull.
+
+# recipe horsehair-line
+in: 6 crafting.sinew, 3 crafting.quill, 1 crafting.leather
+out: 1 horsehair-line
+skill: crafting.crafting 96
+rate: crafting.crafting
+say: It takes an afternoon and one horse's worth of patience, and it will outlast three of anything else.
+
+# recipe small-fishing-net
+in: 6 crafting.sinew
+out: 1 small-fishing-net
+skill: crafting.crafting 22
+rate: crafting.crafting
+say: Knotted square, mesh by mesh, until it is the size of the fish you have in mind.
+
+# recipe large-fishing-net
+in: 14 crafting.sinew, 1 crafting.leather
+out: 1 large-fishing-net
+skill: crafting.crafting 70
+rate: crafting.crafting
+say: The same knot four hundred more times, and a leather edge so the weight of it does not tear the mesh.
+
 # passive keen-line
 tackle, +3 fishing
 
@@ -356,6 +504,44 @@ title: A Full Tin
 examine: A dented tin that rattles, and has rattled the same amount for as long as anyone has had it.
 cluster-jewel: a-full-tin
 
+# shop fishing-supplies
+coin: coin
+stocks:
+  20 herring
+  3 small-fishing-net
+  2 large-fishing-net
+  3 fishing-rod
+  200 dried-fish-bait
+  1 wrigglers
+  10 gut-line
+  6 braided-fiber-line
+  3 horsehair-line
+  4 steel-line
+
+# entity fishing-supplies
+title: Fishing Supplies
+examine: Nets on hooks, line on spools, and a crate of herring on ice at the front.
+keeps shop: fishing-supplies
+
+# entity tulsa.player
++skills: fishing
+on line-parted:
+  say: The line goes slack in your hands, and what was on the end of it is somewhere under the water with the fish.
+  restore: line-health
+  roll: parted-tackle
+
+# location tulsa.market-row
++entities: fishing-supplies
+
+# location tulsa.riverside
++entities: shrimp-shoal, anchovy-shoal
+
+# location tulsa.deep-water
++entities: trout-run, salmon-pool
+
+# location tulsa.the-narrows
++entities: pike-reach, sturgeon-hole
+
 # save both-nets-and-no-fishing-behind-them
 {"version":13,"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.small-fishing-net","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.large-fishing-net","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
@@ -365,3 +551,45 @@ equip: 2
 refused
 equip: 1
 assert: stat.max-line-health > 0
+
+# save rodded-up-at-the-deep-water
+{"version":13,"location":"tulsa.deep-water","xp":{"fishing.fishing":467},"inventory":{"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+# test the-deep-water-is-fished-with-a-rod-and-bait
+load: rodded-up-at-the-deep-water
+equip: 1
+equip: dried-fish-bait
+equip: 2
+use: entity.trout-run.cast until has raw-trout
+assert: has raw-trout
+use: entity.salmon-pool.cast until has raw-salmon
+assert: has raw-salmon
+assert: inventory.dried-fish-bait < 40
+
+# test the-tackle-stall-is-where-the-herring-is
+load: tulsa.in-town-with-bent-coins
+travel: tulsa.market-row
+shop: tulsa.general-store
+submit-modal: item=more:sell:core.bent-coin
+submit-modal: count=6
+submit-modal: item=close
+assert: inventory.core.coin > 0
+assert: inventory.core.bent-coin = 2
+shop: fishing-supplies
+submit-modal: item=buy:core.herring
+submit-modal: item=close
+assert: has core.herring
+travel: tulsa.tavern-street
+travel: tulsa.sha-dynastys
+craft: cooking.cooked-herring
+assert: not has core.herring
+
+# test the-lanes-are-where-the-cooking-is
+load: tulsa.a-netful-on-well-lane
+travel: tulsa.hasks-house
+craft: cooked-shrimp
+assert: inventory.raw-shrimp = 3
+travel: tulsa.nans-house
+craft: cooked-shrimp
+assert: inventory.raw-shrimp = 2
+assert: xp.cooking.cooking > 0
