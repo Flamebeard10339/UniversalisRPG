@@ -274,6 +274,18 @@ describe('replenishing runs on simulated time', () => {
     expect(stockNow(shop, held)).toEqual({ nail: 4, pin: 2 });
   });
 
+  it('reads an authored replenish: in the unit it was written in, not a thousand times faster', () => {
+    const written = loadInEnglish(MODULE.replace('# shop stall', '# shop stall\nreplenish: 5m'));
+    const shop = written.shops.get('stall')!;
+    const state = carrying({ coin: 40 }, written);
+    buy(shop, state, written, 'nail', 4);
+
+    state.time += 4 * MINUTE;
+    expect(stockNow(shop, state).nail ?? 0).toBe(0);
+    state.time += 6 * MINUTE;
+    expect(stockNow(shop, state).nail).toBe(2);
+  });
+
   it('restocks 1 nail across two buys thirty seconds apart, the same as if nobody had come between', () => {
     const state = carrying({ coin: 40 });
     buy(shopOf('stall'), state, registry, 'nail', 4);

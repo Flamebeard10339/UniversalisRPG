@@ -8,7 +8,7 @@ import { Item } from './item';
 
 export const DEFAULT_BUYING = 1.2;
 export const DEFAULT_SELLING = 0.8;
-export const DEFAULT_REPLENISH = 60_000;
+export const DEFAULT_REPLENISH = 60;
 
 export const ACCEPTS = ['any', 'stocked'] as const;
 
@@ -60,9 +60,9 @@ export function unpriceableStock(shop: Shop, items: ReadonlyMap<string, Item>): 
   return found === undefined ? undefined : `# shop ${shop.id} stocks: names ${found.item}, which declares no value: and so is untradable`;
 }
 
-export function replenishSteps(shop: Shop, elapsed: number): number {
-  if (elapsed < 0) return 0;
-  return Math.floor(elapsed / shop.replenish);
+export function replenishSteps(shop: Shop, elapsedSeconds: number): number {
+  if (elapsedSeconds < 0) return 0;
+  return Math.floor(elapsedSeconds / shop.replenish);
 }
 
 const toward = (from: number, to: number, steps: number): number => (from < to ? Math.min(to, from + steps) : Math.max(to, from - steps));
@@ -85,9 +85,9 @@ export const shop = section<Shop>()({
   fields: {
     coin: { parser: id, names: { id: 'item' }, note: 'the item this shop counts in, which is therefore the one thing it will neither buy nor sell' },
     stocks: { parser: list(quantified), default: () => [], block: true },
-    buying: { parser: decimal, default: () => DEFAULT_BUYING, printed: 'unless-default' },
-    selling: { parser: decimal, default: () => DEFAULT_SELLING, printed: 'unless-default' },
-    replenish: { parser: duration, default: () => DEFAULT_REPLENISH, printed: 'unless-default' },
+    buying: { parser: decimal, default: () => DEFAULT_BUYING, printed: 'unless-default', example: '1.5', note: "a multiplier on an item's `value:`, and what the player pays for one — so a shop marks up whatever it sells" },
+    selling: { parser: decimal, default: () => DEFAULT_SELLING, printed: 'unless-default', example: '0.5', note: "a multiplier on an item's `value:`, and what the player is paid for one" },
+    replenish: { parser: duration, default: () => DEFAULT_REPLENISH, printed: 'unless-default', note: 'how long one unit of stock takes to come back, so a shop emptied of four is whole again after four of these' },
     accepts: { parser: acceptsValue, default: () => 'any', printed: 'unless-default' },
     hiddenIf: hiddenIf('the counter is not kept while this holds, so nothing is bought or sold here — which is how a quest opens a shop that was not there before, or shuts one'),
   },

@@ -4,6 +4,7 @@ import { buyPrice, declaredStock, replenished, replenishSteps, sellPrice, Shop, 
 import { RuntimeError } from './error';
 import { carriesItem, destroyItem, handOver, HandOver, isGrownCopy, itemTemplate, packRows, receiveItem, roomToPack, spendableCount } from './itemInstance';
 import { packKey } from './packOrder';
+import { msToSeconds, secondsToMs } from './units';
 import { GameState, ShopStock } from './state';
 
 export const isShopStock = (value: unknown): boolean => {
@@ -18,13 +19,13 @@ const asFound = (shop: Shop, state: GameState): ShopStock => state.shops[shop.id
 
 export function stockNow(shop: Shop, state: GameState): Record<string, number> {
   const held = asFound(shop, state);
-  return replenished(shop, held.counts, replenishSteps(shop, state.time - held.at));
+  return replenished(shop, held.counts, replenishSteps(shop, msToSeconds(state.time - held.at)));
 }
 
 function settle(shop: Shop, state: GameState): ShopStock {
   const held = asFound(shop, state);
-  const steps = replenishSteps(shop, state.time - held.at);
-  return { at: held.at + steps * shop.replenish, counts: replenished(shop, held.counts, steps) };
+  const steps = replenishSteps(shop, msToSeconds(state.time - held.at));
+  return { at: held.at + secondsToMs(steps * shop.replenish), counts: replenished(shop, held.counts, steps) };
 }
 
 function write(state: GameState, shop: Shop, settled: ShopStock, counts: Record<string, number>): void {

@@ -5,7 +5,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
 import { Loose, Pruning, Visit, condition as visitCondition, put, strings } from '../refs';
 import { Condition, condition } from '../../grammar/condition';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
@@ -137,6 +137,15 @@ function pointedAt(parser: Parser<unknown>, written: (value: string) => string, 
   return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: valueOf(parser) }) };
 }
 
+function leftOut(spec: AnyField): string | undefined {
+  if (spec.printed !== 'unless-default' || spec.default === undefined) return undefined;
+  try {
+    return `left out, it reads ${(spec.parser as Parser<unknown>).print(spec.default(undefined as never, DEFAULT_CONTEXT))}`;
+  } catch {
+    return undefined;
+  }
+}
+
 const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] => {
   const parser = spec.parser as Parser<unknown>;
   const keyword = spec.keyword ?? name;
@@ -145,7 +154,9 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const needs = schema.needs?.[name];
   const block = positional ? undefined : blockOf(parser);
   const filled = { ...filledBy(parser), ...filledBy(spec) };
-  const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(spec.note === undefined ? {} : { note: spec.note }), ...(needs === undefined ? {} : { needs }), ...filled };
+  const unwritten = leftOut(spec);
+  const note = [spec.note, unwritten].filter((each) => each !== undefined).join(' — ');
+  const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(note === '' ? {} : { note }), ...(needs === undefined ? {} : { needs }), ...filled };
   const named = pointedAt(parser, written, said);
   const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];
   if (shapes.length === 0) return [];
