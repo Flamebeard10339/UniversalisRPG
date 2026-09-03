@@ -170,20 +170,6 @@ on that being reasonable. What the run did establish, walked and recorded:
 *Moves when: a speedrun comes back with game-minutes to 20 and to 30 for a thief who buys
 his kit, and how many of those minutes went on the coin.*
 
-## No thief can stand at any of these marks for an hour, and the pass did not price it
-
-Every run of every mark in this band ended in death or in being thrown out, never in the
-hour running down. `npc-thieving-damage` is a flat drain on the miss and the marks bleed
-between 150 and 1,100 health an hour — the treasure chest eight health a miss, the highest
-in the module. A thief who has not levelled health has nothing like that to spend.
-
-Nothing was done about it, because the model rules that a mark is two knobs and cost is not
-a third. But the numbers assume the mark is being worked, and a mark that empties the player
-in ninety seconds is not being worked. Only one of those readings can be the design.
-
-*Moves when: he says whether the health drain is a knob a balance pass may move, or a thing
-the player answers by levelling health.*
-
 ## The accuracy denominator does not need moving, on this evidence
 
 Asked on 2026-09-03 whether `contest-spread` should go from 100 to 150 or 200. It is a

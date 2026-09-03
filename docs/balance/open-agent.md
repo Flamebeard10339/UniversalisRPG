@@ -122,23 +122,37 @@ of them is the band's aim. They earn their place by proving the routes still wal
 *Closes when: a floor route buys and wears the kit before it works the mark — which is what
 `gear-up` does for one rate jewel already, and what the step-2 speedrun owes.*
 
-## Two things about the stand-in mechanic that were not run down
+## A mark measured against a thief who has never fought reads far below what it is
 
-A picked pocket now leaves the person standing with the pocket gone, booked as a deficit against
-the room's population. Two readings of it were noticed and parked rather than chased, and both
-want checking once the reversible-transformation rewrite lands, because that rewrite moves the
-same machinery.
+Ruled 2026-09-03: thieving is meant to want some investment in health, and how much is out of
+scope for a thieving pass. That ruling has a consequence for how a mark is read, and it is easy
+to trip over.
 
-**The room's arithmetic pays more than the plain reading.** Market Square holds eight townsmen
-on a two-minute pocket, so eight picks every hundred and twenty seconds is about 960 experience
-an hour, and the run measures 3,958. Something about how `applyRespawns` clears the deficit is
-more generous than picking-eight-then-waiting, and the pocket marks' payouts are about to be
-derived from exactly that arithmetic.
+At the top of the ladder the knight's pocket pays 3,863 an hour, which is what its numbers say
+it should. At level eleven — its own gate — it pays **262, sixteen hundredths of the curve**,
+because a pure thief misses about half the time, takes a point of damage a miss, and dies. The
+floor routes never fight, so every rung read off one is a thief with a level-one constitution,
+and a pocket mark measured that way is limited by dying rather than by anything the pass sets.
 
-**Killing a stand-in may book nothing.** `downOne` returns early unless the location *declares*
-the entity, and a stand-in is declared in no location — so a killed one may be killable again at
-once, where killing the original books a respawn. The rewrite removes stand-in entities outright,
-which should dissolve this, but it is worth a route that kills one twice.
+The lock marks are much less affected: a lock's miss throws you out or dazes you rather than
+draining you, so the same reading is closer to honest for them.
 
-*Closes when: both are measured against whatever the rewrite leaves standing, and the pocket
-payouts are derived from a population rule that has been checked rather than assumed.*
+*Closes when: a rung save exists that has fought as much as it has stolen, and the marks are
+read against that as well as against the pure thief — at which point the gap between the two is
+the size of the health investment the skill is asking for, which is a number worth knowing
+rather than a defect.*
+
+## The floors now carry a geared route, and it lands on the curve
+
+`gear-up` used to farm a townsman for a jewel at one in a hundred and nine and cost 139
+game-minutes. The common jewel is bought from the alley now, and it costs 27.6, which drags
+`geared-to-20` and `geared-to-30` to 0.91 and 0.98 of the curve — the closest either has been.
+So the note that this band's floors walk ungeared is only half true now: three of the ten carry
+gear, and the rest are deliberately the bare floor.
+
+What is still missing is a route that carries the *band's own* gear — the climbing gloves, the
+burglar's picks, a rare jewel — rather than the one common jewel the alley sells. The band's
+marks are cut against a ladder no floor route stands on.
+
+*Closes when: a floor route buys or wins the band's gear, so the marks of levels eleven to
+thirty are walked by a thief who has what they were cut for.*
