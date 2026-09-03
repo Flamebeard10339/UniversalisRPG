@@ -1343,7 +1343,7 @@ stage offered-to-teach:
     ask: About the net.
     "You said you'd show me." He is still watching your hands more than your face. "Have you got one going spare?"
     -> Here. (when inventory.small-fishing-net >= 2)
-      take: 1 small-fishing-net
+      take: worn mainhand
       set: has-taught-rook
       say: He turns it over twice before he believes it is really for him. "I'll pay you back," he says, in a voice that means he has no idea how.
       goto taught
@@ -1518,6 +1518,7 @@ equip: 3
 equip: 4
 equip: 5
 equip: bread-paste
+use: core.melee-combat on tulsa.bog-lurker until done
 use: entity.tench-hole.cast until has raw-tench
 assert: has raw-tench
 goto: the-mere
@@ -1595,6 +1596,7 @@ assert: has raw-salmon
 
 # test the-boy-at-the-narrows-is-taught-to-fish-in-the-open
 load: at-the-narrows-with-a-spare-net
+equip: 1
 talk: rook
 choose: I could show you a better way, if you had a net.
 assert: the-boy-at-the-narrows.offered-to-teach
@@ -1602,6 +1604,7 @@ talk: rook
 choose: Here.
 assert: has-taught-rook
 assert: the-boy-at-the-narrows.taught
+assert: inventory.small-fishing-net = 1
 
 # save on-the-shingle-with-a-rod
 {"version":13,"location":"tulsa.riverside","xp":{"fishing.fishing":20000},"inventory":{"core.coin":40,"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.1,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.2,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
@@ -1618,7 +1621,6 @@ use: entity.pike-reach.cast until has raw-pike
 assert: has raw-pike
 goto: tulsa.riverside
 talk: weigh-master
-choose: Weigh the pike.
 assert: has the-pirn-jewel
 assert: fenn-beaten-honest
 talk: fenn
@@ -1632,3 +1634,12 @@ load: holding-the-old-slate-head
 talk: aggie
 assert: not has old-slate-head
 assert: head-given-to-aggie
+
+# save eel-bed-at-its-gate
+{"version":13,"location":"tulsa.swamp-mire","xp":{"fishing.fishing":5000},"inventory":{"fishing.dried-fish-bait":40},"flags":{"fishing.eel-bed-found":true}}
+
+# save tench-hole-at-its-gate
+{"version":13,"location":"tulsa.swamp-mire","xp":{"fishing.fishing":8000},"inventory":{"fishing.bread-paste":300},"equipped":{"mainhand":"1","gloves":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.2,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.horsehair-line","payload":{"roll":0.3,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
+# save the-mere-at-its-gate
+{"version":13,"location":"the-mere","xp":{"fishing.fishing":13000},"inventory":{"fishing.bread-paste":300,"fishing.dried-fish-bait":300},"equipped":{"mainhand":"1","gloves":"2","legs":"3","boots":"4","body":"5"},"instances":{"next":6,"byId":{"1":{"kind":"item","template":"fishing.greenheart-rod","payload":{"roll":0.2,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.dressed-silk-line","payload":{"roll":0.3,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"3":{"kind":"item","template":"fishing.waders","payload":{"roll":0.4,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"4":{"kind":"item","template":"fishing.hobnailed-river-boots","payload":{"roll":0.6,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"5":{"kind":"item","template":"fishing.fishermans-gansey","payload":{"roll":0.7,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
