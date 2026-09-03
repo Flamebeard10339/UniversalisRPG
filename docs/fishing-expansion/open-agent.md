@@ -37,16 +37,19 @@ the game-minutes it took beside what the curve allows.
 *Closes when: `floors/fishing-floor.dsl` walks at least a mid-band and a top-band route, and
 `npm run floors` reports both against the curve.*
 
-## The swamp mire is contested water and no route outside fishing knows it
+## The swamp mire is contested water, and the tench hole is paying for it
 
 `tulsa.swamp-mire` holds `tulsa.bog-lurker`, which jumps a player standing in it before any
-action is armed. The eel bed and the tench hole are both there by design, so every route that
-fishes them has to fight first — `use: core.melee-combat on tulsa.bog-lurker until done` is the
-line, and without it the trace shows the lurkers killed on the step that "failed to cast".
+action is armed, so every route that fishes the eel bed or the tench hole has to fight first —
+`use: core.melee-combat on tulsa.bog-lurker until done` is the line, and without it the trace
+shows the lurkers killed on the step that "failed to cast".
 
-That is the world working, but it is also a fishing water that quietly asks for a combat build,
-and nothing in the module says so to a player deciding whether to walk out there.
+That is the world working. It is also the whole of the tench hole's balance gap: measured
+2026-09-03 at `--ideal` from a save standing at its gate, the tench reads **4,767/h against the
+5,040 it is cut for**, where the perch and the carp at the uncontested mere hit their marks
+exactly. The five percent is time lost to lurkers, and nothing in the module tells a player
+walking out there that the water costs a fight.
 
-*Closes when: either the mire's fishing is priced with the fight in it — a sweep of the eel bed
-and the tench hole that does not stand under `unkillable` — or the water says in its own prose
-what standing in it costs.*
+*Closes when: either the mire's waters are cut with the fight priced in — a sweep that does not
+stand under `unkillable` — or the water says in its own prose what standing in it costs, and
+the tench's row is re-read against whichever it is.*

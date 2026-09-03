@@ -19,6 +19,23 @@ plausible pace for a lockpick either way.
 *Closes when: the three lines say the pace their shops are meant to keep, read off what a
 player can actually empty rather than left at whichever number happens not to matter.*
 
+## A sweep re-issues one directive, so an offer that is two actions cannot be priced
+
+`npm run simulate-activity` builds a `# test` per offer that takes that offer until the window
+closes. That prices anything a player stands and repeats, and it cannot price a loop made of
+more than one action. Measured 2026-09-03 on fishing's eel trap, which is `set the trap`, a
+three-minute soak, then `lift the trap`, with each action hidden while the other is the one to
+take: the sweep got one lift in, divided it by the moment it took, and reported **46,957/h**.
+That is not a rate and nothing in the sheet says so.
+
+The trap's own route sets and lifts three times over and passes, so the loop works. It is the
+only offer in the module with no price on it, and any mechanic shaped like it — a thing set and
+come back to, a fire banked, a snare — will read the same way.
+
+*Closes when: a sweep can be given the cadence an offer actually has — the run taking whatever
+the engine puts on the sheet next rather than re-issuing the one it started with — or the sheet
+says of an offer that left and came back that what it printed is a payoff and not a rate.*
+
 ## The blowfish hole pays nineteen times the curve and sits in fishing's best water
 
 Measured 2026-09-03: `entity.the-bars-crawl.blowfish-hole.cast` at the Deep Water reads
