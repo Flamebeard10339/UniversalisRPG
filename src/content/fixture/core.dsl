@@ -243,6 +243,11 @@ title: Stout Heart Jewel
 examine: It does not add. It insists.
 cluster-jewel: stout-heart
 
+# item keen-orb
+title: Keen Orb
+examine: A sliver of something that was never blunt.
+cluster-effect: +25% attack
+
 # item quiet-hour-jewel
 title: Quiet Hour Jewel
 examine: An hour nobody asked after, kept in iron.

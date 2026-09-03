@@ -59,11 +59,15 @@ const usage = [
   'for a character who plays more than one.',
   '',
   'The build is `npm run tier-build --grow`, which is greedy and order-dependent, and the order',
-  'it is fed is one piece per slot: the piece with the most plane points where a jewel reaching',
-  'the stat exists to fill them, and the piece with the biggest bonus of its own where none does.',
-  'So every figure below is a floor — the build a plain rule arrives at — and not the best build',
-  'the pieces allow. A cluster-effect orb is never applied, because the greedy has no move for',
-  'one, so a stat whose gear leans on orbs reads lower here than it plays.',
+  'it is fed is one piece per slot: the piece with the most plane points where a jewel or a',
+  'cluster-effect orb reaching the stat exists to fill them, and the piece with the biggest bonus',
+  'of its own where neither does. So every figure below is a floor — the build a plain rule',
+  'arrives at — and not the best build the pieces allow. A cluster-effect orb is one of the',
+  'greedy\'s moves now, applied to any hex already holding a jewel with an open mod slot; it is',
+  'never spent where every candidate reads no better than leaving the hex alone, but short of that',
+  'floor the greedy still takes the first one that clears the bar rather than the best one, and a',
+  'hex is never revisited once its mod slots are spent on the wrong orb first — so a stat whose',
+  'gear leans on orbs can still read lower here than the best build reaches.',
   '',
   'This is a tool and not a gate. It asserts nothing, CI does not run it, and it always exits 0',
   'unless the arguments or the corpus are refused.',
@@ -150,6 +154,10 @@ export function jewelReaches(registry: Registry, itemId: string, statId: string)
   return Object.values(jewel.positions).some((passiveId) => (registry.passives.get(passiveId)?.tags ?? []).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
 }
 
+export function effectReaches(registry: Registry, itemId: string, statId: string): boolean {
+  return registry.items.get(itemId)?.clusterEffect?.statId === statId;
+}
+
 const planePoints = (item: Item): number => item.itemLevel?.max ?? 0;
 
 const bestFirst = (registry: Registry, statId: string, planesPay: boolean) => (one: Item, other: Item): number => {
@@ -160,14 +168,14 @@ const bestFirst = (registry: Registry, statId: string, planesPay: boolean) => (o
 
 export interface Kit {
   readonly worn: readonly Item[];
-  readonly jewels: readonly string[];
+  readonly extras: readonly string[];
   readonly points: number;
 }
 
 export function kitFor(registry: Registry, activity: Activity, level: number, statId: string, holds: (itemId: string) => boolean): Kit {
   const standing = tierState(registry, activity, level);
-  const jewels = [...registry.items.values()].filter((item) => holds(item.id) && jewelReaches(registry, item.id, statId)).map((item) => item.id);
-  const planesPay = jewels.length > 0;
+  const extras = [...registry.items.values()].filter((item) => holds(item.id) && (jewelReaches(registry, item.id, statId) || effectReaches(registry, item.id, statId))).map((item) => item.id);
+  const planesPay = extras.length > 0;
   const bySlot = new Map<string, Item[]>();
   for (const item of registry.items.values()) {
     if (item.slot === undefined || !holds(item.id)) continue;
@@ -176,7 +184,7 @@ export function kitFor(registry: Registry, activity: Activity, level: number, st
     bySlot.set(item.slot, [...(bySlot.get(item.slot) ?? []), item]);
   }
   const worn = [...bySlot.values()].map((all) => [...all].sort(bestFirst(registry, statId, planesPay))[0]!);
-  return { worn, jewels, points: worn.reduce((total, item) => total + planePoints(item), 0) };
+  return { worn, extras, points: worn.reduce((total, item) => total + planePoints(item), 0) };
 }
 
 export interface Delivered {
@@ -188,7 +196,7 @@ export interface Delivered {
 export function delivered(registry: Registry, activity: Activity, level: number, statId: string, holds: (itemId: string) => boolean): Delivered {
   const kit = kitFor(registry, activity, level, statId, holds);
   const stock = Math.max(1, kit.points);
-  const handed = [...kit.worn.map((item) => item.id), ...kit.jewels.map((id) => `${id}:${String(stock)}`)];
+  const handed = [...kit.worn.map((item) => item.id), ...kit.extras.map((id) => `${id}:${String(stock)}`)];
   const built = buildTier(registry, activity, level, handed, [statId]);
   return { kit, stood: built.grown!.after[statId]!, spent: built.grown!.spent };
 }
@@ -209,7 +217,7 @@ function rungLines(registry: Registry, activity: Activity, statId: string, level
     `  level ${String(level)} — the ladder asks ${figure(asked)}`,
     ...sources.map((source) => {
       const read = delivered(registry, activity, level, statId, source.holds);
-      const kit = `${String(read.kit.worn.length)} worn, ${String(read.spent)} of ${String(read.kit.points)} plane points spent, ${String(read.kit.jewels.length)} jewel(s) to hand`;
+      const kit = `${String(read.kit.worn.length)} worn, ${String(read.spent)} of ${String(read.kit.points)} plane points spent, ${String(read.kit.extras.length)} jewel(s)/orb(s) to hand`;
       return `    ${source.title.padEnd(COLUMN)}${figure(read.stood).padStart(8)}  ·  ${residual(read.stood, asked).padEnd(16)}·  ${kit}`;
     }),
   ];

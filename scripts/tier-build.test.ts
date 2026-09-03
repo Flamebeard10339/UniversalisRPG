@@ -133,6 +133,39 @@ describe('a build spends the points its gear dropped with', () => {
     expect(built.grown!.spent).toBe(spent);
   });
 });
+describe('cluster-effect orbs, the greedy\'s third move', () => {
+  const KIT = ['core.heavy-spade'];
+  const ORB = 'core.keen-orb';
+
+  const effectsIn = (build: { save: string }): string[] => {
+    const sheet = JSON.parse(build.save) as { instances?: { byId: Record<string, { payload: { plane: Plane } }> } };
+    return Object.values(sheet.instances?.byId ?? {}).flatMap((row) => planeClusters(row.payload.plane).flatMap(({ cluster }) => cluster.effects));
+  };
+
+  it('is a move the greedy can take, found off cluster-effect: rather than off a list of orb ids this would need updating for', () => {
+    const built = buildTier(shipped, combat, 20, [...KIT, `${ORB}:5`], ['core.attack']);
+    expect(effectsIn(built)).toContain(ORB);
+  });
+
+  it('never leaves a build worse off than the same build offered no orb', () => {
+    const withOrb = buildTier(shipped, combat, 20, [...KIT, `${ORB}:5`], ['core.attack']);
+    const withoutOrb = buildTier(shipped, combat, 20, KIT, ['core.attack']);
+    expect(withOrb.grown!.after['core.attack']!).toBeGreaterThanOrEqual(withoutOrb.grown!.after['core.attack']!);
+  });
+
+  it('leaves a build better off wherever a hex it can reach already carries something for it to scale', () => {
+    const withOrb = buildTier(shipped, combat, 20, [...KIT, `${ORB}:5`], ['core.attack']);
+    const withoutOrb = buildTier(shipped, combat, 20, KIT, ['core.attack']);
+    expect(withOrb.grown!.after['core.attack']!).toBeGreaterThan(withoutOrb.grown!.after['core.attack']!);
+  });
+
+  it('spends nothing off the plane\'s own point budget, since an orb is inventory and not points', () => {
+    const withOrb = buildTier(shipped, combat, 20, [...KIT, `${ORB}:5`], ['core.attack']);
+    const withoutOrb = buildTier(shipped, combat, 20, KIT, ['core.attack']);
+    expect(withOrb.grown!.spent).toBe(withoutOrb.grown!.spent);
+    expect(withOrb.grown!.unspent).toBe(withoutOrb.grown!.unspent);
+  });
+});
 describe('the doors a build is put together through', () => {
   it('are the engine\'s own, so a build cannot hold what a player could not', () => {
     const state = initialState(shipped);

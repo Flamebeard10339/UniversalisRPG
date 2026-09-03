@@ -4,6 +4,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { Item } from '../src/content/sections/item';
 import { shippedSources } from '../src/content/shipped';
+import { applyClusterEffect } from '../src/runtime/clusterEffect';
 import { isAllocated, neighbours, nodeKey, placementAt, planeClusters, rootPosition, slotState, type Plane } from '../src/runtime/clusterPlane';
 import { equip } from '../src/runtime/equipment';
 import { allocate, itemInstance, itemTemplate, pointsRemaining, receiveItem, slotJewel, type ItemInstance } from '../src/runtime/itemInstance';
@@ -20,7 +21,8 @@ const usage = [
   '  <item>       gear to hand over and put on, in the order it should be tried. `<id>:<count>`',
   '               hands over a stock of it, which is what bait and anything else spent by using it',
   '               wants -- a tier has everything it beat and every shop, so nothing here is budgeted.',
-  '               A jewel is an item like any other: hand it over here and it is there to be socketed',
+  '               A jewel or a cluster-effect orb is an item like any other: hand it over here and',
+  '               it is there for --grow to reach for',
   '  --grow       the stats the build is trying for, best first. With it, every point every worn piece',
   "               dropped with is spent, through the engine's own doors. Without it nothing is spent,",
   '               which is a character at roughly half of what its gear allows',
@@ -44,6 +46,16 @@ const usage = [
   'corridor that would have paid three nodes later is never crossed. Nothing here knows what any',
   'passive or jewel is worth -- each move is applied and the stat is read back -- so the answer moves',
   'when the world does, and a better search would replace this one without replacing anything else.',
+  '',
+  'A cluster-effect orb handed over here is a third move, tried on every hex that already carries a',
+  'jewel with an open mod slot, through the engine\'s own applyClusterEffect -- the same door a',
+  'player uses, never a model of what the effect is worth. Which items count is read off cluster-',
+  'effect: the way a jewel candidate is read off cluster-jewel:, so an orb the corpus adds next',
+  'month needs no edit here. Applying one is one-way -- these doors never take an orb back off a',
+  'hex -- so the rule refuses to spend one where every candidate reads no better than leaving the',
+  'hex alone. Short of that floor it keeps the same looseness as the other two moves: the first orb',
+  'that clears the bar stands even where a later hex would have paid it back better, and a hex is',
+  'never revisited once its budget of mod slots is spent trying the wrong one first.',
 ].join('\n');
 
 export interface TierArgs {
@@ -98,10 +110,15 @@ export interface Grown {
   after: Record<string, number>;
 }
 
-type Move = { kind: 'allocate'; node: PlaneNode } | { kind: 'socket'; hex: Hex; direction: Direction; jewel: string };
+type Move = { kind: 'allocate'; node: PlaneNode } | { kind: 'socket'; hex: Hex; direction: Direction; jewel: string } | { kind: 'effect'; hex: Hex; effect: string };
 
 const applyMove = (state: GameState, registry: Registry, target: string, move: Move): boolean =>
-  (move.kind === 'allocate' ? allocate(state, registry, target, move.node) : slotJewel(state, registry, target, move.jewel, move.hex, move.direction)).ok;
+  (move.kind === 'allocate'
+    ? allocate(state, registry, target, move.node)
+    : move.kind === 'socket'
+      ? slotJewel(state, registry, target, move.jewel, move.hex, move.direction)
+      : applyClusterEffect(state, registry, target, move.effect, move.hex)
+  ).ok;
 
 function standing(registry: Registry, plane: Plane): PlaneNode[] {
   const nodes = new Map<string, PlaneNode>();
@@ -117,20 +134,28 @@ function standing(registry: Registry, plane: Plane): PlaneNode[] {
   return [...nodes.values()];
 }
 
-function movesFrom(registry: Registry, plane: Plane, jewels: readonly string[]): Move[] {
+function movesFrom(registry: Registry, plane: Plane, jewels: readonly string[], effects: readonly string[], canAllocate: boolean): Move[] {
   const moves: Move[] = [];
-  const seen = new Set<string>();
-  for (const node of standing(registry, plane)) {
-    for (const next of neighbours(registry, plane, node)) {
-      if (isAllocated(registry, plane, next) || seen.has(nodeKey(next))) continue;
-      seen.add(nodeKey(next));
-      moves.push({ kind: 'allocate', node: next });
+  if (canAllocate) {
+    const seen = new Set<string>();
+    for (const node of standing(registry, plane)) {
+      for (const next of neighbours(registry, plane, node)) {
+        if (isAllocated(registry, plane, next) || seen.has(nodeKey(next))) continue;
+        seen.add(nodeKey(next));
+        moves.push({ kind: 'allocate', node: next });
+      }
     }
   }
   for (const { hex, cluster } of planeClusters(plane)) {
     for (const direction of cluster.allocatedSlots) {
       if (slotState(registry, plane, hex, direction) !== 'open') continue;
       for (const jewel of jewels) moves.push({ kind: 'socket', hex, direction, jewel });
+    }
+    const placement = placementAt(registry, plane, hex);
+    if (placement === undefined || cluster.effects.length >= placement.jewel.modSlots) continue;
+    for (const effect of effects) {
+      if (cluster.effects.includes(effect)) continue;
+      moves.push({ kind: 'effect', hex, effect });
     }
   }
   return moves;
@@ -161,21 +186,24 @@ function beats(one: readonly number[], other: readonly number[]): boolean {
 
 const GUARD = 500;
 
-function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], playedOut: boolean): number {
+function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], effects: readonly string[], playedOut: boolean): number {
   let spent = 0;
   for (let guard = 0; guard < GUARD; guard++) {
     const payload = itemInstance(state, target);
-    if (!payload || pointsRemaining(payload, item) <= 0) break;
+    if (!payload) break;
+    const canAllocate = pointsRemaining(payload, item) > 0;
+    const baseline = reading(state, registry, stats);
 
     let chosen: Move | undefined;
     let best: number[] | undefined;
-    for (const move of movesFrom(registry, payload.plane, jewels)) {
+    for (const move of movesFrom(registry, payload.plane, jewels, effects, canAllocate)) {
       const taken = snapshot(state, payload);
       const made = applyMove(state, registry, target, move);
       if (made) {
-        if (playedOut) spendPlane(state, registry, target, item, stats, jewels, false);
+        if (playedOut) spendPlane(state, registry, target, item, stats, jewels, effects, false);
         const score = reading(state, registry, stats);
-        if (best === undefined || beats(score, best)) [chosen, best] = [move, score];
+        const worthwhile = move.kind !== 'effect' || beats(score, baseline);
+        if (worthwhile && (best === undefined || beats(score, best))) [chosen, best] = [move, score];
       }
       undo(state, payload, taken);
     }
@@ -185,7 +213,7 @@ function spendPlane(state: GameState, registry: Registry, target: string, item: 
   return spent;
 }
 
-export function growWorn(state: GameState, registry: Registry, stats: readonly string[], jewels: readonly string[]): Grown {
+export function growWorn(state: GameState, registry: Registry, stats: readonly string[], jewels: readonly string[], effects: readonly string[]): Grown {
   const named = (values: number[]): Record<string, number> => Object.fromEntries(stats.map((id, at) => [id, values[at]!]));
   const before = reading(state, registry, stats);
   let spent = 0;
@@ -193,7 +221,7 @@ export function growWorn(state: GameState, registry: Registry, stats: readonly s
   for (const worn of Object.values(state.equipped)) {
     const item = registry.items.get(itemTemplate(state, worn));
     if (!item || !itemInstance(state, worn)) continue;
-    spent += spendPlane(state, registry, worn, item, stats, jewels, true);
+    spent += spendPlane(state, registry, worn, item, stats, jewels, effects, true);
     unspent += Math.max(0, pointsRemaining(itemInstance(state, worn)!, item));
   }
   return { spent, unspent, before: named(before), after: named(reading(state, registry, stats)) };
@@ -222,7 +250,8 @@ export function buildTier(registry: Registry, activity: Activity, level: number,
     worn.push(refused === undefined ? { item } : { item, refused: String(refused) });
   }
   const jewels = items.map((written) => handedOver(written).item).filter((item) => registry.items.get(item)?.clusterJewel !== undefined);
-  const grown = grow.length === 0 ? undefined : growWorn(state, registry, grow, jewels);
+  const effects = items.map((written) => handedOver(written).item).filter((item) => registry.items.get(item)?.clusterEffect !== undefined);
+  const grown = grow.length === 0 ? undefined : growWorn(state, registry, grow, jewels, effects);
   return { save: serializeSave(state, registry), worn, grown };
 }
 
