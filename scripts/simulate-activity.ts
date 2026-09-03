@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
@@ -24,7 +25,7 @@ export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
-  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all] [--ideal]',
+  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--world <dir>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all] [--ideal]',
   '',
   '  --ladder        <stat>=<level>[,<stat>=<level>...] — stand the player where the ladder puts a',
   '                  character of that level in that stat, so a sweep names the rung it is asking',
@@ -51,6 +52,11 @@ const usage = [
   '                  so `highwayman` and `core.melee-combat on combat.highwayman` both name',
   '                  something. With none, everything on offer anywhere is measured',
   '  --at            narrows the sweep to one location',
+  '  --world         <dir> — measure the world in that directory rather than the shipped corpus,',
+  '                  which is what an authoring run reaches for: its draft lives in a copy of its',
+  '                  own and every figure here is read off a run, so a run that cannot be pointed',
+  '                  at the draft cannot balance it. --after then reads a floors/ beside that',
+  '                  directory where there is one, and the shipped floors where there is not',
   '  --off           turn a pack or a module off before measuring, by the name the settings',
   '                  page offers it under; repeatable. `--off quests` measures the town alone',
   `  --seeds         how many rng seeds each offer is run under (default ${String(DEFAULT_SEEDS)})`,
@@ -129,6 +135,7 @@ export interface SimulationArgs {
   stats?: readonly StatAsk[];
   rungs?: readonly RungAsk[];
   after?: string;
+  world?: string;
 }
 
 export type Start = { readonly save: string } | { readonly after: string };
@@ -202,6 +209,10 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
       const at = raw[++i];
       if (at === undefined) throw new Error('--at wants a location id after it');
       args.at = at;
+    } else if (arg === '--world') {
+      const dir = raw[++i];
+      if (dir === undefined) throw new Error('--world wants the directory of a world after it');
+      args.world = dir;
     } else if (arg === '--off') {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--off wants a pack or module name after it');
@@ -581,8 +592,14 @@ export interface SimulationReport {
   ok: boolean;
 }
 
-export function worldOff(names: readonly string[]): readonly ModuleSource[] {
-  const shipped = shippedSources();
+export const floorsBeside = (world: string | undefined): string => {
+  if (world === undefined) return FLOORS_DIR;
+  const alongside = path.join(path.dirname(path.resolve(world)), FLOORS_DIR);
+  return existsSync(alongside) ? alongside : FLOORS_DIR;
+};
+
+export function worldOff(names: readonly string[], world?: string): readonly ModuleSource[] {
+  const shipped = world === undefined ? shippedSources() : readSources([world]);
   if (names.length === 0) return shipped;
   return withModulesOff(shipped, modulesNamed(loadUniverseWithDiagnostics(shipped).modules, names));
 }
@@ -653,7 +670,7 @@ function main(): void {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const report = simulate([...worldOff(args.off ?? []), ...(args.after === undefined ? [] : readSources([FLOORS_DIR]))], args);
+  const report = simulate([...worldOff(args.off ?? [], args.world), ...(args.after === undefined ? [] : readSources([floorsBeside(args.world)]))], args);
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
 }

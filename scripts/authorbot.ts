@@ -174,12 +174,15 @@ The tools you have:
                                          test suite anywhere answers for what you are writing
     npm run probe -- ${corpus} --test <id>
                                          run one \`# test\` and report PASSED or FAILED
-    npm run simulate-activity -- <save> [<word>] [--ideal] [--stats <stat>=<n>,...]
-    npm run simulate-activity -- --after <test> [<word>] ...
+    npm run simulate-activity -- --world ${corpus} <save> [<word>] [--ideal] [--stats <stat>=<n>,...]
+    npm run simulate-activity -- --world ${corpus} --after <test> [<word>] ...
                                          what every offer in front of a player standing on that save,
                                          or where that route ends, pays an hour and what it costs them,
-                                         and whether the loop it was asked for finished. --ideal reads
-                                         the most it can pay and the least it can cost, under the god
+                                         and whether the loop it was asked for finished. **--world is
+                                         what points it at the world you are writing** — without it,
+                                         it measures the shipped corpus and none of your saves or
+                                         entities exist, so never leave it off. --ideal reads the most
+                                         an offer can pay and the least it can cost, under the god
                                          words; --stats stands the player at a rung of the stat ladder
     npm run notes -- ${corpus}
                                          every \`@@@\` held by the corpus you are writing into,

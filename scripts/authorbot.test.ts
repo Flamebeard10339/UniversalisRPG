@@ -158,6 +158,7 @@ describe('what the run is told', () => {
     expect(said).toContain('npm run oracle');
     expect(said).toContain('npm run probe');
     expect(said).toContain('npm run simulate-activity');
+    expect(said).toContain('npm run simulate-activity -- --world /work/content');
     expect(said).toContain('Balance is yours');
     expect(said).not.toContain('Balance is not yours to settle');
   });

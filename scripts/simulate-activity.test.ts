@@ -5,7 +5,9 @@ import { DEBUG_MARK } from '../src/content/sections/define';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { msToSeconds, secondsToMs } from '../src/runtime/units';
 import { abilityAtLevel } from './lib/pace';
-import { simulate, simulationLines, baseForRung, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standClocks, standingAt, stood, subjectsFrom, type Measured, type Run, type Start, type Stood, type Subject } from './simulate-activity';
+import path from 'node:path';
+import { FLOORS_DIR } from './floors';
+import { floorsBeside, simulate, simulationLines, baseForRung, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standClocks, standingAt, stood, subjectsFrom, type Measured, type Run, type Start, type Stood, type Subject } from './simulate-activity';
 
 const GRAPPLE_GATE = 30;
 
@@ -199,6 +201,19 @@ describe('what the arguments ask for', () => {
 
   it('refuses a flag it does not know instead of reading it as a save', () => {
     expect(() => parseSimulationArgs(['s', '--threat'])).toThrow(/unknown flag --threat/);
+  });
+
+  it('takes the world to measure, since a draft an authoring run wrote is not the shipped corpus', () => {
+    expect(parseSimulationArgs(['s', '--world', 'somewhere/content']).world).toBe('somewhere/content');
+    expect(parseSimulationArgs(['s']).world).toBeUndefined();
+    expect(() => parseSimulationArgs(['s', '--world'])).toThrow(/--world wants the directory/);
+  });
+
+  it('reads the floors beside the world it was given, and the shipped ones where that world has none', () => {
+    expect(floorsBeside(undefined)).toBe(FLOORS_DIR);
+    expect(floorsBeside('no-such-place/content')).toBe(FLOORS_DIR);
+    const besideTheFloors = 'scripts';
+    expect(floorsBeside(besideTheFloors)).toBe(path.join(path.dirname(path.resolve(besideTheFloors)), FLOORS_DIR));
   });
 });
 
