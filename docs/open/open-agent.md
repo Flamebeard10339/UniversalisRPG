@@ -76,102 +76,6 @@ those to move.
 clean with tulsa's routes passing, and tulsa's `skills:` line names only `core.woodcutting`
 and the two combat stats.
 
-## Nobody has established that editing while playing is cheaper than reporting and fixing
-
-The premise of handing a playbot the authoring vocabulary is that a bot editing in situ beats a
-bot reporting and an agent fixing. It is a real hunch and it is not measured, and the arms it is
-usually stated as — *fleet* against *global agent* — do not isolate it, because they differ in two
-things at once: **who found the gap** and **who wrote the DSL**.
-
-What is already known cuts across it. Where the edit is a fact about the world you are standing in
-and the kind is schema-driven, editing in situ plainly wins, and `/place` and `/link` are that case
-working today.
-
-**Three runs have now been made, and what they cost is here so the sweep does not re-measure it.**
-All against a copy of `content/`, one bot, default effort, on 2026-08-29:
-
-| run | mode | turns asked | turns played | wall | out tokens | cache read | cache write | edits |
-|---|---|---|---|---|---|---|---|---|
-| smoke | reader | 3 | 3 | 20.4s | 715 | 19,371 | 8,352 | — |
-| first-steps | bughunter | 60 | 44 | 366.4s | 21,735 | 621,666 | 127,284 | **0** |
-| ball-of-a-boy | briefed | 100 | 60 | 831.6s | 47,994 | 872,887 | 385,764 | 5 |
-| ball-of-a-boy, every argument landing | briefed | 120 | **120** | 1,147.9s | 70,739 | 1,933,201 | 809,546 | **0** |
-
-So a turn costs about **7 seconds when the bot is walking and about 14 when it is writing** — the
-staging turn alone produced 4,695 output tokens, where a walking turn produces about 300. The
-prompt is written once and read every turn, which is why cache read runs an order of magnitude
-above everything else and why prompt size is close to free after turn one.
-
-**The one run that did finish spent 83 of its 120 turns reading.** 73 `/source` and 10 `/grammar`
-against 11 talks, 11 modal answers, 8 uses and 3 travels — and **no edit at all**. It is the arm
-with the most information and the best tools: the full brief, opened on `tulsa.in-town` in finished
-content, every argument delivered. The truncated one-paragraph brief, by contrast, staged a
-four-stage quest at turn 39. More to read made it write less, and that is the finding.
-
-**Neither of the two earlier long runs finished, and neither stopped for a reason about the game.** The
-bughunter stopped on a note field that spelled emptiness rather than being empty; the briefed run
-stopped on four `/dsl` refusals it could not read. Both are closed or queued. **Until a run ends
-because it finished, none of these numbers is a cost-to-complete** — they are a cost-to-die, and
-the sweep needs the first.
-
-*Closes when:* the sweep is run as three arms over one brief — report-only bot then coding agent,
-editing bot alone, coding agent alone — and the report says what each cost and what each landed.
-Isolation is a copy of `content/` per bot and a local file of its own, and nothing commits, so the
-one-writer rule has nothing to bite on.
-
-## N bots hitting one edge case would file N near-identical proofs
-
-`runAsSections` turns a run into a `# test`, which is what makes a fan-out cheap to keep.
-It is also this repository's worst failure mode pointed at its own suite: three harnesses
-replay every corpus `# test`, `npm run review` walks them, and the first item in this file
-already says the suite holds duplicate proofs. A sweep that files every bot's run adds to
-that by construction.
-
-`npm run mutate` cannot be the gate — it writes a break into the working tree, so it may not
-run in a checkout anyone else is in, and it costs a suite run per line.
-
-*Closes when:* the merge step over N staged local-changes files is written with a stated
-rule that at most one route is kept per end that was not reachable before, and the rest are
-read and discarded. Two staged sections at one id are k candidate implementations and the
-diffs are the argument; two staged sections at different ids for one gap is the one-home
-call, and the only judgement the loop owes a human.
-
-## What the two arms cost, and what each landed
-
-Both arms ran the same brief over the same world on 2026-08-29. The playbot is Sonnet 5 at
-`effort: low`.
-
-| arm | wall | tokens | cost | quest |
-|---|---|---|---|---|
-| playbot, `--mode briefed`, 117 turns | 24.0 min | 95,208 out; 1.92M cache read; 732K cache write | **$3.17** | **none** — 4 edits typed, 4 refused, nothing staged |
-| a cold coding agent, same brief, no playbot | 17.2 min | 232,423 total | **~$0.65** | **all five beats**, walked by a corpus `# test` |
-
-The playbot spent **74 of its 117 turns reading** (61 `/source` applied, 13 refused) and reached its
-first edit at **turn 107 of 120**. The cold agent read the same world off disk and wrote the file.
-
-So: **five times the money, forty percent more wall time, and nothing shipped.** Per turn the
-playbot is cheap — 2.7 cents — and per completed task it has no figure at all, because it has never
-completed one.
-
-**This does not settle the premise, and the two reasons it did not have both been closed since.** The
-final run failed on a missing diagnostic, not on the bot's judgement or its grasp of the language: it
-had read the corpus, found the right id, chosen the right stage, and written a body whose only
-visible defect was whitespace. A staged edit that will not load now says what the loader said — the
-line it stopped on and what may stand there instead. What is measured here is a loop with one broken
-link, not a bot that cannot author.
-
-**The reading both arms did was also being forced, and that is the second.** Every id list the oracle
-and the grammar panel offered was cut off at 24. An author standing in a hole saw 24 of 86 entities,
-24 of 220 flags and 24 of 112 items — not one flag in `tulsa`, which is the town both arms were
-writing in, and not one `core` item, so neither `core.coin` nor `core.bread` could be found without
-opening the corpus. The lists are written whole now, which is why a quest can be authored against
-`npm run oracle` alone.
-
-*Closes when:* this run is repeated against the world as it now stands. If the bot then lands a
-quest, these numbers are the before. If it still does not, the premise is answered and the playbot
-is a reporter — which is worth having: the two `first-steps` repairs that landed this session both
-came out of playbot reports, and no agent reading the corpus had found either.
-
 ## Two of the ten quest notes still have no module
 
 Reverse Infiltration and Plague Matters. Plague Matters waits on Reverse Infiltration;
@@ -238,20 +142,27 @@ pattern-matching `kill-it-with-fire.dsl`. Both are the same cost paid two ways.
 *Closes when:* a refusal inside a `# test` body names the line it is about, and the
 thread-id form is printed off whatever declares it.
 
-## Nothing can prove that a searched hive hides itself
+## A route that pins a gate cannot say which refusal it caught
 
-`hidden if: searched` is what stops one of Kelsa's three hives standing for all three —
-without it a player searches the same hive three times and the count reaches three.
-It works, and **no route can ask whether it works**, because what a route would assert
-is that an action is *not offered*: `refuse:` takes `slot`, `allocate`, `unallocate`
-and `apply`, and no `use:`.
+This line used to say that nothing can prove a `hidden if:` works, because `refuse:` takes
+`slot`, `allocate`, `unallocate` and `apply` and no `use:`. **That was wrong, and it was wrong
+about the wrong directive.** `refused` is a separate, general directive standing under any line
+the engine was asked to take, `use:` included — `refusalFrom` in `src/runtime/session.ts` catches
+the `RuntimeError` a hidden action throws in `src/runtime/runtime.ts`. Measured 2026-09-03
+against the shipped corpus: a route that searches `first-hive`, uses its `search-the-comb` and
+writes `refused` PASSES, and the same route against the unsearched `second-hive` FAILS with *was
+not refused*. Both fishing band gates behave the same way. So the hive beat is provable today,
+and so is every gate the fishing expansion adds, with two lines and no language change.
 
-So the mechanism the whole hive beat rests on is unproved, and a later edit that drops
-the `hidden if:` reddens nothing. This line is the only place that says so.
+What is actually missing is that `refused` does not say **why**. Also measured: a `use:` on the
+pike reach from the wrong location is refused, and so is one with the bait unequipped. A route
+meaning to pin a level band therefore passes for three unrelated reasons, and goes silently
+vacuous the day the bait runs out or the walk changes. Every gate route anybody writes carries
+that risk, and nothing reports it.
 
-*Closes when:* `refuse: use <action>` is a thing a route may write, or a `describe` in
-this folder's `open-tests.test.ts` pins it off the offering the engine puts up — the
-second is much the smaller and does not wait on the language.
+*Closes when:* a route can say which refusal it caught — `refused: <reason>` reading off the
+same engine keys the refusals are raised under, so no second list of reasons exists — and the
+routes for the hive and the two fishing bands are written against it.
 
 ## A long step still nets what a short step would have clamped
 
@@ -456,14 +367,24 @@ listed at 60 cost 72; fingerless gloves at 45 cost 54. A run budgeting what a cl
 before it can buy has to buy something first and watch the purse. `npm run oracle -- shop` says
 nothing about markup.
 
-**`equip: <template>` does nothing, silently, once another rolled copy stands ahead of it in
-the pack.** A run that bought three bases in one modal session and equipped them by name got no
-refusal and no equipment, and had to trace instance numbers through an intermediate
-`--record` to write `equip: 8`. An earlier run met the same fault as a *refusal* that named the
-template — *player does not carry item core.unassuming-cap*, while the cap was plainly carried,
-because several were. So it is silent down one path and misleading down the other, and
-`floors/thieving-floor.dsl` now carries two bare instance numbers because of it, which will
-break the day anything upstream mints one more item.
+**`equip: <template>` never works on a rolled item, and the two paths fail differently.**
+Re-measured 2026-09-03, and it is not about copies colliding: inside a `# test`, `equip:` naming
+a base always refuses, whether one rolled copy stands in the pack or three — *player does not
+carry item fishing.small-fishing-net*, while it is plainly carried. `carriesItem` falls through
+to a stack count, and a base never has a stack, because `receiveItem` mints instances. The
+**silence is the GUI's**: `carriedSubmit` in `src/runtime/carriedScreen.ts` finds no entry for an
+unknown item id and returns null with no refusal, and `carriedScreen` discards `equip`'s return
+besides. So an authoring run that met silence was in the app or answering a modal, not writing a
+route.
+
+The fix is to resolve a template id to the first unequipped copy in pack order and refuse only
+when none stands — which is what the pack screen already means by the name. It goes beside
+`named` in `src/runtime/itemInstance.ts`, the one place that turns a written id into a copy, and
+that closes `swap:`, `slot:`, `allocate:` and `apply:` in the same move, since all four take the
+same `<carried>` token through `growItem`. `floors/thieving-floor.dsl` carries three bare
+instance numbers because of this — `equip: 3`, `equip: 8`, `equip: 9` in `# test gear-up`, plus
+five growth directives targeting a bare `3` — and every one of them shifts the day anything
+upstream mints one more item.
 
 **A long probabilistic loop cannot be traced.** `probe --record` prints the final state only,
 and a failing `assert:` stops the run with no partial dump, so there is no way to see which

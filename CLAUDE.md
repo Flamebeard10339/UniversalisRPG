@@ -57,7 +57,7 @@ content.** The corpus's whole verdict is `npm run oracle -- --at content`: every
 the engine has something to say about, whether it loads, whether it prints back to
 itself, whether every route still walks, and anything it takes that an author probably
 did not mean. Those last are remarks rather than refusals, they live in
-`src/content/worldRemarks.ts`, and each derives its own subjects.
+`src/runtime/worldRemarks.ts`, and each derives its own subjects.
 
 **Authoring a module is dispatched, not typed.** `npm run authorbot -- <brief>` hands
 one brief to an agent that cannot read the engine and counts every time it tried; the
@@ -238,7 +238,7 @@ coherent, and that every field parser prints back what it parsed.
 
 **A claim about the shipped world is not one of these.** That the corpus loads, prints
 back to itself and walks its own routes is `npm run oracle -- --at content`'s to say,
-and a rule an author can break is a remark in `src/content/worldRemarks.ts`. A test
+and a rule an author can break is a remark in `src/runtime/worldRemarks.ts`. A test
 that would go red because somebody wrote a quest is in the wrong file.
 
 Prefer adding a claim there over writing a new per-kind test file. Write a
