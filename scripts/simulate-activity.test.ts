@@ -6,6 +6,8 @@ import { secondsToMs } from '../src/runtime/units';
 import { abilityAtLevel } from './lib/pace';
 import { simulate, simulationLines, baseForRung, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, stood, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
+const GRAPPLE_GATE = 30;
+
 const ISLAND = `# info island
 version: 1.0.0
 
@@ -55,6 +57,15 @@ rate: 60
 give: berry
 xp: gathering 5
 
+# action grapple
+title: Grapple
+hidden if: stat.attack < ${String(GRAPPLE_GATE)}
+continuous
+rate: 60
+damage: us.attack vs them.defence
+depletes: them.life
+xp: fighting 9
+
 # location shore
 x: 0, y: 0
 starting
@@ -82,7 +93,7 @@ entities:
 # entity player
 stats: max-life 100, attack 10, swing-rate 60
 faction: islander
-uses: strike
+uses: strike, grapple
 on fainting:
   restore: life
   relocate: shore
@@ -190,6 +201,18 @@ describe('a sweep at a rung of the stat ladder', () => {
     const registry = beside(probe);
     expect(standingAt(registry, SAVE, ['island.attack'])).toEqual([{ id: 'island.attack', value: 40 }]);
     expect(standingAt(island(), SAVE, ['island.attack'])[0]!.value).not.toBe(40);
+  });
+
+  it('sweeps what the stood player is offered, so an offer a rung opens is measured at that rung and not below it', () => {
+    const sources = [{ name: 'island', text: ISLAND }];
+    const asked = { save: SAVE, holds: 'grapple', seeds: 1, window: 1, all: true };
+    const below = simulate(sources, asked);
+    expect(below.ok).toBe(true);
+    expect(below.lines.join('\n')).toMatch(/nothing is on offer/);
+
+    const atTheRung = simulate(sources, { ...asked, stats: [{ id: 'island.attack', value: GRAPPLE_GATE }] });
+    expect(atTheRung.ok).toBe(true);
+    expect(atTheRung.lines.join('\n')).toContain('grapple');
   });
 
   it('refuses a stat the world does not declare rather than standing the player at nothing', () => {
