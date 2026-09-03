@@ -44,3 +44,49 @@ less than the whole of the points it dropped with — and none reaches this one.
 
 *Closes when:* a tier artifact stores a hash of its resolved contribution set,
 recomputed and compared on read, so a difference is reported rather than absorbed.
+
+## An ejecting mark's window column is a payoff, not a rate, and reads as one
+
+`npm run simulate-activity` ends a run where the offer leaves the sheet, and a mark that
+throws the player out leaves it on the first miss. So its window row is *the xp of one
+visit*, divided by an hour — and two ejecting marks put side by side in that column are
+being compared on how long their visits are rather than on what they pay. Measured
+2026-09-03 at the level-22 rung: the jewellery box read 68/h against the house chest's
+161/h and is in fact worth 10,470/h against the chest's 6,900/h, because the chest's visit
+runs 75 seconds and the box's 17. That column is why the last pass recorded that every
+gated mark loses to the ungated chest.
+
+The walk back is the missing term and the tool already holds both halves of it —
+`worked` is the visit, and the roads out of the eject room are in the registry.
+
+*Closes when: a run the engine ended by moving the player prices the walk back to where it
+was standing and reports one rate, or the column says in the sheet's own words that it is a
+payoff per visit.*
+
+## A daze costs a lock-picker nothing, so the strongbox's punishment is inert
+
+`# item dazed` is `-100% thieving-rate`, `pick-pocket` is `rate: us.thieving-rate` and
+`pick-the-lock` is `time: 6`. So a daze stops a pocket dead for its duration and takes
+nothing at all off a lock. Four marks inflict it and two of them are locks.
+
+That is priced into the numbers this pass shipped — the strongbox's payout is set against
+its attempt alone — so nothing is wrong today. It is written down because the next author
+to write `inflict: dazed` on a lock will believe they have written a cost.
+
+*Closes when: either `dazed` carries something a lock feels, or the daze comes off the two
+lock marks and is replaced by what the author means them to cost.*
+
+## Three marks can have no floor route, because of how far their miss throws you
+
+A `# test` loop body has to be a walk that is legal both from the mark's room and from
+wherever a miss lands the player, and `travel:` is one hop and refuses the room it is
+already in. So a two-hop eject loops (`travel: <the room between>`, `travel: <the mark>`)
+and a one-hop or three-hop eject cannot. `thieving-floor` therefore covers the treasure
+chest and the jewellery box and not the tavern lockbox, the pay chest or the duke.
+
+The treasure chest was thrown to the market square and now lands at the castle gate, which
+is what made its route writable; its payout was re-derived for the shorter walk in the same
+commit, so the change is worth nothing to a player.
+
+*Closes when: the three remaining marks have floor routes — which wants either a way for a
+route to name where it stands, or their misses landing two hops out like the others'.*
