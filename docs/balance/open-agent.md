@@ -6,6 +6,19 @@ what is below is what that plan does not already say to do next.
 
 ---
 
+## The gear run had to learn two things by experiment that the page should say
+
+How many points a jewel's own hex carries once it is socketed — four, out of the six
+positions the rate jewel declares — is stated nowhere the oracle prints, and the run found
+it by allocating one position at a time until `engine.plane.no-points`. And `equip:` by
+template id was refused with *player does not carry item core.unassuming-cap* while the
+cap was plainly carried, because several copies were, and only `equip: 3`, the instance,
+took. The refusal names the template rather than saying an instance is wanted.
+
+*Closes when: the cluster-jewel page says what sets a socketed hex's points, and equipping
+a template that is carried more than once either picks one or refuses by saying that an
+instance number is wanted — with a refusal test beside it.*
+
 ## `-<line>` should take a scalar back, and does not yet
 
 The grammar page offers `-<line>` on every line of every section, and it works on
