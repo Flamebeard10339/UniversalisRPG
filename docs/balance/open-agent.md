@@ -6,6 +6,30 @@ what is below is what that plan does not already say to do next.
 
 ---
 
+## Three `replenish:` lines still read as whole-shelf times, and mean per-unit ones
+
+`c049e157` made `replenish:` the time **one unit** of stock takes to come back, and all five
+shipped lines were written meaning the whole shelf. The two the urchins route asserts were
+re-cut when the route went red on 2026-09-03; the other three were not, because nothing
+empties them and so nothing is wrong today. `forge-supplies` is `replenish: 5m` over 200
+bronze bars and 200 iron, which is a thousand game-minutes to refill a shelf nobody can drain;
+the alley coat's 15m and the Fence's 10m are over stocks of two to twelve, which reads as a
+plausible pace for a lockpick either way.
+
+*Closes when: the three lines say the pace their shops are meant to keep, read off what a
+player can actually empty rather than left at whichever number happens not to matter.*
+
+## The blowfish hole pays nineteen times the curve and sits in fishing's best water
+
+Measured 2026-09-03: `entity.the-bars-crawl.blowfish-hole.cast` at the Deep Water reads
+**42,200/h at `--ideal` against a level-20 curve of 2,177**, where the salmon pool beside it
+reads 2,640. It is `the-bars-crawl`'s quest prop rather than fishing's, and it is the
+best-paying offer in the room by a factor of sixteen, so every sweep run at the Deep Water is
+reported against it and any water cut to beat it would be absurd.
+
+*Closes when: the blowfish is priced as a thing a player may stand and repeat, or stops being
+one — a `stands:` that empties the hole, or a gate that shuts it once the quest is done.*
+
 ## The stat read is what `--grow` costs, and it recomputes six planes to answer about one
 
 `npm run ladder-check` spends about 60% of its build time inside `statBreakdown`, which
