@@ -236,24 +236,29 @@ Whether any shipped item that grows also carries an action is not the point —
 *Closes when:* an action owned by a grown copy survives a save and a load, or the
 pair is refused at load time so an author is told rather than quietly losing it.
 
-## A counter and an anvil cannot be opened by a quest
+## An anvil cannot be opened by a quest, though a counter now can
 
-`npm run oracle -- shop entity recipe` has no conditional form of `keeps shop:`, no
-`hidden if:` on a `# shop`, no `requires:` on a `# recipe` and no condition on an
-entity's `stations:`. So a quest whose reward is a shop or a station can only open
-it to everybody or to nobody, and two shipped quests have taken the second: the
-potion counter `kill-it-with-fire` pays out is left as `tulsa.oolgas-counter`
-already had it, and `a-grand-blade` cannot gate `tulsa.anvil` on having met the
-smith's son, so a player can craft at the forge before the quest exists. Both
-carry the reward in a line of dialogue instead.
+`# shop` takes `hidden if:` since 2026-09-03, so a quest opening or shutting a counter is one
+line — which is what fishing's Hob wants. An entity's `stations:` still takes a bare id with no
+condition, so `a-grand-blade` still cannot gate `tulsa.anvil` on having met the smith's son and a
+player can craft at the forge before the quest exists.
 
-This was written in a comment in each file and is here because comments are gone.
-It is a wall two modules have hit independently, which is what makes it a line
-rather than a note.
+The workaround the two shipped quests took is not the only one, and the line used to imply it
+was. `tulsa.oolgas-counter` and `tulsa.anvil` are already entities of their own, separate from
+Oolga and the smith, and an entity's `hidden if:` is honoured by `standing()` in
+`src/runtime/population.ts` — so hiding the whole entity gates its station today. What that
+cannot do is gate the *station* while leaving the entity's flavour standing: hiding `# entity
+anvil` takes its `strike it:` line with it, and keeping the flavour means two entities with one
+title, which is the duplication this repository spends its commits undoing. That is the real
+shape of the wall.
 
-*Closes when:* a `# shop`'s counter and an entity's `stations:` can each be gated on
-a condition, with `npm run oracle` printing the form off the declaration.
+`hidden if:` on `# station` itself is the cheap half and is world-wide by nature — right for
+`anvil`, which one entity holds, and wrong in general, since `core.stove` is named by six of
+tulsa's. Per-entity gating means a condition on the `stations:` **entry**, which costs an element
+parser and breaks the auto-visit that reads a bare `<hole>` naming a kind.
 
+*Closes when:* an entity's `stations:` can be gated on a condition without the entity going with
+it, and `npm run oracle` prints the form off the declaration.
 
 ## The page teaches merging and says nothing about a field that clears another
 

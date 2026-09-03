@@ -6,7 +6,8 @@ import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../.
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
-import { Loose, Pruning, Visit, put, strings } from '../refs';
+import { Loose, Pruning, Visit, condition as visitCondition, put, strings } from '../refs';
+import { Condition, condition } from '../../grammar/condition';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
 import { A_LITERAL_BRACE, parseSegments } from '../../grammar/segment';
 
@@ -184,6 +185,11 @@ export interface Named {
   standsWithout: boolean;
 }
 
+export const hiddenIf = (note: string) => ({ parser: condition, keyword: 'hidden if', note }) as const;
+
+const conditionFields = (schema: AnySchema): readonly { field: string; site: string }[] =>
+  Object.entries(schema.fields).flatMap(([field, spec]) => (spec.parser === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
+
 const namedFields = (schema: AnySchema): readonly Named[] =>
   Object.entries(schema.fields).flatMap(([field, spec]) => {
     const kind = nameKind(spec);
@@ -234,6 +240,7 @@ export const section =
       throw new Error(`# ${kind} reads its own body and lands in a map, so it must declare a merge: what a second body written at one of its ids means`);
     }
     const names = schema === undefined ? [] : namedFields(schema);
+    const conditions = schema === undefined ? [] : conditionFields(schema);
     const written = schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar;
     const visited = (value: V, where: string, visit: Visit): void => {
       for (const each of names) {
@@ -241,10 +248,15 @@ export const section =
         if (each.list) strings(value as unknown as Loose, each.field, each.kind, at, visit);
         else put(value as unknown as Loose, each.field, each.kind, at, visit);
       }
+      for (const each of conditions) visitCondition((value as unknown as Loose)[each.field] as Condition | undefined, `${where} ${each.site}`, visit);
       walk(value, where, visit);
     };
     const without = (value: V, at: Pruning, where: string): V | null => {
       let held: Loose | undefined;
+      for (const each of conditions) {
+        const written = (value as unknown as Loose)[each.field] as Condition | undefined;
+        if (!at.intact(() => visitCondition(written, `${where} ${each.site}`, at.visit))) return null;
+      }
       for (const each of names) {
         const current = (value as unknown as Loose)[each.field];
         const site = `${where} ${each.site}`;

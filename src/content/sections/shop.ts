@@ -2,7 +2,8 @@ import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { decimal, duration, id, Quantified, quantified } from '../../grammar/values';
 import { quantified as quantifiedItems, type Loose, type Pruning, type Visit } from '../refs';
-import { section } from './define';
+import type { Condition } from '../../grammar/condition';
+import { hiddenIf, section } from './define';
 import { Item } from './item';
 
 export const DEFAULT_BUYING = 1.2;
@@ -21,6 +22,7 @@ export interface Shop {
   selling: number;
   replenish: number;
   accepts: Accepts;
+  hiddenIf?: Condition;
 }
 
 const acceptsValue: Parser<Accepts> = {
@@ -87,6 +89,7 @@ export const shop = section<Shop>()({
     selling: { parser: decimal, default: () => DEFAULT_SELLING, printed: 'unless-default' },
     replenish: { parser: duration, default: () => DEFAULT_REPLENISH, printed: 'unless-default' },
     accepts: { parser: acceptsValue, default: () => 'any', printed: 'unless-default' },
+    hiddenIf: hiddenIf('the counter is not kept while this holds, so nothing is bought or sold here — which is how a quest opens a shop that was not there before, or shuts one'),
   },
   validate: (value) => {
     if (!value.coin) return 'requires a coin:, which is the item its prices are counted in';

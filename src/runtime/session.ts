@@ -252,9 +252,15 @@ function stoodTitle(registry: Registry, localizer: Localizer, stood: StoodHere, 
   return { ...source, detail: localizer.words('guise', stood.guise.id, 'title') ?? source.detail };
 }
 
+export function shopOpen(registry: Registry, state: GameState, shopId: string | undefined): boolean {
+  if (shopId === undefined) return false;
+  const shop = registry.shops.get(shopId);
+  return shop !== undefined && (shop.hiddenIf === undefined || !evaluateCondition(shop.hiddenIf, state, registry));
+}
+
 export function shopkeeperHere(registry: Registry, state: GameState, shopId: string): string | undefined {
   const location = registry.locations.get(state.location);
-  if (!location) return undefined;
+  if (!location || !shopOpen(registry, state, shopId)) return undefined;
   return stoodHere(state, registry, location).find((stood) => stood.entity.shop === shopId)?.id;
 }
 
@@ -284,7 +290,7 @@ function entityOffers(stood: StoodHere, registry: Registry, state: GameState, lo
   if (!masked && reachedNow(registry, state, entityId) !== null) {
     offers.push({ choice: { id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: source.detail }), ...source }, minted: false });
   }
-  if (!masked && entity.shop !== undefined && registry.shops.has(entity.shop)) {
+  if (!masked && shopOpen(registry, state, entity.shop)) {
     offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
   }
   for (const action of availableActions(stood.offers, state, registry)) {

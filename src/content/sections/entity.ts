@@ -1,7 +1,7 @@
 import { actionResultLists } from '../../grammar/action';
 import { Action, actionBody } from '../../grammar/action';
 import { ActionResult, resultBlock, resultGrammar, resultList } from '../../grammar/actionResult';
-import { Condition, condition } from '../../grammar/condition';
+import { Condition } from '../../grammar/condition';
 import { HOOK_FAMILY, HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
@@ -9,8 +9,8 @@ import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
 import { duration, id, text } from '../../grammar/values';
 import { localeKey } from '../locale';
-import { condition as visitCondition, hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
-import { MintedAction, section, TOUCHED } from './define';
+import { hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
+import { hiddenIf, MintedAction, section, TOUCHED } from './define';
 import { Dialogue, spokenBy } from './dialogue';
 import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
@@ -142,7 +142,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     title: TITLE_FIELD,
     group: GROUP_FIELD,
     examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words. Until it is taken, this thing stands under a placeholder with nothing else on offer` },
-    hiddenIf: { parser: condition, keyword: 'hidden if', note: 'the entity is not there to be met or robbed while this holds' },
+    hiddenIf: hiddenIf('the entity is not there to be met or robbed while this holds'),
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
       parser: list(id),
@@ -184,12 +184,10 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     const held = value as unknown as Loose;
     for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
     for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
-    visitCondition(held.hiddenIf as Condition | undefined, `${where} hidden if:`, visit);
     blocks(held.blocks, where, visit);
     hooks(held, where, visit);
   },
   prune: (value, at, where) => {
-    if (!at.intact(() => visitCondition(value.hiddenIf, `${where} hidden if:`, at.visit))) return null;
     const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
     const blocks = pruneBlocks(value.blocks, where, at);
     const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));

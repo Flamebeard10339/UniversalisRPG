@@ -389,7 +389,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(replenish|selling|buying|stocks|coin)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|replenish|selling|buying|stocks|coin)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"

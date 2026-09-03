@@ -4,7 +4,9 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import type { Registry } from '../content/registry';
 import { partsOf } from './modalOption';
 import { BACK, countFrame, countOptions, countSubmit, LEAVE, shopFrame, shopOptions } from './shopScreen';
+import { TOUCHED } from '../content/sections/define';
 import { initialState } from './save';
+import { shopkeeperHere, shopOpen } from './session';
 import type { GameState } from './state';
 import { receiveItem } from './itemInstance';
 
@@ -120,5 +122,70 @@ describe('the two sides of a counter, as the screen publishes them', () => {
 
     expect(walked.map((each) => each.at)).toEqual(option.values!.map((_choice, at) => at));
     expect(walked.map((each) => each.choice)).toEqual([...option.values!]);
+  });
+});
+
+describe('a counter a quest opens', () => {
+  const GATED =
+    FIXTURE_WORLD +
+    `
+# flag trusted
+
+# location hut
+x: 12, y: 12
+entities:
+  hob
+
+# item coin
+title: Coin
+
+# item trap
+title: Trap
+value: 40
+
+# shop hobs-tackle
+coin: coin
+hidden if: not trusted
+stocks:
+  1 trap
+
+# entity hob
+title: Hob
+keeps shop: hobs-tackle
+`;
+
+  const world = loadInEnglish(GATED);
+
+  const stood = (trusted: boolean): GameState => {
+    const state = initialState(world);
+    state.location = 'hut';
+    state.flags[`hob.${TOUCHED}`] = true;
+    if (trusted) state.flags.trusted = true;
+    return state;
+  };
+
+  it('stands the keeper where the shop is either way, or neither claim below is about the condition', () => {
+    for (const trusted of [false, true]) {
+      expect(world.entities.get('hob')?.shop).toBe('hobs-tackle');
+      expect(stood(trusted).location).toBe('hut');
+    }
+  });
+
+  it('keeps no counter while the condition holds, and finds no keeper for it here', () => {
+    const shut = stood(false);
+
+    expect(shopOpen(world, shut, 'hobs-tackle')).toBe(false);
+    expect(shopkeeperHere(world, shut, 'hobs-tackle')).toBeUndefined();
+  });
+
+  it('keeps it once the flag is set, with nothing else about the shop or the keeper changed', () => {
+    const open = stood(true);
+
+    expect(shopOpen(world, open, 'hobs-tackle')).toBe(true);
+    expect(shopkeeperHere(world, open, 'hobs-tackle')).toBe('hob');
+  });
+
+  it('leaves an ungated shop open, so the gate is the condition and not the field existing', () => {
+    expect(shopOpen(registry, carrying({}), 'stall')).toBe(true);
   });
 });
