@@ -22,6 +22,7 @@ import {
   relocateTo,
   settlePools,
   spendable,
+  contestSettled,
 } from './effects';
 import { actorTitle, attemptFraction, damageTarget, enterEncounter, IMPLICIT_TARGET_FULL, logSwing, newCadence, opposes, leaveFight, playerCadence, poolLevel, retaliation, standAt, targetLevel } from './encounter';
 import { armedAction, Participant, participants, seatOf } from './roster';
@@ -268,7 +269,8 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   const struck = action.depletes ? sideOf(action.depletes, self, other) : null;
   const felling = self === PLAYER && struck !== null && struck !== PLAYER && debugging(state, 'instant-kill');
 
-  const hit = felling || action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry);
+  const settled = self === PLAYER ? contestSettled(state) : null;
+  const hit = felling || (settled ?? (action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry)));
 
   const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry);
   const capacity = dealt !== null && action.depletes ? Math.max(targetLevel(state, registry, action, self, other), 0) : null;

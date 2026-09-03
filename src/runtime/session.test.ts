@@ -1016,6 +1016,7 @@ describe('what the engine withholds', () => {
       location: 'published',
       time: 'published',
       cyclesDone: 'withheld',
+      spent: 'withheld',
       flags: 'published',
       bundles: 'withheld',
       inventory: 'published',
@@ -2229,18 +2230,45 @@ entities:
 # item roasted-chestnut
 examine: Split and steaming.
 
+# stat nimble
+base: 0
+
+# stat guard
+base: 1000
+
 # entity oven
+stats: guard 1000
 roast:
   time: 4
   give: 1 roasted-chestnut
 scald:
   time: 1
   drain: 100 health
+pilfer:
+  time: 1
+  attempts: 1
+  accuracy: us.nimble vs them.guard
+  on success:
+    give: 1 roasted-chestnut
 
 # entity player
 on death:
   restore: health
   stop
+
+# test five-pilfers-sure
+travel: camp
+succeed-checks
+until 5 times:
+  use: entity.oven.pilfer until done
+assert: inventory.roasted-chestnut = 5
+
+# test five-pilfers-thumbed
+travel: camp
+fail-checks
+until 5 times:
+  use: entity.oven.pilfer until done
+assert: inventory.roasted-chestnut = 0
 
 # test three-chestnuts
 travel: camp
@@ -2283,6 +2311,21 @@ until inventory.roasted-chestnut >= 3:
     const state = createGameState();
     expect(runTest('a-death-ends-the-pass', registry, state)).toEqual({ passed: true });
     expect(state.inventory['roasted-chestnut']).toBe(2);
+  });
+
+  it('settles an action\'s accuracy roll the way succeed-checks and fail-checks say, since a roll the player is weighed by is a contest', () => {
+    const registry = loadInEnglish(module);
+    expect(runTest('five-pilfers-sure', registry, createGameState())).toEqual({ passed: true });
+    expect(runTest('five-pilfers-thumbed', registry, createGameState())).toEqual({ passed: true });
+  });
+
+  it('tallies what the player\'s pools lost along the way, capped at what each held, whatever restored them after', () => {
+    const registry = loadInEnglish(module);
+    const state = createGameState();
+    runTest('a-death-ends-the-pass', registry, state);
+    const [pool, full] = Object.entries(state.resources)[0]!;
+    expect(full).toBeGreaterThan(0);
+    expect(state.spent[pool]).toBe(2 * full);
   });
 
   it('refuses a pass that leaves the world as it found it, in the engine\'s own words', () => {

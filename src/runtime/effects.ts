@@ -101,6 +101,7 @@ export function poolFell(segment: Segment, actorId: string, resourceId: string, 
   const standing = store?.levels[resourceId];
   const taken = standing === undefined ? milliFall : Math.min(milliFall, Math.max(standing, 0));
   if (taken <= 0) return;
+  if (actorId === PLAYER) segment.state.spent[resourceId] = (segment.state.spent[resourceId] ?? 0) + taken * count;
   fireEvents(segment, actorId, 'damage-taken', resourceId, count, fromMilliUnits(taken));
 }
 
@@ -171,7 +172,7 @@ function requireDropTable(registry: Registry, id: string): DropTable {
   return table;
 }
 
-function contestSettled(state: GameState): boolean | null {
+export function contestSettled(state: GameState): boolean | null {
   const sure = debugging(state, 'succeed-checks');
   const thumbs = debugging(state, 'fail-checks');
   if (sure && thumbs) throw new RuntimeError('succeed-checks and fail-checks both stand, and a contest cannot be settled both ways: a route asks for one of them');

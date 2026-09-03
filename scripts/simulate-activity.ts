@@ -2,7 +2,7 @@ import path from 'node:path';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { DEBUG_MARK } from '../src/content/sections/define';
-import { printDirective, printTerminator } from '../src/content/sections/test';
+import { printDirective, printTerminator, type DebugSwitch } from '../src/content/sections/test';
 import { shippedSources } from '../src/content/shipped';
 import { modulesNamed } from '../src/content/packs';
 import { withModulesOff, type ModuleSource } from '../src/content/universe';
@@ -12,7 +12,7 @@ import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
 import { nextBoundary } from '../src/runtime/runtime';
 import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, startSession, type PlaySession } from '../src/runtime/session';
 import { createGameState } from '../src/runtime/state';
-import { MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
+import { fromMilliUnits, MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
 import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
 type Walked = ReturnType<typeof createGameState>;
@@ -21,7 +21,11 @@ export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
-  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all]',
+  'Usage: npm run simulate-activity -- <save> [<action-spec>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all] [--ideal]',
+  '',
+  '  --ideal         stand every run up under unkillable, instant-kill and succeed-checks, so what',
+  '                  is read is the most an offer can pay and the least it can cost: the ceiling',
+  '                  a build is measured against rather than what any build gets',
   '',
   '  <save>          a # save id to start every run from, as `load:` names one',
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
@@ -93,7 +97,10 @@ export interface SimulationArgs {
   seeds: number;
   window: number;
   all: boolean;
+  ideal?: boolean;
 }
+
+export const GOD_WORDS: readonly DebugSwitch[] = ['unkillable', 'instant-kill', 'succeed-checks'];
 
 const counted = (flag: string, raw: string | undefined): number => {
   const value = Number(raw);
@@ -103,11 +110,12 @@ const counted = (flag: string, raw: string | undefined): number => {
 
 export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
   const loose: string[] = [];
-  const args: SimulationArgs = { save: '', seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false };
+  const args: SimulationArgs = { save: '', seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false, ideal: false };
   for (let i = 0; i < raw.length; i++) {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') throw new Error(usage);
     else if (arg === '--all') args.all = true;
+    else if (arg === '--ideal') args.ideal = true;
     else if (arg === '--at') {
       const at = raw[++i];
       if (at === undefined) throw new Error('--at wants a location id after it');
@@ -180,11 +188,11 @@ export const PROBE_MODULE = 'simulation-probe';
 export const standTest = (index: number): string => `${PROBE_MODULE}.stand-${index}`;
 export const runTestId = (index: number): string => `${PROBE_MODULE}.run-${index}`;
 
-export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number): ModuleSource {
+export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], save: string, endMs: number, ideal = false): ModuleSource {
   const lines = [`# info ${PROBE_MODULE}`, 'version: 1.0.0', 'dependencies:', ...dependencies.map((id) => `  ${id}`)];
   const until = printTerminator(windowTerminator(endMs));
   subjects.forEach((subject, index) => {
-    lines.push('', `# test stand-${index}`, DEBUG_MARK, `load: ${save}`, `goto: ${subject.at}`);
+    lines.push('', `# test stand-${index}`, DEBUG_MARK, `load: ${save}`, ...(ideal ? GOD_WORDS : []), `goto: ${subject.at}`);
     lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${until}`);
   });
   return { name: PROBE_MODULE, text: `${lines.join('\n')}\n` };
@@ -224,7 +232,9 @@ type Counts = Readonly<Record<string, number>>;
 
 type Tallies = Record<string, Counts>;
 
-const tallies = (state: { xp: Counts; inventory: Counts }): Tallies => ({ xp: state.xp, item: state.inventory });
+const inUnits = (milli: Counts): Counts => Object.fromEntries(Object.entries(milli).map(([id, amount]) => [id, fromMilliUnits(amount)]));
+
+const tallies = (state: { xp: Counts; inventory: Counts; spent: Counts }): Tallies => ({ xp: state.xp, item: state.inventory, spent: inUnits(state.spent) });
 
 function since(was: Tallies, now: Tallies): Gain[] {
   const gains: Gain[] = [];
@@ -237,7 +247,7 @@ function since(was: Tallies, now: Tallies): Gain[] {
   return gains;
 }
 
-const snapshot = (state: { xp: Counts; inventory: Counts }): Tallies => Object.fromEntries(Object.entries(tallies(state)).map(([kind, counts]) => [kind, { ...counts }]));
+const snapshot = (state: { xp: Counts; inventory: Counts; spent: Counts }): Tallies => Object.fromEntries(Object.entries(tallies(state)).map(([kind, counts]) => [kind, { ...counts }]));
 
 function standsHere(session: PlaySession, state: Walked, subject: Subject): boolean {
   if (state.location !== subject.at) return false;
@@ -397,10 +407,10 @@ function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Le
 
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
-export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'>, levels: Levels = {}): string[] {
+export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'> & { ideal?: boolean }, levels: Levels = {}): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
-  const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time`];
+  const head = [`${args.save}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time${args.ideal ? `, under ${GOD_WORDS.join(', ')}: the most an offer can pay and the least it can cost` : ''}`];
   if (shown.length === 0) return [...head, 'nothing on offer paid anything under any seed. --all lists what was tried.'];
 
   const body: string[] = [];
@@ -445,7 +455,7 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
 
   const endMs = clockOn(base.registry, args.save) + args.window * MS_PER_MINUTE;
   const dependencies = base.parsed.map((module) => module.info.id);
-  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs)]);
+  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, args.save, endMs, args.ideal)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
   return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), args, levelsOn(base.registry, args.save)), ok: true };

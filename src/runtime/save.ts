@@ -22,7 +22,7 @@ import { isSettingName, isSettingSheet, standingChoice, standingSettings, type S
 
 export const SAVE_VERSION = 13;
 
-export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'engagedBy' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'debug'>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'engagedBy' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'spent' | 'debug'>;
 
 export type SaveDiff = Partial<Pick<GameState, SaveField>>;
 

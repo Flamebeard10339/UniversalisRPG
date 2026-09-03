@@ -42,7 +42,7 @@ const jewelIdOf = (item: AuthoredItem): string | undefined => (typeof item.jewel
 
 const jewelCarriedBy = (item: AuthoredItem): ClusterJewel | undefined => (typeof item.jewel === 'object' ? item.jewel : undefined);
 
-const CARRIES_ONE = 'the jewel it is, written out where nothing else names one. It stands at this item\'s own id and says this item\'s title: and examine:';
+const CARRIES_ONE = 'the jewel it is, written out where nothing else names one. It stands at this item\'s own id and says this item\'s title: and examine:. A jewel is slotted into any base — anything worn that carries an item-level: — and the base\'s points are spent on its passives';
 
 const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
@@ -112,7 +112,7 @@ export const item = section<AuthoredItem, never, 'actions'>()({
     itemLevel: {
       parser: range,
       keyword: 'item-level',
-      note: 'how many points one of these drops carrying, rolled once on arrival and fixed on that copy; two copies that rolled differently do not stack',
+      note: 'makes this a base: a copy arrives with a plane and this many points on it, rolled once and fixed on that copy, and two copies that rolled differently do not stack. Any base takes a jewel — a plain cap as readily as a sword — and the points go on the jewel\'s passives, which is how a worn thing comes to raise a skill it says nothing about; `slot:` and `allocate:` under # test are how a route grows one',
     },
     tags: { parser: list(tagClause), default: () => [] },
     jewel: {

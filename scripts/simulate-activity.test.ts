@@ -3,7 +3,7 @@ import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
-import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, measure, parseSimulationArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
+import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
 const ISLAND = `# info island
 version: 1.0.0
@@ -130,7 +130,7 @@ const SAVE = 'island.on-the-shore';
 
 describe('what the arguments ask for', () => {
   it('takes a save on its own and falls back to its own defaults', () => {
-    expect(parseSimulationArgs([SAVE])).toEqual({ save: SAVE, seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false });
+    expect(parseSimulationArgs([SAVE])).toEqual({ save: SAVE, seeds: DEFAULT_SEEDS, window: DEFAULT_WINDOW_MINUTES, all: false, ideal: false });
   });
 
   it('reads a second loose argument as the text an offer has to hold', () => {
@@ -138,7 +138,7 @@ describe('what the arguments ask for', () => {
   });
 
   it('takes a place, a seed count and a window off the flags', () => {
-    expect(parseSimulationArgs(['s', '--at', 'island.thicket', '--seeds', '2', '--window', '3', '--all'])).toEqual({ save: 's', at: 'island.thicket', seeds: 2, window: 3, all: true });
+    expect(parseSimulationArgs(['s', '--at', 'island.thicket', '--seeds', '2', '--window', '3', '--all'])).toEqual({ save: 's', at: 'island.thicket', seeds: 2, window: 3, all: true, ideal: false });
   });
 
   it('refuses a run with no save to start from', () => {
@@ -156,6 +156,18 @@ describe('what the arguments ask for', () => {
 
   it('refuses a flag it does not know instead of reading it as a save', () => {
     expect(() => parseSimulationArgs(['s', '--threat'])).toThrow(/unknown flag --threat/);
+  });
+});
+
+describe('the ideal case', () => {
+  it('is asked for by one flag and stands every run up under the god words before it steps anywhere', () => {
+    expect(parseSimulationArgs(['s', '--ideal']).ideal).toBe(true);
+    expect(parseSimulationArgs(['s']).ideal).toBe(false);
+    const plain = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW).text;
+    const ideal = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW, true).text;
+    for (const word of GOD_WORDS) expect(plain).not.toContain(word);
+    expect(ideal).toMatch(new RegExp(`load: ${SAVE}\\n${GOD_WORDS.join('\\n')}\\ngoto: `));
+    beside(ideal);
   });
 });
 
@@ -241,6 +253,14 @@ describe('what a run reports', () => {
     expect(picked.runs[0]!.gains.map((gain) => `${gain.kind} ${gain.id}`).sort()).toEqual(['item island.berry', 'xp island.gathering']);
     expect(picked.runs[0]!.gains.every((gain) => gain.amount > 0)).toBe(true);
     expect(picked.runs[0]!.worked).toBeGreaterThan(0);
+  });
+
+  it('reads what a run spent off the run too: a pool the wasp drained is a cost beside the pay, in the pool\'s own units', () => {
+    const [stung] = swept('wasp');
+    const spent = stung.runs[0]!.gains.filter((gain) => gain.kind === 'spent');
+    expect(spent.map((gain) => gain.id)).toEqual(['island.life']);
+    expect(spent[0]!.amount).toBeGreaterThan(0);
+    expect(Number.isInteger(spent[0]!.amount * 1000)).toBe(true);
   });
 
   it('says a run stopped short in the words the engine stopped it with', () => {

@@ -137,6 +137,7 @@ export interface GameState extends RngCursor {
   carriedTold: string | null;
   time: number;
   cyclesDone: number;
+  spent: Record<string, number>;
   engagesAt: number;
   debug: DebugSheet;
   activeAction: ActiveAction | null;
@@ -175,7 +176,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, bundles: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, engagedBy: null, carriedTold: null, time: 0, cyclesDone: 0, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, bundles: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, engagedBy: null, carriedTold: null, time: 0, cyclesDone: 0, spent: {}, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {
