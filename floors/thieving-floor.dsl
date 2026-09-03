@@ -53,9 +53,9 @@ assert: inventory.thieving.common-general-thieving >= 1
 assert: has core.unassuming-cap
 assert: has thieving.fingerless-gloves
 assert: has thieving.soft-toed-boots
-equip: 3
-equip: 8
-equip: 9
+equip: core.unassuming-cap
+equip: thieving.fingerless-gloves
+equip: thieving.soft-toed-boots
 allocate: 3 at 0,0 slot e
 slot: 3 at 0,0 e with common-general-thieving
 allocate: 3 at 1,0 position 1
