@@ -252,3 +252,85 @@ Everybody in Sha Dynasty's has a story about the thing in the sturgeon hole. Thr
 ## Dusk
 
 There is no clock, but anglers keep the hours, and the world should say so. At the Deep Water and the Narrows, a `wait for dusk` action at the bank (twenty seconds) grants a buff, `the rise`, lasting three minutes, during which every rod water's rate is better and the prose on a cast says so. Fenn only fishes the rise. Marle's rounds are during the day; taking the rise and his absence together is what an experienced poacher would do, and the game does not point it out. @@@ dusk is a wait the player takes and not a time that comes; if the town ever runs a clock, this becomes a window on it.
+
+## Balance, measured 2026-09-03, and it is yours to finish
+
+Every number below was read off a run rather than reckoned, on the day this section was
+written. Do not re-derive them. Do balance the water you add against them, and measure what
+you wrote before you report it: `npm run simulate-activity -- <save> --ideal --at <location>`
+answers in about three seconds.
+
+**What a cast water pays at its ceiling is exact**: `xp per cast x rate x 60`, per hour. That
+is the most it can pay, and a real angler gets less because they miss. This is the shipped
+ladder, measured at `--ideal`:
+
+    water          xp/cast  rate   ceiling   gate   curve there   ratio
+    shrimp shoal      3       6     1,080      1       1,200       0.90
+    anchovy shoal     4       6     1,440      3       1,279       1.13
+    trout run         9       4     2,160      5       1,364       1.58
+    salmon pool      11       4     2,640      8       1,495       1.77
+    pike reach       16       4     3,840     11       1,641       2.34
+    sturgeon hole    17       4     4,080     16       1,918       2.13
+
+Two things to read off that. The ceilings rise in gate order, which is the rule and must go
+on holding. And the ratio **climbs** through the early skill and then settles: it is under one
+where a beginner has nothing else to do, and about **2.2** by the time the water is gated at
+all. Every water in this expansion is gated at 18 or above, so cut them all at 2.2. What the
+curve asks up there:
+
+    level  18     20     22     24     26     28     30
+    curve  2,044  2,177  2,319  2,468  2,627  2,798  2,980
+    2.2x   4,496  4,789  5,101  5,430  5,779  6,156  6,557
+
+**Difficulty is `depth`, and it is the ladder read at the water's own gate**: ability starts
+at 0 on level 1 and rises 7 a level, so a water gated at 18 is `depth 119`, at 22 `147`, at 26
+`175`, at 30 `203`. Hit chance is `1/(1 + 10^((depth - fishing)/100))`, so a water cut this way
+opens at about a coin toss for somebody standing on its rung and is nearly free once they are a
+band above it — which is when they should be moving on to the next one.
+
+**The six shipped waters are not on that ladder and you should put them on it.** Pike is
+`depth 96` against a ladder 70 at its gate of 11, and sturgeon `118` against `105`; trout and
+salmon are gated by nothing at all while sitting at `80` and `102`. The ladder depth for each
+of the six, in the gate order the payouts already imply:
+
+    shrimp 0 (gate 1)   anchovy 14 (gate 3)   trout 28 (gate 5)
+    salmon 49 (gate 8)  pike 70 (gate 11)     sturgeon 105 (gate 16)
+
+Write those depths and **nothing else about those six**. In particular do not give trout,
+salmon or the anchovies the `hidden if:` gate the band implies: the level in the column is
+which rung the depth is cut at, not a door. `the-deep-water-is-fished-with-a-rod-and-bait`
+walks a level-five angler onto the salmon pool, and a gate at eight would end that route.
+Leave every payout as it stands too — the payouts already rank correctly, and it is only the
+difficulty that is off.
+
+That gives, for the new water in this expansion:
+
+- **the tench hole**, gate 22 — `depth 147`, rate 4, so `xp: fishing 21` a catch (5,040/h).
+- **the perch shoal** at the mere, gate 24 — `depth 161`, rate 4, `xp: fishing 22` (5,280/h).
+- **the carp**, gate 26 — `depth 175`. Carp fight for a very long time, so `rate: 2`, and the
+  payout comes off the same ceiling: `xp: fishing 48` (5,760/h). This is the water that makes
+  the line tier past horsehair worth owning.
+- **Old Slate**, gate 30 — `depth 203`, and it is landed once ever, so it is not on this ladder
+  at all. Pay the landing a lump of about 3,000, which is an hour of the curve at 30.
+- **the eel trap** is not a cast and its cadence is the soak, so it is deliberately *not* on the
+  frontier: a lift about every three minutes paying ~120 xp is 2,400/h if the player stands
+  there and does nothing, a shade over the curve at 18, and far less than that in practice
+  because nobody stands there. That is the point of it — it pays while you are somewhere else.
+  Do not raise it to compete with a cast water.
+
+**Two things that will confuse a measurement, so they are written down here:**
+
+- The blowfish hole in the Deep Water — `the-bars-crawl`'s, not fishing's — reads **42,200/h,
+  nineteen times the curve**. It will dominate every sweep you run at the Deep Water. It is a
+  quest prop in another module and it is not this run's to touch. Ignore it, and do not cut
+  anything against it.
+- The tutorial complaint in *What is already there* above is **stale and was re-measured on
+  2026-09-03**. Level two costs 100 experience now, not a thousand: that is 34 shrimp casts and
+  5.6 minutes against the 5 minutes the curve gives level one. There is nothing to fix, so do
+  not touch the shrimp, the nets or Miki's unlock.
+
+**How to check your own work.** Write a `# save` per new water standing at that water's gate
+level with the tackle of its band worn, then run `npm run simulate-activity` at that location
+with `--ideal` and read the ceiling back. Put the measured table in your report beside the
+table above. A water whose measured ceiling is not within about a tenth of its row has a number
+wrong somewhere, and the sweep is how you find out which.
