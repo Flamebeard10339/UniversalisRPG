@@ -186,27 +186,61 @@ function beats(one: readonly number[], other: readonly number[]): boolean {
 
 const GUARD = 500;
 
-function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], effects: readonly string[], playedOut: boolean): number {
+interface Spending {
+  readonly state: GameState;
+  readonly registry: Registry;
+  readonly target: string;
+  readonly item: Item;
+  readonly stats: readonly string[];
+  readonly jewels: readonly string[];
+  readonly effects: readonly string[];
+  readonly played: Map<string, number[]>;
+}
+
+type Scored = (at: Spending) => number[];
+
+const reachedFrom = (at: Spending, payload: ItemInstance): string =>
+  `${JSON.stringify(payload.plane)}|${JSON.stringify(at.state.inventory)}|${String(at.state.rng)}`;
+
+function chosenMove(at: Spending, scored: Scored): Move | undefined {
+  const payload = itemInstance(at.state, at.target);
+  if (!payload) return undefined;
+  const canAllocate = pointsRemaining(payload, at.item) > 0;
+  const baseline = reading(at.state, at.registry, at.stats);
+
+  let chosen: Move | undefined;
+  let best: number[] | undefined;
+  for (const move of movesFrom(at.registry, payload.plane, at.jewels, at.effects, canAllocate)) {
+    const taken = snapshot(at.state, payload);
+    if (applyMove(at.state, at.registry, at.target, move)) {
+      const score = scored(at);
+      const worthwhile = move.kind !== 'effect' || beats(score, baseline);
+      if (worthwhile && (best === undefined || beats(score, best))) [chosen, best] = [move, score];
+    }
+    undo(at.state, payload, taken);
+  }
+  return chosen;
+}
+
+const asItStands: Scored = (at) => reading(at.state, at.registry, at.stats);
+
+function playedOut(at: Spending, budget: number): number[] {
+  const payload = itemInstance(at.state, at.target);
+  if (!payload || budget === 0) return asItStands(at);
+  const key = reachedFrom(at, payload);
+  const held = at.played.get(key);
+  if (held !== undefined) return held;
+  const next = chosenMove(at, asItStands);
+  const value = next !== undefined && applyMove(at.state, at.registry, at.target, next) ? playedOut(at, budget - 1) : asItStands(at);
+  at.played.set(key, value);
+  return value;
+}
+
+function spendPlane(state: GameState, registry: Registry, target: string, item: Item, stats: readonly string[], jewels: readonly string[], effects: readonly string[]): number {
+  const at: Spending = { state, registry, target, item, stats, jewels, effects, played: new Map() };
   let spent = 0;
   for (let guard = 0; guard < GUARD; guard++) {
-    const payload = itemInstance(state, target);
-    if (!payload) break;
-    const canAllocate = pointsRemaining(payload, item) > 0;
-    const baseline = reading(state, registry, stats);
-
-    let chosen: Move | undefined;
-    let best: number[] | undefined;
-    for (const move of movesFrom(registry, payload.plane, jewels, effects, canAllocate)) {
-      const taken = snapshot(state, payload);
-      const made = applyMove(state, registry, target, move);
-      if (made) {
-        if (playedOut) spendPlane(state, registry, target, item, stats, jewels, effects, false);
-        const score = reading(state, registry, stats);
-        const worthwhile = move.kind !== 'effect' || beats(score, baseline);
-        if (worthwhile && (best === undefined || beats(score, best))) [chosen, best] = [move, score];
-      }
-      undo(state, payload, taken);
-    }
+    const chosen = chosenMove(at, (from) => playedOut(from, GUARD));
     if (!chosen || !applyMove(state, registry, target, chosen)) break;
     if (chosen.kind === 'allocate') spent += 1;
   }
@@ -221,7 +255,7 @@ export function growWorn(state: GameState, registry: Registry, stats: readonly s
   for (const worn of Object.values(state.equipped)) {
     const item = registry.items.get(itemTemplate(state, worn));
     if (!item || !itemInstance(state, worn)) continue;
-    spent += spendPlane(state, registry, worn, item, stats, jewels, effects, true);
+    spent += spendPlane(state, registry, worn, item, stats, jewels, effects);
     unspent += Math.max(0, pointsRemaining(itemInstance(state, worn)!, item));
   }
   return { spent, unspent, before: named(before), after: named(reading(state, registry, stats)) };

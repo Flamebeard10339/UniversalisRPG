@@ -4,7 +4,7 @@ import type { Registry } from '../src/content/registry';
 import { fixtureSources } from '../src/content/worldFixture';
 import type { ModuleSource } from '../src/content/universe';
 import { activitiesIn } from './lib/tiers';
-import { defaultRungs, delivered, droppedItems, kitFor, ladderLines, parseLadderArgs, sourcesIn, stockedItems } from './ladder-check';
+import { defaultRungs, delivered, droppedItems, jewelReaches, kitFor, ladderLines, parseLadderArgs, sourcesIn, stockedItems } from './ladder-check';
 
 const LEDGE = `# info ledge
 version: 1.0.0
@@ -46,6 +46,13 @@ requires: level.tinkering >= 10
 # item tinkers-ring-jewel
 title: Tinker's Ring Jewel
 cluster-jewel: tinkers-ring
+
+# item tinkers-band
+title: Tinker's Band
+cluster-jewel:
+  shape: ring
+  open-connections: e
+  passives: 1 nimble, 2 nimble
 
 # item work-gloves
 title: Work Gloves
@@ -161,6 +168,50 @@ describe('where the gear a rung can reach is read from', () => {
     const activity = tinkering(registry);
     const reach = (source: { holds: (id: string) => boolean }): number => delivered(registry, activity, 12, STAT, source.holds).stood;
     expect(reach(anywhere(registry))).toBeGreaterThan(reach(stall(registry)));
+  });
+});
+
+describe('the stat a jewel on a piece of gear reaches', () => {
+  const grants = (registry: Registry, jewelId: string): string[] => {
+    const jewel = registry.clusterJewels.get(jewelId);
+    expect(jewel, jewelId).toBeDefined();
+    return [
+      ...new Set(
+        Object.values(jewel!.positions).flatMap((passiveId) =>
+          (registry.passives.get(passiveId)?.tags ?? []).flatMap((tag) => (tag.kind === 'stat-bonus' ? [tag.statId] : [])),
+        ),
+      ),
+    ];
+  };
+
+  it('is read through the item, so a jewel an item names counts for as much as one written out under it', () => {
+    const registry = ledge();
+    const carrying = [...registry.items.values()].filter((item) => item.clusterJewel !== undefined);
+    expect(carrying.filter((item) => item.clusterJewel === item.id).length, 'a jewel written out under the item carrying it').toBeGreaterThan(0);
+    expect(carrying.filter((item) => item.clusterJewel !== item.id).length, 'a jewel declared on its own and named by an item').toBeGreaterThan(0);
+
+    for (const item of carrying) {
+      const reaches = grants(registry, item.clusterJewel!);
+      expect(reaches.length, `${item.id} carries a jewel granting a stat`).toBeGreaterThan(0);
+      for (const statId of reaches) expect(jewelReaches(registry, item.id, statId), `${item.id} reaches ${statId}`).toBe(true);
+    }
+  });
+
+  it('is nothing at all where the item carries no jewel, whatever else stands under its own id', () => {
+    const registry = ledge();
+    for (const item of registry.items.values()) {
+      if (item.clusterJewel !== undefined) continue;
+      expect(jewelReaches(registry, item.id, STAT), item.id).toBe(false);
+    }
+  });
+
+  it('puts every reaching jewel a source holds among the extras that rung is handed', () => {
+    const registry = ledge();
+    const source = anywhere(registry);
+    const reaching = [...registry.items.values()].filter((item) => source.holds(item.id) && jewelReaches(registry, item.id, STAT)).map((item) => item.id);
+    expect(reaching.length, 'the fixture drops a jewel that reaches tinkering').toBeGreaterThan(0);
+    const extras = kitFor(registry, tinkering(registry), 12, STAT, source.holds).extras;
+    for (const id of reaching) expect(extras, id).toContain(id);
   });
 });
 

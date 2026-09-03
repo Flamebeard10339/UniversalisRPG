@@ -149,7 +149,8 @@ export function directReach(registry: Registry, item: Item, statId: string): num
 }
 
 export function jewelReaches(registry: Registry, itemId: string, statId: string): boolean {
-  const jewel = registry.clusterJewels.get(itemId);
+  const carried = registry.items.get(itemId)?.clusterJewel;
+  const jewel = carried === undefined ? undefined : registry.clusterJewels.get(carried);
   if (jewel === undefined) return false;
   return Object.values(jewel.positions).some((passiveId) => (registry.passives.get(passiveId)?.tags ?? []).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
 }
