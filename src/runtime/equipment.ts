@@ -4,7 +4,7 @@ import { GameState } from './state';
 import { Registry } from '../content/registry';
 import { evaluateCondition } from './conditions';
 import { Localized, localizerOf } from './localized';
-import { carriesItem, handOver, HandOver, isGrownCopy, itemTemplate, packFull, receiveItem, roomToPack } from './itemInstance';
+import { carriesItem, copyToWear, handOver, HandOver, isGrownCopy, itemTemplate, packFull, receiveItem, roomToPack } from './itemInstance';
 
 function outOfPack(state: GameState, id: string): boolean {
   if (isGrownCopy(state, id)) return true;
@@ -31,11 +31,12 @@ export function tooGreenToWear(state: GameState, registry: Registry, itemId: str
   return refused;
 }
 
-export function equip(state: GameState, registry: Registry, itemId: string): Localized | undefined {
+export function equip(state: GameState, registry: Registry, written: string): Localized | undefined {
+  const itemId = copyToWear(state, written);
   const item = registry.items.get(itemTemplate(state, itemId));
-  if (!item) throw new RuntimeError(`equip: unknown item: ${itemId}`);
-  if (!item.slot) throw new RuntimeError(`equip: item ${itemId} has no slot`);
-  if (!carriesItem(state, itemId)) throw new RuntimeError(`equip: player does not carry item ${itemId}`);
+  if (!item) throw new RuntimeError(`equip: unknown item: ${written}`);
+  if (!item.slot) throw new RuntimeError(`equip: item ${written} has no slot`);
+  if (!carriesItem(state, itemId)) throw new RuntimeError(`equip: player does not carry item ${written}`);
   if (!wearable(state, registry, itemId)) return tooGreenToWear(state, registry, itemId);
   if (state.equipped[item.slot] !== undefined) {
     const inTheWay = unequip(state, registry, item.slot);

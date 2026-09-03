@@ -321,3 +321,44 @@ describe('a grown item is worn like any other', () => {
     expect(state.equipped['mainhand']).toBeUndefined();
   });
 });
+
+describe('a rolled base is worn by the name an author writes', () => {
+  it('is a base that really only exists as rolled copies, or the rest of this proves nothing', () => {
+    const registry = loaded();
+    const state = carrying(registry, {});
+    dropped(state, registry, 'honed-blade');
+
+    expect(state.inventory['honed-blade']).toBeUndefined();
+    expect(carriesItem(state, 'honed-blade')).toBe(false);
+  });
+
+  it('picks the copy in the pack when the template is written', () => {
+    const registry = loaded();
+    const state = carrying(registry, {});
+    const grownId = dropped(state, registry, 'honed-blade');
+
+    equip(state, registry, 'honed-blade');
+
+    expect(state.equipped['mainhand']).toBe(grownId);
+  });
+
+  it('picks an unworn copy rather than the one already on, so writing it twice does not undress anybody', () => {
+    const registry = loaded();
+    const state = carrying(registry, {});
+    const first = dropped(state, registry, 'honed-blade');
+    const second = dropped(state, registry, 'honed-blade');
+
+    equip(state, registry, 'honed-blade');
+    equip(state, registry, 'honed-blade');
+
+    expect([first, second]).toContain(state.equipped['mainhand']);
+    expect(packedCount(state, 'honed-blade')).toBe(1);
+  });
+
+  it('still refuses by name when no copy is carried at all', () => {
+    const registry = loaded();
+    const state = carrying(registry, {});
+
+    expect(() => equip(state, registry, 'honed-blade')).toThrow(/does not carry item honed-blade/);
+  });
+});

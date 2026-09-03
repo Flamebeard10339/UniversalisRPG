@@ -126,6 +126,11 @@ export function heldCount(state: GameState, itemId: string): number {
   return stack + grown + worn;
 }
 
+export function copyToWear(state: GameState, written: string): string {
+  if (carriesItem(state, written)) return written;
+  return packRows(state).flatMap((row) => (row.kind === 'grown' && row.template === written ? [row.id] : []))[0] ?? written;
+}
+
 export function packRows(state: GameState): PackRow[] {
   const rows: PackRow[] = [];
   for (const [template, { stack }] of itemCopies(state)) {
