@@ -39,17 +39,23 @@ assert: level.thieving >= 30
 
 # test gear-up
 run: first-steps.thieving-route-full
-until inventory.core.coin >= 200:
+until inventory.core.coin >= 306:
   use: entity.tulsa.civilian.pick-pocket until done
   wait: 90
 travel: tavern-street
 travel: thieving.back-alley
 shop: thieving.the-alley-coat
 submit-modal: item=buy:thieving.common-general-thieving
+submit-modal: item=buy:thieving.fingerless-gloves
+submit-modal: item=buy:thieving.soft-toed-boots
 submit-modal: item=close
 assert: inventory.thieving.common-general-thieving >= 1
 assert: has core.unassuming-cap
+assert: has thieving.fingerless-gloves
+assert: has thieving.soft-toed-boots
 equip: 3
+equip: 8
+equip: 9
 allocate: 3 at 0,0 slot e
 slot: 3 at 0,0 e with common-general-thieving
 allocate: 3 at 1,0 position 1

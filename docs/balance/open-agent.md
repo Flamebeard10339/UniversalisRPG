@@ -156,3 +156,29 @@ marks are cut against a ladder no floor route stands on.
 
 *Closes when: a floor route buys or wins the band's gear, so the marks of levels eleven to
 thirty are walked by a thief who has what they were cut for.*
+
+## Three things a speedrun had to work out for itself
+
+Found 2026-09-03 by the run that took the record to 401.1 game-minutes. Each cost it real
+budget, and each is a question the oracle could answer.
+
+**A shop marks everything up a fifth over `value:`, and nothing says so.** Boots listed at 60
+cost 72, gloves at 45 cost 54. An author budgeting what a climb must earn before it can buy
+has to discover that by buying something and watching the purse, which is what this run did.
+`npm run oracle -- shop` says nothing about it.
+
+**`equip: <template>` fails silently once other rolled copies stand ahead of it in the pack.**
+This is the same fault an earlier gear run reported as a confusing refusal — it is worse than
+that: buying three bases in one modal session and then equipping them by name does nothing at
+all, with no refusal to read, and the run had to trace the instance numbers through an
+intermediate `--record` and write `equip: 8`. The floors route now carries those bare numbers,
+which is a route that will break the day anything upstream of it mints one more item.
+
+**A long probabilistic loop cannot be traced.** `probe --record` prints the final state only,
+and a failing `assert:` stops the run with no partial dump, so there is no way to see which
+iterations of a four-hundred-minute loop failed. The run wanted that to work out whether
+repositioning could dodge the travel tax after a success, and could not get it without
+instrumenting the DSL with thousands of asserts.
+
+*Closes when: the oracle prints a shop's markup where it prints the shop, `equip:` by template
+either picks a copy or says an instance is wanted, and `probe` can print a step trace.*
