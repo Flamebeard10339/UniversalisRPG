@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
+import { DEBUG_MARK } from '../src/content/sections/define';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
-import { secondsToMs } from '../src/runtime/units';
+import { msToSeconds, secondsToMs } from '../src/runtime/units';
 import { abilityAtLevel } from './lib/pace';
-import { simulate, simulationLines, baseForRung, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, stood, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
+import { simulate, simulationLines, baseForRung, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standClocks, standingAt, stood, subjectsFrom, type Measured, type Run, type Start, type Stood, type Subject } from './simulate-activity';
 
 const ISLAND = `# info island
 version: 1.0.0
@@ -117,17 +118,47 @@ uses: strike
 
 const island = (): ReturnType<typeof loadModule> => loadModule(ISLAND);
 
-const beside = (probe: string): ReturnType<typeof loadModule> => {
-  const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ISLAND }, { name: 'simulation-probe', text: probe }]);
+const besideWorld = (world: string, probe: string): ReturnType<typeof loadModule> => {
+  const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: world }, { name: 'simulation-probe', text: probe }]);
   expect(loaded.diagnostics).toEqual([]);
   return loaded.registry;
 };
+
+const beside = (probe: string): ReturnType<typeof loadModule> => besideWorld(ISLAND, probe);
 
 const uses = (found: readonly Subject[]): string[] => found.map((subject) => subject.use);
 
 const QUIET_WINDOW = secondsToMs(20);
 
 const SAVE = 'island.on-the-shore';
+
+interface Windowed {
+  registry: ReturnType<typeof loadModule>;
+  ends: number[];
+}
+
+const windowed = (world: string, subjects: readonly Subject[], windowMs: number, start: Start | string, stoodUp?: Stood): Windowed => {
+  const standing = besideWorld(world, probeSource(['island'], subjects, start, [], false, stoodUp).text);
+  const ends = standClocks(standing, subjects).map((clock) => clock + windowMs);
+  return { registry: besideWorld(world, probeSource(['island'], subjects, start, ends, false, stoodUp).text), ends };
+};
+
+const worldOf = (text: string): ReturnType<typeof loadModule> => {
+  const loaded = loadUniverseWithDiagnostics([{ name: 'island', text }]);
+  expect(loaded.diagnostics).toEqual([]);
+  return loaded.registry;
+};
+
+const sweep = (world: string, start: Start | string, narrow: { holds?: string; at?: string }, windowMs: number, stoodUp?: Stood): Measured[] => {
+  const subjects = subjectsFrom(worldOf(world), start, narrow);
+  const { registry, ends } = windowed(world, subjects, windowMs, start, stoodUp);
+  return measure(registry, subjects, seedsFrom(2), ends);
+};
+
+const swept = (holds?: string, windowMs: number = QUIET_WINDOW, at?: string): Measured[] => sweep(ISLAND, SAVE, { holds, at }, windowMs);
+
+const paidPer = ({ runs }: Measured, of: string, windowMs: number): number =>
+  runs.reduce((sum, run) => sum + (run.gains.find((gain) => `${gain.kind} ${gain.id}` === of)?.amount ?? 0), 0) / runs.length / windowMs;
 
 describe('what the arguments ask for', () => {
   it('takes a save on its own and falls back to its own defaults', () => {
@@ -164,8 +195,10 @@ describe('the ideal case', () => {
   it('is asked for by one flag and stands every run up under the god words before it steps anywhere', () => {
     expect(parseSimulationArgs(['s', '--ideal']).ideal).toBe(true);
     expect(parseSimulationArgs(['s']).ideal).toBe(false);
-    const plain = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW).text;
-    const ideal = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW, true).text;
+    const subjects = subjectsFrom(island(), SAVE);
+    const ends = subjects.map(() => QUIET_WINDOW);
+    const plain = probeSource(['island'], subjects, SAVE, ends).text;
+    const ideal = probeSource(['island'], subjects, SAVE, ends, true).text;
     for (const word of GOD_WORDS) expect(plain).not.toContain(word);
     expect(ideal).toMatch(new RegExp(`load: ${SAVE}\\n${GOD_WORDS.join('\\n')}\\ngoto: `));
     beside(ideal);
@@ -185,7 +218,8 @@ describe('a sweep at a rung of the stat ladder', () => {
 
   it('stands the player at the pair through the world\'s own door, and reads back what they actually stood at', () => {
     const stood = { player: 'island.player', stats: [{ id: 'island.attack', value: 40 }] };
-    const probe = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW, false, stood).text;
+    const subjects = subjectsFrom(island(), SAVE);
+    const probe = probeSource(['island'], subjects, SAVE, subjects.map(() => QUIET_WINDOW), false, stood).text;
     expect(probe).toContain('# entity island.player\n+stats: island.attack 40');
     const registry = beside(probe);
     expect(standingAt(registry, SAVE, ['island.attack'])).toEqual([{ id: 'island.attack', value: 40 }]);
@@ -231,7 +265,7 @@ describe('a sweep at a rung of the declared ladder', () => {
       const asked = abilityAtLevel(level);
       const base = baseForRung(sources, modules, PLAYER, start, { id: 'island.attack', level });
       expect(base, 'the rung was written down as a base instead of being solved for').not.toBeCloseTo(asked, 3);
-      const loaded = loadUniverseWithDiagnostics([...sources, probeSource(modules, [], start, 0, false, { player: PLAYER, stats: [{ id: 'island.attack', value: base }] })]);
+      const loaded = loadUniverseWithDiagnostics([...sources, probeSource(modules, [], start, [], false, { player: PLAYER, stats: [{ id: 'island.attack', value: base }] })]);
       expect(loaded.diagnostics).toEqual([]);
       expect(standingAt(loaded.registry, start, ['island.attack'])[0]!.value).toBeCloseTo(asked, 6);
     }
@@ -255,12 +289,11 @@ describe('a sweep at a rung of the declared ladder', () => {
 });
 
 describe('a sweep that starts where a route ends', () => {
-  const ROUTE = `${ISLAND}\n# test to-the-thicket\ntravel: thicket\n`;
-  const walked = (): ReturnType<typeof island> => {
-    const loaded = loadUniverseWithDiagnostics([{ name: 'island', text: ROUTE }]);
-    expect(loaded.diagnostics).toEqual([]);
-    return loaded.registry;
-  };
+  const ROUTE = `${ISLAND}\n# test to-the-thicket\nload: ${SAVE}\ntravel: thicket\n\n# test the-long-way-round\nload: ${SAVE}\ntravel: thicket\nuse: island.strike on island.wasp until done\ntravel: shore\n`;
+  const walked = (): ReturnType<typeof island> => worldOf(ROUTE);
+  const LONG_WAY: Start = { after: 'island.the-long-way-round' };
+  const BY_THE_SHORE = { holds: 'bush', at: 'island.shore' };
+  const HARD_HITTING: Stood = { player: 'island.player', stats: [{ id: 'island.attack', value: 40 }] };
 
   it('is asked for by --after in place of a save, with the loose word still the offer to hold', () => {
     expect(parseSimulationArgs(['--after', 'island.to-the-thicket', 'wasp'])).toMatchObject({ after: 'island.to-the-thicket', holds: 'wasp', save: '' });
@@ -272,13 +305,27 @@ describe('a sweep that starts where a route ends', () => {
     const registry = walked();
     const start = { after: 'island.to-the-thicket' };
     expect(stood(registry, start).state.location).toBe('island.thicket');
-    expect(clockOn(registry, start)).toBe(stood(registry, start).state.time);
-    expect(probeSource(['island'], subjectsFrom(registry, start), start, QUIET_WINDOW).text).toContain('run: island.to-the-thicket\ngoto: ');
+    expect(stood(registry, start).state.time).toBeGreaterThan(0);
+    const subjects = subjectsFrom(registry, start);
+    expect(probeSource(['island'], subjects, start, subjects.map(() => QUIET_WINDOW)).text).toContain('run: island.to-the-thicket\ngoto: ');
   });
 
   it('refuses a route that does not walk rather than measuring from wherever it stopped', () => {
     const registry = loadUniverseWithDiagnostics([{ name: 'island', text: `${ISLAND}\n# test nowhere\nassert: has berry\n` }]).registry;
     expect(() => stood(registry, { after: 'island.nowhere' })).toThrow(/does not walk/);
+  });
+
+  it('opens the window on the clock the run it measures stands on, not on one read off a world nothing runs in', () => {
+    const subjects = subjectsFrom(walked(), LONG_WAY, BY_THE_SHORE);
+    const clockUnder = (stoodUp?: Stood): number =>
+      standClocks(besideWorld(ROUTE, probeSource(['island'], subjects, LONG_WAY, [], false, stoodUp).text), subjects)[0]!;
+    expect(clockUnder(HARD_HITTING), 'the route this world walks takes the same time however hard the player hits').toBeLessThan(clockUnder());
+  });
+
+  it('pays the same rate whatever window it is measured over, even where the standing moved the clock the route ends on', () => {
+    const rate = (windowMs: number): number => paidPer(sweep(ROUTE, LONG_WAY, BY_THE_SHORE, windowMs, HARD_HITTING)[0]!, 'item island.berry', windowMs);
+    expect(rate(secondsToMs(200)) / rate(QUIET_WINDOW)).toBeGreaterThan(0.95);
+    expect(rate(secondsToMs(200)) / rate(QUIET_WINDOW)).toBeLessThan(1.05);
   });
 });
 
@@ -311,13 +358,38 @@ describe('what a sweep finds to measure', () => {
     expect(subjectsFrom(island(), SAVE, { at: 'island.thicket' }).map((subject) => subject.at)).toEqual(['island.thicket', 'island.thicket']);
   });
 
-  it('reads the clock off the save every run of a sweep starts from', () => {
-    expect(clockOn(island(), SAVE)).toBe(0);
+});
+
+describe('the window every run is given', () => {
+  const subjects = subjectsFrom(island(), SAVE);
+  const clocks = standClocks(beside(probeSource(['island'], subjects, SAVE, []).text), subjects);
+
+  it('closes a window past the clock each run of its own stands up on, so every offer is run over the same game time', () => {
+    const ends = clocks.map((clock) => clock + QUIET_WINDOW);
+    const written = probeSource(['island'], subjects, SAVE, ends).text;
+    for (const [index, subject] of subjects.entries()) {
+      expect(written).toContain(`# test run-${String(index)}\n${DEBUG_MARK}\n${subject.use} until time >= ${String(msToSeconds(ends[index]!))}`);
+    }
+  });
+
+  it('never lets an offer work longer than the window, wherever it stands and however long that window is', () => {
+    for (const windowMs of [QUIET_WINDOW, secondsToMs(120)]) {
+      for (const { subject, runs } of swept(undefined, windowMs)) {
+        for (const run of runs) expect(run.worked, `${subject.use} at ${subject.at}`).toBeLessThanOrEqual(windowMs);
+      }
+    }
+  });
+
+  it('pays an offer that lasts the window out at the same rate whatever window it is measured over', () => {
+    const rate = (windowMs: number): number => paidPer(swept('bush', windowMs, 'island.shore')[0]!, 'item island.berry', windowMs);
+    expect(rate(secondsToMs(200)) / rate(QUIET_WINDOW)).toBeGreaterThan(0.95);
+    expect(rate(secondsToMs(200)) / rate(QUIET_WINDOW)).toBeLessThan(1.05);
   });
 });
 
 describe('the module a sweep writes to run itself', () => {
-  const written = probeSource(['island'], subjectsFrom(island(), SAVE), SAVE, QUIET_WINDOW);
+  const offered = subjectsFrom(island(), SAVE);
+  const written = probeSource(['island'], offered, SAVE, offered.map(() => QUIET_WINDOW));
 
   it('marks its own sections DEBUG, so a sweep may stand where no player is meant to', () => {
     expect(written.text).toMatch(/# test stand-0\nDEBUG\n/);
@@ -351,13 +423,6 @@ describe('the seeds a sweep samples', () => {
 });
 
 describe('what a run reports', () => {
-  const swept = (holds?: string, windowMs: number = QUIET_WINDOW, at?: string): Measured[] => {
-    const world = island();
-    const subjects = subjectsFrom(world, SAVE, { holds, at });
-    const endMs = clockOn(world, SAVE) + windowMs;
-    return measure(beside(probeSource(['island'], subjects, SAVE, endMs).text), subjects, seedsFrom(2), endMs);
-  };
-
   it('reads what an offer paid off the run rather than off the declaration', () => {
     const [picked] = swept('bush');
     expect(picked.runs.every((run) => run.stoppedBy === undefined)).toBe(true);

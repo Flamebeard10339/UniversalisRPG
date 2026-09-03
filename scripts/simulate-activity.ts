@@ -12,7 +12,7 @@ import { DEFAULT_RNG_SEED, nextRandom } from '../src/runtime/rng';
 import { nextBoundary, statValue } from '../src/runtime/runtime';
 import { applyDirective, choiceToDirective, readRoom, runTest, sessionOver, sessionStatus, type PlaySession } from '../src/runtime/session';
 import { createGameState, type GameState } from '../src/runtime/state';
-import { fromMilliUnits, MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
+import { fromMilliUnits, MS_PER_MINUTE, msToSeconds } from '../src/runtime/units';
 import { FLOORS_DIR } from './floors';
 import { readSources } from './probe';
 import { abilityAtLevel } from './lib/pace';
@@ -58,12 +58,19 @@ const usage = [
   '  --all           list every offer, including the ones that paid nothing at all',
   '',
   'Nothing here is computed: every figure is read off a run. The tool builds a # test per',
-  'offer — `load:` the save, `goto:` the place, then that offer `until time >= <the far end of the',
-  'window>` — walks it against a state of its own, and reports what the state ended holding. So a',
-  'buff, a proc, an on-kill effect, a pack of two, or retaliation is priced in by having happened.',
+  'offer — `load:` the save, `goto:` the place, then that offer `until time >= <the far end of that',
+  'offer\'s own window>`, which is read off standing the run up rather than reckoned — walks it against',
+  'a state of its own, and reports what the state ended holding. So a buff, a proc, an on-kill effect,',
+  'a pack of two, or retaliation is priced in by having happened.',
   '',
   'Every run is given the same window of game time, and that window is the only denominator any',
-  'rate here has. An offer that stops inside the window is taken up again where the player is left',
+  'rate here has. The window opens on the clock the run itself stands up on — the save\'s own, or where',
+  'the route under --after left the player, walked in the very world the run is then measured in — and',
+  'closes a window of game time later. So a player stood at a rung of the ladder, who walks that route',
+  'faster than the base underneath them does, is measured over the window rather than over the window',
+  'plus the difference between the two.',
+  '',
+  'An offer that stops inside the window is taken up again where the player is left',
   'standing, waiting out anything the world puts right on its own — a fallen thing back on its feet,',
   'a daze worn off. What ends a run is the player having to go and do something else: buy bait, mend',
   'a line, walk back to where the target was. Nothing here knows those apart, and none of them is',
@@ -79,11 +86,13 @@ const usage = [
   'with no edit here. A fight the world picks is measured with it: the run does not have to',
   'take the offer to be killed by what made it.',
   '',
-  '`worked` is how much of the window the offer itself ran for, across every time it was taken up,',
-  "and where it is short of the window the engine's own sentence for the last attempt says why, death",
-  'included. There is no death flag to read: dying is authored in the corpus rather than known to the',
-  'engine, so the tool quotes rather than classifies. Where `worked` is short, the pace inside it is',
-  'printed beside the rate — that one is a ceiling carried out to an hour, not an hour anything held.',
+  '`worked` is how much of the window the offer itself ran for, across every time it was taken up, and',
+  'it is never more than the window: an attempt still under way when the window closes counts for the',
+  "part of it that fell inside. Where it is short of the window, the engine's own sentence for the last",
+  'attempt says why, death included. There is no death flag to read: dying is authored in the corpus',
+  'rather than known to the engine, so the tool quotes rather than classifies. Where `worked` is short,',
+  'the pace inside it is printed beside the rate — a ceiling carried out to an hour, not an hour',
+  'anything held.',
   '',
   'A fight something aggressive started is named where one happened. It is an annotation and not a',
   'suppression: whoever swung, the window is the one the player lived through, and what they came out',
@@ -256,10 +265,6 @@ export function subjectsFrom(registry: Registry, start: Start | string, narrow: 
   return found.sort(byReach);
 }
 
-export function clockOn(registry: Registry, start: Start | string): number {
-  return secondsToMs(sessionStatus(stood(registry, start).session).time);
-}
-
 export function levelsOn(registry: Registry, start: Start | string): Levels {
   return levelsIn(stood(registry, start).state.xp);
 }
@@ -287,22 +292,45 @@ export interface Stood {
   readonly stats: readonly StatAsk[];
 }
 
-export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], start: Start | string, endMs: number, ideal = false, stood?: Stood): ModuleSource {
+export function probeSource(dependencies: readonly string[], subjects: readonly Subject[], start: Start | string, ends: readonly number[], ideal = false, stood?: Stood): ModuleSource {
   const lines = [`# info ${PROBE_MODULE}`, 'version: 1.0.0', 'dependencies:', ...dependencies.map((id) => `  ${id}`)];
   if (stood !== undefined && stood.stats.length > 0) lines.push('', `# entity ${stood.player}`, `+stats: ${stood.stats.map((each) => `${each.id} ${String(each.value)}`).join(', ')}`);
-  const until = printTerminator(windowTerminator(endMs));
   subjects.forEach((subject, index) => {
     lines.push('', `# test stand-${index}`, DEBUG_MARK, standLine(asStart(start)), ...(ideal ? GOD_WORDS : []), `goto: ${subject.at}`);
-    lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${until}`);
+    const endsAt = ends[index];
+    if (endsAt !== undefined) lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${printTerminator(windowTerminator(endsAt))}`);
   });
   return { name: PROBE_MODULE, text: `${lines.join('\n')}\n` };
+}
+
+function clockStandingUp(registry: Registry, test: string): number {
+  const state = createGameState();
+  try {
+    runTest(test, registry, state);
+  } catch {
+    return state.time;
+  }
+  return state.time;
+}
+
+export function standClocks(registry: Registry, subjects: readonly Subject[]): number[] {
+  const stoodAlready = new Map<string, number>();
+  return subjects.map((_subject, index) => {
+    const test = standTest(index);
+    const sameStand = JSON.stringify(registry.tests.get(test)?.directives ?? test);
+    const known = stoodAlready.get(sameStand);
+    if (known !== undefined) return known;
+    const clock = clockStandingUp(registry, test);
+    stoodAlready.set(sameStand, clock);
+    return clock;
+  });
 }
 
 export const RUNG_PROBE_BASES: readonly [number, number] = [0, 1];
 
 export function baseForRung(sources: readonly ModuleSource[], dependencies: readonly string[], player: string, start: Start, rung: RungAsk): number {
   const readAt = (base: number): number => {
-    const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, [], start, 0, false, { player, stats: [{ id: rung.id, value: base }] })]);
+    const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, [], start, [], false, { player, stats: [{ id: rung.id, value: base }] })]);
     if (loaded.diagnostics.length > 0) throw new Error(loaded.diagnostics.map(formatModuleDiagnostic).join('\n'));
     return standingAt(loaded.registry, start, [rung.id])[0]!.value;
   };
@@ -402,7 +430,7 @@ function walk(registry: Registry, index: number, subject: Subject, seed: number,
       noteAggression();
       const from = state.time;
       stoppedBy = runTest(runTestId(index), registry, state).failure;
-      worked += state.time - from;
+      worked += Math.min(state.time, endMs) - from;
       if (stoppedBy === undefined || state.time >= endMs) break;
       if (state.time === from) break;
       if (!waitForOffer(session, state, registry, subject, endMs)) break;
@@ -422,8 +450,8 @@ function walk(registry: Registry, index: number, subject: Subject, seed: number,
   }
 }
 
-export function measure(registry: Registry, subjects: readonly Subject[], seeds: readonly number[], endMs: number): Measured[] {
-  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, subject, seed, endMs)) }));
+export function measure(registry: Registry, subjects: readonly Subject[], seeds: readonly number[], ends: readonly number[]): Measured[] {
+  return subjects.map((subject, index) => ({ subject, runs: seeds.map((seed) => walk(registry, index, subject, seed, ends[index]!)) }));
 }
 
 export const paidNothing = ({ runs }: Measured): boolean => runs.every((run) => run.gains.length === 0 && run.engagedBy === undefined);
@@ -599,13 +627,16 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
     return { lines: [error instanceof Error ? error.message : String(error)], ok: false };
   }
 
-  const endMs = clockOn(base.registry, start) + args.window * MS_PER_MINUTE;
   const stoodAt: Stood | undefined = asked.length > 0 ? { player: base.registry.player!.id, stats: asked } : undefined;
-  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, endMs, args.ideal, stoodAt)]);
+  const standing = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, [], args.ideal, stoodAt)]);
+  if (standing.diagnostics.length > 0) return { lines: standing.diagnostics.map(formatModuleDiagnostic), ok: false };
+  const ends = standClocks(standing.registry, subjects).map((at) => at + args.window * MS_PER_MINUTE);
+
+  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, ends, args.ideal, stoodAt)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  const standing = standingAt(loaded.registry, start, asked.map((each) => each.id));
-  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), endMs), { ...args, standing }, levelsOn(base.registry, start)), ok: true };
+  const stoodStats = standingAt(loaded.registry, start, asked.map((each) => each.id));
+  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), ends), { ...args, standing: stoodStats }, levelsOn(base.registry, start)), ok: true };
 }
 
 function main(): void {
