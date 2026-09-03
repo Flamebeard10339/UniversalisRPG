@@ -295,34 +295,26 @@ what makes it dangerous is that the question reaching it can now be a bad one.
 the root's own declaration rather than from a second list of which roots are checked, and a
 `describe` in this folder's `open-tests.test.ts` pins the refusal an author sees.
 
-## Two things a gearing run still has to work out by experiment
+## A long probabilistic loop cannot be traced
 
-Two of the four that stood here closed on 2026-09-03. A shop's markup is printed — the page
-says what any `printed: 'unless-default'` field reads when it is left out, derived off the
-field's own default through the field's own parser, so `buying:`, `selling:`, `replenish:` and
-`accepts:` all gained the line and so will the next such field. A socketed hex's points were
-never a property of the hex: the budget is rolled per copy off the base's `item-level:`, and
-reaching a socketed jewel spends one of them before any passive, which `item-level:`'s note now
-says. `# cluster-jewel`'s `shape:` also names its five shapes and their position counts rather
-than printing `<id>` with a misleading example.
+Three of the four that stood here closed on 2026-09-03. A shop's markup is printed, derived
+off any `printed: 'unless-default'` field's own default through its own parser. A socketed
+hex's points were never a property of the hex — the budget is rolled per copy off the base's
+`item-level:`, and reaching a socketed jewel spends one before any passive, which
+`item-level:`'s note now says. And `equip:` by template picks the first unworn copy rather than
+refusing every rolled base.
 
-**`equip: <template>` never works on a rolled item.** Inside a `# test` it always refuses,
-whether one rolled copy stands in the pack or three — *player does not carry item X*, while X is
-plainly carried — because `carriesItem` falls through to a stack count and a base never has a
-stack. The silence an earlier run met is the GUI's: `carriedSubmit` finds no entry for an unknown
-item id and returns null with no refusal. The fix is to resolve a template id to the first
-unequipped copy in pack order and refuse only when none stands, beside `named` in
-`src/runtime/itemInstance.ts` — the one place that turns a written id into a copy, which closes
-`swap:`, `slot:`, `allocate:` and `apply:` in the same move. `floors/thieving-floor.dsl` carries
-three bare instance numbers because of this, and five growth directives targeting a bare `3`;
-every one shifts the day anything upstream mints one more item.
+What is left: `probe --record` prints the final state only, and a failing `assert:` stops the
+run with no partial dump, so there is no way to see which iterations of a four-hundred-minute
+loop failed. A run wanting to know whether repositioning could dodge the travel tax after a
+success could not find out without instrumenting the DSL with thousands of asserts.
 
-**A long probabilistic loop cannot be traced.** `probe --record` prints the final state only, and
-a failing `assert:` stops the run with no partial dump, so there is no way to see which iterations
-of a four-hundred-minute loop failed. A run wanting to know whether repositioning could dodge the
-travel tax after a success could not find out without instrumenting the DSL with thousands of
-asserts.
+Two smaller things ride with it, both from the same fix and neither on the authoring path.
+`swap:`, `slot:`, `allocate:` and `apply:` take the same `<carried>` token through `growItem`
+and still refuse a template naming a rolled base. `carriedScreen`'s submit finds no entry for an
+unknown item id and returns null with no refusal at all, which is where the silence an earlier
+run met actually lives. `floors/thieving-floor.dsl` still carries three bare instance numbers
+that could now be written as names.
 
-*Closes when: `equip:` by template picks an unequipped copy or refuses by saying an instance is
-wanted, with a refusal test beside it and the floor's three bare numbers written back as names;
-and `probe` can print a step trace.*
+*Closes when: `probe` can print a step trace; and the four growth directives resolve a template
+the way `equip:` does, with the floor's three bare numbers written back as names.*
