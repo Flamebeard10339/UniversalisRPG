@@ -816,16 +816,17 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
   return armAction('travel', travelPair(origin, dest), actionAddress(travelAction(origin, dest, registry)), registry, state);
 }
 
-function noWayTo(dest: string, registry: Registry, state: GameState): Localized {
+function unwalkable(dest: string, registry: Registry, state: GameState): Localized {
   const localizer = localizerOf(registry, state);
-  return localizer.engine('engine.travel.no-way', { destination: localizer.title('location', dest) });
+  const because = state.location === dest ? 'engine.travel.already-here' : 'engine.travel.no-way';
+  return localizer.engine(because, { destination: localizer.title('location', dest) });
 }
 
 export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    state.log.push(noWayTo(dest, registry, state));
+    state.log.push(unwalkable(dest, registry, state));
     return { armed: false };
   }
   state.journey = { to: dest, legs: route };
@@ -877,7 +878,7 @@ export function walkTo(dest: string, registry: Registry, state: GameState): Loca
   }
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
-    const refused = noWayTo(dest, registry, state);
+    const refused = unwalkable(dest, registry, state);
     state.log.push(refused);
     return refused;
   }
