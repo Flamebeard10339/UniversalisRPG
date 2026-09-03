@@ -213,7 +213,7 @@ const residual = (stood: number, asked: number): string => {
 const COLUMN = 22;
 
 function rungLines(registry: Registry, activity: Activity, statId: string, level: number, sources: readonly Source[]): string[] {
-  const asked = abilityAtLevel(level);
+  const asked = abilityAtLevel(level, statId);
   return [
     `  level ${String(level)} — the ladder asks ${figure(asked)}`,
     ...sources.map((source) => {

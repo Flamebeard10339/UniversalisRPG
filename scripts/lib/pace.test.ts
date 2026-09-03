@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { xpForLevel } from '../../src/runtime/skills';
-import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, GROWTH_CEILING, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, rateAtLevel } from './pace';
+import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, GROWTH_CEILING, Ladder, ladderFor, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -45,5 +45,34 @@ describe('the ability a level is assumed to stand at', () => {
 
   it('puts exactly one growth between one level and the next, wherever the two constants are moved to', () => {
     for (let level = 1; level < 100; level += 1) expect(abilityAtLevel(level + 1) - abilityAtLevel(level)).toBeCloseTo(ABILITY_GROWTH_PER_LEVEL, 9);
+  });
+});
+
+describe('a ladder per stat, rather than one line for all of them', () => {
+  const STEEPER: Ladder = { minutesAtLevelOne: 10, minutesGrowthPerLevel: 1.09, abilityAtLevelOne: 4, abilityGrowthPerLevel: 11 };
+
+  const readOff = (ladder: Ladder, level: number): number => ladder.abilityAtLevelOne + ladder.abilityGrowthPerLevel * (level - 1);
+
+  it('gives an id nobody declared one for the line everything used to share', () => {
+    expect(ladderFor('nothing.declared-here')).toBe(ONE_LINE);
+    expect(ladderFor()).toBe(ONE_LINE);
+  });
+
+  it('reads fishing off a ladder of its own, whatever that ladder later says', () => {
+    expect(ladderFor('fishing.fishing')).toBeDefined();
+  });
+
+  it('would tell two ladders apart at every rung, so a declaration that moves is a reading that moves', () => {
+    for (let level = 2; level < 100; level += 1) {
+      expect(readOff(STEEPER, level)).not.toBeCloseTo(readOff(ONE_LINE, level), 6);
+    }
+  });
+
+  it('reads every rung of a named ladder off that ladder and not off the shared one', () => {
+    for (let level = 1; level < 100; level += 1) {
+      const named = ladderFor('fishing.fishing');
+      expect(abilityAtLevel(level, 'fishing.fishing')).toBeCloseTo(readOff(named, level), 9);
+      expect(minutesForLevel(level, 'fishing.fishing')).toBeCloseTo(named.minutesAtLevelOne * named.minutesGrowthPerLevel ** (level - 1), 9);
+    }
   });
 });

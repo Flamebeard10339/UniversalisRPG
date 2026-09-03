@@ -115,20 +115,6 @@ for one — so the size of every piece of that tier is unsettled until it can.
 *Moves when: the orb is readable and the tier is sized against the residual rather than
 guessed. Then it is authoring rather than a ruling.*
 
-## Different stats may want different ladders
-
-One declared line covers every skill today and two skills say it should not. `combat.health`
-reads 476 against a ladder of 169, because `max-health` starts at a base of 30 and is a pool
-rather than an ability — it was never on this scale. `crafting` and `smithing` read identical
-at every rung, because no gear in the world reaches either stat at all: 78 against 203 at
-level 30.
-
-Ruled 2026-09-03: **not now — this pass is thieving only** — and that different stats may
-each want their own ladder rather than one line for all of them.
-
-*Moves when: a pass takes a skill that is not thieving. The shape of the answer is a ladder
-per stat, not a second constant on the one line.*
-
 ## The house chest keeps the band's first three marks off the frontier until level 16
 
 A mark you have outgrown does not stop paying: the house chest is difficulty 25, so from

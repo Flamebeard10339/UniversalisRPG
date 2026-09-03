@@ -80,7 +80,7 @@ export function floorLines(sources: readonly ModuleSource[], floors: readonly st
       continue;
     }
     const reached = skillLevel(state.xp[goal.skill] ?? 0);
-    const asks = minutesToReach(reached);
+    const asks = minutesToReach(reached, goal.skill);
     lines.push(`${id}: ${goal.skill} ${String(reached)} in ${minutes.toFixed(1)} game-minutes; the curve asks ${asks.toFixed(1)} (${times(minutes / asks)})`);
   }
   return { lines, ok };

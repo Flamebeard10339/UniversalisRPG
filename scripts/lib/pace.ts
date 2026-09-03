@@ -1,23 +1,48 @@
 import { LEVELS_PER_DOUBLING, xpForLevel } from '../../src/runtime/skills';
 
-export const MINUTES_AT_LEVEL_ONE = 5;
-export const MINUTES_GROWTH_PER_LEVEL = 1.07;
+export interface Ladder {
+  minutesAtLevelOne: number;
+  minutesGrowthPerLevel: number;
+  abilityAtLevelOne: number;
+  abilityGrowthPerLevel: number;
+}
+
+export const ONE_LINE: Ladder = {
+  minutesAtLevelOne: 5,
+  minutesGrowthPerLevel: 1.07,
+  abilityAtLevelOne: 0,
+  abilityGrowthPerLevel: 7,
+};
+
+const LADDERS: Readonly<Record<string, Ladder>> = {
+  'fishing.fishing': ONE_LINE,
+};
+
+export const ladderFor = (id?: string): Ladder => (id === undefined ? ONE_LINE : (LADDERS[id] ?? ONE_LINE));
+
+export const MINUTES_AT_LEVEL_ONE = ONE_LINE.minutesAtLevelOne;
+export const MINUTES_GROWTH_PER_LEVEL = ONE_LINE.minutesGrowthPerLevel;
+export const ABILITY_AT_LEVEL_ONE = ONE_LINE.abilityAtLevelOne;
+export const ABILITY_GROWTH_PER_LEVEL = ONE_LINE.abilityGrowthPerLevel;
 
 export const GROWTH_CEILING = 2 ** (1 / LEVELS_PER_DOUBLING);
 
-export const minutesForLevel = (level: number): number => MINUTES_AT_LEVEL_ONE * MINUTES_GROWTH_PER_LEVEL ** (level - 1);
+export const minutesForLevel = (level: number, id?: string): number => {
+  const ladder = ladderFor(id);
+  return ladder.minutesAtLevelOne * ladder.minutesGrowthPerLevel ** (level - 1);
+};
 
-export function minutesToReach(level: number): number {
+export function minutesToReach(level: number, id?: string): number {
   let total = 0;
-  for (let each = 1; each < level; each += 1) total += minutesForLevel(each);
+  for (let each = 1; each < level; each += 1) total += minutesForLevel(each, id);
   return total;
 }
 
 const MINUTES_PER_HOUR = 60;
 
-export const rateAtLevel = (level: number): number => ((xpForLevel(level + 1) - xpForLevel(level)) * MINUTES_PER_HOUR) / minutesForLevel(level);
+export const rateAtLevel = (level: number, id?: string): number => ((xpForLevel(level + 1) - xpForLevel(level)) * MINUTES_PER_HOUR) / minutesForLevel(level, id);
 
-export const ABILITY_AT_LEVEL_ONE = 0;
-export const ABILITY_GROWTH_PER_LEVEL = 7;
-
-export const abilityAtLevel = (level: number): number => ABILITY_AT_LEVEL_ONE + ABILITY_GROWTH_PER_LEVEL * (level - 1);
+export const abilityAtLevel = (level: number, id?: string): number => {
+  const ladder = ladderFor(id);
+  return ladder.abilityAtLevelOne + ladder.abilityGrowthPerLevel * (level - 1);
+};

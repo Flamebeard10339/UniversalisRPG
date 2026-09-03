@@ -18,7 +18,7 @@ export const ratioOf = ({ target, paid }: Pick<Ratio, 'target' | 'paid'>): numbe
 
 export function ratioFor(skill: string, paid: number, levels: Levels): Ratio {
   const level = levelOf(levels, skill);
-  return { skill, level, target: rateAtLevel(level), paid };
+  return { skill, level, target: rateAtLevel(level, skill), paid };
 }
 
 export const meanRate = (rates: readonly number[]): number => (rates.length === 0 ? 0 : rates.reduce((total, rate) => total + rate, 0) / rates.length);
