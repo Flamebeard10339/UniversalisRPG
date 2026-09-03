@@ -39,14 +39,14 @@ assert: level.thieving >= 30
 
 # test gear-up
 run: first-steps.thieving-route-full
-until inventory.thieving.thieving-rate-jewel >= 1:
+until inventory.thieving.common-general-thieving >= 1:
   use: entity.tulsa.civilian.pick-pocket until done
   wait: 120
-assert: inventory.thieving.thieving-rate-jewel >= 1
+assert: inventory.thieving.common-general-thieving >= 1
 assert: has core.unassuming-cap
 equip: 3
 allocate: 3 at 0,0 slot e
-slot: 3 at 0,0 e with thieving-rate-jewel
+slot: 3 at 0,0 e with common-general-thieving
 allocate: 3 at 1,0 position 1
 allocate: 3 at 1,0 position 2
 allocate: 3 at 1,0 position 3

@@ -146,7 +146,7 @@ tools, +3-8 luck
 title: Practised Fence
 tools, +8-15 luck
 
-# item thieving-ability-jewel
+# item uncommon-general-thieving
 title: Quiet Hour
 value: 250
 cluster-jewel: 
@@ -154,7 +154,7 @@ cluster-jewel:
   open-connections: e
   passives: 1 flat-thieving-small, 2 flat-thieving-rate-small, 3 flat-thieving-large, 4 flat-thieving-small, 5 flat-thieving-rate-small, 6 flat-thieving-large
 
-# item thieving-rate-jewel
+# item common-general-thieving
 title: Light Touch
 value: 500
 cluster-jewel: 
@@ -162,7 +162,7 @@ cluster-jewel:
   open-connections: e
   passives: 1 flat-thieving-small, 2 flat-thieving-rate-large, 3 flat-thieving-large, 4 increased-thieving-small, 5 flat-thieving-rate-large, 6 flat-thieving-small
 
-# item thieving-utility-jewel
+# item uncommon-utility-thieving
 title: Cold Nerve
 value: 350
 cluster-jewel: 
@@ -170,7 +170,7 @@ cluster-jewel:
   open-connections: e, nw
   passives: 1 thieving-flat-health-1, 2 reduced-daze-duration-1, 3 thieving-regeneration-1, 4 reduced-daze-duration-2, 5 thieving-flat-health-1, 6 thieving-regeneration-1, 7 flat-thieving-large
 
-# item luck-jewel
+# item unique-luck-thieving
 title: Fence's Eye
 value: 1500
 cluster-jewel: 
@@ -224,7 +224,7 @@ pick-pocket:
   one of:
     100x: give: 3 core.coin
     8x: roll: townsmans-wardrobe
-    1x: give: 1 thieving-rate-jewel
+    1x: give: 1 common-general-thieving
   +on attempts exhausted:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
 
@@ -269,10 +269,10 @@ pick-pocket:
   requires: level.thieving >= 11
   stands: picked-thief for 5m
   one of:
-    100x: give: 18 core.coin
-    2x: give: 1 fingerless-gloves
+    250x: give: 18 core.coin
+    5x: give: 1 fingerless-gloves
     1x:
-      give: 1 luck-jewel
+      give: 1 unique-luck-thieving
       say: The loupe was in the same pocket as the coin, and they will miss it a great deal more.
   +on attempts exhausted:
     say: They let you get all the way to it before their hand closes on your wrist, which is how you know they were watching the whole time. Nobody raises their voice. Nobody lets go either.
@@ -336,8 +336,8 @@ one of:
   6x: give: 1 ruby
   4x: give: 1 soft-toed-boots
   2x: give: 1 fingerless-gloves
-  1x: give: 1 thieving-ability-jewel
-  1x: give: 1 thieving-utility-jewel
+  1x: give: 1 uncommon-general-thieving
+  1x: give: 1 uncommon-utility-thieving
 
 # location tulsa.oolga-house
 +entities: house-chest
@@ -510,11 +510,7 @@ tools, -40% daze-duration
 title: Hard Knuckles
 tools, +25 core.max-health
 
-# passive fences-favour
-title: Fence's Favour
-tools, +15-25 luck
-
-# item long-look-jewel
+# item rare-general-thieving
 title: The Long Look
 examine: A ring of dull steel with seven notches filed into it, one for every day somebody stood across the street from a door.
 value: 2500
@@ -523,7 +519,7 @@ cluster-jewel:
   open-connections: e, sw
   passives: 1 cutpurse, 2 patience, 3 casing, 4 cutpurse, 5 sleight, 6 patience, 7 casing
 
-# item nothing-to-declare-jewel
+# item rare-utility-thieving
 title: Nothing to Declare
 examine: A closed ring of black iron with nothing on its surface that would catch on anything.
 value: 2000
@@ -531,15 +527,6 @@ cluster-jewel:
   shape: ring
   open-connections: e
   passives: 1 hard-knuckles, 2 iron-nerve, 3 cutpurse, 4 hard-knuckles, 5 iron-nerve, 6 sleight
-
-# item the-ledger-jewel
-title: The Ledger
-examine: A brass spindle with a column of figures scratched down one side of it and no names beside them.
-value: 3000
-cluster-jewel:
-  shape: spindle
-  open-connections: e
-  passives: 1 fences-favour, 2 patience
 
 # item burglars-picks
 title: Burglar's Picks
@@ -631,6 +618,7 @@ stocks:
   2 burglars-picks
   3 climbing-gloves
   6 steel-lockpicks
+  12 common-general-thieving
 replenish: 10m
 
 # shop fruit-stall
@@ -647,11 +635,11 @@ replenish: 5m
 
 # droptable jewellery-box-contents
 one of:
-  6x: give: 1 gold-necklace
-  5x: give: 1 sapphire
-  4x: give: 1 ruby
-  3x: give: 1 pearl-earrings
-  1x: give: 1 nothing-to-declare-jewel
+  42x: give: 1 gold-necklace
+  35x: give: 1 sapphire
+  28x: give: 1 ruby
+  21x: give: 1 pearl-earrings
+  1x: give: 1 rare-utility-thieving
 
 # droptable wardens-lockbox-contents
 one of:
@@ -659,7 +647,7 @@ one of:
   4x: give: 1 gold-ring
   3x: give: 1 fingerless-gloves
   2x: give: 1 core.lockpick
-  1x: give: 1 nothing-to-declare-jewel
+  1x: give: 1 rare-utility-thieving
 
 # droptable the-lookouts-share
 roll: strongbox-contents
@@ -1384,7 +1372,6 @@ pick-the-lock:
   one of:
     12x: give: 20-45 core.coin
     2x: give: 1 tulsa.bottle-of-vodka
-    1x: give: 1 the-ledger-jewel
   say: The chain lets the lid come up an inch, and an inch is enough for a hand.
   +on attempts exhausted:
     say: Sunny does not stop drying the glass. "That is mine," she says, and the man on the end stool has you by the collar before you have stood up, and then you are in the street.
@@ -1402,7 +1389,6 @@ pick-the-lock:
   one of:
     10x: give: 30-70 core.coin
     2x: give: 1 pearl-earrings
-    1x: give: 1 the-ledger-jewel
   say: The straps are for show and the lock is not, but it turns, and the chest is fuller than the guard would like the guard to know.
   +on attempts exhausted:
     say: The captain does not look up from her report. "Lock-up," she says, to nobody in particular, and four men who were bored a moment ago are not any more.
@@ -1415,9 +1401,9 @@ pick-pocket:
   requires: level.thieving >= 25
   stands: picked-duke for 15m
   one of:
-    60x: give: 40-90 core.coin
-    5x: give: 1 signet-ring
-    1x: give: 1 long-look-jewel
+    120x: give: 40-90 core.coin
+    10x: give: 1 signet-ring
+    1x: give: 1 rare-general-thieving
   +on attempts exhausted:
     say: He does not turn round. He says a name, not loudly, and the two men you did not see come in from the stair take an arm each.
     roll: sent-to-jail
