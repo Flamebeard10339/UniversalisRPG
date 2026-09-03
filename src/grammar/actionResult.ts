@@ -45,7 +45,7 @@ type ResultLine =
   | { kind: 'unset'; variable: string }
   | { kind: 'add'; variable: string; amount: number }
   | { kind: 'give'; item: string; amount?: Range }
-  | { kind: 'take'; item: string; amount?: number }
+  | { kind: 'take'; item: string; amount?: number; atMost?: true }
   | { kind: 'take-worn'; slot: string }
   | { kind: 'strip' }
   | { kind: 'empty'; bundle: string }
@@ -85,7 +85,7 @@ export interface DropRow {
 export function itemCost(results: readonly ActionResult[]): Map<string, number> {
   const cost = new Map<string, number>();
   for (const result of results) {
-    if (result.kind === 'take') cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
+    if (result.kind === 'take' && result.atMost !== true) cost.set(result.item, (cost.get(result.item) ?? 0) + (result.amount ?? 1));
   }
   return cost;
 }
@@ -125,6 +125,8 @@ const EVERYTHING_TAKEN = new RegExp(`${EVERYTHING}(?![\\w-])`);
 const EMPTIED = new RegExp(`${EVERYTHING}[ \\t]+in[ \\t]+`);
 
 const WORN_TAKEN = /worn[ \t]+(?=[a-z])/;
+
+const AT_MOST = /up[ \t]+to[ \t]+/;
 
 export const BUNDLE = 'bundle';
 
@@ -355,15 +357,19 @@ const LEAVES: readonly Leaf[] = [
   },
   {
     opens: /take:[ \t]*/,
-    forms: ['take: <count> <item>', 'take: worn <slot>', `take: ${EVERYTHING}`],
-    examples: ['take: 3 plank', 'take: worn gloves', `take: ${EVERYTHING}`],
+    forms: ['take: <count> <item>', 'take: up to <count> <item>', 'take: worn <slot>', `take: ${EVERYTHING}`],
+    examples: ['take: 3 plank', 'take: up to 50 coin', 'take: worn gloves', `take: ${EVERYTHING}`],
     read: (cursor) => {
       if (cursor.take(EVERYTHING_TAKEN) !== null) return { kind: 'strip' };
       if (cursor.take(WORN_TAKEN) !== null) return { kind: 'take-worn', slot: id.parse(cursor) };
-      return { kind: 'take', ...quantified.parse(cursor) };
+      const atMost = cursor.take(AT_MOST) !== null;
+      const asked = quantified.parse(cursor);
+      return atMost ? { kind: 'take', ...asked, atMost: true } : { kind: 'take', ...asked };
     },
     yields: BUNDLE,
     notes: {
+      'take: up to <count> <item>':
+        'takes as many as are there and no more, so a fine larger than the purse empties the purse — where a plain `take:` of more than is held takes nothing at all and says so',
       'take: worn <slot>':
         'takes whatever the player is wearing in that slot, whichever piece it is and whether or not it was rolled — which is how a mishap costs the piece it happened to rather than a piece named by id, and the only form that reaches a rolled copy at all',
     },
@@ -545,7 +551,7 @@ function printResultLine(value: ActionResult): string {
     case 'give':
       return `give: ${produced.print(value)}`;
     case 'take':
-      return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
+      return `take: ${value.atMost === true ? 'up to ' : ''}${quantified.print({ item: value.item, amount: value.amount })}`;
     case 'take-worn':
       return `take: worn ${value.slot}`;
     case 'strip':

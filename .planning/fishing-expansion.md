@@ -94,9 +94,10 @@ And two notes on where things live:
   Under a soft `? thieving` the keepnet would be silently dropped whenever thieving is off.
   Declare fishing's own difficulty stat and contested action instead.
 - The two `@@@` marks this brief pre-authorises for the clock — the bailiff's rounds and the
-  dusk rise — are the same question, and it already has a home in
-  `docs/thieving-expansion/open-human.md`. Write neither. A wait the player takes is the shape
-  until that line is answered.
+  dusk rise — are **ruled, on 2026-09-03: a wait the player takes is the intended shape, not a
+  workaround.** The town runs no clock and is not going to. Write neither mark, and do not
+  describe either beat as standing in for something better. Marle goes up the river because you
+  waited for him to; the rise comes because you sat out the afternoon for it.
 
 ## What a jewel's rarity buys, ruled 2026-09-03
 

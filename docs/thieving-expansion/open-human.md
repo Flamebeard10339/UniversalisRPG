@@ -28,16 +28,6 @@ the office door and the lockbox both check whether he is back before they open.
 *Moves when: he says whether a room may act on being entered. That is a language
 question — an `on enter:` a location takes — and not a content edit.*
 
-## Whether the market watch rotates on a clock or on a wait
-
-The brief has a guard detail that comes and goes. The world has no clock a location
-can read, so the detail stands in both markets until the player waits twenty seconds
-for it to move on, and it is back three minutes later on a buff's timer. That is a
-rotation the player starts rather than one that happens to them.
-
-*Moves when: he says whether the town should run a clock of its own. If the wait is
-the intended shape, this closes. If not, it is a language feature and crosses.*
-
 ## Whether luck should scale anything
 
 `# stat luck` is fed by three jewels' worth of passives, one of them new (`The

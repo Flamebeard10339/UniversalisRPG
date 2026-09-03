@@ -267,7 +267,7 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     }
     case 'take': {
       const wanted = (result.amount ?? 1) * count;
-      const parting = HandOver.asked(state, result.item, wanted);
+      const parting = result.atMost === true ? HandOver.asMuchAs(state, result.item, wanted) : HandOver.asked(state, result.item, wanted);
       if (!parting) {
         const say = localizerOf(registry, state);
         state.log.push(say.engine('engine.inputs.short', { item: say.title('item', result.item) }));

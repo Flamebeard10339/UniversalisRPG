@@ -197,6 +197,10 @@ export class HandOver {
     return new HandOver({ item: itemId, count });
   }
 
+  static asMuchAs(state: GameState, itemId: string, count: number): HandOver | undefined {
+    return HandOver.asked(state, itemId, Math.min(count, spendableCount(state, itemId)));
+  }
+
   get item(): string {
     return this.parting.item;
   }

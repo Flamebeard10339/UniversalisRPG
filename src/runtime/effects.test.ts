@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MODAL_SCREENS } from '../grammar/actionResult';
+import { itemCost, MODAL_SCREENS } from '../grammar/actionResult';
 import { point } from '../grammar/range';
 import { applyResults, facing, getDelta, HANDLER_SETTLE_PASSES, newSegment, RESULT_OBSERVERS, ResultApplication, ResultObserver, settlePools, standWhereTheyAre } from './effects';
 import { DISCOVERED } from '../content/sections/location';
@@ -262,6 +262,43 @@ describe('applyResults: watching what was applied', () => {
 
     expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
     expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);
+  });
+});
+
+describe('take: up to <count> <item> takes as many as are there', () => {
+  const purse = (coins: number): { registry: Registry; state: GameState } => {
+    const held = fresh(`${MODULE}\n\n# item coin\ntitle: Coin\nvalue: 1\n`);
+    if (coins > 0) held.state.inventory.coin = coins;
+    return held;
+  };
+
+  it('empties a purse the fine is larger than', () => {
+    const { registry, state } = purse(20);
+
+    applyResultsNow(state, registry, [{ kind: 'take', item: 'coin', amount: 50, atMost: true }]);
+
+    expect(state.inventory.coin ?? 0).toBe(0);
+  });
+
+  it('takes only what was asked when there is more than that', () => {
+    const { registry, state } = purse(100);
+
+    applyResultsNow(state, registry, [{ kind: 'take', item: 'coin', amount: 50, atMost: true }]);
+
+    expect(state.inventory.coin).toBe(50);
+  });
+
+  it('leaves a plain take of more than is held taking nothing, which is the difference', () => {
+    const { registry, state } = purse(20);
+
+    applyResultsNow(state, registry, [{ kind: 'take', item: 'coin', amount: 50 }]);
+
+    expect(state.inventory.coin).toBe(20);
+  });
+
+  it('is not counted as a cost the action must be able to pay, where a plain take is', () => {
+    expect(itemCost([{ kind: 'take', item: 'coin', amount: 50 }])).toEqual(new Map([['coin', 50]]));
+    expect(itemCost([{ kind: 'take', item: 'coin', amount: 50, atMost: true }])).toEqual(new Map());
   });
 });
 
