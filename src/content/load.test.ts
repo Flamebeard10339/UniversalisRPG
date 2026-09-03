@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverse } from './load';
+import { loadUniverse, loadUniverseWithDiagnostics, UNATTRIBUTED } from './load';
 import type { ModuleSource } from './universe';
 
 const WATERS: ModuleSource = {
@@ -34,5 +34,29 @@ describe('an entry heading may name the module its subject comes from', () => {
 
   it('refuses a heading whose dot joins nothing, which is no heading at all', () => {
     expect(() => loadUniverse([WATERS, UNSEEN, shore('on waters.:', '  say: hm')])).toThrow(/unexpected content: "on waters\.:"/);
+  });
+});
+
+describe('a build failure nobody owns', () => {
+  const SILENT: ModuleSource = {
+    name: 'silent',
+    text: ['# info silent', 'version: 1.0.0', '', '# entity mute', 'title: Mute', 'examine: @@@ say something here'].join('\n'),
+  };
+
+  const loaded = loadUniverseWithDiagnostics([WATERS, SILENT]);
+
+  it('really is a failure, or there is nothing below to be attributed', () => {
+    expect(loaded.diagnostics).toHaveLength(1);
+    expect(loaded.diagnostics[0]!.message).toContain('note');
+  });
+
+  it('says the world rather than naming whichever module happened to be first', () => {
+    expect(loaded.diagnostics[0]!.moduleId).toBe(UNATTRIBUTED);
+    expect(loaded.diagnostics[0]!.sourceName).toBe(UNATTRIBUTED);
+  });
+
+  it('disables nothing, where blaming a module would have disabled an innocent one', () => {
+    expect(loaded.disabledModules).toEqual([]);
+    expect(loaded.loadedModules).toEqual([]);
   });
 });

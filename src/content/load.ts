@@ -53,6 +53,8 @@ function lineColumn(source: string, span: Span | undefined): { line: number; col
   return { line, column };
 }
 
+export const UNATTRIBUTED = 'the world, and no module in it';
+
 function diagnostic(source: ModuleSource, moduleId: string, stage: ModuleLoadStage, error: DslError): ModuleDiagnostic {
   const position = lineColumn(source.text, error.span);
   return {
@@ -259,7 +261,7 @@ function silence(locales: Locales): DslError | undefined {
 type OwnedSection = ModuleSection & { module: ParsedModule };
 
 interface BuildFailure {
-  module: ParsedModule;
+  module: ParsedModule | null;
   stage: ModuleLoadStage;
   error: DslError;
 }
@@ -853,7 +855,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       if (!(error instanceof DslError)) throw error;
       return {
         failure: {
-          module: sectionOwner(owners, kind, id) ?? modules[0],
+          module: sectionOwner(owners, kind, id) ?? null,
           stage: 'build',
           error,
         },
@@ -871,7 +873,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
       if (error)
         return {
           failure: {
-            module: byNamespace.get(declared.module) ?? modules[0],
+            module: byNamespace.get(declared.module) ?? null,
             stage: 'build',
             error,
           },
@@ -879,7 +881,7 @@ function compileModules(modules: readonly ParsedModule[]): { registry: Registry 
     }
   }
   const silent = silence(registry.locales);
-  if (silent) return { failure: { module: modules[0]!, stage: 'build', error: silent } };
+  if (silent) return { failure: { module: null, stage: 'build', error: silent } };
   return { registry };
 }
 
@@ -968,9 +970,14 @@ export function loadUniverseWithDiagnostics(sources: readonly ModuleSource[]): U
       };
     }
 
-    diagnostics.push(diagnostic(compiled.failure.module.source, compiled.failure.module.info.id, compiled.failure.stage, compiled.failure.error));
-    disabled.add(compiled.failure.module.source);
-    statuses.set(compiled.failure.module.source, parsedModuleStatus(compiled.failure.module, false));
+    const blamed = compiled.failure.module;
+    if (blamed === null) {
+      diagnostics.push(diagnostic({ name: UNATTRIBUTED, text: '' }, UNATTRIBUTED, compiled.failure.stage, compiled.failure.error));
+      return { registry: emptyRegistry(), diagnostics, modules: sources.map((source) => statuses.get(source) ?? moduleStatus(source, source.name, undefined, false)), parsed: [], loadedModules: [], disabledModules: [] };
+    }
+    diagnostics.push(diagnostic(blamed.source, blamed.info.id, compiled.failure.stage, compiled.failure.error));
+    disabled.add(blamed.source);
+    statuses.set(blamed.source, parsedModuleStatus(blamed, false));
     active = active.filter((source) => !disabled.has(source));
   }
 }

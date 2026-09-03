@@ -329,18 +329,6 @@ what makes it dangerous is that the question reaching it can now be a bad one.
 the root's own declaration rather than from a second list of which roots are checked, and a
 `describe` in this folder's `open-tests.test.ts` pins the refusal an author sees.
 
-## A build failure is reported against the first module in the world
-
-`compileModules` blames a failure on `sectionOwner(owners, kind, id) ?? modules[0]`
-(`src/content/load.ts:855`) and `byNamespace.get(declared.module) ?? modules[0]` (`:873`).
-Where the lookup fails the author is pointed at whichever module happens to be first, with
-nothing saying the attribution was guessed. It miscomputes nothing, and it costs the reader
-the same bisect as any wrong line number — which is the cost the neighbouring line in this
-file about refusals inside a `# test` is also about.
-
-*Closes when:* a build failure whose owner cannot be found says so rather than naming a module
-that had nothing to do with it.
-
 ## Two things a gearing run still has to work out by experiment
 
 Two of the four that stood here closed on 2026-09-03. A shop's markup is printed — the page
