@@ -42,3 +42,8 @@ jobs:
       # route it holds still walks, and anything it takes that an author probably
       # did not mean. It exits non-zero on any of them.
       - run: npm run oracle -- --at content
+      # The floors: the fastest route anyone has walked to each goal, kept under
+      # floors/ beside the world. Red only where a route no longer walks, which is
+      # what a rebalance that killed the floor looks like; the minutes are read,
+      # never asserted.
+      - run: npm run floors

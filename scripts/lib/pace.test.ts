@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { xpForLevel } from '../../src/runtime/skills';
-import { GROWTH_CEILING, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, rateAtLevel } from './pace';
+import { GROWTH_CEILING, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -19,6 +19,12 @@ describe('the pace a level is meant to take', () => {
   it('leaves the first level where a first level belongs, which is the one figure chosen rather than derived', () => {
     expect(minutesForLevel(1)).toBe(MINUTES_AT_LEVEL_ONE);
     expect(rateAtLevel(1)).toBeCloseTo((costOfLevel(1) * 60) / MINUTES_AT_LEVEL_ONE, 6);
+  });
+
+  it('reaches a level by the sum of every level before it, and level one by nothing at all', () => {
+    expect(minutesToReach(1)).toBe(0);
+    expect(minutesToReach(2)).toBe(minutesForLevel(1));
+    expect(minutesToReach(5)).toBeCloseTo(minutesForLevel(1) + minutesForLevel(2) + minutesForLevel(3) + minutesForLevel(4), 9);
   });
 
   it('asks for exactly the level cost over the level time, so a re-tune of either moves it', () => {
