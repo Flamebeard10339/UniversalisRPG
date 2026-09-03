@@ -32,6 +32,88 @@ Read `content/fishing.dsl` before adding anything — all of it is in there now.
 - The swamp beyond the Marsh Gate exists as `tulsa.swamp-mire`, and nothing in it is fished.
 - The tutorial leans on fishing and comes out lopsided. Miki's unlock asks the player to reach a second level in any skill, and the only skill in front of them is fishing: a shrimp pays 18 xp against 1000 for the first level, so the route takes **56 casts and 147 seconds of game time** and the apology route ends with fifty-six raw shrimp in the pack. That is a fishing number, so it is this expansion's to fix rather than the tutorial's. Three answers were on the table — the first level is too expensive for a tutorial, netting is too cheap, or Miki should be asking on a route where the rats are already levelling attack — and the first two are yours to pick between here. `npm run simulate-activity` reads it rather than reckons it.
 
+## What the engine will take, probed before the run
+
+Every mechanic below was put through the real loader on 2026-09-03, as a route that ran rather
+than as a reading of the grammar. Do not re-derive these, and do not write an `@@@` for any of
+them: they work.
+
+- **A buff's timer gating an action** — yes, and the `@@@` this brief pre-authorises should not
+  be written. The shipped shape is not the buff but a **stat the buff item carries**: a
+  `# stat eel-soak` with `hidden if: always`, a `# item the-trap-is-soaking` with `+1 eel-soak`,
+  `inflict: the-trap-is-soaking for 3m`, and then `hidden if: stat.eel-soak >= 1` reads
+  *running* and `not stat.eel-soak >= 1` reads *expired*. `content/thieving.dsl` does exactly
+  this for the market watch. The trap needs both terms so `lift` is not offered before the trap
+  was ever set: `hidden if: not trap-set or stat.eel-soak >= 1`.
+- **An action offered only while a buff runs** — yes, same reading. This is the keepnet.
+- **A counter that escalates** — yes, but `add:` names a **`# flag`**, not a `# variable`. Every
+  `# variable` in the corpus is an engine tuning constant. Write `# flag times-caught`, branch
+  with `if times-caught = 1:` / `= 2:` / `>= 3:`, and let dialogue read it with
+  `when: times-caught >= 3`. This is how the thieving wardens escalate.
+- **An action written on an item** — yes, and it works laid over another module's item. The
+  herring the stall sells is already `core.herring`, so the cut is `# item core.herring` with a
+  `cut for bait:` body written from fishing's side. No new herring is needed.
+- **`rewards scaled by: haul`** — yes, and it does exactly what this brief wants: it reaches
+  every amount the action hands over, including rows of a `one of:` and a `# droptable` it
+  rolls, so no water has to know the stat exists. **It must be written into fishing's own
+  `# action cast`.** A second body at an action id replaces the section rather than merging, so
+  it cannot be laid over from elsewhere.
+- **`{flag: words}` in an `examine:`** — yes, in any line the game says to a player.
+- **A dialogue branching on `when: has <item>`**, several threads open at once, compounded with
+  the buff (`when: stat.match-clock >= 1 and has raw-trout`) — yes. Route-authoring note: with
+  several threads open a `# test` must `choose:` the **thread id**, not the ask text.
+- **An item taken by a dialogue choice** — yes.
+- **`hidden if:` on an entity, and hidden forever once landed** — yes:
+  `hidden if: not level.fishing >= 30 or old-slate-landed`.
+- **A `# recipe` in fishing.dsl naming cooking's station and skill whole** — yes, and
+  `content/fishing.dsl` already does it six times.
+- **`+entities:`, addressed headings, `? tulsa`, and a new `# location` reaching the map by
+  `adjacent:`** — yes, all shipped.
+- **`take: worn <slot>`** — new on 2026-09-03, and it is what a mishap costs a player. It takes
+  whatever is standing in that slot whichever piece it is, and it is the only form that reaches
+  a rolled copy at all. `# droptable parted-tackle` is one line now. Every new piece of tackle is
+  covered by having been written, so **do not add a `take:` per piece to anything.**
+
+Three things the engine will **not** take, so write around them the way it says:
+
+- **A contest whose difficulty changes while an NPC stands there.** Every form this brief
+  suggests is refused: `accuracy:` naming another entity's stat wants a side and there are only
+  two; `accuracy:` under an `if` is not a result; `inflict: deep-water on them` is refused
+  outside a hit list; and arithmetic (`them.depth + 60`) is refused. There is also no presence
+  reading — `entity.marle.present` names no flag. **The shipped answer is two entities in the
+  location, each `hidden if:` on the bailiff's buff stat, with different `depth`** — which is
+  how `content/thieving.dsl` runs its three wardens. What a cast *pays* may still branch on
+  `if not stat.marle-away >= 1:` inside the `cast:` body; only what it *contests* cannot.
+- **`value: 0`** is refused. The fish head "with no value" means **omitting** `value:`.
+- **A `food` tag's stat must be a `# stat`, not a resource** — `+6 core.health` is refused.
+
+And two notes on where things live:
+
+- The keepnet theft wants `# action steal` and `npc-thieving-difficulty` / `-xp` / `-damage`,
+  which are **`content/thieving.dsl`'s, not core's**, and fishing does not depend on thieving.
+  Under a soft `? thieving` the keepnet would be silently dropped whenever thieving is off.
+  Declare fishing's own difficulty stat and contested action instead.
+- The two `@@@` marks this brief pre-authorises for the clock — the bailiff's rounds and the
+  dusk rise — are the same question, and it already has a home in
+  `docs/thieving-expansion/open-human.md`. Write neither. A wait the player takes is the shape
+  until that line is answered.
+
+## What a jewel's rarity buys, ruled 2026-09-03
+
+The four new jewels are cut against this, and it is the world's scheme rather than fishing's. A
+jewel's tier is its **scarcity and where in the world it is found**; what a tier buys is **point
+efficiency** — how much stat each of the base's finite plane points returns.
+
+      common     a shop sells it, point inefficient
+      uncommon   1 in 16 to 1 in 64, greater variety, utility stats
+      rare       1 in 128, point efficient, endgame
+      unique     a boss drops it, 1 in 256 or worse, best in slot or a capability nothing else has
+
+So The Priest, off Old Slate, and The Pirn, which is the contest prize and drops nowhere, are
+both **unique**. A Good Bag off the carp is **rare**. Tight Lines, coming rarely out of the eel
+pot, is **uncommon**. Note that a jewel's own points are rolled per copy off the base's
+`item-level:`, and that socketing one costs a point to reach before any of its passives.
+
 ## A short glossary, for an author who does not fish
 
 Every term below is real, and the mechanic that follows it is what the term becomes in the game. Use the words in prose and dialogue; anglers talk like this.
