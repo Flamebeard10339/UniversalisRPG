@@ -326,14 +326,17 @@ export function standClocks(registry: Registry, subjects: readonly Subject[]): n
   });
 }
 
+export function stoodIn(sources: readonly ModuleSource[], dependencies: readonly string[], start: Start | string, stood?: Stood): Registry {
+  const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, [], start, [], false, stood)]);
+  if (loaded.diagnostics.length > 0) throw new Error(loaded.diagnostics.map(formatModuleDiagnostic).join('\n'));
+  return loaded.registry;
+}
+
 export const RUNG_PROBE_BASES: readonly [number, number] = [0, 1];
 
 export function baseForRung(sources: readonly ModuleSource[], dependencies: readonly string[], player: string, start: Start, rung: RungAsk): number {
-  const readAt = (base: number): number => {
-    const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, [], start, [], false, { player, stats: [{ id: rung.id, value: base }] })]);
-    if (loaded.diagnostics.length > 0) throw new Error(loaded.diagnostics.map(formatModuleDiagnostic).join('\n'));
-    return standingAt(loaded.registry, start, [rung.id])[0]!.value;
-  };
+  const readAt = (base: number): number =>
+    standingAt(stoodIn(sources, dependencies, start, { player, stats: [{ id: rung.id, value: base }] }), start, [rung.id])[0]!.value;
   const [lower, upper] = RUNG_PROBE_BASES;
   const [stoodLow, stoodHigh] = [readAt(lower), readAt(upper)];
   const perPoint = (stoodHigh - stoodLow) / (upper - lower);
@@ -598,11 +601,6 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
     return { lines: [`${args.at}: no # location with that id.`], ok: false };
   }
 
-  const subjects = subjectsFrom(base.registry, start, args);
-  if (subjects.length === 0) {
-    return { lines: [`${startLabel(start)}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
-  }
-
   const named = args.stats ?? [];
   const rungs = args.rungs ?? [];
   const dependencies = base.parsed.map((module) => module.info.id);
@@ -621,13 +619,21 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
   if (standers.length > 0 && base.registry.player === undefined) return { lines: [`${standers.join(' and ')} has no player to stand: the world declares no # entity player`], ok: false };
 
   let asked: StatAsk[];
+  let world: Registry;
+  let stoodAt: Stood | undefined;
   try {
     asked = [...named, ...rungs.map((rung) => ({ id: rung.id, value: baseForRung(sources, dependencies, base.registry.player!.id, start, rung) }))];
+    stoodAt = asked.length > 0 ? { player: base.registry.player!.id, stats: asked } : undefined;
+    world = stoodIn(sources, dependencies, start, stoodAt);
   } catch (error) {
     return { lines: [error instanceof Error ? error.message : String(error)], ok: false };
   }
 
-  const stoodAt: Stood | undefined = asked.length > 0 ? { player: base.registry.player!.id, stats: asked } : undefined;
+  const subjects = subjectsFrom(world, start, args);
+  if (subjects.length === 0) {
+    return { lines: [`${startLabel(start)}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
+  }
+
   const standing = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, [], args.ideal, stoodAt)]);
   if (standing.diagnostics.length > 0) return { lines: standing.diagnostics.map(formatModuleDiagnostic), ok: false };
   const ends = standClocks(standing.registry, subjects).map((at) => at + args.window * MS_PER_MINUTE);
@@ -635,8 +641,8 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
   const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, ends, args.ideal, stoodAt)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
-  const stoodStats = standingAt(loaded.registry, start, asked.map((each) => each.id));
-  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), ends), { ...args, standing: stoodStats }, levelsOn(base.registry, start)), ok: true };
+  const stoodStats = standingAt(world, start, asked.map((each) => each.id));
+  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), ends), { ...args, standing: stoodStats }, levelsOn(world, start)), ok: true };
 }
 
 function main(): void {
