@@ -30,27 +30,6 @@ The Rook beat is written round it with `take: worn mainhand` for now, so nothing
 picks one. The first two are then a lane's afternoon; the third is a line on the page saying so
 and closes the `open-agent.md` line beside it.*
 
-## Whether `on failure:` keeps a name that reads as the opposite of what it does
-
-`on failure:` runs where an action is **turned away before it begins** — a `requires:` that does
-not hold, a thing that is not here, an input it has not got. It does **not** run when a contest
-inside the body falls the wrong way; that is `on attempts exhausted:`. The page says both of
-these plainly and has said them the whole time.
-
-The authoring run read it as "the cast missed" anyway and wrote one on Old Slate saying
-*Anything short of dressed silk goes before the fish does* — which is a lost fish, not a
-refusal. The cost was not the wrong words in the wrong place. It is that `on failure:` also
-**swallows every refusal on that action**: `refuseWith` runs the body instead of raising, so the
-route written to prove Old Slate does not come back once landed could not catch a refusal at
-all, and read as an engine bug for a while.
-
-So the trap has two halves and they compound: the name invites the wrong reading, and taking it
-silently disarms the one thing that could have caught the mistake.
-
-*Moves when: he says whether the keyword is renamed to what it means — `on turned away:` and
-`on missed:` were the two obvious candidates and neither has been costed — or whether it stands
-and the page is where the warning lives.*
-
 ## Whether the fishing contest's five minutes is a fair window
 
 The match is on while a buff the weigh-master gives lasts, and the design doc sets that at five
