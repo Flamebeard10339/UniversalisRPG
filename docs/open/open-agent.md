@@ -295,26 +295,25 @@ what makes it dangerous is that the question reaching it can now be a bad one.
 the root's own declaration rather than from a second list of which roots are checked, and a
 `describe` in this folder's `open-tests.test.ts` pins the refusal an author sees.
 
-## A long probabilistic loop cannot be traced
+## Four growth directives still refuse a rolled base by name
 
-Three of the four that stood here closed on 2026-09-03. A shop's markup is printed, derived
-off any `printed: 'unless-default'` field's own default through its own parser. A socketed
-hex's points were never a property of the hex — the budget is rolled per copy off the base's
-`item-level:`, and reaching a socketed jewel spends one before any passive, which
-`item-level:`'s note now says. And `equip:` by template picks the first unworn copy rather than
-refusing every rolled base.
+`equip:` resolves a written template to the first unworn copy since 14f72baf. `swap:`,
+`slot:`, `allocate:` and `apply:` take the same `<carried>` token through `growItem` and do
+not, so `floors/thieving-floor.dsl` still writes `allocate: 3` where it now writes
+`equip: core.unassuming-cap` two lines above.
 
-What is left: `probe --record` prints the final state only, and a failing `assert:` stops the
-run with no partial dump, so there is no way to see which iterations of a four-hundred-minute
-loop failed. A run wanting to know whether repositioning could dodge the travel tax after a
-success could not find out without instrumenting the DSL with thousands of asserts.
+**This is a question rather than an oversight, and it was tried.** A `copyToGrow` preferring
+the worn copy made the whole floor writable by name and reddened an authored claim in
+`src/runtime/itemInstance.test.ts` — *refuses a base named by its template, because the points
+belong to a copy and not to the item*. That claim is right about the distinction: you equip a
+copy and any will do, while you allocate onto one particular plane, and a player holding three
+swords with three planes has three answers. Naming a template there has to pick, and the pick
+would be silent.
 
-Two smaller things ride with it, both from the same fix and neither on the authoring path.
-`swap:`, `slot:`, `allocate:` and `apply:` take the same `<carried>` token through `growItem`
-and still refuse a template naming a rolled base. `carriedScreen`'s submit finds no entry for an
-unknown item id and returns null with no refusal at all, which is where the silence an earlier
-run met actually lives. `floors/thieving-floor.dsl` still carries three bare instance numbers
-that could now be written as names.
+The other half of the same fix, also unbuilt: `carriedSubmit` in
+`src/runtime/carriedScreen.ts` finds no entry for an unknown item id and returns null with no
+refusal at all, and `carriedScreen` discards `equip`'s return besides. That is where the
+silence an authoring run once met actually lives, and it is the GUI rather than the loop.
 
-*Closes when: `probe` can print a step trace; and the four growth directives resolve a template
-the way `equip:` does, with the floor's three bare numbers written back as names.*
+*Moves when: he says whether a growth directive may name a template — and if it may, what it
+picks when several copies stand, since that is the thing the claim says cannot be silent.*

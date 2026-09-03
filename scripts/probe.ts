@@ -16,6 +16,7 @@ import { replayTest, runTest, type TestRun } from '../src/runtime/session';
 import { serializeSave } from '../src/runtime/save';
 import { overLines } from '../src/content/sections/save';
 import { endSaveId } from '../src/runtime/runLog';
+import { traceTests } from './lib/trace';
 
 export type RoundTripMode = 'universe' | 'module';
 
@@ -23,6 +24,7 @@ export interface ProbeOptions {
   show: string[];
   test?: string[];
   record?: string[];
+  trace?: string[];
   roundTrip: boolean;
   roundTripMode?: RoundTripMode;
   each?: boolean;
@@ -43,13 +45,19 @@ const SHOWABLE = new Map<string, string>(contentSectionMaps());
 export const DOCUMENT_SEPARATOR = '---';
 
 const usage = [
-  'Usage: npm run probe -- <source>... [--off <pack>] [--show <kind>.<id>] [--test <id>] [--record <id>] [--round-trip] [--each]',
+  'Usage: npm run probe -- <source>... [--off <pack>] [--show <kind>.<id>] [--test <id>] [--trace <id>] [--record <id>] [--round-trip] [--each]',
   '',
   '  <source>       a DSL file, a directory of them, or - to read from stdin',
   '  --off          turn a pack or a module off before loading, by the name the',
   '                 settings page offers it under; repeatable. `--off quests` is',
   '                 the town with no quest in it',
   '  --show         print one registry record as JSON; repeatable',
+  '  --trace        run one # test and print a line per step: what the step was, which',
+  '                 loop pass it ran in, and what moved in the save because of it. This is',
+  '                 how a long probabilistic loop is read — a failing route already names',
+  '                 the pass it stopped on, and this says what the world looked like on the',
+  '                 way there. A long run prints its first thirty steps and its last twenty',
+  '                 and says how many it left out; repeatable',
   '  --record       run one # test and print the state it ends on as the # save section',
   '                 its own closing expect: names, so the printed section replaces that',
   '                 section in the file wholesale; repeatable. This is how a route whose',
@@ -102,6 +110,10 @@ export function parseProbeArgs(raw: readonly string[]): ProbeArgs {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--show wants a <kind>.<id> after it');
       args.show.push(spec);
+    } else if (arg === '--trace') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--trace wants a # test id after it');
+      (args.trace ??= []).push(spec);
     } else if (arg === '--record') {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--record wants a # test id after it');
@@ -305,6 +317,13 @@ export function probe(sources: readonly ModuleSource[], options: ProbeOptions): 
   const named = options.test ?? [];
   if (named.length > 0) {
     const ran = runTests(loaded.registry, named);
+    lines.push('', ...ran.lines);
+    if (!ran.ok) ok = false;
+  }
+
+  const traced = options.trace ?? [];
+  if (traced.length > 0) {
+    const ran = traceTests(loaded.registry, traced.flatMap((spec) => testsNamed(loaded.registry, spec)));
     lines.push('', ...ran.lines);
     if (!ran.ok) ok = false;
   }

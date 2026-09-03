@@ -177,6 +177,18 @@ interface SessionInternals {
   registry: Registry;
   state: GameState;
   logCursor: number;
+  watch?: (step: Step) => void;
+  pass: number | null;
+}
+
+interface Step {
+  readonly directive: Directive;
+  readonly pass: number | null;
+  readonly failure: string | null;
+}
+
+export function watchSteps(session: PlaySession, watch: (step: Step) => void): void {
+  own(session).watch = watch;
 }
 
 const INTERNALS = new WeakMap<PlaySession, SessionInternals>();
@@ -199,7 +211,7 @@ function stateOf(session: PlaySession): GameState {
 
 export function sessionOver(registry: Registry, state: GameState): PlaySession {
   initResources(state, registry);
-  const internals: SessionInternals = { registry, state, logCursor: state.log.length };
+  const internals: SessionInternals = { registry, state, logCursor: state.log.length, pass: null };
   const session: PlaySession = { get registry() { return internals.registry; } };
   INTERNALS.set(session, internals);
   return session;
@@ -910,7 +922,11 @@ function wentRound(session: PlaySession, loop: Extract<Directive, { kind: 'loop'
   for (let passes = 0; ; passes++) {
     if (isCycles(loop.until) ? passes >= loop.until.times : evaluateCondition(loop.until, state, registry)) return {};
     const before = serializeSession(session);
+    const held = own(session);
+    const outer = held.pass;
+    held.pass = passes + 1;
     const { failure } = walkTest(session, loop.body);
+    held.pass = outer;
     if (failure !== null) return { failure: `${heading} — pass ${passes + 1}: ${failure}` };
     if (!isCycles(loop.until) && serializeSession(session) === before) return { failure: `${heading} — ${localizerOf(registry, state).engine('engine.stopped.round')}` };
   }
@@ -968,9 +984,12 @@ export function walkTest(session: PlaySession, steps: readonly Directive[], upTo
       continue;
     }
 
+    const seen = INTERNALS.get(session);
+    const pass = seen?.pass ?? null;
     const refusal = refusalFrom(session, directive);
     const claimed = steps[at + 1]?.kind === 'refused';
     walked.push(directive);
+    seen?.watch?.({ directive, pass, failure: claimed ? null : refusal });
 
     if (refusal !== null && !claimed) return { walked, failure: refusal };
     if (refusal === null && claimed) return { walked, failure: `refused: ${printDirective(directive)} was not refused` };
