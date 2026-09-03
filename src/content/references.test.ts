@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ENGINE_ROOT_NAMES, rootedKind } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { loadModule, loadUniverse } from './load';
+import { BY_MODULE, BY_WHOLE_ID } from './namespace';
 import { mapOf } from './registry';
 import { contentSectionMaps } from './sections';
 
@@ -476,5 +477,39 @@ describe('an id inside a # save body', () => {
     const diff = arrived('{"version":13,"inventory":{"isla.ghost":1}}');
 
     expect(diff.inventory).toEqual({ 'isla.ghost': 1 });
+  });
+});
+
+describe('what an ambiguous id is told to do about it', () => {
+  const OTHER = ['# info other', 'version: 1.0.0', '', '# entity their-hive', 'title: Their Hive', 'examine: A skep.', 'flags: searched'].join('\n');
+
+  const mine = (...hives: string[]): string =>
+    ['# info mine', 'version: 1.0.0', 'dependencies:', '  other', '', ...hives.flatMap((id) => [`# entity ${id}`, `title: ${id}`, 'examine: A skep.', 'flags: searched', '']), '# entity keeper', 'title: Keeper', 'examine: A woman.', 'hidden if: searched'].join('\n');
+
+  const refusal = (...hives: string[]): string => {
+    try {
+      loadUniverse([
+        { name: 'other', text: OTHER },
+        { name: 'mine', text: mine(...hives) },
+      ]);
+    } catch (error) {
+      return String((error as Error).message);
+    }
+    return 'nothing was refused';
+  };
+
+  it('sends an author to the module when naming one really would separate them', () => {
+    const said = refusal('my-hive');
+
+    expect(said).toContain('ambiguous between mine.my-hive.searched and other.their-hive.searched');
+    expect(said).toContain(BY_MODULE);
+  });
+
+  it('sends them to the whole id when one module declares more than one, where the module cannot', () => {
+    const said = refusal('first-hive', 'second-hive');
+
+    expect(said).toContain('mine.first-hive.searched and mine.second-hive.searched');
+    expect(said).toContain(BY_WHOLE_ID);
+    expect(said).not.toContain(BY_MODULE);
   });
 });

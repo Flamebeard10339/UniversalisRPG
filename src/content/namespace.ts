@@ -22,6 +22,10 @@ export const memberKey = (memberKind: string, ownerKind: string, owner: string, 
 
 const SELF = 'self';
 
+export const BY_MODULE = `Name the module, or write \`${SELF}\` for the module this line is written in.`;
+
+export const BY_WHOLE_ID = 'Naming the module does not separate them, because one of them declares more than one: write one of the ids above whole.';
+
 export function spelledSegments(kind: string, raw: string, self: string | null): string[] {
   const segments = raw.split('.');
   if (segments[0] === kind && segments.length > 1) segments.shift();
@@ -165,6 +169,9 @@ export class Namespace {
     }
     if (matches.length === 1) return matches[0];
     if (matches.length === 0) throw new DslError(`${where} names an unknown ${kind}: ${raw}`);
-    throw new DslError(`${where} names ${raw}, which is ambiguous between ${matches.sort().join(' and ')}. Name the module, or use self.`);
+    const spelled = matches.sort();
+    const owners = spelled.map((key) => this.ownerOf(kind, key));
+    const separates = new Set(owners).size === owners.length;
+    throw new DslError(`${where} names ${raw}, which is ambiguous between ${spelled.join(' and ')}. ${separates ? BY_MODULE : BY_WHOLE_ID}`);
   }
 }

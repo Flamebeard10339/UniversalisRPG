@@ -108,24 +108,6 @@ rather than bringing a parallel geography of its own.
 
 *Closes when:* the two are written and merge with the suite green.
 
-## The resolver names `self` as the fix and the loader does not take it
-
-Found on 2026-08-30 giving Kelsa's three hives a `searched` flag each. An
-unqualified `assert: searched` in another module is now ambiguous, and the refusal
-reads *"Name the module, or use self."* — but `self.searched` comes back *"names an
-unknown flag"*, and `npm run oracle` never prints `self` under any kind. So the
-message advertises a form the language does not have, which is worse than naming no
-fix at all: the author tries it, is refused a second time in different words, and has
-learned nothing about which of the two refusals is the real rule.
-
-Either half is a fix and they are different sizes. Whichever it is, it has to come off
-the same declaration the oracle reads, or the message and the page drift the moment
-one of them moves.
-
-*Closes when:* `self` resolves to the section it is written in, or the refusal names
-the qualified form instead — and `npm run oracle` says which without anyone keeping
-the page in step.
-
 ## A refused line in a `# test` is reported against the next section header
 
 Met by the authoring run that wrote The Rat Conspiracy, and it cost that run real
