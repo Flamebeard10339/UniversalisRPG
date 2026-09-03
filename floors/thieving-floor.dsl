@@ -35,3 +35,33 @@ until level.thieving >= 30:
   travel: oolga-house
   use: entity.house-chest.pick-the-lock until done
 assert: level.thieving >= 30
+
+# test gear-up
+run: first-steps.thieving-route-full
+until inventory.thieving.thieving-rate-jewel >= 1:
+  use: entity.tulsa.civilian.pick-pocket until done
+assert: inventory.thieving.thieving-rate-jewel >= 1
+assert: has core.unassuming-cap
+equip: 3
+allocate: 3 at 0,0 slot e
+slot: 3 at 0,0 e with thieving-rate-jewel
+allocate: 3 at 1,0 position 1
+allocate: 3 at 1,0 position 2
+allocate: 3 at 1,0 position 3
+allocate: 3 at 1,0 position 4
+
+# test geared-to-20
+run: gear-up
+until level.thieving >= 20:
+  travel: tavern-street
+  travel: oolga-house
+  use: entity.house-chest.pick-the-lock until done
+assert: level.thieving >= 20
+
+# test geared-to-30
+run: geared-to-20
+until level.thieving >= 30:
+  travel: tavern-street
+  travel: oolga-house
+  use: entity.house-chest.pick-the-lock until done
+assert: level.thieving >= 30
