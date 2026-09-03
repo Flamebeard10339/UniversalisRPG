@@ -16,7 +16,7 @@ export const GRACE_MINUTES = 2;
 
 const usage = [
   'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--minutes <n>] [--model <id>]',
-  '       npm run authorbot -- --watch [<brief>]',
+  '       npm run authorbot -- --watch [--once] [<brief>]',
   '',
   '  <brief>    the file saying what to write, named as a loose word or after --brief;',
   ...BRIEF_IS_A_FILE.map((line) => `             ${line}`),
@@ -33,6 +33,8 @@ const usage = [
   '  --model    which model plays the author (default claude-sonnet-5)',
   '  --watch    do not start anything: say where every authorbot run on this machine stands,',
   '             and go on saying it until they have all ended. With a brief, just that one',
+  '  --once     with --watch, say it once and stop, rather than holding the terminal until',
+  '             every run has ended — which is what to reach for to ask where a run stands',
   '',
   'The run works on a copy of content/ in a directory of its own and writes nothing in this',
   'checkout, so it does not count as a second writer in it. It prints where that directory is,',
@@ -47,6 +49,7 @@ export interface Asked {
   minutes: number | null;
   model: string;
   watch: boolean;
+  once: boolean;
 }
 
 export const moduleNameFor = (brief: string): string =>
@@ -73,7 +76,7 @@ const requireCount = (flag: string, value: string): number => {
 };
 
 export function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false };
+  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false, once: false };
   const named = (word: string): void => {
     if (asked.brief !== null) throw new Error(`the brief is named once, and ${JSON.stringify(word)} is a second\n\n${usage}`);
     asked.brief = word;
@@ -87,6 +90,7 @@ export function parseArgs(argv: readonly string[]): Asked {
     else if (arg === '--model') asked.model = requireValue(arg, argv[++i]);
     else if (arg === '--open') asked.open = true;
     else if (arg === '--watch') asked.watch = true;
+    else if (arg === '--once') asked.once = true;
     else if (arg.startsWith('-')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
     else named(arg);
   }
@@ -319,7 +323,7 @@ function statusNow(workdirs: readonly string[]): readonly RunStatus[] {
 
 const WATCH_INTERVAL_MS = 15_000;
 
-async function watch(brief: string | null): Promise<number> {
+async function watch(brief: string | null, once: boolean): Promise<number> {
   const workdirs = brief === null ? runsInFlight(os.tmpdir()) : [workdirFor(brief)];
   if (workdirs.length === 0 || !workdirs.some((each) => existsSync(each))) {
     console.log('no authorbot run has left a directory on this machine');
@@ -328,7 +332,7 @@ async function watch(brief: string | null): Promise<number> {
   for (;;) {
     const held = statusNow(workdirs.filter((each) => existsSync(each)));
     console.log([new Date().toISOString(), ...held.flatMap(statusLines), ''].join('\n'));
-    if (held.every((each) => each.ended)) return 0;
+    if (once || held.every((each) => each.ended)) return 0;
     await new Promise((resolve) => setTimeout(resolve, WATCH_INTERVAL_MS));
   }
 }
@@ -442,7 +446,7 @@ async function main(): Promise<void> {
   }
   try {
     const asked = parseArgs(argv);
-    process.exit(asked.watch ? await watch(asked.brief) : await run(asked));
+    process.exit(asked.watch ? await watch(asked.brief, asked.once) : await run(asked));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(2);

@@ -10,7 +10,7 @@ const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseA
 
 describe('what the run was asked for', () => {
   it('is one loose word, since the brief and the module it writes were the same word twice', () => {
-    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false });
+    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false, once: false });
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
@@ -61,6 +61,11 @@ describe('what the run was asked for', () => {
   it('watches without a brief, since five runs at once are watched by asking after all of them', () => {
     expect(parseArgs(['--watch'])).toMatchObject({ watch: true, brief: null, target: null });
     expect(parseArgs(['--watch', 'b.md'])).toMatchObject({ watch: true, brief: 'b.md' });
+  });
+
+  it('says a status once when asked to, since a watch that holds the terminal cannot answer where a run stands', () => {
+    expect(parseArgs(['--watch'])).toMatchObject({ once: false });
+    expect(parseArgs(['--watch', '--once'])).toMatchObject({ watch: true, once: true });
   });
 
   it('runs a brief in the one place named by its own name, so watching it needs nothing kept beside it', () => {
