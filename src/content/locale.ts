@@ -18,6 +18,7 @@ export const ENGINE_KEYS = [
   'engine.target.unoffered',
   'engine.inputs.short',
   'engine.inputs.grown',
+  'engine.inputs.bare-slot',
   'engine.combat.player.hit',
   'engine.combat.player.miss',
   'engine.combat.foe.hit',

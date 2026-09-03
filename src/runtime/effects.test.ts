@@ -10,6 +10,8 @@ import { buffsOf } from './buffs';
 import { roadsFrom } from './journey';
 import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { applyResultsNow, createGameState, GameState, grantBuff, initResources, PLAYER } from './runtime';
+import { equip } from './equipment';
+import { isGrownCopy, packRows, receiveItem } from './itemInstance';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
 import { secondsToMs, toMilliUnits } from './units';
@@ -260,6 +262,65 @@ describe('applyResults: watching what was applied', () => {
 
     expect(state.log).toEqual([expect.stringContaining(OPENING_ONE)]);
     expect(seen.map((application) => application.result.kind)).toEqual(['open-modal']);
+  });
+});
+
+describe('take: worn <slot> is the only form that reaches a rolled copy', () => {
+  const world = loadUniverseWithDiagnostics(fixtureSources()).registry;
+
+  const GROWN = 'core.leather-gloves';
+
+  const newestCopy = (state: GameState, template: string): string =>
+    packRows(state).flatMap((row) => (row.kind === 'grown' && row.template === template ? [row.id] : []))[0];
+
+  const wearing = (template: string): GameState => {
+    const state = createGameState();
+    initResources(state, world);
+    receiveItem(state, world, template, 1);
+    equip(state, world, newestCopy(state, template));
+    return state;
+  };
+
+  it('is asked of an item that really is rolled, or it proves nothing', () => {
+    const state = wearing(GROWN);
+    expect(world.items.get(GROWN)?.itemLevel).toBeDefined();
+    expect(isGrownCopy(state, state.equipped.gloves!)).toBe(true);
+  });
+
+  it('takes the piece off the slot, whichever copy is standing there', () => {
+    const state = wearing(GROWN);
+
+    applyResultsNow(state, world, [{ kind: 'take-worn', slot: 'gloves' }]);
+
+    expect(state.equipped.gloves).toBeUndefined();
+    expect(packRows(state).some((row) => row.template === GROWN)).toBe(false);
+  });
+
+  it('leaves a second copy of the same piece standing in the pack, so it takes one and not a kind', () => {
+    const state = wearing(GROWN);
+    receiveItem(state, world, GROWN, 1);
+
+    applyResultsNow(state, world, [{ kind: 'take-worn', slot: 'gloves' }]);
+
+    expect(packRows(state).filter((row) => row.template === GROWN)).toHaveLength(1);
+  });
+
+  it('is what take: <item> cannot do, which is why the form exists', () => {
+    const state = wearing(GROWN);
+
+    applyResultsNow(state, world, [{ kind: 'take', item: GROWN, amount: 1 }]);
+
+    expect(state.equipped.gloves).toBeDefined();
+  });
+
+  it('says so and changes nothing when the slot is bare', () => {
+    const state = createGameState();
+    initResources(state, world);
+
+    applyResultsNow(state, world, [{ kind: 'take-worn', slot: 'gloves' }]);
+
+    expect(state.equipped.gloves).toBeUndefined();
+    expect(state.log).toHaveLength(1);
   });
 });
 

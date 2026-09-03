@@ -134,12 +134,7 @@ item-level: 3-7
 tackle, +25 max-line-health, +100% max-line-health, -6 fishing
 
 # droptable parted-tackle
-take: 1 small-fishing-net
-take: 1 large-fishing-net
-take: 1 gut-line
-take: 1 braided-fiber-line
-take: 1 horsehair-line
-take: 1 steel-line
+take: worn gloves
 
 # droptable spend-bait
 one of:

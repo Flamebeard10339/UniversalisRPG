@@ -13,7 +13,7 @@ import { evaluateCondition, weighing } from './conditions';
 import { effectiveAdjacent } from './journey';
 import { actorEntity } from './actionLookup';
 import { hasPool } from './stats';
-import { handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem, stripHoldings } from './itemInstance';
+import { destroyItem, handOver, HandOver, heldSignature, NOTHING_HELD, receiveItem, stripHoldings } from './itemInstance';
 import { bundleCount, bundleHeld, bundleStack, bundleWholePack, pourOut } from './bundle';
 import { openModalNamed } from './modalStack';
 import { Localized, localizerOf } from './localized';
@@ -277,6 +277,19 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
       if (result.into !== undefined) bundleStack(state, result.into, result.item, gone);
       announceCarried(segment, gone);
       return -gone;
+    }
+    case 'take-worn': {
+      const say = localizerOf(registry, state);
+      const worn = state.equipped[result.slot];
+      if (worn === undefined) {
+        state.log.push(say.engine('engine.inputs.bare-slot', { slot: say.title('slot', result.slot) }));
+        return 0;
+      }
+      const gone = destroyItem(state, worn);
+      if (!gone.ok) return 0;
+      if (result.into !== undefined) bundleStack(state, result.into, gone.item, 1);
+      announceCarried(segment, 1);
+      return -1;
     }
     case 'xp': {
       const amount = drawCount(state, registry, readAmount(segment, result.amount, actor)) * count;

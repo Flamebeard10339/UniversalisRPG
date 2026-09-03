@@ -152,6 +152,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'take':
         put(result, 'item', 'item', `${where} ${result.kind}:`, visit);
         break;
+      case 'take-worn':
+        put(result, 'slot', 'slot', `${where} take: worn`, visit);
+        break;
       case 'roll':
         put(result, 'table', 'droptable', `${where} roll:`, visit);
         break;

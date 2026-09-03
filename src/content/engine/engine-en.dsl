@@ -18,6 +18,7 @@ engine.target.absent: There is no {target} here.
 engine.target.unoffered: The {target} is in no state for that just now.
 engine.inputs.short: You don't have enough {item}.
 engine.inputs.grown: Your {item} has grown a plane of its own, and a grown item is never spent.
+engine.inputs.bare-slot: You are wearing nothing on your {slot}.
 engine.combat.player.hit: You hit the {target} for {damage}.
 engine.combat.player.miss: You miss the {target}.
 engine.combat.foe.hit: The {attacker} hits you for {damage}.

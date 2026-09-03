@@ -46,6 +46,7 @@ type ResultLine =
   | { kind: 'add'; variable: string; amount: number }
   | { kind: 'give'; item: string; amount?: Range }
   | { kind: 'take'; item: string; amount?: number }
+  | { kind: 'take-worn'; slot: string }
   | { kind: 'strip' }
   | { kind: 'empty'; bundle: string }
   | { kind: 'xp'; skill: string; amount: Amount }
@@ -122,6 +123,8 @@ export const EVERYTHING = 'everything';
 const EVERYTHING_TAKEN = new RegExp(`${EVERYTHING}(?![\\w-])`);
 
 const EMPTIED = new RegExp(`${EVERYTHING}[ \\t]+in[ \\t]+`);
+
+const WORN_TAKEN = /worn[ \t]+(?=[a-z])/;
 
 export const BUNDLE = 'bundle';
 
@@ -352,10 +355,18 @@ const LEAVES: readonly Leaf[] = [
   },
   {
     opens: /take:[ \t]*/,
-    forms: ['take: <count> <item>', `take: ${EVERYTHING}`],
-    examples: ['take: 3 plank', `take: ${EVERYTHING}`],
-    read: (cursor) => (cursor.take(EVERYTHING_TAKEN) !== null ? { kind: 'strip' } : { kind: 'take', ...quantified.parse(cursor) }),
+    forms: ['take: <count> <item>', 'take: worn <slot>', `take: ${EVERYTHING}`],
+    examples: ['take: 3 plank', 'take: worn gloves', `take: ${EVERYTHING}`],
+    read: (cursor) => {
+      if (cursor.take(EVERYTHING_TAKEN) !== null) return { kind: 'strip' };
+      if (cursor.take(WORN_TAKEN) !== null) return { kind: 'take-worn', slot: id.parse(cursor) };
+      return { kind: 'take', ...quantified.parse(cursor) };
+    },
     yields: BUNDLE,
+    notes: {
+      'take: worn <slot>':
+        'takes whatever the player is wearing in that slot, whichever piece it is and whether or not it was rolled — which is how a mishap costs the piece it happened to rather than a piece named by id, and the only form that reaches a rolled copy at all',
+    },
   },
   {
     opens: /xp:[ \t]*/,
@@ -535,6 +546,8 @@ function printResultLine(value: ActionResult): string {
       return `give: ${produced.print(value)}`;
     case 'take':
       return `take: ${quantified.print({ item: value.item, amount: value.amount })}`;
+    case 'take-worn':
+      return `take: worn ${value.slot}`;
     case 'strip':
       return `take: ${EVERYTHING}`;
     case 'empty':
