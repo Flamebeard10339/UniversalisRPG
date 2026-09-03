@@ -15,6 +15,7 @@ import { createGameState, type GameState } from '../src/runtime/state';
 import { fromMilliUnits, MS_PER_MINUTE, msToSeconds, secondsToMs } from '../src/runtime/units';
 import { FLOORS_DIR } from './floors';
 import { readSources } from './probe';
+import { abilityAtLevel } from './lib/pace';
 import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
 type Walked = ReturnType<typeof createGameState>;
@@ -24,6 +25,15 @@ export const DEFAULT_WINDOW_MINUTES = 60;
 
 const usage = [
   'Usage: npm run simulate-activity -- <save> [<action-spec>] [--off <pack>] [--at <location>] [--seeds <n>] [--window <minutes>] [--all] [--ideal]',
+  '',
+  '  --ladder        <stat>=<level>[,<stat>=<level>...] — stand the player where the ladder puts a',
+  '                  character of that level in that stat, so a sweep names the rung it is asking',
+  '                  about rather than the base underneath one. The ladder is the declared line in',
+  '                  scripts/lib/pace.ts that `npm run ladder-check` audits the world against, and',
+  '                  the base that reaches it is solved rather than reckoned: the player is stood up',
+  '                  twice under two bases, what the world made of each is read back, and the base',
+  '                  that lands on the rung falls out of the two. So gear, race and what the level',
+  '                  itself grants are all inside the figure, and the head says what they stood at',
   '',
   '  --ideal         stand every run up under unkillable, instant-kill and succeed-checks, so what',
   '                  is read is the most an offer can pay and the least it can cost: the ceiling',
@@ -108,6 +118,7 @@ export interface SimulationArgs {
   all: boolean;
   ideal?: boolean;
   stats?: readonly StatAsk[];
+  rungs?: readonly RungAsk[];
   after?: string;
 }
 
@@ -124,14 +135,28 @@ export interface StatAsk {
   readonly value: number;
 }
 
+export interface RungAsk {
+  readonly id: string;
+  readonly level: number;
+}
+
 export const GOD_WORDS: readonly DebugSwitch[] = ['unkillable', 'instant-kill', 'succeed-checks'];
 
-export function parseStats(spec: string): StatAsk[] {
+export function parsePairs(flag: string, spec: string): StatAsk[] {
   return spec.split(',').map((pair) => {
     const [id, raw, ...more] = pair.split('=');
     const value = Number(raw);
-    if (!id || raw === undefined || more.length > 0 || raw.trim() === '' || !Number.isFinite(value)) throw new Error(`--stats takes <stat>=<number> pairs separated by commas, and ${JSON.stringify(pair)} is not one`);
+    if (!id || raw === undefined || more.length > 0 || raw.trim() === '' || !Number.isFinite(value)) throw new Error(`${flag} takes <stat>=<number> pairs separated by commas, and ${JSON.stringify(pair)} is not one`);
     return { id: id.trim(), value };
+  });
+}
+
+export const parseStats = (spec: string): StatAsk[] => parsePairs('--stats', spec);
+
+export function parseRungs(spec: string): RungAsk[] {
+  return parsePairs('--ladder', spec).map(({ id, value }) => {
+    if (!Number.isInteger(value) || value < 1) throw new Error(`--ladder takes <stat>=<level>, and a level is a whole number of at least 1, not ${String(value)}`);
+    return { id, level: value };
   });
 }
 
@@ -158,6 +183,11 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
       const spec = raw[++i];
       if (spec === undefined) throw new Error('--stats wants <stat>=<number>[,<stat>=<number>...] after it');
       args.stats = [...(args.stats ?? []), ...parseStats(spec)];
+    }
+    else if (arg === '--ladder') {
+      const spec = raw[++i];
+      if (spec === undefined) throw new Error('--ladder wants <stat>=<level>[,<stat>=<level>...] after it');
+      args.rungs = [...(args.rungs ?? []), ...parseRungs(spec)];
     }
     else if (arg === '--at') {
       const at = raw[++i];
@@ -266,6 +296,23 @@ export function probeSource(dependencies: readonly string[], subjects: readonly 
     lines.push('', `# test run-${index}`, DEBUG_MARK, `${subject.use} until ${until}`);
   });
   return { name: PROBE_MODULE, text: `${lines.join('\n')}\n` };
+}
+
+export const RUNG_PROBE_BASES: readonly [number, number] = [0, 1];
+
+export function baseForRung(sources: readonly ModuleSource[], dependencies: readonly string[], player: string, start: Start, rung: RungAsk): number {
+  const readAt = (base: number): number => {
+    const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, [], start, 0, false, { player, stats: [{ id: rung.id, value: base }] })]);
+    if (loaded.diagnostics.length > 0) throw new Error(loaded.diagnostics.map(formatModuleDiagnostic).join('\n'));
+    return standingAt(loaded.registry, start, [rung.id])[0]!.value;
+  };
+  const [lower, upper] = RUNG_PROBE_BASES;
+  const [stoodLow, stoodHigh] = [readAt(lower), readAt(upper)];
+  const perPoint = (stoodHigh - stoodLow) / (upper - lower);
+  if (perPoint === 0) {
+    throw new Error(`--ladder ${rung.id}=${String(rung.level)}: a point of ${rung.id} written on the sheet moves what the player stands at by nothing at all, so no base of it stands them on that rung`);
+  }
+  return lower + (abilityAtLevel(rung.level) - stoodLow) / perPoint;
 }
 
 export interface Gain {
@@ -528,13 +575,31 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
     return { lines: [`${startLabel(start)}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
   }
 
-  const asked = args.stats ?? [];
-  const unknown = asked.filter((each) => !base.registry.stats.has(each.id));
-  if (unknown.length > 0) return { lines: [`--stats names no # stat under: ${unknown.map((each) => each.id).join(', ')}. Write the id whole, as thieving.thieving-ability.`], ok: false };
-  if (asked.length > 0 && base.registry.player === undefined) return { lines: ['--stats has no player to stand: the world declares no # entity player'], ok: false };
+  const named = args.stats ?? [];
+  const rungs = args.rungs ?? [];
+  const dependencies = base.parsed.map((module) => module.info.id);
+
+  const written: readonly (readonly [string, readonly string[]])[] = [
+    ['--stats', named.map((each) => each.id)],
+    ['--ladder', rungs.map((each) => each.id)],
+  ];
+  for (const [flag, ids] of written) {
+    const unknown = ids.filter((id) => !base.registry.stats.has(id));
+    if (unknown.length > 0) return { lines: [`${flag} names no # stat under: ${unknown.join(', ')}. Write the id whole, as thieving.thieving-ability.`], ok: false };
+  }
+  const both = rungs.map((each) => each.id).filter((id) => named.some((each) => each.id === id));
+  if (both.length > 0) return { lines: [`--stats and --ladder both name ${both.join(', ')}, and a player stands on one base per stat: name it under one of them`], ok: false };
+  const standers = written.filter(([, ids]) => ids.length > 0).map(([flag]) => flag);
+  if (standers.length > 0 && base.registry.player === undefined) return { lines: [`${standers.join(' and ')} has no player to stand: the world declares no # entity player`], ok: false };
+
+  let asked: StatAsk[];
+  try {
+    asked = [...named, ...rungs.map((rung) => ({ id: rung.id, value: baseForRung(sources, dependencies, base.registry.player!.id, start, rung) }))];
+  } catch (error) {
+    return { lines: [error instanceof Error ? error.message : String(error)], ok: false };
+  }
 
   const endMs = clockOn(base.registry, start) + args.window * MS_PER_MINUTE;
-  const dependencies = base.parsed.map((module) => module.info.id);
   const stoodAt: Stood | undefined = asked.length > 0 ? { player: base.registry.player!.id, stats: asked } : undefined;
   const loaded = loadUniverseWithDiagnostics([...sources, probeSource(dependencies, subjects, start, endMs, args.ideal, stoodAt)]);
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };

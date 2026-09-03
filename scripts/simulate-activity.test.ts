@@ -3,7 +3,8 @@ import { SAVE_VERSION } from '../src/runtime/save';
 import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { secondsToMs } from '../src/runtime/units';
-import { simulate, simulationLines, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, stood, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
+import { abilityAtLevel } from './lib/pace';
+import { simulate, simulationLines, baseForRung, clockOn, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standingAt, stood, subjectsFrom, type Measured, type Run, type Subject } from './simulate-activity';
 
 const ISLAND = `# info island
 version: 1.0.0
@@ -195,6 +196,61 @@ describe('a sweep at a rung of the stat ladder', () => {
     const { lines, ok } = simulate([{ name: 'island', text: ISLAND }], { save: SAVE, seeds: 1, window: 1, all: false, stats: [{ id: 'island.stealth', value: 5 }] });
     expect(ok).toBe(false);
     expect(lines[0]).toMatch(/--stats names no # stat under: island.stealth/);
+  });
+});
+
+const LADDERED = `# info rung
+version: 1.0.0
+dependencies:
+  island
+
+# skill prowling
+title: Prowling
+stat: island.attack
+
+# entity island.player
++skills: prowling
+`;
+
+describe('a sweep at a rung of the declared ladder', () => {
+  const sources = [{ name: 'island', text: ISLAND }, { name: 'rung', text: LADDERED }];
+  const modules = ['island', 'rung'];
+  const PLAYER = 'island.player';
+  const start = { save: SAVE };
+
+  it('reads <stat>=<level> pairs off one flag, and refuses a rung that is not a level', () => {
+    expect(parseSimulationArgs(['s', '--ladder', 'island.attack=12']).rungs).toEqual([{ id: 'island.attack', level: 12 }]);
+    expect(parseSimulationArgs(['s', '--ladder', 'a=1', '--ladder', 'b=2']).rungs).toEqual([{ id: 'a', level: 1 }, { id: 'b', level: 2 }]);
+    expect(() => parseSimulationArgs(['s', '--ladder', 'island.attack=2.5'])).toThrow(/a whole number of at least 1/);
+    expect(() => parseSimulationArgs(['s', '--ladder', 'island.attack=0'])).toThrow(/a whole number of at least 1/);
+    expect(() => parseSimulationArgs(['s', '--ladder', 'island.attack'])).toThrow(/<stat>=<number>/);
+  });
+
+  it('solves the base that stands the player on the rung rather than writing the rung down as one', () => {
+    for (const level of [1, 12, 30]) {
+      const asked = abilityAtLevel(level);
+      const base = baseForRung(sources, modules, PLAYER, start, { id: 'island.attack', level });
+      expect(base, 'the rung was written down as a base instead of being solved for').not.toBeCloseTo(asked, 3);
+      const loaded = loadUniverseWithDiagnostics([...sources, probeSource(modules, [], start, 0, false, { player: PLAYER, stats: [{ id: 'island.attack', value: base }] })]);
+      expect(loaded.diagnostics).toEqual([]);
+      expect(standingAt(loaded.registry, start, ['island.attack'])[0]!.value).toBeCloseTo(asked, 6);
+    }
+  });
+
+  it('says where the player actually stood, which is the rung and not the base under it', () => {
+    const report = simulate(sources, { save: SAVE, holds: 'pick', seeds: 1, window: 1, all: false, rungs: [{ id: 'island.attack', level: 12 }] });
+    expect(report.ok).toBe(true);
+    expect(report.lines.find((line) => line.startsWith('standing at'))).toContain(`island.attack ${String(Math.round(abilityAtLevel(12) * 10) / 10)}`);
+  });
+
+  it('refuses a stat the world does not declare, and one that both flags name', () => {
+    const undeclared = simulate(sources, { save: SAVE, seeds: 1, window: 1, all: false, rungs: [{ id: 'island.stealth', level: 4 }] });
+    expect(undeclared.ok).toBe(false);
+    expect(undeclared.lines[0]).toMatch(/--ladder names no # stat under: island.stealth/);
+
+    const twice = simulate(sources, { save: SAVE, seeds: 1, window: 1, all: false, stats: [{ id: 'island.attack', value: 40 }], rungs: [{ id: 'island.attack', level: 4 }] });
+    expect(twice.ok).toBe(false);
+    expect(twice.lines[0]).toMatch(/--stats and --ladder both name island.attack/);
   });
 });
 

@@ -16,3 +16,8 @@ export function minutesToReach(level: number): number {
 const MINUTES_PER_HOUR = 60;
 
 export const rateAtLevel = (level: number): number => ((xpForLevel(level + 1) - xpForLevel(level)) * MINUTES_PER_HOUR) / minutesForLevel(level);
+
+export const ABILITY_AT_LEVEL_ONE = 0;
+export const ABILITY_GROWTH_PER_LEVEL = 7;
+
+export const abilityAtLevel = (level: number): number => ABILITY_AT_LEVEL_ONE + ABILITY_GROWTH_PER_LEVEL * (level - 1);

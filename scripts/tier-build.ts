@@ -202,9 +202,14 @@ export function growWorn(state: GameState, registry: Registry, stats: readonly s
 export const evenlySpent = (activity: Activity, level: number): Record<string, number> =>
   Object.fromEntries(activity.skills.map((skill) => [skill, poolForTier(activity, level) / activity.skills.length]));
 
-export function buildTier(registry: Registry, activity: Activity, level: number, items: readonly string[], grow: readonly string[] = []): TierBuild {
+export function tierState(registry: Registry, activity: Activity, level: number): GameState {
   const state = initialState(registry);
   Object.assign(state.xp, evenlySpent(activity, level));
+  return state;
+}
+
+export function buildTier(registry: Registry, activity: Activity, level: number, items: readonly string[], grow: readonly string[] = []): TierBuild {
+  const state = tierState(registry, activity, level);
 
   const worn: Worn[] = [];
   for (const written of items) {

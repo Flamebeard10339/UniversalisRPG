@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { xpForLevel } from '../../src/runtime/skills';
-import { GROWTH_CEILING, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, rateAtLevel } from './pace';
+import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, GROWTH_CEILING, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -31,5 +31,19 @@ describe('the pace a level is meant to take', () => {
     for (const level of [1, 9, 30, 70]) {
       expect(rateAtLevel(level)).toBeCloseTo((costOfLevel(level) * 60) / minutesForLevel(level), 6);
     }
+  });
+});
+
+describe('the ability a level is assumed to stand at', () => {
+  it('never falls, because a character does not get weaker for having levelled', () => {
+    for (let level = 1; level < 100; level += 1) expect(abilityAtLevel(level + 1)).toBeGreaterThanOrEqual(abilityAtLevel(level));
+  });
+
+  it('stands the first level on the anchor, which is the one figure chosen rather than derived', () => {
+    expect(abilityAtLevel(1)).toBe(ABILITY_AT_LEVEL_ONE);
+  });
+
+  it('puts exactly one growth between one level and the next, wherever the two constants are moved to', () => {
+    for (let level = 1; level < 100; level += 1) expect(abilityAtLevel(level + 1) - abilityAtLevel(level)).toBeCloseTo(ABILITY_GROWTH_PER_LEVEL, 9);
   });
 });
