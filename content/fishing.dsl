@@ -995,6 +995,7 @@ stocks:
   4 steel-line
   60 bread-paste
   2 greenheart-rod
+replenish: 5s
 
 # entity fishing-supplies
 title: Fishing Supplies
