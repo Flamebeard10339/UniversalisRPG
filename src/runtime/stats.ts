@@ -8,7 +8,7 @@ import { sideOf } from '../grammar/action';
 import { Registry } from '../content/registry';
 import { carriedPassives, CounterLevel, itemContribution, scaledAmount, StatContribution } from './itemContribution';
 import { Item } from '../content/sections/item';
-import { itemInstance, itemTemplate } from './itemInstance';
+import { type ItemInstance, itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { skillTags } from '../content/sections/skill';
@@ -78,7 +78,7 @@ export interface ModifierCarrier {
   hooks?: HookCarrier;
   tags?: readonly TagClause[];
   item?: Item;
-  wornId?: string;
+  instance?: ItemInstance;
 }
 
 function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean): ModifierCarrier | undefined {
@@ -108,8 +108,9 @@ export function modifierCarriers(state: GameState, registry: Registry, actorId: 
     const templateId = itemTemplate(state, wornId);
     const item = registry.items.get(templateId);
     if (!item) continue;
-    carriers.push({ source: titled('item', templateId), hooks: item, item, wornId });
-    for (const passiveId of carriedPassives(registry, itemInstance(state, wornId))) {
+    const instance = itemInstance(state, wornId);
+    carriers.push({ source: titled('item', templateId), hooks: item, item, instance });
+    for (const passiveId of carriedPassives(registry, instance)) {
       const carrier = passiveCarrier(registry, passiveId, false);
       if (carrier) carriers.push(carrier);
     }
@@ -153,7 +154,7 @@ export function statBreakdown(statId: string, state: GameState, registry: Regist
   for (const carrier of carriers) {
     const fold: StatFold = { added: point(0), increased: 0 };
     if (carrier.tags) foldStatBonuses(carrier.tags, statId, fold, counter);
-    if (carrier.item) foldContribution(itemContribution(registry, carrier.item, itemInstance(state, carrier.wornId!), counter), statId, fold);
+    if (carrier.item) foldContribution(itemContribution(registry, carrier.item, carrier.instance, counter), statId, fold);
     if (!contributes(fold)) continue;
     const address = addressOf(carrier.source);
     const held = parts.get(address);

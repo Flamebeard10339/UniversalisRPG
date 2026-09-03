@@ -19,6 +19,27 @@ took. The refusal names the template rather than saying an instance is wanted.
 a template that is carried more than once either picks one or refuses by saying that an
 instance number is wanted — with a refusal test beside it.*
 
+## The stat read is what `--grow` costs, and it recomputes six planes to answer about one
+
+`npm run ladder-check` spends about 60% of its build time inside `statBreakdown`, which
+rebuilds every carrier of every worn piece on every read — six planes walked to answer a
+question only one of them can have changed, because `spendPlane` is growing one piece at a
+time. `itemContribution` then folds all of that piece's stats, sorts them and materialises
+an array, and `foldContribution` keeps the one stat asked for. Measured 2026-09-03 on
+`combat.attack` at the level-30 rung: 20k reads at ~65us each, and the deep `isPlane` guard
+that `itemInstance` runs on every access is 27% of the build on its own.
+
+The greedy cannot read fewer times without either modelling what a passive is worth — which
+`tier-build` refuses on purpose — or weakening the played-out lookahead, which is the thing
+that stops `--grow` being decorative. So the remaining speed is all in the read, and it is
+the engine's hottest path rather than the tool's, which is why this was left rather than
+taken: the sweep is a usable 4.9s and no gate runs it.
+
+*Closes when: `statBreakdown` can be asked about one stat without every worn item's whole
+contribution set being built and sorted for it, and `itemInstance` stops deep-validating a
+payload the runtime itself just built — with the UI's own use of `itemContribution` still
+served by the same one home.*
+
 ## `-<line>` should take a scalar back, and does not yet
 
 The grammar page offers `-<line>` on every line of every section, and it works on
