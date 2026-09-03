@@ -4,7 +4,7 @@ import { AnySchema, HydrateContext, listMembers, parseAnySection, printSection }
 import { RawLine } from '../../grammar/structure';
 import { id, number, text } from '../../grammar/values';
 import { DIRECTIONS, Direction } from '../hex';
-import { getShape, Shape } from '../shapes';
+import { getShape, Shape, SHAPES } from '../shapes';
 import { type Loose } from '../refs';
 import { PrintContext, schemaGrammar, section } from './define';
 import { TITLE_FIELD } from './info';
@@ -61,6 +61,20 @@ export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): s
   return undefined;
 }
 
+const shapeNamed: Parser<string> = {
+  parse(cursor) {
+    const start = cursor.pos;
+    const raw = cursor.take(/[a-z][a-z0-9-]*/);
+    if (raw === null || !SHAPES.some((each) => each.name === raw)) {
+      throw new DslError(`a shape is one of ${SHAPES.map((each) => each.name).join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+    }
+    return raw;
+  },
+  print: (value) => value,
+  forms: SHAPES.map((each) => each.name),
+  examples: SHAPES.map((each) => each.name),
+};
+
 export const clusterJewel = section<ClusterJewel>()({
   kind: 'cluster-jewel',
   ids: 'owned',
@@ -70,7 +84,7 @@ export const clusterJewel = section<ClusterJewel>()({
   fields: {
     title: TITLE_FIELD,
     examine: { parser: text },
-    shape: { parser: id },
+    shape: { parser: shapeNamed, note: `how many positions it has, which is what \`positions:\` may name — ${SHAPES.map((each) => `${each.name} ${String(each.positionCount)}`).join(', ')}` },
     openConnections: {
       parser: list(id),
       default: () => [],

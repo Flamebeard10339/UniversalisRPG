@@ -260,26 +260,6 @@ parser and breaks the auto-visit that reads a bare `<hole>` naming a kind.
 *Closes when:* an entity's `stations:` can be gated on a condition without the entity going with
 it, and `npm run oracle` prints the form off the declaration.
 
-## The page teaches merging and says nothing about a field that clears another
-
-`npm run oracle` now says what a second body does to a line it writes again — laid over
-keyword by keyword, `laid over by name` where a body goes home by its own name, and four
-kinds where the one already there is gone. It says nothing about `schema.exclusive`,
-which is a *third* thing a second body can do: writing one field clears another outright.
-`clearedBy` in `src/grammar/section.ts:60` is the machinery, and `# location`'s
-`exclusive: [['x', 'y', 'z'], ['relative']]` (`src/content/sections/location.ts:217`) is
-its only declaration — so a second body writing `relative:` silently drops the `x/y/z`
-the first one had, and the page an author reads does not mention it.
-
-It is derivable exactly like the rest: the groups are on the schema and nothing has to be
-enumerated. It is not written because the page is held to a size — the whole merge
-teaching cost one line, 372 to 373 — and a fourth thing to say about merging is where
-that budget starts to bite.
-
-*Closes when:* an author reading `npm run oracle -- location` is told that `relative:`
-and `x/y/z` displace each other, derived from `schema.exclusive`, with the no-kind page
-no longer than it is now.
-
 ## A `them.` amount is taken where no two sides stand
 
 `refuseParty` (`src/grammar/actionResult.ts:466`) is what enforces *the two sides stand
@@ -361,46 +341,34 @@ file about refusals inside a `# test` is also about.
 *Closes when:* a build failure whose owner cannot be found says so rather than naming a module
 that had nothing to do with it.
 
-## Three things every gearing run has had to work out by experiment
+## Two things a gearing run still has to work out by experiment
 
-Three authoring runs have now spent budget discovering the same class of thing: a fact the
-tooling knows and does not say. Each was found by a run that could not read `src/`, which is
-what makes them oracle and probe defects rather than author error.
+Two of the four that stood here closed on 2026-09-03. A shop's markup is printed — the page
+says what any `printed: 'unless-default'` field reads when it is left out, derived off the
+field's own default through the field's own parser, so `buying:`, `selling:`, `replenish:` and
+`accepts:` all gained the line and so will the next such field. A socketed hex's points were
+never a property of the hex: the budget is rolled per copy off the base's `item-level:`, and
+reaching a socketed jewel spends one of them before any passive, which `item-level:`'s note now
+says. `# cluster-jewel`'s `shape:` also names its five shapes and their position counts rather
+than printing `<id>` with a misleading example.
 
-**A shop marks everything up a fifth over `value:`, and nothing prints it.** Soft-toed boots
-listed at 60 cost 72; fingerless gloves at 45 cost 54. A run budgeting what a climb must earn
-before it can buy has to buy something first and watch the purse. `npm run oracle -- shop` says
-nothing about markup.
+**`equip: <template>` never works on a rolled item.** Inside a `# test` it always refuses,
+whether one rolled copy stands in the pack or three — *player does not carry item X*, while X is
+plainly carried — because `carriesItem` falls through to a stack count and a base never has a
+stack. The silence an earlier run met is the GUI's: `carriedSubmit` finds no entry for an unknown
+item id and returns null with no refusal. The fix is to resolve a template id to the first
+unequipped copy in pack order and refuse only when none stands, beside `named` in
+`src/runtime/itemInstance.ts` — the one place that turns a written id into a copy, which closes
+`swap:`, `slot:`, `allocate:` and `apply:` in the same move. `floors/thieving-floor.dsl` carries
+three bare instance numbers because of this, and five growth directives targeting a bare `3`;
+every one shifts the day anything upstream mints one more item.
 
-**`equip: <template>` never works on a rolled item, and the two paths fail differently.**
-Re-measured 2026-09-03, and it is not about copies colliding: inside a `# test`, `equip:` naming
-a base always refuses, whether one rolled copy stands in the pack or three — *player does not
-carry item fishing.small-fishing-net*, while it is plainly carried. `carriesItem` falls through
-to a stack count, and a base never has a stack, because `receiveItem` mints instances. The
-**silence is the GUI's**: `carriedSubmit` in `src/runtime/carriedScreen.ts` finds no entry for an
-unknown item id and returns null with no refusal, and `carriedScreen` discards `equip`'s return
-besides. So an authoring run that met silence was in the app or answering a modal, not writing a
-route.
+**A long probabilistic loop cannot be traced.** `probe --record` prints the final state only, and
+a failing `assert:` stops the run with no partial dump, so there is no way to see which iterations
+of a four-hundred-minute loop failed. A run wanting to know whether repositioning could dodge the
+travel tax after a success could not find out without instrumenting the DSL with thousands of
+asserts.
 
-The fix is to resolve a template id to the first unequipped copy in pack order and refuse only
-when none stands — which is what the pack screen already means by the name. It goes beside
-`named` in `src/runtime/itemInstance.ts`, the one place that turns a written id into a copy, and
-that closes `swap:`, `slot:`, `allocate:` and `apply:` in the same move, since all four take the
-same `<carried>` token through `growItem`. `floors/thieving-floor.dsl` carries three bare
-instance numbers because of this — `equip: 3`, `equip: 8`, `equip: 9` in `# test gear-up`, plus
-five growth directives targeting a bare `3` — and every one of them shifts the day anything
-upstream mints one more item.
-
-**A long probabilistic loop cannot be traced.** `probe --record` prints the final state only,
-and a failing `assert:` stops the run with no partial dump, so there is no way to see which
-iterations of a four-hundred-minute loop failed. A run wanting to know whether repositioning
-could dodge the travel tax after a success could not find out without instrumenting the DSL
-with thousands of asserts.
-
-One more of the same shape, from the same runs: how many points a jewel's own hex carries once
-it is socketed — four, of the six the rate jewel declares — is printed nowhere, and was found by
-allocating one position at a time until `engine.plane.no-points`.
-
-*Closes when: the oracle prints a shop's markup where it prints the shop and a socketed hex's
-points where it prints the jewel; `equip:` by template either picks a copy or refuses by saying
-an instance is wanted, with a refusal test beside it; and `probe` can print a step trace.*
+*Closes when: `equip:` by template picks an unequipped copy or refuses by saying an instance is
+wanted, with a refusal test beside it and the floor's three bare numbers written back as names;
+and `probe` can print a step trace.*

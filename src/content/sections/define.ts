@@ -5,7 +5,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
 import { Loose, Pruning, Visit, condition as visitCondition, put, strings } from '../refs';
 import { Condition, condition } from '../../grammar/condition';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
@@ -137,6 +137,15 @@ function pointedAt(parser: Parser<unknown>, written: (value: string) => string, 
   return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: valueOf(parser) }) };
 }
 
+function insteadOf(schema: AnySchema, name: string): string | undefined {
+  const groups = schema.exclusive ?? [];
+  const mine = groups.find((group) => group.includes(name));
+  if (mine === undefined) return undefined;
+  const others = groups.filter((group) => group !== mine).flatMap((group) => group.map((each) => writtenAs(schema, each)));
+  if (others.length === 0) return undefined;
+  return `stands in place of ${others.join(', ')}, which cannot be written in the same body, and which a second body writing this one clears`;
+}
+
 function leftOut(spec: AnyField): string | undefined {
   if (spec.printed !== 'unless-default' || spec.default === undefined) return undefined;
   try {
@@ -155,7 +164,8 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const block = positional ? undefined : blockOf(parser);
   const filled = { ...filledBy(parser), ...filledBy(spec) };
   const unwritten = leftOut(spec);
-  const note = [spec.note, unwritten].filter((each) => each !== undefined).join(' — ');
+  const displaces = insteadOf(schema, name);
+  const note = [spec.note, displaces, unwritten].filter((each) => each !== undefined).join(' — ');
   const said = { ...(spec.family === undefined ? {} : { family: spec.family }), ...(note === '' ? {} : { note }), ...(needs === undefined ? {} : { needs }), ...filled };
   const named = pointedAt(parser, written, said);
   const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];

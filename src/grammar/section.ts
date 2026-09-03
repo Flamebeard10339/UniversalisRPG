@@ -299,7 +299,7 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
   }
 }
 
-const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
+export const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
 
 export function unmetNeed(authored: Record<string, unknown>, schema: AnySchema): string | undefined {
   for (const [name, needed] of Object.entries(schema.needs ?? {})) {

@@ -112,7 +112,7 @@ export const item = section<AuthoredItem, never, 'actions'>()({
     itemLevel: {
       parser: range,
       keyword: 'item-level',
-      note: 'makes this a base: a copy arrives with a plane and this many points on it, rolled once and fixed on that copy, and two copies that rolled differently do not stack. Any base takes a jewel — a plain cap as readily as a sword — and the points go on the jewel\'s passives, which is how a worn thing comes to raise a skill it says nothing about; `slot:` and `allocate:` under # test are how a route grows one',
+      note: 'makes this a base: a copy arrives with a plane and this many points on it, rolled once and fixed on that copy, and two copies that rolled differently do not stack. Any base takes a jewel — a plain cap as readily as a sword — and the points go on the jewel\'s passives, which is how a worn thing comes to raise a skill it says nothing about; `slot:` and `allocate:` under # test are how a route grows one. A point buys one position or one connection out of a hex, and the first position of the plane itself is the only free one — so a jewel socketed an edge out costs a point to reach before any of its passives',
     },
     tags: { parser: list(tagClause), default: () => [] },
     jewel: {
