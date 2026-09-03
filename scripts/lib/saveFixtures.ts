@@ -1,6 +1,7 @@
 import { globSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { qualify } from '../../src/content/namespace';
+import { everyDirective } from '../../src/content/sections/test';
 import { formatModuleDiagnostic, type Registry } from '../../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../../src/content/load';
 import { isOverLine, parseSaveSection } from '../../src/content/sections/save';
@@ -105,7 +106,7 @@ export function classifier(registry: Registry, fixtures: readonly Fixture[]): (i
   const found = new Map<string, Classification>();
   for (const fixture of fixtures) found.set(fixture.id, 'unreferenced');
   for (const test of registry.tests.values()) {
-    for (const directive of test.directives) {
+    for (const directive of everyDirective(test.directives)) {
       if (directive.kind === 'load' && found.get(directive.save) === 'unreferenced') found.set(directive.save, 'input');
       if (directive.kind === 'expect' || directive.kind === 'expect-only') found.set(directive.save, 'recording');
     }

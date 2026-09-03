@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { sourceFiles } from './lib/dslSources';
+import { everyDirective } from '../src/content/sections/test';
 import { formatVersion } from '../src/grammar/dependency';
 import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { mapOf } from '../src/content/registry';
@@ -183,7 +184,7 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
 
 function closingSaveId(registry: Registry, testId: string): string | undefined {
   let closing: string | undefined;
-  for (const directive of registry.tests.get(testId)?.directives ?? []) {
+  for (const directive of everyDirective(registry.tests.get(testId)?.directives ?? [])) {
     if (directive.kind === 'expect' || directive.kind === 'expect-only') closing = directive.save;
   }
   return closing;

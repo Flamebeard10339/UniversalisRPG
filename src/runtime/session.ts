@@ -39,7 +39,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
 import { compareSave, compareSaveOnly, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import type { PruneWarning } from './pruning';
-import { Directive, parseUseChoiceId, printDirective, printTerminator, Terminator, useChoiceId } from '../content/sections/test';
+import { Directive, isCycles, parseUseChoiceId, printDirective, printRounds, printTerminator, Terminator, useChoiceId } from '../content/sections/test';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -682,6 +682,7 @@ function arm(directive: Directive, registry: Registry, state: GameState): ArmRes
     case 'apply':
     case 'refuse':
     case 'until':
+    case 'loop':
     case 'open-modal':
     case 'submit-modal':
     case 'shop':
@@ -852,6 +853,8 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       const started = performDirective(session, directive.inner);
       return started.failure ? started : waitedOut(state, registry, directive.until, start);
     }
+    case 'loop':
+      return wentRound(session, directive);
     case 'equip':
       return { failure: equip(state, registry, directive.item) };
     case 'unequip':
@@ -893,6 +896,19 @@ function waitedOut(state: GameState, registry: Registry, terminator: Terminator 
   return { failure: `${label} — ${waited.reason}` };
 }
 
+function wentRound(session: PlaySession, loop: Extract<Directive, { kind: 'loop' }>): DirectiveOutcome {
+  const { registry } = session;
+  const state = stateOf(session);
+  const heading = printRounds(loop.until);
+  for (let passes = 0; ; passes++) {
+    if (isCycles(loop.until) ? passes >= loop.until.times : evaluateCondition(loop.until, state, registry)) return {};
+    const before = serializeSession(session);
+    const { failure } = walkTest(session, loop.body);
+    if (failure !== null) return { failure: `${heading} — pass ${passes + 1}: ${failure}` };
+    if (!isCycles(loop.until) && serializeSession(session) === before) return { failure: `${heading} — ${localizerOf(registry, state).engine('engine.stopped.round')}` };
+  }
+}
+
 function grew(session: PlaySession, state: GameState, growth: Growth): { failure?: string } {
   if (growth.ok) return {};
   const refused = say(sessionLocalizer(session), growth.refused);
@@ -918,7 +934,15 @@ export function testSteps(testId: string, registry: Registry, stack: readonly st
   if (stack.includes(testId)) throw new RuntimeError(`cyclic test run: ${[...stack, testId].join(' -> ')}`);
   const test = registry.tests.get(testId);
   if (!test) throw new RuntimeError(`unknown test: ${testId}`);
-  return test.directives.flatMap((directive) => (directive.kind === 'run' ? testSteps(directive.test, registry, [...stack, testId]) : [directive]));
+  return runsUnrolled(test.directives, registry, [...stack, testId]);
+}
+
+function runsUnrolled(directives: readonly Directive[], registry: Registry, stack: readonly string[]): Directive[] {
+  return directives.flatMap((directive) => {
+    if (directive.kind === 'run') return testSteps(directive.test, registry, stack);
+    if (directive.kind === 'loop') return [{ ...directive, body: runsUnrolled(directive.body, registry, stack) }];
+    return [directive];
+  });
 }
 
 export interface Replayed {

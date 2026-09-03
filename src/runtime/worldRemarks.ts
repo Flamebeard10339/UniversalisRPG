@@ -1,7 +1,7 @@
 import { isBase } from '../content/sections/item';
 import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
-import type { Directive } from '../content/sections/test';
+import { everyDirective, type Directive } from '../content/sections/test';
 import { keywordsIn, type TagClause } from '../grammar/tagClause';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
@@ -55,11 +55,12 @@ function restated(registry: Registry): Remark[] {
 
 function unspoken(registry: Registry): Remark[] {
   return [...registry.tests.values()]
-    .filter((each) => each.directives.some((directive) => !REACHES.includes(directive.kind)))
-    .filter((each) => !each.directives.some((directive) => SPELLS_IT_OUT.includes(directive.kind)))
-    .filter((each) => !each.directives.some((directive) => directive.kind === 'expect'))
+    .map((each) => ({ id: each.id, lines: everyDirective(each.directives) }))
+    .filter((each) => each.lines.some((directive) => !REACHES.includes(directive.kind)))
+    .filter((each) => !each.lines.some((directive) => SPELLS_IT_OUT.includes(directive.kind)))
+    .filter((each) => !each.lines.some((directive) => directive.kind === 'expect'))
     .map((each) => {
-      const sheets = each.directives.flatMap((directive) => (directive.kind === 'expect-only' ? [directive.save] : []));
+      const sheets = each.lines.flatMap((directive) => (directive.kind === 'expect-only' ? [directive.save] : []));
       const only = sheets.length > 0 ? `save ${sheets.join(' and ')}` : 'nowhere at all';
       return { where: `# test ${each.id}`, says: `states no claim: what it proves lives in ${only}. Write the claim as assert: lines — \`npm run oracle -- test\` lists what a condition may read — or, where nothing a condition can read names it, close on expect: and say why in a comment.` };
     });

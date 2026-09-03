@@ -1,8 +1,8 @@
 import { Condition, condition } from '../../grammar/condition';
 import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreen, modalScreenRefusal, place } from '../../grammar/actionResult';
-import { DslError, parseWhole } from '../../grammar/parser';
+import { DslError, parseWhole, type Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { hasBlock } from '../../grammar/structure';
+import { hasBlock, indentLines, takeBlock, type RawLine } from '../../grammar/structure';
 import type { Span } from '../../grammar/parser';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
 import type { EngineKey } from '../locale';
@@ -81,6 +81,7 @@ export type Directive =
   | { kind: 'apply'; target: string; hex: Hex; effect: string }
   | { kind: 'refuse'; inner: GrowthDirective }
   | { kind: 'until'; inner: Directive; until: Terminator }
+  | { kind: 'loop'; until: Rounds; body: Directive[] }
   | { kind: 'open-modal'; modal: ModalScreen }
   | { kind: 'setting'; setting: string; value: string }
   | { kind: 'debug'; which: DebugSwitch }
@@ -99,12 +100,16 @@ export type Terminator = 'done' | Cycles | Condition;
 
 export type WaitFor = 'done' | Cycles;
 
+export type Rounds = Cycles | Condition;
+
 export const isCycles = (value: Terminator): value is Cycles => typeof value === 'object' && 'times' in value;
 
 export interface Test {
   id: string;
   directives: Directive[];
 }
+
+export const everyDirective = (directives: readonly Directive[]): Directive[] => directives.flatMap((directive) => (directive.kind === 'loop' ? [directive, ...everyDirective(directive.body)] : [directive]));
 
 const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
 const SLUG = '[a-z0-9][a-z0-9-]*';
@@ -154,6 +159,17 @@ function parseTerminator(text: string): Terminator | null {
   } catch {
     return null;
   }
+}
+
+const LOOP = /^until[ \t]+(?<rounds>.+):$/;
+const LOOP_FORM = 'until <condition>: or until <n> times:';
+const OPENS_A_BLOCK = `only an \`${LOOP_FORM}\` line takes an indented block in a # test, and the block is what it goes round`;
+
+function parseRounds(text: string, span: Span): Rounds {
+  const rounds = parseTerminator(text);
+  if (rounds === null) throw new DslError(`malformed until block (expected ${LOOP_FORM}): ${text}`, span);
+  if (rounds === 'done') throw new DslError(`\`until done:\` opens nothing: a block has no one action under way to be done with, so it goes round ${LOOP_FORM}`, span);
+  return rounds;
 }
 const CARRIED = `(?:${PATH}|[0-9]+)`;
 const HEX = '-?\\d+,-?\\d+';
@@ -401,8 +417,16 @@ function inlined(inner: Directive, verb = inner.kind): string {
   return `${verb} ${printDirective(inner).replace(/^[a-z-]+:[ \t]*/, '')}`;
 }
 
+export const printRounds = (value: Rounds): string => `until ${printTerminator(value)}:`;
+
+export function printDirectiveLines(value: Directive): string[] {
+  return value.kind === 'loop' ? [printRounds(value.until), ...indentLines(value.body.flatMap(printDirectiveLines))] : [printDirective(value)];
+}
+
 export function printDirective(value: Directive): string {
   switch (value.kind) {
+    case 'loop':
+      return printDirectiveLines(value).join('\n');
     case 'run':
       return `run: ${value.test}`;
     case 'talk':
@@ -481,6 +505,9 @@ const USED = { names: { id: '<kind>', action: null } };
 
 const UNTIL_NOTE = 'performs the directive, then waits it out exactly as the matching `wait:` does';
 
+const LOOP_NOTE =
+  'goes round the lines under it, asking before each pass whether the condition holds and stopping the moment it does — so a death that cuts an action short ends that pass and not the route, and a pass that leaves the world exactly as it found it is refused rather than gone round again forever';
+
 const REFUSED_STANDS_UNDER =
   'refused is about the line above it, which has to be a line the engine was asked to take';
 
@@ -489,6 +516,28 @@ function refusalStands(above: Directive | undefined, span: Span): void {
   if (above.kind === 'note' || above.kind === 'page' || above.kind === 'refused') {
     throw new DslError(`${REFUSED_STANDS_UNDER}; ${JSON.stringify(printDirective(above))} is not one`, span);
   }
+}
+
+function heldByTest(): readonly Written[] {
+  return test.grammar;
+}
+
+function parseLines(lines: readonly RawLine[]): Directive[] {
+  const directives: Directive[] = [];
+  for (const line of lines) {
+    const loop = LOOP.exec(line.text)?.groups;
+    if (loop) {
+      if (!hasBlock(line)) throw new DslError(`${JSON.stringify(line.text)} opens a block and nothing stands under it`, line.span);
+      directives.push({ kind: 'loop', until: parseRounds(loop.rounds, line.span), body: parseLines(takeBlock(line)) });
+      continue;
+    }
+    if (hasBlock(line)) throw new DslError(`${OPENS_A_BLOCK}: ${line.text}`, line.span);
+    const directive = parseDirectiveLine(line.text);
+    if (!directive) throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
+    if (directive.kind === 'refused') refusalStands(directives[directives.length - 1], line.span);
+    directives.push(directive);
+  }
+  return directives;
 }
 
 export const test = section<Test>()({
@@ -559,6 +608,19 @@ export const test = section<Test>()({
       note: UNTIL_NOTE,
       holds: () => ({ condition }),
     },
+    {
+      form: 'until <condition>:',
+      example: 'until level.thieving >= 30:',
+      note: LOOP_NOTE,
+      holds: () => ({ condition }),
+      block: heldByTest,
+    },
+    {
+      form: 'until <n> times:',
+      example: 'until 4 times:',
+      note: 'goes round the lines under it that many times',
+      block: heldByTest,
+    },
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
     { form: 'swap: <item> with <item>', example: 'swap: rusty-sword with bread', note: 'exchanges where two things sit in the pack, which is the order the pack is drawn in and the order a save carries' },
@@ -592,20 +654,9 @@ export const test = section<Test>()({
   ],
   parse: (raw) => {
     if (!raw.id) throw new DslError('# test requires an id', raw.span);
-    const directives: Directive[] = [];
-
-    for (const line of raw.body) {
-      if (hasBlock(line)) throw new DslError(`# test directives are single-line: ${line.text}`, line.span);
-
-      const directive = parseDirectiveLine(line.text);
-      if (!directive) throw new DslError(`unexpected line in # test: ${JSON.stringify(line.text)}`, line.span);
-      if (directive.kind === 'refused') refusalStands(directives[directives.length - 1], line.span);
-      directives.push(directive);
-    }
-
-    return { id: raw.id, directives };
+    return { id: raw.id, directives: parseLines(raw.body) };
   },
-  print: (value, { moduleId }) => [`# test ${moduleLocalId(moduleId, value.id)}`, ...value.directives.map(printDirective)],
+  print: (value, { moduleId }) => [`# test ${moduleLocalId(moduleId, value.id)}`, ...value.directives.flatMap(printDirectiveLines)],
   visit: (value, where, visit) => {
     for (const directive of value.directives ?? []) visitDirective(directive, where, visit);
   },
@@ -680,6 +731,10 @@ export function visitDirective(value: Directive, where: string, visit: Visit): v
     case 'until':
       visitDirective(value.inner, `${where} until:`, visit);
       if (value.until !== 'done' && !isCycles(value.until)) visitCondition(value.until, `${where} until:`, visit);
+      return;
+    case 'loop':
+      if (!isCycles(value.until)) visitCondition(value.until, `${where} until:`, visit);
+      for (const inner of value.body) visitDirective(inner, `${where} until:`, visit);
       return;
     case 'note':
     case 'refused':

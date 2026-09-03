@@ -16,6 +16,7 @@ import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
 import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, sheetOffers, startSession, submitModal, view, wait } from './session';
 import { skillLevel, xpForLevel } from './skills';
+import { BASE_LANGUAGE, localizerFor } from './localized';
 
 import { parseDirectiveLine, printDirective, useChoiceId, type UseDirective } from '../content/sections/test';
 import { actionLinesWritten } from '../grammar/action';
@@ -2204,5 +2205,96 @@ describe('what a page of offers draws, and what belongs to the map', () => {
     const status = sessionStatus(backAtTheGate());
 
     for (const offer of sheetOffers(status)) expect(status.choices[offer.position - 1]!.id, offer.id).toBe(offer.id);
+  });
+});
+
+describe('runTest: an until block goes round its lines', () => {
+  const module =
+    FIXTURE_WORLD +
+    `
+# stat regeneration
+
+# resource health
+max: max-health
+rate: regeneration
+
+# event death
+resource: health
+trigger: on empty
+
+# location camp
+entities:
+  oven
+
+# item roasted-chestnut
+examine: Split and steaming.
+
+# entity oven
+roast:
+  time: 4
+  give: 1 roasted-chestnut
+scald:
+  time: 1
+  drain: 100 health
+
+# entity player
+on death:
+  restore: health
+  stop
+
+# test three-chestnuts
+travel: camp
+until inventory.roasted-chestnut >= 3:
+  use: entity.oven.roast until done
+assert: inventory.roasted-chestnut = 3
+
+# test twice-round
+travel: camp
+until 2 times:
+  use: entity.oven.roast until done
+assert: inventory.roasted-chestnut = 2
+
+# test a-death-ends-the-pass
+travel: camp
+until inventory.roasted-chestnut >= 2:
+  use: entity.oven.scald until done
+  use: entity.oven.roast until done
+
+# test a-pass-that-moves-nothing
+travel: camp
+until inventory.roasted-chestnut >= 1:
+  assert: not has roasted-chestnut
+
+# test the-failing-pass-is-named
+travel: camp
+until inventory.roasted-chestnut >= 3:
+  use: entity.oven.roast until done
+  assert: inventory.roasted-chestnut < 2
+`;
+
+  it('stops the moment the condition holds, or after the passes asked for', () => {
+    const registry = loadInEnglish(module);
+    expect(runTest('three-chestnuts', registry, createGameState())).toEqual({ passed: true });
+    expect(runTest('twice-round', registry, createGameState())).toEqual({ passed: true });
+  });
+
+  it('lets a death end the pass rather than the route, so the next pass starts where the world put the player', () => {
+    const registry = loadInEnglish(module);
+    const state = createGameState();
+    expect(runTest('a-death-ends-the-pass', registry, state)).toEqual({ passed: true });
+    expect(state.inventory['roasted-chestnut']).toBe(2);
+  });
+
+  it('refuses a pass that leaves the world as it found it, in the engine\'s own words', () => {
+    const registry = loadInEnglish(module);
+    const state = createGameState();
+    const { failure } = runTest('a-pass-that-moves-nothing', registry, state);
+    expect(failure).toContain(localizerFor(registry, BASE_LANGUAGE).engine('engine.stopped.round'));
+  });
+
+  it('names the pass a failing line was on', () => {
+    const registry = loadInEnglish(module);
+    const { failure } = runTest('the-failing-pass-is-named', registry, createGameState());
+    expect(failure).toMatch(/^until inventory\.roasted-chestnut >= 3: — pass 2: /);
   });
 });

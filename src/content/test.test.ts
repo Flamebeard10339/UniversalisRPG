@@ -416,3 +416,36 @@ describe('a terminator follows a payload, not free text', () => {
     expect(roundTrip('travel: beach until has rope')).toBe('travel: beach until has rope');
   });
 });
+
+describe('an until block goes round the lines under it', () => {
+  const LOOP = ['# test grind', 'until level.thieving >= 30:', '  use: entity.civilian.pick-pocket until done', '  until 2 times:', '    wait: 90', 'assert: level.thieving >= 30'].join('\n');
+
+  const grindOf = (source: string) => parseModule(source)[0]!.value as { directives: Parameters<typeof printDirective>[0][] };
+
+  it('parses to a loop holding its rounds and its body, nested as deep as it is written', () => {
+    expect(grindOf(LOOP).directives).toEqual([
+      {
+        kind: 'loop',
+        until: expect.objectContaining({ kind: 'comparison' }),
+        body: [
+          { kind: 'until', inner: { kind: 'use', obj: 'entity', objId: 'civilian', actionId: 'pick-pocket' }, until: 'done' },
+          { kind: 'loop', until: { times: 2 }, body: [{ kind: 'wait', seconds: 90 }] },
+        ],
+      },
+      { kind: 'assert', condition: expect.objectContaining({ kind: 'comparison' }) },
+    ]);
+  });
+
+  it('prints back the block it was written as', () => {
+    expect(grindOf(LOOP).directives.map(printDirective).join('\n')).toBe(LOOP.split('\n').slice(1).join('\n'));
+  });
+
+  it('refuses until done: as a heading, since a block has no one action to be done with', () => {
+    expect(() => parseModule('# test bad\nuntil done:\n  wait: 1')).toThrow(/until done:/);
+  });
+
+  it('refuses a heading with nothing under it, and a block under any other line', () => {
+    expect(() => parseModule('# test bad\nuntil has rope:')).toThrow(/nothing stands under it/);
+    expect(() => parseModule('# test bad\ntravel: beach\n  expect: bridge-open')).toThrow(/only an `until/);
+  });
+});

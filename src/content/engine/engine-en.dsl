@@ -321,6 +321,7 @@ engine.stopped.pack-full: your pack was full and there was nowhere to put what y
 engine.stopped.unloadable: what was under way could not be picked up again
 engine.stopped.short: {because}, and {condition} never came true
 engine.stopped.short-count: {because}, and it came round {times} of the {wanted} times asked for
+engine.stopped.round: a pass through the block left the world exactly as it found it, so going round again would never end
 engine.setting.stands: {setting}: {value}
 engine.setting.takes: takes {choices}
 engine.setting.on: On

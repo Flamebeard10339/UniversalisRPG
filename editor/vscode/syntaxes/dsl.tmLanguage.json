@@ -1442,7 +1442,7 @@
           }
         },
         {
-          "match": "^[ \\t]*([+-]?)(succeed-checks|instant-kill|fail-checks|lock-pools|unkillable|refused|cancel)\\b",
+          "match": "^[ \\t]*([+-]?)(succeed-checks|instant-kill|fail-checks|lock-pools|unkillable|refused|cancel|until)\\b",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
