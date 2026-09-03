@@ -102,6 +102,33 @@ jewels, and it may never win one by design.
 
 *Moves when: the first matrix shows a jewel with no winning build at any tier.*
 
+## Whether a faint should cost anything
+
+The player's `on death:` in `content/tulsa.dsl` restores health, shakes every buff off,
+and puts the player back on the market square, and outside hardcore it takes nothing —
+not coin, not xp, not a minute of the clock. So the fastest thing a fresh thief can do
+is pick pockets until they faint and go again: that route reaches thieving 30 in 792
+game-minutes against the curve's 1363, with nothing bought, worn or sold. This subsumes
+the pick-pocket question above — a level-1 thief need not survive an hour, because
+dying is free.
+
+*Moves when: he says what a faint costs. Minutes, coin, a share of xp, or nothing by
+design. Each is one line in the handler, and the speedrun brief re-answers it in a run.*
+
+## Whether a house chest is meant to carry a whole skill
+
+`house-chest.pick-the-lock` carries no `requires:` at all, pays five times what a
+pocket does, and a miss costs three health and a walk back from the square. Oolga's
+chest is two hops from the square, so a route that does nothing but walk there and try
+it reaches thieving 30 in 523 game-minutes, the fastest walked so far. Every gated mark
+the expansion added — the lockbox at 18, the jewellery box at 22, the den's thief and
+strongbox — loses to it on time at every level up to 30, because their difficulty costs
+more in misses than their payout returns.
+
+*Moves when: he says whether a house chest gets a level gate, a lower payout, or a
+consequence for being caught. If the chest is meant to be the beginner's mark and the
+gated marks are meant to overtake it, the gated marks' difficulty is what moves.*
+
 ## Whether a derived requirement is ever shown to a player
 
 §6.2 produces *"20 fishing, 50 combat"* for a quest, read off the lowest per-skill
