@@ -1258,7 +1258,7 @@ pull it:
 # entity the-blades
 title: The Blades
 examine: A passage with slots cut in the walls at knee height and shoulder height, and something in the slots that catches the lamplight and moves.
-stats: npc-thieving-difficulty 60, npc-thieving-xp 40
+stats: npc-thieving-difficulty 60, npc-thieving-xp 7
 uses: cross
 cross:
   +on success:
@@ -1274,7 +1274,7 @@ cross:
 # entity the-boulder
 title: The Slope
 examine: A passage that climbs, and at the top of it something round and heavy in a cradle of timber, and a rope from the cradle to a trip somewhere on the floor between you and it.
-stats: npc-thieving-difficulty 75, npc-thieving-xp 55
+stats: npc-thieving-difficulty 75, npc-thieving-xp 9
 uses: cross
 cross:
   +on success:
@@ -1290,7 +1290,7 @@ cross:
 # entity the-fire
 title: The Grate
 examine: A short passage floored in iron grating, and under the grating, coals, and along the walls at head height, pipes with a smell of oil coming off them.
-stats: npc-thieving-difficulty 90, npc-thieving-xp 70
+stats: npc-thieving-difficulty 90, npc-thieving-xp 12
 uses: cross
 cross:
   +on success:
@@ -1306,7 +1306,7 @@ cross:
 # entity the-pit
 title: The Pit
 examine: The floor stops. A plank, one, spans a drop that the lamp does not reach the bottom of, and the plank is not fixed at either end.
-stats: npc-thieving-difficulty 105, npc-thieving-xp 90
+stats: npc-thieving-difficulty 105, npc-thieving-xp 15
 uses: cross
 cross:
   +on success:
@@ -1325,11 +1325,12 @@ examine: A plain door with an hourglass in a bracket beside it. The sand in the 
 go through:
   hidden if: not stat.initiation-clock >= 1
   instant
+  if not initiated:
+    xp: thieving 300
   set: initiated
   set: has-the-word
   add: outfit-pieces 1
   shake off: the-sand-is-running
-  xp: thieving 300
   say: The door is not locked. It never was. On the other side of it is the den, from the other end, and every face in it turned towards the door, and one of them says the words to you before you have asked, slowly, so that you will have them.
   if outfit-pieces = 1:
     give: 1 rogues-hood
