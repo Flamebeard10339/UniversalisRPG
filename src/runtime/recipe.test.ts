@@ -285,3 +285,61 @@ describe('burn: accuracy < 1 with a burnt output', () => {
     expect(state.activeAction).toBeNull();
   });
 });
+
+describe('a recipe that names its own difficulty as a number', () => {
+  const DISHES =
+    FIXTURE_WORLD +
+    `
+# stat searing
+base: 80
+
+# item raw-fish
+examine: A fish.
+
+# item shrimp-dish
+examine: A plate of shrimp.
+
+# item carp-dish
+examine: A plate of carp.
+
+# item ruined
+examine: Charcoal.
+
+# recipe easy-dish
+time: 1
+accuracy: searing
+evasion: 20
+in: raw-fish
+out: shrimp-dish
+burnt: ruined
+
+# recipe hard-dish
+time: 1
+accuracy: searing
+evasion: 200
+in: raw-fish
+out: carp-dish
+burnt: ruined
+`;
+
+  const ruinedOutOf = (recipeId: string, attempts: number): number => {
+    const registry = loadModule(DISHES);
+    const state = createGameState('camp');
+    state.inventory['raw-fish'] = attempts;
+    craft(recipeId, registry, state);
+    resolve(state, registry, secondsToMs(attempts * 10));
+    expect(state.inventory['raw-fish']).toBe(0);
+    return state.inventory.ruined ?? 0;
+  };
+
+  it('is contested against that number rather than against a stat read off the cook', () => {
+    const registry = loadModule(DISHES);
+    expect(registry.recipeActions.get('hard-dish')?.accuracy?.right).toBe(200);
+  });
+
+  it('ruins more of a harder dish than an easier one at the same skill, which is what a tier of risk means', () => {
+    const attempts = 500;
+
+    expect(ruinedOutOf('hard-dish', attempts)).toBeGreaterThan(ruinedOutOf('easy-dish', attempts));
+  });
+});

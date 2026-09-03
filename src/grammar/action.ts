@@ -8,7 +8,7 @@ import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './p
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
 import { KEYWORDS, keywordsIn, keywordsOn, TagClause, tagClause, withoutKeywords, type KeywordOn } from './tagClause';
-import { decimal, DECIMAL, id, parseSided, printSided, refuseRange, side, SIDE_MARK, SIDES, sideOf, type Side, type Sided } from './values';
+import { decimal, DECIMAL, id, number, parseSided, printSided, refuseRange, side, SIDE_MARK, SIDES, sideOf, type Side, type Sided } from './values';
 
 export type ActionKind = 'duration' | KeywordOn<'action'>;
 
@@ -16,8 +16,10 @@ export { side, SIDES, sideOf, type Side, type Sided };
 
 export interface Contest {
   left: Sided;
-  right?: Sided;
+  right?: Sided | number;
 }
+
+export const isFixed = (half: Sided | number | undefined): half is number => typeof half === 'number';
 
 export interface Action {
   label: string;
@@ -54,12 +56,12 @@ const RETIRED_ACTION_TAGS: Readonly<Record<string, string>> = {
 
 export const actionKind = (action: Action): ActionKind => action.kind ?? 'duration';
 
-const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${printSided(value.right)}`);
+const printContest = (value: Contest): string => (value.right === undefined ? printSided(value.left) : `${printSided(value.left)} vs ${isFixed(value.right) ? value.right : printSided(value.right)}`);
 
 function parseContest(cursor: Cursor): Contest {
   const left = parseSided(cursor);
   if (cursor.take(/[ \t]+vs[ \t]+/) === null) return { left };
-  return { left, right: parseSided(cursor) };
+  return { left, right: cursor.peek(/\d/) === null ? parseSided(cursor) : number.parse(cursor) };
 }
 
 const sidedIn = (hole: string, examples: readonly string[]): Parser<Sided> => ({
@@ -74,8 +76,12 @@ const contest: Parser<Contest> = {
   parse: parseContest,
   print: printContest,
   holds: () => ({ side }),
-  forms: ['[<side>.]<stat>[ vs [<side>.]<stat>]'],
-  examples: ['attack vs defence', 'us.attack vs them.defence', 'felling'],
+  forms: ['[<side>.]<stat>[ vs [<side>.]<stat>]', '[<side>.]<stat> vs <number>'],
+  examples: ['attack vs defence', 'us.attack vs them.defence', 'felling', 'cooking vs 120'],
+  notes: {
+    '[<side>.]<stat> vs <number>':
+      'contested against a fixed difficulty rather than against somebody, which is what a craft wants: nothing stands across the bench to read a stat off, so the recipe says how hard it is itself',
+  },
 };
 
 const depleted = sidedIn('resource', ['health', 'them.health']);
@@ -287,7 +293,7 @@ export function sidedFields(action: Action): { written: string; value: Sided }[]
   ] as const) {
     if (!held) continue;
     found.push({ written, value: held.left });
-    if (held.right) found.push({ written, value: held.right });
+    if (held.right !== undefined && !isFixed(held.right)) found.push({ written, value: held.right });
   }
   if (action.depletes) found.push({ written: 'depletes', value: action.depletes });
   return found;

@@ -21,7 +21,7 @@ export interface Recipe {
   time?: number;
   rate?: number | string;
   accuracy?: string;
-  evasion?: string;
+  evasion?: string | number;
   burnt: Produced[];
 }
 
@@ -69,7 +69,7 @@ function compile(recipe: Recipe): ActionDeclaration {
       ? {
           accuracy: {
             left: { id: recipe.accuracy },
-            ...(recipe.evasion ? { right: { id: recipe.evasion } } : {}),
+            ...(recipe.evasion === undefined ? {} : { right: typeof recipe.evasion === 'number' ? recipe.evasion : { id: recipe.evasion } }),
           },
         }
       : {}),
@@ -117,7 +117,10 @@ export const recipe = section<Recipe>()({
     time: { parser: decimal },
     rate: { parser: numberOrStat },
     accuracy: { parser: id, names: { id: 'stat' } },
-    evasion: { parser: id, names: { id: 'stat' } },
+    evasion: {
+      parser: numberOrStat,
+      note: 'what the accuracy: stat is weighed against. A number is how hard this dish is, written on the dish — nothing stands across the bench to read a stat off, so a recipe that leaves this out is contested against nothing and every dish of every tier risks the same',
+    },
     burnt: { parser: list(produced), default: () => [], block: true },
   },
   validate: (value) => (value.burnt.length > 0 && !value.accuracy ? 'burnt: needs an accuracy: stat, or nothing can ever burn' : undefined),

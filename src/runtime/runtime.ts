@@ -265,8 +265,8 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   standAt(cadence, 0);
   cadence.attemptsMade++;
 
-  const half = (field: Sided | undefined, read: typeof statValue, fallback: number): number =>
-    field === undefined ? fallback : read(field.id, state, registry, sideOf(field, self, other));
+  const half = (field: Sided | number | undefined, read: typeof statValue, fallback: number): number =>
+    field === undefined ? fallback : typeof field === 'number' ? field : read(field.id, state, registry, sideOf(field, self, other));
 
   const struck = action.depletes ? sideOf(action.depletes, self, other) : null;
   const felling = self === PLAYER && struck !== null && struck !== PLAYER && debugging(state, 'instant-kill');

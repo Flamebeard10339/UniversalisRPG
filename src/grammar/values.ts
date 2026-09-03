@@ -63,7 +63,7 @@ export const numberOrStat: Parser<number | string> = {
   print: (value) => (typeof value === 'string' ? value : String(value)),
   names: { float: 'stat' },
   forms: ['<float>', '<stat>'],
-  examples: ['3', '1.5', 'attack-speed'],
+  examples: ['3', 'attack-speed'],
 };
 
 const SECONDS_PER_MINUTE = 60;

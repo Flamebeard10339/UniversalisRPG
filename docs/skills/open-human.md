@@ -26,23 +26,6 @@ and the tunnels were left dense because that is where the experience is meant to
 to the bench, or whether the first rung is meant to be survivable standing still. Either
 is a count and a respawn; guessing decides how the whole first hour feels.*
 
-## Whether every dish should burn at the same rate
-
-`# recipe`'s `accuracy:` and `evasion:` both name a stat, and both are read off the player
-— a craft has no opponent to read the other side off. So a dish's difficulty cannot be
-written on the dish, and every recipe in `content/cooking.dsl` is contested against the
-player's `cooking` and nothing else: about one in five ruined bare at level 1, about one in
-eighteen at level 20 in a full kitchen. A salmon is worth more than a shrimp and risks
-exactly as much.
-
-Giving each tier its own difficulty means inventing a stat per tier, and a stat is
-something the character sheet draws — the player would read *Searing Difficulty 120* on
-their own sheet, which is the reason a lane did not do it.
-
-*Moves when: he says whether tiers should differ in risk. If yes it is a language question
-(a recipe wants a number where it now wants a stat) and not a content edit, which is why
-this is here rather than in the other file.*
-
 ## Whether Smithing and Crafting levelling should buy anything but speed
 
 Both stats are used as their recipes' `rate:`, so a level makes the pile go down faster and

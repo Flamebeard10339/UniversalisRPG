@@ -247,7 +247,7 @@ function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written
   ] as const) {
     if (!contest) continue;
     sites.push({ held: contest.left, kind: 'stat', written });
-    if (contest.right) sites.push({ held: contest.right, kind: 'stat', written });
+    if (contest.right !== undefined && typeof contest.right !== 'number') sites.push({ held: contest.right, kind: 'stat', written });
   }
   if (action.depletes)
     sites.push({
