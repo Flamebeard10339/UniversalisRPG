@@ -156,7 +156,7 @@ cluster-jewel:
 
 # item common-general-thieving
 title: Light Touch
-value: 500
+value: 150
 cluster-jewel: 
   shape: ring
   open-connections: e
@@ -220,11 +220,10 @@ value: 150
 +stats: npc-thieving-difficulty 20, npc-thieving-xp 4, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  stands: picked-townsman for 2m
+  stands: picked-townsman for 90s
   one of:
     100x: give: 3 core.coin
     8x: roll: townsmans-wardrobe
-    1x: give: 1 common-general-thieving
   +on attempts exhausted:
     say: Your hand is on the purse and then their hand is on your wrist, and they are not gentle about it.
 
@@ -236,20 +235,20 @@ one of:
   1x: give: 1 core.simple-boots
 
 # entity tulsa.guardsman
-+stats: npc-thieving-difficulty 55, npc-thieving-xp 5, npc-thieving-damage 1
++stats: npc-thieving-difficulty 55, npc-thieving-xp 10, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  stands: picked-guardsman for 3m
+  stands: picked-guardsman for 90s
   give: 7 core.coin
   +on attempts exhausted:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
 
 # entity tulsa.knight
-+stats: npc-thieving-difficulty 70, npc-thieving-xp 6, npc-thieving-damage 1
++stats: npc-thieving-difficulty 70, npc-thieving-xp 25, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 11
-  stands: picked-knight for 4m
+  stands: picked-knight for 90s
   give: 12 core.coin
   +on attempts exhausted:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
@@ -257,7 +256,7 @@ pick-pocket:
 # entity thief
 title: Thief
 examine: A casual cloaked figure idly rolling a blade between their gloved hands. 
-stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 70, npc-thieving-xp 7, npc-thieving-damage 1
+stats: attack 20, defense 6, max-health 85, attack-rate 26, accuracy 95, evasion 60, npc-thieving-difficulty 70, npc-thieving-xp 30, npc-thieving-damage 1
 uses: core.melee-combat, pick-pocket
 faction: core.world
 respawn after: 80s
@@ -267,7 +266,7 @@ on death:
     1 in 14: give: 1 steel-lockpicks
 pick-pocket:
   requires: level.thieving >= 11
-  stands: picked-thief for 5m
+  stands: picked-thief for 90s
   one of:
     250x: give: 18 core.coin
     5x: give: 1 fingerless-gloves
@@ -319,7 +318,7 @@ one of:
 # entity strongbox
 title: Strongbox
 examine: Banded twice over and set into the floor, and the lock is the newest thing in the room by thirty years.
-stats: npc-thieving-difficulty 91, npc-thieving-xp 47, npc-thieving-damage 2
+stats: npc-thieving-difficulty 91, npc-thieving-xp 45, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 14
@@ -611,6 +610,21 @@ eat:
   instant
   take: 1 pear
   say: You eat the pear, and it runs down your wrist.
+
+# entity coat-of-pockets
+title: A Man With a Coat
+examine: He stands where the alley bends, so that he can see both ends of it at once, and the coat is cut a good deal wider than a coat needs to be. What he is selling is inside it, and he opens it the way somebody opens a book they have read.
+
+keeps shop: the-alley-coat
+
+# shop the-alley-coat
+coin: core.coin
+stocks:
+  6 common-general-thieving
+  3 fingerless-gloves
+  3 soft-toed-boots
+  2 steel-lockpicks
+replenish: 15m
 
 # shop the-fence
 coin: core.coin
@@ -1350,7 +1364,7 @@ hammer on it:
 # entity jewellery-box
 title: Jewellery Box
 examine: A walnut box on the dressing table with a lock the size of a fingernail, and the key is not in it.
-stats: npc-thieving-difficulty 147, npc-thieving-xp 57, npc-thieving-damage 4
+stats: npc-thieving-difficulty 147, npc-thieving-xp 55, npc-thieving-damage 4
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 22
@@ -1364,7 +1378,7 @@ pick-the-lock:
 # entity tavern-lockbox
 title: Lockbox
 examine: An iron box under the end of the bar, chained to the leg of it, that holds the night's takings until Sunny carries them up.
-stats: npc-thieving-difficulty 119, npc-thieving-xp 43, npc-thieving-damage 3
+stats: npc-thieving-difficulty 119, npc-thieving-xp 45, npc-thieving-damage 3
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 18
@@ -1381,7 +1395,7 @@ pick-the-lock:
 # entity pay-chest
 title: Pay Chest
 examine: A strapped chest under the captain's table with the duke's mark burnt into the lid. The guard's wages sit in it between the castle and the guard.
-stats: npc-thieving-difficulty 133, npc-thieving-xp 72, npc-thieving-damage 2
+stats: npc-thieving-difficulty 133, npc-thieving-xp 70, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 20
@@ -1395,11 +1409,11 @@ pick-the-lock:
     roll: sent-to-jail
 
 # entity tulsa.the-duke
-+stats: npc-thieving-difficulty 168, npc-thieving-xp 33, npc-thieving-damage 2
++stats: npc-thieving-difficulty 168, npc-thieving-xp 160, npc-thieving-damage 2
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 25
-  stands: picked-duke for 15m
+  stands: picked-duke for 90s
   one of:
     120x: give: 40-90 core.coin
     10x: give: 1 signet-ring
@@ -1482,7 +1496,7 @@ let yourself out:
 # entity wardens-lockbox
 title: The Warden's Lockbox
 examine: An iron box bolted to the floorboards through its own base, with a lock on the front and a ledger number painted on the lid.
-stats: npc-thieving-difficulty 98, npc-thieving-xp 36, npc-thieving-damage 2
+stats: npc-thieving-difficulty 98, npc-thieving-xp 35, npc-thieving-damage 2
 uses: pick-the-lock
 pick-the-lock:
   requires: level.thieving >= 15
@@ -1605,7 +1619,7 @@ examine: A gap between the backs of two houses, wide enough for one and used by 
 adjacent:
   tulsa.tavern-street
 entities:
-  lurking-man
+  lurking-man, coat-of-pockets
 
 # location tulsa.tavern-street
 +adjacent: back-alley
