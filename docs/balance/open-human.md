@@ -60,38 +60,46 @@ jewels, and it may never win one by design.
 
 *Moves when: the first matrix shows a jewel with no winning build at any tier.*
 
-## How much of the ladder a shop may still be selling at level 30
+## What is still owed on the jewels, now that the rarities are ruled
 
-Ruled 2026-09-03: the ladder is declared rather than derived, it stands at nothing on level
-one and rises seven a level, and a shop carries a character to **level 7** and no further —
-which fixes the shop's whole contribution at 41 and makes it 20% of the ladder at level 30.
+Ruled 2026-09-03. A jewel's tier is its **scarcity and where in the world it is found**, and
+what a tier buys is **point efficiency** — how much stat each of the base's finite plane points
+returns. That makes the shop's share fall on its own as item levels rise, with nothing kept in
+sync: a point-inefficient jewel falls further behind every time a plane gets bigger.
 
-What is not ruled is whether that 20% is held strictly. A shop line with tiers — the plan is
-that shops keep selling every slot, just a worse version of it than the world drops — grows
-its total by the difference between its own tiers, since a slot holds one item. If each tier
-is about three better than the last in its slot, the shop lands near 50 at level 30, which
-is 25% rather than 20%. Holding 20% exactly means the later shop tiers are close to
-cosmetic in stat terms: they fill a slot and give a jewel somewhere to sit, and almost
-nothing else.
+  common     a shop sells it, point inefficient
+  common+    a shop sells it, near uncommon, expensive — deferred, not designed
+  uncommon   1 in 16 to 1 in 64, greater variety, utility stats
+  rare       1 in 128, point efficient, endgame
+  unique     a boss drops it, 1 in 256 or worse, best in slot or a capability nothing else has
 
-*Moves when: he says 20% strictly, or names the share he will take — that number sets how
-much room every shop tier above level 7 has.*
+Read against it, the seven thieving jewels have **rarity and power inverted**: The Ledger is the
+most valuable in the module and the easiest thing in the game to get at one in fourteen, while
+Light Touch is the least point-efficient and the rarest at one in a hundred and nine. Four of
+the seven are three or more places out between the author's own values and their scarcity.
 
-## The jewels are not tiered, and they are where nearly all the power is
+What is open is not the scheme but two calls inside it. The tier-0 the early game needs turns
+out to exist already — Light Touch is the point-inefficient beginner's jewel and wants moving to
+a shop rather than a new item being written. And The Ledger drops from two marks today, so making
+it unique means choosing its one home; the pay chest tells a better story than the tavern
+lockbox.
 
-There is no bronze-iron-steel jewel line. The four thieving jewels differ by what they do —
-ability, rate, utility, luck — and by shape, and nothing separates a beginner's from an
-endgame one. Meanwhile the audit says the shop's 66 at level 30 is almost all flat bonuses
-against 6 plane points spent, while the world's 176 is 43 plane points and three jewels. So
-a jewel is worth more than everything else put together, and **which jewels can be bought
-decides the shop's share by itself**: a Fence simply stocking the jewels that exist would
-take the shop from 20% to something near 80%.
+*Moves when: he confirms Light Touch is the shop's common rather than a new tier-0, and names
+The Ledger's home. The rest is work rather than a question.*
 
-The material naming convention is what closes this — tier the jewels, sell the lowest, drop
-the rest — and it is the same decision as the one above rather than a second one.
+## Whether the passives get the same naming treatment, and when
 
-*Moves when: the jewel line is tiered, at which point the shop's share falls out of the
-mechanics rather than being a number anybody keeps.*
+The jewels are being renamed to `<rarity>-<role>-<skill>` so a reader can reason about them
+without holding seven flavour titles in their head, with the flavour kept in `title:`. The
+passives have the same problem and are what one actually reasons about when pricing a jewel per
+point: `flat-thieving-small` and `increased-thieving-small` are already systematic, but
+`cutpurse`, `patience`, `casing`, `sleight`, `iron-nerve`, `hard-knuckles` and `fences-favour`
+are pure flavour ids.
+
+Doing thieving's alone would leave two conventions standing in one world.
+
+*Moves when: he says whether the passives are renamed too, and whether that is one pass across
+every skill rather than this module's.*
 
 ## The top of the ladder has no gear to reach it
 

@@ -121,3 +121,24 @@ of them is the band's aim. They earn their place by proving the routes still wal
 
 *Closes when: a floor route buys and wears the kit before it works the mark — which is what
 `gear-up` does for one rate jewel already, and what the step-2 speedrun owes.*
+
+## Two things about the stand-in mechanic that were not run down
+
+A picked pocket now leaves the person standing with the pocket gone, booked as a deficit against
+the room's population. Two readings of it were noticed and parked rather than chased, and both
+want checking once the reversible-transformation rewrite lands, because that rewrite moves the
+same machinery.
+
+**The room's arithmetic pays more than the plain reading.** Market Square holds eight townsmen
+on a two-minute pocket, so eight picks every hundred and twenty seconds is about 960 experience
+an hour, and the run measures 3,958. Something about how `applyRespawns` clears the deficit is
+more generous than picking-eight-then-waiting, and the pocket marks' payouts are about to be
+derived from exactly that arithmetic.
+
+**Killing a stand-in may book nothing.** `downOne` returns early unless the location *declares*
+the entity, and a stand-in is declared in no location — so a killed one may be killable again at
+once, where killing the original books a respawn. The rewrite removes stand-in entities outright,
+which should dissolve this, but it is worth a route that kills one twice.
+
+*Closes when: both are measured against whatever the rewrite leaves standing, and the pocket
+payouts are derived from a population rule that has been checked rather than assumed.*
