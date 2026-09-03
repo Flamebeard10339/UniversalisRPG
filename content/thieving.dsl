@@ -234,7 +234,7 @@ one of:
   1x: give: 1 core.simple-boots
 
 # entity tulsa.guardsman
-+stats: npc-thieving-difficulty 55, npc-thieving-xp 7, npc-thieving-damage 1
++stats: npc-thieving-difficulty 55, npc-thieving-xp 5, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
   give: 7 core.coin
@@ -275,7 +275,7 @@ pick-pocket:
 # entity house-chest
 title: Chest
 examine: A banded chest under the window with a lock on it older than the window.
-stats: npc-thieving-difficulty 60, npc-thieving-xp 20, npc-thieving-damage 3
+stats: npc-thieving-difficulty 25, npc-thieving-xp 14, npc-thieving-damage 3
 uses: pick-the-lock
 pick-the-lock:
   roll: house-chest-contents
@@ -296,6 +296,7 @@ examine: Iron under the wood, and somebody has cut runes into the band that are 
 stats: npc-thieving-difficulty 110, npc-thieving-xp 55, npc-thieving-damage 8
 uses: pick-the-lock
 pick-the-lock:
+  requires: level.thieving >= 11
   time: 10
   roll: treasure-chest-contents
   say: The last ward turns over and the lid comes up on its own.
