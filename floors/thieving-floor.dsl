@@ -10,6 +10,7 @@ dependencies:
 run: first-steps.thieving-route-full
 until level.thieving >= 30:
   use: entity.civilian.pick-pocket until done
+  wait: 120
 assert: level.thieving >= 30
 
 # test oolga-chest-to-10
@@ -40,6 +41,7 @@ assert: level.thieving >= 30
 run: first-steps.thieving-route-full
 until inventory.thieving.thieving-rate-jewel >= 1:
   use: entity.tulsa.civilian.pick-pocket until done
+  wait: 120
 assert: inventory.thieving.thieving-rate-jewel >= 1
 assert: has core.unassuming-cap
 equip: 3
