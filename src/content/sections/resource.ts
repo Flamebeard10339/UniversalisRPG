@@ -38,7 +38,7 @@ export const resource = section<Resource>()({
   text: ['title'],
   fields: {
     title: TITLE_FIELD,
-    rate: { parser: id, names: { id: 'stat' } },
+    rate: { parser: id, names: { id: 'stat' }, note: 'the stat holding how much of this pool comes back per minute, or falls away per minute where it reads below nothing' },
     max: { parser: id, names: { id: 'stat' } },
     start: { parser: decimal },
     display: { parser: displayValue, default: () => 'full', printed: 'always' },

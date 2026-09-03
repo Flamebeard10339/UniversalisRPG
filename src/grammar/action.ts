@@ -105,9 +105,9 @@ function named<T>(written: string, label: string, line: RawLine, read: () => T):
   }
 }
 
-const seconds: Parser<number> = { parse: (cursor) => decimal.parse(cursor), print: (value) => decimal.print(value), forms: ['<seconds>'], examples: ['3', '1.5'] };
+export const seconds: Parser<number> = { parse: (cursor) => decimal.parse(cursor), print: (value) => decimal.print(value), forms: ['<seconds>'], examples: ['3', '1.5'] };
 
-const perMinute: Parser<number | Sided> = {
+export const perMinute: Parser<number | Sided> = {
   parse(cursor) {
     const raw = cursor.take(DECIMAL);
     return raw === null ? parseSided(cursor) : Number(raw);

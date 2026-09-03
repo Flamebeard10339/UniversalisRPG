@@ -1,10 +1,10 @@
-import { actionResultLists } from '../../grammar/action';
+import { actionResultLists, seconds } from '../../grammar/action';
 import { Action } from '../../grammar/action';
 import { ActionResult } from '../../grammar/actionResult';
 import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
-import { decimal, id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
+import { id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
 import { put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
@@ -114,8 +114,8 @@ export const recipe = section<Recipe>()({
     out: { parser: list(produced), default: () => [], block: true },
     skill: { parser: recipeSkillValue, note: 'the experience one craft pays into that skill' },
     say: { parser: text },
-    time: { parser: decimal },
-    rate: { parser: numberOrStat },
+    time: { parser: seconds, note: 'how long one craft takes' },
+    rate: { parser: numberOrStat, note: 'how many crafts an hour of game time holds, as a count per minute — the other way of saying `time:`, and an action takes one or the other' },
     accuracy: { parser: id, names: { id: 'stat' } },
     evasion: {
       parser: numberOrStat,
