@@ -18,6 +18,14 @@ describe('what the run was asked for', () => {
     for (const file of fixtureFiles()) expect(targetFor(path.join(FIXTURE_CORPUS_DIR, `${path.basename(file, '.dsl')}.md`))).toBe(path.basename(file));
   });
 
+  it('writes a --target the loader will read, whether it was named as a module or as a file', () => {
+    for (const file of fixtureFiles()) {
+      const named = path.basename(file, '.dsl');
+      expect(parseArgs(['a-brief.md', '--target', named]).target).toBe(`${named}.dsl`);
+      expect(parseArgs(['a-brief.md', '--target', `${named}.dsl`]).target).toBe(`${named}.dsl`);
+    }
+  });
+
   it('refuses to run without one, rather than inventing something to write', () => {
     expect(() => parseArgs([])).toThrow(/the brief is a file/);
     expect(() => parseArgs(['a.md', 'b.md'])).toThrow(/named once/);

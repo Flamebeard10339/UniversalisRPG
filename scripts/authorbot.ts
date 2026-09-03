@@ -57,7 +57,9 @@ export const moduleNameFor = (brief: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-export const targetFor = (brief: string): string => `${moduleNameFor(brief)}.dsl`;
+export const fileFor = (name: string): string => (name.endsWith('.dsl') ? name : `${name}.dsl`);
+
+export const targetFor = (brief: string): string => fileFor(moduleNameFor(brief));
 
 const requireValue = (flag: string, value: string | undefined): string => {
   if (value === undefined || value.startsWith('-')) throw new Error(`${flag} wants a value after it\n\n${usage}`);
@@ -79,7 +81,7 @@ export function parseArgs(argv: readonly string[]): Asked {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--brief') named(requireValue(arg, argv[++i]));
-    else if (arg === '--target') asked.target = requireValue(arg, argv[++i]);
+    else if (arg === '--target') asked.target = fileFor(requireValue(arg, argv[++i]));
     else if (arg === '--turns') asked.turns = requireCount(arg, requireValue(arg, argv[++i]));
     else if (arg === '--minutes') asked.minutes = requireCount(arg, requireValue(arg, argv[++i]));
     else if (arg === '--model') asked.model = requireValue(arg, argv[++i]);
