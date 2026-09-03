@@ -403,3 +403,37 @@ file about refusals inside a `# test` is also about.
 
 *Closes when:* a build failure whose owner cannot be found says so rather than naming a module
 that had nothing to do with it.
+
+## Three things every gearing run has had to work out by experiment
+
+Three authoring runs have now spent budget discovering the same class of thing: a fact the
+tooling knows and does not say. Each was found by a run that could not read `src/`, which is
+what makes them oracle and probe defects rather than author error.
+
+**A shop marks everything up a fifth over `value:`, and nothing prints it.** Soft-toed boots
+listed at 60 cost 72; fingerless gloves at 45 cost 54. A run budgeting what a climb must earn
+before it can buy has to buy something first and watch the purse. `npm run oracle -- shop` says
+nothing about markup.
+
+**`equip: <template>` does nothing, silently, once another rolled copy stands ahead of it in
+the pack.** A run that bought three bases in one modal session and equipped them by name got no
+refusal and no equipment, and had to trace instance numbers through an intermediate
+`--record` to write `equip: 8`. An earlier run met the same fault as a *refusal* that named the
+template — *player does not carry item core.unassuming-cap*, while the cap was plainly carried,
+because several were. So it is silent down one path and misleading down the other, and
+`floors/thieving-floor.dsl` now carries two bare instance numbers because of it, which will
+break the day anything upstream mints one more item.
+
+**A long probabilistic loop cannot be traced.** `probe --record` prints the final state only,
+and a failing `assert:` stops the run with no partial dump, so there is no way to see which
+iterations of a four-hundred-minute loop failed. A run wanting to know whether repositioning
+could dodge the travel tax after a success could not find out without instrumenting the DSL
+with thousands of asserts.
+
+One more of the same shape, from the same runs: how many points a jewel's own hex carries once
+it is socketed — four, of the six the rate jewel declares — is printed nowhere, and was found by
+allocating one position at a time until `engine.plane.no-points`.
+
+*Closes when: the oracle prints a shop's markup where it prints the shop and a socketed hex's
+points where it prints the jewel; `equip:` by template either picks a copy or refuses by saying
+an instance is wanted, with a refusal test beside it; and `probe` can print a step trace.*
