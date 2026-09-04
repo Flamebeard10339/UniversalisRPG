@@ -80,7 +80,7 @@ damage share: 1.4
 # entity straw-man
 title: Straw Man
 faction: world
-stats: max-health 100, attack 2, accuracy 100, evasion 0, defense 0, attack-rate 60
+stats: max-health 500, attack 2, accuracy 100, evasion 0, defense 0, attack-rate 60
 tier: quick
 uses: melee
 

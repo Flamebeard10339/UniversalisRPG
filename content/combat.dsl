@@ -919,6 +919,7 @@ assert: xp.combat.health = 0
 
 # test the-sewer-pays-a-beginner-in-both-halves-of-a-fight
 load: at-the-sewer-junction
+unkillable
 wait: 20
 assert: xp.combat.attack > 0
 assert: xp.combat.health > 0

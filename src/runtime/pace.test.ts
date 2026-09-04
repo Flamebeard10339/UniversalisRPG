@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
 import { xpForLevel } from './skills';
-import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, DPS_LINE, SECONDS_TO_FELL_AN_EVEN_MATCH, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, toughnessAtLevel, dpsAtLevel, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
+import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, DPS_LINE, SECONDS_TO_FELL_AN_EVEN_MATCH, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, toughnessAtLevel, dpsAtLevel, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel, TOUGHNESS_LINE, TOUGHNESS_STAT } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -101,14 +101,14 @@ describe('a stat that deals a damage type climbs a ladder of damage a second, no
   it('asks the damage a second that empties an even match in the seconds the line names, at every rung', () => {
     for (let level = 1; level < 100; level += 1) {
       for (const statId of deals()) {
-        expect(abilityAtLevelIn(registry, level, statId) * SECONDS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(abilityAtLevel(level), 9);
+        expect(abilityAtLevelIn(registry, level, statId) * SECONDS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(toughnessAtLevel(level), 9);
       }
     }
   });
 
   it('reads the two axes as independent, so a body may climb what it can lose without climbing what it deals', () => {
+    expect(ladderFor(TOUGHNESS_STAT)).toBe(TOUGHNESS_LINE);
     for (const level of [1, 10, 30]) {
-      expect(toughnessAtLevel(level)).toBeCloseTo(abilityAtLevel(level), 9);
       expect(dpsAtLevel(level) * SECONDS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(toughnessAtLevel(level), 9);
     }
   });

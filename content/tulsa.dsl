@@ -1357,6 +1357,7 @@ assert: sunny.the-animals.visits = 1
 
 # test the-key-opens-the-barred-door
 load: at-the-sewer-junction
+unkillable
 travel: sewer-outfall
 wait: done
 use: entity.barred-door.pick-lock

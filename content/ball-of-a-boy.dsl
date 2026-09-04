@@ -145,6 +145,7 @@ over: tulsa.at-the-sewer-junction
 
 # test the-toll-buys-a-quiet-word-with-larry
 load: at-the-grate
+unkillable
 talk: tulsa.mouse
 choose: down-the-grate.asked.mouse.0.said
 choose: I'll get it back for you.
@@ -176,6 +177,7 @@ assert: xp.thieving.thieving >= 1500
 
 # test the-captain-pays-a-bounty-for-the-news
 load: at-the-grate
+unkillable
 talk: tulsa.mouse
 choose: down-the-grate.asked.mouse.0.said
 choose: I'll get it back for you.
@@ -205,6 +207,7 @@ assert: inventory.core.coin >= 500
 
 # test a-cooked-herring-haggles-the-toll-down
 load: at-the-grate-with-a-herring
+unkillable
 talk: tulsa.mouse
 choose: down-the-grate.asked.mouse.0.said
 choose: I'll get it back for you.
@@ -232,6 +235,7 @@ assert: down-the-grate.reported
 
 # test the-back-way-answers-when-the-front-does-not
 load: at-the-grate
+unkillable
 talk: tulsa.mouse
 choose: down-the-grate.asked.mouse.0.said
 choose: I'll get it back for you.

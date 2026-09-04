@@ -211,11 +211,11 @@ describe('three tags cut a body, and reading it back finds the tier they were cu
   });
 
   it('cannot cut a blow under the floor the engine puts on one, so low enough on the ladder a body reads over its tier however it is cut', () => {
-    const under = 2;
-    const world = loadModule([WORLD, ['# entity underfoot', 'title: Underfoot', 'faction: world', 'tier: quick', 'profile: even', `level: ${String(under)}`, 'uses: melee'].join('\n')].join('\n\n'));
+    const under = 1;
+    const world = loadModule([WORLD, ['# entity underfoot', 'title: Underfoot', 'faction: world', 'tier: quick', 'profile: quickfoot', `level: ${String(under)}`, 'uses: melee'].join('\n')].join('\n\n'));
     const entity = world.entities.get('arena.underfoot')!;
     const fight = fightOf(world, entity)!;
-    const fighter: Fighter = { entity, fight, tier: world.tiers.get('quick'), profile: world.profiles.get('even'), level: under };
+    const fighter: Fighter = { entity, fight, tier: world.tiers.get('quick'), profile: world.profiles.get('quickfoot'), level: under };
     const at = referencePlayer(world);
     const blow = statValue(fight.damage.ours, at, world, entity.id) - statValue(fight.damage.theirs, at, world, 'player');
     expect(blow, 'the tier asks for less than one point of damage a blow, which the engine will not deal').toBeLessThan(minDamage(world));

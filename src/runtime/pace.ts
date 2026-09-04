@@ -17,14 +17,23 @@ export const ONE_LINE: Ladder = {
 
 export const SECONDS_TO_FELL_AN_EVEN_MATCH = 15;
 
-export const DPS_LINE: Ladder = {
+export const TOUGHNESS_STAT = 'core.max-health';
+
+export const TOUGHNESS_LINE: Ladder = {
   ...ONE_LINE,
-  abilityAtLevelOne: ONE_LINE.abilityAtLevelOne / SECONDS_TO_FELL_AN_EVEN_MATCH,
-  abilityGrowthPerLevel: ONE_LINE.abilityGrowthPerLevel / SECONDS_TO_FELL_AN_EVEN_MATCH,
+  abilityAtLevelOne: 100,
+  abilityGrowthPerLevel: 31,
+};
+
+export const DPS_LINE: Ladder = {
+  ...TOUGHNESS_LINE,
+  abilityAtLevelOne: TOUGHNESS_LINE.abilityAtLevelOne / SECONDS_TO_FELL_AN_EVEN_MATCH,
+  abilityGrowthPerLevel: TOUGHNESS_LINE.abilityGrowthPerLevel / SECONDS_TO_FELL_AN_EVEN_MATCH,
 };
 
 const LADDERS: Readonly<Record<string, Ladder>> = {
   'fishing.fishing': ONE_LINE,
+  [TOUGHNESS_STAT]: TOUGHNESS_LINE,
 };
 
 export const ladderFor = (id?: string): Ladder => (id === undefined ? ONE_LINE : (LADDERS[id] ?? ONE_LINE));
@@ -63,4 +72,4 @@ export const abilityAtLevelIn = (registry: Registry, level: number, statId?: str
 
 export const dpsAtLevel = (level: number): number => abilityOn(DPS_LINE, level);
 
-export const toughnessAtLevel = (level: number): number => abilityOn(ONE_LINE, level);
+export const toughnessAtLevel = (level: number): number => abilityOn(TOUGHNESS_LINE, level);
