@@ -3,7 +3,7 @@ import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
 import { midpoint } from '../grammar/range';
 import type { TagClause } from '../grammar/tagClause';
-import { addedOn, increasedOn, ladderForStat } from './pace';
+import { ladderForStat } from './pace';
 import { grantsOf, passiveTags, roundedFor, worthOf } from './passiveGrant';
 
 const registry = loadUniverse(fixtureSources());

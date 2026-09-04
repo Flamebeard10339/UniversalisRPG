@@ -3,7 +3,7 @@ import { PROFILE_PAIRS, type Profile } from '../../src/content/sections/profile'
 import type { Tier } from '../../src/content/sections/tier';
 import { opposes } from '../../src/runtime/encounter';
 import { fightOf, ladderedFor, readingAt, type Fighter, type LadderedStats, type Reading } from '../../src/runtime/foeTier';
-import { abilityAtLevelIn } from '../../src/runtime/pace';
+import { FACTORS, weighedFor } from '../../src/runtime/foeSolve';
 import { statValue } from '../../src/runtime/stats';
 import type { GameState } from '../../src/runtime/state';
 import { PLAYER } from '../../src/runtime/state';
@@ -58,22 +58,15 @@ const SOLVED = new Set<string>(PROFILE_PAIRS.flat());
 export function shapeOf(registry: Registry, state: GameState, fighter: Fighter): Shape[] {
   const { fight, profile } = fighter;
   if (!profile) return [];
-  const foe = fighter.entity.id;
   const laddered = ladderedFor(registry, fight);
-  const ours = (statId: string, climbs: string | undefined): number =>
-    (climbs !== undefined && fighter.level !== undefined ? abilityAtLevelIn(registry, fighter.level, climbs) : undefined) ?? statValue(statId, state, registry, PLAYER);
-  const factors: readonly { factor: keyof Profile & string; stat: string | undefined; climbs?: string }[] = [
-    { factor: 'rate', stat: fight.rate },
-    { factor: 'damage', stat: fight.damage.ours, climbs: laddered?.dealt },
-    { factor: 'accuracy', stat: fight.accuracy.ours },
-    { factor: 'evasion', stat: fight.accuracy.theirs },
-    { factor: 'reduction', stat: fight.damage.theirs },
-    { factor: 'pool', stat: laddered?.pooled, climbs: laddered?.pooled },
-  ];
-  return factors.flatMap(({ factor, stat, climbs }) => {
+  if (laddered === undefined) return [];
+  const foe = fighter.entity.id;
+  const weighed = weighedFor(registry, fight, laddered, fighter.level, (statId) => statValue(statId, state, registry, PLAYER));
+  return FACTORS.flatMap((factor) => {
     const said = profile[factor];
-    if (said === undefined || stat === undefined || typeof said !== 'number') return [];
-    return [{ factor, said, read: RATIO(statValue(stat, state, registry, foe), ours(stat, climbs)) }];
+    if (said === undefined || typeof said !== 'number') return [];
+    const { stat, against } = weighed[factor];
+    return [{ factor, said, read: RATIO(statValue(stat, state, registry, foe), against) }];
   });
 }
 

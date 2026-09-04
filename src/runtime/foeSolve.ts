@@ -53,6 +53,30 @@ export function ladderedFor(registry: Registry, fight: FightShape): LadderedStat
   return activity === undefined ? undefined : ladderedIn(registry, activity, fight);
 }
 
+export type Factor = 'rate' | 'damage' | 'accuracy' | 'evasion' | 'reduction' | 'pool';
+
+export const FACTORS: readonly Factor[] = ['rate', 'damage', 'accuracy', 'evasion', 'reduction', 'pool'];
+
+export interface Weighed {
+  stat: string;
+  against: number;
+}
+
+export function weighedFor(registry: Registry, fight: FightShape, laddered: LadderedStats, level: number | undefined, ours: (statId: string) => number): Record<Factor, Weighed> {
+  const ourRate = ours(fight.rate);
+  const ourAccuracy = ours(fight.accuracy.ours);
+  const ourPool = level === undefined ? ours(laddered.pooled) : abilityOn(laddered.pool, level);
+  const ourDealt = level === undefined ? ours(fight.damage.ours) : perHitFor(abilityOn(laddered.dps, level), ourRate, ourAccuracy, registry);
+  return {
+    rate: { stat: fight.rate, against: ourRate },
+    damage: { stat: fight.damage.ours, against: ourDealt },
+    accuracy: { stat: fight.accuracy.ours, against: ourAccuracy },
+    evasion: { stat: fight.accuracy.theirs, against: ourAccuracy },
+    reduction: { stat: fight.damage.theirs, against: ourDealt },
+    pool: { stat: laddered.pooled, against: ourPool },
+  };
+}
+
 export function landed(dealt: number, resistance: number, reduction: number, registry: Registry): number {
   const through = dealt * (1 - resistance / 100);
   return Math.max(Math.min(minDamage(registry), Math.max(through, 0)), through - reduction);
@@ -103,36 +127,41 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
 
   const us = actorEntity(registry, PLAYER);
   const type = registry.stats.get(laddered.dealt)?.deals;
-  const ourPool = abilityOn(laddered.pool, level);
-  const ourRate = declaredOn(registry, us, fight.rate);
-  const ourAccuracy = declaredOn(registry, us, fight.accuracy.ours);
+  const weighed = weighedFor(registry, fight, laddered, level, (statId) => declaredOn(registry, us, statId));
+  const ourPool = weighed.pool.against;
+  const ourRate = weighed.rate.against;
+  const ourAccuracy = weighed.accuracy.against;
+  const ourDealt = weighed.damage.against;
   const ourEvasion = declaredOn(registry, us, fight.accuracy.theirs);
   const ourReduction = declaredOn(registry, us, fight.damage.theirs);
   const ourResistance = resistanceDeclaredOn(registry, us, type);
   const theirResistance = resistanceDeclaredOn(registry, entity, type);
-  const ourDealt = perHitFor(abilityOn(laddered.dps, level), ourRate, ourAccuracy, registry);
 
   const written = (statId: string): number | undefined => {
     const held = entity.stats[statId];
     return held === undefined ? undefined : midpoint(held);
   };
-  const shaped = (statId: string, factor: number | undefined, neutral: number): number | undefined => written(statId) ?? (factor === undefined ? undefined : neutral * factor);
+  const shaped = (factor: Factor): number | undefined => {
+    const { stat, against } = weighed[factor];
+    const said = profile[factor];
+    return written(stat) ?? (said === undefined ? undefined : against * said);
+  };
 
-  const theirAccuracy = shaped(fight.accuracy.ours, profile.accuracy, ourAccuracy)!;
-  const theirEvasion = shaped(fight.accuracy.theirs, profile.evasion, ourAccuracy)!;
+  const theirAccuracy = shaped('accuracy')!;
+  const theirEvasion = shaped('evasion')!;
 
   const theyLand = hitChance(theirAccuracy, ourEvasion, registry);
   const askedDps = (tier.damageShare * ourPool) / SURVIVAL_WINDOW_SECONDS;
-  const saidRate = shaped(fight.rate, profile.rate, ourRate);
-  const saidDealt = shaped(fight.damage.ours, profile.damage, ourDealt);
+  const saidRate = shaped('rate');
+  const saidDealt = shaped('damage');
   const theirDealt = saidDealt ?? dealtFor(askedDps / (perSecond(saidRate!) * theyLand), ourResistance, ourReduction);
   const perSwing = landed(theirDealt, ourResistance, ourReduction, registry);
   const rate = saidRate ?? (perSwing * theyLand <= 0 ? Infinity : (askedDps / (perSwing * theyLand)) * SECONDS_PER_MINUTE);
 
   const weLand = hitChance(ourAccuracy, theirEvasion, registry);
   const ourSwings = perSecond(ourRate) * weLand;
-  const saidPool = shaped(laddered.pooled, profile.pool, ourPool);
-  const saidReduction = shaped(fight.damage.theirs, profile.reduction, ourDealt);
+  const saidPool = shaped('pool');
+  const saidReduction = shaped('reduction');
   const theirReduction = saidReduction ?? ourDealt * (1 - theirResistance / 100) - saidPool! / (tier.secondsToFell * ourSwings);
   const ourHit = landed(ourDealt, theirResistance, theirReduction, registry);
   const pool = saidPool ?? tier.secondsToFell * ourHit * ourSwings;
