@@ -82,6 +82,7 @@ stat: fishing
 
 # action cast
 title: Fish
+requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
 continuous
 attempts: 1
 rate: us.fishing-rate
@@ -394,7 +395,6 @@ examine: Fast water over stones, and every so often something turns in it.
 stats: depth 28
 uses: cast
 cast:
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-trout
@@ -413,7 +413,6 @@ hidden if: not stat.river-clear >= 1
 stats: depth 49
 uses: cast
 cast:
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-salmon
@@ -433,7 +432,6 @@ hidden if: stat.river-clear >= 1
 stats: depth 102
 uses: cast
 cast:
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-salmon
@@ -452,7 +450,6 @@ stats: depth 70
 uses: cast
 cast:
   hidden if: level.fishing < 11
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-pike
@@ -471,7 +468,6 @@ stats: depth 105
 uses: cast
 cast:
   hidden if: level.fishing < 16
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-sturgeon
@@ -564,7 +560,6 @@ stats: depth 161
 uses: cast
 cast:
   hidden if: level.fishing < 24
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
   rate: 4
   roll: spend-bait
   give: 1 raw-perch

@@ -18,7 +18,6 @@ examine: A slack backwater off the main current, and whatever lives in it does n
 stats: depth 86
 uses: fishing.cast
 cast:
-  requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers
   rate: 15
   roll: spend-bait
   one of:
