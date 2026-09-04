@@ -13,9 +13,11 @@ the sheet never had a special case to answer; A Grand Blade is **two** quests, a
 miniquest that teaches the plane and a hard finale that pays a weapon; **damage climbs at a
 fifth of health so an even fight takes five blows**; **stats that meet in an adversarial
 check share one ladder**, or the check stops meaning what it looks like it means; **a
-foe's toughness is typed resistance, never flat damage reduction**; and **a foe is
-classified by tier rather than cut one at a time**, the four tiers being declared in
-`content/combat.dsl` and the shape of them in `src/content/sections/tier.ts`:
+foe's toughness is typed resistance, never flat damage reduction**; **a foe is classified by
+tier and shaped by profile rather than cut one at a time**, and **balance is the engine's
+problem rather than the author's** — an author names what an encounter needs to be and only
+writes a stat where it is load-bearing for the story. The four tiers are declared in
+`content/combat.dsl` and their shape in `src/content/sections/tier.ts`:
 
     tier      seconds to fell    damage share    experience share    drops
     mob             7                0.8               0.7           common
@@ -24,8 +26,10 @@ classified by tier rather than cut one at a time**, the four tiers being declare
     boss           75                1.75              0.5           unique
 
 Normal is the curve, so a room of them is on pace and elites pay above it. Damage share is
-against survivable incoming over a **60-second** window, which is the one figure assumed
-rather than ruled — say if it should be another. Damage share is per body, and a place is
+against survivable incoming over a **60-second** window, confirmed 2026-09-04 and meaning
+*are you net positive in health after a minute of this fight* — if yes it can be farmed
+without watching, and if no the player has to pay attention or die, which is the right
+threshold for a semi-idle game. Damage share is per body, and a place is
 single combat unless it says `multicombat`, so a room of six is one at a time until it says
 otherwise.
 **A line is deleted the day it closes.**
@@ -70,6 +74,38 @@ the sweep moving foe toughness off flat reduction and onto typed resistance.
 *Closes when:* `combat.dsl` is re-cut with every route in it still walking,
 `ladder-check` reads both skills within a stated band, and what the flat 613 of health turned
 out to be is written into the commit.
+
+## A foe is three tags and the numbers are still hand-cut under them
+
+Ruled 2026-09-04, and the declarations are built: `tier:` fixes the budget, `profile:` fixes
+how it is spent, `level:` says what character both are read against. All three are on
+`# entity`, `# tier` and `# profile` are declared in `content/combat.dsl`, and
+`npm run ladder-check` reads a body against all of it.
+
+**What is not built is the derivation.** The tags describe; they do not yet produce. An
+author still types `stats: attack 4, defense 12, max-health 115, …` and the audit tells them
+it disagrees with the tags. The whole point of the ruling is that the author stops typing
+those: the engine solves them from tier, profile and level, and the author writes only what
+is load-bearing for the encounter — `-20% fire-resistance`, and nothing else.
+
+Two pieces stand between here and there:
+
+- **`# entity` cannot write a modifier.** The `<tag>` grammar has had `+<amount> <stat>`,
+  `-<amount> <stat>` and `+<percent>% <stat>` since long before this, and items, passives,
+  races and guises all write them. An entity takes only `stats: <stat> <amount>`, bare
+  absolutes. Give it the same grammar and the question of whether an author's line adds,
+  multiplies or replaces is answered the way it is answered everywhere else, rather than by
+  a scheme of its own.
+- **The solve itself.** A neutral body at a level is one whose rate and accuracy are the
+  player's, whose damage makes the tier's damage share, and whose pool makes the tier's
+  seconds to fell. The profile's multipliers then move each factor off that neutral, and a
+  profile whose factors leave the product alone — twice the damage at half the rate — has
+  not touched the tier at all. That is the whole rule, and `readingAt` in
+  `scripts/lib/foeTier.ts` already computes every quantity it needs in the other direction.
+
+*Closes when:* a body that names a tier, a profile and a level needs no `stats:` line at all,
+an author's own line reads as a modifier over what those give, and `ladder-check` reports
+nothing against a body that writes none.
 
 ## The passive ids were not renamed, and were ruled to be
 
