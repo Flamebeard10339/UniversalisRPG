@@ -1,7 +1,7 @@
 import type { Condition } from '../../grammar/condition';
 import { DslError, type Parser } from '../../grammar/parser';
 import { point, Range, range } from '../../grammar/range';
-import { id, numberOrStat } from '../../grammar/values';
+import { decimal, id, numberOrStat } from '../../grammar/values';
 import { firstCycle } from '../cycle';
 import type { Loose } from '../refs';
 import { hiddenIf, section } from './define';
@@ -23,7 +23,7 @@ export interface Stat {
   resists?: string;
   converts?: Conversion;
   atMost?: number | string;
-  whole: boolean;
+  roundsTo?: number;
 }
 
 const conversion: Parser<Conversion> = {
@@ -43,12 +43,8 @@ const ROLES = ['deals', 'resists', 'converts'] as const;
 
 const IN_A_SWING = 'a role in a swing, and a stat has one:';
 
-export const stat = section<Stat, 'whole'>()({
+export const stat = section<Stat>()({
   kind: 'stat',
-  keywords: ['whole'],
-  keywordNotes: {
-    whole: 'the stat carries whole numbers, so a value the engine works out for it — what a point of a # passive budget comes to, what a tier hands a body — is cut down to one rather than left with a fraction on it. A stat without this keeps whatever fraction it was solved to',
-  },
   ids: 'owned',
   vocabulary: 'declared',
   map: 'stats',
@@ -76,6 +72,12 @@ export const stat = section<Stat, 'whole'>()({
       parser: conversion,
       note: `${IN_A_SWING} this stat's value is the percent of the first type whoever carries it would have dealt that lands as the second instead, moved before either type is resisted. Conversions are read in one pass in the order they chain, so a chain that comes back round to a type is refused when the world loads, and stats that together convert more than the whole of a type share the whole of it`,
     },
+    roundsTo: {
+      parser: decimal,
+      keyword: 'rounds to',
+      standsWithout: true,
+      note: 'the step every value the engine works out for this stat is rounded to the nearest of — what a point of a # passive budget comes to, and anything else solved rather than written. `rounds to: 5` gives a stat that moves in fives however the ladder under it falls, which is worth more than an exact figure nobody can hold in their head. A worth that is more than nothing never rounds away to nothing: it comes up to one step rather than down to none. A stat saying nothing here keeps whatever fraction it was solved to',
+    },
     atMost: {
       parser: numberOrStat,
       keyword: 'at most',
@@ -88,6 +90,7 @@ export const stat = section<Stat, 'whole'>()({
     if (roles.length > 1) return `declares ${roles.join(' and ')}, and a stat is one thing in a swing: declare a stat per role`;
     if (value.converts !== undefined && value.converts.from === value.converts.to) return `converts: ${value.converts.from} to ${value.converts.to} moves a type onto itself, which would never finish`;
     if (value.atMost === value.id) return 'at most: names itself, so it could never be read';
+    if (value.roundsTo !== undefined && value.roundsTo <= 0) return `rounds to: ${String(value.roundsTo)} is not a step anything could be rounded to; a step is more than zero`;
     return undefined;
   },
   visit: (value, where, visit) => {

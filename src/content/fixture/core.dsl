@@ -68,7 +68,7 @@ base: 60
 
 # stat max-health
 base: 30
-whole
+rounds to: 5
 
 # stat regeneration
 base: 0

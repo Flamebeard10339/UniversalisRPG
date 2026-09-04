@@ -42,7 +42,7 @@ group: combat
 
 # stat max-health
 group: combat
-whole
+rounds to: 5
 
 # ladder max-health
 at level one: 100

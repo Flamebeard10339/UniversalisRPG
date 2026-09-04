@@ -222,7 +222,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|converts|at[ \\t]+most|resists|deals|group|title|base)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|rounds[ \\t]+to|converts|at[ \\t]+most|resists|deals|group|title|base)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -232,17 +232,6 @@
             },
             "3": {
               "name": "punctuation.separator.key-value.dsl"
-            }
-          }
-        },
-        {
-          "match": "^[ \\t]*([+-]?)(whole)\\b",
-          "captures": {
-            "1": {
-              "name": "keyword.operator.written-again.dsl"
-            },
-            "2": {
-              "name": "keyword.other.dsl"
             }
           }
         },

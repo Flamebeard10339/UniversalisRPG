@@ -4,7 +4,7 @@ import { fixtureSources } from '../content/worldFixture';
 import { midpoint } from '../grammar/range';
 import type { TagClause } from '../grammar/tagClause';
 import { ladderForStat } from './pace';
-import { grantOf, passiveTags } from './passiveGrant';
+import { grantOf, passiveTags, roundedFor } from './passiveGrant';
 
 const registry = loadUniverse(fixtureSources());
 
@@ -23,18 +23,24 @@ describe('what a point of a passive is worth is read off the ladder its stat cli
   it('is one level of that ladder divided by the budget, for every passive that names one', () => {
     for (const passive of budgeted()) {
       const ladder = ladderForStat(registry, passive.grants)!;
-      const stat = registry.stats.get(passive.grants!)!;
       const exact = ladder.growthPerLevel / passive.budget!;
-      expect(grantOf(registry, passive)).toBe(stat.whole ? Math.trunc(exact) : exact);
+      expect(grantOf(registry, passive)).toBe(roundedFor(registry, passive.grants!, exact));
     }
   });
 
-  it('cuts a stat that says it carries whole numbers down to one, and leaves one that does not alone', () => {
-    const passive = budgeted().find((each) => registry.stats.get(each.grants!)?.whole === true)!;
+  it('rounds to the nearest step the stat declares, so a passive moves in fives where the stat says fives', () => {
+    const passive = budgeted().find((each) => registry.stats.get(each.grants!)?.roundsTo !== undefined)!;
     expect(passive).toBeDefined();
-    const ladder = ladderForStat(registry, passive.grants)!;
-    expect(ladder.growthPerLevel / passive.budget!).not.toBe(Math.trunc(ladder.growthPerLevel / passive.budget!));
-    expect(Number.isInteger(grantOf(registry, passive))).toBe(true);
+    const step = registry.stats.get(passive.grants!)!.roundsTo!;
+    const exact = ladderForStat(registry, passive.grants)!.growthPerLevel / passive.budget!;
+    expect(exact % step, 'the fixture would round to itself, so this claim would hold vacuously').not.toBe(0);
+    expect(grantOf(registry, passive)! % step).toBe(0);
+  });
+
+  it('never rounds a worth that is more than nothing away to nothing, bringing it up a step instead', () => {
+    const stepped = [...registry.stats.values()].find((each) => each.roundsTo !== undefined)!;
+    expect(roundedFor(registry, stepped.id, stepped.roundsTo! / 100)).toBe(stepped.roundsTo);
+    expect(roundedFor(registry, stepped.id, 0)).toBe(0);
   });
 
   it('mints the bonus onto the tags it is read through, so nothing has to read the budget twice', () => {
@@ -59,7 +65,7 @@ describe('what a point of a passive is worth is read off the ladder its stat cli
       const now = grantOf(steeper, steeper.passives.get(passive.id)!)!;
       const ladder = ladderForStat(steeper, passive.grants)!;
       const exact = ladder.growthPerLevel / passive.budget!;
-      expect(now, passive.id).toBe(registry.stats.get(passive.grants!)!.whole ? Math.trunc(exact) : exact);
+      expect(now, passive.id).toBe(roundedFor(steeper, passive.grants!, exact));
       expect(now, `${passive.id} did not move with the ladder`).toBeGreaterThan(was);
     }
   });
