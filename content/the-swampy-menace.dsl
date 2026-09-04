@@ -38,7 +38,7 @@ stage errands:
         1x: say: Three doors, three debts, none of them written down anywhere but her memory.
 
 stage swamp-bound:
-  log: Oolga wants three things out of the mire past the marsh gate — marsh thistle, fen root, and a leaf off the same hummock — and will not say what for.
+  log: Oolga wants three things out of the mire past the marsh gate — marsh thistle, fen root, and a leaf off the same hummock — and will not say what for. {has marsh-thistle: The thistle is in my pack.} {has fen-root: The root too.} {has adders-tongue: And the leaf.}
   done when: has marsh-thistle and has fen-root and has adders-tongue
   goto confronted
   oolga says:
@@ -84,8 +84,6 @@ stage settled:
 
 # flag oolga-struck
 
-# flag herbs-collected
-
 # entity tulsa.oolga
 stats: attack 0, defense 999, max-health 999999, attack-rate 20, accuracy 0, evasion 0
 uses: core.melee-combat
@@ -118,12 +116,11 @@ node the-captain-wants-you:
   Go and see her before she comes back and makes it my doing twice.
 
 # droptable herb-find
-add: herbs-collected 1
-if herbs-collected = 1:
+if not has marsh-thistle and not has fen-root and not has adders-tongue:
   say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-if herbs-collected = 2:
+if has marsh-thistle and not has fen-root and not has adders-tongue or not has marsh-thistle and has fen-root and not has adders-tongue or not has marsh-thistle and not has fen-root and has adders-tongue:
   say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-if herbs-collected = 3:
+if has marsh-thistle and has fen-root and not has adders-tongue or has marsh-thistle and not has fen-root and has adders-tongue or not has marsh-thistle and has fen-root and has adders-tongue:
   say: Something surges up out of the mud before your hand closes round it — not a rat, though it was one once, and not a toad either.
 
 # entity tulsa.herb-patch
@@ -153,7 +150,7 @@ stats: attack 22, defense 6, max-health 80, attack-rate 22, accuracy 85, evasion
 uses: core.melee-combat
 faction: world
 aggressive
-hidden if: not herbs-collected >= 3
+hidden if: not has marsh-thistle or not has fen-root or not has adders-tongue
 respawn after: 10m
 on death:
   credit:
@@ -164,6 +161,10 @@ on death:
 
 # save both-prior-quests-done
 {"version":13,"location":"tulsa.market-square","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"kill-it-with-fire.oolgas-basement.cellar-cleared":true,"ball-of-a-boy.down-the-grate.reported":true}}
+
+# save ambushed-in-the-mire
+over: both-prior-quests-done
+{"version":13,"location":"tulsa.swamp-mire","inventory":{"core.marsh-thistle":1,"core.fen-root":1,"core.adders-tongue":1},"flags":{"oolgas-errands.errands":true,"oolgas-errands.swamp-bound":true,"oolga-struck":true}}
 
 # test the-swampy-menace-start-to-finish
 load: both-prior-quests-done
@@ -199,19 +200,79 @@ travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pull-root
 assert: has fen-root
-assert: herbs-collected = 1
 travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.pick-thistle
 assert: has marsh-thistle
-assert: herbs-collected = 2
 unkillable
 instant-kill
 travel: swamp-edge
 travel: swamp-mire
 use: entity.herb-patch.take-the-leaf
 assert: has adders-tongue
-assert: herbs-collected = 3
+use: melee-combat on rat-toad until done
+assert: not fainted
+travel: swamp-edge
+travel: market-square
+travel: tavern-street
+travel: oolga-house
+talk: oolga
+choose: oolgas-errands.confronted.oolga.0.said
+choose: continue
+assert: oolgas-errands.settled
+assert: inventory.coin > 0
+assert: xp.combat.health > 0
+
+# test the-rat-toad-is-outrun-rather-than-fought
+load: ambushed-in-the-mire
+unkillable
+wait: 5
+assert: not fainted
+travel: swamp-edge
+assert: not fainted
+travel: market-square
+assert: not fainted
+
+# test the-swampy-menace-with-the-herbs-found-in-a-different-order
+load: both-prior-quests-done
+equip: 1
+travel: castle-gate
+talk: castle-guard
+choose: continue
+travel: guard-barracks
+talk: guard-captain
+choose: oolgas-errands.sent-to-oolga.guard-captain.0.said
+choose: continue
+assert: oolgas-errands.errands
+travel: castle-gate
+travel: market-square
+travel: tavern-street
+travel: oolga-house
+talk: oolga
+choose: oolgas-errands.errands.oolga.0.said
+choose: What needs doing now?
+use: melee-combat on oolga until oolga-struck
+assert: oolga-struck
+talk: oolga
+choose: oolgas-errands.swamp-bound.oolga.0.said
+choose: continue
+assert: oolgas-errands.swamp-bound
+travel: tavern-street
+travel: market-square
+travel: swamp-edge
+travel: swamp-mire
+use: entity.herb-patch.pick-thistle
+assert: has marsh-thistle
+travel: swamp-edge
+travel: swamp-mire
+use: entity.herb-patch.take-the-leaf
+assert: has adders-tongue
+unkillable
+instant-kill
+travel: swamp-edge
+travel: swamp-mire
+use: entity.herb-patch.pull-root
+assert: has fen-root
 use: melee-combat on rat-toad until done
 assert: not fainted
 travel: swamp-edge
