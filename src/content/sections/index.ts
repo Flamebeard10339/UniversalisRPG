@@ -34,10 +34,11 @@ import { slot } from './slot';
 import { stat } from './stat';
 import { station } from './station';
 import { test } from './test';
+import { tier } from './tier';
 import { variable } from './variable';
 
 const declared = () =>
-  [damageType, stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
+  [damageType, tier, stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 

@@ -152,6 +152,16 @@ assert: resource.health > 12
 
 # damage-type fire
 
+# tier vermin-tier
+seconds to fell: 7
+damage share: 0.8
+experience share: 0.5
+
+# tier hearth-tier
+seconds to fell: 30
+damage share: 1.4
+experience share: 1
+
 # stat fire-damage
 deals: fire
 
@@ -174,6 +184,7 @@ title: The Ember
 examine: A coal the size of a dog, and it is looking at you.
 faction: vermin
 stats: attack 0, fire-damage 40, defense 0, max-health 1000, attack-rate 60, accuracy 100000, evasion 0
+tier: hearth-tier
 uses: core.melee-combat
 
 # entity brazier

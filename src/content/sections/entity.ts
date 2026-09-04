@@ -51,6 +51,7 @@ export interface AuthoredEntity extends HookCarrier {
   faction: string[];
   allies: Ally[];
   aggressive: boolean;
+  tier?: string;
   respawnAfter?: number;
   hiddenIf?: Condition;
   blocks: EntityBlock[];
@@ -143,6 +144,12 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     group: GROUP_FIELD,
     examine: { parser: text, note: `offered as an action addressed \`${EXAMINE_FIELD}\`, which says these words. Until it is taken, this thing stands under a placeholder with nothing else on offer` },
     hiddenIf: hiddenIf('the entity is not there to be met or robbed while this holds'),
+    tier: {
+      parser: id,
+      names: { id: 'tier' },
+      standsWithout: true,
+      note: 'what this is worth fighting, which is what its toughness, its damage and what an hour of it pays are all read against. A body that names none is not audited against any of them',
+    },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
       parser: list(id),
@@ -177,7 +184,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
-  needs: { respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
+  needs: { tier: 'stats', respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {

@@ -109,6 +109,9 @@ DEBUG
 # damage-type probe-fire
 DEBUG
 
+# tier probe-tier
+DEBUG
+
 # recipe probe-recipe
 DEBUG
 in: probe-item
