@@ -76,18 +76,16 @@ the droptables and say in the report what a level-one player can actually get.
 `simulate-activity` and do not tune.** A passive is written as a share of a level with
 `grants:`, and what a jewel is worth follows from that.
 
-`ladder-check` on the shipped corpus, read 2026-09-04 **after the damage ladder was corrected
-that afternoon**, says the two halves of the kit are wrong in opposite directions.
-`combat.attack` from shops is 46.4 **over** the ladder at level 10 and 51.2 over at 20 — the
-world's weapons and attack jewels are cut for a ladder five times too steep and have not been
-re-cut yet. `combat.health` from shops is 10.2 **short** at 10 and 63.4 short at 20.
+**Read `npm run ladder-check -- --world <your corpus>` before deciding what the stall sells,
+and take no figure from this brief.** The two halves of the kit are wrong in opposite
+directions and which way each one points has already flipped twice while this brief sat
+waiting, so the direction is the run's to read rather than this page's to assert.
 
-**So the stall does not answer an attack gap, because there is not one.** If it stocks a
-weapon at all, that weapon is cut against the corrected ladder rather than against what the
-armoury counter happens to sell today, and it will look weak beside the counter's stock —
-say so in the report rather than matching the counter. Where the stall can honestly help is
-the health side, and only a little: it is a stall a man just got, not a rival armoury, and
-what it stocks is the tier a competent crafter with no premises makes.
+What is settled is the judgement, not the numbers: this is a stall a man just got, not a rival
+armoury, so what it stocks is the tier a competent crafter with no premises makes. Cut what it
+sells against the ladder rather than against what the armoury counter happens to stock today,
+and where that leaves it looking weak beside the counter, **say so in the report rather than
+matching the counter.**
 
 Read the residual off your own corpus rather than trusting those figures, and say in the
 report what the stall moved.

@@ -10,6 +10,7 @@ import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
 import { abilityAtLevelIn, climbsDps } from '../src/runtime/pace';
+import { passiveTagsOf } from '../src/runtime/passiveGrant';
 import { fightOf } from '../src/runtime/foeSolve';
 import { hitChance } from '../src/runtime/tuning';
 import { actorEntity } from '../src/runtime/actionLookup';
@@ -171,7 +172,7 @@ export function jewelReaches(registry: Registry, itemId: string, statId: string)
   const carried = registry.items.get(itemId)?.clusterJewel;
   const jewel = carried === undefined ? undefined : registry.clusterJewels.get(carried);
   if (jewel === undefined) return false;
-  return Object.values(jewel.positions).some((passiveId) => (registry.passives.get(passiveId)?.tags ?? []).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
+  return Object.values(jewel.positions).some((passiveId) => passiveTagsOf(registry, passiveId).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
 }
 
 export function effectReaches(registry: Registry, itemId: string, statId: string): boolean {

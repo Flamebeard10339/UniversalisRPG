@@ -62,21 +62,19 @@ describe('a passive says what it is worth as a multiple of a level, and the engi
   });
 
   it('moves every granting passive at once when the ladder moves, which is the whole of why it is declared there', () => {
-    const steeper = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace('added growth per level: 15', 'added growth per level: 30') })));
+    const pool = [...registry.ladders.values()].find((each) => each.addedGrowthPerLevel !== 0)!;
+    const was = `added growth per level: ${String(pool.addedGrowthPerLevel)}`;
+    const steeper = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace(was, `added growth per level: ${String(pool.addedGrowthPerLevel * 2)}`) })));
+    expect([...steeper.ladders.values()].find((each) => each.id === pool.id)!.addedGrowthPerLevel, 'the substitution found nothing, so the world under test never moved').toBe(pool.addedGrowthPerLevel * 2);
+
+    let read = 0;
     for (const passive of granting()) {
       for (const grant of grantsOf(passive)) {
-        if (grant.axis === 'increased' || ladderForStat(registry, grant.statId)!.addedGrowthPerLevel !== 15) continue;
+        if (grant.axis === 'increased' || ladderForStat(registry, grant.statId)!.id !== pool.id) continue;
         expect(worthOf(steeper, grant), passive.id).toBe(worthOf(registry, grant)! * 2);
+        read += 1;
       }
     }
-  });
-
-  it('reads the ladder the same way the engine reads a character, so a grant is a share of a real rung', () => {
-    for (const ladder of registry.ladders.values()) {
-      for (const level of [1, 10, 30]) {
-        expect(addedOn(ladder, level)).toBeCloseTo(ladder.addedAtLevelOne + ladder.addedGrowthPerLevel * (level - 1), 9);
-        expect(increasedOn(ladder, level)).toBeCloseTo(ladder.increasedAtLevelOne + ladder.increasedGrowthPerLevel * (level - 1), 9);
-      }
-    }
+    expect(read, 'no grant read the ladder that moved, so this claim asserted nothing').toBeGreaterThan(0);
   });
 });

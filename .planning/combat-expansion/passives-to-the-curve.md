@@ -1,9 +1,12 @@
 # Combat: write every passive as a share of a level
 
-`combat.dsl` holds seventy-five `# passive` sections. Seventy-three of them carry an amount
-somebody chose — `+3 physical-damage`, `+25 max-health`, `+12% max-health` — with nothing
-saying what a passive of that rarity at that plane cost is allowed to be worth. That is how
-the health jewels came to sit six hundred points over the ladder with nothing noticing.
+Nearly every `# passive` in `combat.dsl` carries an amount somebody chose — `+3
+physical-damage`, `+25 max-health`, `+12% max-health` — with nothing saying what a passive of
+that rarity at that plane cost is allowed to be worth. That is how the health jewels came to
+sit hundreds of points over the ladder with nothing noticing.
+
+**Ask the module how many there are rather than trusting a count here.** `grep -c '^# passive '`
+on your copy says how many, and those already carrying a `grants:` line are the ones done.
 
 The engine now answers it. A passive says what share of a level it is worth and the number is
 written for it, so a ladder that moves re-cuts every passive hanging off it. Your job is the

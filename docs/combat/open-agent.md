@@ -25,14 +25,10 @@ carrying `deals:` reads that same line divided by those seconds, and damage-per-
 derived from dps and attack rate rather than declared — the two used to be on different clocks, blows against seconds, which
 is what made the ladder and the tiers measure different things.
 
-The four tiers are declared in `content/combat.dsl`, their shape in
-`src/content/sections/tier.ts`:
-
-    tier      seconds to fell    damage share    experience share    drops
-    mob             7                0.8               0.7           common
-    normal         15                1.0               1.0           uncommon
-    elite          30                1.4               1.3           rare
-    boss           75                1.75              0.5           unique
+The tiers are declared in `content/combat.dsl` and their shape in
+`src/content/sections/tier.ts`. `npm run oracle -- tier` prints what a tier may say and what
+each one says; do not write the table down here, and note that an older copy of it carried a
+`drops` column no `# tier` has ever had.
 
 Normal is the curve, so a room of them is on pace and elites pay above it. Damage share is
 against survivable incoming over a **60-second** window, meaning *are you net positive in
@@ -53,28 +49,23 @@ no-op, since the player's is zero.
 ## Every number in combat.dsl is cut against ladders that have since moved
 
 Nothing under `content/` moved when the damage model and the ladders were corrected, and the
-toughness anchor has since gone to 100 at level one and 999 at thirty. `npm run ladder-check`
-now reads its lines out of `# ladder` sections in the world:
+toughness anchor has since gone to 100 at level one and 1000 at thirty on two axes.
 
-    combat.attack (dps)                          shop         anywhere
-      level 10   the ladder asks 25.3/s      10.0 short     12.3 over
-      level 20   the ladder asks 45.9/s      25.8 short      2.1 short
-      level 30   the ladder asks 66.6/s      41.1 short     14.2 short
+**Run `npm run ladder-check`; no figure from it is written down here.** It was, three times in
+three files, and every cell of one copy was stale within the day — one brief drew the opposite
+conclusion from its own stale row and was queued for dispatch saying so. What the tool says is
+the tool's.
 
-    combat.health (core.max-health)              shop         anywhere
-      level 10   ladder asks 379.0          326.2 short    325.9 over
-      level 20   ladder asks 689.0          619.4 short     70.6 over
-      level 30   ladder asks 999.0          910.6 short    182.8 short
+What the readings have consistently shown, which is the part worth writing down:
 
-The flat surcharge on attack is gone: it was flat because the ladder was nearly flat, and
-against a real slope it reads as a slope deficit crossing near level 20. The health drop row
-that used to sit 613 over at every rung likewise crosses instead of running parallel — the
-kit is level-independent and it was the ladder that was flat, which is what the 613 was.
-
-What is left is a genuine content gap on the shop row: **the world grants a player 39 health
-at level one and 88 at thirty, all of it gear**, because a skill raises its stat by +1 and
-+1% a level and nothing else. Against a ladder asking 100 to 999 that is short everywhere,
-and it is why five routes had to say `unkillable` when the anchor moved.
+- **The drop rows start far over and end short.** The kit the audit reaches for is nearly
+  level-independent while the ladder climbs, so it overpays a beginner and underpays a thirty.
+  That is the jewels and the passives behind them, and it has a line of its own above.
+- **The shop health row is short at every rung and worsens with it.** The world grants a player
+  health almost entirely through gear, because a skill raises its stat by +1 and +1% a level
+  and nothing else does anything. Against a ladder asking 100 at level one and 1000 at thirty
+  that is short by an order of magnitude at the top, and it is why routes in the corpus say
+  `unkillable`.
 
 The brief is `.planning/combat-expansion/combat-recut.md`. It also carries the sweep moving
 foe toughness off flat reduction onto typed resistance, and the classification of 175
@@ -131,7 +122,7 @@ engine's own summation rather than a second model of it.
 *Closes when:* a body dealing two types reads back at its tier, and `readingAt` no longer
 names a single damage stat.
 
-## Seventy-three passives still carry amounts cut against nothing
+## Passives still carry amounts cut against nothing
 
 `# passive` takes `grants:`, a block of multiples of what one level is worth on the ladder the
 stat climbs: `+2x increased physical-damage`, `-0.5x added defense`. The engine writes the
@@ -140,8 +131,8 @@ says the step the added half comes to the nearest of.
 
 Every shape a passive takes is covered by that one form, which is why there is no list of cases
 here: a trade-off is two lines, a two-stat passive is two lines, and either half may be added
-or increased. **Two of seventy-five are converted** — `combat.immovable` (+1x added, reading
-+15) and `combat.reckless` (+2x increased, its defense half still hand-cut).
+or increased. A handful are converted; `grep -l '^grants:' content/*.dsl` says which, and
+`combat.reckless` is the one carrying a hand-cut modifier beside its block.
 
 Two things to know before converting the rest. A grant against a stat that climbs no `# ladder`
 mints nothing at all, and `worldRemarks` reports it — `core.defense` and `combat.attack-rate`
@@ -157,7 +148,8 @@ what is left hand-cut is hand-cut because somebody decided it should be.
 
 Ruled that a route asks whether a path is walkable and nothing else; whether the player lives
 through it is the balance system's to answer. `unkillable` was already in the grammar, so this
-was a doctrine change rather than a build, and five routes carry it after the anchor moved.
+was a doctrine change rather than a build, and the routes that died when the anchor moved carry
+it; `grep -c '^unkillable$' content/*.dsl` says which and how many.
 
 Fifteen routes still assert `not core.fainted`, and those are engine tests — *does damage
 apply* — standing in the shipped world where a contributor editing content cannot run them.
@@ -178,8 +170,8 @@ the fifteen moved to `src/content/fixture/` or to a `.test.ts`, where an engine 
 
 The base run renamed the six jewel items it wrote to `<rarity>-<role>-<skill>` and stopped
 there. The six older `<name>-jewel` items — `keen-edge-jewel`, `stout-heart-jewel`,
-`tempered-will-jewel`, `great-work-jewel`, `causeway-jewel`, `crossroads-jewel` — and all
-thirty-two `# passive` sections still carry flavour ids. Ruled that the passives are renamed
+`tempered-will-jewel`, `great-work-jewel`, `causeway-jewel`, `crossroads-jewel` — and every
+`# passive` in `combat.dsl` still carry flavour ids. Ruled that the passives are renamed
 too and their flavour moves into `title:`.
 
 `npm run rename-section` writes one id everywhere the world reads it and refuses unless the
@@ -197,24 +189,17 @@ than from this paragraph.
 are, each has a `title:` holding the flavour it gave up, and
 `npm run oracle -- --at content` is green.
 
-## The wave is four merged of twelve, and its briefs still ask for balance
+## The wave still has briefs waiting, and they now ask for tags
 
 The briefs live in `.planning/combat-expansion/`, and one that has merged moves into
-`completed/` beside them, so what is left to run is what is in the folder. Each is one
-`npm run authorbot -- <brief> --target <module>`, three at a time.
-
-    completed/: combat-expansion     ball-of-a-boy-pass   combat-lessons
-                reverse-infiltration kill-it-with-fire-pass
-    waiting:    combat-recut             birds-and-the-bees-pass
-                the-swampy-menace-pass   attention-to-detail-pass
-                the-bars-crawl-pass      the-grumpy-crafter
-                a-grand-blade-pass       plague-matters
-                combat-floor             passives-to-the-curve
+`completed/` beside them, **so what is left to run is what is in the folder and there is no
+list of them here.** Each is one `npm run authorbot -- <brief> --target <module>`, three at a
+time.
 
 The briefs were rewritten 2026-09-04 to ask for tags rather than numbers, and each now says
 plainly not to run `simulate-activity`. The speedrun is the one lane that still iterates,
-because a floor is walked rather than declared. `passives-to-the-curve.md` is new and is the
-brief for the passive line above.
+because a floor is walked rather than declared. `passives-to-the-curve.md` is the brief for the
+passive line above.
 
 Orders to keep: `a-grand-blade-pass` after `the-grumpy-crafter`; `combat-recut` and the
 passive rename never at once; The Rat Conspiracy gets no pass. **Dispatching is on hold until
