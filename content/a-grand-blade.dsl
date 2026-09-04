@@ -1,5 +1,5 @@
 # info a-grand-blade
-version: 0.1.0
+version: 0.2.0
 pack: quests
 dependencies:
   core
@@ -37,8 +37,22 @@ stage searching:
     take: 1 smiths-notes
     give: 1 grand-blade-schematic
     xp: smithing.smithing 400
-    There's a blade in here too big for anything he ever sold — bar count, temper, the whole shape of it. I don't think he thought anyone would get this far. Take the pattern of it. You'll be at that anvil more than I will, the look of you.
-    Use it. It's yours as much as it's mine, these days.
+    There's a blade in here too big for anything he ever sold — bar count, temper, the whole shape of it. I don't think he thought anyone would get this far. Take the pattern of it.
+    One thing in here I can't get you, though. The bar count calls for iron with a grain in it that isn't ours — ratkin-work. He traded a warchief for a bar of it once, back when trading was still a thing you could do with them. I don't have that trade. If this gets made, you're the one taking the bar off whoever's holding it now.
+    goto gathering-the-iron
+
+stage gathering-the-iron:
+  log: The pattern calls for a bar the shop cannot supply — ratkin ironwork, out past the muster, and nobody down there is giving it up for the asking.
+  tulsa.bladesmiths-son says:
+    when: not has ratkin-ingot
+    ask: About the ratkin iron.
+    again: Past the muster, and past whichever of them is minding it now. I know what I'm asking. I don't have a better way to ask it.
+    He doesn't dress it up. "It's ratkin-work, out past the muster. Whoever's leading that lot these days isn't handing it over for a please." He doesn't say what happens if you can't take it off him. He doesn't have to.
+  tulsa.bladesmiths-son says:
+    when: has ratkin-ingot
+    ask: I have the bar.
+    He turns it over twice before he believes it's real, thumb along the grain like he's never felt metal sit like that before. "That's it. That's exactly what he traded for."
+    He doesn't ask what it cost you to get it, which is its own kind of answer. He doesn't take it off you, either — that's a job for the anvil, not for his hands.
     goto forge-reopened
 
 stage forge-reopened:
@@ -48,7 +62,7 @@ stage forge-reopened:
     always
     ask: About the forge, now.
     again: Fire's lit. Anvil's yours as much as it's mine, these days.
-    Fire's lit for the first time since he died. Feels like it should have taken more than a book under a paving stone.
+    Fire's lit for the first time since he died. Feels like it should have taken more than a book under a paving stone and a warchief's arm besides.
 
 # entity tulsa.anvil
 flags: notes-found
@@ -59,6 +73,42 @@ search under the anvil:
   set: notes-found
   say: One flag under the anvil's foot sits proud of the others, cut to fit around it rather than under it — set by whoever set the anvil there in the first place. It lifts on a fingernail. Underneath, wrapped against the damp, is a notebook that has not seen daylight in years.
 
+# flag warchief-confronted
+
+# entity combat.ratkin-warrior
+push-to-the-warchief:
+  requires: level.combat.attack >= 22
+  hidden if: warchief-confronted or not finding-the-notes.gathering-the-iron
+  instant
+  set: warchief-confronted
+  say: You put enough of them down, fast enough, that the ones still standing give ground rather than die for a stranger's fight. Past them, something a head taller than the rest turns to face you at last.
+  on refused:
+    say: You get three strides into the press before two spears meet in front of you and a third takes you back a step. Whatever is standing behind this lot, you are not getting past it today.
+
+# entity ratkin-warchief
+title: The Ratkin Warchief
+examine: Scaled in plate the rest of the muster only wears pieces of, worked from an iron with a grain in it no Tulsa forge has ever put there.
+hidden if: not warchief-confronted
+tier: elite
+profile: brute
+level: 24
+stats: physical-resistance 55
+uses: core.melee-combat
+faction: world
+aggressive
+respawn after: 3m
+on death:
+  credit:
+    roll: combat.ratman-remains
+    give: 1 ratkin-ingot
+
+# location tulsa.the-muster
++entities: ratkin-warchief
+
+# item ratkin-ingot
+title: Ratkin Ingot
+examine: A bar the colour of old iron and heavier than its size has any business being, worked in a grain that runs the wrong way for anything a Tulsa smith learned.
+
 # item grand-blade-schematic
 title: The Grand Blade Schematic
 examine: Bar count, temper, and the whole shape of a blade too big for anything the shop ever sold, copied out in a steadier hand than whatever wrote the original.
@@ -68,9 +118,9 @@ title: Grand Blade
 examine: A long, plain blade with nothing on it a smith would call decoration, and an edge that does not argue with anything it meets.
 slot: mainhand
 requires: level.combat.attack >= 25
-value: 900
-item-level: 14-20
-weapon, +28 attack
+value: 2400
+item-level: 24-30
+weapon, +23 physical-damage
 
 # item smiths-notes
 title: The Bladesmith's Notes
@@ -78,16 +128,18 @@ examine: A notebook wrapped in oilcloth, the pages gone soft at the corners from
 
 # recipe grand-blade
 station: anvil
-in: 15 iron-bar, 1 hammer, 1 grand-blade-schematic
+in: 15 iron-bar, 1 hammer, 1 grand-blade-schematic, 1 ratkin-ingot
 out: 1 grand-blade, 1 hammer, 1 grand-blade-schematic
 skill: smithing 650
 rate: smithing
-say: You work from the pattern rather than around it, and the blade that comes off the anvil is not shaped like anything either of you made before.
+say: You work the ratkin bar in with the rest, and the blade that comes off the anvil is not shaped like anything either of you made before.
 
 # save outside-the-forge
-{"version":13,"location":"tulsa.market-row","inventory":{"core.coin":1000,"smithing.iron-bar":15,"smithing.hammer":1}}
+{"version":13,"location":"tulsa.market-row","xp":{"combat.attack":200000,"combat.health":200000},"inventory":{"core.coin":1000,"smithing.iron-bar":15,"smithing.hammer":1}}
 
 # test a-grand-blade-start-to-finish
+unkillable
+instant-kill
 load: outside-the-forge
 travel: forge
 talk: tulsa.bladesmiths-son
@@ -101,8 +153,49 @@ choose: finding-the-notes.searching.bladesmiths-son.1.said
 choose: continue
 assert: not has smiths-notes
 assert: has grand-blade-schematic
+assert: finding-the-notes.gathering-the-iron
+goto: the-muster
+use: entity.combat.ratkin-warrior.push-to-the-warchief
+assert: warchief-confronted
+use: core.melee-combat on ratkin-warchief until has ratkin-ingot
+cancel
+assert: has ratkin-ingot
+goto: forge
+talk: tulsa.bladesmiths-son
+choose: finding-the-notes.gathering-the-iron.bladesmiths-son.1.said
+choose: continue
+assert: has ratkin-ingot
 assert: finding-the-notes.forge-reopened
 craft: grand-blade
 assert: has grand-blade
 assert: has grand-blade-schematic
+assert: not has ratkin-ingot
 assert: inventory.smithing.iron-bar = 0
+
+# save at-the-muster-with-the-schematic
+{"version":13,"location":"tulsa.the-muster","xp":{"combat.attack":200000,"combat.health":200000},"flags":{"a-grand-blade.finding-the-notes.gathering-the-iron":true},"inventory":{"core.coin":1000,"smithing.iron-bar":15,"smithing.hammer":1,"a-grand-blade.grand-blade-schematic":1}}
+
+# test the-warchief-is-not-taken-by-asking
+unkillable
+instant-kill
+load: at-the-muster-with-the-schematic
+use: entity.combat.ratkin-warrior.push-to-the-warchief
+assert: warchief-confronted
+use: core.melee-combat on ratkin-warchief until has ratkin-ingot
+cancel
+assert: has ratkin-ingot
+goto: forge
+talk: tulsa.bladesmiths-son
+choose: finding-the-notes.gathering-the-iron.bladesmiths-son.1.said
+choose: continue
+assert: finding-the-notes.forge-reopened
+craft: grand-blade
+assert: has grand-blade
+
+# save at-the-muster-untrained
+{"version":13,"location":"tulsa.the-muster","flags":{"a-grand-blade.finding-the-notes.gathering-the-iron":true},"inventory":{"core.coin":1000}}
+
+# test the-muster-turns-away-a-fighter-who-is-not-ready
+load: at-the-muster-untrained
+use: entity.combat.ratkin-warrior.push-to-the-warchief
+assert: not warchief-confronted
