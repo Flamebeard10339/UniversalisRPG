@@ -63,7 +63,6 @@ examine: A stranger with a notebook, keeping half an eye on the castle and half 
 # location tulsa.market-row
 +entities: reporter
 
-// action is there to be tried again the moment that passes. The `@@@` on the
 # location tulsa.market-rooftops
 watch the castle windows:
   hidden if: overheard-the-captain
