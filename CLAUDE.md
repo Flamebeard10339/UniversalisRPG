@@ -284,3 +284,13 @@ Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.ym
 Android: Capacitor sync + Gradle release build, APK signed and attached to the release.
 CI runs `tsc --noEmit`, `npm test`, `npm run layer-check` and `npm run comment-check`.
 
+# Harness bugs
+
+`SendMessage` is disabled and refuses every call, so a spawned subagent cannot be
+steered or resumed — re-spawn it and restate the context. `ListAgents` still works
+and still tells you to use `SendMessage`, as does the `Agent` tool's own result;
+both are stale, ignore them. Session-to-session messaging still works through
+`mcp__ccd_session_mgmt__send_message`. Checked 2026-09-04 on 2.1.260, last working
+2026-08-31 on 2.1.247. **Recheck on 2026-09-18** and either move that date or delete
+this section.
+
