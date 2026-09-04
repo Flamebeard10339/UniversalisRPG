@@ -995,6 +995,9 @@ stocks:
   4 steel-line
   60 bread-paste
   2 greenheart-rod
+  2 fishermans-gansey
+  2 waders
+  2 hobnailed-river-boots
 replenish: 5s
 
 # entity fishing-supplies
@@ -1236,6 +1239,7 @@ coin: coin
 stocks:
   1 rod-and-winch
   2 dressed-silk-line
+  1 creel
 replenish: 10m
 hidden if: not hobs-traps.trusted
 

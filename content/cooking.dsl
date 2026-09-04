@@ -4,6 +4,7 @@ pack: skills
 dependencies:
   core
   combat
+  ~ tulsa
 
 # stat cooking
 title: Cooking
@@ -45,6 +46,33 @@ requires: level.cooking >= 5
 value: 60
 item-level: 6-12
 kitchen, +6 cooking
+
+# item stove-apron
+title: Stove Apron
+examine: Canvas gone stiff down the front with grease no wash has ever got out of it, tied twice at the back because the first knot never holds a whole shift.
+slot: body
+requires: level.cooking >= 25
+value: 170
+item-level: 20-26
+kitchen, +8 cooking
+
+# item kitchen-clogs
+title: Kitchen Clogs
+examine: Wooden soles with a tread nailed on after the fact, for a floor that is wet from the moment the range is lit.
+slot: boots
+requires: level.cooking >= 25
+value: 150
+item-level: 20-26
+kitchen, +8 cooking
+
+# item cooks-whites
+title: Cook's Whites
+examine: Checked trousers boiled so many times the pattern is going, and the only pair in the kitchen without a scorch mark on them yet.
+slot: legs
+requires: level.cooking >= 30
+value: 300
+item-level: 26-32
+kitchen, +14 cooking
 
 # item cooked-chicken
 title: Cooked Chicken
@@ -171,3 +199,66 @@ passives: 1 practised, 2 second-nature
 title: A Steady Hand
 examine: A wooden spoon burnt black at one edge and not the other, which took some doing.
 cluster-jewel: a-steady-hand
+
+# shop cooks-shelf
+coin: coin
+stocks:
+  4 oven-mitts
+  4 cast-iron-pan
+  2 chefs-hat
+  2 stove-apron
+  2 kitchen-clogs
+  1 cooks-whites
+replenish: 5s
+
+# entity cooks-shelf
+title: The Cook's Shelf
+examine: A shelf by the stove, hung and stacked with what Aggie is not using this minute.
+keeps shop: cooks-shelf
+
+# location the-larder
+east of tulsa.aggies-house
+title: The Larder
+examine: A narrow room off the back of Aggie's kitchen, shelved to the ceiling on both sides.
+adjacent:
+  tulsa.aggies-house
+entities:
+  cooks-shelf
+
+# save at-aggies-stove-with-a-chicken
+{"version":13,"location":"tulsa.aggies-house","inventory":{"combat.raw-chicken":2}}
+
+# test a-cook-turns-raw-chicken-into-supper
+succeed-checks
+load: at-aggies-stove-with-a-chicken
+craft: cooked-chicken
+assert: has cooked-chicken
+assert: inventory.combat.raw-chicken = 1
+use: item.cooked-chicken.eat
+assert: not has cooked-chicken
+
+# test a-burnt-dish-comes-off-the-stove-not-the-plate
+fail-checks
+load: at-aggies-stove-with-a-chicken
+craft: cooked-chicken
+assert: has burnt-food
+assert: not has cooked-chicken
+
+# save at-aggies-house-flush
+{"version":13,"location":"tulsa.aggies-house","xp":{"cooking.cooking":20000},"inventory":{"core.coin":400}}
+
+# test the-cooks-shelf-sells-gear-that-can-be-worn
+load: at-aggies-house-flush
+travel: the-larder
+shop: cooks-shelf
+submit-modal: item=buy:chefs-hat
+submit-modal: item=buy:oven-mitts
+submit-modal: item=buy:cast-iron-pan
+submit-modal: item=close
+assert: has chefs-hat
+assert: has oven-mitts
+assert: has cast-iron-pan
+equip: chefs-hat
+equip: oven-mitts
+equip: cast-iron-pan
+assert: stat.cooking > 60
