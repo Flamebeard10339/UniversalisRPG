@@ -503,7 +503,8 @@ export function printDirective(value: Directive): string {
 
 const USED = { names: { id: '<kind>', action: null } };
 
-const UNTIL_NOTE = 'performs the directive, then waits it out exactly as the matching `wait:` does';
+const UNTIL_NOTE =
+  'performs the directive, then waits it out exactly as the matching `wait:` does — and where the action stops before the wait is satisfied, the route stops there too, saying what it was waiting for and that it never came true. That is the whole difference between this and the `until <condition>:` block below: an action cut short by a fight the player was pulled into, by a pack with nothing left to spend, or by a gate of its own coming to hold ends a route written this way, and only ends a pass of one written that way';
 
 const LOOP_NOTE =
   'goes round the lines under it, asking before each pass whether the condition holds and stopping the moment it does — so a death that cuts an action short ends that pass and not the route, and a pass that leaves the world exactly as it found it is refused rather than gone round again forever';
