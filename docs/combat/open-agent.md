@@ -55,7 +55,7 @@ Three faults with three different answers, which is why this is one brief and no
 attack rows are five-fold over because they are the old ladder showing through; the health
 shop row is an ordinary residual wanting gear the world has not got; and the health drop row
 is 613 over **and flat across every rung**, which is not a curve fault at all but something
-granting a large fixed amount. The brief is `.planning/combat-recut.md`, and it also carries
+granting a large fixed amount. The brief is `.planning/combat-expansion/combat-recut.md`, and it also carries
 the sweep moving foe toughness off flat reduction and onto typed resistance.
 
 *Closes when:* `combat.dsl` is re-cut with every route in it still walking,
@@ -94,18 +94,21 @@ are, each has a `title:` holding the flavour it gave up, and
 
 ## The wave after the base run is four merged of twelve
 
-Nine briefs stood in `.planning/` on 2026-09-04, each written off a measured gap; the ruling
-on A Grand Blade added two more and the ladder correction added a third. Each is one
+Nine briefs stood on 2026-09-04, each written off a measured gap; the ruling on A Grand
+Blade added two more and the ladder correction added a third. They live in
+`.planning/combat-expansion/`, and one that has been merged moves into `completed/` beside
+them, so what is left to run is what is in the folder. Each is one
 `npm run authorbot -- <brief> --target <module>`, run in the background with `--watch`
 beside it. **Three at a time**, so a fault in the tool or the oracle is caught before it has
 eaten eight runs.
 
-    merged:     ball-of-a-boy-pass   combat-lessons   reverse-infiltration
-                kill-it-with-fire-pass
+    completed/: combat-expansion     ball-of-a-boy-pass   combat-lessons
+                reverse-infiltration kill-it-with-fire-pass
     waiting:    combat-recut             birds-and-the-bees-pass
                 the-swampy-menace-pass   attention-to-detail-pass
                 the-bars-crawl-pass      the-grumpy-crafter
                 a-grand-blade-pass       plague-matters
+                combat-floor
 
 Orders to keep: `plague-matters.md` after `reverse-infiltration.md` — already merged, so it
 is free; `a-grand-blade-pass.md` after `the-grumpy-crafter.md`, since the pass hands the
@@ -140,7 +143,7 @@ rung, and the room table is re-read against the change.
 `docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets
 a floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
 thieving's; nothing walks a fighter from level one to thirty. The brief is
-`.planning/combat-floor.md` and it waits on the re-cut, since a floor measured against
+`.planning/combat-expansion/combat-floor.md` and it waits on the re-cut, since a floor measured against
 numbers about to move is measured twice.
 
 *Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
@@ -185,7 +188,7 @@ third is the one that matters most, because it makes population and respawn part
 sum rather than a separate open line.
 
 Every foe in the world names no tier at all yet, which is the other half of this: the sweep
-that classifies them is `.planning/combat-recut.md`.
+that classifies them is `.planning/combat-expansion/combat-recut.md`.
 
 *Closes when:* `ladder-check` reports foes against their declared tiers, and a foe that
 names none is reported as unaudited rather than passing.
