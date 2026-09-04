@@ -151,16 +151,16 @@ lock marks and is replaced by what the author means them to cost.*
 ## Three marks can have no floor route, because of how far their miss throws you
 
 A `# test` loop body has to be a walk that is legal both from the mark's room and from
-wherever a miss lands the player, and `travel:` is one hop and refuses the room it is
-already in. So a two-hop eject loops (`travel: <the room between>`, `travel: <the mark>`)
-and a one-hop or three-hop eject cannot. `thieving-floor` therefore covers the treasure
-chest and the jewellery box and not the tavern lockbox, the pay chest or the duke.
+wherever a miss lands the player. Since 2026-09-04 a `travel:` to the room the player is
+already standing in walks nothing and is not refused, so a loop body may open by naming the
+room it wants to stand in and be legal from anywhere a road reaches it — which is what the
+thieving floor now does after a faint sends the player home. What is left is the walk
+itself: a one-hop eject is one `travel:`, and a three-hop one is three, each of which has
+to be a road from wherever the pass began. `thieving-floor` therefore still covers the
+treasure chest and the jewellery box and not the tavern lockbox, the pay chest or the duke.
 
-The treasure chest was thrown to the market square and now lands at the castle gate, which
-is what made its route writable, and its payout was set for the shorter walk.
-
-*Closes when: the three remaining marks have floor routes — which wants either a way for a
-route to name where it stands, or their misses landing two hops out like the others'.*
+*Closes when: the three remaining marks have floor routes, each opening with the walk from
+wherever its miss lands the player.*
 
 ## The floors for this band walk ungeared, which is not what the band was balanced for
 

@@ -8,13 +8,11 @@ import { declaredId } from '../content/sections/entity';
 import { hostile, Registry } from '../content/registry';
 import { findActiveAction } from './actions';
 import { standing } from './population';
-import { type ActiveAction, type ActorState, type Cadence, GameState, PLAYER, templateOf } from './state';
+import { type ActiveAction, type ActorState, type Cadence, GameState, IMPLICIT_TARGET_FULL, newCadence, PLAYER, templateOf } from './state';
 import { Answer, Localized, localizerOf, Params } from './localized';
-import { fromMilliUnits, toMilliUnits, MILLI_UNITS } from './units';
+import { fromMilliUnits, toMilliUnits } from './units';
 
-export function newCadence(): Cadence {
-  return { progress: 0, attemptsMade: 0 };
-}
+export { IMPLICIT_TARGET_FULL, newCadence };
 
 export function playerCadence(active: ActiveAction): Cadence {
   return (active.cadences[PLAYER] ??= newCadence());
@@ -32,8 +30,6 @@ export function attemptFraction(cadence: Cadence, duration: number): number {
   if (!(span > 0)) return stopped ? 0 : 1;
   return Math.min(1, Math.max(0, cadence.progress / span));
 }
-
-export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
 export function retaliation(state: GameState, registry: Registry, actorId: string, attackerId: string): { id: string; action: Action } | undefined {
   for (const action of actorEntity(registry, actorId)?.actions ?? []) {

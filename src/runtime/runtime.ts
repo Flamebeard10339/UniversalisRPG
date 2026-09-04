@@ -683,6 +683,7 @@ function runFreely(state: GameState, registry: Registry, owner: string, action: 
   settlePools(state, registry, [], 0, segment.deltas);
   grantFoodFor(state, registry, owner, action, false);
   if (segment.stopped) endAction(state, segment.stopped);
+  beginPerformNext(state, registry);
 }
 
 interface NamedOn {
@@ -847,12 +848,12 @@ export function armTravel(origin: string, dest: string, registry: Registry, stat
 
 function unwalkable(dest: string, registry: Registry, state: GameState): Localized {
   const localizer = localizerOf(registry, state);
-  const because = state.location === dest ? 'engine.travel.already-here' : 'engine.travel.no-way';
-  return localizer.engine(because, { destination: localizer.title('location', dest) });
+  return localizer.engine('engine.travel.no-way', { destination: localizer.title('location', dest) });
 }
 
 export function armJourney(dest: string, registry: Registry, state: GameState): ArmResult {
   if (!registry.locations.has(dest)) throw new RuntimeError(`unknown location: ${dest}`);
+  if (state.location === dest) return { armed: false };
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
     state.log.push(unwalkable(dest, registry, state));
@@ -905,6 +906,7 @@ export function walkTo(dest: string, registry: Registry, state: GameState): Loca
     useTravel('', dest, registry, state);
     return undefined;
   }
+  if (state.location === dest) return undefined;
   const route = routeTo(state.location, dest, registry, state);
   if (!route) {
     const refused = unwalkable(dest, registry, state);

@@ -6,6 +6,7 @@ import type { EngineKey } from '../content/locale';
 import type { DebugSwitch } from '../content/sections/test';
 import type { Answer, Localized } from './localized';
 import { DEFAULT_RNG_SEED, RngCursor } from './rng';
+import { MILLI_UNITS } from './units';
 import type { Said } from './said';
 
 export type PoolLevels = { readonly [resourceId: string]: number };
@@ -36,6 +37,12 @@ export interface Cadence {
   attemptsMade: number;
   span?: number;
 }
+
+export function newCadence(): Cadence {
+  return { progress: 0, attemptsMade: 0 };
+}
+
+export const IMPLICIT_TARGET_FULL = MILLI_UNITS;
 
 export interface ActorState {
   resources: Record<string, number>;

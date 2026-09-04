@@ -1,11 +1,10 @@
 import { actionAddress } from '../content/sections/action';
 import type { Registry } from '../content/registry';
 import { endJourney } from './actionEnd';
-import { IMPLICIT_TARGET_FULL, newCadence } from './encounter';
 import { RuntimeError } from './error';
 import { type Localized, localizerOf } from './localized';
 import { seatOf } from './roster';
-import { type GameState, PLAYER } from './state';
+import { type GameState, IMPLICIT_TARGET_FULL, newCadence, PLAYER } from './state';
 
 export function heldByForce(state: GameState, registry: Registry): Localized | undefined {
   if (state.activeAction?.forced !== true) return undefined;
