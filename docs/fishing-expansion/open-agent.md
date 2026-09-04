@@ -1,8 +1,9 @@
 # What is still wrong that a lane can take
 
-The design doc is `.planning/fishing-expansion.md` and its last section holds the balance marks
-and how they were derived. The module walks all twelve of its own routes and the floor walks
-four more. **A line is deleted the day it closes.**
+The push covered both halves of the fishing/cooking split. The design doc is
+`.planning/fishing-expansion.md` and its last section holds the balance marks and how they were
+derived; `.planning/cooking-pass.md` is cooking's. Fishing walks twelve routes, the floor four,
+cooking three. **A line is deleted the day it closes.**
 
 ---
 
@@ -60,3 +61,31 @@ lifts three times over and passes, so the loop works; what it pays an hour is a 
 
 *Closes when: the balance line about a two-action offer closes, and the trap is swept like every
 other water in the module.*
+
+## Cooking's three jewels are one-off finds, so a cook has exactly three, ever
+
+`a-cooks-hands`, `a-hot-pass` and `a-steady-hand` each come from a single `hidden if: emptied`
+search in tulsa — the end drawer of a range, the spike on the bar's pass rail, Aggie's spoon
+crock. There is no repeatable source of any of them at any rarity, so what a cook can socket is
+fixed at three for the life of a character, and the rarity scheme the world rules by — a shop's
+common, an uncommon at one in sixteen to sixty-four, a rare at one in a hundred and twenty-eight
+— has nothing to say about cooking at all.
+
+Every other skill's jewels drop off something a player can go back to. This is why cooking's
+ladder residual sits where it does even after a whole band of gear was added: 9.4 short at level
+20 and 17.1 at 30, on six worn pieces with 116 plane points and no way to fill them.
+
+*Closes when: cooking has a repeatable jewel source cut at a rarity, the way fishing's four drop
+off its waters — at which point the residual is read again and is the real one.*
+
+## Fishing is still 39 short at level 30 with its whole band now buyable
+
+Making the gansey, the waders, the hobnailed boots and the creel purchasable took fishing's
+residual at 30 from 67.8 to 39.2, and moved 20 not at all — the band added was all level 25 and
+above. So the shape of what is missing has changed: it is no longer that the gear does not
+exist, it is that seven worn pieces with 141 plane points cannot be filled from the four jewels
+fishing drops.
+
+*Closes when: the level-30 orb the thieving pass is also waiting on is readable, and fishing's
+top rung is sized against the residual rather than guessed — the same line `docs/balance` holds
+for thieving, and neither closes without it.*
