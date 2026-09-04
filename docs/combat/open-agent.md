@@ -17,9 +17,12 @@ rather than the author's** — an author names what an encounter needs to be and
 only where it is load-bearing for the story.
 
 Two axes, independent so that a body may climb one without the other: **toughness**, what a
-character can lose, and **dps**, what it deals a second. An even match is felled in
-`SECONDS_TO_FELL_AN_EVEN_MATCH`, and damage-per-blow is derived from dps and attack rate
-rather than declared — the two used to be on different clocks, blows against seconds, which
+character can lose, and **dps**, what it deals a second. Both are declared in the world as
+`# ladder <stat>` sections, one per stat, each carrying what a character of that level stands
+at and how long the level takes; `src/runtime/pace.ts` holds no balance number of its own. The
+toughness line is whichever ladder declares `seconds to fell an even match:`, every stat
+carrying `deals:` reads that same line divided by those seconds, and damage-per-blow is
+derived from dps and attack rate rather than declared — the two used to be on different clocks, blows against seconds, which
 is what made the ladder and the tiers measure different things.
 
 The four tiers are declared in `content/combat.dsl`, their shape in
@@ -47,53 +50,38 @@ no-op, since the player's is zero.
 
 ---
 
-## The ladders and the curve are TypeScript while everything they govern is DSL
-
-`# tier`, `# profile` and `# damage-type` are declared in `content/`. The two ladders and the
-experience curve are constants in `src/runtime/pace.ts`, so a tier's `experience share` is a
-DSL number multiplying a TypeScript one. Same kind of fact, two homes, and the home an author
-cannot reach is the one that governs the rest.
-
-Ruled 2026-09-04 that they move, as **one `# ladder <skill-or-stat>` section per line** —
-each naming what it climbs, with its anchor and its growth. `fishing.fishing` already has a
-line of its own, so the per-skill case is real rather than hypothetical, and a modded world
-adds one by writing one. The curve goes the same way.
-
-Ruled to be done **after** the units settled, which they now have.
-
-*Closes when:* `ladder-check` reads its lines out of the world, `src/runtime/pace.ts`
-declares no balance number of its own, and a world declaring none still loads.
-
 ## Every number in combat.dsl is cut against ladders that have since moved
 
-Nothing under `content/` moved when the damage model and the ladders were corrected.
-`npm run ladder-check`, read after the dps ladder landed:
+Nothing under `content/` moved when the damage model and the ladders were corrected, and the
+toughness anchor has since gone to 100 at level one and 999 at thirty. `npm run ladder-check`
+now reads its lines out of `# ladder` sections in the world:
 
     combat.attack (dps)                          shop         anywhere
-      level 10   the ladder asks   4.2/s      11.0 over     33.3 over
-      level 20   the ladder asks   8.9/s      11.2 over     35.0 over
-      level 30   the ladder asks  13.5/s      11.9 over     38.9 over
+      level 10   the ladder asks 25.3/s      10.0 short     12.3 over
+      level 20   the ladder asks 45.9/s      25.8 short      2.1 short
+      level 30   the ladder asks 66.6/s      41.1 short     14.2 short
 
     combat.health (core.max-health)              shop         anywhere
-      level 10   ladder asks  63.0           10.2 short    641.9 over
-      level 20   ladder asks 133.0           63.4 short    626.6 over
-      level 30   ladder asks 203.0          114.6 short    613.3 over
+      level 10   ladder asks 379.0          326.2 short    325.9 over
+      level 20   ladder asks 689.0          619.4 short     70.6 over
+      level 30   ladder asks 999.0          910.6 short    182.8 short
 
-Three faults with three different answers, which is why this is one brief and not three. The
-attack rows are **a flat surcharge** — about 11 a second over at every rung out of a shop —
-which says the level grant dominates and gear adds a constant rather than a slope; a skill's
-level grants its own stat, and a bare character with no gear stands at physical-damage
-1.01 / 11 / 24 / 39 at levels 1 / 10 / 20 / 30. The health shop row is an ordinary residual
-wanting gear the world has not got. The health drop row is 613 over **and flat across every
-rung**, which is not a curve fault at all but something granting a large fixed amount.
+The flat surcharge on attack is gone: it was flat because the ladder was nearly flat, and
+against a real slope it reads as a slope deficit crossing near level 20. The health drop row
+that used to sit 613 over at every rung likewise crosses instead of running parallel — the
+kit is level-independent and it was the ladder that was flat, which is what the 613 was.
+
+What is left is a genuine content gap on the shop row: **the world grants a player 39 health
+at level one and 88 at thirty, all of it gear**, because a skill raises its stat by +1 and
++1% a level and nothing else. Against a ladder asking 100 to 999 that is short everywhere,
+and it is why five routes had to say `unkillable` when the anchor moved.
 
 The brief is `.planning/combat-expansion/combat-recut.md`. It also carries the sweep moving
 foe toughness off flat reduction onto typed resistance, and the classification of 175
 entities of which two name a tier.
 
-*Closes when:* `combat.dsl` is re-cut with every route in it still walking, `ladder-check`
-reads both skills within a stated band, and what the flat 613 of health turned out to be is
-written into the commit.
+*Closes when:* `combat.dsl` is re-cut with every route in it still walking, and `ladder-check`
+reads both skills within a stated band.
 
 ## The kit the audit dresses is chosen for one stat, so the dps row understates the world
 
@@ -114,16 +102,18 @@ because rate and accuracy are the profile's and the floor is the engine's. It bi
 `combat.feral-rat` as a `skirmisher` at level 4; re-tagging it a `brute` — slower blows, each
 above the floor — closed that case and is the pattern for the next.
 
-The same wall stands on the toughness half, and there the solve reaches past it by writing a
-**negative** reduction. That is a judgement and it is in `open-human.md`.
+Raising the toughness anchor to 100 is most of the answer, and was measured rather than
+argued: swept across every tier and profile at every rung, the wall now stands in **one cell**
+— level 1, on the fastest profile — where it used to bite a real content body at level 4. The
+proof is `src/runtime/foeTier.test.ts`'s *cannot cut a blow under the floor the engine puts on
+one*, repointed at that cell, and it still pins the wall rather than a way round it.
 
-Three answers are open: raise the level a `mob` is met at, lower `min-damage`, or let a tier
-declare that below some level it is read against a shorter window. The proof is
-`src/runtime/foeTier.test.ts`'s *cannot cut a blow under the floor the engine puts on one*,
-which pins the wall rather than a way round it.
+A solved reduction may go negative: ruled that a body which takes extra damage from every blow
+is a legitimate state to arrive at, and an author may write one deliberately. It reads as a
+higher xp/hour, since that depends on dps.
 
-*Closes when:* a body can be cut to any declared tier at any level it is met at, or the
-levels at which it cannot are refused with a message saying why.
+*Closes when:* a body can be cut to any declared tier at any level it is met at, or the one
+level at which it cannot is refused with a message saying why.
 
 ## The tier audit models one damage stat, and the engine has many
 
@@ -141,19 +131,43 @@ engine's own summation rather than a second model of it.
 *Closes when:* a body dealing two types reads back at its tier, and `readingAt` no longer
 names a single damage stat.
 
-## A passive is hand-cut the way a foe used to be
+## Sixty passives have a budget to be cut against and are still carrying hand-cut amounts
 
-Seventy-five `# passive` sections carry numbers somebody chose — `+3 physical-damage`,
-`+25 max-health`, `+12% max-health` — with nothing saying what a passive of a given rarity at
-a given plane cost is worth. That is the shape `# tier` and `# profile` fixed for foes, and
-it is why the health jewels reached 613 over the ladder without anything noticing: no line
-said what they were allowed to be worth.
+`# passive` now takes `grants:` — the stat — and `budget:` — how many points of it come to one
+level of the ladder that stat climbs. The amount is derived rather than written, so moving a
+ladder re-cuts every passive hanging off it with no content edit, and `rounds to:` on a
+`# stat` says the step the derived number comes to the nearest of, so `core.max-health` moves
+in fives. `combat.immovable` is converted and reads +30 where it was a hand-cut +25.
 
-Named by the author as a later concern, and recorded here because the evidence is already on
-the table rather than because it is next.
+**One of seventy-five is converted.** Measured shapes of the rest: 43 more are one flat grant
+of one stat and convert exactly as `immovable` did; 17 grant a percent, which cannot be solved
+because a percent of a linear ladder is a different number at every rung, and want an audit
+instead; 15 are trade-offs, per-resource scaling, behaviour-only or multi-stat, and what those
+should do is in `open-human.md`.
 
-*Closes when:* what a passive may grant is derived from something declared, and
-`ladder-check` reports one that exceeds it.
+This must not run at the same time as the passive rename below, since both write every
+`# passive` in `combat.dsl`.
+
+*Closes when:* every passive that is one flat grant of one stat names a budget and no amount,
+`ladder-check` reports a percent passive that exceeds what its budget allows, and
+`npm run oracle -- --at content` is green.
+
+## A route proves reachability, and fifteen of them still assert survival
+
+Ruled that a route asks whether a path is walkable and nothing else; whether the player lives
+through it is the balance system's to answer. `unkillable` was already in the grammar, so this
+was a doctrine change rather than a build, and five routes carry it after the anchor moved.
+
+Fifteen routes still assert `not core.fainted`, and those are engine tests — *does damage
+apply* — standing in the shipped world where a contributor editing content cannot run them.
+They belong in `src/content/fixture/` or in a `.test.ts`. Three more assert an absolute pool
+value (`resource.core.health = 11`), which `WALKED_FIELDS` already forbids an `expect:` sheet
+and does not yet forbid an `assert:`. The predicate that derives cleanly is in `open-human.md`
+and waits on a ruling, because read literally it refuses all 102 `has` asserts too.
+
+*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value, and
+the filter that stops the next one being written is derived from `SAVE_FIELDS` rather than
+listed beside it.
 
 ## The passive ids were not renamed, and were ruled to be
 
@@ -223,8 +237,14 @@ in four seeds of four. **This is population, respawn and aggression**, and a tie
 a room that cannot be killed fast enough to reach its share is under-populated rather than
 under-paying.
 
-*Closes when:* at least the band-appropriate room of each band runs the window out at its own
-rung, and the room table is re-read against the change.
+Ruled 2026-09-04 that **this has no one answer and is not a fault to be fixed**. There is a
+real difference between a room holding three guards and one holding ten, and choosing it is
+the author's job: a place may be meant to be lucrative, or dangerous, or thin. What the
+engine owes is a reading of what a room comes to, not a rule that every room comes to the
+same thing. So this closes on the sheet being read, not on the rooms being levelled.
+
+*Closes when:* the room table is re-read after the re-cut and the rooms that stop short are
+either meant to or given population, with the choice named per room rather than swept.
 
 ## Combat has no floor, so its tier saves cannot be deleted
 
