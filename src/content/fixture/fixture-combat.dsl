@@ -154,11 +154,10 @@ assert: resource.health > 12
 
 # profile skittering
 rate: 2
-damage: 0.5
+pool: 0.6
 
 # profile lumbering
 rate: 0.5
-damage: 2
 pool: 1.5
 
 # tier vermin-tier
@@ -192,7 +191,9 @@ examine: A coat of clay, still damp.
 title: The Ember
 examine: A coal the size of a dog, and it is looking at you.
 faction: vermin
-stats: attack 0, fire-damage 40, defense 0, max-health 1000, attack-rate 60, accuracy 100000, evasion 0
+stats: attack 0, attack-rate 60, accuracy 100000
+modifiers:
+  +40 fire-damage
 tier: hearth-tier
 profile: lumbering
 level: 12

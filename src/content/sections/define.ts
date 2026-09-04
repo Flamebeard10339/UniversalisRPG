@@ -5,7 +5,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, hydrateSection, isListField, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, alternativesFor, hydrateSection, isListField, neededAlternatives, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
 import { Loose, Pruning, Visit, condition as visitCondition, put, strings } from '../refs';
 import { Condition, condition } from '../../grammar/condition';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
@@ -138,10 +138,10 @@ function pointedAt(parser: Parser<unknown>, written: (value: string) => string, 
 }
 
 function insteadOf(schema: AnySchema, name: string): string | undefined {
-  const groups = schema.exclusive ?? [];
-  const mine = groups.find((group) => group.includes(name));
-  if (mine === undefined) return undefined;
-  const others = groups.filter((group) => group !== mine).flatMap((group) => group.map((each) => writtenAs(schema, each)));
+  const choice = alternativesFor(schema, name);
+  if (choice === undefined) return undefined;
+  const mine = choice.find((group) => group.includes(name));
+  const others = choice.filter((group) => group !== mine).flatMap((group) => group.map((each) => writtenAs(schema, each)));
   if (others.length === 0) return undefined;
   return `stands in place of ${others.join(', ')}, which cannot be written in the same body, and which a second body writing this one clears`;
 }
@@ -160,7 +160,8 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const keyword = spec.keyword ?? name;
   const positional = isPositionalField(schema, name);
   const written = (value: string): string => (positional ? value : `${keyword}: ${value}`);
-  const needs = schema.needs?.[name];
+  const needed = schema.needs?.[name];
+  const needs = needed === undefined ? undefined : neededAlternatives(needed);
   const block = positional ? undefined : blockOf(parser);
   const filled = { ...filledBy(parser), ...filledBy(spec) };
   const unwritten = leftOut(spec);
@@ -177,7 +178,7 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
 
 export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec).map((line) => ({ ...line, over: overwrittenField(schema, name) }))),
-  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, over: overwrittenField(schema, word), ...(schema.keywordNotes?.[word] === undefined ? {} : { note: schema.keywordNotes[word]! }), ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, over: overwrittenField(schema, word), ...(schema.keywordNotes?.[word] === undefined ? {} : { note: schema.keywordNotes[word]! }), ...(schema.needs?.[word] === undefined ? {} : { needs: neededAlternatives(schema.needs[word]!) }) })),
   ...(schema.entries === undefined ? [] : schema.entries.body.grammar.map((line) => ({ ...line, over: overwrittenField(schema, schema.entries!.into) }))),
 ];
 

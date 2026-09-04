@@ -16,7 +16,7 @@ import { createGameState, type GameState } from '../src/runtime/state';
 import { fromMilliUnits, MS_PER_MINUTE, msToSeconds } from '../src/runtime/units';
 import { FLOORS_DIR } from './floors';
 import { readSources } from './probe';
-import { abilityAtLevelIn } from './lib/pace';
+import { abilityAtLevelIn } from '../src/runtime/pace';
 import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
 type Walked = ReturnType<typeof createGameState>;
@@ -32,7 +32,7 @@ const usage = [
   '  --ladder        <stat>=<level>[,<stat>=<level>...] — stand the player where the ladder puts a',
   '                  character of that level in that stat, so a sweep names the rung it is asking',
   '                  about rather than the base underneath one. The ladder is the declared line in',
-  '                  scripts/lib/pace.ts that `npm run ladder-check` audits the world against, and',
+  '                  src/runtime/pace.ts that `npm run ladder-check` audits the world against, and',
   '                  the base that reaches it is solved rather than reckoned: the player is stood up',
   '                  twice under two bases, what the world made of each is read back, and the base',
   '                  that lands on the rung falls out of the two. So gear, race and what the level',

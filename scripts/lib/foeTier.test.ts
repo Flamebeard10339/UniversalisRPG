@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../../src/content/load';
 import type { Registry } from '../../src/content/registry';
-import { fairAt, fightersIn, ladderedStatsFor, readingAt, shapeDisagrees, shapeOf, type Fighter, type LadderedStats } from './foeTier';
-import { activitiesIn } from './tiers';
-import { tierState } from '../tier-build';
+import { ladderedFor, referencePlayer, type Fighter, type LadderedStats } from '../../src/runtime/foeTier';
+import { fairAt, fightersIn, shapeDisagrees, shapeOf, unwrittenFactors } from './foeTier';
 
 const WORLD = `
 # info arena
@@ -14,6 +13,7 @@ pack: fixture
 
 # stat attack
 base: 0
+deals: physical
 
 # stat defense
 
@@ -21,6 +21,7 @@ base: 0
 base: 100
 
 # stat evasion
+base: 20
 
 # stat attack-rate
 base: 60
@@ -28,9 +29,6 @@ base: 60
 # stat max-health
 
 # stat regeneration
-
-# stat blade
-deals: physical
 
 # stat ward
 resists: physical
@@ -45,7 +43,7 @@ trigger: on empty
 
 # skill striking
 title: Striking
-stat: blade
+stat: attack
 
 # skill enduring
 title: Enduring
@@ -65,11 +63,11 @@ depletes: them.health
 
 # profile quickfoot
 rate: 2
-damage: 0.5
+pool: 0.5
 
 # profile leaden
-rate: 0.5
 damage: 2
+reduction: 1.5
 
 # tier quick
 seconds to fell: 7
@@ -110,7 +108,7 @@ uses: melee
 
 # entity player
 faction: player
-stats: max-health 30, attack 0, accuracy 100, evasion 0, defense 0, attack-rate 60
+stats: max-health 30, attack 0, accuracy 100, evasion 20, defense 0, attack-rate 60
 uses: melee
 
 # location yard
@@ -120,43 +118,29 @@ entities: straw-man, boulder, untagged-thing, swift-thing
 `;
 
 const registry: Registry = loadModule(WORLD);
-const activity = activitiesIn(registry)[0]!;
-const stood = tierState(registry, activity, 1);
+const stood = referencePlayer(registry);
 const fighters = fightersIn(registry);
 const named = (id: string): Fighter => fighters.find((each) => each.entity.id.endsWith(id))!;
-const laddered = (fighter: Fighter): LadderedStats => ladderedStatsFor(registry, activity, fighter.fight)!;
+const laddered = (fighter: Fighter): LadderedStats => ladderedFor(registry, fighter.fight)!;
 
-describe('what a fight is made of, read off the action rather than named here', () => {
-  it('takes every stat in the contest off the action the foe uses', () => {
-    const shape = named('straw-man').fight;
-    expect(shape).toEqual({
-      rate: 'arena.attack-rate',
-      accuracy: { ours: 'arena.accuracy', theirs: 'arena.evasion' },
-      damage: { ours: 'arena.attack', theirs: 'arena.defense' },
-      pool: 'arena.health',
-    });
-  });
-
+describe('what the audit finds to read', () => {
   it('finds what opposes the player and not the player, however many things use the action', () => {
     const found = fighters.map((each) => each.entity.id);
     expect(found).toContain('arena.straw-man');
     expect(found).not.toContain('arena.player');
   });
 
-  it('reads the laddered stats off the skills rather than off a list, dealt one and pooled one', () => {
-    expect(laddered(named('straw-man'))).toEqual({ dealt: 'arena.blade', pooled: 'arena.max-health' });
+  it('leaves a body that names no tier out of the reading rather than guessing one for it', () => {
+    expect(named('untagged-thing').tier).toBeUndefined();
+  });
+
+  it('carries the level a body names, so it is read there rather than solved for', () => {
+    expect(named('swift-thing').level).toBe(9);
+    expect(named('straw-man').level).toBeUndefined();
   });
 });
 
-describe('a foe read against the tier it names', () => {
-  it('falls faster the higher the player stands, since the ladder gives them more to hit with', () => {
-    const straw = named('straw-man');
-    const low = readingAt(registry, stood, straw, laddered(straw), 5);
-    const high = readingAt(registry, stood, straw, laddered(straw), 25);
-    expect(high.secondsToFell).toBeLessThan(low.secondsToFell);
-    expect(high.damageShare).toBeLessThan(low.damageShare);
-  });
-
+describe('the level at which a body that names none comes true', () => {
   it('names the level at which each half of the tier comes true', () => {
     const straw = named('straw-man');
     const fair = fairAt(registry, stood, straw, laddered(straw), registry.tiers.get('quick')!, 30);
@@ -178,17 +162,19 @@ describe('a foe read against the tier it names', () => {
     const asSlow = fairAt(registry, stood, straw, laddered(straw), registry.tiers.get('slow')!, 30);
     expect(asSlow.toughness!).toBeLessThan(asQuick.toughness!);
   });
-
-  it('leaves a body that names no tier out of the reading rather than guessing one for it', () => {
-    expect(named('untagged-thing').tier).toBeUndefined();
-  });
 });
 
 describe('a body read against the shape it says it fights in', () => {
-  it('reads every factor of the profile as a multiple of what the player stands at', () => {
-    const swift = shapeOf(registry, stood, named('swift-thing'));
-    expect(swift.map((each) => each.factor).sort()).toEqual(['accuracy', 'damage', 'evasion', 'rate', 'reduction']);
-    expect(swift.find((each) => each.factor === 'rate')!.said).toBe(2);
+  it('reads back every factor the profile wrote, and stays silent about the two it solved', () => {
+    const swift = named('swift-thing');
+    const profile = swift.profile!;
+    const read = shapeOf(registry, stood, swift).map((each) => each.factor);
+    expect(read.sort()).toEqual(
+      Object.keys(profile)
+        .filter((key) => key !== 'id' && profile[key as keyof typeof profile] !== undefined)
+        .sort(),
+    );
+    expect(read).not.toContain(unwrittenFactors(profile)[0]);
   });
 
   it('says nothing about a body that names no profile, rather than holding it to a default one', () => {
@@ -201,17 +187,5 @@ describe('a body read against the shape it says it fights in', () => {
     expect(swinging.read, 'it swings at 120 against a player at 60, so it reads as the 2x it claims').toBeCloseTo(2, 6);
     expect(shapeDisagrees([swinging])).toEqual([]);
     expect(shapeDisagrees([{ factor: 'rate', said: 2, read: 0.2 }])).toHaveLength(1);
-  });
-
-  it('carries the level a body names, so it is read there rather than solved for', () => {
-    expect(named('swift-thing').level).toBe(9);
-    expect(named('straw-man').level).toBeUndefined();
-  });
-
-  it('reads a body at its own level as one reading rather than two crossings', () => {
-    const swift = named('swift-thing');
-    const at = readingAt(registry, stood, swift, laddered(swift), swift.level!);
-    expect(at.secondsToFell).toBeGreaterThan(0);
-    expect(Number.isFinite(at.damageShare)).toBe(true);
   });
 });

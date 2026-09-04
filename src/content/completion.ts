@@ -511,7 +511,7 @@ export function offeringAt(text: string, cursor: number, known: readonly Address
   const held = asRead(`${text.slice(0, lineStart)}${text.slice(lineEnd)}`);
   const here = linesAt(owner, text, lineStart, indent);
   const alongside = continuing ? 'one more value' : field.key === null ? 'what goes here' : `what ${field.key}: takes`;
-  const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || held[written.needs] !== undefined);
+  const lines = here.lines.filter((written) => written.needs === undefined || held === undefined || written.needs.some((each) => held[each] !== undefined));
 
   const shapes: Shape[] = [
     ...(continuing || under !== '' ? [] : lines).map((line) => shapeOf(line, '', typed)),

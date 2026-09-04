@@ -1,11 +1,11 @@
 import type { LocaleSection } from './sections/locale';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Action, actionKind, actionProblem, actionResultLists, assembledActionProblem, isFight, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionKind, actionProblem, actionResultLists, assembledActionProblem, fightShapeOf, isFight, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner, actionWords, type ActionDeclaration } from './sections/action';
-import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing } from './sections/entity';
+import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing, shapedByItsTags } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unframedProblem, unsuppliedParameters } from './locale';
 import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
@@ -549,6 +549,7 @@ function linkEntity(entity: Entity, registry: Registry): Entity {
 }
 
 function performerStatProblem(entity: Entity, action: Action, registry: Registry): string | undefined {
+  if (shapedByItsTags(entity) && fightShapeOf(action) !== undefined) return undefined;
   for (const field of sidedFields(action)) {
     if (field.value.side !== 'us') continue;
     const needed = field.written === 'depletes' ? registry.resources.get(field.value.id)?.max : field.value.id;

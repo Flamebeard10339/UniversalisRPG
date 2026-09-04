@@ -75,37 +75,43 @@ the sweep moving foe toughness off flat reduction and onto typed resistance.
 `ladder-check` reads both skills within a stated band, and what the flat 613 of health turned
 out to be is written into the commit.
 
-## A foe is three tags and the numbers are still hand-cut under them
+## The engine's floor of one point a blow puts some tiers out of reach low on the ladder
 
-Ruled 2026-09-04, and the declarations are built: `tier:` fixes the budget, `profile:` fixes
-how it is spent, `level:` says what character both are read against. All three are on
-`# entity`, `# tier` and `# profile` are declared in `content/combat.dsl`, and
-`npm run ladder-check` reads a body against all of it.
+The solve is built: `tier:`, `profile:` and `level:` on a `# entity` now produce its stats,
+and `solvedStatsOf` in `src/runtime/foeTier.ts` is `readingAt` run backwards. What it cannot
+do is cut a blow under `min-damage`, which the engine floors every hit at. `combat.feral-rat`
+is the live case: at level 4 the mob tier asks for about half a point a blow, the engine
+deals one, and `ladder-check` reads it at 1.62x of the 0.80x its tier asks — with nothing an
+author can write to close it, because rate, accuracy and evasion are all the profile's.
 
-**What is not built is the derivation.** The tags describe; they do not yet produce. An
-author still types `stats: attack 4, defense 12, max-health 115, …` and the audit tells them
-it disagrees with the tags. The whole point of the ruling is that the author stops typing
-those: the engine solves them from tier, profile and level, and the author writes only what
-is load-bearing for the encounter — `-20% fire-resistance`, and nothing else.
+The same wall stands on the toughness half wherever the tier's `seconds to fell` needs a
+smaller hit than the floor allows, and there it can be reached by writing a negative
+reduction, which the solve now does.
 
-Two pieces stand between here and there:
+Three answers are open and none is obviously right: raise the level a `mob` is met at, lower
+`min-damage`, or let a tier declare that below some level it is read against a shorter
+window. The proof is
+`src/runtime/foeTier.test.ts`'s *cannot cut a blow under the floor the engine puts on one*,
+which pins the wall rather than a way round it.
 
-- **`# entity` cannot write a modifier.** The `<tag>` grammar has had `+<amount> <stat>`,
-  `-<amount> <stat>` and `+<percent>% <stat>` since long before this, and items, passives,
-  races and guises all write them. An entity takes only `stats: <stat> <amount>`, bare
-  absolutes. Give it the same grammar and the question of whether an author's line adds,
-  multiplies or replaces is answered the way it is answered everywhere else, rather than by
-  a scheme of its own.
-- **The solve itself.** A neutral body at a level is one whose rate and accuracy are the
-  player's, whose damage makes the tier's damage share, and whose pool makes the tier's
-  seconds to fell. The profile's multipliers then move each factor off that neutral, and a
-  profile whose factors leave the product alone — twice the damage at half the rate — has
-  not touched the tier at all. That is the whole rule, and `readingAt` in
-  `scripts/lib/foeTier.ts` already computes every quantity it needs in the other direction.
+*Closes when:* `npm run ladder-check -- combat.attack` reads `combat.feral-rat` on tier on
+both halves, and the reason it can is written into the commit.
 
-*Closes when:* a body that names a tier, a profile and a level needs no `stats:` line at all,
-an author's own line reads as a modifier over what those give, and `ladder-check` reports
-nothing against a body that writes none.
+## The tier audit models one damage stat, and the engine has many
+
+`readingAt` prices a foe's output as its `us.attack` stat run through the resistance of
+whatever the player's laddered damage stat deals. The engine's real damage path is
+`typedDamage`, which sums *every* stat carrying `deals:` on the swinger and resists each type
+separately. A foe whose bite is mostly `fire-damage` — `fixture-combat.ember` is one — reads
+to the audit as though it dealt almost nothing, and the solve then hands it an `attack` big
+enough to make the tier on top of the fire it already deals.
+
+So a foe that deals more than one type is priced wrong in both directions, and the fixture
+carries the shape that shows it. The fix is for the solve and `readingAt` to share the
+engine's own summation rather than a second model of it.
+
+*Closes when:* a body dealing two types reads back at its tier, and `readingAt` no longer
+names a single damage stat.
 
 ## The passive ids were not renamed, and were ruled to be
 

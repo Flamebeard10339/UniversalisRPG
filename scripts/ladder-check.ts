@@ -9,10 +9,11 @@ import { readSources } from './probe';
 import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
-import { abilityAtLevelIn } from './lib/pace';
+import { abilityAtLevelIn } from '../src/runtime/pace';
 import { activitiesIn, type Activity } from './lib/tiers';
 import { buildTier, tierState } from './tier-build';
-import { fairAt, fightersIn, ladderedStatsFor, readingAt, shapeDisagrees, shapeOf, SURVIVAL_WINDOW_SECONDS, type Fighter } from './lib/foeTier';
+import { activityFor, ladderedFor, readingAt, SURVIVAL_WINDOW_SECONDS, type Fighter } from '../src/runtime/foeTier';
+import { fairAt, fightersIn, shapeDisagrees, shapeOf } from './lib/foeTier';
 
 export const TOP_RUNG = 30;
 export const RUNG_STEP = 10;
@@ -33,7 +34,7 @@ const usage = [
   '             which is what an authoring run reaches for: its draft lives in a copy of its',
   '             own, and a residual read off the shipped tree says nothing about it',
   '',
-  'Balance pins two lines. `scripts/lib/pace.ts` already says how long a level is meant to',
+  'Balance pins two lines. `src/runtime/pace.ts` already says how long a level is meant to',
   'take; beside it now stands the ladder — what a character of that level is assumed to be',
   'able to stand at in the stat their skill raises. Both are declared rather than measured,',
   'and declaring the second is what breaks the circle a balance pass otherwise walks: a',
@@ -249,7 +250,7 @@ const OUT_OF_TRUE = 1.5;
 const share = (value: number): string => (Number.isFinite(value) ? `${value.toFixed(2)}x` : 'never');
 
 function foeLine(registry: Registry, activity: Activity, fighter: Fighter, top: number): string[] | undefined {
-  const laddered = ladderedStatsFor(registry, activity, fighter.fight);
+  const laddered = ladderedFor(registry, fighter.fight);
   const tier = fighter.tier;
   if (!laddered || !tier) return undefined;
   const stood = tierState(registry, activity, 1);
@@ -281,12 +282,11 @@ function shapeLines(registry: Registry, stood: ReturnType<typeof tierState>, fig
 function foeLines(registry: Registry, args: LadderArgs): string[] {
   const fighters = fightersIn(registry);
   if (fighters.length === 0) return [];
-  const activities = activitiesIn(registry);
   const top = Math.max(...args.levels);
   const lines: string[] = [];
   for (const fighter of fighters) {
     if (!fighter.tier) continue;
-    const activity = activities.find((each) => ladderedStatsFor(registry, each, fighter.fight) !== undefined);
+    const activity = activityFor(registry, fighter.fight);
     const said = activity && foeLine(registry, activity, fighter, top);
     if (said) lines.push(...said);
   }

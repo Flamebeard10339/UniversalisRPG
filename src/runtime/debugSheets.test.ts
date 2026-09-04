@@ -114,6 +114,8 @@ DEBUG
 
 # profile probe-profile
 DEBUG
+rate: 1
+pool: 1
 
 # recipe probe-recipe
 DEBUG

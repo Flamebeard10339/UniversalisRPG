@@ -247,14 +247,6 @@
           }
         },
         {
-          "match": "^[ \\t]*(-|\\+)",
-          "captures": {
-            "1": {
-              "name": "keyword.operator.dsl"
-            }
-          }
-        },
-        {
           "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
           "captures": {
             "1": {
@@ -481,14 +473,6 @@
             },
             "2": {
               "name": "keyword.other.dsl"
-            }
-          }
-        },
-        {
-          "match": "^[ \\t]*(-|\\+)",
-          "captures": {
-            "1": {
-              "name": "keyword.operator.dsl"
             }
           }
         },
@@ -750,14 +734,6 @@
           }
         },
         {
-          "match": "^[ \\t]*(-|\\+)",
-          "captures": {
-            "1": {
-              "name": "keyword.operator.dsl"
-            }
-          }
-        },
-        {
           "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
           "captures": {
             "1": {
@@ -796,7 +772,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|perform|profile|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|level|stats|title|unset|give|rate|roll|take|tier|time|uses|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|modifiers|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|perform|profile|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|level|stats|title|unset|give|rate|roll|take|tier|time|uses|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -944,7 +920,7 @@
           }
         },
         {
-          "match": "^[ \\t]*(-|\\+)",
+          "match": "^[ \\t]*(-)",
           "captures": {
             "1": {
               "name": "keyword.operator.dsl"

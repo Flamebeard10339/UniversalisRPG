@@ -31,7 +31,7 @@ export interface Written extends Filled {
   of?: string;
   family?: string;
   note?: string;
-  needs?: string;
+  needs?: readonly string[];
   block?: () => readonly Written[];
 }
 

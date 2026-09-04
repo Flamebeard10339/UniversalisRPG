@@ -61,7 +61,7 @@ function treeLines(written_: readonly Written[], pad: string, sitting: Sitting, 
   const lines = spelling(written_, written);
   const held = new Map(lines.map((line) => [line.form, line]));
   const saidOf = (line: Written | undefined): string => {
-    const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs}: is set`, line.note, namesKind(line));
+    const spoken = line === undefined ? undefined : said(line.needs === undefined ? undefined : `only once ${line.needs.map((each) => `${each}:`).join(' or ')} is set`, line.note, namesKind(line));
     return spoken === undefined ? '' : `   — ${spoken}`;
   };
   const listed = (block: readonly Written[], beside: readonly { form: string }[]): boolean => block.every((line) => beside.some((offer) => offer.form.endsWith(`${line.form}, …`)));
@@ -168,7 +168,7 @@ export function namedGrammars(kinds: readonly string[]): { called: string; lines
 
 const SHARED_HEAD = 'taken by the kinds named beside it';
 
-const sameLine = (line: Written): string => [line.form, line.example, line.family ?? '', line.note ?? '', line.needs ?? '', line.block === undefined ? '' : keyOf(line.block())].join(' ');
+const sameLine = (line: Written): string => [line.form, line.example, line.family ?? '', line.note ?? '', (line.needs ?? []).join(','), line.block === undefined ? '' : keyOf(line.block())].join(' ');
 
 function sharedLines(kinds: readonly string[]): Map<string, { line: Written; kinds: string[] }> {
   const held = new Map<string, { line: Written; kinds: string[] }>();
