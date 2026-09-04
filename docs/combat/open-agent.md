@@ -270,16 +270,41 @@ same thing. So this closes on the sheet being read, not on the rooms being level
 *Closes when:* the room table is re-read after the re-cut and the rooms that stop short are
 either meant to or given population, with the choice named per room rather than swept.
 
-## Combat has no floor, so its tier saves cannot be deleted
+## Combat has no floor, and authorbot cannot write one
 
-`docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets
-a floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
+`docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets a
+floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
 thieving's; nothing walks a fighter from level one to thirty. The brief is
-`.planning/combat-expansion/combat-floor.md` and it waits on the re-cut, since a floor
-measured against numbers about to move is measured twice.
+`.planning/combat-expansion/combat-floor.md`.
+
+**It cannot be dispatched the way the other briefs are, for two reasons found on 2026-09-04.**
+`authorbot` copies `content/` and writes one module under it, so a run cannot write
+`floors/combat-floor.dsl` and cannot read `floors/thieving-floor.dsl` or
+`floors/fishing-floor.dsl`, which its own brief tells it to copy the shape of. And the harness
+now tells every run that balance is declared and not to spend itself on `simulate-activity` —
+correct for authoring a module, wrong for the one lane whose whole job is walking a route to
+find what it actually costs.
+
+So this wants either a `--floors` that copies and targets that folder and says the measuring
+line differently, or a hand-written module by somebody who can read both folders at once.
 
 *Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
-edges and the combat saves in `content/tiers.dsl` are deleted.
+edges, the combat saves in `content/tiers.dsl` are deleted, and whichever of the two ways it
+was written is the one the next speedrun brief uses.
+
+## A run greps the checkout's content and is refused, four times in one run
+
+`birds-and-the-bees-pass` reached for the engine four times and every one was a `grep` at
+`content/tulsa.dsl` or an absolute path into this checkout rather than at its own copy. The
+refusal explains the copy well once it fires, but the instinct it corrects is the natural one,
+and four turns is four turns.
+
+Small, and recorded rather than fixed: worth a line in the system prompt naming the corpus path
+in the same breath as "read any of them", or worth leaving alone if a refusal that teaches once
+is cheap enough.
+
+*Closes when:* a run stops spending turns discovering which directory is its own, or this is
+ruled cheap enough to keep.
 
 ## The muster is a room, and now reads as a room that runs out
 
