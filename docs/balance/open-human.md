@@ -156,19 +156,3 @@ on that being reasonable. What the run did establish, walked and recorded:
 *Moves when: a speedrun comes back with game-minutes to 20 and to 30 for a thief who buys
 his kit, and how many of those minutes went on the coin.*
 
-## The accuracy denominator does not need moving, on this evidence
-
-Asked on 2026-09-03 whether `contest-spread` should go from 100 to 150 or 200. It is a
-`# variable` a world may write, not engine code, so it is a one-line change in `core.dsl`
-whenever it is wanted — nothing in `content/` writes it today and `src/runtime/tuning.ts`
-defaults it to 100.
-
-It looked wrong because the marks were two to five times harder than the thief standing in
-front of them, which a wider denominator would have papered over. With the difficulties on
-the ladder instead, a thief standing on his rung is at a coin toss and one a band below is
-well under it. The pair that matters is the ladder's slope over the spread, and nothing else:
-at seven a level against a spread of a hundred, a mark gated three levels above you is 1.62x
-odds against, where the old 5.17 made it 1.43x. So the slope ruling has already moved this
-knob once, in the direction of levels mattering more.
-
-*Moves when: play says the gap between a geared thief and an ungeared one is too wide.*
