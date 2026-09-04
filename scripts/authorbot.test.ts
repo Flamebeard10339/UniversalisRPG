@@ -224,8 +224,10 @@ describe('what the run is told', () => {
   });
 
   it('says the same thing about the engine in the prompt and in the refusal, out of one home', () => {
-    expect(systemFor(asked(), '/c', '/d')).toContain(ENGINE_IS_OFF_LIMITS);
-    expect(refusalFor('engine', '/w/content/x.dsl')).toContain(ENGINE_IS_OFF_LIMITS);
+    const both = 'A reach for the engine is put to the engine worker';
+    expect(systemFor(asked(), '/c', '/d')).toContain(both);
+    expect(refusalFor('engine', '/w/content/x.dsl')).toContain(both);
+    expect(refusalFor('engine', '/w/content/x.dsl')).toBe(ENGINE_IS_OFF_LIMITS);
   });
 
   it('says the engine is off limits, or that it is not, and never both', () => {

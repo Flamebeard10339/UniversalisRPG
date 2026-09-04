@@ -59,10 +59,12 @@ export const ENGINE_TEXT = new RegExp(`\\b(${ENGINE_DIRS.join('|')})[/\\\\]|\\.t
 
 export const enginePaths = (): string => `${ENGINE_DIRS.map((dir) => `${dir}/`).join(', ')} and every .ts file`;
 
-export const ENGINE_IS_OFF_LIMITS =
-  "the engine's source is off limits in this run. What may be written in the language is printed by `npm run oracle`, so ask it instead. A reach for the engine is put to the engine worker, who may answer it in a sentence, so say plainly in your next message what you were hoping to find — but it is never a way to read the source, and what comes back is one sentence or nothing.";
+const REACH_FOR_A_PERSON_INSTEAD =
+  'What may be written in the language is printed by `npm run oracle`, so ask it instead. A reach for the engine is put to the engine worker, who may answer it in a sentence, so say plainly in your next message what you were hoping to find — but it is never a way to read the source, and what comes back is one sentence or nothing.';
 
-export const ASK_LINE = `**The engine's source code is off limits.** Nothing under ${enginePaths()} may be read — ${ENGINE_IS_OFF_LIMITS}`;
+export const ENGINE_IS_OFF_LIMITS = `the engine's source is off limits in this run. ${REACH_FOR_A_PERSON_INSTEAD}`;
+
+export const ASK_LINE = `**The engine's source code is off limits.** Nothing under ${enginePaths()} may be read. ${REACH_FOR_A_PERSON_INSTEAD}`;
 
 export const BRIEF_IS_NOT_AUTHORITATIVE =
   'Nothing in the brief is authoritative about what already exists. It says what to build and why, and where it names an id, a route, a module or a dependency, that is a guess by somebody who was not looking at the world when they wrote it. Check before you lean on one: the corpus and the oracle are what is true.';

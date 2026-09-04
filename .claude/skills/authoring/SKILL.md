@@ -5,13 +5,9 @@ description: Use whenever the work is writing or editing the game's world — a 
 
 # Authoring is not engine work
 
-Two jobs share this repository and they do not overlap.
-
-| | authoring | engine |
-|---|---|---|
-| writes | `content/*.dsl` | `src/`, `scripts/` |
-| reads | the corpus, and `npm run oracle` | anything |
-| its gate | `npm run oracle -- --at content` | `npm test`, `tsc`, `npm run layer-check` |
+Two jobs share this repository and they do not overlap. What each one writes, what each one
+reads, and what gates each one is the table under *Two jobs, and a line between them* in
+`CLAUDE.md`. It is there and not here, so that there is one of it.
 
 **An author never reads the engine.** Everything the language allows is printed by the
 oracle; a question the oracle does not answer is a defect in the oracle, not a reason
@@ -28,18 +24,23 @@ reached from here.
 npm run authorbot -- "<brief file>"
 ```
 
-Run it **in the background** — a module is 10–25 minutes — and get on with something
-else. It copies `content/` to a directory of its own, so it is not a second writer in
-this checkout and nothing it does can be lost or can collide with yours.
+Run it **in the background** — a module is 10–25 minutes. It copies `content/` to a directory of
+its own, so it is not a second writer in this checkout and nothing it does can be lost or can
+collide with yours.
 
-- `--target <module>` — the one file the run may write. Default: the brief's own name,
-  so `planning/A Grand Blade.md` writes `a-grand-blade.dsl`.
-- `--turns`, `--model` — how long and as whom.
-- `--open` — let the run read the engine. **Do not pass this** unless the user asks:
-  refusing it is what turns every unanswered question into a number at the end.
+**`npm run authorbot -- --help` prints every flag**, and is the only place they are written down.
+Three things about running one are judgement rather than usage, and they are the whole of what
+this section has to add:
 
-`npm run authorbot -- --watch` says where every run on this machine stands, and whether
-one is going in circles.
+- **Do not pass `--open`** unless the user asks for it. Refusing the engine is what turns every
+  unanswered question into a number at the end, and that number is the point of dispatching this
+  way rather than writing the module by hand.
+- **A run that reaches for the engine stands still and waits for you.** It is not fire and
+  forget. Leave `npm run authorbot -- --watch` going — it returns the moment a run has asked
+  something *or* ended — and answer with `--answer "<one sentence>"`. A run nobody answers is
+  delayed rather than stopped, but it is delayed by ten minutes a question.
+- **`--watch` also says when a run is going in circles**, which is worth more than knowing how
+  far along it is.
 
 ## There is no brief file yet
 
@@ -47,6 +48,13 @@ Most asks arrive as a sentence in the chat, not a file. Write the brief first �
 scratchpad, or to `.planning/` if the user keeps them — then hand *that* to authorbot.
 A brief says what the module is for, who is in it, what the player does and in what
 order, and what it may lean on. It does not say what to type: that is the oracle's.
+
+**A brief may carry what it paid for, and may not assert what the run can check in one command.**
+Measurements you actually ran, and diagnoses that cost you a trace, are worth their space — the
+run would otherwise buy them again. An id, a route's name, a dependency direction or what a
+location holds is not: name the question rather than the answer, because a brief is written by
+somebody who was not looking at the world at the time. Three briefs in one session asserted one
+of each and all three were wrong.
 
 Name the file after the module it becomes, because the name is the module id, the
 working directory and the line `--watch` prints.
@@ -58,8 +66,8 @@ It writes nothing here and prints where its work is. Then:
 1. Copy the module into `content/`.
 2. `npm run oracle -- --at content` — the corpus may have moved under the run while it
    was going, so its own green is not this checkout's.
-3. Read what it reached for. Every reach is a question the oracle did not answer, and
-   that list is the point of running it this way rather than by hand.
+3. Read what it reached for, and whether anybody answered it. An unanswered reach is a question
+   the oracle did not answer and should have; that list is the point of running it this way.
 
 ## Balance is part of authoring, not a pass afterwards
 
@@ -75,19 +83,22 @@ missing, and below *that* by dying. Measured against real runs it holds to about
 
 So a mark is two numbers and both are derived:
 
-- **Difficulty is the declared ladder read at the mark's own gate level** — `abilityAtLevel` in
-  `scripts/lib/pace.ts`, which stands at nothing on level one and rises seven a level. A mark
-  then opens at about a coin toss for a character standing on its rung. Hit chance is
-  `1/(1 + 10^((difficulty - ability)/100))`, and that hundred is `# variable contest-spread`.
+- **Difficulty is the declared ladder read at the mark's own gate level.** `abilityAtLevel` in
+  `scripts/lib/pace.ts` is what a character of that level can stand at, and `ladderFor` beside it
+  says the ladder is per skill rather than one line for the world. A mark cut to it opens at
+  about a coin toss for somebody standing on its rung. What the odds then are is `hitChance` in
+  `src/runtime/stats.ts`, over a spread a world may write as `# variable contest-spread`.
 - **Payout is set from the ceiling**, chosen so the marks rank in gate order for a character at
   the top of the band. Do *not* set it so a mark pays its share of the curve at its own gate:
   that reimburses an expensive miss with experience which turns free the moment the player stops
   missing, and a fast action then out-earns every slow one above it.
 
-What the curve asks at a level is `rateAtLevel`, in the same file. A cadence is `60/rate`
-seconds where a `rate:` is written and flat seconds where a `time:` is; a miss costs three
-seconds a hop walking back, the daze duration on a pocket, nothing at all on a lock, and about
-twenty seconds if it puts the player in a cell.
+**Do not restate any of those numbers in a brief.** The slope, the spread and the curve are
+declared, they move, and a run cannot read `src/` to notice that a constant you typed out has
+gone stale. Name the function and let the run ask the tool. What the curve asks at a level is
+`rateAtLevel`, in the same file. A cadence is `60/rate` seconds where a `rate:` is written and
+flat seconds where a `time:` is; a miss costs three seconds a hop walking back, the daze duration
+on a pocket, nothing at all on a lock, and about twenty seconds if it puts the player in a cell.
 
 **A repeatable mark has to run out, or a speed stat scales without limit.** Combat's does not,
 because its enemies die and come back on a timer. Give a mark the same floor with
@@ -110,11 +121,13 @@ against what the ladder asks. **Its residual is a brief for content, never a pas
 a gap at level eight is answered by an obscure seller in an alley who fits the world, not by
 adding a line to the general store because that makes a number go green.
 
-**Then have the run check itself.** Stage `# test`s that each open with `run:` of the one before,
-walk them with `npm run probe -- <world> --test <id>`, and read the clock off
-`npm run probe -- <world> --record <id>`, where `time` is milliseconds. Stand that beside what
-the curve asks for the level reached. A route that walks and lands near the curve is the module
-balanced; one that cannot walk at all is the finding.
+**Then have the run check itself.** `npm run simulate-activity` reads what an offer actually pays
+an hour, and stands a player on a rung of the declared ladder to read it there rather than at
+whatever base a save happens to hold. `npm run probe` walks a staged `# test` and records the
+clock it ended on. Both take the draft's own world rather than the shipped one, and both print
+their flags with `--help`. Stage the routes so each opens with `run:` of the one before, stand
+what they read beside what the curve asks for the level reached: a route that walks and lands
+near the curve is the module balanced, and one that cannot walk at all is the finding.
 
 Two habits that cost nothing. Ids carry what a thing *is* — `rare-general-thieving` — and the
 flavour lives in `title:`; naming a set precisely is how a jewel was found to be a second copy of
