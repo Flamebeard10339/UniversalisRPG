@@ -72,7 +72,7 @@ stage back-to-kelsa:
     "Korning." She says it flatly, and then she says it again. "Korning. That is four hundred miles of somebody else's country between here and a thing that was sitting in my third hive."
     She is quiet for a moment, which from her is a great deal. "Somebody carried it. Wasps do not walk."
     give: 5000 coin
-    That is what I said I would pay and it is what I am paying. {queen-fell: George says he had to carry you out of there once, and that my girl was on her back when he did it. She is not on her back now, so we will say nothing more about it.} @@@ asked, on top of the coin, for every bee on the property to go neutral and for the hives to be harvestable in peace afterwards. Nothing in the grammar makes `aggressive` conditional — it is a bare word on a sheet with no `when` to hang on — and hiding the drones behind a flag would be deleting the field rather than calming it, so the apiary is as angry after this as before and the two working hives hand over comb to anybody who will stand there for it, exactly as they did before the quest.
+    That is what I said I would pay and it is what I am paying. {queen-fell: George says he had to carry you out of there once, and that my girl was on her back when he did it. She is not on her back now, so we will say nothing more about it.} And whatever had the property like that let go of the rest of them when it let go of her — you can hear it, if you know what you are listening for. A hive is worth something again with nothing coming up out of it at you.
     Tell whoever it is you actually work for that a hive is not a small thing to lose, and that I want to know who was walking a Korning wasp about the countryside.
     goto settled
 
@@ -91,6 +91,7 @@ examine: Comb to every side and above you, chewed out in galleries a bee never c
 adjacent:
   tulsa.hive-mouth while kelsas-hives.the-hives and tulsa.the-third-search-was-at-the-mouth
   tulsa.apiary-field while kelsas-hives.the-hives and tulsa.the-third-search-was-in-the-field
+multicombat
 entities:
   mind-wasp
   taken-queen
@@ -98,7 +99,9 @@ entities:
 # entity mind-wasp
 title: Korning Mind Wasp
 examine: Longer than your forearm and banded in a colour no bee wears, and the head of it turns to follow you before the body does.
-stats: attack 20-26, defense 8, max-health 150, attack-rate 20, accuracy 95, evasion 45
+tier: elite
+profile: skirmisher
+level: 10
 uses: core.melee-combat
 faction: world
 aggressive
@@ -114,7 +117,10 @@ on death:
 # entity taken-queen
 title: The Third Queen
 examine: A queen bee the length of your hand, and she moves the way a hand moves a glove. Nothing behind her eyes is hers.
-stats: attack 14-18, defense 4, max-health 90, attack-rate 26, accuracy 80, evasion 50, regeneration -40
+tier: normal
+profile: duellist
+level: 8
+stats: regeneration -40
 uses: core.melee-combat
 faction: world
 aggressive
@@ -126,6 +132,23 @@ on death:
       say: The queen goes down and the hive goes up, all of it at once, and the last thing you are sure of is a hand in your collar. @@@ asked for the inside of the hive to be an instanced arena that resets each time it is entered; the engine has nothing instanced in it, so this is an ordinary room behind a road that is only open while the fight is on. A second attempt walks back down into the same room rather than into a fresh one, and the queen is not standing in it again until she has respawned.
       say: George gets you as far as the mouth of the hive before he lets go of you. "I got here just in time to drag you out. Are you alright?"
       relocate: tulsa.hive-mouth
+
+# entity calm-drone
+title: Drone Bee
+examine: A drone off one of Kelsa's hives, minding its own business the way a drone is supposed to.
+hidden if: not kelsas-hives.settled
+tier: mob
+profile: skirmisher
+level: 3
+uses: core.melee-combat
+faction: world
+respawn after: 2m
+
+# location tulsa.apiary-field
++entities: 5 calm-drone
+
+# entity tulsa.drone-bee
+hidden if: kelsas-hives.settled
 
 # flag wasp-put-down
 
@@ -172,6 +195,14 @@ talk: kelsa
 choose: continue
 assert: kelsas-hives.settled
 assert: inventory.core.coin > 0
+travel: bee-gate
+travel: apiary-field
+use: entity.tulsa.drone-bee.examine
+refused
+use: entity.birds-and-the-bees.calm-drone.examine
+use: entity.tulsa.first-hive.harvest-comb until done
+use: entity.tulsa.second-hive.harvest-comb until done
+assert: has core.honeycomb
 
 # test george-answers-for-himself-while-the-quest-stands-beside-him
 load: in-town
