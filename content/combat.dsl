@@ -1186,7 +1186,7 @@ assert: stat.physical-damage > 0
 tier: mob
 profile: duellist
 level: 3
--stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
+respawn after: 45s
 on death:
   credit:
     roll: purse
@@ -1195,7 +1195,7 @@ on death:
 tier: normal
 profile: duellist
 level: 5
--stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
+respawn after: 70s
 +stats: physical-resistance 10
 on death:
   credit:
@@ -1206,7 +1206,7 @@ on death:
 tier: elite
 profile: brute
 level: 20
--stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
+respawn after: 100s
 +stats: physical-resistance 25
 on death:
   credit:
@@ -1218,13 +1218,14 @@ on death:
 tier: mob
 profile: skirmisher
 level: 3
--stats: attack 6, defense 0, max-health 14, attack-rate 30, accuracy 70, evasion 55
+aggressive
+respawn after: 2m
 
 # entity tulsa.groundwurm
 tier: elite
 profile: brute
 level: 15
--stats: attack 18-22, defense 5, max-health 80, attack-rate 16, accuracy 85, evasion 10
+aggressive
 +stats: physical-resistance 20
 
 # entity tulsa.sewer-shelf

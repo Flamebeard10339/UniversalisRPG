@@ -924,35 +924,26 @@ examine: Alchemy crates thrown into the bushes in a hurry, and among the straw a
 # entity civilian
 title: Townsman
 examine: Somebody about their day, with a purse on their belt and no reason to expect you.
-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
 uses: core.melee-combat
 faction: world
-respawn after: 45s
 
 # entity guardsman
 title: Guardsman
 examine: One of the duke's, in a coat of plates and a mood.
-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
 uses: core.melee-combat
 faction: world
-respawn after: 70s
 
 # entity knight
 title: Knight
 examine: Iron from the crown of his head to the soles of his feet, and he has been hit by better than you.
-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
 uses: core.melee-combat
 faction: world
-respawn after: 100s
 
 # entity drone-bee
 title: Drone Bee
 examine: A drone off one of Kelsa's hives, and it should not be this angry.
-stats: attack 6, defense 0, max-health 14, attack-rate 30, accuracy 70, evasion 55
 uses: core.melee-combat
 faction: world
-aggressive
-respawn after: 2m
 
 # entity player
 title: You
@@ -984,10 +975,8 @@ slather with poison:
 title: Groundwurm
 examine: A ridge of packed earth moving under the cellar floor, and something pale and segmented shouldering up through the middle of it.
 hidden if: not corners-slathered
-stats: attack 18-22, defense 5, max-health 80, attack-rate 16, accuracy 85, evasion 10
 uses: core.melee-combat
 faction: world
-aggressive
 on death:
   set: wurm-defeated
   say: The ground stops moving, and the cellar is quiet in a way it has not been since you came down here.
