@@ -2,7 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
-import { ASKED_FOR_MINUTES, ENGINE_IS_OFF_LIMITS } from './lib/ask';
+import { ASK_LINE, ASKED_FOR_MINUTES, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS } from './lib/ask';
 import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, inLastMinute, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
@@ -150,6 +150,17 @@ describe('a call the run makes', () => {
   it('is reaching for it through a command as readily as through a file, since a grep is a read', () => {
     expect(reaching('Bash', { command: 'grep -rn "food" src/runtime' })).toEqual({ reaching: true, why: 'engine' });
     expect(reaching('Bash', { command: 'sed -n 1,40p scripts/oracle.ts' })).toEqual({ reaching: true, why: 'engine' });
+  });
+
+  it('refuses every directory it calls the engine, through a command as readily as through a read', () => {
+    for (const dir of ENGINE_DIRS) {
+      expect(reaching('Read', { file_path: path.join(REPO, dir, 'held.txt') }), `Read ${dir}`).toEqual({ reaching: true, why: 'engine' });
+      expect(reaching('Bash', { command: `cat ${dir}/held.txt` }), `cat ${dir}`).toEqual({ reaching: true, why: 'engine' });
+    }
+  });
+
+  it('says the same set in the prose it shows the run as the one it enforces', () => {
+    for (const dir of ENGINE_DIRS) expect(ASK_LINE, dir).toContain(`${dir}/`);
   });
 
   it('is not reaching for it where it asks the oracle, reads the corpus, or runs a test', () => {

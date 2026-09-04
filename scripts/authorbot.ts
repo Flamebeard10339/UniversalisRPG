@@ -5,7 +5,7 @@ import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
-import { answer, answeredBy, ask, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_IS_OFF_LIMITS, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
+import { answer, answeredBy, ask, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS, ENGINE_TEXT, enginePaths, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
@@ -26,7 +26,7 @@ const usage = [
   '             write anywhere. With none, the brief\'s own name: a brief at',
   '             planning/A Grand Blade.md writes a-grand-blade.dsl',
   '  --open     let the run read the engine and count every reach, rather than refusing it.',
-  '             Without this, src/, scripts/, docs/ and every .ts are refused, and the refusal',
+  `             Without this, ${enginePaths()} are refused, and the refusal`,
   '             says to ask the oracle',
   `  --turns    how many replies before the run is cut off (default ${String(DEFAULT_TURNS)})`,
   '  --minutes  how many minutes of wall clock the run may take. With a minute left, the run is',
@@ -121,9 +121,6 @@ const LAST_MINUTE_MS = 60_000;
 export const inLastMinute = (startedAt: number, minutes: number | null, now: number): boolean => minutes !== null && startedAt + minutes * 60_000 - now <= LAST_MINUTE_MS;
 
 export const LAST_MINUTE = `One minute of wall clock is left on this run, and it is cut off for good ${String(GRACE_MINUTES)} minutes after that. Stop revising and write the report now, from what you already know: a report on what walked is worth everything, and one more attempt is worth nothing.`;
-
-const ENGINE_DIRS = ['src', 'scripts', 'docs', 'node_modules', 'dist'];
-const ENGINE_TEXT = /\b(src|scripts|docs)[/\\]|\.tsx?\b/i;
 
 const engineUnder = (repo: string, written: string): boolean => {
   const rel = path.relative(repo, path.resolve(repo, written)).replace(/\\/g, '/');

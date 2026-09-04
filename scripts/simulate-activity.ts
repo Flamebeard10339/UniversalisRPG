@@ -21,6 +21,8 @@ import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, 
 
 type Walked = ReturnType<typeof createGameState>;
 
+export const GOD_WORDS: readonly DebugSwitch[] = ['unkillable', 'instant-kill', 'succeed-checks'];
+
 export const DEFAULT_SEEDS = 4;
 export const DEFAULT_WINDOW_MINUTES = 60;
 
@@ -36,7 +38,7 @@ const usage = [
   '                  that lands on the rung falls out of the two. So gear, race and what the level',
   '                  itself grants are all inside the figure, and the head says what they stood at',
   '',
-  '  --ideal         stand every run up under unkillable, instant-kill and succeed-checks, so what',
+  `  --ideal         stand every run up under ${GOD_WORDS.join(', ')}, so what`,
   '                  is read is the most an offer can pay and the least it can cost: the ceiling',
   '                  a build is measured against rather than what any build gets',
   '  --after         <test> — stand where that route ends instead of on a save, so a rung of the',
@@ -164,7 +166,6 @@ export interface RungAsk {
   readonly level: number;
 }
 
-export const GOD_WORDS: readonly DebugSwitch[] = ['unkillable', 'instant-kill', 'succeed-checks'];
 
 export function parsePairs(flag: string, spec: string): StatAsk[] {
   return spec.split(',').map((pair) => {
