@@ -192,16 +192,29 @@ describe('a call the run makes', () => {
 });
 
 describe('what the run is told', () => {
-  it('hands over the balance tool as well as the oracle, since what a number is worth is the one thing the oracle has no opinion about', () => {
+  it('points every tool at the run own world, since which directory is its own is the part no --help can know', () => {
     const said = systemFor(asked(), '/work/content', '/work/content/x.dsl');
 
     expect(said).toContain('npm run oracle');
     expect(said).toContain('npm run probe');
-    expect(said).toContain('npm run simulate-activity');
     expect(said).toContain('npm run simulate-activity -- --world /work/content');
     expect(said).toContain('npm run ladder-check -- --world /work/content');
-    expect(said).toContain('Balance is yours');
-    expect(said).not.toContain('Balance is not yours to settle');
+  });
+
+  it('says balance is declared rather than measured, which is what the tags are for', () => {
+    const said = systemFor(asked(), '/work/content', '/work/content/x.dsl');
+
+    expect(said).toContain('Balance is declared, not measured');
+    expect(said, 'a run told to tune spends its turns on what the tags already decide').toContain('do not spend this run on');
+    expect(said).not.toContain('Balance is yours');
+  });
+
+  it('tells a run to ask before it designs around a limit, which is the one thing a refusal cannot teach it', () => {
+    const closed = systemFor(asked(), '/work/content', '/work/content/x.dsl');
+    const open = systemFor({ ...asked(), open: true }, '/work/content', '/work/content/x.dsl');
+
+    expect(closed).toContain('ask before you design around it');
+    expect(open, 'a run that never reaches for the source never trips the refusal, so the standing line has to stand on its own').toContain('ask before you design around it');
   });
 
   it('says a route may not assert a number, which is the one thing balance being the run\'s does not license', () => {

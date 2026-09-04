@@ -62,6 +62,9 @@ export const enginePaths = (): string => `${ENGINE_DIRS.map((dir) => `${dir}/`).
 const REACH_FOR_A_PERSON_INSTEAD =
   'What may be written in the language is printed by `npm run oracle`, so ask it instead. A reach for the engine is put to the engine worker, who may answer it in a sentence, so say plainly in your next message what you were hoping to find — but it is never a way to read the source, and what comes back is one sentence or nothing.';
 
+export const ASK_BEFORE_YOU_DESIGN_AROUND_IT =
+  '**When the engine appears not to be able to do something, ask before you design around it.** Say plainly what you tried and what you expected, and the engine worker answers in a sentence — the same channel a reach for the source is put to, and you do not have to reach for the source to use it. A run that concluded a mechanism was missing and rebuilt the quest around the gap spent half its clock on a limit that did not exist, and two minutes of another pair of hands would have settled it. Concluding that the language cannot do something is a claim about the engine: put it to the worker, and if nobody answers, write it as `@@@` and build the smaller thing rather than the elaborate way round.';
+
 export const ENGINE_IS_OFF_LIMITS = `the engine's source is off limits in this run. ${REACH_FOR_A_PERSON_INSTEAD}`;
 
 export const ASK_LINE = `**The engine's source code is off limits.** Nothing under ${enginePaths()} may be read. ${REACH_FOR_A_PERSON_INSTEAD}`;

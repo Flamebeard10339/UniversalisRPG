@@ -5,7 +5,7 @@ import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
-import { answer, answeredBy, ask, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS, ENGINE_TEXT, enginePaths, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
+import { answer, answeredBy, ask, ASK_BEFORE_YOU_DESIGN_AROUND_IT, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS, ENGINE_TEXT, enginePaths, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
@@ -203,10 +203,18 @@ which directory is yours.
                                          store is how a world gets sanded flat
     npm run notes -- ${corpus}           every \`@@@\` the world holds, your own included
 
-**Balance is yours, and it is read off a run rather than reckoned.** Whether a number you wrote is a
-rat or a dragon is answered by running the world — \`npm run simulate-activity\` above — and the brief
-says what the marks are. Write the figures, measure them, and say in your report what you measured
-and where it landed. A number nobody ran is a guess however sensible it reads beside the corpus.
+**Balance is declared, not measured.** A body that fights names \`tier:\`, \`profile:\` and \`level:\` and
+the engine cuts every stat under them; a \`# passive\` names \`grants:\` as a multiple of what one level
+is worth. Those tags are the balance, and a body naming them needs no \`stats:\` line at all. Write a
+stat only where it is load-bearing for the encounter, and write it as a modifier so it survives a
+rebalance. \`npm run ladder-check\` says whether a body reads as the tags it names; one that does not
+is mis-tagged or met at the wrong level, and both are one word to change.
+
+**So do not spend this run on \`simulate-activity\` or on a tuning pass.** A number typed by hand goes
+stale the next time a ladder moves, and turns spent measuring what the tags already decide are the
+commonest way a run reaches its cap with the work half done.
+
+${ASK_BEFORE_YOU_DESIGN_AROUND_IT}
 
 **No \`# test\` may assert a number a balance pass would move.** That is not a rule about care, it is
 what the routes are for: a rebalance next month must not redden a single one of them.
