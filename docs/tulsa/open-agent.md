@@ -7,6 +7,31 @@ The sheet is `npm run simulate-activity -- tiers.<activity>-tier-<level> --off q
 
 ---
 
+## The grumpy crafter was narrowed around an engine limit that does not exist
+
+The run that wrote `content/the-grumpy-crafter.dsl` reported that a dialogue `when:`, a
+`-> choice (when ...)` or an in-body `if ...:` reading `has <item>` never sees an item
+declaring `item-level:`, and that a choice whose body holds a bare `take:` of such an item is
+silently dropped from the menu. It spent a large share of a fifty-minute run on it and
+designed around it: "any base, any jewel" became a fixed, named trio, two of the three pieces
+are socketed off-screen because nothing could `take:` them, and every hand-over became a shop
+transaction with four new shops laid over existing bodies.
+
+**Re-measured against a minimal world and none of it reproduces.** A choice gated on
+`has <an item-level item>` is offered; a choice whose body `take:`s one is offered and takes
+it; and `has` sees the item while it is worn. The scratch world that shows this is four
+sections and a handful of routes, and building it cost less than the run spent working around
+the conclusion.
+
+So the symptom was real and the cause named for it was not. What the true cause was is
+unknown — likely something in the run's own lines rather than in the engine — and it is worth
+finding, because the same wall will stop the next lane. The module itself works and its three
+routes walk; what is wrong is only that its shape was chosen to avoid something imaginary.
+
+*Closes when:* the real cause of the dead choice is named, and the quest either takes any base
+and any jewel as the design asked or the narrowing is defended on its own merits rather than
+on the engine's.
+
 ## Two of Kelsa's hives write the harvest out, beside a shared action that shows the answer
 
 `tulsa.dsl` writes `harvest comb:` twice — `time: 8`, `give: 1 honeycomb`, differing only in
