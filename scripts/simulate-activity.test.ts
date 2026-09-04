@@ -203,6 +203,11 @@ describe('what the arguments ask for', () => {
     expect(() => parseSimulationArgs(['s', '--threat'])).toThrow(/unknown flag --threat/);
   });
 
+  it('sweeps the whole world only when asked to by name, since that is minutes rather than seconds', () => {
+    expect(parseSimulationArgs(['s']).everywhere).toBeUndefined();
+    expect(parseSimulationArgs(['s', '--everywhere']).everywhere).toBe(true);
+  });
+
   it('takes the world to measure, since a draft an authoring run wrote is not the shipped corpus', () => {
     expect(parseSimulationArgs(['s', '--world', 'somewhere/content']).world).toBe('somewhere/content');
     expect(parseSimulationArgs(['s']).world).toBeUndefined();
@@ -254,7 +259,7 @@ describe('a sweep at a rung of the stat ladder', () => {
 
   it('sweeps what the stood player is offered, so an offer a rung opens is measured at that rung and not below it', () => {
     const sources = [{ name: 'island', text: ISLAND }];
-    const asked = { save: SAVE, holds: 'grapple', seeds: 1, window: 1, all: true };
+    const asked = { save: SAVE, holds: 'grapple', seeds: 1, window: 1, all: true, everywhere: true };
     const below = simulate(sources, asked);
     expect(below.ok).toBe(true);
     expect(below.lines.join('\n')).toMatch(/nothing is on offer/);

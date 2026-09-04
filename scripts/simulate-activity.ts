@@ -51,7 +51,10 @@ const usage = [
   '  <action-spec>   narrows the sweep to the offers whose `use:` line holds this text,',
   '                  so `highwayman` and `core.melee-combat on combat.highwayman` both name',
   '                  something. With none, everything on offer anywhere is measured',
-  '  --at            narrows the sweep to one location',
+  '  --at            narrows the sweep to one location. With none, the sweep stands where the',
+  '                  save or the route left the player, which is the question this tool is',
+  '                  almost always asked; a start that stands nowhere is refused rather than',
+  '                  read as the whole world', 
   '  --world         <dir> — measure the world in that directory rather than the shipped corpus,',
   '                  which is what an authoring run reaches for: its draft lives in a copy of its',
   '                  own and every figure here is read off a run, so a run that cannot be pointed',
@@ -62,6 +65,10 @@ const usage = [
   `  --seeds         how many rng seeds each offer is run under (default ${String(DEFAULT_SEEDS)})`,
   `  --window        how many minutes of game time every run is given (default ${String(DEFAULT_WINDOW_MINUTES)})`,
   '  --all           list every offer, including the ones that paid nothing at all',
+  '  --everywhere    measure every location in the world rather than the one the run stands in.',
+  '                  This is minutes rather than seconds — it stands the player up once per room',
+  '                  and reads every offer in each — so it is a different question from the one',
+  '                  this tool is usually asked, and it has to be asked for by name',
   '',
   'Nothing here is computed: every figure is read off a run. The tool builds a # test per',
   'offer — `load:` the save, `goto:` the place, then that offer `until time >= <the far end of that',
@@ -136,6 +143,7 @@ export interface SimulationArgs {
   rungs?: readonly RungAsk[];
   after?: string;
   world?: string;
+  everywhere?: boolean;
 }
 
 export type Start = { readonly save: string } | { readonly after: string };
@@ -189,6 +197,7 @@ export function parseSimulationArgs(raw: readonly string[]): SimulationArgs {
     const arg = raw[i];
     if (arg === '--help' || arg === '-h') throw new Error(usage);
     else if (arg === '--all') args.all = true;
+    else if (arg === '--everywhere') args.everywhere = true;
     else if (arg === '--ideal') args.ideal = true;
     else if (arg === '--after') {
       const test = raw[++i];
@@ -274,6 +283,11 @@ export function subjectsFrom(registry: Registry, start: Start | string, narrow: 
     }
   }
   return found.sort(byReach);
+}
+
+export function whereItStands(registry: Registry, start: Start | string): string | undefined {
+  const at = stood(registry, start).state.location;
+  return at === '' ? undefined : at;
 }
 
 export function levelsOn(registry: Registry, start: Start | string): Levels {
@@ -617,6 +631,10 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
   if (args.at !== undefined && !base.registry.locations.has(args.at)) {
     return { lines: [`${args.at}: no # location with that id.`], ok: false };
   }
+  const sweptAt = args.everywhere ? undefined : (args.at ?? whereItStands(base.registry, start));
+  if (sweptAt === undefined && !args.everywhere) {
+    return { lines: [`${startLabel(start)} declares no location, so there is nowhere for it to stand: name --at <location>, or --everywhere to measure the whole world.`], ok: false };
+  }
 
   const named = args.stats ?? [];
   const rungs = args.rungs ?? [];
@@ -646,7 +664,7 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
     return { lines: [error instanceof Error ? error.message : String(error)], ok: false };
   }
 
-  const subjects = subjectsFrom(world, start, args);
+  const subjects = subjectsFrom(world, start, { ...args, at: sweptAt });
   if (subjects.length === 0) {
     return { lines: [`${startLabel(start)}: nothing is on offer anywhere that matches. Widen the spec or drop --at.`], ok: true };
   }
