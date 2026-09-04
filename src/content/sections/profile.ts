@@ -33,6 +33,14 @@ const half = (keyword: string, note: string, spent: string) => ({
   note: `${note} It is one of the two ways ${spent}, and the tier fixes what the two come to between them, so writing this one solves the other rather than leaving it at 1.`,
 });
 
+const contested = (keyword: string, note: string, against: string) => ({
+  parser: decimal,
+  keyword,
+  default: () => 1,
+  printed: 'always' as const,
+  note: `${note}, as a multiple of ${against} rather than of the player's own stat of the same name — a stat weighed against another is only meaningful beside the one it is weighed against, and the player's own may sit at nothing at all. 1 is an even contest, and is what an unwritten line here means.`,
+});
+
 const PAIRED = (pair: readonly string[]): string => `names neither ${pair.join(' nor ')}, so the tier's budget has nothing to hang on and both halves are unknown. Write one of them; the other is solved from the tier`;
 
 export const profile = section<Profile>()({
@@ -43,10 +51,10 @@ export const profile = section<Profile>()({
   fields: {
     damage: half('damage', 'how hard one blow of this lands, as a multiple of what the player of its level deals.', 'a tier spends what a body deals a second'),
     rate: half('rate', 'how often it swings, as a multiple of how often the player of its level does.', 'a tier spends what a body deals a second'),
-    accuracy: factor('accuracy', 'how often a swing of its own finds the mark.'),
+    accuracy: factor('accuracy', 'how often a swing of its own finds the mark, as a multiple of how often the player of its level does.'),
     pool: half('pool', 'how much it has to lose before it goes down, as a multiple of what the player of its level can lose.', 'a tier spends how long a body stands'),
-    evasion: factor('evasion', 'how hard it is to land a blow on.'),
-    reduction: half('reduction', 'how much it takes off every blow that does land, as a multiple of what the player of its level takes off.', 'a tier spends how long a body stands'),
+    evasion: contested('evasion', 'how hard it is to land a blow on', 'the accuracy it is weighed against'),
+    reduction: half('reduction', 'how much it takes off every blow that does land, as a multiple of the damage a player of its level deals rather than of the reduction that player carries — it is weighed against the blow, so the blow is what it means anything beside.', 'a tier spends how long a body stands'),
   },
   exclusive: PROFILE_PAIRS.map((pair) => pair.map((each) => [each])),
   validate: (value) => {
