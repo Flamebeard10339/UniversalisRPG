@@ -39,6 +39,11 @@ title: Cleaned Blowfish Bones
 examine: Picked out whole and boiled once already. Whatever was in them that would have killed you came off in the water instead.
 value: 2
 
+# item poisoned-blowfish-bones
+title: Poisoned Blowfish Bones
+examine: Picked out whole and boiled the same as any batch that came out clean. Whatever was in them that would have killed you did not come off in the water. It is still in there.
+value: 1
+
 # item blowfish-brew
 title: Sunny's Blowfish Brew
 examine: Cloudy, faintly bitter, and it does not smell like anything that used to have a spine.
@@ -47,7 +52,7 @@ examine: Cloudy, faintly bitter, and it does not smell like anything that used t
 station: stove
 in: raw-blowfish
 out: blowfish-bones
-burnt: burnt-food
+burnt: poisoned-blowfish-bones
 accuracy: cooking
 skill: cooking 25
 rate: core.cooking-rate
@@ -87,7 +92,7 @@ stage offered:
     Same faces, same stools, same rounds, every night this year. I want something on the bar nobody's had before.
     There's a fish out past the shingle, in the deep water — blowfish, they call it, and it swells up like a bladder the second it's out of the water. The meat's poison until it's cooked exactly right, and the bones are worth more dissolved than the meat is worth eating.
     Charlie tried it raw once, back when he still had opinions about things. He's been on that floor since Tuesday.
-    Cook it wrong and the poison's still in the bones same as it was in the fish. Cook it right and it's gone. Bring the bones back clean and I'll see to the rest myself. @@@ a fumbled attempt should come back saying just that — that the poison stayed in — rather than the world's one generic burnt-food; a recipe has one `say:` for the attempt and no `on refused:` of its own to say anything else on
+    Cook it wrong and the poison's still in the bones same as it was in the fish. Cook it right and it's gone. Bring the bones back clean and I'll see to the rest myself.
     goto catching
 
 stage catching:
@@ -98,6 +103,12 @@ stage catching:
     when: not has blowfish-bones
     ask: About the blowfish again.
     again: Deep water, past the shingle, and a rod reaches it same as it reaches the trout. Cook it wrong and you'll know soon enough what's left of it. Cook it right and bring me the bones.
+  sunny says:
+    when: has poisoned-blowfish-bones
+    sticky
+    ask: I don't think I got this right.
+    -> Here.
+      say: She doesn't take it, just tips it back into your hand with two fingers. "Smell that? That's not gone, that's just wet. Whatever was in the meat's still in there — you rushed the water, or missed a bone. Take your time over it and try again."
 
 stage dissolving:
   log: The bones are clean. Sunny wants them dissolved down over a flame before she calls it a brew.
@@ -169,3 +180,17 @@ choose: Give her the bottle.
 assert: sunnys-brew.poured
 assert: has cooks-cap
 assert: has cooks-apron
+
+# save at-sha-dynastys-with-a-raw-blowfish
+{"version":13,"location":"tulsa.sha-dynastys","inventory":{"the-bars-crawl.raw-blowfish":1},"flags":{"the-bars-crawl.sunnys-brew.offered":true,"the-bars-crawl.sunnys-brew.catching":true}}
+
+# test cooking-the-blowfish-wrong-leaves-the-poison-in
+fail-checks
+load: at-sha-dynastys-with-a-raw-blowfish
+craft: cleaned-blowfish
+assert: has poisoned-blowfish-bones
+assert: not has blowfish-bones
+talk: sunny
+choose: sunnys-brew.catching.sunny.1.said
+choose: Here.
+assert: has poisoned-blowfish-bones
