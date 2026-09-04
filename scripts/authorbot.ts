@@ -5,8 +5,9 @@ import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
-import { answer, answeredBy, ask, ASK_BEFORE_YOU_DESIGN_AROUND_IT, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS, ENGINE_TEXT, enginePaths, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
+import { answer, answeredBy, ask, ASK_BEFORE_YOU_DESIGN_AROUND_IT, ASK_LINE, FLOORS_ARE_WALKED, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS, ENGINE_TEXT, enginePaths, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
+import { FLOORS_DIR } from './floors';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
 
@@ -25,6 +26,9 @@ const usage = [
   '  --target   the module under content/ the run may write, which is the only file it may',
   '             write anywhere. With none, the brief\'s own name: a brief at',
   '             planning/A Grand Blade.md writes a-grand-blade.dsl',
+  `  --floors   write a floor route into ${FLOORS_DIR}/ rather than a module into ${CORPUS_DIR}/. The run`,
+  '             gets both folders, walks its own with --world, and is told to measure by walking',
+  '             rather than to declare, which is the one lane that still iterates',
   '  --open     let the run read the engine and count every reach, rather than refusing it.',
   `             Without this, ${enginePaths()} are refused, and the refusal`,
   '             says to ask the oracle',
@@ -61,6 +65,7 @@ export interface Asked {
   once: boolean;
   askFor: number;
   said: string | null;
+  floors: boolean;
 }
 
 export const moduleNameFor = (brief: string): string =>
@@ -87,7 +92,7 @@ const requireCount = (flag: string, value: string): number => {
 };
 
 export function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null };
+  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null, floors: false };
   const named = (word: string): void => {
     if (asked.brief !== null) throw new Error(`the brief is named once, and ${JSON.stringify(word)} is a second\n\n${usage}`);
     asked.brief = word;
@@ -100,6 +105,7 @@ export function parseArgs(argv: readonly string[]): Asked {
     else if (arg === '--minutes') asked.minutes = requireCount(arg, requireValue(arg, argv[++i]));
     else if (arg === '--model') asked.model = requireValue(arg, argv[++i]);
     else if (arg === '--open') asked.open = true;
+    else if (arg === '--floors') asked.floors = true;
     else if (arg === '--watch') asked.watch = true;
     else if (arg === '--once') asked.once = true;
     else if (arg === '--ask-for') asked.askFor = requireCount(arg, requireValue(arg, argv[++i]));
@@ -171,6 +177,7 @@ export function systemFor(asked: Asked, corpus: string, draft: string): string {
 How this run is set up:
 
 - The world you are writing into is the corpus of .dsl files in ${corpus}. Read any of them.
+${asked.floors ? `- The floors beside it are in ${path.dirname(draft)}. Read those too: they are the shape to copy.` : ''}
 - The one file you may write is ${draft}.
 - Run every command from ${repoRoot}, which is the working directory.
 ${asked.open ? '- The repository is yours to read: the engine under src/ and scripts/ is there if you want it.' : `- ${ASK_LINE}`}
@@ -197,7 +204,12 @@ which directory is yours.
                                          hour and what it costs them, read off a run rather than
                                          reckoned. **--world is what points it at your world**, and
                                          without it none of your saves or entities exist
-    npm run ladder-check -- --world ${corpus}
+${asked.floors ? `    npm run floors -- --world ${path.dirname(corpus)}
+                                         **your gate.** Walks every route under your floors folder
+                                         and prints, per route, the level it reached, the
+                                         game-minutes it took and the minutes the curve allows.
+                                         Nothing about the minutes is asserted: the sheet is read
+` : ''}    npm run ladder-check -- --world ${corpus}
                                          what the world can put on a character of a level against what
                                          the declared ladder asks of them. Short means gear the world
                                          has not got yet: it is a brief for content, never a pass or a
@@ -205,7 +217,7 @@ which directory is yours.
                                          store is how a world gets sanded flat
     npm run notes -- ${corpus}           every \`@@@\` the world holds, your own included
 
-**Balance is declared, not measured.** A body that fights names \`tier:\`, \`profile:\` and \`level:\` and
+${asked.floors ? FLOORS_ARE_WALKED : `**Balance is declared, not measured.** A body that fights names \`tier:\`, \`profile:\` and \`level:\` and
 the engine cuts every stat under them; a \`# passive\` names \`grants:\` as a multiple of what one level
 is worth. Those tags are the balance, and a body naming them needs no \`stats:\` line at all. Write a
 stat only where it is load-bearing for the encounter, and write it as a modifier so it survives a
@@ -214,7 +226,7 @@ is mis-tagged or met at the wrong level, and both are one word to change.
 
 **So do not spend this run on \`simulate-activity\` or on a tuning pass.** A number typed by hand goes
 stale the next time a ladder moves, and turns spent measuring what the tags already decide are the
-commonest way a run reaches its cap with the work half done.
+commonest way a run reaches its cap with the work half done.`}
 
 ${ASK_BEFORE_YOU_DESIGN_AROUND_IT}
 
@@ -452,7 +464,8 @@ async function run(asked: Asked): Promise<number> {
   const corpus = path.join(workdir, 'content').replace(/\\/g, '/');
   cpSync(path.join(repoRoot, CORPUS_DIR), path.join(workdir, 'content'), { recursive: true });
   cpSync(path.join(repoRoot, ENGINE_MODULE_DIR), path.join(workdir, 'content'), { recursive: true });
-  const draft = path.join(corpus, asked.target!).replace(/\\/g, '/');
+  if (asked.floors) cpSync(path.join(repoRoot, FLOORS_DIR), path.join(workdir, FLOORS_DIR), { recursive: true });
+  const draft = path.join(asked.floors ? path.join(workdir, FLOORS_DIR) : corpus, asked.target!).replace(/\\/g, '/');
   if (!existsSync(draft)) writeFileSync(draft, '');
   const before = readFileSync(draft, 'utf8');
 

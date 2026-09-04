@@ -270,27 +270,21 @@ same thing. So this closes on the sheet being read, not on the rooms being level
 *Closes when:* the room table is re-read after the re-cut and the rooms that stop short are
 either meant to or given population, with the choice named per room rather than swept.
 
-## Combat has no floor, and authorbot cannot write one
+## Combat has no floor, so its tier saves cannot be deleted
 
 `docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets a
 floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
 thieving's; nothing walks a fighter from level one to thirty. The brief is
 `.planning/combat-expansion/combat-floor.md`.
 
-**It cannot be dispatched the way the other briefs are, for two reasons found on 2026-09-04.**
-`authorbot` copies `content/` and writes one module under it, so a run cannot write
-`floors/combat-floor.dsl` and cannot read `floors/thieving-floor.dsl` or
-`floors/fishing-floor.dsl`, which its own brief tells it to copy the shape of. And the harness
-now tells every run that balance is declared and not to spend itself on `simulate-activity` —
-correct for authoring a module, wrong for the one lane whose whole job is walking a route to
-find what it actually costs.
-
-So this wants either a `--floors` that copies and targets that folder and says the measuring
-line differently, or a hand-written module by somebody who can read both folders at once.
+It is dispatchable now: `npm run authorbot -- <brief> --floors` gives a run both folders, writes
+its module into `floors/`, hands it `npm run floors -- --world <its own copy>` as the gate, and
+tells it the opposite of what an authoring run is told — that here balance is measured by
+walking rather than declared, and that a floor may not say `unkillable`, because what a real
+player survives is the whole measurement.
 
 *Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
-edges, the combat saves in `content/tiers.dsl` are deleted, and whichever of the two ways it
-was written is the one the next speedrun brief uses.
+edges, and the combat saves in `content/tiers.dsl` are deleted.
 
 ## A run greps the checkout's content and is refused, four times in one run
 

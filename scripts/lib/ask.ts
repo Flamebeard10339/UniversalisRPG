@@ -87,3 +87,15 @@ export const waitForAnswer = async (
     await sleep(every);
   }
 };
+
+export const FLOORS_ARE_WALKED = `**This run writes a floor, so balance is measured here rather than declared.** A floor route is
+the fastest way anybody has actually walked to a level, and what it costs is only knowable by
+walking it: run the route, read the minutes, make it faster, run it again. That is the opposite
+of what an authoring run is told, and it is right here and nowhere else.
+
+So \`npm run simulate-activity\` and repeated walking are the work rather than a distraction. What
+still holds is that **no \`# test\` may assert a number a balance pass would move**: a floor
+asserts the level it reached and nothing about the minutes, because the minutes are read off the
+sheet rather than pinned. And a floor may not say \`unkillable\` — what a real player can survive
+is the whole measurement, so a route that cannot be walked without dying is the finding, and the
+report says where it died and at what rung.`;

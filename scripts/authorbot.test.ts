@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { ASK_LINE, ASKED_FOR_MINUTES, ENGINE_DIRS, ENGINE_IS_OFF_LIMITS } from './lib/ask';
+import { foldersOf } from './floors';
 import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, inLastMinute, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
@@ -11,7 +12,7 @@ const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseA
 
 describe('what the run was asked for', () => {
   it('is one loose word, since the brief and the module it writes were the same word twice', () => {
-    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null });
+    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null, floors: false });
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
@@ -293,5 +294,46 @@ describe('what the run cost', () => {
 
   it('leaves the tokens unsaid rather than printing four zeroes, which reads like a run that was free', () => {
     expect(summaryLines([], { ...cost, usage: undefined }, '/work').join('\n')).toContain('nothing billed');
+  });
+});
+
+describe('a run that writes a floor rather than a module', () => {
+  it('takes the flag and defaults to off, since a floor is the exception rather than the shape', () => {
+    expect(parseArgs(['b.md']).floors).toBe(false);
+    expect(parseArgs(['b.md', '--floors']).floors).toBe(true);
+  });
+
+  it('is told to measure by walking, which is the opposite of what every other run is told', () => {
+    const floors = systemFor({ ...asked(), floors: true }, '/work/content', '/work/floors/x.dsl');
+    const module = systemFor(asked(), '/work/content', '/work/content/x.dsl');
+
+    expect(floors).toContain('balance is measured here rather than declared');
+    expect(floors, 'the one lane that still iterates has to be told simulate-activity is the work').toContain('npm run simulate-activity');
+    expect(floors).not.toContain('Balance is declared, not measured');
+
+    expect(module).toContain('Balance is declared, not measured');
+    expect(module).not.toContain('balance is measured here rather than declared');
+  });
+
+  it('is handed the floors gate and the folder to copy the shape from, neither of which a module run has', () => {
+    const floors = systemFor({ ...asked(), floors: true }, '/work/content', '/work/floors/x.dsl');
+
+    expect(floors).toContain('npm run floors -- --world /work');
+    expect(floors).toContain('/work/floors');
+    expect(systemFor(asked(), '/work/content', '/work/content/x.dsl')).not.toContain('npm run floors');
+  });
+
+  it('keeps the rules a floor does not get to bend, since it is still a route in a world', () => {
+    const floors = systemFor({ ...asked(), floors: true }, '/work/content', '/work/floors/x.dsl');
+
+    expect(floors, 'the minutes are read off the sheet and never pinned').toContain('may assert a number a balance pass would move');
+    expect(floors, 'what a real player survives is the measurement').toContain('may not say `unkillable`');
+  });
+
+  it('walks the shipped floors through the same seam a run would walk its own', () => {
+    const shipped = foldersOf([]);
+    expect(foldersOf(['--world', '/work'])).toEqual({ corpus: path.join('/work', shipped.corpus), floors: path.join('/work', shipped.floors) });
+    expect(() => foldersOf(['--world'])).toThrow(/wants a directory/);
+    expect(() => foldersOf(['--world', '--help'])).toThrow(/wants a directory/);
   });
 });

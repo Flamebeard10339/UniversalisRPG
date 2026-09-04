@@ -15,7 +15,7 @@ import { readSources } from './probe';
 export const FLOORS_DIR = 'floors';
 
 const usage = [
-  'Usage: npm run floors',
+  'Usage: npm run floors [-- --world <dir>]',
   '',
   `Walks every # test under ${FLOORS_DIR}/ over the shipped world and prints, for each, the level`,
   'it reached, the game-minutes it took, and the minutes the curve allows for reaching that',
@@ -26,6 +26,10 @@ const usage = [
   '',
   "A route's goal is read off its own closing `assert: level.<skill> >= <n>`; one that closes",
   'on nothing of the kind is walked and reported without a curve to stand beside.',
+  '',
+  `  --world  a directory holding a ${CORPUS_DIR}/ and a ${FLOORS_DIR}/ of its own, walked instead of`,
+  '           the shipped ones. This is what points it at a copy of the world rather than at this',
+  '           checkout, and without it the shipped folders are what it reads.',
 ].join('\n');
 
 const MS_PER_MINUTE = 60_000;
@@ -47,6 +51,16 @@ export function goalOf(registry: Registry, testId: string): Goal | undefined {
 }
 
 export const floorIds = (sources: readonly ModuleSource[], under: string): readonly string[] => sourceFiles(under).map((file) => path.basename(file).replace(/\.[^.]*$/, '')).filter((id) => sources.some((source) => source.name === id));
+
+export function foldersOf(argv: readonly string[]): { corpus: string; floors: string } {
+  const at = argv.indexOf('--world');
+  if (at === -1) return { corpus: CORPUS_DIR, floors: FLOORS_DIR };
+  const world = argv[at + 1];
+  if (world === undefined || world.startsWith('--')) throw new Error(`--world wants a directory after it
+
+${usage}`);
+  return { corpus: path.join(world, CORPUS_DIR), floors: path.join(world, FLOORS_DIR) };
+}
 
 const times = (ratio: number): string => `${ratio.toFixed(2)}×`;
 
@@ -96,8 +110,9 @@ function main(): void {
     console.log(usage);
     return;
   }
-  const sources = readSources([CORPUS_DIR, FLOORS_DIR]);
-  const report = floorLines(sources, floorIds(sources, FLOORS_DIR));
+  const { corpus, floors } = foldersOf(process.argv.slice(2));
+  const sources = readSources([corpus, floors]);
+  const report = floorLines(sources, floorIds(sources, floors));
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
 }

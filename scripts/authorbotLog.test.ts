@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { movedBetween, runRecord, type Asked, type Cost, type Reach } from './authorbot';
 
-const ASKED: Asked = { brief: 'C:/planning/a-brief.md', target: 'combat.dsl', open: false, turns: 150, minutes: 40, model: 'claude-sonnet-5', watch: false, once: false, askFor: 10, said: null };
+const ASKED: Asked = { brief: 'C:/planning/a-brief.md', target: 'combat.dsl', open: false, turns: 150, minutes: 40, model: 'claude-sonnet-5', watch: false, once: false, askFor: 10, said: null, floors: false };
 
 const COST: Cost = { turns: 55, seconds: 388.94, calls: 33, usage: { input_tokens: 48, output_tokens: 22840 } };
 
