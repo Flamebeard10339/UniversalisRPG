@@ -2,6 +2,7 @@ import type { Action } from '../../src/grammar/action';
 import { isFight } from '../../src/grammar/action';
 import type { Registry } from '../../src/content/registry';
 import type { Entity } from '../../src/content/sections/entity';
+import type { Profile } from '../../src/content/sections/profile';
 import type { Tier } from '../../src/content/sections/tier';
 import { opposes } from '../../src/runtime/encounter';
 import { hitChance, statValue } from '../../src/runtime/stats';
@@ -52,6 +53,8 @@ export interface Fighter {
   entity: Entity;
   fight: FightShape;
   tier?: Tier;
+  profile?: Profile;
+  level?: number;
 }
 
 export function fightersIn(registry: Registry): Fighter[] {
@@ -59,7 +62,13 @@ export function fightersIn(registry: Registry): Fighter[] {
   for (const entity of registry.entities.values()) {
     const fight = fightOf(registry, entity);
     if (!fight || !opposes(registry, entity.id, PLAYER)) continue;
-    found.push({ entity, fight, tier: entity.tier === undefined ? undefined : registry.tiers.get(entity.tier) });
+    found.push({
+      entity,
+      fight,
+      tier: entity.tier === undefined ? undefined : registry.tiers.get(entity.tier),
+      profile: entity.profile === undefined ? undefined : registry.profiles.get(entity.profile),
+      level: entity.level,
+    });
   }
   return found;
 }
@@ -150,3 +159,30 @@ export function fairAt(registry: Registry, state: GameState, fighter: Fighter, l
   }
   return found;
 }
+
+export interface Shape {
+  factor: string;
+  said: number;
+  read: number;
+}
+
+const RATIO = (ours: number, theirs: number): number => (theirs === 0 ? Infinity : ours / theirs);
+
+export function shapeOf(registry: Registry, state: GameState, fighter: Fighter): Shape[] {
+  const { fight, profile } = fighter;
+  if (!profile) return [];
+  const foe = fighter.entity.id;
+  const asNeutral = (theirs: string, ours: string): number => RATIO(statValue(theirs, state, registry, foe), statValue(ours, state, registry, PLAYER));
+  return [
+    { factor: 'rate', said: profile.rate, read: asNeutral(fight.rate, fight.rate) },
+    { factor: 'damage', said: profile.damage, read: asNeutral(fight.damage.ours, fight.damage.ours) },
+    { factor: 'accuracy', said: profile.accuracy, read: asNeutral(fight.accuracy.ours, fight.accuracy.ours) },
+    { factor: 'evasion', said: profile.evasion, read: asNeutral(fight.accuracy.theirs, fight.accuracy.theirs) },
+    { factor: 'reduction', said: profile.reduction, read: asNeutral(fight.damage.theirs, fight.damage.theirs) },
+  ];
+}
+
+export const OUT_BY = 2;
+
+export const shapeDisagrees = (shape: readonly Shape[]): Shape[] =>
+  shape.filter((each) => Number.isFinite(each.read) && (each.read > each.said * OUT_BY || each.read * OUT_BY < each.said));

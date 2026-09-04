@@ -152,6 +152,15 @@ assert: resource.health > 12
 
 # damage-type fire
 
+# profile skittering
+rate: 2
+damage: 0.5
+
+# profile lumbering
+rate: 0.5
+damage: 2
+pool: 1.5
+
 # tier vermin-tier
 seconds to fell: 7
 damage share: 0.8
@@ -185,6 +194,8 @@ examine: A coal the size of a dog, and it is looking at you.
 faction: vermin
 stats: attack 0, fire-damage 40, defense 0, max-health 1000, attack-rate 60, accuracy 100000, evasion 0
 tier: hearth-tier
+profile: lumbering
+level: 12
 uses: core.melee-combat
 
 # entity brazier

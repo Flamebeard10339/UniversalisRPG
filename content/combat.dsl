@@ -35,6 +35,23 @@ gain 6 * amount experience on damage-taken
 
 # damage-type chaos
 
+# profile skirmisher
+rate: 1.5
+damage: 0.6
+evasion: 1.2
+pool: 0.7
+
+# profile brute
+rate: 0.6
+damage: 2
+pool: 1.4
+evasion: 0.7
+
+# profile duellist
+rate: 1
+damage: 1
+accuracy: 1.3
+
 # tier mob
 seconds to fell: 7
 damage share: 0.8
@@ -572,6 +589,8 @@ title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
 stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
 tier: mob
+profile: skirmisher
+level: 4
 uses: core.melee-combat
 faction: world
 aggressive
@@ -597,6 +616,8 @@ title: Ratkin Warrior
 examine: A head taller than the ones in the sewer and put together properly, in scale somebody cut and fitted rather than found. It watches you the whole way in.
 stats: attack 4, defense 12, max-health 115, attack-rate 14, accuracy 70, evasion 40
 tier: elite
+profile: brute
+level: 21
 uses: core.melee-combat
 faction: world
 respawn after: 90s

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule } from '../../src/content/load';
 import type { Registry } from '../../src/content/registry';
-import { fairAt, fightersIn, ladderedStatsFor, readingAt, type Fighter, type LadderedStats } from './foeTier';
+import { fairAt, fightersIn, ladderedStatsFor, readingAt, shapeDisagrees, shapeOf, type Fighter, type LadderedStats } from './foeTier';
 import { activitiesIn } from './tiers';
 import { tierState } from '../tier-build';
 
@@ -63,6 +63,14 @@ accuracy: us.accuracy vs them.evasion
 damage: us.attack vs them.defense
 depletes: them.health
 
+# profile quickfoot
+rate: 2
+damage: 0.5
+
+# profile leaden
+rate: 0.5
+damage: 2
+
 # tier quick
 seconds to fell: 7
 damage share: 0.8
@@ -85,6 +93,15 @@ stats: max-health 100000, attack 2, accuracy 100, evasion 0, defense 0, attack-r
 tier: quick
 uses: melee
 
+# entity swift-thing
+title: Swift Thing
+faction: world
+stats: max-health 100, attack 2, accuracy 100, evasion 0, defense 0, attack-rate 120
+tier: quick
+profile: quickfoot
+level: 9
+uses: melee
+
 # entity untagged-thing
 title: Untagged Thing
 faction: world
@@ -99,7 +116,7 @@ uses: melee
 # location yard
 x: 0, y: 0
 starting
-entities: straw-man, boulder, untagged-thing
+entities: straw-man, boulder, untagged-thing, swift-thing
 `;
 
 const registry: Registry = loadModule(WORLD);
@@ -164,5 +181,37 @@ describe('a foe read against the tier it names', () => {
 
   it('leaves a body that names no tier out of the reading rather than guessing one for it', () => {
     expect(named('untagged-thing').tier).toBeUndefined();
+  });
+});
+
+describe('a body read against the shape it says it fights in', () => {
+  it('reads every factor of the profile as a multiple of what the player stands at', () => {
+    const swift = shapeOf(registry, stood, named('swift-thing'));
+    expect(swift.map((each) => each.factor).sort()).toEqual(['accuracy', 'damage', 'evasion', 'rate', 'reduction']);
+    expect(swift.find((each) => each.factor === 'rate')!.said).toBe(2);
+  });
+
+  it('says nothing about a body that names no profile, rather than holding it to a default one', () => {
+    expect(shapeOf(registry, stood, named('untagged-thing'))).toEqual([]);
+  });
+
+  it('keeps quiet where the body is cut in the shape it names, and speaks where it is not', () => {
+    const swift = named('swift-thing');
+    const swinging = shapeOf(registry, stood, swift).find((each) => each.factor === 'rate')!;
+    expect(swinging.read, 'it swings at 120 against a player at 60, so it reads as the 2x it claims').toBeCloseTo(2, 6);
+    expect(shapeDisagrees([swinging])).toEqual([]);
+    expect(shapeDisagrees([{ factor: 'rate', said: 2, read: 0.2 }])).toHaveLength(1);
+  });
+
+  it('carries the level a body names, so it is read there rather than solved for', () => {
+    expect(named('swift-thing').level).toBe(9);
+    expect(named('straw-man').level).toBeUndefined();
+  });
+
+  it('reads a body at its own level as one reading rather than two crossings', () => {
+    const swift = named('swift-thing');
+    const at = readingAt(registry, stood, swift, laddered(swift), swift.level!);
+    expect(at.secondsToFell).toBeGreaterThan(0);
+    expect(Number.isFinite(at.damageShare)).toBe(true);
   });
 });

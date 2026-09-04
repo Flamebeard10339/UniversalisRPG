@@ -7,7 +7,7 @@ import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
-import { duration, id, text } from '../../grammar/values';
+import { duration, id, number, text } from '../../grammar/values';
 import { localeKey } from '../locale';
 import { hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { hiddenIf, MintedAction, section, TOUCHED } from './define';
@@ -52,6 +52,8 @@ export interface AuthoredEntity extends HookCarrier {
   allies: Ally[];
   aggressive: boolean;
   tier?: string;
+  profile?: string;
+  level?: number;
   respawnAfter?: number;
   hiddenIf?: Condition;
   blocks: EntityBlock[];
@@ -150,6 +152,17 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       standsWithout: true,
       note: 'what this is worth fighting, which is what its toughness, its damage and what an hour of it pays are all read against. A body that names none is not audited against any of them',
     },
+    profile: {
+      parser: id,
+      names: { id: 'profile' },
+      standsWithout: true,
+      note: 'the shape this fights in: how the budget its tier allows is spent across how hard it hits, how often, and how much it can stand. A body that names none is shaped however its own stats fell out',
+    },
+    level: {
+      parser: number,
+      standsWithout: true,
+      note: 'the level a player is meant to meet this at, which is the character its tier and its profile are both read against. A body that names none is read at whatever level its own numbers happen to answer to',
+    },
     respawnAfter: { parser: duration, keyword: 'respawn after' },
     capabilities: {
       parser: list(id),
@@ -184,7 +197,7 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
-  needs: { tier: 'stats', respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
+  needs: { tier: 'stats', profile: 'stats', level: 'stats', respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {

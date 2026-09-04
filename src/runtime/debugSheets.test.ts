@@ -112,6 +112,9 @@ DEBUG
 # tier probe-tier
 DEBUG
 
+# profile probe-profile
+DEBUG
+
 # recipe probe-recipe
 DEBUG
 in: probe-item

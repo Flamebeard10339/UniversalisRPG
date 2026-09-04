@@ -12,7 +12,7 @@ import { itemContribution } from '../src/runtime/itemContribution';
 import { abilityAtLevelIn } from './lib/pace';
 import { activitiesIn, type Activity } from './lib/tiers';
 import { buildTier, tierState } from './tier-build';
-import { fairAt, fightersIn, ladderedStatsFor, SURVIVAL_WINDOW_SECONDS, type Fighter } from './lib/foeTier';
+import { fairAt, fightersIn, ladderedStatsFor, readingAt, shapeDisagrees, shapeOf, SURVIVAL_WINDOW_SECONDS, type Fighter } from './lib/foeTier';
 
 export const TOP_RUNG = 30;
 export const RUNG_STEP = 10;
@@ -244,17 +244,38 @@ function skillLines(registry: Registry, skill: Skill, activity: Activity, args: 
 }
 
 const APART = 5;
+const OUT_OF_TRUE = 1.5;
 
-function foeLine(registry: Registry, activity: Activity, fighter: Fighter, top: number): string | undefined {
+const share = (value: number): string => (Number.isFinite(value) ? `${value.toFixed(2)}x` : 'never');
+
+function foeLine(registry: Registry, activity: Activity, fighter: Fighter, top: number): string[] | undefined {
   const laddered = ladderedStatsFor(registry, activity, fighter.fight);
   const tier = fighter.tier;
   if (!laddered || !tier) return undefined;
   const stood = tierState(registry, activity, 1);
-  const fair = fairAt(registry, stood, fighter, laddered, tier, top);
   const say = (level: number | undefined): string => (level === undefined ? 'nowhere on the ladder' : `level ${String(level)}`);
+
+  if (fighter.level !== undefined) {
+    const at = readingAt(registry, stood, fighter, laddered, fighter.level);
+    const fells = Number.isFinite(at.secondsToFell) ? `${at.secondsToFell.toFixed(0)}s of ${tier.secondsToFell.toFixed(0)}s` : `never, wanting ${tier.secondsToFell.toFixed(0)}s`;
+    const hurts = `${share(at.damageShare)} of ${share(tier.damageShare)}`;
+    const off = Number.isFinite(at.secondsToFell) && (at.secondsToFell > tier.secondsToFell * OUT_OF_TRUE || at.secondsToFell * OUT_OF_TRUE < tier.secondsToFell);
+    const sore = Number.isFinite(at.damageShare) && (at.damageShare > tier.damageShare * OUT_OF_TRUE || at.damageShare * OUT_OF_TRUE < tier.damageShare);
+    const verdict = !Number.isFinite(at.secondsToFell) || off || sore ? `  — ${[off && 'toughness', sore && 'damage'].filter(Boolean).join(' and ') || 'toughness'} off its tier` : '';
+    return [`    ${fighter.entity.id.padEnd(34)}${tier.id.padEnd(8)}at its own level ${String(fighter.level).padEnd(4)}fells in ${fells.padEnd(20)}hurts at ${hurts.padEnd(18)}${verdict}`, ...shapeLines(registry, stood, fighter)];
+  }
+
+  const fair = fairAt(registry, stood, fighter, laddered, tier, top);
   const gap = fair.toughness !== undefined && fair.damage !== undefined ? Math.abs(fair.toughness - fair.damage) : undefined;
   const verdict = gap === undefined ? '  — one of the two never lands' : gap > APART ? `  — ${String(gap)} levels apart` : '';
-  return `    ${fighter.entity.id.padEnd(34)}${tier.id.padEnd(8)}fells at ${say(fair.toughness).padEnd(20)}hurts at ${say(fair.damage).padEnd(20)}${verdict}`;
+  return [`    ${fighter.entity.id.padEnd(34)}${tier.id.padEnd(8)}names no level, so it reads as fells at ${say(fair.toughness).padEnd(18)}hurts at ${say(fair.damage).padEnd(18)}${verdict}`, ...shapeLines(registry, stood, fighter)];
+}
+
+function shapeLines(registry: Registry, stood: ReturnType<typeof tierState>, fighter: Fighter): string[] {
+  const adrift = shapeDisagrees(shapeOf(registry, stood, fighter));
+  if (adrift.length === 0) return [];
+  const said = adrift.map((each) => `${each.factor} says ${each.said.toFixed(2)}x and reads ${share(each.read)}`).join('; ');
+  return [`        its # profile ${String(fighter.entity.profile)} is not the shape it is cut in: ${said}`];
 }
 
 function foeLines(registry: Registry, args: LadderArgs): string[] {
@@ -266,15 +287,16 @@ function foeLines(registry: Registry, args: LadderArgs): string[] {
   for (const fighter of fighters) {
     if (!fighter.tier) continue;
     const activity = activities.find((each) => ladderedStatsFor(registry, each, fighter.fight) !== undefined);
-    const line = activity && foeLine(registry, activity, fighter, top);
-    if (line) lines.push(line);
+    const said = activity && foeLine(registry, activity, fighter, top);
+    if (said) lines.push(...said);
   }
   const untiered = fighters.filter((each) => !each.tier);
   const head = [
     '',
     '# what the world puts in front of a player, against the tier each names',
     `a tier says how long something stands and what share of survivable incoming it deals, both read against a player the ladder puts at that level; survivable is a full pool spent over ${String(SURVIVAL_WINDOW_SECONDS)} seconds.`,
-    'so the two columns are the level at which each half of the tier comes true. A body whose halves land far apart is cut wrong however either reads alone.',
+    'a body that names its own level is read there, against both halves at once. One that names none is read the other way about — the level at which each half comes true — and halves that land far apart say it is cut wrong however either reads alone.',
+    'a # profile says how the budget is spent, as a multiple of what the player stands at. Where the body is not cut in the shape it names, the factors that disagree are listed under it.',
   ];
   const quiet = untiered.length === 0 ? [] : ['', `    ${String(untiered.length)} thing(s) that fight name no tier and are audited against nothing: ${untiered.slice(0, 6).map((each) => each.entity.id).join(', ')}${untiered.length > 6 ? ', …' : ''}`];
   return [...head, ...(lines.length === 0 ? ['', '    nothing that fights names a tier yet.'] : lines), ...quiet];

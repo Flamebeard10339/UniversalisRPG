@@ -96,6 +96,58 @@
       ]
     },
     {
+      "name": "meta.section.profile.dsl",
+      "begin": "^(#)[ \\t]+(profile)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(reduction|accuracy|evasion|damage|pool|rate)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "meta.section.stat.dsl",
       "begin": "^(#)[ \\t]+(stat)\\b[ \\t]*(.*)$",
       "beginCaptures": {
@@ -744,7 +796,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|perform|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|stats|title|unset|give|rate|roll|take|tier|time|uses|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|perform|profile|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|level|stats|title|unset|give|rate|roll|take|tier|time|uses|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
