@@ -452,6 +452,7 @@ async function run(asked: Asked): Promise<number> {
   cpSync(path.join(repoRoot, ENGINE_MODULE_DIR), path.join(workdir, 'content'), { recursive: true });
   const draft = path.join(corpus, asked.target!).replace(/\\/g, '/');
   if (!existsSync(draft)) writeFileSync(draft, '');
+  const before = readFileSync(draft, 'utf8');
 
   const transcript = path.join(workdir, 'transcript.md');
   const calls = path.join(workdir, CALLS_FILE);
@@ -553,7 +554,9 @@ async function run(asked: Asked): Promise<number> {
   }
 
   say(`\n${ended}`);
-  say(summaryLines(reaches, { turns: turn, seconds: (Date.now() - started) / 1000, calls: reaches.length, usage }, workdir).join('\n'));
+  const cost: Cost = { turns: turn, seconds: (Date.now() - started) / 1000, calls: reaches.length, usage };
+  say(summaryLines(reaches, cost, workdir).join('\n'));
+  logRun(repoRoot, runRecord(asked, cost, reaches, brief, before, readFileSync(draft, 'utf8'), new Date()));
   writeFileSync(path.join(workdir, ENDED_FILE), '');
   return 0;
 }

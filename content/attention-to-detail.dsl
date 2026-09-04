@@ -36,6 +36,9 @@ stage reporting:
     ask: I've got something for you.
     You get a look on you when you've actually got something. Out with it, before you talk yourself out of it.
     So the captain still makes that climb. And he's still not finished with whatever it is he's waiting on. That's worth more to me than the number I quoted you.
+    {noticed-the-ring: And that ring of his — off his hand and nowhere on him. A duke's own seal loose in the world is worth more to some people than the ring itself, and I know exactly who to ask about it.}
+    {counted-the-coin: And a cart coming in the postern after the gate's shut, carrying something that chinks and wasn't ordered by the kitchen. Whatever that is, he's not paying tax on it.}
+    {marked-a-guest: And somebody using that solar who isn't on the guard's own roster, gone again before you got a look at him. I'd give a week's pay for a name.}
     give: 40 core.coin
     give: 1 fine-lockpicks
     Here — picked up off somebody who didn't need them. They'll get you through more doors than the coin will, and I'd rather you owed me than the other way round.
@@ -50,6 +53,12 @@ stage paid:
     again: I've got what I needed off that one. Find me something else if you want the coin again.
 
 # flag overheard-the-captain
+
+# flag noticed-the-ring
+
+# flag counted-the-coin
+
+# flag marked-a-guest
 
 # stat wall-watch
 title: Wall Watch
@@ -72,6 +81,15 @@ watch the castle windows:
     set: overheard-the-captain
     xp: thieving.thieving 40
     say: The captain crosses the yard below and takes the stairs to the solar without being announced. The shutters are open for her. "Not yet," the duke says, plain enough to carry. "Not until the last of them is finished." The shutters swing to before you hear finished what.
+    1 in 2:
+      set: noticed-the-ring
+      say: His hand rests on the sill a moment longer than a duke needs to rest a hand, and there's a paler band of skin where a ring sat until recently and doesn't now. A signet like that doesn't go missing quietly.
+    1 in 2:
+      set: counted-the-coin
+      say: A hand cart comes through the postern well after the gate's shut, and what two men carry up the kitchen stair from it doesn't rattle like anything the kitchen ordered — it chinks, and it takes both of them.
+    1 in 2:
+      set: marked-a-guest
+      say: A second shape crosses the solar behind the duke's, too tall for the captain and gone again before the shutters swing to. Nobody announced him at the gate, and nobody's going to.
   if not overheard-the-captain:
     drain: 2 core.health
     inflict: thieving.dazed for thieving.daze-duration
