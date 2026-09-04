@@ -46,33 +46,38 @@ no-op, since the player's is zero.
 
 ---
 
-## Every number in combat.dsl is cut against ladders that have since moved
+## The armour above iron does not exist, so the health ladder runs out at the top
 
-Nothing under `content/` moved when the damage model and the ladders were corrected, and the
-toughness anchor has since gone to 100 at level one and 1000 at thirty on two axes.
+The re-cut landed 2026-09-04. Fifteen bodies name a tier where two did, every one reads on
+tier, and toughness moved off flat reduction onto typed resistance. `npm run ladder-check` is
+the sheet; no figure from it is written down here.
 
-**Run `npm run ladder-check`; no figure from it is written down here.** It was, three times in
-three files, and every cell of one copy was stale within the day — one brief drew the opposite
-conclusion from its own stale row and was queued for dispatch saying so. What the tool says is
-the tool's.
+What the run could not close, and said so rather than inventing: **the shop health row is still
+far short at level 30**, because there is no armour tier above iron. Bronze and iron were
+raised and iron was added to the armoury counter, which closed levels 1 and 10 and most of 20.
+A `knights-sword` exists as a level-20 weapon with nothing armoured to match it. Closing this
+means a third armour tier — items, recipes, shop lines — which is authoring rather than a
+number.
 
-What the readings have consistently shown, which is the part worth writing down:
+The drop rows are far over at every rung and that is the passive lane's, above.
 
-- **The drop rows start far over and end short.** The kit the audit reaches for is nearly
-  level-independent while the ladder climbs, so it overpays a beginner and underpays a thirty.
-  That is the jewels and the passives behind them, and it has a line of its own above.
-- **The shop health row is short at every rung and worsens with it.** The world grants a player
-  health almost entirely through gear, because a skill raises its stat by +1 and +1% a level
-  and nothing else does anything. Against a ladder asking 100 at level one and 1000 at thirty
-  that is short by an order of magnitude at the top, and it is why routes in the corpus say
-  `unkillable`.
+*Closes when:* a player can reach the health line at thirty out of what the world sells, or the
+ladder is re-cut to what the world can actually offer and the change is argued in the commit.
 
-The brief is `.planning/combat-expansion/combat-recut.md`. It also carries the sweep moving
-foe toughness off flat reduction onto typed resistance, and the classification of 175
-entities of which two name a tier.
+## Two synthetic combat worlds are kept in sync by hand
 
-*Closes when:* `combat.dsl` is re-cut with every route in it still walking, and `ladder-check`
-reads both skills within a stated band.
+`src/runtime/foeTier.test.ts`'s `ARENA` and `scripts/lib/foeTier.test.ts`'s `WORLD` are two
+hand-rolled worlds for one subject, and they have already diverged: `straw-man` carries a
+different pool in each, `# stat defense` a different base, `# profile even` exists in one only.
+Every ladder or tier change must be applied to both by hand, and a divergence introduced by
+touching one is indistinguishable from the ones already there.
+
+The suite is supposed to stand in `src/content/fixture/`. Found by audit rather than by a
+failure, and deferred because it was not known whether any divergence is load-bearing for a
+specific assertion — that is the thing to measure first.
+
+*Closes when:* one world serves both, or the divergences are named as deliberate in the file
+that keeps them.
 
 ## The kit the audit dresses is chosen for one stat, so the dps row understates the world
 
