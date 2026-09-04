@@ -161,27 +161,45 @@ This must not run at the same time as the passive rename below, since both write
 says so, and `npm run oracle -- --at content` reports no passive granting against an
 unladdered stat.
 
-## A route proves reachability, and fifteen of them still assert survival
+## Fifteen routes assert survival and fourteen of them cannot fail
 
 Ruled that a route asks whether a path is walkable and nothing else; whether the player lives
 through it is the balance system's to answer. `unkillable` was already in the grammar, so this
-was a doctrine change rather than a build, and the routes that died when the anchor moved carry
-it; `grep -c '^unkillable$' content/*.dsl` says which and how many.
+was a doctrine change rather than a build.
 
-Fifteen routes still assert `not core.fainted`, and those are engine tests — *does damage
-apply* — standing in the shipped world where a contributor editing content cannot run them.
-They belong in `src/content/fixture/` or in a `.test.ts`. Three more assert an absolute pool
-value (`resource.core.health = 11`), which `WALKED_FIELDS` already forbids an `expect:` sheet
-and does not forbid an `assert:`.
+**Measured 2026-09-04, and it changes what closing this means.** `unkillable` floors every pool
+so nothing empties, so `# event death` never fires and `core.fainted` is never set — and
+**fourteen of the fifteen `assert: not core.fainted` lines sit under an `unkillable` in their
+own route.** They cannot fail here, in `src/content/fixture/`, or in a `.test.ts`. Moving them
+somewhere better would close this line on fourteen assertions that never had teeth. The worst
+is `combat-lessons`'s *the iron shield turns a highwayman's fire*, whose only survival claim is
+the one the switch guarantees; its real proof is the two `fire-resistance` lines above it.
 
-**Ruled that it stays unforbidden and this is discipline rather than a gate.** A filter over
-`assert:` refuses all 102 `has` asserts along with the three worth refusing, because
-`inventory` is not a walked field and no predicate tells a quest item from a drop. The signal
-is cheaper than the gate: **if a balance change reddens the suite, that is the tell that one
-of these got written.**
+The exception is `combat.a-feral-rat-picks-the-fight-itself`, which is not under `unkillable` —
+and whose *other* assertion is `resource.core.health < 31.31` against a player whose max-health
+is 30. That is above the ceiling, so it holds before the rat has swung. The route is named for
+the rat opening the fight and nothing in it checks that.
 
-*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value —
-the fifteen moved to `src/content/fixture/` or to a `.test.ts`, where an engine test belongs.
+So the answer is **deletion, not relocation**, and the three absolute-pool asserts go with them.
+Where survival is genuinely the question, `simulate-activity` is the tool and a route is not.
+
+*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value, and
+`a-feral-rat-picks-the-fight-itself` either checks what its name promises or is deleted.
+
+## Five resistance caps are one fact in five bodies
+
+`physical/fire/cold/lightning/chaos-resistance-cap` in `combat.dsl` are byte-identical —
+`base: 75`, `group: core.combat`, `hidden if: always`, `at most: 90` — and nothing anywhere
+moves one without the others. Move the world's cap to 80 and miss one and fire stops at 75
+while everything else stops at 80, with no test, no remark and no round-trip failure.
+
+`at most: <stat>` already reads another stat off the same carrier and one shared cap makes no
+ring, so this needs no engine change: one `# stat resistance-cap`, and every `<type>-resistance`
+says `at most: resistance-cap`. Whether the per-type split is deliberate headroom for a future
+item is the author's call, and that is the only reason it is a line rather than a commit.
+
+*Closes when:* one stat says where resistances stop, or the five are named as deliberately
+independent in the commit that keeps them.
 
 ## The passive ids were not renamed, and were ruled to be
 

@@ -7,6 +7,18 @@ cooking three. **A line is deleted the day it closes.**
 
 ---
 
+## Dusk is two facts in two places, and a third water would make it three
+
+`fishing.dsl` writes `wait for dusk` twice, with identical `hidden if:`, `time: 20` and
+`inflict: the-rise for 3m`. How long dusk takes and how long the rise lasts are one fact each,
+written once per water.
+
+Found beside a worse one now fixed: ten waters each wrote out which rod and bait a cast needs,
+and the tenth had drifted so a player with an upgraded rod could not fish the blowfish hole at
+all. That gate now lives on `# action cast`. This is the same shape, smaller.
+
+*Closes when:* one action holds the wait and the rise, and each water says only where it is.
+
 ## `take:` of an item held several times over should put up a choose-item modal
 
 Ruled 2026-09-04, and none of the three answers that were on the table. `take: 1 <item>` where
