@@ -177,7 +177,11 @@ export function foldStat({ base, parts }: StatBreakdown): Range {
 }
 
 export function statRange(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): Range {
-  return foldStat(statBreakdown(statId, state, registry, actorId));
+  const folded = foldStat(statBreakdown(statId, state, registry, actorId));
+  const cap = registry.stats.get(statId)?.atMost;
+  if (cap === undefined) return folded;
+  const ceiling = typeof cap === 'number' ? cap : statValue(cap, state, registry, actorId);
+  return { min: Math.min(folded.min, ceiling), max: Math.min(folded.max, ceiling) };
 }
 
 export function statChanged(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): boolean {

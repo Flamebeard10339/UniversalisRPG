@@ -6,6 +6,44 @@
   ],
   "patterns": [
     {
+      "name": "meta.section.damage-type.dsl",
+      "begin": "^(#)[ \\t]+(damage-type)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "meta.section.stat.dsl",
       "begin": "^(#)[ \\t]+(stat)\\b[ \\t]*(.*)$",
       "beginCaptures": {
@@ -28,7 +66,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|group|title|base)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|converts|at[ \\t]+most|resists|deals|group|title|base)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"

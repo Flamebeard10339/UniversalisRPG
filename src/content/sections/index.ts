@@ -7,6 +7,7 @@ import { Ids, Maps, NAMES_THE_SECTION, PrintContext, Section } from './define';
 
 import { action, type ActionTextOwner } from './action';
 import { clusterJewel } from './clusterJewel';
+import { damageType } from './damageType';
 import { dialogue } from './dialogue';
 import { droptable } from './droptable';
 import { entity } from './entity';
@@ -36,7 +37,7 @@ import { test } from './test';
 import { variable } from './variable';
 
 const declared = () =>
-  [stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
+  [damageType, stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 

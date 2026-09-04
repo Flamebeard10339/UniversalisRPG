@@ -149,3 +149,56 @@ load: hurt-in-town
 use: entity.fixture-combat.bench.sit
 wait: 30
 assert: resource.health > 12
+
+# damage-type fire
+
+# stat fire-damage
+deals: fire
+
+# stat fire-resistance
+resists: fire
+at most: max-fire-resistance
+
+# stat max-fire-resistance
+base: 75
+at most: 90
+hidden if: always
+
+# item fireproof
+title: Fireproof
+examine: A coat of clay, still damp.
++75 fire-resistance, 10m
+
+# entity ember
+title: The Ember
+examine: A coal the size of a dog, and it is looking at you.
+faction: vermin
+stats: attack 0, fire-damage 40, defense 0, max-health 1000, attack-rate 60, accuracy 100000, evasion 0
+uses: core.melee-combat
+
+# entity brazier
+title: The Brazier
+examine: Clay in a bucket beside a fire.
+faction: world
+daub with clay:
+  instant
+  inflict: fireproof
+
+# location fixture-town.loft
++entities: ember, brazier
+
+# save in-the-loft
+{"version":13,"location":"fixture-town.loft"}
+
+# test a-dealt-type-lands-and-a-resistance-takes-its-share
+load: in-the-loft
+unkillable
+use: core.melee-combat on ember
+wait: 2
+assert: resource.health < 3
+load: in-the-loft
+unkillable
+use: entity.fixture-combat.brazier.daub-with-clay
+use: core.melee-combat on ember
+wait: 2
+assert: resource.health > 5

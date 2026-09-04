@@ -135,6 +135,16 @@ function lopsided(registry: Registry): Remark[] {
   });
 }
 
+function undealt(registry: Registry): Remark[] {
+  const dealt = new Set([...registry.stats.values()].flatMap((each) => (each.deals === undefined ? [] : [each.deals])));
+  return [...registry.stats.values()].flatMap((each) => {
+    const read = each.resists ?? each.converts?.from;
+    if (read === undefined || dealt.has(read)) return [];
+    const role = each.resists !== undefined ? `resists ${read}` : `converts ${read}`;
+    return [{ where: `# stat ${each.id}`, says: `${role}, and no stat anywhere deals it, so nothing this reads can ever land. Declare a stat that \`deals: ${read}\`, or take the role off.` }];
+  });
+}
+
 type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
 const RULES: readonly Rule[] = [
@@ -146,6 +156,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => stale(registry),
   (_sources, registry) => rotted(registry),
   (_sources, registry) => lopsided(registry),
+  (_sources, registry) => undealt(registry),
   (sources) => unpacked(sources),
   (sources) => rootless(sources),
   unread,

@@ -12,23 +12,6 @@ whatever mix the speedruns find. **A line is deleted the day it closes.**
 
 ---
 
-## Damage has one channel and nothing resists it
-
-`damage:` on an action is one contest, `us.attack vs them.defense`, and no stat takes a share
-off what lands. Rage, thorns, a stacking buff and poison as a regeneration debuff are all
-expressible today and `content/combat-expansion.dsl` writes each; typed damage and
-resistances are not. The shape ruled: `# damage-type <id>` declares a type, a `# stat`
-declares one role in a swing — `deals: <type>`, `resists: <type>`, or
-`converts: <type> to <type>` — and `at most: <float> | <stat>` caps any stat, so 75 and 90
-are two stats and no number in the engine. Untyped damage is the absence of a type and stays
-on the action's own line. Conversions and caps form a graph read in one pass in its own
-order, and a cycle anywhere in it is refused at load rather than iterated.
-
-*Closes when:* `a-dealt-type-lands-and-a-resistance-takes-its-share` passes,
-`a-resistance-reads-no-higher-than-the-stat-that-caps-it` passes,
-`a-conversion-moves-damage-between-types-before-it-is-resisted` passes,
-`a-conversion-cycle-is-refused-at-load` passes and `a-cap-cycle-is-refused-at-load` passes.
-
 ## A faint is a relocate, and nothing in the world can hold a player still
 
 The player's `on death:` in `content/tulsa.dsl` restores the pool and relocates, and there is

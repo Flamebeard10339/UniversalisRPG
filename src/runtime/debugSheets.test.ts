@@ -106,6 +106,9 @@ holds:
 # station probe-station
 DEBUG
 
+# damage-type probe-fire
+DEBUG
+
 # recipe probe-recipe
 DEBUG
 in: probe-item

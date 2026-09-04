@@ -21,6 +21,8 @@ import { registrySlots, validateItemSlots, validateSectionReferences, validateTe
 import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { unpriceableStock } from './sections/shop';
+import { statRing } from './sections/stat';
+import { firstCycle } from './cycle';
 import { actionAddresses, carriedIds, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { validateTuningVariable } from './tuningVariables';
@@ -414,29 +416,7 @@ function dropTableCycle(registry: Registry): string[] | null {
     collect(table.results, targets);
     rolls.set(id, targets);
   }
-
-  const done = new Set<string>();
-  const path: string[] = [];
-  const onPath = new Set<string>();
-  const walk = (id: string): string[] | null => {
-    if (onPath.has(id)) return [...path.slice(path.indexOf(id)), id];
-    if (done.has(id)) return null;
-    path.push(id);
-    onPath.add(id);
-    for (const target of rolls.get(id) ?? []) {
-      const cycle = walk(target);
-      if (cycle) return cycle;
-    }
-    path.pop();
-    onPath.delete(id);
-    done.add(id);
-    return null;
-  };
-  for (const id of rolls.keys()) {
-    const cycle = walk(id);
-    if (cycle) return cycle;
-  }
-  return null;
+  return firstCycle(rolls.keys(), (id) => rolls.get(id) ?? []);
 }
 
 function compileFactionBits(registry: Registry): void {
@@ -631,6 +611,14 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   if (cycle) {
     const module = sectionOwner(owners, 'droptable', cycle[0]);
     const error = new DslError(`# droptable ${cycle[0]} rolls itself: ${cycle.join(' -> ')}`);
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
+
+  const ring = statRing(registry.stats);
+  if (ring) {
+    const module = sectionOwner(owners, 'stat', ring.stats[0]!);
+    const error = new DslError(ring.says);
     if (!module) throw error;
     return { module, stage: 'validate', error };
   }
