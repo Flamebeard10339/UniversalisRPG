@@ -3,6 +3,7 @@ import { loadModule } from '../content/load';
 import type { Registry } from '../content/registry';
 import { midpoint } from '../grammar/range';
 import { fightOf, ladderedFor, readingAt, referencePlayer, solvedStatsOf, type Fighter, type LadderedStats } from './foeTier';
+import { abilityAtLevelIn } from './pace';
 import { statValue } from './stats';
 import { minDamage } from './tuning';
 
@@ -177,11 +178,13 @@ describe('three tags cut a body, and reading it back finds the tier they were cu
   it.each(cut)('cuts $tierId / $profileId at level $level in the shape its profile names, on every side the profile wrote', ({ tierId, profileId, level }) => {
     const fighter = fighterFor(shaped(tierId, profileId, level));
     const profile = fighter.profile!;
-    const asMultiple = (statId: string): number => statValue(statId, stood, registry, fighter.entity.id) / statValue(statId, stood, registry, 'player');
-    expect(asMultiple(fighter.fight.accuracy.ours)).toBeCloseTo(profile.accuracy, 6);
-    expect(asMultiple(fighter.fight.accuracy.theirs)).toBeCloseTo(profile.evasion, 6);
-    if (profile.rate !== undefined) expect(asMultiple(fighter.fight.rate)).toBeCloseTo(profile.rate, 6);
-    if (profile.reduction !== undefined) expect(asMultiple(fighter.fight.damage.theirs)).toBeCloseTo(profile.reduction, 6);
+    const theirs = (statId: string): number => statValue(statId, stood, registry, fighter.entity.id);
+    const ours = (statId: string): number => statValue(statId, stood, registry, 'player');
+    const dealt = abilityAtLevelIn(registry, level, laddered(fighter).dealt);
+    expect(theirs(fighter.fight.accuracy.ours) / ours(fighter.fight.accuracy.ours)).toBeCloseTo(profile.accuracy, 6);
+    expect(theirs(fighter.fight.accuracy.theirs) / ours(fighter.fight.accuracy.ours), 'evasion is read against the accuracy it is contested with, not against the player evasion it shares a name with').toBeCloseTo(profile.evasion, 6);
+    if (profile.rate !== undefined) expect(theirs(fighter.fight.rate) / ours(fighter.fight.rate)).toBeCloseTo(profile.rate, 6);
+    if (profile.reduction !== undefined) expect(theirs(fighter.fight.damage.theirs) / dealt, 'reduction is read against the damage it takes its cut of').toBeCloseTo(profile.reduction, 6);
   });
 
   it('leaves a body that writes its own stat alone, and solves only what it left unwritten', () => {

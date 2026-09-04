@@ -69,7 +69,7 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     why: 'a body the tier audit is reading, standing beside the fight it is read through and the tier, profile and level it names. `npm run ladder-check` is the only thing that holds one, its every field is a section the registry already declares, and nothing it carries is ever drawn to a player',
   },
   {
-    type: 'src/runtime/foeTier.ts#LadderedStats',
+    type: 'src/runtime/foeSolve.ts#LadderedStats',
     why: 'which stat of the fight the player climbs a ladder in and which measures the pool it empties: two machine names the audit reads off the world and puts back into it',
   },
   {

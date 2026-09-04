@@ -39,3 +39,7 @@ const DEFAULT_MAP_GRID = 140;
 export function mapGrid(registry: Registry): number {
   return Math.max(1, registry.variables.get(MAP_GRID)?.value ?? DEFAULT_MAP_GRID);
 }
+
+export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
+  return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
+}

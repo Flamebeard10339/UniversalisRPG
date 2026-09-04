@@ -14,15 +14,13 @@ import { skillLevel } from './skills';
 import { skillTags } from '../content/sections/skill';
 import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, parseOwnerRef, PLAYER } from './state';
-import { solvedStatsOf } from './foeTier';
-import { contestSpread, defaultActionDuration, minDamage } from './tuning';
+import { solvedStatsOf } from './foeSolve';
+import { defaultActionDuration, hitChance, minDamage } from './tuning';
+
+export { hitChance };
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
 import { HookCarrier } from '../grammar/hook';
-
-export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
-  return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
-}
 
 interface StatFold {
   added: Range;

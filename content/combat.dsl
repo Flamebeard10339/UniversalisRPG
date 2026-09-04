@@ -586,7 +586,7 @@ on death:
 title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
 tier: mob
-profile: skirmisher
+profile: brute
 level: 4
 uses: core.melee-combat
 faction: world
