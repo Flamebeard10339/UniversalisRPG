@@ -36,11 +36,14 @@ every blow it lands, the room behind the hive reopens rather than resetting) sta
 
 ## Balance
 
-The queen and the wasp were re-cut today onto typed damage along with everything in
-`combat.dsl`; this fight is the first boss a player meets and has to be walkable by somebody
-who has fought the sewer and nothing else. Stand a save at the hive mouth with what such a
-player wears and read `npm run simulate-activity -- <save> --world <your corpus> --at <the
-arena room>` before and after any number you move; say in the report what it read.
+This fight is the first boss a player meets and has to be walkable by somebody who has fought
+the sewer and nothing else. That is a `tier:` and a `level:` — the level being the rung such a
+player actually stands on, which is the whole of what makes the fight fair. The engine cuts
+every stat from there.
+
+`npm run ladder-check -- --world <your corpus>` says whether the queen and the wasp read as the
+tags they name. **Do not run `simulate-activity` and do not move numbers**; if the fight reads
+wrong the tier or the level is wrong, not a stat.
 
 ## Done means
 

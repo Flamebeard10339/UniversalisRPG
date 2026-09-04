@@ -56,20 +56,26 @@ the level-21 rung while paying 1.8× the curve in attack experience for the twel
 lasts. Rooms that stop short pay a fraction of the curve over the window and healthily above
 it while they run.
 
-**Those room figures were read before the damage ladder was corrected on the afternoon of
-2026-09-04 and the shape of them survives the correction, but the numbers do not.** On the
-corrected line the muster reads 0.43× attack and 0.51× health over 880 seconds where it read
-1.8× and 0.13× over 700. Re-read any room you lean on rather than taking a figure from here.
+**Every room figure in this brief is stale and the shape of them is all that survives.** The
+ladders moved twice since they were read: first the damage line was corrected, then on
+2026-09-04 the ladders moved into the world as `# ladder` sections and grew a second axis, so
+toughness now runs 100 at level one to 1000 at thirty on an added line and an increased one
+multiplied together. **Re-read every room you lean on. Take no figure from this brief.**
+
+This is also the lane that will feel the health gap first: the world hands a player 39 health
+at level one and 88 at thirty against a ladder asking 100 and 1000, so a fighter dies more
+than the curve assumes. **That is a finding, not something to walk around**: say where a route
+died and at what rung. What deaths cost a floor is already covered below.
 
 So a floor route that stands still in one room will stall, and **the interesting floor is the
 one that moves**: a circuit of rooms walked in an order that keeps the player fighting, with
 the walk between them costing what it costs. Write that circuit and the minutes it takes.
 
-Watch whether a fighter's two skills climb together. On the old line the muster paid 1.8×
-attack against 0.13× health, so the arms were fourteen-fold apart; correcting the ladder
-brought them to 0.43× and 0.51×, which is close enough that one circuit may serve both. If
-you find a room where they part again, a floor to level 30 in *both* may need different rooms
-for each — say which if so.
+Watch whether a fighter's two skills climb together. They were once fourteen-fold apart and
+the correction brought them close enough that one circuit might serve both — but that was read
+on a ladder that has since moved twice, so measure it rather than believing it. If you find a
+room where they part, a floor to level 30 in *both* may need different rooms for each; say
+which if so.
 
 ## The facts you need, so you do not spend the run finding them
 
@@ -93,9 +99,9 @@ for each — say which if so.
 
 ## What the curve allows, for your report
 
-`rateAtLevel` and `abilityAtLevel` in `scripts/lib/pace.ts` are the declared curve and ladder,
-and `npm run ladder-check` audits the world against them — but do not read that file and do
-not copy a number out of it into your module. Take what the curve allows at each level off
+The curve and the ladders are declared in the world as `# ladder` sections, which
+`npm run oracle -- ladder` prints and `npm run ladder-check` audits against — but do not copy
+a number out of either into your module. Take what the curve allows at each level off
 `npm run floors` on the shipped floors, whose output prints the allowance beside the minutes,
 and take your own routes' minutes off
 `npm run probe -- <your corpus> --record <test id>`, where `time` is in milliseconds.

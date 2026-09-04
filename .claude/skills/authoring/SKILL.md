@@ -101,6 +101,25 @@ that a tier says should pay a certain amount per hour reaches that only if its p
 respawn let a player kill fast enough, so how many stand there and how quickly they come back
 is authoring rather than arithmetic.
 
+**A passive is written as a share of a level, not as an amount.** The same rule on the other
+side of the fight: `grants:` takes a block of multiples of what one level is worth on the
+ladder the stat climbs, and the engine writes the number.
+
+    # passive immovable
+    juggernaut, life
+    grants:
+      +1x added core.max-health
+
+`+1x added` is worth exactly what a level adds; `+2x increased` is worth twice what a level
+increases, and lands as a percent because that is the half it names. A trade-off is two lines,
+one of them negative, and a passive granting two stats is two lines — there is nothing else to
+learn, because the unit is a share rather than a number. `npm run oracle -- ladder` prints
+what the world's ladders say, and `rounds to:` on a `# stat` keeps the results readable.
+
+**A grant against a stat that climbs no `# ladder` mints nothing at all**, and the oracle says
+so. Where that happens the stat wants a ladder, or the passive keeps an ordinary modifier —
+both are fine, and a passive may carry hand-cut modifiers and `grants:` at once.
+
 **A repeatable mark has to run out**, or a speed stat scales without limit. Combat's does,
 because its enemies die and come back on a timer. Give a non-combat mark the same floor with
 `stands: <guise> for <duration>` — ninety seconds is the house number — and the room empties,

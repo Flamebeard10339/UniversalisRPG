@@ -75,11 +75,16 @@ its tier, and name the shipped weapons it now sits under. Do not match them.
 
 ## Balance
 
-Every fight this quest stages must be measured rather than guessed:
-`npm run simulate-activity -- <save> --world <your corpus> --at <room> --ladder <stat>=<level>`
-stands a character on a declared rung and reads what the room actually pays and costs. The
-gate fight should be lost at the middle of the band and won at the top of it; show both in
-the report. Nothing here asserts a number in a `# test`.
+Every fight this quest stages names a `tier:`, a `profile:` and a `level:`, and the engine cuts
+every stat under them. That the gate fight is lost at the middle of the band and won at the top
+of it is a choice of tier and of the level it is met at — not a number to solve for. Say in the
+report which tier you gave it and why.
+
+`npm run ladder-check -- --world <your corpus>` says whether a body reads as the tags it names.
+One that does not is mis-tagged or met at the wrong level, and both are one word to change.
+
+**Do not run `simulate-activity` and do not tune anything.** The tags are the balance. Nothing
+here asserts a number in a `# test`.
 
 One measured thing worth having: on the shipped corpus every combat room but the pasture
 stops short of the hour in every seed — a faint ends the offer at the low rungs and the room

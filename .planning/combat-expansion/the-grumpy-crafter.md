@@ -68,9 +68,13 @@ report: what the best and worst distribution pay.
 
 A level-one character has to be able to finish this, which bounds what he may ask for: three
 jewels and three bases at prices the armoury counter and the world's first drops can actually
-meet, and no fight anywhere in it. Stand a save at the point a player leaves the tutorial and
-read what the counter sells with `npm run simulate-activity -- <save> --world <your corpus>`
-and `npm run ladder-check` against that world.
+meet, and no fight anywhere in it. That bound is about what is *reachable* — what a shop stocks
+and what a first drop gives — rather than about numbers to tune, so read it off the shop and
+the droptables and say in the report what a level-one player can actually get.
+
+`npm run ladder-check -- --world <your corpus>` reads the kit against the ladder. **Do not run
+`simulate-activity` and do not tune.** A passive is written as a share of a level with
+`grants:`, and what a jewel is worth follows from that.
 
 `ladder-check` on the shipped corpus, read 2026-09-04 **after the damage ladder was corrected
 that afternoon**, says the two halves of the kit are wrong in opposite directions.

@@ -40,11 +40,14 @@ even at the end.
 
 ## Balance
 
-A player reaches this at the top of the ladder, around level thirty in attack and health,
-in the top band's gear and with whatever Oolga sells. Cut the Plague against the ladder at
-thirty, read with `npm run ladder-check -- --world <your corpus>`, and read the fight with
-`npm run simulate-activity -- <save> --ladder combat.attack=30,combat.health=30 --world <your corpus> --at <the room>`
-before and after any number you move. A boss pays once; pay the landing as a lump.
+A player reaches this at the top of the ladder, around level thirty in attack and health, in
+the top band's gear and with whatever Oolga sells. So the Plague is a `boss` tier met at
+`level: 30`, and the engine cuts it from there — there is no number to solve. Choose its
+`profile:` for the shape the fight should have and say in the report why that shape.
+
+`npm run ladder-check -- --world <your corpus>` says whether it reads as what it names. **Do
+not run `simulate-activity` and do not move numbers.** A boss pays once; pay the landing as a
+lump.
 
 ## Done means
 
