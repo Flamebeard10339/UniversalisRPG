@@ -46,7 +46,8 @@ const usage = [
   '',
   'The run works on a copy of content/ in a directory of its own and writes nothing in this',
   'checkout, so it does not count as a second writer in it. It prints where that directory is,',
-  'what the run cost, and every reach it made for the engine.',
+  'what the run cost, and every reach it made for the engine. Every run also appends one line to',
+  '.authorbot/runs.jsonl: what was asked of it, what it took, and how many lines of DSL it moved.',
 ].join('\n');
 
 export interface Asked {
@@ -252,6 +253,75 @@ export function summaryLines(reaches: readonly Reach[], cost: Cost, workdir: str
     '',
     `what it wrote, and the run's own account of it, are under ${workdir}`,
   ];
+}
+
+export const RUN_LOG = '.authorbot/runs.jsonl';
+
+export interface RunRecord {
+  at: string;
+  brief: string;
+  target: string;
+  model: string;
+  open: boolean;
+  askedTurns: number;
+  askedMinutes: number | null;
+  briefLines: number;
+  replies: number;
+  calls: number;
+  reaches: number;
+  seconds: number;
+  usage?: Record<string, number>;
+  linesBefore: number;
+  linesAfter: number;
+  linesAdded: number;
+  linesRemoved: number;
+}
+
+const linesOf = (text: string): string[] => text.split('\n').filter((line) => line.trim() !== '');
+
+function tally(lines: readonly string[]): Map<string, number> {
+  const held = new Map<string, number>();
+  for (const line of lines) held.set(line, (held.get(line) ?? 0) + 1);
+  return held;
+}
+
+export function movedBetween(before: string, after: string): { added: number; removed: number } {
+  const was = tally(linesOf(before));
+  const now = tally(linesOf(after));
+  let added = 0;
+  let removed = 0;
+  for (const [line, count] of now) added += Math.max(0, count - (was.get(line) ?? 0));
+  for (const [line, count] of was) removed += Math.max(0, count - (now.get(line) ?? 0));
+  return { added, removed };
+}
+
+export function runRecord(asked: Asked, cost: Cost, reaches: readonly Reach[], brief: string, before: string, after: string, at: Date): RunRecord {
+  const moved = movedBetween(before, after);
+  return {
+    at: at.toISOString(),
+    brief: path.basename(asked.brief ?? ''),
+    target: asked.target ?? '',
+    model: asked.model,
+    open: asked.open,
+    askedTurns: asked.turns,
+    askedMinutes: asked.minutes,
+    briefLines: linesOf(brief).length,
+    replies: cost.turns,
+    calls: cost.calls,
+    reaches: reaches.filter((each) => each.decision !== 'allow').length,
+    seconds: Math.round(cost.seconds * 10) / 10,
+    ...(cost.usage === undefined ? {} : { usage: cost.usage }),
+    linesBefore: linesOf(before).length,
+    linesAfter: linesOf(after).length,
+    linesAdded: moved.added,
+    linesRemoved: moved.removed,
+  };
+}
+
+export function logRun(root: string, record: RunRecord): void {
+  const at = path.join(root, RUN_LOG);
+  mkdirSync(path.dirname(at), { recursive: true });
+  appendFileSync(at, `${JSON.stringify(record)}\n`);
 }
 
 const WORKDIR_PREFIX = 'universalis-authorbot-';
