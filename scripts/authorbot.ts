@@ -134,11 +134,13 @@ export type Verdict = { reaching: false } | { reaching: true; why: 'engine' } | 
 
 const BARE_CORPUS_ARG = /(?:^|[\s"'=])content(?:[\s"'/\\]|$)/;
 
-const namesCheckoutCorpus = (command: string, repo: string): boolean => {
-  const corpus = path.resolve(repo, CORPUS_DIR);
-  const spelled = [corpus, corpus.replace(/\\/g, '/')].map((each) => each.toLowerCase());
+const spellings = (of: string): string[] => [of, of.replace(/\\/g, '/')].map((each) => each.toLowerCase());
+
+const namesCheckoutCorpus = (command: string, repo: string, workdir: string): boolean => {
   const lowered = command.toLowerCase();
-  return spelled.some((each) => lowered.includes(each)) || BARE_CORPUS_ARG.test(command);
+  if (spellings(path.resolve(repo, CORPUS_DIR)).some((each) => lowered.includes(each))) return true;
+  if (spellings(path.resolve(workdir)).some((each) => lowered.includes(each))) return false;
+  return BARE_CORPUS_ARG.test(command);
 };
 
 export function verdictOf(tool: string, input: Record<string, unknown>, repo: string, workdir: string): Verdict {
@@ -149,7 +151,7 @@ export function verdictOf(tool: string, input: Record<string, unknown>, repo: st
   }
   if (tool === 'Bash') {
     const command = String(input.command ?? '');
-    if (namesCheckoutCorpus(command, repo)) return { reaching: true, why: 'checkout' };
+    if (namesCheckoutCorpus(command, repo, workdir)) return { reaching: true, why: 'checkout' };
     return ENGINE_TEXT.test(command) ? { reaching: true, why: 'engine' } : { reaching: false };
   }
   const named = [input.file_path, input.path, input.pattern].filter((each): each is string => typeof each === 'string');

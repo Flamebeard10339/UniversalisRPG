@@ -185,6 +185,25 @@ describe('a call the run makes', () => {
     expect(refusalFor('checkout', '/work/content/x.dsl')).toContain('/work/content');
   });
 
+  it('lets a command aimed at the run own corpus name the word content elsewhere in itself', () => {
+    const own = path.join(WORK, 'content').replace(/\\/g, '/');
+    const asked = `grep -rn "^# dialogue " "${own}"/*.dsl | grep -v "content/tulsa.dsl"`;
+
+    expect(reaching('Bash', { command: asked }), 'the run grepped its own copy and was refused for a word in an exclude pattern').toEqual({ reaching: false });
+  });
+
+  it('still refuses a bare content argument from a command that names no corpus of its own', () => {
+    expect(reaching('Bash', { command: 'cat content/tulsa.dsl' })).toEqual({ reaching: true, why: 'checkout' });
+    expect(reaching('Bash', { command: 'grep -rn "x" content/' })).toEqual({ reaching: true, why: 'checkout' });
+  });
+
+  it('refuses the checkout corpus spelled in full even where the run own corpus is named beside it', () => {
+    const own = path.join(WORK, 'content').replace(/\\/g, '/');
+    const both = `diff "${own}/tulsa.dsl" "${path.join(REPO, 'content').replace(/\\/g, '/')}/tulsa.dsl"`;
+
+    expect(reaching('Bash', { command: both })).toEqual({ reaching: true, why: 'checkout' });
+  });
+
   it('is told what to do instead, since a refusal that only says no teaches the run nothing', () => {
     expect(refusalFor('engine', '/work/content/x.dsl')).toContain('npm run oracle');
     expect(refusalFor('elsewhere', '/work/content/x.dsl')).toContain('/work/content/x.dsl');
