@@ -3,7 +3,7 @@ version: 1.0.0
 pack: skills
 dependencies:
   core
-  combat
+  cooking
 
 # stat crafting
 title: Crafting
@@ -75,29 +75,44 @@ value: 90
 item-level: 4-8
 armour, +2 core.defense, +4 core.max-health
 
+# item cowhide
+title: Cowhide
+examine: A whole hide, folded hair-in. The tanners take these by the cart.
+value: 12
+
+# item wolf-pelt
+title: Wolf Pelt
+examine: Grey through to the roots, and it still smells of the pines.
+value: 22
+
+# item feather
+title: Feather
+examine: One brown feather. Nobody has ever wanted just one.
+value: 1
+
 # recipe leather
-in: 1 combat.cowhide
+in: 1 crafting.cowhide
 out: 1 leather
 skill: crafting 18
 rate: crafting
 say: You scrape the hide down, work it soft, and cut what is left square.
 
 # recipe sinew
-in: 1 combat.raw-beef
+in: 1 cooking.raw-beef
 out: 2 sinew
 skill: crafting 10
 rate: crafting
 say: You strip the sinew out along the grain of the meat and hang it to dry.
 
 # recipe wolfskin
-in: 1 combat.wolf-pelt
+in: 1 crafting.wolf-pelt
 out: 1 wolfskin
 skill: crafting 30
 rate: crafting
 say: The guard hairs stay on, which means the whole thing has to be cured twice.
 
 # recipe quill
-in: 3 combat.feather
+in: 3 crafting.feather
 out: 1 quill
 skill: crafting 4
 rate: crafting

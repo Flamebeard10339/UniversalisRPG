@@ -3,7 +3,7 @@ version: 1.2.0
 pack: skills
 dependencies:
   core
-  combat
+  ? combat
   ? tulsa
 
 # stat thieving-ability

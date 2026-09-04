@@ -6,6 +6,7 @@ dependencies:
   first-steps
   fishing
   tulsa
+  combat
 
 # test bare-floor-to-14
 run: first-steps.apology-route-full
@@ -100,7 +101,7 @@ travel: tulsa.swamp-edge
 travel: tulsa.swamp-mire
 equip: fishing.bread-paste
 until level.fishing >= 25:
-  use: core.melee-combat on tulsa.bog-lurker until done
+  use: core.melee-combat on combat.bog-lurker until done
   until level.fishing >= 25 or not has fishing.bread-paste:
     use: entity.fishing.tench-hole.cast until done
   travel: tulsa.swamp-edge

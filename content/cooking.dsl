@@ -3,7 +3,6 @@ version: 1.0.0
 pack: skills
 dependencies:
   core
-  combat
   ~ tulsa
 
 # stat cooking
@@ -74,26 +73,6 @@ value: 300
 item-level: 26-32
 kitchen, +14 cooking
 
-# item cooked-chicken
-title: Cooked Chicken
-examine: Turned on the spit until the skin went the colour it is supposed to go.
-value: 12
-food, +6 core.regeneration, 90s
-eat:
-  instant
-  take: 1 cooked-chicken
-  say: You take it apart with your hands and there is nothing left of it a minute later.
-
-# item cooked-beef
-title: Cooked Beef
-examine: A cut of it, seared outside and barely warm in the middle.
-value: 22
-food, +9 core.regeneration, 120s
-eat:
-  instant
-  take: 1 cooked-beef
-  say: You eat the beef standing up, which is a waste of good beef.
-
 # recipe dough
 in: jug-of-water, pot-of-flour
 out: dough
@@ -118,26 +97,6 @@ accuracy: cooking
 skill: cooking 2
 rate: core.cooking-rate
 say: You grill the herring through, which is the only way it is worth eating.
-
-# recipe cooked-chicken
-station: stove
-in: combat.raw-chicken
-out: cooked-chicken
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 3
-rate: core.cooking-rate
-say: You turn it until the fat stops running clear.
-
-# recipe cooked-beef
-station: stove
-in: combat.raw-beef
-out: cooked-beef
-burnt: burnt-food
-accuracy: cooking
-skill: cooking 5
-rate: core.cooking-rate
-say: You sear it hard on both sides and leave the middle alone.
 
 # recipe roasted-chestnut
 station: oven
@@ -200,6 +159,16 @@ title: A Steady Hand
 examine: A wooden spoon burnt black at one edge and not the other, which took some doing.
 cluster-jewel: a-steady-hand
 
+# item raw-chicken
+title: Raw Chicken
+examine: A plucked bird, still warm.
+value: 4
+
+# item raw-beef
+title: Raw Beef
+examine: A slab of it, and more than one meal's worth.
+value: 8
+
 # shop cooks-shelf
 coin: coin
 stocks:
@@ -224,25 +193,6 @@ adjacent:
   tulsa.aggies-house
 entities:
   cooks-shelf
-
-# save at-aggies-stove-with-a-chicken
-{"version":13,"location":"tulsa.aggies-house","inventory":{"combat.raw-chicken":2}}
-
-# test a-cook-turns-raw-chicken-into-supper
-succeed-checks
-load: at-aggies-stove-with-a-chicken
-craft: cooked-chicken
-assert: has cooked-chicken
-assert: inventory.combat.raw-chicken = 1
-use: item.cooked-chicken.eat
-assert: not has cooked-chicken
-
-# test a-burnt-dish-comes-off-the-stove-not-the-plate
-fail-checks
-load: at-aggies-stove-with-a-chicken
-craft: cooked-chicken
-assert: has burnt-food
-assert: not has cooked-chicken
 
 # save at-aggies-house-flush
 {"version":13,"location":"tulsa.aggies-house","xp":{"cooking.cooking":20000},"inventory":{"core.coin":400}}

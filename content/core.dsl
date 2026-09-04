@@ -161,6 +161,15 @@ accuracy: us.accuracy vs them.evasion
 damage: us.attack vs them.defense
 depletes: them.health
 
+# action faint
+title: Fainted
+time: 5
+on success:
+  relocate: starting-location
+  if setting.hardcore:
+    say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
+    take: everything
+
 # item cooked-shrimp
 examine: A simple meal.
 value: 7
@@ -252,159 +261,6 @@ value: 2
 examine: A red stone the size of a thumbnail. It does not warm in your hand.
 value: 60
 
-# passive hale
-life, +15 max-health
-
-# passive constitution
-life, +20 max-health
-
-# passive tempered-frame
-life, +12% max-health
-
-# passive mending
-life, recovery, +2 regeneration
-
-# passive warded
-armour, +2 defense
-
-# passive plated
-armour, +3 defense
-
-# passive hardened
-armour, +10% defense
-
-# passive whetted
-physical, +2 attack
-
-# passive honed
-physical, +3 attack
-
-# passive brutal
-physical, +8% attack
-
-# passive swift-hands
-speed, +2 attack-rate
-
-# passive flurry
-speed, +3 attack-rate
-
-# passive frenzied
-speed, +10% attack-rate
-
-# passive keen-eye
-precision, +4-8 accuracy
-
-# passive marksman
-precision, +8 accuracy
-
-# passive deadly-precision
-precision, +12% accuracy
-
-# passive quickstep
-evasion, +6-10 evasion
-
-# passive evasive
-evasion, +15% evasion
-
-# cluster-jewel keen-edge
-examine: Six facets, each one sharpened against the last.
-shape: ring
-open-connections: e
-passives: 1 whetted, 2 keen-eye, 3 honed, 4 brutal, 5 swift-hands, 6 whetted
-
-# cluster-jewel stout-heart
-examine: A knot of iron that will not be moved.
-shape: ring
-open-connections: ne, se
-passives: 1 warded, 2 hale, 3 constitution, 5 hale, 6 mending
-
-# cluster-jewel tempered-will
-examine: It does not add. It insists.
-shape: wheel
-open-connections: e, se
-passives: 1 hale, 2 tempered-frame, 3 brutal, 4 hardened, 5 tempered-frame, 6 brutal
-
-# cluster-jewel great-work
-examine: Twelve years of somebody's evenings, and they are not finished.
-shape: double-ring
-open-connections: e, sw
-passives:
-  1 warded
-  2 plated
-  3 constitution
-  4 marksman
-  5 hale
-  6 honed
-  10 flurry
-
-# cluster-jewel causeway
-examine: A road, and nothing on either side of it.
-shape: spindle
-open-connections: e
-passives: 2 hale
-
-# cluster-jewel crossroads
-examine: A junction stone. It offers roads, not shelter.
-shape: point
-open-connections: ne, e, se, sw, nw
-
-# cluster-jewel heartwood-core
-shape: spindle
-open-connections: e, ne
-passives: 1 mending, 2 tempered-frame
-
-# item keen-edge-jewel
-examine: A closed ring of iron, warm to the touch.
-cluster-jewel: keen-edge
-
-# item stout-heart-jewel
-cluster-jewel: stout-heart
-
-# item tempered-will-jewel
-cluster-jewel: tempered-will
-
-# item great-work-jewel
-cluster-jewel: great-work
-
-# item causeway-jewel
-cluster-jewel: causeway
-
-# item crossroads-jewel
-cluster-jewel: crossroads
-
-# item orb-of-vitality
-title: Orb of Vitality
-examine: A dull red bead. It beats, very slowly. Nothing drinks it: an orb is spent on a cluster, and scales what that cluster already gives.
-cluster-effect: +25% max-health
-
-# item orb-of-the-edge
-title: Orb of the Edge
-examine: A sliver of something that was never blunt.
-cluster-effect: +25% attack
-
-# item lesser-orb-of-the-edge
-title: Lesser Orb of the Edge
-examine: The same sliver, ground down by whoever had it first.
-cluster-effect: +10% attack
-
-# item orb-of-the-bulwark
-title: Orb of the Bulwark
-examine: Heavier than the hand expects.
-cluster-effect: +25% defense
-
-# item orb-of-renewal
-title: Orb of Renewal
-examine: Cool, and faintly wet, and it does not dry. Nothing drinks it: an orb is spent on a cluster, and scales what that cluster already gives.
-cluster-effect: +25% regeneration
-
-# item heartwood-blade
-examine: The grain still moves, slowly, when you are not looking.
-slot: mainhand
-value: 30
-weapon, +4 attack
-item-level: 12-18
-origin-cluster: heartwood-core
-
 # item coin
 title: Coin
 examine: A milled coin of Yanodonin, the duke's profile worn nearly flat.
@@ -487,21 +343,6 @@ eat:
 # droptable rat-remains
 give: 1-3 rat-bone
 1 in 4: give: 1 rat-tail
-
-# droptable smiths-cache
-give: 1 heartwood-blade
-give: 1 iron-sword
-give: 1 keen-edge-jewel
-give: 1 stout-heart-jewel
-give: 1 tempered-will-jewel
-give: 1 great-work-jewel
-give: 1 causeway-jewel
-give: 1 crossroads-jewel
-give: 1 orb-of-vitality
-give: 2 orb-of-the-edge
-give: 1 lesser-orb-of-the-edge
-give: 1 orb-of-the-bulwark
-give: 1 orb-of-renewal
 
 # droptable trinket
 one of:

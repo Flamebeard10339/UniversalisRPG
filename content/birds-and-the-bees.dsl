@@ -4,6 +4,7 @@ pack: quests
 dependencies:
   core
   tulsa
+  combat
 
 # quest kelsas-hives
 title: Birds and the Bees

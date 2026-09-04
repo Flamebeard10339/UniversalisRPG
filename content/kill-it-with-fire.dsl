@@ -89,7 +89,7 @@ respawn after: 40s
 on death:
   add: cellar-rats-killed 1
   credit:
-    roll: tulsa.feral-rat-remains
+    roll: combat.feral-rat-remains
 
 # location tulsa.oolga-basement
 +entities: 4 cellar-rat

@@ -12,20 +12,6 @@ whatever mix the speedruns find. **A line is deleted the day it closes.**
 
 ---
 
-## Combat's mechanics live in core and its foes in the town
-
-`content/core.dsl` holds eighteen combat passives, seven jewels, five orbs and the first
-weapons; `content/tulsa.dsl` holds every fighter but four and names combat eighteen times;
-`content/combat-expansion.dsl` is a prototype with a `DEBUG` item and is an optional
-dependency of the town. Thieving and fishing each depend on `? tulsa` and write onto it,
-ruled 2026-09-03 as the pattern for a skill. The seven stats, the health pool and
-`melee-combat` stay in core, because thieving drains health and fishing reads regeneration;
-everything only combat reads moves.
-
-*Closes when:* every passive, jewel, orb, weapon, armour piece and foe that only combat reads
-stands in `content/combat.dsl`, `combat-expansion.dsl` is gone, and
-`npm run probe -- content --off combat` loads with tulsa's routes passing.
-
 ## Combat has no floor, so its tier saves cannot be deleted
 
 `docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets

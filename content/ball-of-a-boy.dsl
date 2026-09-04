@@ -4,6 +4,7 @@ pack: quests
 dependencies:
   core
   tulsa
+  combat
 
 # quest down-the-grate
 title: Ball of a Boy

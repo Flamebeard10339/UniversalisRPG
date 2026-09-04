@@ -3,11 +3,9 @@ version: 1.0.0
 pack: tulsa
 dependencies:
   core
-  combat
   cooking
   smithing
   crafting
-  ? combat-expansion
 
 # flag heard-of-the-back-way
 
@@ -30,21 +28,6 @@ examine: Sunny's own. The label is hand-written and does not say what is in it.
 # item sewer-key
 title: Sewer Key
 examine: A heavy iron key, left on a table by someone who expected to come back for it.
-
-# droptable feral-rat-remains
-give: 1-2 rat-pelt
-1 in 3: give: 1-4 coin
-1 in 90: give: 1 core.lesser-orb-of-the-edge
-
-# droptable ratman-remains
-give: 1 rat-pelt
-give: 3-8 coin
-
-# droptable swamp-pickings
-one of:
-  6x: nothing
-  3x: give: 1 mollusk-venom
-  1x: give: 1-3 coin
 
 # location market-square
 x: 7, y: 0
@@ -104,8 +87,6 @@ title: Proving Ground
 examine: A walled yard behind the armoury, sand raked flat and stained, with the town wall for one of its four sides.
 adjacent:
   forge
-entities:
-  armourers-chest, proving-post, spined-urchin
 
 # location tavern-street
 x: 8, y: 1
@@ -408,7 +389,7 @@ adjacent:
   bee-gate
   hive-mouth
 entities:
-  5 drone-bee, first-hive, second-hive, princess-bee
+  5 drone-bee, first-hive, second-hive
 
 # location hive-mouth
 x: 10, y: 4
@@ -425,8 +406,6 @@ title: The Pasture
 examine: Kelsa's field beyond the hives, cropped short, with a gate at the top of it and cattle who have never once used the gate.
 adjacent:
   bee-gate
-entities:
-  4 combat.cow, 6 combat.chicken
 
 # location tunnel-mouth
 x: 11, y: 5
@@ -444,8 +423,6 @@ adjacent:
   tunnel-mouth
   ratkin-border
   the-muster
-entities:
-  6 feral-rat
 
 # location the-muster
 x: 16, y: 13, z: -1
@@ -453,8 +430,6 @@ title: The Muster
 examine: The tunnel opens into a dug hall with a roof held up by pit props, and there are more of them down here than the town above has soldiers. Nobody is in a hurry. They are waiting for a date.
 adjacent:
   tunnels
-entities:
-  6 ratkin-warrior
 
 # location ratkin-border
 x: 17, y: 11
@@ -472,7 +447,7 @@ examine: Standing water to the knee, a quarter-mile off the coast road. Thistle 
 adjacent:
   swamp-edge
 entities:
-  3 swamp-mollusk, 2 bog-lurker, herb-patch, dumped-crates
+  herb-patch, dumped-crates
 
 # location north-road
 x: 8, y: -5
@@ -481,8 +456,6 @@ examine: Out of the King's Gate and banked either side, with rocks along the top
 adjacent:
   kings-road
   pinewood
-entities:
-  4 combat.highwayman
 
 # location pinewood
 x: 8, y: -6
@@ -490,8 +463,6 @@ title: The Pinewood
 examine: Black pine and no undergrowth at all, which means you can see a long way and so can everything else.
 adjacent:
   north-road
-entities:
-  5 combat.wolf
 
 # location deep-water
 x: 7, y: 5
@@ -525,7 +496,7 @@ adjacent:
   sewer-outfall
   oolga-basement
 entities:
-  6 feral-rat, sewer-signs
+  sewer-signs
 
 # location sewer-outfall
 x: 7, y: 0, z: -1
@@ -535,7 +506,7 @@ adjacent:
   sewer-junction
   sewer-locked-room while barred-door.unlocked
 entities:
-  2 feral-rat, barred-door, outfall-grate
+  barred-door, outfall-grate
 
 # location sewer-locked-room
 x: 10, y: 0, z: -1
@@ -544,7 +515,7 @@ examine: A dry room behind the water, kept by someone. A table, a shelf, and two
 adjacent:
   sewer-outfall
 entities:
-  2 ratman, key-table, sewer-shelf
+  key-table, sewer-shelf
 
 # entity mouse
 title: Mouse
@@ -748,12 +719,6 @@ take the key:
 title: Shelf
 examine: A plank shelf on two spikes driven into the brick, with a lamp, a whetstone, and a flat iron thing at the back of it under a cloth.
 flags: emptied
-look under the cloth:
-  time: 6
-  hidden if: emptied
-  set: emptied
-  give: 1 core.great-work-jewel
-  say: Under the cloth is a disc of iron the size of a saucer, cut through in twelve places and filed at every one of them, and half the filing is fresher than the other half. Whoever kept this room was years into it and had not finished.
 
 # entity anvil
 title: Anvil
@@ -963,9 +928,6 @@ stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 
 uses: core.melee-combat
 faction: world
 respawn after: 45s
-on death:
-  credit:
-    roll: combat.purse
 
 # entity guardsman
 title: Guardsman
@@ -974,10 +936,6 @@ stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion
 uses: core.melee-combat
 faction: world
 respawn after: 70s
-on death:
-  credit:
-    roll: combat.purse
-    1 in 8: give: 1 combat.bronze-helmet
 
 # entity knight
 title: Knight
@@ -986,48 +944,6 @@ stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evas
 uses: core.melee-combat
 faction: world
 respawn after: 100s
-on death:
-  credit:
-    roll: knights-purse
-    1 in 10: give: 1 combat.iron-helmet
-
-# entity feral-rat
-title: Feral Rat
-examine: A rat the size of a cat, hairless in patches and weeping where it is not.
-stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
-uses: core.melee-combat
-faction: world
-aggressive
-respawn after: 40s
-on death:
-  credit:
-    roll: feral-rat-remains
-
-# entity ratman
-title: Ratman
-examine: A man's frame, a rat's head, and the join between them done badly on purpose.
-stats: attack 14, defense 4, max-health 60, attack-rate 20, accuracy 85, evasion 40
-uses: core.melee-combat
-faction: world
-aggressive
-respawn after: 10m
-on death:
-  credit:
-    roll: ratman-remains
-
-# entity ratkin-warrior
-title: Ratkin Warrior
-examine: A head taller than the ones in the sewer and put together properly, in scale somebody cut and fitted rather than found. It watches you the whole way in.
-stats: attack 24, defense 12, max-health 115, attack-rate 14, accuracy 88, evasion 40
-uses: core.melee-combat
-faction: world
-respawn after: 90s
-on death:
-  credit:
-    roll: ratman-remains
-    give: 8-20 core.coin
-    1 in 20: give: 1 combat.iron-dagger
-    1 in 25: give: 1 core.orb-of-renewal
 
 # entity drone-bee
 title: Drone Bee
@@ -1038,67 +954,11 @@ faction: world
 aggressive
 respawn after: 2m
 
-# entity swamp-mollusk
-title: Swamp Mollusk
-examine: A shell the size of a shield, and the foot under it is wet with something you would not touch.
-stats: attack 11, defense 8, max-health 45, attack-rate 10, accuracy 60, evasion 5
-uses: core.melee-combat
-faction: world
-respawn after: 5m
-on death:
-  credit:
-    give: 1 mollusk-venom
-    1 in 10: give: 1 core.orb-of-the-bulwark
-
-# entity bog-lurker
-title: Bog Lurker
-examine: Something long standing very still in water that is not deep enough to hide it.
-stats: attack 16, defense 3, max-health 50, attack-rate 22, accuracy 80, evasion 45
-uses: core.melee-combat
-faction: world
-aggressive
-respawn after: 5m
-on death:
-  credit:
-    roll: swamp-pickings
-    1 in 12: give: 1 core.tempered-will-jewel
-
-# entity armourers-chest
-title: Armourer's Chest
-examine: A long crate, stencilled, and nobody has come for it.
-flags: emptied
-open:
-  instant
-  hidden if: emptied
-  roll: combat-expansion.archetype-cache
-  set: emptied
-  say: Six jewels and a plain blade with room in it for one of them.
-
-# entity proving-post
-title: Proving Post
-examine: A banded post, chest high, and it has taken worse than you.
-stats: max-health 2000, defense 0, evasion 0, accuracy 0
-
-# entity spined-urchin
-title: Spined Urchin
-examine: A knot of black spines around something that has not moved in years.
-stats: max-health 2000, defense 0, evasion 0, accuracy 0
-passives: combat-expansion.retribution
-
-# entity smiths-chest
-DEBUG
-flags: emptied
-open:
-  instant
-  hidden if: emptied
-  roll: smiths-cache
-  set: emptied
-
 # entity player
 title: You
 faction: core.player
 stats: max-health 30, attack 8-12, defense 5, attack-rate 25, accuracy 100, evasion 0
-skills: core.woodcutting, combat.attack, combat.health, cooking.cooking, smithing.smithing, crafting.crafting
+skills: core.woodcutting, cooking.cooking, smithing.smithing, crafting.crafting
 equipment-slots: mainhand, offhand, head, body, legs, gloves, boots
 uses: core.melee-combat
 on death:
@@ -1106,14 +966,7 @@ on death:
   set: core.fainted
   restore: core.health
   shake off: everything
-  if setting.hardcore:
-    say: Somebody went through your pockets while you were down, and took the coat off your back besides. You have nothing.
-    take: everything
-  if market-square.touched:
-    relocate: market-square
-  if not market-square.touched:
-    relocate: starting-location
-  stop
+  perform: core.faint
 
 # entity oolgas-sacks
 title: The Sacks
@@ -1138,19 +991,6 @@ aggressive
 on death:
   set: wurm-defeated
   say: The ground stops moving, and the cellar is quiet in a way it has not been since you came down here.
-
-# entity princess-bee
-title: Princess Bee
-examine: Half again the size of a drone and it does not buzz so much as hum, a note that sits wrong in your teeth.
-stats: attack 10-14, defense 2, max-health 40, attack-rate 28, accuracy 75, evasion 55
-uses: core.melee-combat
-faction: world
-aggressive
-respawn after: 5m
-on death:
-  credit:
-    give: 1 royal-jelly
-    1 in 8: give: 1 core.orb-of-vitality
 
 # recipe sunnys-poison
 station: stove
@@ -1364,24 +1204,8 @@ node over-the-barrel:
 # save a-netful-on-well-lane
 {"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}
 
-# save at-the-forge-with-coin
-{"version":13,"location":"tulsa.forge","inventory":{"core.coin":200,"smithing.hammer":1}}
-
-# save growing-a-heartwood-blade-start
-{"version":13}
-
-# save growing-a-heartwood-blade-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[2,3],"allocatedSlots":["ne","e"],"effects":["core.orb-of-vitality"]},"1,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.06484867143444717,"allocatedPositions":[1,2,3,4,5],"allocatedSlots":[],"effects":["core.orb-of-the-edge","core.lesser-orb-of-the-edge"]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.causeway","entry":"e","roll":0.2666903811041266,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"rng":1145426465}
-
-# save growing-through-the-inventory-screen-end
-{"version":13,"inventory":{"core.stout-heart-jewel":1,"core.tempered-will-jewel":1,"core.great-work-jewel":1,"core.causeway-jewel":1,"core.orb-of-vitality":1,"core.orb-of-the-edge":2,"core.lesser-orb-of-the-edge":1,"core.orb-of-the-bulwark":1,"core.orb-of-renewal":1},"flags":{"tulsa.smiths-chest.emptied":true},"equipped":{"mainhand":"2"},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.heartwood-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":"core.heartwood-core","entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"core.crossroads","entry":"e","roll":0.06484867143444717,"allocatedPositions":[1],"allocatedSlots":["ne"],"effects":[]},"2,-1":{"jewel":"core.keen-edge","entry":"ne","roll":0.545911343768239,"allocatedPositions":[1],"allocatedSlots":[],"effects":[]}}}}}},"rng":2344671368}
-
 # save armed-at-the-sewer-junction
 over: in-town-with-a-sword-and-a-shield, at-the-sewer-junction
-{"version":13}
-
-# save the-grown-blades-and-the-one-in-hand
-over: growing-a-heartwood-blade-end, rage-rises-as-swings-land-end
 {"version":13}
 
 # item deaths-door
@@ -1407,6 +1231,7 @@ assert: inventory.core.iron-sword = 2
 load: four-rows-and-a-blade-worn
 setting: hardcore on
 use: item.deaths-door.step-through
+wait: done
 assert: inventory.core.bent-coin = 0
 assert: inventory.core.rats-eye-gem = 0
 assert: inventory.core.iron-sword = 0
@@ -1460,20 +1285,6 @@ assert: hive-mouth.discovered
 assert: doss-house.discovered
 assert: pinewood.discovered
 
-# test a-minute-at-the-post-trains-the-arm-and-not-the-hide
-load: at-the-proving-ground
-use: core.melee-combat on proving-post
-wait: 60
-assert: xp.combat.attack > 0
-assert: xp.combat.health = 0
-
-# test the-sewer-pays-a-beginner-in-both-halves-of-a-fight
-load: at-the-sewer-junction
-wait: 20
-assert: xp.combat.attack > 0
-assert: xp.combat.health > 0
-assert: not core.fainted
-
 # test a-sword-and-a-shield-are-goods-at-a-counter
 load: in-town-with-a-sword-and-a-shield
 shop: general-store
@@ -1512,12 +1323,6 @@ travel: oolga-basement
 use: entity.broken-wall.squeeze-through
 assert: heard-of-the-back-way
 assert: sewer-junction.discovered
-
-# test a-feral-rat-picks-the-fight-itself
-load: at-the-sewer-junction
-wait: 10
-assert: resource.core.health < 31.31
-assert: not core.fainted
 
 # test the-bench-is-where-health-comes-back
 load: hurt-in-town
@@ -1568,167 +1373,3 @@ assert: inventory.core.lockpick = 1
 assert: heard-of-the-back-way
 travel: sewer-outfall
 
-# test a-build-and-a-run-that-each-grew-something-keep-both
-load: the-grown-blades-and-the-one-in-hand
-unequip: mainhand
-assert: inventory.combat-expansion.proving-blade = 1
-assert: inventory.core.heartwood-blade = 1
-assert: inventory.core.iron-sword = 1
-
-# test the-forge-is-a-way-onto-a-plane
-load: at-the-forge-with-coin
-shop: smithing.forge-supplies
-submit-modal: item=more:buy:smithing.bronze-bar
-submit-modal: count=3
-submit-modal: item=close
-craft: smithing.bronze-dagger
-craft: smithing.causeway-jewel
-assert: has core.causeway-jewel
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with core.causeway-jewel
-assert: not has core.causeway-jewel
-
-# test growing-a-heartwood-blade
-DEBUG
-load: growing-a-heartwood-blade-start
-use: entity.smiths-chest.open
-refuse: allocate heartwood-blade at 0,0 position 2
-refuse: allocate 1 at 0,0 position 3
-allocate: 1 at 0,0 position 2
-allocate: 1 at 0,0 position 3
-allocate: 1 at 0,0 slot ne
-slot: 1 at 0,0 ne with keen-edge-jewel
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with crossroads-jewel
-refuse: slot 1 at 0,0 e with causeway-jewel
-refuse: allocate 1 at 0,0 position 2
-allocate: 1 at 1,-1 position 1
-allocate: 1 at 1,-1 position 2
-allocate: 1 at 1,-1 position 3
-allocate: 1 at 1,-1 position 4
-allocate: 1 at 1,-1 position 5
-allocate: 1 at 1,0 position 1
-refuse: allocate 1 at 1,0 slot nw
-refuse: slot 1 at 1,0 nw with causeway-jewel
-allocate: 1 at 1,0 slot ne
-apply: 1 at 1,-1 with orb-of-the-edge
-apply: 1 at 1,-1 with lesser-orb-of-the-edge
-refuse: apply 1 at 1,-1 with orb-of-the-edge
-refuse: apply 1 at 1,-1 with orb-of-the-bulwark
-apply: 1 at 0,0 with orb-of-vitality
-allocate: 2 at 0,0 slot e
-slot: 2 at 0,0 e with causeway-jewel
-expect only: growing-a-heartwood-blade-end
-
-# test growing-through-the-inventory-screen
-DEBUG
-load: growing-a-heartwood-blade-start
-use: entity.smiths-chest.open
-open-modal: carried-items
-submit-modal: item=2
-submit-modal: verb=grow
-submit-modal: plane=allocate: slot e
-submit-modal: plane=slot: e with core.crossroads-jewel
-submit-modal: plane=go: 1,0
-submit-modal: plane=allocate: position 1
-submit-modal: plane=allocate: slot ne
-submit-modal: plane=slot: ne with core.keen-edge-jewel
-submit-modal: plane=go: 2,-1
-submit-modal: plane=allocate: position 1
-submit-modal: plane=back
-submit-modal: verb=equip
-open-modal: carried-items
-submit-modal: item=close
-assert: has core.heartwood-blade
-expect only: growing-through-the-inventory-screen-end
-
-# save at-the-proving-ground
-{"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true}}
-
-# test rage-rises-as-swings-land
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with combat-expansion.wrath-jewel
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 7
-equip: 1
-use: core.melee-combat on proving-post
-wait: 30
-assert: resource.combat-expansion.rage > 0
-expect only: rage-rises-as-swings-land-end
-
-# save at-the-proving-ground-with-a-tally
-DEBUG
-{"version":13,"location":"tulsa.proving-ground","flags":{"tulsa.proving-ground.discovered":true},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.vigor-tally","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
-
-# test accelerated-vigor-stacks-behind-its-gate
-DEBUG
-load: at-the-proving-ground-with-a-tally
-use: entity.armourers-chest.open
-allocate: 2 at 0,0 slot e
-slot: 2 at 0,0 e with combat-expansion.wrath-jewel
-allocate: 2 at 1,0 position 1
-allocate: 2 at 1,0 position 2
-allocate: 2 at 1,0 position 6
-allocate: 2 at 1,0 position 5
-equip: 2
-equip: 1
-use: core.melee-combat on proving-post
-wait: 60
-assert: stat.evasion > 0
-expect only: accelerated-vigor-stacks-behind-its-gate-end
-
-# test poison-holds-the-struck-enemy
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with combat-expansion.creeping-rot-jewel
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 7
-equip: 1
-use: core.melee-combat on proving-post
-wait: 10
-assert: stat.regeneration > 0
-expect only: poison-holds-the-struck-enemy-end
-
-# test poison-lifts-when-its-own-duration-runs-out
-run: poison-holds-the-struck-enemy
-cancel
-wait: 30
-expect: poison-lifts-when-its-own-duration-runs-out-end
-
-# test striking-a-thorned-enemy-costs-the-striker
-load: at-the-proving-ground
-assert: not has combat-expansion.retribution-jewel
-use: core.melee-combat on spined-urchin
-wait: 10
-expect only: striking-a-thorned-enemy-costs-the-striker-end
-
-# test a-plane-unwinds-from-its-leaves-and-never-out-from-under-a-jewel
-DEBUG
-load: at-the-proving-ground
-use: entity.armourers-chest.open
-allocate: 1 at 0,0 slot e
-slot: 1 at 0,0 e with combat-expansion.wrath-jewel
-refuse: unallocate 1 at 0,0 slot e
-allocate: 1 at 1,0 position 1
-allocate: 1 at 1,0 position 2
-refuse: unallocate 1 at 1,0 position 1
-unallocate: 1 at 1,0 position 2
-unallocate: 1 at 1,0 position 1
-
-# save rage-rises-as-swings-land-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":381},"resources":{"combat-expansion.rage":19800},"equipped":{"mainhand":"1"},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":1200,"attemptsMade":13,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1809706,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":32400,"rng":3953799810}
-
-# save accelerated-vigor-stacks-behind-its-gate-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1,"combat-expansion.creeping-rot-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":39},"equipped":{"mainhand":"2","offhand":"1"},"buffs":{"player":[{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":88800},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":97428},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":107183},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":112508},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":119000},{"source":"combat-expansion.accelerated-vigor","tags":[{"kind":"keyword","value":"stacks"},{"kind":"stat-bonus","statId":"core.attack-rate","percent":false,"amount":{"min":2,"max":2}},{"kind":"duration","seconds":60}],"expiresAt":121980}]},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":420,"attemptsMade":30,"span":1374}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1590538,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":0}}}},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"combat-expansion.vigor-tally","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.wrath","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,2,6,5],"allocatedSlots":[],"effects":[]}}}}}},"time":62400,"rng":829729617}
-
-# save poison-holds-the-struck-enemy-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":133},"resourceRateRemainders":{"core.health":40000},"equipped":{"mainhand":"1"},"buffs":{"tulsa.proving-post":[{"source":"combat-expansion.venom","tags":[{"kind":"keyword","value":"poison"},{"kind":"stat-bonus","statId":"core.regeneration","percent":false,"amount":{"min":-30,"max":-30}},{"kind":"duration","seconds":20}],"expiresAt":32000}]},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.proving-post"}},"actors":{"tulsa.proving-post":{"resources":{"core.health":1928692,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":40000}}}},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":12400,"rng":2882385315}
-
-# save poison-lifts-when-its-own-duration-runs-out-end
-{"version":13,"inventory":{"combat-expansion.blood-frenzy-jewel":1,"combat-expansion.wrath-jewel":1,"combat-expansion.iron-bulwark-jewel":1,"combat-expansion.retribution-jewel":1,"combat-expansion.wracking-blades-jewel":1},"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true,"tulsa.armourers-chest.emptied":true},"xp":{"combat.attack":133},"resourceRateRemainders":{"core.health":40000},"equipped":{"mainhand":"1"},"location":"tulsa.proving-ground","instances":{"next":2,"byId":{"1":{"kind":"item","template":"combat-expansion.proving-blade","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":["e"],"effects":[]},"1,0":{"jewel":"combat-expansion.creeping-rot","entry":"e","roll":0.794003525050357,"allocatedPositions":[1,7],"allocatedSlots":[],"effects":[]}}}}}},"time":42400,"rng":2882385315}
-
-# save striking-a-thorned-enemy-costs-the-striker-end
-{"version":13,"flags":{"tulsa.proving-ground.discovered":true,"tulsa.proving-ground.touched":true,"tulsa.forge.discovered":true},"xp":{"combat.attack":109},"resources":{"core.health":6516},"resourceRateRemainders":{"core.health":40000},"location":"tulsa.proving-ground","activeAction":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","repeating":true,"implicitTarget":1000,"cadences":{"player":{"progress":400,"attemptsMade":5,"span":2400}},"roster":{"player":{"ownerRef":"action.core.melee-combat","actionSlug":"melee-combat","target":"tulsa.spined-urchin"}},"actors":{"tulsa.spined-urchin":{"resources":{"core.health":1945968,"combat-expansion.rage":0,"fishing.line-health":0},"rateRemainders":{"core.health":40000}}}},"time":12400,"rng":1288631604}

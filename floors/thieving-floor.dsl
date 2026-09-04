@@ -9,6 +9,7 @@ dependencies:
 # test death-farm-to-30
 run: first-steps.thieving-route-full
 until level.thieving >= 30:
+  travel: tulsa.market-square
   use: entity.civilian.pick-pocket until done
   wait: 120
 assert: level.thieving >= 30
@@ -40,6 +41,7 @@ assert: level.thieving >= 30
 # test gear-up
 run: first-steps.thieving-route-full
 until inventory.core.coin >= 306:
+  travel: tulsa.market-square
   use: entity.tulsa.civilian.pick-pocket until done
   wait: 90
 travel: tavern-street

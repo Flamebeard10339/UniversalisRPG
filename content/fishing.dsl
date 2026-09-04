@@ -6,6 +6,7 @@ dependencies:
   cooking
   crafting
   ? tulsa
+  ? combat
 
 # stat fishing
 title: Fishing
@@ -1523,7 +1524,7 @@ equip: 3
 equip: 4
 equip: 5
 equip: bread-paste
-use: core.melee-combat on tulsa.bog-lurker until done
+use: core.melee-combat on combat.bog-lurker until done
 use: entity.tench-hole.cast until has raw-tench
 assert: has raw-tench
 goto: the-mere
