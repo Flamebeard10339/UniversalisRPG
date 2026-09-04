@@ -1,6 +1,6 @@
 import type { LocaleSection } from './sections/locale';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Action, actionProblem, actionResultLists, assembledActionProblem, isFight, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionKind, actionProblem, actionResultLists, assembledActionProblem, isFight, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
@@ -419,6 +419,31 @@ function dropTableCycle(registry: Registry): string[] | null {
   return firstCycle(rolls.keys(), (id) => rolls.get(id) ?? []);
 }
 
+function performedProblem(registry: Registry): { action: string; says: string } | null {
+  for (const [kind, id, lists] of authoredResults(registry)) {
+    const performed: string[] = [];
+    const collect = (results: readonly ActionResult[]): void => {
+      for (const result of results) {
+        if (result.kind === 'perform') performed.push(result.action);
+        for (const nested of nestedResults(result)) collect(nested);
+      }
+    };
+    for (const list of lists) collect(list);
+    for (const actionId of performed) {
+      const action = registry.actions.get(actionId);
+      if (!action) continue;
+      const by = `# ${kind} ${id}`;
+      if (actionKind(action) === 'continuous') {
+        return { action: actionId, says: `# action ${actionId} is performed by ${by} and is continuous, so it would hold the player for good: a performed action ends on its own, with a time: and no continuous` };
+      }
+      if (isTwoSided(action)) {
+        return { action: actionId, says: `# action ${actionId} is performed by ${by} and is a contest between two sides, and a performed action has nobody across from the player: write it with a time: and results of its own` };
+      }
+    }
+  }
+  return null;
+}
+
 function compileFactionBits(registry: Registry): void {
   registry.factionBits.clear();
   let next = 0;
@@ -619,6 +644,14 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   if (ring) {
     const module = sectionOwner(owners, 'stat', ring.stats[0]!);
     const error = new DslError(ring.says);
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
+
+  const performed = performedProblem(registry);
+  if (performed) {
+    const module = sectionOwner(owners, 'action', performed.action);
+    const error = new DslError(performed.says);
     if (!module) throw error;
     return { module, stage: 'validate', error };
   }

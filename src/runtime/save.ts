@@ -22,7 +22,7 @@ import { isSettingName, isSettingSheet, standingChoice, standingSettings, type S
 
 export const SAVE_VERSION = 13;
 
-export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'engagedBy' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'spent' | 'debug'>;
+export type SaveField = Exclude<keyof GameState, 'log' | 'language' | 'endedBecause' | 'engagedBy' | 'carriedTold' | 'engagesAt' | 'cyclesDone' | 'spent' | 'debug' | 'performNext'>;
 
 export type SaveDiff = Partial<Pick<GameState, SaveField>>;
 
@@ -77,7 +77,8 @@ const isActiveAction = (value: unknown): boolean =>
   at(value, 'implicitTarget', isNumber) &&
   at(value, 'cadences', (held) => everyValue(held, isCadence)) &&
   optional(value, 'actors', (held) => everyValue(held, isActor)) &&
-  optional(value, 'roster', (held) => everyValue(held, isSeat));
+  optional(value, 'roster', (held) => everyValue(held, isSeat)) &&
+  optional(value, 'forced', (held) => held === true);
 
 const isJourney = (value: unknown): boolean => at(value, 'to', isText) && at(value, 'legs', (held) => Array.isArray(held) && held.every(isText));
 

@@ -27,6 +27,7 @@ import { wearFor } from './population';
 import { engagementDelay } from './tuning';
 import { divideRateRemainder, fromMilliUnits, MILLI_UNITS, toMilliUnits } from './units';
 import { applyDeclared, buffsOf, clearBuffs, shakeOffBuff } from './buffs';
+import { beginPerformNext } from './perform';
 
 export interface Segment {
   state: GameState;
@@ -313,6 +314,12 @@ function applyOne(segment: Segment, result: ActionResult, actor: string, count: 
     case 'open-modal':
       openModalNamed(state, result.modal);
       return 0;
+    case 'perform': {
+      if (actor !== PLAYER) throw new RuntimeError(`perform: ${result.action} is asked of ${actor}, and only the player can be made to do something: nothing else has anything under way`);
+      if (!registry.actions.has(result.action)) throw new RuntimeError(`perform: names an unknown action: ${result.action}`);
+      state.performNext = result.action;
+      return 1;
+    }
     case 'pool': {
       requireResource(registry, result.resource);
       const milliAmount = toMilliUnits(drawAmount(state, readAmount(segment, result.delta, actor))) * count;
@@ -404,6 +411,7 @@ export function applyResultsNow(state: GameState, registry: Registry, results: r
   applyResults(segment, results ?? [], PLAYER, count);
   settlePools(state, registry, [], 0, segment.deltas);
   if (segment.stopped) endAction(state, segment.stopped);
+  beginPerformNext(state, registry);
 }
 
 export function initResources(state: GameState, registry: Registry): void {

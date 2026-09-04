@@ -318,6 +318,8 @@ engine.stopped.unavailable: you could not carry on with it
 engine.stopped.arrived: you got where you were going
 engine.stopped.no-road: the way on was closed
 engine.stopped.called-off: you called it off
+engine.stopped.forced: something else took hold of you
+engine.forced.holds: you cannot do anything else until this is over
 engine.stopped.engaged: the {attacker} came at you
 engine.stopped.bound: the world had already run {hours} hours on your behalf, which is as far as it will run unattended
 engine.stopped.still: what was under way advances by nothing, so waiting it out would never end

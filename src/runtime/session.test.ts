@@ -1028,6 +1028,7 @@ describe('what the engine withholds', () => {
       player: 'published',
       settings: 'published',
       activeAction: 'published',
+      performNext: 'withheld',
       journey: 'published',
       log: 'withheld',
       endedBecause: 'withheld',

@@ -319,6 +319,8 @@ export const ENGINE_KEYS = [
   'engine.stopped.arrived',
   'engine.stopped.no-road',
   'engine.stopped.called-off',
+  'engine.stopped.forced',
+  'engine.forced.holds',
   'engine.stopped.engaged',
   'engine.stopped.bound',
   'engine.stopped.still',

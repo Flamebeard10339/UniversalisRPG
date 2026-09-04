@@ -30,6 +30,7 @@ import { stoodHere, type StoodHere } from './population';
 import { truthy, weighing } from './conditions';
 import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
+import { heldByForce } from './perform';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
 import { socketsInto, verbsOffered } from './carriedScreen';
 import { Registry } from '../content/registry';
@@ -80,6 +81,7 @@ export interface PlayAction {
   progress: number;
   attempts: number;
   completion: number | null;
+  forced?: true;
 }
 
 export interface CountedRow {
@@ -657,6 +659,7 @@ function publishAction(state: GameState, registry: Registry): PlayAction | null 
     progress: actionProgress(state, registry),
     attempts: clock.attemptsMade,
     completion: stillToCount(action, active),
+    ...(active.forced ? { forced: true as const } : {}),
   };
 }
 
@@ -859,9 +862,12 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       if (!saved) throw new RuntimeError(`unknown save: ${directive.save}`);
       return { pruned: loadSaved(session, saved) };
     }
-    case 'cancel':
+    case 'cancel': {
+      const held = heldByForce(state, registry);
+      if (held !== undefined) return { failure: held };
       endJourney(state, localizerOf(registry, state).engine('engine.stopped.called-off'));
       return {};
+    }
     case 'wait':
       resolve(state, registry, state.time + secondsToMs(directive.seconds));
       return {};

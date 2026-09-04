@@ -50,6 +50,7 @@ export interface ActiveAction {
   cadences: Record<string, Cadence>;
   actors?: Record<string, ActorState>;
   roster?: Record<string, Seat>;
+  forced?: true;
 }
 
 export interface Journey {
@@ -142,6 +143,7 @@ export interface GameState extends RngCursor {
   engagesAt: number;
   debug: DebugSheet;
   activeAction: ActiveAction | null;
+  performNext: string | null;
   journey: Journey | null;
   readonly buffs: BuffTable;
   resources: PoolLevels;
@@ -177,7 +179,7 @@ export function emptyPlayerSheet(): PlayerSheet {
 }
 
 export function createGameState(location = '', language: string = DEFAULT_LANGUAGE): GameState {
-  return { language, flags: {}, bundles: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, engagedBy: null, carriedTold: null, time: 0, cyclesDone: 0, spent: {}, engagesAt: 0, debug: {}, activeAction: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
+  return { language, flags: {}, bundles: {}, inventory: {}, packOrder: [], location, visits: {}, xp: {}, log: [], endedBecause: null, engagedBy: null, carriedTold: null, time: 0, cyclesDone: 0, spent: {}, engagesAt: 0, debug: {}, activeAction: null, performNext: null, journey: null, buffs: {}, resources: {}, resourceRateRemainders: {}, equipped: {}, instances: createInstanceTable(), populations: {}, shops: {}, rng: DEFAULT_RNG_SEED, player: emptyPlayerSheet(), settings: standingSettings(), modals: [] };
 }
 
 export function advanceTime(state: GameState, milliseconds: number): void {

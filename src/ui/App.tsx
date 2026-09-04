@@ -39,6 +39,7 @@ import { StatBody } from './StatBody';
 import { StatsPane } from './StatsPane';
 import { carried, worn } from './sheet';
 import { CancelUnderway } from './CancelUnderway';
+import { ForcedSheet } from './ForcedSheet';
 import { StatusBanner } from './StatusBanner';
 import { TabBar } from './TabBar';
 import { useTestSurface } from './useTestSurface';
@@ -344,7 +345,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
               <LocationBanner key={`location-${generation}`} view={view} flash={generation > 0} />,
               <StatusBanner key="status" view={view} live={snapshot.live} speed={snapshot.speed} stirring={stirring(crossed)} />,
             ]}
-            beside={[null, snapshot.live === null ? null : <CancelUnderway key="cancel" label={snapshot.live.label} onCancel={driver.cancel} />]}
+            beside={[null, snapshot.live === null || view.action?.forced ? null : <CancelUnderway key="cancel" label={snapshot.live.label} onCancel={driver.cancel} />]}
             bodies={bodies}
           />
           <Notices channel={driver.transient} />
@@ -361,6 +362,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
             <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
               {screen.beside}
             </ModalSheet>
+          ) : view.action?.forced ? (
+            <ForcedSheet action={view.action} />
           ) : null)}
       </div>
     </TransientProvider>

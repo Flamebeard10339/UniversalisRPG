@@ -12,22 +12,6 @@ whatever mix the speedruns find. **A line is deleted the day it closes.**
 
 ---
 
-## A faint is a relocate, and nothing in the world can hold a player still
-
-The player's `on death:` in `content/tulsa.dsl` restores the pool and relocates, and there is
-no way to make a beat take time: every result is instant and every action is the player's to
-call off. Ruled: one result, `perform: <action>`, ends whatever is under way and starts the
-named action on whoever the result acts for, marked forced — calling it off, travelling and
-taking anything else up are refused until it ends, nothing engages the player meanwhile, and
-the interface shows it as a modal carrying the action's title, its lines and its timer. The
-faint is then an ordinary `faint:` block on the player with `time: 5` and
-`relocate: starting-location` under `on success:`, and a cutscene is a performed action
-whose `on success:` performs the next.
-
-*Closes when:* `a-performed-action-cannot-be-called-off` passes,
-`a-performed-action-runs-its-success-when-its-time-is-up` passes and
-`nothing-engages-a-player-while-a-performed-action-runs` passes.
-
 ## Combat's mechanics live in core and its foes in the town
 
 `content/core.dsl` holds eighteen combat passives, seven jewels, five orbs and the first

@@ -191,6 +191,9 @@ export function results(list: ActionResult[] | undefined, where: string, visit: 
       case 'discover':
         putLocation(result, 'location', `${where} ${result.kind}:`, visit);
         break;
+      case 'perform':
+        put(result, 'action', 'action', `${where} perform:`, visit);
+        break;
       case 'pool': {
         const site = `${where} ${amountFalls(result.delta) ? 'drain' : 'restore'}:`;
         put(result, 'resource', 'resource', site, visit);

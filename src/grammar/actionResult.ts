@@ -53,6 +53,7 @@ type ResultLine =
   | { kind: 'relocate'; location: string }
   | { kind: 'discover'; location: string }
   | { kind: 'open-modal'; modal: ModalScreen }
+  | { kind: 'perform'; action: string }
   | { kind: 'pool'; resource: string; delta: Amount; party?: Party }
   | { kind: 'fill'; resource: string; party?: Party }
   | { kind: 'inflict'; buff: string; party?: Party; lasts?: number | string }
@@ -387,6 +388,16 @@ const LEAVES: readonly Leaf[] = [
   { opens: /relocate:[ \t]*/, forms: ['relocate: <place>'], examples: ['relocate: camp'], read: (cursor) => ({ kind: 'relocate', location: id.parse(cursor) }) },
   { opens: /discover:[ \t]*/, forms: ['discover: <place>'], examples: ['discover: camp'], read: (cursor) => ({ kind: 'discover', location: id.parse(cursor) }) },
   { opens: /open modal:[ \t]*/, forms: ['open modal: <modal>'], examples: [`open modal: ${MODAL_SCREENS[0]}`], read: parseOpenModal },
+  {
+    opens: /perform:[ \t]*/,
+    forms: ['perform: <action>'],
+    examples: ['perform: faint'],
+    read: (cursor) => ({ kind: 'perform', action: id.parse(cursor) }),
+    notes: {
+      'perform: <action>':
+        'ends whatever the player has under way and starts that `# action` in its place, held: it cannot be called off, nothing else can be taken up and nothing engages them until it has run its time, which is what a faint or a scene is. It takes a `time:` and ends on its own — one that is `continuous`, or a contest between two sides, is refused when the world loads — and what happens when it ends is its own `on success:`, where a second `perform:` is how one scene follows another. Only the player can be made to do something, so this stands where the player acts',
+    },
+  },
   { opens: /drain:[ \t]*/, forms: ['drain: <amount> <resource>[ from <me or them>]'], examples: ['drain: 5 health'], read: (cursor) => parsePool(-1, cursor) },
   {
     opens: /restore:[ \t]*/,
@@ -566,6 +577,8 @@ function printResultLine(value: ActionResult): string {
       return `discover: ${value.location}`;
     case 'open-modal':
       return `open modal: ${value.modal}`;
+    case 'perform':
+      return `perform: ${value.action}`;
     case 'pool': {
       const magnitude = risingAmount(value.delta);
       const verb = amountFalls(value.delta) ? 'drain' : 'restore';

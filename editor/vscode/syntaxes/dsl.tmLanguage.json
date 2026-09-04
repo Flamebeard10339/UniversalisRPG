@@ -241,7 +241,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|when[ \\t]+hit|examine|inflict|restore|credit|on[ \\t]+hit|one[ \\t]+of|stands|drain|title|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|when[ \\t]+hit|examine|inflict|perform|restore|credit|on[ \\t]+hit|one[ \\t]+of|stands|drain|title|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -356,7 +356,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|open-connections|origin-cluster|cluster-jewel|item-level|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|mod-slots|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stops[ \\t]+on|when[ \\t]+hit|examine|inflict|restore|credit|on[ \\t]+hit|one[ \\t]+of|stands|drain|group|title|unset|value|give|rate|roll|slot|take|time|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|open-connections|origin-cluster|cluster-jewel|item-level|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|mod-slots|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stops[ \\t]+on|when[ \\t]+hit|examine|inflict|perform|restore|credit|on[ \\t]+hit|one[ \\t]+of|stands|drain|group|title|unset|value|give|rate|roll|slot|take|time|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -621,7 +621,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|relocate|requires|stops[ \\t]+on|extends|inflict|restore|credit|one[ \\t]+of|stands|drain|title|unset|give|rate|roll|take|time|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|relocate|requires|stops[ \\t]+on|extends|inflict|perform|restore|credit|one[ \\t]+of|stands|drain|title|unset|give|rate|roll|take|time|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -692,7 +692,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|stats|title|unset|give|rate|roll|take|time|uses|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|equipment-slots|respawn[ \\t]+after|keeps[ \\t]+shop|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stations|stops[ \\t]+on|when[ \\t]+hit|examine|faction|inflict|perform|restore|allies|credit|on[ \\t]+hit|one[ \\t]+of|skills|stands|drain|flags|group|stats|title|unset|give|rate|roll|take|time|uses|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -815,7 +815,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|adjacent|attempts|depletes|discover|entities|relocate|requires|stops[ \\t]+on|examine|inflict|restore|credit|one[ \\t]+of|stands|drain|flags|title|unset|give|rate|roll|take|time|add|say|set|xp|x|y|z)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|shake[ \\t]+off|adjacent|attempts|depletes|discover|entities|relocate|requires|stops[ \\t]+on|examine|inflict|perform|restore|credit|one[ \\t]+of|stands|drain|flags|title|unset|give|rate|roll|take|time|add|say|set|xp|x|y|z)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -1080,7 +1080,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|inflict|restore|credit|one[ \\t]+of|stands|drain|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|inflict|perform|restore|credit|one[ \\t]+of|stands|drain|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -1143,7 +1143,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|inflict|restore|credit|one[ \\t]+of|stands|again|drain|unset|give|roll|take|when|add|ask|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|inflict|perform|restore|credit|one[ \\t]+of|stands|again|drain|unset|give|roll|take|when|add|ask|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -1214,7 +1214,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|done[ \\t]+when|shake[ \\t]+off|discover|relocate|inflict|restore|credit|one[ \\t]+of|stands|again|drain|title|unset|give|roll|take|when|add|ask|log|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|done[ \\t]+when|shake[ \\t]+off|discover|relocate|inflict|perform|restore|credit|one[ \\t]+of|stands|again|drain|title|unset|give|roll|take|when|add|ask|log|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"

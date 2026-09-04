@@ -50,6 +50,7 @@ import { applyDeclared, clearBuffs, expireBuffs, nextBuffExpiry } from './buffs'
 import { type ActiveAction, advanceTime, debugging, FIGHT_SCOPED, GameState, isFightScoped, PLAYER, templateOf } from './state';
 import { attemptDuration, hitChance, hitDamage, sampleStat, stalledPace, statValue } from './stats';
 import { typedDamage } from './typedDamage';
+import { beginPerformNext, heldByForce } from './perform';
 import { engagementDelay } from './tuning';
 import { msToDrain, MS_PER_MINUTE, toMilliUnits, fromMilliUnits } from './units';
 import { describeCondition, evaluateCondition, itemMissingFor } from './conditions';
@@ -465,6 +466,7 @@ function resolveSegment(state: GameState, registry: Registry, segEnd: number): v
 function applyDueBoundaries(state: GameState, registry: Registry, at: number): void {
   for (;;) {
     let changed = applyRespawns(state);
+    if (beginPerformNext(state, registry)) changed = true;
     if (stepJourney(state, registry)) changed = true;
     if (fightLeftItsLocation(state, registry)) {
       endAction(state, localizerOf(registry, state).engine('engine.stopped.unavailable'));
@@ -528,7 +530,7 @@ function aggressorHere(state: GameState, registry: Registry): { entity: string; 
 }
 
 function openAggression(state: GameState, registry: Registry): void {
-  if (state.time < state.engagesAt) return;
+  if (state.time < state.engagesAt || state.activeAction?.forced) return;
   const coming = aggressorHere(state, registry);
   if (!coming) return;
   if (state.activeAction) {
@@ -737,7 +739,16 @@ function takenByAGuise(named: NamedOn, action: Action, registry: Registry, state
   return localizerOf(registry, state).engine('engine.target.unoffered', { target: actorTitle(named.id, registry, state) });
 }
 
+function refusedWhileForced(state: GameState, registry: Registry): ArmResult | undefined {
+  const held = heldByForce(state, registry);
+  if (held === undefined) return undefined;
+  state.log.push(held);
+  return { armed: false, refused: held };
+}
+
 export function armAction(obj: string, objId: string, actionId: string, registry: Registry, state: GameState): ArmResult {
+  const forced = refusedWhileForced(state, registry);
+  if (forced) return forced;
   const say = localizerFor(registry, BASE_LANGUAGE);
   const target = ownerAsStood(obj, objId, registry, state);
   if (!target) throw new RuntimeError(say.engine('engine.action.stale.owner', { kind: say.identifier(obj), id: say.identifier(objId) }));
@@ -793,6 +804,8 @@ export function actionFirstUnit(obj: string, objId: string, actionId: string, re
 }
 
 export function armFightAction(actionId: string, targetId: string, registry: Registry, state: GameState): ArmResult {
+  const forced = refusedWhileForced(state, registry);
+  if (forced) return forced;
   const declared = registry.actions.get(actionId);
   const action = actorEntity(registry, PLAYER)?.actions.find((each) => declaredId(each) === actionId) ?? declared;
   if (!declared || !action) throw new RuntimeError(`unknown action: ${actionId}`);
