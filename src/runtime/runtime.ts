@@ -515,17 +515,27 @@ function fightLeftItsLocation(state: GameState, registry: Registry): boolean {
   return isElsewhere(state, registry, location, target);
 }
 
-function aggressorHere(state: GameState, registry: Registry): { entity: string; id: string; action: Action } | undefined {
+function alreadyIn(state: GameState, entity: string): number {
+  return Object.keys(state.activeAction?.actors ?? {}).filter((actorId) => templateOf(actorId) === entity).length;
+}
+
+function nextCopyOf(state: GameState, entity: string): string {
+  const engaged = alreadyIn(state, entity);
+  return engaged === 0 ? entity : `${entity}${FIGHT_SCOPED}${String(engaged + 1)}`;
+}
+
+function aggressorHere(state: GameState, registry: Registry): { entity: string; actorId: string; id: string; action: Action } | undefined {
   const location = registry.locations.get(state.location);
   if (!location) return undefined;
   const met = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const aggressors = standing(state, registry, location).filter((entry) => registry.entities.get(entry.entity)?.aggressive && opposes(registry, entry.entity, PLAYER));
-  if (aggressors.some((entry) => met.has(entry.entity))) return undefined;
+  if (!location.multicombat && aggressors.some((entry) => met.has(entry.entity))) return undefined;
   for (const entry of aggressors) {
+    if (location.multicombat && alreadyIn(state, entry.entity) >= entry.count) continue;
     if (!retaliation(state, registry, entry.entity, PLAYER)) continue;
     const answer = retaliation(state, registry, PLAYER, entry.entity);
     if (!answer) continue;
-    return { entity: entry.entity, ...answer };
+    return { entity: entry.entity, actorId: nextCopyOf(state, entry.entity), ...answer };
   }
   return undefined;
 }
@@ -534,12 +544,14 @@ function openAggression(state: GameState, registry: Registry): void {
   if (state.time < state.engagesAt || state.activeAction?.forced) return;
   const coming = aggressorHere(state, registry);
   if (!coming) return;
-  if (state.activeAction) {
+  const joining = registry.locations.get(state.location)?.multicombat === true && state.activeAction?.actors !== undefined;
+  if (state.activeAction && !joining) {
     if (leavesHere(armedAction(state, registry))) return;
     endAction(state, localizerOf(registry, state).engine('engine.stopped.engaged', { attacker: actorTitle(coming.entity, registry, state) }));
   }
   state.engagedBy = coming.entity;
-  armFight(state, registry, coming.id, coming.action, coming.entity);
+  if (joining) enterEncounter(state.activeAction!, coming.actorId, state, registry, PLAYER);
+  else armFight(state, registry, coming.id, coming.action, coming.actorId);
 }
 
 function joinAllies(active: ActiveAction, state: GameState, registry: Registry, sideOwner: string, against: string): void {

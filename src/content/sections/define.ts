@@ -177,7 +177,7 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
 
 export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...Object.entries(schema.fields).flatMap(([name, spec]) => fieldLines(schema, name, spec).map((line) => ({ ...line, over: overwrittenField(schema, name) }))),
-  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, over: overwrittenField(schema, word), ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
+  ...(schema.keywords ?? []).map((word) => ({ form: word, example: word, over: overwrittenField(schema, word), ...(schema.keywordNotes?.[word] === undefined ? {} : { note: schema.keywordNotes[word]! }), ...(schema.needs?.[word] === undefined ? {} : { needs: schema.needs![word]! }) })),
   ...(schema.entries === undefined ? [] : schema.entries.body.grammar.map((line) => ({ ...line, over: overwrittenField(schema, schema.entries!.into) }))),
 ];
 

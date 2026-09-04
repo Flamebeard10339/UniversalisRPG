@@ -49,6 +49,7 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   clauses?: Exclude<keyof H, 'id' | Flags | Entries>;
   bare?: Exclude<keyof H, 'id' | Flags | Entries>;
   keywords?: readonly Flags[];
+  keywordNotes?: Partial<Record<Flags, string>>;
   keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
   exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
@@ -78,6 +79,7 @@ export interface AnySchema {
   clauses?: string;
   bare?: string;
   keywords?: readonly string[];
+  keywordNotes?: Record<string, string>;
   keywordsAfter?: string;
   entries?: { into: string; body: EntryBody };
   exclusive?: readonly (readonly string[])[];

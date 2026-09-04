@@ -5,7 +5,7 @@ import { loadModule } from '../content/load';
 import { apply, startSession, view } from './session';
 
 function loc(id: string, over: Partial<Location> = {}): Location {
-  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], flags: [], actions: [], starting: false, ...over };
+  return { id, x: 0, y: 0, z: 0, title: id, entities: [], adjacent: [], flags: [], actions: [], starting: false, multicombat: false, ...over };
 }
 
 function relative(id: string, direction: Direction, of: string): Location {

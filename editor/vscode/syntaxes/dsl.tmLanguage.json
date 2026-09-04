@@ -881,7 +881,7 @@
           }
         },
         {
-          "match": "^[ \\t]*([+-]?)(continuous|north[ \\t]+of|south[ \\t]+of|starting|east[ \\t]+of|instant|west[ \\t]+of|above|below|stop|if)\\b",
+          "match": "^[ \\t]*([+-]?)(multicombat|continuous|north[ \\t]+of|south[ \\t]+of|starting|east[ \\t]+of|instant|west[ \\t]+of|above|below|stop|if)\\b",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"

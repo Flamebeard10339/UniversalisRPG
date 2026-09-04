@@ -44,6 +44,7 @@ export interface Location {
   adjacent: Edge[];
   flags: string[];
   starting: boolean;
+  multicombat: boolean;
   relative?: Relative;
   actions: Action[];
 }
@@ -247,7 +248,7 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
   }
 }
 
-const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
+const SCHEMA: SectionSchema<Location, 'starting' | 'multicombat', 'actions'> = {
   kind: 'location',
   fields: {
     relative: { parser: relativeValue },
@@ -265,7 +266,10 @@ const SCHEMA: SectionSchema<Location, 'starting', 'actions'> = {
     },
     flags: { parser: list(id), default: () => [], block: true },
   },
-  keywords: ['starting'],
+  keywords: ['starting', 'multicombat'],
+  keywordNotes: {
+    multicombat: 'more than one thing here may fight the player at once, up to as many of each as stand in the room. Without it a place is single combat: whatever is already swinging is all that swings, however much else is standing about, and nothing else joins until that is settled',
+  },
   keywordsAfter: 'examine',
   bare: 'relative',
   exclusive: [['x', 'y', 'z'], ['relative']],
@@ -301,7 +305,7 @@ const printLocation = (value: Location, context: PrintContext): readonly string[
   return [heading!, coordinates.join(', '), ...rest];
 };
 
-export const location = section<Location, 'starting', 'actions'>()({
+export const location = section<Location, 'starting' | 'multicombat', 'actions'>()({
   flags: [TOUCHED, DISCOVERED],
   says: (value) => value.actions.flatMap(actionResultLists),
   ...SCHEMA,
