@@ -8,6 +8,7 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
 import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
+import { passiveTags, passiveTagsOf } from './passiveGrant';
 import { loadSave } from './save';
 import { createGameState } from './state';
 import { staleTiers } from './tierSaves';
@@ -116,9 +117,9 @@ function lopsided(registry: Registry): Remark[] {
   return [...modulesOf].flatMap((namespace) => {
     const own = (id: string): boolean => id.startsWith(`${namespace}.`);
     const wordsOn = (tags: readonly TagClause[]): string[] => keywordsIn(tags, []).beyond;
-    const shared = new Set([...registry.passives.values()].filter((passive) => !own(passive.id)).flatMap((passive) => wordsOn(passive.tags)));
+    const shared = new Set([...registry.passives.values()].filter((passive) => !own(passive.id)).flatMap((passive) => wordsOn(passiveTags(registry, passive))));
     const jewels = [...registry.clusterJewels.values()].filter((jewel) => own(jewel.id));
-    const carried = (jewel: { positions: Record<number, string> }): TagClause[] => Object.values(jewel.positions).flatMap((passiveId) => registry.passives.get(passiveId)?.tags ?? []);
+    const carried = (jewel: { positions: Record<number, string> }): TagClause[] => Object.values(jewel.positions).flatMap((passiveId) => passiveTagsOf(registry, passiveId));
 
     const by = new Map<string, string[]>();
     for (const jewel of jewels) {

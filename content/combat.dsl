@@ -770,7 +770,9 @@ berserker, speed, +3% attack-rate per stack of accelerated-vigor
 juggernaut, armour, +4 defense
 
 # passive immovable
-juggernaut, life, +25 max-health
+juggernaut, life
+grants: core.max-health
+budget: 1
 
 # passive slow-and-certain
 juggernaut, armour, +3 defense, -2 attack-rate

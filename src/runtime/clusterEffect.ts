@@ -4,6 +4,7 @@ import { BonusAmount, Counter } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
 import { clusterAt, isAllocated, placementAt, Plane, planeClusters } from './clusterPlane';
 import { Growth, growItem, ItemInstance } from './itemInstance';
+import { passiveTagsOf } from './passiveGrant';
 import { aCount, anId, says, type Said } from './said';
 import { GameState } from './state';
 
@@ -32,7 +33,7 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
   if (passiveId === undefined) return [];
   const node: PlaneNode = { hex, kind: 'position', position };
   const payloads: ScaledPayload[] = [];
-  for (const tag of registry.passives.get(passiveId)?.tags ?? []) {
+  for (const tag of passiveTagsOf(registry, passiveId)) {
     if (tag.kind !== 'stat-bonus') continue;
     const bonus = rolledAt(tag, cluster.roll);
     const scale = clusterScale(registry, cluster.effects, tag.statId);

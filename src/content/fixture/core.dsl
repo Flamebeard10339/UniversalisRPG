@@ -68,6 +68,7 @@ base: 60
 
 # stat max-health
 base: 30
+whole
 
 # stat regeneration
 base: 0
@@ -150,7 +151,8 @@ stat: scavenging-rate
 +5% defense
 
 # passive hale
-+10 max-health
+grants: max-health
+budget: 4
 
 # passive keen
 +4 attack

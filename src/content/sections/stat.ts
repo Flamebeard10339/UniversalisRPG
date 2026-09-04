@@ -23,6 +23,7 @@ export interface Stat {
   resists?: string;
   converts?: Conversion;
   atMost?: number | string;
+  whole: boolean;
 }
 
 const conversion: Parser<Conversion> = {
@@ -42,8 +43,12 @@ const ROLES = ['deals', 'resists', 'converts'] as const;
 
 const IN_A_SWING = 'a role in a swing, and a stat has one:';
 
-export const stat = section<Stat>()({
+export const stat = section<Stat, 'whole'>()({
   kind: 'stat',
+  keywords: ['whole'],
+  keywordNotes: {
+    whole: 'the stat carries whole numbers, so a value the engine works out for it — what a point of a # passive budget comes to, what a tier hands a body — is cut down to one rather than left with a fraction on it. A stat without this keeps whatever fraction it was solved to',
+  },
   ids: 'owned',
   vocabulary: 'declared',
   map: 'stats',

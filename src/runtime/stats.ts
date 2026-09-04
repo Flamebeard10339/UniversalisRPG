@@ -12,6 +12,7 @@ import { itemInstance, itemTemplate } from './itemInstance';
 import { nextRandom } from './rng';
 import { skillLevel } from './skills';
 import { skillTags } from '../content/sections/skill';
+import { passiveTags } from './passiveGrant';
 import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, parseOwnerRef, PLAYER } from './state';
 import { solvedStatsOf } from './foeSolve';
@@ -84,7 +85,7 @@ function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean)
   const passive = registry.passives.get(passiveId);
   if (!passive) return undefined;
   const source = titled('passive', passiveId);
-  return paysOut ? { source, hooks: passive, tags: passive.tags } : { source, hooks: passive };
+  return paysOut ? { source, hooks: passive, tags: passiveTags(registry, passive) } : { source, hooks: passive };
 }
 
 export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
