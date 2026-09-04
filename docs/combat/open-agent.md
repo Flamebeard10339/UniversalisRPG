@@ -29,6 +29,17 @@ that id. **It was deliberately not done while the wave was in flight**, because 
 copy of `content/` taken when it started and a module that merges afterwards would name the
 old id.
 
+The form that fits what is already there is the jewel items' own, one term shorter: a
+passive's id is `[<role>-]<stat>-<form>`, where the role is written only where the passive
+carries one (`berserker`, `juggernaut`, `assassin`) and the form separates the passives that
+would otherwise collide — `-small`, `-medium`, `-percent`, `-range` for the plain grants, and
+a word for what the passive actually does where it does more than grant (`-on-hit`,
+`-per-vigor`, `-at-defense` for one that pays for its bonus with another stat). So `whetted`,
+`honed` and `brutal` become `physical-damage-small`, `physical-damage-medium` and
+`physical-damage-percent`; `retribution` becomes `juggernaut-thorns`; `rising-fury` becomes
+`berserker-rage-scaling`. Derive the terms from each passive's own declaration rather than
+from this paragraph — it is an illustration and not a list.
+
 *Closes when:* every `# passive` and the six `<name>-jewel` items carry ids saying what they
 are, each has a `title:` holding the flavour it gave up, and
 `npm run oracle -- --at content` is green.
@@ -123,9 +134,18 @@ The shop residual is the expected shape — shops are meant to be about a fifth 
 by thirty — and the level-20 and level-30 gaps are what an obscure seller in the world is
 for; `the-grumpy-crafter` brief is pointed at part of it and `a-grand-blade-pass` at the
 level-30 attack residual. **What is not the expected shape is `combat.health` reading 613
-over the ladder at every rung when everything in the world is counted.** That is one or two
-health jewels paying an order of magnitude more than the ladder wants, and it is a content
-bug rather than a residual.
+over the ladder at every rung when everything in the world is counted.** Attack's two rows sit
+2× apart and health's sit 9× apart, which is the whole finding: the health jewels pay an order
+of magnitude more than the ladder wants and the attack jewels do not.
+
+**The ladder is not what is wrong — that was checked before this was written.** `ONE_LINE` in
+`scripts/lib/pace.ts` is the ladder for every skill but fishing, and it asks 203 at level 30 of
+whatever stat a skill names, which for `combat.health` is `core.max-health`. That reads like a
+unit error — 203 damage a swing and 203 health are not the same quantity — and it is not one:
+every normal foe the world declares tops out at 115 max-health, so a character with 203 at
+level 30 is on the right order of magnitude and one with 816 is not. Neither skill grants its
+stat per level, so both figures are gear and jewels alone. Do not spend the lane re-arguing the
+ladder.
 
 *Closes when:* the health jewels are re-cut so that `it exists anywhere` lands within the
 band the other skills land in, and `ladder-check` is re-read.
