@@ -74,15 +74,16 @@ rounds to: 5
 base: 0
 
 # ladder max-health
-at level one: 100
-growth per level: 31
+added at level one: 100
+added growth per level: 15
+increased growth per level: 3
 minutes at level one: 5
 minutes growth per level: 1.07
 seconds to fell an even match: 15
 
 # ladder digging-rate
-at level one: 0
-growth per level: 7
+added at level one: 0
+added growth per level: 7
 minutes at level one: 5
 minutes growth per level: 1.07
 

@@ -14,7 +14,7 @@ export function dpsLadder(registry: Registry): Ladder | undefined {
   const pool = toughnessLadder(registry);
   const seconds = pool?.secondsToFellAnEvenMatch;
   if (pool === undefined || seconds === undefined || seconds === 0) return undefined;
-  return { ...pool, atLevelOne: pool.atLevelOne / seconds, growthPerLevel: pool.growthPerLevel / seconds };
+  return { ...pool, addedAtLevelOne: pool.addedAtLevelOne / seconds, addedGrowthPerLevel: pool.addedGrowthPerLevel / seconds };
 }
 
 export const ladderForStat = (registry: Registry, statId?: string): Ladder | undefined => (climbsDps(registry, statId) ? dpsLadder(registry) : ladderFor(registry, statId));
@@ -23,7 +23,11 @@ export const ladderForSkill = (registry: Registry, skillId: string): Ladder | un
 
 export const GROWTH_CEILING = 2 ** (1 / LEVELS_PER_DOUBLING);
 
-export const abilityOn = (ladder: Ladder, level: number): number => ladder.atLevelOne + ladder.growthPerLevel * (level - 1);
+export const addedOn = (ladder: Ladder, level: number): number => ladder.addedAtLevelOne + ladder.addedGrowthPerLevel * (level - 1);
+
+export const increasedOn = (ladder: Ladder, level: number): number => ladder.increasedAtLevelOne + ladder.increasedGrowthPerLevel * (level - 1);
+
+export const abilityOn = (ladder: Ladder, level: number): number => addedOn(ladder, level) * (1 + increasedOn(ladder, level) / 100);
 
 export const minutesOn = (ladder: Ladder, level: number): number => ladder.minutesAtLevelOne * ladder.minutesGrowthPerLevel ** (level - 1);
 

@@ -3,14 +3,17 @@ import { section } from './define';
 
 export interface Ladder {
   id: string;
-  atLevelOne: number;
-  growthPerLevel: number;
+  addedAtLevelOne: number;
+  addedGrowthPerLevel: number;
+  increasedAtLevelOne: number;
+  increasedGrowthPerLevel: number;
   minutesAtLevelOne: number;
   minutesGrowthPerLevel: number;
   secondsToFellAnEvenMatch?: number;
 }
 
-const WHAT_A_LADDER_IS = 'what a character of a given level is assumed to stand at, which every figure the world is audited against is read off';
+const TWO_HALVES =
+  'A stat is worked out the way the engine works one out: every flat grant summed into what is added, every percent summed into what is increased, and the first multiplied by the second. A ladder therefore climbs on two lines rather than one, and what it asks at a level is the added line times the increased line. How much of the climb each half carries is the choice this makes available: the same total can be reached by a stat that grows mostly by being added to and one that grows mostly by being multiplied, and they play differently.';
 
 export const ladder = section<Ladder>()({
   kind: 'ladder',
@@ -18,19 +21,33 @@ export const ladder = section<Ladder>()({
   vocabulary: 'declared',
   map: 'ladders',
   fields: {
-    atLevelOne: {
+    addedAtLevelOne: {
       parser: decimal,
-      keyword: 'at level one',
+      keyword: 'added at level one',
       default: () => 0,
       printed: 'always',
-      note: `${WHAT_A_LADDER_IS} — this is the bottom of it, where a character of level one stands in the stat this section is named for`,
+      note: `what is added to this stat for a character of level one, before anything increases it. ${TWO_HALVES}`,
     },
-    growthPerLevel: {
+    addedGrowthPerLevel: {
       parser: decimal,
-      keyword: 'growth per level',
+      keyword: 'added growth per level',
       default: () => 0,
       printed: 'always',
-      note: 'how much the line rises for each level above the first, added rather than multiplied, so a stat that climbs 7 a level stands at 7 more at every rung. A ladder that grows by nothing says the stat is not meant to climb, and is read that way rather than as an omission',
+      note: 'how much more is added for each level above the first, added rather than multiplied. A ladder that grows by nothing here climbs only by what increases it, which is a real shape rather than an omission',
+    },
+    increasedAtLevelOne: {
+      parser: decimal,
+      keyword: 'increased at level one',
+      default: () => 0,
+      printed: 'always',
+      note: 'the percent this stat is increased by for a character of level one, which is nothing in most worlds: a level-one character has earned no increases, so the ladder asks exactly what it says is added',
+    },
+    increasedGrowthPerLevel: {
+      parser: decimal,
+      keyword: 'increased growth per level',
+      default: () => 0,
+      printed: 'always',
+      note: 'how many more percent this stat is increased by for each level above the first. Percents sum before they multiply, exactly as the engine sums them, so three a level comes to eighty-seven percent by level thirty rather than compounding past it',
     },
     minutesAtLevelOne: {
       parser: decimal,
@@ -50,7 +67,7 @@ export const ladder = section<Ladder>()({
       parser: decimal,
       keyword: 'seconds to fell an even match',
       standsWithout: true,
-      note: 'how long this pool takes to empty against something of the same level, which is the line that ties what a character can lose to what one deals. A ladder naming this is the world\'s toughness line: every stat carrying `deals:` climbs this same line divided by these seconds, so damage a second is derived here rather than declared anywhere, and one ladder in a world may say it',
+      note: 'how long this pool takes to empty against something of the same level, which is the line that ties what a character can lose to what one deals. A ladder naming this is the world toughness line: every stat carrying `deals:` climbs this same line with its added half divided by these seconds, so damage a second is derived here rather than declared anywhere, and one ladder in a world may say it',
     },
   },
 });

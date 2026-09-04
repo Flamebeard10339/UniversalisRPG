@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { loadModule, loadUniverse } from '../content/load';
+import { midpoint, point, scaleRange } from '../grammar/range';
 import { FIXTURE_WORLD, fixtureSources } from '../content/worldFixture';
 import { xpForLevel } from './skills';
-import { abilityAtLevelIn, abilityOn, climbsDps, dpsLadder, GROWTH_CEILING, ladderFor, ladderForStat, minutesOn, minutesToReachOn, rateOn, secondsToFellAnEvenMatch, toughnessLadder } from './pace';
+import { abilityAtLevelIn, abilityOn, addedOn, increasedOn, climbsDps, dpsLadder, GROWTH_CEILING, ladderFor, ladderForStat, minutesOn, minutesToReachOn, rateOn, secondsToFellAnEvenMatch, toughnessLadder } from './pace';
 
 const registry = loadUniverse(fixtureSources());
 
@@ -85,14 +86,34 @@ describe('the ability a level is assumed to stand at', () => {
     }
   });
 
-  it('stands the first level on the anchor its own ladder declares', () => {
-    for (const ladder of ladders()) expect(abilityOn(ladder, 1)).toBe(ladder.atLevelOne);
+  it('stands the first level on what its own ladder declares, both halves of it', () => {
+    for (const ladder of ladders()) {
+      expect(addedOn(ladder, 1)).toBe(ladder.addedAtLevelOne);
+      expect(increasedOn(ladder, 1)).toBe(ladder.increasedAtLevelOne);
+      expect(abilityOn(ladder, 1)).toBeCloseTo(ladder.addedAtLevelOne * (1 + ladder.increasedAtLevelOne / 100), 9);
+    }
   });
 
-  it('puts exactly one growth between one level and the next, wherever the ladder is written', () => {
+  it('puts exactly one growth between one level and the next on each half, whatever their product does', () => {
     for (const ladder of ladders()) {
-      for (let level = 1; level < 100; level += 1) expect(abilityOn(ladder, level + 1) - abilityOn(ladder, level)).toBeCloseTo(ladder.growthPerLevel, 9);
+      for (let level = 1; level < 100; level += 1) {
+        expect(addedOn(ladder, level + 1) - addedOn(ladder, level)).toBeCloseTo(ladder.addedGrowthPerLevel, 9);
+        expect(increasedOn(ladder, level + 1) - increasedOn(ladder, level)).toBeCloseTo(ladder.increasedGrowthPerLevel, 9);
+      }
     }
+  });
+
+  it('asks what the engine would work out for a character standing there, which is the whole reason there are two halves', () => {
+    for (const ladder of ladders()) {
+      for (const level of [1, 10, 30]) {
+        expect(abilityOn(ladder, level)).toBeCloseTo(midpoint(scaleRange(point(addedOn(ladder, level)), 1 + increasedOn(ladder, level) / 100)), 9);
+      }
+    }
+  });
+
+  it('climbs on both halves in the world it ships, or the claim above holds by one of them being nothing', () => {
+    const both = ladders().filter((each) => each.addedGrowthPerLevel !== 0 && each.increasedGrowthPerLevel !== 0);
+    expect(both.length).toBeGreaterThan(0);
   });
 
   it('would tell two declared ladders apart at every rung, so a declaration that moves is a reading that moves', () => {

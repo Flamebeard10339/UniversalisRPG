@@ -16,7 +16,7 @@ export function grantOf(registry: Registry, passive: Passive): number | undefine
   if (grants === undefined || budget === undefined) return undefined;
   const ladder = ladderForStat(registry, grants);
   if (ladder === undefined) return undefined;
-  return roundedFor(registry, grants, ladder.growthPerLevel / budget);
+  return roundedFor(registry, grants, ladder.addedGrowthPerLevel / budget);
 }
 
 export function passiveTags(registry: Registry, passive: Passive): readonly TagClause[] {

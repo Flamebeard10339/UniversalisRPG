@@ -23,7 +23,7 @@ describe('what a point of a passive is worth is read off the ladder its stat cli
   it('is one level of that ladder divided by the budget, for every passive that names one', () => {
     for (const passive of budgeted()) {
       const ladder = ladderForStat(registry, passive.grants)!;
-      const exact = ladder.growthPerLevel / passive.budget!;
+      const exact = ladder.addedGrowthPerLevel / passive.budget!;
       expect(grantOf(registry, passive)).toBe(roundedFor(registry, passive.grants!, exact));
     }
   });
@@ -32,7 +32,7 @@ describe('what a point of a passive is worth is read off the ladder its stat cli
     const passive = budgeted().find((each) => registry.stats.get(each.grants!)?.roundsTo !== undefined)!;
     expect(passive).toBeDefined();
     const step = registry.stats.get(passive.grants!)!.roundsTo!;
-    const exact = ladderForStat(registry, passive.grants)!.growthPerLevel / passive.budget!;
+    const exact = ladderForStat(registry, passive.grants)!.addedGrowthPerLevel / passive.budget!;
     expect(exact % step, 'the fixture would round to itself, so this claim would hold vacuously').not.toBe(0);
     expect(grantOf(registry, passive)! % step).toBe(0);
   });
@@ -59,12 +59,12 @@ describe('what a point of a passive is worth is read off the ladder its stat cli
   });
 
   it('moves every budgeted passive at once when the ladder moves, which is the whole of why it is declared there', () => {
-    const steeper = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace('growth per level: 31', 'growth per level: 62') })));
+    const steeper = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace('added growth per level: 15', 'added growth per level: 30') })));
     for (const passive of budgeted()) {
       const was = grantOf(registry, passive)!;
       const now = grantOf(steeper, steeper.passives.get(passive.id)!)!;
       const ladder = ladderForStat(steeper, passive.grants)!;
-      const exact = ladder.growthPerLevel / passive.budget!;
+      const exact = ladder.addedGrowthPerLevel / passive.budget!;
       expect(now, passive.id).toBe(roundedFor(steeper, passive.grants!, exact));
       expect(now, `${passive.id} did not move with the ladder`).toBeGreaterThan(was);
     }

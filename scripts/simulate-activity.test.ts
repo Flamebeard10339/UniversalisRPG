@@ -18,8 +18,8 @@ version: 1.0.0
 base: 10
 
 # ladder attack
-at level one: 0
-growth per level: 7
+added at level one: 0
+added growth per level: 7
 minutes at level one: 5
 minutes growth per level: 1.07
 
