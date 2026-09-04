@@ -3,7 +3,8 @@ import { loadModule } from '../content/load';
 import type { Registry } from '../content/registry';
 import { midpoint } from '../grammar/range';
 import { fightOf, ladderedFor, readingAt, referencePlayer, solvedStatsOf, type Fighter, type LadderedStats } from './foeTier';
-import { abilityAtLevelIn } from './pace';
+import { perHitFor } from './foeSolve';
+import { dpsAtLevel } from './pace';
 import { statValue } from './stats';
 import { minDamage } from './tuning';
 
@@ -180,7 +181,7 @@ describe('three tags cut a body, and reading it back finds the tier they were cu
     const profile = fighter.profile!;
     const theirs = (statId: string): number => statValue(statId, stood, registry, fighter.entity.id);
     const ours = (statId: string): number => statValue(statId, stood, registry, 'player');
-    const dealt = abilityAtLevelIn(registry, level, laddered(fighter).dealt);
+    const dealt = perHitFor(dpsAtLevel(level), ours(fighter.fight.rate), ours(fighter.fight.accuracy.ours), registry);
     expect(theirs(fighter.fight.accuracy.ours) / ours(fighter.fight.accuracy.ours)).toBeCloseTo(profile.accuracy, 6);
     expect(theirs(fighter.fight.accuracy.theirs) / ours(fighter.fight.accuracy.ours), 'evasion is read against the accuracy it is contested with, not against the player evasion it shares a name with').toBeCloseTo(profile.evasion, 6);
     if (profile.rate !== undefined) expect(theirs(fighter.fight.rate) / ours(fighter.fight.rate)).toBeCloseTo(profile.rate, 6);

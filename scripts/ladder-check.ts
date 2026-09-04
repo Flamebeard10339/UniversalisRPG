@@ -9,7 +9,11 @@ import { readSources } from './probe';
 import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
-import { abilityAtLevelIn } from '../src/runtime/pace';
+import { abilityAtLevelIn, climbsDps, dpsAtLevel } from '../src/runtime/pace';
+import { fightOf } from '../src/runtime/foeSolve';
+import { hitChance } from '../src/runtime/tuning';
+import { actorEntity } from '../src/runtime/actionLookup';
+import { PLAYER } from '../src/runtime/state';
 import { activitiesIn, type Activity } from './lib/tiers';
 import { buildTier, tierState } from './tier-build';
 import { activityFor, ladderedFor, readingAt, SURVIVAL_WINDOW_SECONDS, type Fighter } from '../src/runtime/foeTier';
@@ -213,9 +217,18 @@ export function delivered(registry: Registry, activity: Activity, level: number,
   const kit = kitFor(registry, activity, level, statId, holds);
   const stock = Math.max(1, kit.points);
   const handed = [...kit.worn.map((item) => item.id), ...kit.extras.map((id) => `${id}:${String(stock)}`)];
-  const built = buildTier(registry, activity, level, handed, [statId]);
-  return { kit, stood: built.grown!.after[statId]!, spent: built.grown!.spent };
+  const fight = fightOf(registry, actorEntity(registry, PLAYER)!);
+  const alsoRead = climbsDps(registry, statId) && fight !== undefined ? [fight.rate, fight.accuracy.ours] : [];
+  const built = buildTier(registry, activity, level, handed, [statId, ...alsoRead]);
+  const after = built.grown!.after;
+  const perHit = after[statId]!;
+  const stood = alsoRead.length === 0 ? perHit : dpsOf(perHit, after[fight!.rate]!, after[fight!.accuracy.ours]!, registry);
+  return { kit, stood, spent: built.grown!.spent };
 }
+
+const SECONDS_PER_MINUTE = 60;
+
+const dpsOf = (perHit: number, rate: number, accuracy: number, registry: Registry): number => (perHit * rate * hitChance(accuracy, accuracy, registry)) / SECONDS_PER_MINUTE;
 
 const figure = (value: number): string => value.toFixed(1);
 
@@ -228,9 +241,9 @@ const residual = (stood: number, asked: number): string => {
 const COLUMN = 22;
 
 function rungLines(registry: Registry, activity: Activity, statId: string, level: number, sources: readonly Source[]): string[] {
-  const asked = abilityAtLevelIn(registry, level, statId);
+  const asked = climbsDps(registry, statId) ? dpsAtLevel(level) : abilityAtLevelIn(registry, level, statId);
   return [
-    `  level ${String(level)} — the ladder asks ${figure(asked)}`,
+    `  level ${String(level)} — the ladder asks ${figure(asked)}${climbsDps(registry, statId) ? ' a second' : ''}`,
     ...sources.map((source) => {
       const read = delivered(registry, activity, level, statId, source.holds);
       const kit = `${String(read.kit.worn.length)} worn, ${String(read.spent)} of ${String(read.kit.points)} plane points spent, ${String(read.kit.extras.length)} jewel(s)/orb(s) to hand`;

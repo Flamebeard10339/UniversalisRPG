@@ -4,7 +4,7 @@ import { activitiesIn, type Activity } from '../content/activities';
 import type { Registry } from '../content/registry';
 import type { Entity } from '../content/sections/entity';
 import { actorEntity } from './actionLookup';
-import { abilityAtLevelIn } from './pace';
+import { dpsAtLevel, toughnessAtLevel } from './pace';
 import { PLAYER } from './state';
 import { hitChance, minDamage } from './tuning';
 
@@ -52,6 +52,11 @@ export function landed(dealt: number, resistance: number, reduction: number, reg
   return Math.max(Math.min(minDamage(registry), Math.max(through, 0)), through - reduction);
 }
 
+export function perHitFor(dps: number, rate: number, accuracy: number, registry: Registry): number {
+  const evenly = perSecond(rate) * hitChance(accuracy, accuracy, registry);
+  return evenly <= 0 ? 0 : dps / evenly;
+}
+
 const dealtFor = (hit: number, resistance: number, reduction: number): number => (resistance >= 100 ? Infinity : (hit + reduction) / (1 - resistance / 100));
 
 function declaredOn(registry: Registry, sheet: Entity | undefined, statId: string): number {
@@ -92,14 +97,14 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
 
   const us = actorEntity(registry, PLAYER);
   const type = registry.stats.get(laddered.dealt)?.deals;
-  const ourDealt = abilityAtLevelIn(registry, level, laddered.dealt);
-  const ourPool = abilityAtLevelIn(registry, level, laddered.pooled);
+  const ourPool = toughnessAtLevel(level);
   const ourRate = declaredOn(registry, us, fight.rate);
   const ourAccuracy = declaredOn(registry, us, fight.accuracy.ours);
   const ourEvasion = declaredOn(registry, us, fight.accuracy.theirs);
   const ourReduction = declaredOn(registry, us, fight.damage.theirs);
   const ourResistance = resistanceDeclaredOn(registry, us, type);
   const theirResistance = resistanceDeclaredOn(registry, entity, type);
+  const ourDealt = perHitFor(dpsAtLevel(level), ourRate, ourAccuracy, registry);
 
   const written = (statId: string): number | undefined => {
     const held = entity.stats[statId];

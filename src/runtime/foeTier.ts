@@ -3,10 +3,10 @@ import type { Registry } from '../content/registry';
 import type { Entity } from '../content/sections/entity';
 import type { Profile } from '../content/sections/profile';
 import type { Tier } from '../content/sections/tier';
-import { landed, perSecond, SURVIVAL_WINDOW_SECONDS, type LadderedStats } from './foeSolve';
+import { landed, perHitFor, perSecond, SURVIVAL_WINDOW_SECONDS, type LadderedStats } from './foeSolve';
 import { initialState } from './save';
 import { hitChance, statValue } from './stats';
-import { abilityAtLevelIn } from './pace';
+import { dpsAtLevel, toughnessAtLevel } from './pace';
 import type { GameState } from './state';
 import { PLAYER } from './state';
 
@@ -51,8 +51,10 @@ export function readingAt(registry: Registry, state: GameState, fighter: Fighter
   const foe = entity.id;
   const type = registry.stats.get(laddered.dealt)?.deals;
 
-  const ourDealt = abilityAtLevelIn(registry, level, laddered.dealt);
-  const ourPool = abilityAtLevelIn(registry, level, laddered.pooled);
+  const ourPool = toughnessAtLevel(level);
+  const ourRateNow = statValue(fight.rate, state, registry, PLAYER);
+  const ourAccuracyNow = statValue(fight.accuracy.ours, state, registry, PLAYER);
+  const ourDealt = perHitFor(dpsAtLevel(level), ourRateNow, ourAccuracyNow, registry);
   const ourRate = statValue(fight.rate, state, registry, PLAYER);
   const ourAccuracy = statValue(fight.accuracy.ours, state, registry, PLAYER);
   const ourEvasion = statValue(fight.accuracy.theirs, state, registry, PLAYER);

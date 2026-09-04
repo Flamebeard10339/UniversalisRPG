@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
 import { xpForLevel } from './skills';
-import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, BLOWS_TO_FELL_AN_EVEN_MATCH, DAMAGE_LINE, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
+import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, DPS_LINE, SECONDS_TO_FELL_AN_EVEN_MATCH, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, toughnessAtLevel, dpsAtLevel, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -79,7 +79,7 @@ describe('a ladder per stat, rather than one line for all of them', () => {
   });
 });
 
-describe('a stat that deals a damage type climbs at a share of the pool it empties', () => {
+describe('a stat that deals a damage type climbs a ladder of damage a second, not of damage a blow', () => {
   const registry = loadUniverse(fixtureSources());
 
   const deals = (): string[] => [...registry.stats.values()].filter((stat) => stat.deals !== undefined).map((stat) => stat.id);
@@ -91,18 +91,25 @@ describe('a stat that deals a damage type climbs at a share of the pool it empti
   });
 
   it('reads every dealing stat off the damage line, whichever type it deals', () => {
-    for (const statId of deals()) expect(ladderForStat(registry, statId)).toBe(DAMAGE_LINE);
+    for (const statId of deals()) expect(ladderForStat(registry, statId)).toBe(DPS_LINE);
   });
 
   it('reads every stat that deals nothing off the line its own id names', () => {
     for (const statId of dealsNothing()) expect(ladderForStat(registry, statId)).toBe(ladderFor(statId));
   });
 
-  it('asks a fifth as much of a dealing stat at every rung, so an even match takes that many blows', () => {
+  it('asks the damage a second that empties an even match in the seconds the line names, at every rung', () => {
     for (let level = 1; level < 100; level += 1) {
       for (const statId of deals()) {
-        expect(abilityAtLevelIn(registry, level, statId) * BLOWS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(abilityAtLevel(level), 9);
+        expect(abilityAtLevelIn(registry, level, statId) * SECONDS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(abilityAtLevel(level), 9);
       }
+    }
+  });
+
+  it('reads the two axes as independent, so a body may climb what it can lose without climbing what it deals', () => {
+    for (const level of [1, 10, 30]) {
+      expect(toughnessAtLevel(level)).toBeCloseTo(abilityAtLevel(level), 9);
+      expect(dpsAtLevel(level) * SECONDS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(toughnessAtLevel(level), 9);
     }
   });
 });
