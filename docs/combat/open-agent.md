@@ -12,6 +12,45 @@ whatever mix the speedruns find. **A line is deleted the day it closes.**
 
 ---
 
+## The base run's module is merged as it wrote it, and the run never wrote its report
+
+`npm run authorbot -- .planning/combat-expansion.md --target combat` ran on 2026-09-04 and
+hit its 150-turn cap while still cutting the muster's numbers, so no report was written and
+the muster is at whatever its last edit left it. Its `combat.dsl` (1,325 lines) is copied
+into `content/` as it stood: the five types and fifteen stats, the attack skill on
+`physical-damage`, the weapons on physical and the iron set carrying resistances, the
+jewels renamed to `<rarity>-<role>-<skill>` (`uncommon-berserker-attack`, `rare-thorns-health`,
+`unique-rage-attack` and so on), a physical-to-fire conversion stat, a counter, and 84 routes
+that all walk. It was never read for reaches: `npm run friction` says what it had to work out.
+
+`npm run oracle -- --at content` is red on one thing said six ways: `# save
+combat.iron-band-in-hand` writes the six iron pieces under `"inventory"` where a base has to
+stand under `"instances"` as a copy with a roll. The run used that save to sweep the second
+band. `npm run probe -- content --record <a route that buys the iron>` prints the body to
+paste over it, or the save goes if nothing loads it.
+
+*Closes when:* the gate is green, `npm run ladder-check` and a per-band
+`npm run simulate-activity` table are read off the merged module and written into the commit
+that closes this, the muster reads as a room at the level-21 rung in the band's shop gear,
+and whether the jewels' passives were renamed is stated.
+
+## The wave after the base run has its briefs and has not been dispatched
+
+Nine briefs stand in `.planning/`, each written off a measured gap on 2026-09-04, and each is
+one `npm run authorbot -- <brief> --target <module>`, run in the background with `--watch`
+beside it. They may run in parallel because each writes one file, with two orders to keep:
+`plague-matters.md` after `reverse-infiltration.md` has merged, since it names that quest's
+ids; and none before the line above closes, since every one reads combat's ids. The Rat
+Conspiracy matches its own note and gets no pass; A Grand Blade's pass waits on the ruling in
+`open-human.md`.
+
+    ball-of-a-boy-pass.md        kill-it-with-fire-pass.md    birds-and-the-bees-pass.md
+    the-swampy-menace-pass.md    attention-to-detail-pass.md  the-bars-crawl-pass.md
+    combat-lessons.md            reverse-infiltration.md      plague-matters.md
+
+*Closes when:* each module is merged with `npm run oracle -- --at content` green and its
+reaches read, and the two finale quests walk start to finish.
+
 ## Combat has no floor, so its tier saves cannot be deleted
 
 `docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets
