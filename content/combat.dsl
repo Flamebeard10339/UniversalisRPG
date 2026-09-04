@@ -241,7 +241,7 @@ examine: A plain cap of hammered bronze, dented over the left ear by somebody el
 slot: head
 value: 26
 item-level: 2-4
-armour, +2 core.defense, +3 core.max-health
+armour, +2 core.defense, +16 core.max-health
 
 # item bronze-platebody
 title: Bronze Platebody
@@ -249,7 +249,7 @@ examine: Front and back plate, laced at the sides. Heavier than it looks and qui
 slot: body
 value: 44
 item-level: 3-6
-armour, +4 core.defense, +1 core.max-health
+armour, +4 core.defense, +26 core.max-health, +5% core.max-health
 
 # item bronze-platelegs
 title: Bronze Platelegs
@@ -257,7 +257,7 @@ examine: Skirted plate to the knee. Walking in them is a skill nobody warns you 
 slot: legs
 value: 38
 item-level: 2-5
-armour, +3 core.defense, +2 core.max-health
+armour, +3 core.defense, +20 core.max-health, +3% core.max-health
 
 # item bronze-boots
 title: Bronze Boots
@@ -265,7 +265,7 @@ examine: Plate over the shin and the foot, and they are the loudest thing anybod
 slot: boots
 value: 24
 item-level: 2-4
-armour, +2 core.defense, +1 core.max-health
+armour, +2 core.defense, +12 core.max-health
 
 # item bronze-shield
 title: Bronze Shield
@@ -273,7 +273,7 @@ examine: A round of bronze over a board, with a boss in the middle you are meant
 slot: offhand
 value: 32
 item-level: 2-4
-shield, +3 core.defense, +1 core.max-health
+shield, +3 core.defense, +10 core.max-health
 
 # item bronze-sword
 title: Bronze Sword
@@ -300,7 +300,7 @@ slot: head
 requires: level.attack >= 10 and level.health >= 10
 value: 80
 item-level: 4-8
-armour, +4 core.defense, +6 core.max-health, +3 physical-resistance
+armour, +4 core.defense, +55 core.max-health, +3 physical-resistance
 
 # item iron-platebody
 title: Iron Platebody
@@ -309,7 +309,7 @@ slot: body
 requires: level.attack >= 10 and level.health >= 10
 value: 130
 item-level: 6-11
-armour, +7 core.defense, +3 core.max-health, +4 physical-resistance
+armour, +7 core.defense, +85 core.max-health, +18% core.max-health, +4 physical-resistance
 
 # item iron-platelegs
 title: Iron Platelegs
@@ -318,7 +318,7 @@ slot: legs
 requires: level.attack >= 10 and level.health >= 10
 value: 110
 item-level: 5-9
-armour, +6 core.defense, +4 core.max-health, +3 physical-resistance
+armour, +6 core.defense, +65 core.max-health, +12% core.max-health, +3 physical-resistance
 
 # item iron-boots
 title: Iron Boots
@@ -327,7 +327,7 @@ slot: boots
 requires: level.attack >= 10 and level.health >= 10
 value: 70
 item-level: 4-8
-armour, +4 core.defense, +2 core.max-health, +2 physical-resistance
+armour, +4 core.defense, +40 core.max-health, +2 physical-resistance
 
 # item iron-shield
 title: Iron Shield
@@ -336,7 +336,7 @@ slot: offhand
 requires: level.attack >= 10 and level.health >= 10
 value: 95
 item-level: 4-8
-shield, +6 core.defense, +2 core.max-health, +3 physical-resistance, +15 fire-resistance
+shield, +6 core.defense, +45 core.max-health, +3 physical-resistance, +15 fire-resistance
 
 # item knights-sword
 title: Knight's Sword
@@ -530,12 +530,20 @@ stocks:
   3 bronze-boots
   3 bronze-shield
   6 keen-edge-jewel
+  2 iron-dagger
+  2 iron-helmet
+  2 iron-platebody
+  2 iron-platelegs
+  2 iron-boots
+  2 iron-shield
 replenish: 10m
 
 # entity chicken
 title: Chicken
 examine: It has decided you are a threat and it is not entirely wrong.
-stats: attack 2, defense 0, max-health 8, attack-rate 20, accuracy 40, evasion 20
+tier: mob
+profile: skirmisher
+level: 1
 uses: core.melee-combat
 faction: world
 respawn after: 15s
@@ -546,7 +554,9 @@ on death:
 # entity cow
 title: Cow
 examine: Enormous, patient, and standing exactly where it wants to be.
-stats: attack 4, defense 2, max-health 40, attack-rate 12, accuracy 50, evasion 5
+tier: mob
+profile: brute
+level: 2
 uses: core.melee-combat
 faction: world
 respawn after: 50s
@@ -557,7 +567,9 @@ on death:
 # entity wolf
 title: Wolf
 examine: Lean through the ribs and unhurried, which is worse.
-stats: attack 14, defense 4, max-health 55, attack-rate 24, accuracy 85, evasion 45
+tier: normal
+profile: skirmisher
+level: 8
 uses: core.melee-combat
 faction: world
 aggressive
@@ -569,7 +581,10 @@ on death:
 # entity highwayman
 title: Highwayman
 examine: A man who has been waiting behind that rock since before you were on the road, with a torch stuck lit into the ground beside him for the look of it more than the light.
-stats: attack 16, defense 10, max-health 90, attack-rate 22, accuracy 95, evasion 50, fire-damage 8
+tier: normal
+profile: duellist
+level: 12
+stats: fire-damage 8
 uses: core.melee-combat
 faction: world
 aggressive
@@ -599,7 +614,9 @@ on death:
 # entity ratman
 title: Ratman
 examine: A man's frame, a rat's head, and the join between them done badly on purpose.
-stats: attack 14, defense 4, max-health 60, attack-rate 20, accuracy 85, evasion 40
+tier: normal
+profile: duellist
+level: 10
 uses: core.melee-combat
 faction: world
 aggressive
@@ -628,7 +645,10 @@ on death:
 # entity swamp-mollusk
 title: Swamp Mollusk
 examine: A shell the size of a shield, and the foot under it is wet with something you would not touch, and no wonder: nothing about it should smoulder wrong the way it does.
-stats: attack 8, defense 8, max-health 45, attack-rate 10, accuracy 60, evasion 5, chaos-damage 6
+tier: normal
+profile: brute
+level: 18
+stats: chaos-damage 6, physical-resistance 30
 uses: core.melee-combat
 faction: world
 respawn after: 5m
@@ -641,7 +661,9 @@ on death:
 # entity bog-lurker
 title: Bog Lurker
 examine: Something long standing very still in water that is not deep enough to hide it, until it is not still at all.
-stats: attack 16, defense 3, max-health 50, attack-rate 22, accuracy 80, evasion 45
+tier: mob
+profile: skirmisher
+level: 5
 uses: core.melee-combat
 faction: world
 aggressive
@@ -676,7 +698,9 @@ passives: combat.retribution
 # entity princess-bee
 title: Princess Bee
 examine: Half again the size of a drone and it does not buzz so much as hum, a note that sits wrong in your teeth.
-stats: attack 10-14, defense 2, max-health 40, attack-rate 28, accuracy 75, evasion 55
+tier: normal
+profile: skirmisher
+level: 8
 uses: core.melee-combat
 faction: world
 aggressive
@@ -1159,22 +1183,49 @@ assert: stat.physical-damage > 0
 +skills: attack, health
 
 # entity tulsa.civilian
+tier: mob
+profile: duellist
+level: 3
+-stats: attack 5, defense 1, max-health 20, attack-rate 15, accuracy 55, evasion 25
 on death:
   credit:
     roll: purse
 
 # entity tulsa.guardsman
+tier: normal
+profile: duellist
+level: 5
+-stats: attack 16, defense 8, max-health 70, attack-rate 20, accuracy 90, evasion 40
++stats: physical-resistance 10
 on death:
   credit:
     roll: purse
     1 in 8: give: 1 bronze-helmet
 
 # entity tulsa.knight
+tier: elite
+profile: brute
+level: 20
+-stats: attack 26, defense 14, max-health 130, attack-rate 20, accuracy 100, evasion 45
++stats: physical-resistance 25
 on death:
   credit:
     roll: knights-purse
     1 in 10: give: 1 iron-helmet
     1 in 300: give: 1 combat.unique-rage-attack
+
+# entity tulsa.drone-bee
+tier: mob
+profile: skirmisher
+level: 3
+-stats: attack 6, defense 0, max-health 14, attack-rate 30, accuracy 70, evasion 55
+
+# entity tulsa.groundwurm
+tier: elite
+profile: brute
+level: 15
+-stats: attack 18-22, defense 5, max-health 80, attack-rate 16, accuracy 85, evasion 10
++stats: physical-resistance 20
 
 # entity tulsa.sewer-shelf
 look under the cloth:
