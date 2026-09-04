@@ -162,12 +162,16 @@ Fifteen routes still assert `not core.fainted`, and those are engine tests — *
 apply* — standing in the shipped world where a contributor editing content cannot run them.
 They belong in `src/content/fixture/` or in a `.test.ts`. Three more assert an absolute pool
 value (`resource.core.health = 11`), which `WALKED_FIELDS` already forbids an `expect:` sheet
-and does not yet forbid an `assert:`. The predicate that derives cleanly is in `open-human.md`
-and waits on a ruling, because read literally it refuses all 102 `has` asserts too.
+and does not forbid an `assert:`.
 
-*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value, and
-the filter that stops the next one being written is derived from `SAVE_FIELDS` rather than
-listed beside it.
+**Ruled that it stays unforbidden and this is discipline rather than a gate.** A filter over
+`assert:` refuses all 102 `has` asserts along with the three worth refusing, because
+`inventory` is not a walked field and no predicate tells a quest item from a drop. The signal
+is cheaper than the gate: **if a balance change reddens the suite, that is the tell that one
+of these got written.**
+
+*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value —
+the fifteen moved to `src/content/fixture/` or to a `.test.ts`, where an engine test belongs.
 
 ## The passive ids were not renamed, and were ruled to be
 

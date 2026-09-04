@@ -5,26 +5,6 @@ carrying what was measured for it.
 
 ---
 
-## Which asserts a route may not make, now that surviving is not one of them
-
-Ruled that a route proves reachability and the balance system proves survivability, so
-fifteen routes asserting `not core.fainted` are engine tests standing in the shipped world.
-Ruled too that `WALKED_FIELDS` should cover `assert:` the way it already covers `expect:`.
-
-**Read literally that refuses 139 lines, including all 102 `has` and `inventory` asserts**,
-because `inventory` is `walked: false` — and `assert: has sewer-key` is plainly walkability.
-Narrowing it to "a magnitude, not an existence" still catches about 35, because `stat.`
-covers both laddered stats and `# variable` state machines: `assert: stat.warden-away = 2`
-is a quest timer, not a number balance moves.
-
-The rule that derives cleanly off the world's own declarations is: **a route may not pin
-`xp.<skill>`, `level.<skill>`, `resource.<r>`, or `stat.<s>` where some `# skill` names
-`<s>`.** A `# variable` is untouched because no skill names it, and `inventory` is left
-alone. That is about ten lines in the corpus, `assert: stat.cooking > 60` among them.
-
-*Moves when: he says whether that is the rule. It is one predicate in the test section's
-validation, and the lines it refuses are listed above rather than hunted for.*
-
 ## What a passive that is not one flat grant of one stat should do
 
 Sixty of seventy-five passives are one grant of one stat and are now derived from a budget.
