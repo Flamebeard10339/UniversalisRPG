@@ -1,4 +1,5 @@
 import { decimal } from '../../grammar/values';
+import type { Loose } from '../refs';
 import { section } from './define';
 
 export interface Ladder {
@@ -15,11 +16,19 @@ export interface Ladder {
 const TWO_HALVES =
   'A stat is worked out the way the engine works one out: every flat grant summed into what is added, every percent summed into what is increased, and the first multiplied by the second. A ladder therefore climbs on two lines rather than one, and what it asks at a level is the added line times the increased line. How much of the climb each half carries is the choice this makes available: the same total can be reached by a stat that grows mostly by being added to and one that grows mostly by being multiplied, and they play differently.';
 
+export function twoToughnessLines(ladders: ReadonlyMap<string, Ladder>): Ladder[] {
+  const named = [...ladders.values()].filter((each) => each.secondsToFellAnEvenMatch !== undefined);
+  return named.length > 1 ? named : [];
+}
+
 export const ladder = section<Ladder>()({
   kind: 'ladder',
   ids: 'owned',
   vocabulary: 'declared',
   map: 'ladders',
+  visit: (value, where, visit) => {
+    (value as unknown as Loose).id = visit('stat', value.id, where);
+  },
   fields: {
     addedAtLevelOne: {
       parser: decimal,

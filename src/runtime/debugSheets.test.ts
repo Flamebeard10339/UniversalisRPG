@@ -109,7 +109,7 @@ DEBUG
 # damage-type probe-fire
 DEBUG
 
-# ladder probe-ladder
+# ladder probe-stat
 DEBUG
 
 # tier probe-tier

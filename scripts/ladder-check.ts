@@ -11,8 +11,7 @@ import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
 import { abilityAtLevelIn, climbsDps } from '../src/runtime/pace';
 import { passiveTagsOf } from '../src/runtime/passiveGrant';
-import { fightOf } from '../src/runtime/foeSolve';
-import { hitChance } from '../src/runtime/tuning';
+import { dpsFor, fightOf } from '../src/runtime/foeSolve';
 import { actorEntity } from '../src/runtime/actionLookup';
 import { PLAYER } from '../src/runtime/state';
 import { activitiesIn, type Activity } from './lib/tiers';
@@ -223,13 +222,10 @@ export function delivered(registry: Registry, activity: Activity, level: number,
   const built = buildTier(registry, activity, level, handed, [statId, ...alsoRead]);
   const after = built.grown!.after;
   const perHit = after[statId]!;
-  const stood = alsoRead.length === 0 ? perHit : dpsOf(perHit, after[fight!.rate]!, after[fight!.accuracy.ours]!, registry);
+  const stood = alsoRead.length === 0 ? perHit : dpsFor(perHit, after[fight!.rate]!, after[fight!.accuracy.ours]!, registry);
   return { kit, stood, spent: built.grown!.spent };
 }
 
-const SECONDS_PER_MINUTE = 60;
-
-const dpsOf = (perHit: number, rate: number, accuracy: number, registry: Registry): number => (perHit * rate * hitChance(accuracy, accuracy, registry)) / SECONDS_PER_MINUTE;
 
 const figure = (value: number): string => value.toFixed(1);
 

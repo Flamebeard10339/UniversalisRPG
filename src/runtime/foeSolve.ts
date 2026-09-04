@@ -41,7 +41,7 @@ export function ladderedIn(registry: Registry, activity: Activity, fight: FightS
   }
   if (dealt === undefined || pooled === undefined) return undefined;
   const pool = toughnessLadder(registry);
-  const dps = dpsLadder(registry);
+  const dps = dpsLadder(registry, dealt);
   if (pool === undefined || dps === undefined || pool.id !== pooled) return undefined;
   return { dealt, pooled, pool, dps };
 }
@@ -82,10 +82,14 @@ export function landed(dealt: number, resistance: number, reduction: number, reg
   return Math.max(Math.min(minDamage(registry), Math.max(through, 0)), through - reduction);
 }
 
+export const swingsPerSecond = (rate: number, accuracy: number, registry: Registry): number => perSecond(rate) * hitChance(accuracy, accuracy, registry);
+
 export function perHitFor(dps: number, rate: number, accuracy: number, registry: Registry): number {
-  const evenly = perSecond(rate) * hitChance(accuracy, accuracy, registry);
+  const evenly = swingsPerSecond(rate, accuracy, registry);
   return evenly <= 0 ? 0 : dps / evenly;
 }
+
+export const dpsFor = (perHit: number, rate: number, accuracy: number, registry: Registry): number => perHit * swingsPerSecond(rate, accuracy, registry);
 
 const dealtFor = (hit: number, resistance: number, reduction: number): number => (resistance >= 100 ? Infinity : (hit + reduction) / (1 - resistance / 100));
 

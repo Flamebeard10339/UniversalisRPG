@@ -10,14 +10,21 @@ export const ladderFor = (registry: Registry, statId?: string): Ladder | undefin
 
 export const climbsDps = (registry: Registry, statId?: string): boolean => statId !== undefined && registry.stats.get(statId)?.deals !== undefined;
 
-export function dpsLadder(registry: Registry): Ladder | undefined {
+export function dpsLadder(registry: Registry, statId?: string): Ladder | undefined {
   const pool = toughnessLadder(registry);
   const seconds = pool?.secondsToFellAnEvenMatch;
   if (pool === undefined || seconds === undefined || seconds === 0) return undefined;
-  return { ...pool, addedAtLevelOne: pool.addedAtLevelOne / seconds, addedGrowthPerLevel: pool.addedGrowthPerLevel / seconds };
+  return {
+    ...pool,
+    id: statId ?? pool.id,
+    secondsToFellAnEvenMatch: undefined,
+    addedAtLevelOne: pool.addedAtLevelOne / seconds,
+    addedGrowthPerLevel: pool.addedGrowthPerLevel / seconds,
+  };
 }
 
-export const ladderForStat = (registry: Registry, statId?: string): Ladder | undefined => (climbsDps(registry, statId) ? dpsLadder(registry) : ladderFor(registry, statId));
+export const ladderForStat = (registry: Registry, statId?: string): Ladder | undefined =>
+  ladderFor(registry, statId) ?? (climbsDps(registry, statId) ? dpsLadder(registry, statId) : undefined);
 
 export const ladderForSkill = (registry: Registry, skillId: string): Ladder | undefined => ladderForStat(registry, registry.skills.get(skillId)?.stat);
 
@@ -43,11 +50,6 @@ export const rateOn = (ladder: Ladder, level: number): number => ((xpForLevel(le
 
 export const abilityAtLevelIn = (registry: Registry, level: number, statId?: string): number | undefined => {
   const ladder = ladderForStat(registry, statId);
-  return ladder === undefined ? undefined : abilityOn(ladder, level);
-};
-
-export const toughnessAtLevel = (registry: Registry, level: number): number | undefined => {
-  const ladder = toughnessLadder(registry);
   return ladder === undefined ? undefined : abilityOn(ladder, level);
 };
 

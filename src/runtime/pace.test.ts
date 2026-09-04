@@ -131,12 +131,28 @@ describe('a stat that deals a damage type climbs a ladder of damage a second, no
     expect(dealsNothing().length).toBeGreaterThan(0);
   });
 
-  it('reads every dealing stat off the damage line, whichever type it deals, and declares none of its own', () => {
+  it('reads every dealing stat off the damage line, whichever type it deals, under its own name', () => {
+    const pool = toughnessLadder(registry)!;
     for (const statId of deals()) {
       expect(climbsDps(registry, statId)).toBe(true);
-      expect(ladderForStat(registry, statId)).toEqual(dpsLadder(registry));
       expect(registry.ladders.has(statId)).toBe(false);
+      const line = ladderForStat(registry, statId)!;
+      expect(line).toEqual(dpsLadder(registry, statId));
+      expect(line.id, 'a derived line answers to the stat it is for, not to the pool it came off').toBe(statId);
+      expect(line.secondsToFellAnEvenMatch, 'the seconds belong to the pool line and are stale on a copy of it').toBeUndefined();
+      expect(line.addedGrowthPerLevel * pool.secondsToFellAnEvenMatch!).toBeCloseTo(pool.addedGrowthPerLevel, 9);
     }
+  });
+
+  it('lets a stat that declares its own ladder keep it, dealing or not, so a declaration is never quietly ignored', () => {
+    const dealt = deals()[0]!;
+    const bare = dealt.slice(dealt.indexOf('.') + 1);
+    const was = `# stat ${bare}`;
+    const line = ['', `# ladder ${bare}`, 'added at level one: 3', 'added growth per level: 9', 'minutes at level one: 5', 'minutes growth per level: 1.07', ''].join('\n');
+    const declared = loadUniverse(fixtureSources().map((each) => ({ ...each, text: each.text.replace(was, `${line}${was}`) })));
+    expect(declared.ladders.has(dealt), 'the fixture did not take the declaration, so this claim proves nothing').toBe(true);
+    expect(ladderForStat(declared, dealt)).toBe(declared.ladders.get(dealt));
+    expect(ladderForStat(declared, dealt)!.addedGrowthPerLevel).toBe(9);
   });
 
   it('reads every stat that deals nothing off the line its own id names', () => {

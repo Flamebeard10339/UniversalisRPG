@@ -22,6 +22,7 @@ import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { unpriceableStock } from './sections/shop';
 import { statRing } from './sections/stat';
+import { twoToughnessLines } from './sections/ladder';
 import { firstCycle } from './cycle';
 import { actionAddresses, carriedIds, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
@@ -645,6 +646,15 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   if (ring) {
     const module = sectionOwner(owners, 'stat', ring.stats[0]!);
     const error = new DslError(ring.says);
+    if (!module) throw error;
+    return { module, stage: 'validate', error };
+  }
+
+  const toughness = twoToughnessLines(registry.ladders);
+  if (toughness.length > 1) {
+    const said = toughness.map((each) => `# ladder ${each.id}`).join(' and ');
+    const module = sectionOwner(owners, 'ladder', toughness[0]!.id);
+    const error = new DslError(`${said} both say \`seconds to fell an even match\`, and that line names the one ladder every stat carrying \`deals:\` is read against: a world with two of them would pick whichever loaded first. Say it on one.`);
     if (!module) throw error;
     return { module, stage: 'validate', error };
   }
