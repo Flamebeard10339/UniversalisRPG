@@ -131,26 +131,27 @@ engine's own summation rather than a second model of it.
 *Closes when:* a body dealing two types reads back at its tier, and `readingAt` no longer
 names a single damage stat.
 
-## Sixty passives have a budget to be cut against and are still carrying hand-cut amounts
+## Seventy-three passives still carry amounts cut against nothing
 
-`# passive` now takes `grants:` — the stat — and `budget:` — how many points of it come to one
-level of the ladder that stat climbs. The amount is derived rather than written, so moving a
-ladder re-cuts every passive hanging off it with no content edit, and `rounds to:` on a
-`# stat` says the step the derived number comes to the nearest of, so `core.max-health` moves
-in fives. `combat.immovable` is converted and reads +30 where it was a hand-cut +25.
+`# passive` takes `grants:`, a block of multiples of what one level is worth on the ladder the
+stat climbs: `+2x increased physical-damage`, `-0.5x added defense`. The engine writes the
+number, so moving a ladder re-cuts every passive hanging off it, and `rounds to:` on a `# stat`
+says the step the added half comes to the nearest of.
 
-**One of seventy-five is converted.** Measured shapes of the rest: 43 more are one flat grant
-of one stat and convert exactly as `immovable` did; 17 grant a percent, which cannot be solved
-because a percent of a linear ladder is a different number at every rung, and want an audit
-instead; 15 are trade-offs, per-resource scaling, behaviour-only or multi-stat, and what those
-should do is in `open-human.md`.
+Every shape a passive takes is covered by that one form, which is why there is no list of cases
+here: a trade-off is two lines, a two-stat passive is two lines, and either half may be added
+or increased. **Two of seventy-five are converted** — `combat.immovable` (+1x added, reading
++15) and `combat.reckless` (+2x increased, its defense half still hand-cut).
 
-This must not run at the same time as the passive rename below, since both write every
-`# passive` in `combat.dsl`.
+Two things to know before converting the rest. A grant against a stat that climbs no `# ladder`
+mints nothing at all, and `worldRemarks` reports it — `core.defense` and `combat.attack-rate`
+are unladdered today, so a passive granting them needs a ladder declared first or keeps its
+authored modifier. And this must not run at the same time as the passive rename below, since
+both write every `# passive` in `combat.dsl`.
 
-*Closes when:* every passive that is one flat grant of one stat names a budget and no amount,
-`ladder-check` reports a percent passive that exceeds what its budget allows, and
-`npm run oracle -- --at content` is green.
+*Closes when:* every passive whose worth is a share of a level says so with `grants:`,
+`npm run oracle -- --at content` reports no passive granting against an unladdered stat, and
+what is left hand-cut is hand-cut because somebody decided it should be.
 
 ## A route proves reachability, and fifteen of them still assert survival
 
