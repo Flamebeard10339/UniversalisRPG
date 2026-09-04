@@ -16,13 +16,14 @@ stage set-a-task:
   oolga says:
     always
     ask: Can I see what's on your shelves?
+    Things were better before. All of it was. You'll not remember, and there's no fixing that by telling you.
     A glint comes into her eye, quick as a knife catching light, and it is gone just as quick.
     Not until you've earned the look behind me. My cellar's thick with rats and I'll have every one of them still breathing when you're done, or don't bother bringing me the news at all.
-    Try Sha Dynasty's, up the lane. The woman who runs it has a way of asking animals to leave that they actually listen to.
+    Ask around, if it's answers you're after. I've rats to be shut of, not favours to spare on directions.
     goto seek-sunny
 
 stage seek-sunny:
-  log: Oolga wants her cellar clear of rats without one of them killed, and thinks the woman who runs Sha Dynasty's would know how that is managed.
+  log: Oolga wants her cellar clear of rats without one of them killed. She wasn't the one who told me who'd know how that's managed — that took asking around.
   sunny says:
     always
     ask: Oolga sent me about her rats.
@@ -94,8 +95,67 @@ on death:
 # location tulsa.oolga-basement
 +entities: 4 cellar-rat
 
+# dialogue tulsa.town-crier
+node oolgas-rats:
+  when: oolgas-basement.seek-sunny and not oolgas-basement.gather-ingredients
+  ask: About Oolga's rats.
+  again: Sunny, at Sha Dynasty's. I already told you as much.
+  You want Sunny, out at Sha Dynasty's. She has a way with animals that isn't natural and isn't much spoken of, and a rat's an animal same as anything else.
+
+# dialogue tulsa.charlie
+node oolgas-rats:
+  when: oolgas-basement.seek-sunny and not oolgas-basement.gather-ingredients
+  ask: You know anything about clearing rats?
+  again: Sunny. Sha Dynasty's. Same as before.
+  Rats, mice, anything with a heartbeat and no manners — Sunny at Sha Dynasty's can talk them off a place without laying a hand on one. Everybody round here knows that much, if you ask the right way.
+
+# entity tulsa.oolgas-counter
+examine: {oolgas-basement.cellar-cleared: A counter set with jars and stoppered bottles in neat rows, each one labelled in a hand only Oolga can read.}{not oolgas-basement.cellar-cleared: A counter with nothing on it. Everything worth buying is on the shelves behind her, and the shelves are not for you.}
+keeps shop: oolgas-shelf
+ask after her wares:
+  hidden if: oolgas-basement.cellar-cleared
+
+# shop oolgas-shelf
+coin: core.coin
+stocks:
+  3 cinderward-draught
+  3 foulward-draught
+  3 quickmend-draught
+replenish: 10m
+hidden if: not oolgas-basement.cellar-cleared
+
+# item cinderward-draught
+title: Cinderward Draught
+examine: A stoppered bottle, dark red and thick, and the label is a burn mark shaped like an initial.
+value: 70
+food, +25 combat.fire-resistance, 3m
+drink:
+  instant
+  take: 1 cinderward-draught
+  say: It goes down like a coal held too long in the mouth, and the burn does not stop there. Your skin stops minding it either way.
+
+# item foulward-draught
+title: Foulward Draught
+examine: Cloudy green in the jar, and it moves faintly even when the jar is still.
+value: 70
+food, +25 combat.chaos-resistance, 3m
+drink:
+  instant
+  take: 1 foulward-draught
+  say: It tastes the way the swamp smells, which is rather the point, and something under your skin stops arguing back.
+
+# item quickmend-draught
+title: Quickmend Draught
+examine: Pale and thin, and warmer in the hand than a bottle has any business being.
+value: 60
+food, +20 core.regeneration, 3m
+drink:
+  instant
+  take: 1 quickmend-draught
+  say: It goes down easy and sits warm, and whatever it is doing, it is doing it already.
+
 # save sent-out-for-oolga
-{"version":13,"location":"tulsa.market-square","inventory":{"core.royal-jelly":1,"core.mollusk-venom":1},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+{"version":13,"location":"tulsa.market-square","inventory":{"core.royal-jelly":1,"core.mollusk-venom":1,"core.coin":200},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # test kill-it-with-fire-start-to-finish
 unkillable
@@ -133,6 +193,18 @@ talk: oolga
 choose: oolgas-basement.groundwurm-fight.oolga.1.said
 choose: continue
 assert: oolgas-basement.cellar-cleared
+shop: oolgas-shelf
+submit-modal: item=buy:cinderward-draught
+submit-modal: item=close
+assert: has cinderward-draught
+
+# test oolgas-shelf-is-shut-until-her-cellar-is-clear
+load: sent-out-for-oolga
+travel: tavern-street
+travel: oolga-house
+assert: not oolgas-basement.cellar-cleared
+shop: oolgas-shelf
+refused
 
 # test kill-it-with-fire-rats-put-down
 unkillable

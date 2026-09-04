@@ -277,7 +277,8 @@ function resolveAttempt(participant: Participant, segment: Segment): SwingOutcom
   const hit = felling || (settled ?? (action.accuracy === undefined || nextRandom(state) < hitChance(half(action.accuracy.left, statValue, 0), half(action.accuracy.right, statValue, 0), registry)));
 
   const typed = action.damage === undefined ? 0 : typedDamage(state, registry, self, other);
-  const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(half(action.damage?.left, sampleStat, 1), half(action.damage?.right, sampleStat, 0), registry) + typed;
+  const swung = half(action.damage?.left, sampleStat, 1) + fromMilliUnits(typed);
+  const dealt = !hit ? null : felling ? targetLevel(state, registry, action, self, other) : hitDamage(swung, half(action.damage?.right, sampleStat, 0), registry);
   const capacity = dealt !== null && action.depletes ? Math.max(targetLevel(state, registry, action, self, other), 0) : null;
   if (dealt !== null) damageTarget(state, registry, action, self, other, dealt, segment.deltas);
   if (action.depletes) {

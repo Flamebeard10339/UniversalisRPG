@@ -73,6 +73,14 @@ stats: max-health 1000
 faction: world
 stats: max-health 1000, fire-resistance 50
 
+# entity plated-dummy
+faction: world
+stats: max-health 1000, defense 30
+
+# entity clay-plated-dummy
+faction: world
+stats: max-health 1000, fire-resistance 50, defense 30
+
 # entity oiled-dummy
 faction: world
 stats: max-health 1000, fire-resistance -50
@@ -88,7 +96,7 @@ stats: max-health 1000, fire-resistance 200, max-fire-resistance 200
 # location yard
 x: 0, y: 0
 starting
-entities: dummy, clay-dummy, oiled-dummy, glazed-dummy, kiln-dummy
+entities: dummy, clay-dummy, oiled-dummy, glazed-dummy, kiln-dummy, plated-dummy, clay-plated-dummy
 `;
 
 const arena = (playerStats: string): string => `${ARENA}
@@ -121,6 +129,14 @@ describe('a dealt type lands, and a resistance takes its share', () => {
 
   it('deals nothing typed where the action names no damage contest, and nothing where no stat deals a type', () => {
     expect(oneSwingAt(arena('cold-damage 0'), 'dummy')).toBeLessThan(1);
+  });
+
+  it('takes the flat reduction off the whole blow, typed damage included', () => {
+    expect(oneSwingAt(arena('fire-damage 100'), 'plated-dummy')).toBeCloseTo(70, 0);
+  });
+
+  it('resists the type first and reduces what is left, so the two mitigations compound rather than one hiding the other', () => {
+    expect(oneSwingAt(arena('fire-damage 100'), 'clay-plated-dummy')).toBeCloseTo(20, 0);
   });
 });
 
