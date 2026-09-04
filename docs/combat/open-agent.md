@@ -12,8 +12,22 @@ whatever mix the speedruns find; **food is gear with an upkeep cost and nothing 
 the sheet never had a special case to answer; A Grand Blade is **two** quests, a level-one
 miniquest that teaches the plane and a hard finale that pays a weapon; **damage climbs at a
 fifth of health so an even fight takes five blows**; **stats that meet in an adversarial
-check share one ladder**, or the check stops meaning what it looks like it means; and **a
-foe's toughness is typed resistance, never flat damage reduction**.
+check share one ladder**, or the check stops meaning what it looks like it means; **a
+foe's toughness is typed resistance, never flat damage reduction**; and **a foe is
+classified by tier rather than cut one at a time**, the four tiers being declared in
+`content/combat.dsl` and the shape of them in `src/content/sections/tier.ts`:
+
+    tier      seconds to fell    damage share    experience share    drops
+    mob             7                0.8               0.7           common
+    normal         15                1.0               1.0           uncommon
+    elite          30                1.4               1.3           rare
+    boss           75                1.75              0.5           unique
+
+Normal is the curve, so a room of them is on pace and elites pay above it. Damage share is
+against survivable incoming over a **60-second** window, which is the one figure assumed
+rather than ruled — say if it should be another. Damage share is per body, and a place is
+single combat unless it says `multicombat`, so a room of six is one at a time until it says
+otherwise.
 **A line is deleted the day it closes.**
 
 ---
@@ -156,6 +170,25 @@ combat's.
 
 *Closes when:* the combat floor carries one route that eats and one that does not at the same
 two targets, and the sheet says which won where.
+
+## Nothing reads a foe against the tier it declares
+
+`# tier` and `# entity`'s `tier:` exist and the four tiers are declared, and **no tool reads
+them**. `ladder-check` audits what the world can put on a *player* and has never had an
+opinion about a foe. Until it does, a tier is a comment: an author can write `tier: elite`
+on something that dies in four seconds and nothing says a word.
+
+What it should say, per rung: for each foe that names a tier, how long it actually stands
+against a player the ladder puts at its level, what share of survivable incoming it deals,
+and — where it stands in a room — what an hour of that room pays against the curve. The
+third is the one that matters most, because it makes population and respawn part of the same
+sum rather than a separate open line.
+
+Every foe in the world names no tier at all yet, which is the other half of this: the sweep
+that classifies them is `.planning/combat-recut.md`.
+
+*Closes when:* `ladder-check` reports foes against their declared tiers, and a foe that
+names none is reported as unaudited rather than passing.
 
 ## Nothing audits an adversarial pair for sharing a ladder
 

@@ -52,6 +52,41 @@ Three separate faults, and they do not have the same answer:
    before changing anything: the health jewels and the passives behind them are where to look,
    and `ladder-check` says which build it reached and how many plane points it spent.
 
+## Every foe declares a tier, and its numbers are read against that
+
+Ruled 2026-09-04, and the four tiers are already declared at the top of `content/combat.dsl`
+as `# tier` sections. Read them there rather than from here — this table is what they said
+when this brief was written, and they may have moved:
+
+    tier      seconds to fell    damage share    experience share    drops
+    mob             7                0.8               0.7           common
+    normal         15                1.0               1.0           uncommon
+    elite          30                1.4               1.3           rare
+    boss           75                1.75              0.5           unique
+
+`# entity` now takes `tier:`, allowed once `stats:` is set. **Every foe in the world names
+none yet, and giving each the right one is the largest single job in this pass.** Read the
+three fields' own notes off `npm run oracle -- tier` — they say precisely what each means
+and each carries a trap worth knowing before you start.
+
+Three things to hold on to:
+
+- **Seconds, not hits.** A tier fixes how long something stands against a player the ladder
+  puts at its level. Attack-rate is gear-scalable, so hits are not an invariant and seconds
+  are.
+- **Toughness is one budget spent three ways.** The pool, the resistances and the flat
+  reduction come out of the same seconds. A foe given a big pool *and* a heavy resistance is
+  not of its tier however it is labelled — which is the single easiest way to get this wrong.
+- **Experience share is an hour, not a kill.** So what one body pays falls out of the tier
+  beside how long it takes to fell and how long the room takes to put another up. A room that
+  cannot be killed fast enough to reach its share is under-populated rather than
+  under-paying, and that is a finding to report rather than a payout to inflate.
+
+Damage share is **per body**. A place is single combat unless its `# location` says
+`multicombat`, so a room of six is one at a time until it says so — that keyword is new and
+nothing in the world uses it yet. Where a room is meant to swarm, say so there, and
+understand that six mobs at 0.8 is 4.8 times survivable incoming and will kill anyone.
+
 ## Foe toughness is resistances, not reduction
 
 Ruled 2026-09-04: **do not give things flat damage reduction.** Reduction is a small,

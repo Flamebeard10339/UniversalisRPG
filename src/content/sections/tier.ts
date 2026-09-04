@@ -28,7 +28,7 @@ export const tier = section<Tier>()({
       keyword: 'damage share',
       default: () => 0,
       printed: 'always',
-      note: `what something of this tier deals a second, as a share of the incoming a player of the same level can stand — 1 empties them over the window the ladder is cut against, and 0.8 takes four fifths as long to do it. It is per body rather than per room, so a room of six is six times this`,
+      note: `what something of this tier deals a second, as a share of the incoming a player of the same level can stand — 1 empties them over the window the ladder is cut against, and 0.8 takes four fifths as long to do it. It is per body rather than per room, and what a room comes to is therefore its own question: a place is single combat unless it says \`multicombat\`, so a room of six is one of these at a time until it says otherwise`,
     },
     experienceShare: {
       parser: decimal,

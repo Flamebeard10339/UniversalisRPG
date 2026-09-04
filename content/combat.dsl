@@ -35,6 +35,26 @@ gain 6 * amount experience on damage-taken
 
 # damage-type chaos
 
+# tier mob
+seconds to fell: 7
+damage share: 0.8
+experience share: 0.7
+
+# tier normal
+seconds to fell: 15
+damage share: 1
+experience share: 1
+
+# tier elite
+seconds to fell: 30
+damage share: 1.4
+experience share: 1.3
+
+# tier boss
+seconds to fell: 75
+damage share: 1.75
+experience share: 0.5
+
 # stat physical-damage
 group: core.combat
 hidden if: not changed.physical-damage
