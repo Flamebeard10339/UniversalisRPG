@@ -1,7 +1,8 @@
 # What is still wrong that a lane can take
 
-The design doc is `.planning/fishing-expansion.md` and the balance marks are in its last
-section. **A line is deleted the day it closes.**
+The design doc is `.planning/fishing-expansion.md` and its last section holds the balance marks
+and how they were derived. The module walks all twelve of its own routes and the floor walks
+four more. **A line is deleted the day it closes.**
 
 ---
 
@@ -26,30 +27,36 @@ cost a trace and four narrowing experiments to find, on a beat where the conditi
 turned away because it cannot pay one says so where the author can see it — with one home for
 what "can pay" means, so `spendable` and the page cannot drift.*
 
-## Fishing has no floor route, so nothing walks its ladder end to end
+## The mire costs more than it is priced for, and it is the whole of the top band's overrun
 
-`floors/` holds `thieving-floor.dsl` and nothing else. The expansion's own `# test`s prove the
-paths are walkable from saves that are handed the gear; none of them starts at level one and
-earns its way up, so no minute of the fishing curve has been walked rather than asserted.
-`npm run floors` reads a route's goal off its closing `assert: level.<skill> >= <n>` and stands
-the game-minutes it took beside what the curve allows.
+`tulsa.swamp-mire` holds `tulsa.bog-lurker`, which is aggressive, jumps a player standing there
+before any action is armed, and comes back every five minutes. The eel bed and the tench hole
+are both in it by design, so a route that fishes them fights first —
+`use: core.melee-combat on tulsa.bog-lurker until done` — and a climb that takes hours fights
+again, and again.
 
-*Closes when: `floors/fishing-floor.dsl` walks at least a mid-band and a top-band route, and
-`npm run floors` reports both against the curve.*
+What that costs is now two measurements rather than a suspicion:
 
-## The swamp mire is contested water, and the tench hole is paying for it
+- at its ceiling, the tench reads **4,767/h against the 5,040 it is cut for**, where the perch
+  and the carp at the uncontested mere hit their marks exactly
+- walked, `top-floor-to-30` spends **458 game-minutes on the stretch from 20 to 30 where the
+  curve budgets 250** — 1.8× — and its cumulative 626 against 437 is 1.43×
 
-`tulsa.swamp-mire` holds `tulsa.bog-lurker`, which jumps a player standing in it before any
-action is armed, so every route that fishes the eel bed or the tench hole has to fight first —
-`use: core.melee-combat on tulsa.bog-lurker until done` is the line, and without it the trace
-shows the lurkers killed on the step that "failed to cast".
+The water itself is priced right, so this is time spent not fishing: the refights, and the walk
+from the mire back to Market Row for bread paste. Nothing in the module tells a player deciding
+to walk out there that the water costs a fight, and no number in it is set with the fight in it.
 
-That is the world working. It is also the whole of the tench hole's balance gap: measured
-2026-09-03 at `--ideal` from a save standing at its gate, the tench reads **4,767/h against the
-5,040 it is cut for**, where the perch and the carp at the uncontested mere hit their marks
-exactly. The five percent is time lost to lurkers, and nothing in the module tells a player
-walking out there that the water costs a fight.
+*Closes when: the mire's two waters are either cut with the fight priced in — a sweep of them
+that does not stand under `unkillable`, and payouts read off that — or left as they are with
+the prose saying what standing there costs, and `top-floor-to-30` re-read against whichever it
+is.*
 
-*Closes when: either the mire's waters are cut with the fight priced in — a sweep that does not
-stand under `unkillable` — or the water says in its own prose what standing in it costs, and
-the tench's row is re-read against whichever it is.*
+## The eel trap is the one offer in the module with no price on it
+
+`npm run simulate-activity` cannot measure it, for a reason that is the tool's rather than the
+trap's, and that reason is written up in `docs/balance/open-agent.md`. Its own route sets and
+lifts three times over and passes, so the loop works; what it pays an hour is a reckoning
+(`xp: fishing 120` a lift against a three-minute soak, so about 2,400/h) that nothing has run.
+
+*Closes when: the balance line about a two-action offer closes, and the trap is swept like every
+other water in the module.*
