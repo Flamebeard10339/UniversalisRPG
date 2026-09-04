@@ -127,27 +127,39 @@ engine's own summation rather than a second model of it.
 *Closes when:* a body dealing two types reads back at its tier, and `readingAt` no longer
 names a single damage stat.
 
-## Passives still carry amounts cut against nothing
+## Six stats a passive grants against climb no ladder, so most passives cannot be cut
 
 `# passive` takes `grants:`, a block of multiples of what one level is worth on the ladder the
-stat climbs: `+2x increased physical-damage`, `-0.5x added defense`. The engine writes the
-number, so moving a ladder re-cuts every passive hanging off it, and `rounds to:` on a `# stat`
-says the step the added half comes to the nearest of.
+stat climbs, and the engine writes the number. Ten passives in `combat.dsl` are written that
+way; `grep -l '^grants:' content/*.dsl` says which.
 
-Every shape a passive takes is covered by that one form, which is why there is no list of cases
-here: a trade-off is two lines, a two-stat passive is two lines, and either half may be added
-or increased. A handful are converted; `grep -l '^grants:' content/*.dsl` says which, and
-`combat.reckless` is the one carrying a hand-cut modifier beside its block.
+**The rest are not waiting on effort, they are waiting on ladders.** A run put every stat a
+passive in that file grants against to the oracle one at a time: only `core.max-health` (its
+own `# ladder`) and `physical-damage` (which derives one by dealing) climb anything.
+`core.defense`, `core.attack-rate`, `core.accuracy`, `core.evasion`, `core.regeneration` and
+`combat.chaos-resistance` each answered with the grants-nothing remark, and seventeen passives
+grant only those. So the job is **laddering those six stats**, after which the conversion is
+mechanical — and until then a `grants:` against one of them mints nothing at all.
 
-Two things to know before converting the rest. A grant against a stat that climbs no `# ladder`
-mints nothing at all, and `worldRemarks` reports it — `core.defense` and `combat.attack-rate`
-are unladdered today, so a passive granting them needs a ladder declared first or keeps its
-authored modifier. And this must not run at the same time as the passive rename below, since
-both write every `# passive` in `combat.dsl`.
+Deciding what each of the six climbs is a balance judgement, not a conversion: accuracy and
+evasion meet each other in a contested check and want the same line as each other, which is
+the adversarial-pair line at the bottom of this file.
 
-*Closes when:* every passive whose worth is a share of a level says so with `grants:`,
-`npm run oracle -- --at content` reports no passive granting against an unladdered stat, and
-what is left hand-cut is hand-cut because somebody decided it should be.
+The spread already chosen is 0.5x for filler reused across origin clusters, 1x for a notable
+on one uncommon jewel, 2x for a unique — four to one, tied to the rarity of the jewel a
+passive is exclusive to. The rare rung is unpopulated because none of its notables grants a
+laddered stat. Keep that spread when the six are laddered rather than inventing a second one.
+
+A budget in tiers collapses distinctions that hand-cut numbers had: `hale` and `constitution`
+were +15 and +20 max-health and are both `+0.5x` now. If a distinction was doing work, the
+answer is a finer spread and not a number written by hand.
+
+This must not run at the same time as the passive rename below, since both write every
+`# passive` in `combat.dsl`.
+
+*Closes when:* the six stats climb something, every passive whose worth is a share of a level
+says so, and `npm run oracle -- --at content` reports no passive granting against an
+unladdered stat.
 
 ## A route proves reachability, and fifteen of them still assert survival
 
