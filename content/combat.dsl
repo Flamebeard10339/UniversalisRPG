@@ -767,7 +767,9 @@ open-connections: e, ne
 passives: 1 mending, 2 tempered-frame
 
 # passive goring-edge
-berserker, physical, +3 physical-damage
+berserker, physical
+grants:
+  +1x added physical-damage
 
 # passive bloodlust
 berserker, speed, +3 attack-rate
@@ -815,7 +817,9 @@ assassin, precision, +6 accuracy, +2 attack-rate
 assassin, evasion, +12 evasion
 
 # passive exposed-throat
-assassin, precision, +10 accuracy, -1 physical-damage
+assassin, precision, +10 accuracy
+grants:
+  -1x added physical-damage
 
 # passive envenom
 assassin, poison
@@ -823,13 +827,19 @@ assassin, poison
 on hit: inflict: venom on them
 
 # passive hale
-life, +15 max-health
+life
+grants:
+  +0.5x added core.max-health
 
 # passive constitution
-life, +20 max-health
+life
+grants:
+  +0.5x added core.max-health
 
 # passive tempered-frame
-life, +12% max-health
+life
+grants:
+  +0.5x increased core.max-health
 
 # passive mending
 life, recovery, +2 regeneration
@@ -847,13 +857,19 @@ armour, +10% defense
 juggernaut, armour, +12 chaos-resistance
 
 # passive whetted
-physical, +2 physical-damage
+physical
+grants:
+  +0.5x added physical-damage
 
 # passive honed
-physical, +3 physical-damage
+physical
+grants:
+  +0.5x added physical-damage
 
 # passive brutal
-physical, +8% physical-damage
+physical
+grants:
+  +0.5x increased physical-damage
 
 # passive swift-hands
 speed, +2 attack-rate
