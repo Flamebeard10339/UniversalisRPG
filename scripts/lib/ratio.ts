@@ -1,5 +1,6 @@
 import { skillLevel } from '../../src/runtime/skills';
-import { rateAtLevel } from '../../src/runtime/pace';
+import type { Registry } from '../../src/content/registry';
+import { ladderForSkill, rateOn } from '../../src/runtime/pace';
 
 export type Levels = Readonly<Record<string, number>>;
 
@@ -10,15 +11,16 @@ export const levelOf = (levels: Levels, skill: string): number => levels[skill] 
 export interface Ratio {
   skill: string;
   level: number;
-  target: number;
+  target?: number;
   paid: number;
 }
 
-export const ratioOf = ({ target, paid }: Pick<Ratio, 'target' | 'paid'>): number => paid / target;
+export const ratioOf = ({ target, paid }: Pick<Ratio, 'target' | 'paid'>): number | undefined => (target === undefined ? undefined : paid / target);
 
-export function ratioFor(skill: string, paid: number, levels: Levels): Ratio {
+export function ratioFor(registry: Registry, skill: string, paid: number, levels: Levels): Ratio {
   const level = levelOf(levels, skill);
-  return { skill, level, target: rateAtLevel(level, skill), paid };
+  const ladder = ladderForSkill(registry, skill);
+  return { skill, level, target: ladder === undefined ? undefined : rateOn(ladder, level), paid };
 }
 
 export const meanRate = (rates: readonly number[]): number => (rates.length === 0 ? 0 : rates.reduce((total, rate) => total + rate, 0) / rates.length);
@@ -26,7 +28,7 @@ export const meanRate = (rates: readonly number[]): number => (rates.length === 
 export interface Frontier {
   skill: string;
   level: number;
-  target: number;
+  target?: number;
   best: string;
   at: string;
   paid: number;
@@ -43,14 +45,14 @@ export interface Paid {
   rate: number;
 }
 
-export function frontiers(paid: readonly Paid[], levels: Levels): Frontier[] {
+export function frontiers(registry: Registry, paid: readonly Paid[], levels: Levels): Frontier[] {
   const bySkill = new Map<string, Paid[]>();
   for (const each of paid) bySkill.set(each.skill, [...(bySkill.get(each.skill) ?? []), each]);
 
   return [...bySkill]
     .map(([skill, into]) => {
       const best = [...into].sort((one, other) => other.rate - one.rate)[0]!;
-      const { level, target } = ratioFor(skill, best.rate, levels);
+      const { level, target } = ratioFor(registry, skill, best.rate, levels);
       return {
         skill,
         level,

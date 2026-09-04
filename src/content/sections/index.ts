@@ -18,6 +18,7 @@ import { group } from './group';
 import { guise } from './guise';
 import { info } from './info';
 import { item } from './item';
+import { ladder } from './ladder';
 import { locale } from './locale';
 import { location } from './location';
 import { passive } from './passive';
@@ -39,7 +40,7 @@ import { tier } from './tier';
 import { variable } from './variable';
 
 const declared = () =>
-  [damageType, tier, profile, stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
+  [damageType, ladder, tier, profile, stat, skill, race, passive, clusterJewel, item, shop, faction, group, event, action, entity, guise, location, region, station, recipe, resource, droptable, dialogue, quest, flag, slot, variable, locale, save, test, info, remove] as const;
 
 export type AnySection = ReturnType<typeof declared>[number];
 

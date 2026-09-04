@@ -1,75 +1,55 @@
 import type { Registry } from '../content/registry';
+import type { Ladder } from '../content/sections/ladder';
 import { LEVELS_PER_DOUBLING, xpForLevel } from './skills';
 
-export interface Ladder {
-  minutesAtLevelOne: number;
-  minutesGrowthPerLevel: number;
-  abilityAtLevelOne: number;
-  abilityGrowthPerLevel: number;
-}
+export type { Ladder };
 
-export const ONE_LINE: Ladder = {
-  minutesAtLevelOne: 5,
-  minutesGrowthPerLevel: 1.07,
-  abilityAtLevelOne: 0,
-  abilityGrowthPerLevel: 7,
-};
+export const toughnessLadder = (registry: Registry): Ladder | undefined => [...registry.ladders.values()].find((each) => each.secondsToFellAnEvenMatch !== undefined);
 
-export const SECONDS_TO_FELL_AN_EVEN_MATCH = 15;
-
-export const TOUGHNESS_STAT = 'core.max-health';
-
-export const TOUGHNESS_LINE: Ladder = {
-  ...ONE_LINE,
-  abilityAtLevelOne: 100,
-  abilityGrowthPerLevel: 31,
-};
-
-export const DPS_LINE: Ladder = {
-  ...TOUGHNESS_LINE,
-  abilityAtLevelOne: TOUGHNESS_LINE.abilityAtLevelOne / SECONDS_TO_FELL_AN_EVEN_MATCH,
-  abilityGrowthPerLevel: TOUGHNESS_LINE.abilityGrowthPerLevel / SECONDS_TO_FELL_AN_EVEN_MATCH,
-};
-
-const LADDERS: Readonly<Record<string, Ladder>> = {
-  'fishing.fishing': ONE_LINE,
-  [TOUGHNESS_STAT]: TOUGHNESS_LINE,
-};
-
-export const ladderFor = (id?: string): Ladder => (id === undefined ? ONE_LINE : (LADDERS[id] ?? ONE_LINE));
+export const ladderFor = (registry: Registry, statId?: string): Ladder | undefined => (statId === undefined ? undefined : registry.ladders.get(statId));
 
 export const climbsDps = (registry: Registry, statId?: string): boolean => statId !== undefined && registry.stats.get(statId)?.deals !== undefined;
 
-export const ladderForStat = (registry: Registry, statId?: string): Ladder => (climbsDps(registry, statId) ? DPS_LINE : ladderFor(statId));
+export function dpsLadder(registry: Registry): Ladder | undefined {
+  const pool = toughnessLadder(registry);
+  const seconds = pool?.secondsToFellAnEvenMatch;
+  if (pool === undefined || seconds === undefined || seconds === 0) return undefined;
+  return { ...pool, atLevelOne: pool.atLevelOne / seconds, growthPerLevel: pool.growthPerLevel / seconds };
+}
 
-export const MINUTES_AT_LEVEL_ONE = ONE_LINE.minutesAtLevelOne;
-export const MINUTES_GROWTH_PER_LEVEL = ONE_LINE.minutesGrowthPerLevel;
-export const ABILITY_AT_LEVEL_ONE = ONE_LINE.abilityAtLevelOne;
-export const ABILITY_GROWTH_PER_LEVEL = ONE_LINE.abilityGrowthPerLevel;
+export const ladderForStat = (registry: Registry, statId?: string): Ladder | undefined => (climbsDps(registry, statId) ? dpsLadder(registry) : ladderFor(registry, statId));
+
+export const ladderForSkill = (registry: Registry, skillId: string): Ladder | undefined => ladderForStat(registry, registry.skills.get(skillId)?.stat);
 
 export const GROWTH_CEILING = 2 ** (1 / LEVELS_PER_DOUBLING);
 
-export const minutesForLevel = (level: number, id?: string): number => {
-  const ladder = ladderFor(id);
-  return ladder.minutesAtLevelOne * ladder.minutesGrowthPerLevel ** (level - 1);
-};
+export const abilityOn = (ladder: Ladder, level: number): number => ladder.atLevelOne + ladder.growthPerLevel * (level - 1);
 
-export function minutesToReach(level: number, id?: string): number {
+export const minutesOn = (ladder: Ladder, level: number): number => ladder.minutesAtLevelOne * ladder.minutesGrowthPerLevel ** (level - 1);
+
+export function minutesToReachOn(ladder: Ladder, level: number): number {
   let total = 0;
-  for (let each = 1; each < level; each += 1) total += minutesForLevel(each, id);
+  for (let each = 1; each < level; each += 1) total += minutesOn(ladder, each);
   return total;
 }
 
 const MINUTES_PER_HOUR = 60;
 
-export const rateAtLevel = (level: number, id?: string): number => ((xpForLevel(level + 1) - xpForLevel(level)) * MINUTES_PER_HOUR) / minutesForLevel(level, id);
+export const rateOn = (ladder: Ladder, level: number): number => ((xpForLevel(level + 1) - xpForLevel(level)) * MINUTES_PER_HOUR) / minutesOn(ladder, level);
 
-export const abilityOn = (ladder: Ladder, level: number): number => ladder.abilityAtLevelOne + ladder.abilityGrowthPerLevel * (level - 1);
+export const abilityAtLevelIn = (registry: Registry, level: number, statId?: string): number | undefined => {
+  const ladder = ladderForStat(registry, statId);
+  return ladder === undefined ? undefined : abilityOn(ladder, level);
+};
 
-export const abilityAtLevel = (level: number, id?: string): number => abilityOn(ladderFor(id), level);
+export const toughnessAtLevel = (registry: Registry, level: number): number | undefined => {
+  const ladder = toughnessLadder(registry);
+  return ladder === undefined ? undefined : abilityOn(ladder, level);
+};
 
-export const abilityAtLevelIn = (registry: Registry, level: number, statId?: string): number => abilityOn(ladderForStat(registry, statId), level);
+export const dpsAtLevel = (registry: Registry, level: number): number | undefined => {
+  const ladder = dpsLadder(registry);
+  return ladder === undefined ? undefined : abilityOn(ladder, level);
+};
 
-export const dpsAtLevel = (level: number): number => abilityOn(DPS_LINE, level);
-
-export const toughnessAtLevel = (level: number): number => abilityOn(TOUGHNESS_LINE, level);
+export const secondsToFellAnEvenMatch = (registry: Registry): number | undefined => toughnessLadder(registry)?.secondsToFellAnEvenMatch;

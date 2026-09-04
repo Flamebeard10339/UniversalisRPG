@@ -72,6 +72,19 @@ base: 30
 # stat regeneration
 base: 0
 
+# ladder max-health
+at level one: 100
+growth per level: 31
+minutes at level one: 5
+minutes growth per level: 1.07
+seconds to fell an even match: 15
+
+# ladder digging-rate
+at level one: 0
+growth per level: 7
+minutes at level one: 5
+minutes growth per level: 1.07
+
 # stat digging-rate
 base: 12
 group: skilling

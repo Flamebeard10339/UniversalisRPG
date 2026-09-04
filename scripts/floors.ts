@@ -9,7 +9,7 @@ import { replayTest } from '../src/runtime/session';
 import { skillLevel } from '../src/runtime/skills';
 import { createGameState } from '../src/runtime/state';
 import { sourceFiles } from './lib/dslSources';
-import { minutesToReach } from '../src/runtime/pace';
+import { ladderForSkill, minutesToReachOn } from '../src/runtime/pace';
 import { readSources } from './probe';
 
 export const FLOORS_DIR = 'floors';
@@ -80,7 +80,12 @@ export function floorLines(sources: readonly ModuleSource[], floors: readonly st
       continue;
     }
     const reached = skillLevel(state.xp[goal.skill] ?? 0);
-    const asks = minutesToReach(reached, goal.skill);
+    const ladder = ladderForSkill(registry, goal.skill);
+    if (ladder === undefined) {
+      lines.push(`${id}: ${goal.skill} ${String(reached)} in ${minutes.toFixed(1)} game-minutes, and ${goal.skill} declares no # ladder, so it stands beside no curve`);
+      continue;
+    }
+    const asks = minutesToReachOn(ladder, reached);
     lines.push(`${id}: ${goal.skill} ${String(reached)} in ${minutes.toFixed(1)} game-minutes; the curve asks ${asks.toFixed(1)} (${times(minutes / asks)})`);
   }
   return { lines, ok };

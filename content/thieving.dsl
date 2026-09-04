@@ -11,6 +11,12 @@ title: Thieving
 base: 0
 group: core.skilling
 
+# ladder thieving-ability
+at level one: 0
+growth per level: 7
+minutes at level one: 5
+minutes growth per level: 1.07
+
 # stat thieving-rate
 title: Thieving Speed
 base: 15

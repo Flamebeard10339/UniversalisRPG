@@ -22,6 +22,12 @@ title: Depth
 group: core.other
 hidden if: always
 
+# ladder fishing
+at level one: 0
+growth per level: 7
+minutes at level one: 5
+minutes growth per level: 1.07
+
 # stat fishing-rate
 title: Casting Speed
 base: 6

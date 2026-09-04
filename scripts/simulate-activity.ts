@@ -369,7 +369,11 @@ export function baseForRung(sources: readonly ModuleSource[], dependencies: read
   if (perPoint === 0) {
     throw new Error(`--ladder ${rung.id}=${String(rung.level)}: a point of ${rung.id} written on the sheet moves what the player stands at by nothing at all, so no base of it stands them on that rung`);
   }
-  return lower + (abilityAtLevelIn(stoodIn(sources, dependencies, start), rung.level, rung.id) - stoodLow) / perPoint;
+  const asked = abilityAtLevelIn(stoodIn(sources, dependencies, start), rung.level, rung.id);
+  if (asked === undefined) {
+    throw new Error(`--ladder ${rung.id}=${String(rung.level)}: ${rung.id} declares no # ladder, so nothing says what a character of that level stands at`);
+  }
+  return lower + (asked - stoodLow) / perPoint;
 }
 
 export interface Gain {
@@ -517,14 +521,15 @@ const XP = 'xp';
 
 const skillIn = (of: string): string | undefined => (of.startsWith(`${XP} `) ? of.slice(XP.length + 1) : undefined);
 
-const againstTheCurve = (of: string, rates: readonly number[], levels: Levels): string => {
+const againstTheCurve = (registry: Registry, of: string, rates: readonly number[], levels: Levels): string => {
   const skill = skillIn(of);
   if (skill === undefined) return '';
-  const against = ratioFor(skill, meanRate(rates), levels);
-  return ` · ${times(ratioOf(against))}× the level-${String(against.level)} target`;
+  const against = ratioFor(registry, skill, meanRate(rates), levels);
+  const ratio = ratioOf(against);
+  return ratio === undefined ? '' : ` · ${times(ratio)}× the level-${String(against.level)} target`;
 };
 
-function paidLines(runs: readonly Run[], windowMs: number, levels: Levels): string[] {
+function paidLines(registry: Registry, runs: readonly Run[], windowMs: number, levels: Levels): string[] {
   const paid = [...new Set(runs.flatMap((run) => run.gains.map(address)))];
   if (paid.length === 0) return ['      paid nothing'];
   const hours = windowMs / MS_PER_HOUR;
@@ -532,7 +537,7 @@ function paidLines(runs: readonly Run[], windowMs: number, levels: Levels): stri
   return paid
     .map((of) => ({ of, rates: runs.map((run) => amountIn(run, of) / hours), paced: cut.map((run) => amountIn(run, of) / (run.worked / MS_PER_HOUR)) }))
     .sort((one, other) => Math.max(...other.rates) - Math.max(...one.rates))
-    .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}${againstTheCurve(of, rates, levels)}`);
+    .map(({ of, rates, paced }) => `      ${of}: ${spread(rates)}/h${paced.length === 0 ? '' : `, ${spread(paced)}/h ${WHILE_IT_RAN}`}${againstTheCurve(registry, of, rates, levels)}`);
 }
 
 export function paidInto(measured: readonly Measured[], windowMs: number): Paid[] {
@@ -548,21 +553,23 @@ export function paidInto(measured: readonly Measured[], windowMs: number): Paid[
   return paid;
 }
 
-export function curveLines(measured: readonly Measured[], windowMs: number, levels: Levels): string[] {
-  const found = frontiers(paidInto(measured, windowMs), levels);
+export function curveLines(registry: Registry, measured: readonly Measured[], windowMs: number, levels: Levels): string[] {
+  const found = frontiers(registry, paidInto(measured, windowMs), levels);
   if (found.length === 0) return [];
   return [
     '',
     'against the curve, for the build every run here started from:',
     ...found.flatMap((frontier) => [
-      `  ${frontier.skill} at level ${String(frontier.level)} — the curve asks ${round(frontier.target)}/h, and the best within reach pays ${round(frontier.paid)}/h: ${times(frontier.paid / frontier.target)}× target`,
+      frontier.target === undefined
+        ? `  ${frontier.skill} at level ${String(frontier.level)} — no # ladder, so the best within reach pays ${round(frontier.paid)}/h against nothing`
+        : `  ${frontier.skill} at level ${String(frontier.level)} — the curve asks ${round(frontier.target)}/h, and the best within reach pays ${round(frontier.paid)}/h: ${times(frontier.paid / frontier.target)}× target`,
       `    ${frontier.at} — ${frontier.best}`,
       `    ${String(frontier.within)} of ${String(frontier.offers)} offers paying into it come within ${String(WITHIN)}× of that`,
     ]),
   ];
 }
 
-function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Levels): string[] {
+function measuredLines(registry: Registry, { subject, runs }: Measured, windowMs: number, levels: Levels): string[] {
   const lines = [
     `    ${subject.use}`,
     `      cycles ${spread(runs.map((run) => run.cycles))} · worked ${spread(runs.map((run) => msToSeconds(run.worked)))}s of the ${round(msToSeconds(windowMs))}s window`,
@@ -576,12 +583,12 @@ function measuredLines({ subject, runs }: Measured, windowMs: number, levels: Le
       `      stopped short in ${String(short.length)}/${String(runs.length)} seeds: ${short[0]!.stoppedBy!}${endings.size > 1 ? ` (and ${String(endings.size - 1)} other ending(s) across the seeds)` : ''}`,
     );
   }
-  return [...lines, ...paidLines(runs, windowMs, levels)];
+  return [...lines, ...paidLines(registry, runs, windowMs, levels)];
 }
 
 const CEILING = `a rate is what the whole window paid. "${WHILE_IT_RAN}" is the pace inside \`worked\` carried out to an hour — a ceiling nothing here actually held, and the shorter the run the less it means.`;
 
-export function simulationLines(measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'> & { ideal?: boolean; standing?: readonly StatAsk[]; after?: string }, levels: Levels = {}): string[] {
+export function simulationLines(registry: Registry, measured: readonly Measured[], args: Pick<SimulationArgs, 'save' | 'seeds' | 'window' | 'all'> & { ideal?: boolean; standing?: readonly StatAsk[]; after?: string }, levels: Levels = {}): string[] {
   const windowMs = args.window * MS_PER_MINUTE;
   const shown = args.all ? [...measured] : measured.filter((each) => !paidNothing(each));
   const head = [`${startLabel(startOf(args))}: ${String(shown.length)} of ${String(measured.length)} offers, ${String(args.seeds)} seed(s) each, over a ${String(args.window)}-minute window of game time${args.ideal ? `, under ${GOD_WORDS.join(', ')}: the most an offer can pay and the least it can cost` : ''}`];
@@ -595,11 +602,11 @@ export function simulationLines(measured: readonly Measured[], args: Pick<Simula
       place = each.subject.at;
       body.push('', `  ${place}${each.subject.depth === undefined ? ' (no road reaches here)' : ` (${String(each.subject.depth)} roads out)`}`);
     }
-    body.push(...measuredLines(each, windowMs, levels));
+    body.push(...measuredLines(registry, each, windowMs, levels));
   }
   const lines = [...head, ...(body.some((line) => line.includes(WHILE_IT_RAN)) ? [CEILING] : []), ...body];
   if (!args.all) lines.push('', `${String(measured.length - shown.length)} offer(s) paid nothing at all and are not listed; --all shows them.`);
-  return [...lines, ...curveLines(measured, windowMs, levels)];
+  return [...lines, ...curveLines(registry, measured, windowMs, levels)];
 }
 
 export interface SimulationReport {
@@ -678,7 +685,7 @@ export function simulate(sources: readonly ModuleSource[], args: SimulationArgs)
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
 
   const stoodStats = standingAt(world, start, asked.map((each) => each.id));
-  return { lines: simulationLines(measure(loaded.registry, subjects, seedsFrom(args.seeds), ends), { ...args, standing: stoodStats }, levelsOn(world, start)), ok: true };
+  return { lines: simulationLines(loaded.registry, measure(loaded.registry, subjects, seedsFrom(args.seeds), ends), { ...args, standing: stoodStats }, levelsOn(world, start)), ok: true };
 }
 
 function main(): void {

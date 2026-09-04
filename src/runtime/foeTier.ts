@@ -6,7 +6,7 @@ import type { Tier } from '../content/sections/tier';
 import { landed, perHitFor, perSecond, SURVIVAL_WINDOW_SECONDS, type LadderedStats } from './foeSolve';
 import { initialState } from './save';
 import { hitChance, statValue } from './stats';
-import { dpsAtLevel, toughnessAtLevel } from './pace';
+import { abilityOn } from './pace';
 import type { GameState } from './state';
 import { PLAYER } from './state';
 
@@ -51,10 +51,10 @@ export function readingAt(registry: Registry, state: GameState, fighter: Fighter
   const foe = entity.id;
   const type = registry.stats.get(laddered.dealt)?.deals;
 
-  const ourPool = toughnessAtLevel(level);
+  const ourPool = abilityOn(laddered.pool, level);
   const ourRateNow = statValue(fight.rate, state, registry, PLAYER);
   const ourAccuracyNow = statValue(fight.accuracy.ours, state, registry, PLAYER);
-  const ourDealt = perHitFor(dpsAtLevel(level), ourRateNow, ourAccuracyNow, registry);
+  const ourDealt = perHitFor(abilityOn(laddered.dps, level), ourRateNow, ourAccuracyNow, registry);
   const ourRate = statValue(fight.rate, state, registry, PLAYER);
   const ourAccuracy = statValue(fight.accuracy.ours, state, registry, PLAYER);
   const ourEvasion = statValue(fight.accuracy.theirs, state, registry, PLAYER);

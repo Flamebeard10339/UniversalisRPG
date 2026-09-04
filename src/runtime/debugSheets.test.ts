@@ -109,6 +109,9 @@ DEBUG
 # damage-type probe-fire
 DEBUG
 
+# ladder probe-ladder
+DEBUG
+
 # tier probe-tier
 DEBUG
 

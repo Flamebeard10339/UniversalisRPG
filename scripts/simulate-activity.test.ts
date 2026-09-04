@@ -4,7 +4,7 @@ import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEBUG_MARK } from '../src/content/sections/define';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { msToSeconds, secondsToMs } from '../src/runtime/units';
-import { abilityAtLevel } from '../src/runtime/pace';
+import { abilityAtLevelIn } from '../src/runtime/pace';
 import path from 'node:path';
 import { FLOORS_DIR } from './floors';
 import { floorsBeside, simulate, simulationLines, baseForRung, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standClocks, standingAt, stood, subjectsFrom, type Measured, type Run, type Start, type Stood, type Subject } from './simulate-activity';
@@ -16,6 +16,12 @@ version: 1.0.0
 
 # stat attack
 base: 10
+
+# ladder attack
+at level one: 0
+growth per level: 7
+minutes at level one: 5
+minutes growth per level: 1.07
 
 # stat defence
 base: 0
@@ -305,7 +311,7 @@ describe('a sweep at a rung of the declared ladder', () => {
 
   it('solves the base that stands the player on the rung rather than writing the rung down as one', () => {
     for (const level of [1, 12, 30]) {
-      const asked = abilityAtLevel(level);
+      const asked = abilityAtLevelIn(island(), level, 'island.attack')!;
       const base = baseForRung(sources, modules, PLAYER, start, { id: 'island.attack', level });
       expect(base, 'the rung was written down as a base instead of being solved for').not.toBeCloseTo(asked, 3);
       const loaded = loadUniverseWithDiagnostics([...sources, probeSource(modules, [], start, [], false, { player: PLAYER, stats: [{ id: 'island.attack', value: base }] })]);
@@ -317,7 +323,7 @@ describe('a sweep at a rung of the declared ladder', () => {
   it('says where the player actually stood, which is the rung and not the base under it', () => {
     const report = simulate(sources, { save: SAVE, holds: 'pick', seeds: 1, window: 1, all: false, rungs: [{ id: 'island.attack', level: 12 }] });
     expect(report.ok).toBe(true);
-    expect(report.lines.find((line) => line.startsWith('standing at'))).toContain(`island.attack ${String(Math.round(abilityAtLevel(12) * 10) / 10)}`);
+    expect(report.lines.find((line) => line.startsWith('standing at'))).toContain(`island.attack ${String(Math.round(abilityAtLevelIn(island(), 12, 'island.attack')! * 10) / 10)}`);
   });
 
   it('refuses a stat the world does not declare, and one that both flags name', () => {
@@ -485,7 +491,7 @@ describe('what a run reports', () => {
   it('says a run stopped short in the words the engine stopped it with', () => {
     const [stung] = swept('wasp');
     expect(stung.runs.every((run) => run.stoppedBy !== undefined)).toBe(true);
-    expect(simulationLines([stung], { save: 's', seeds: 2, window: 1, all: true }).join('\n')).toMatch(/stopped short in 2\/2 seeds: until time >= /);
+    expect(simulationLines(island(), [stung], { save: 's', seeds: 2, window: 1, all: true }).join('\n')).toMatch(/stopped short in 2\/2 seeds: until time >= /);
   });
 
   it('takes the offer up again once the world puts it back, so a longer window holds more of it', () => {
@@ -516,7 +522,7 @@ describe('what a run reports', () => {
     expect(found.some((each) => each.runs.some((run) => run.stoppedBy !== undefined && run.gains.length > 0)), 'nothing on this island stops short holding anything').toBe(true);
     for (const each of found) {
       const paid = each.runs.some((run) => run.gains.length > 0);
-      expect(simulationLines([each], { save: 's', seeds: 2, window: 1, all: true }).join('\n').includes('/h'), each.subject.use).toBe(paid);
+      expect(simulationLines(island(), [each], { save: 's', seeds: 2, window: 1, all: true }).join('\n').includes('/h'), each.subject.use).toBe(paid);
     }
   });
 
@@ -524,7 +530,7 @@ describe('what a run reports', () => {
     const use = 'use: entity.island.bush.pick';
     const rate = (worked: number, window: number): string => {
       const runs: Run[] = [{ seed: 1, stoppedBy: 'it was finished', cycles: 1, worked, gains: [{ kind: 'item', id: 'island.berry', amount: 6 }] }];
-      const line = simulationLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window, all: true }).find((each) => each.includes('/h'));
+      const line = simulationLines(island(), [{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window, all: true }).find((each) => each.includes('/h'));
       return line!.split(',')[0]!;
     };
     expect(rate(1_000, 60)).toContain('/h');
@@ -536,7 +542,7 @@ describe('what a run reports', () => {
     const use = 'use: entity.island.bush.pick';
     const printed = (worked: number): string => {
       const runs: Run[] = [{ seed: 1, cycles: 1, worked, gains: [{ kind: 'item', id: 'island.berry', amount: 6 }] }];
-      return simulationLines([{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window: 60, all: true }).join('\n');
+      return simulationLines(island(), [{ subject: { at: 'island.shore', depth: 0, use }, runs }], { save: 's', seeds: 1, window: 60, all: true }).join('\n');
     };
     expect(printed(secondsToMs(36))).toContain('/h while it ran');
     expect(printed(secondsToMs(3600))).not.toContain('while it ran');
@@ -548,27 +554,27 @@ describe('what a run reports', () => {
     const [stung] = swept('wasp');
     expect(thorned.runs.every((run) => run.engagedBy === 'island.wasp')).toBe(true);
     expect(stung.runs.every((run) => run.engagedBy === undefined)).toBe(true);
-    const lines = simulationLines([thorned], { save: 's', seeds: 2, window: 1, all: true }).join('\n');
+    const lines = simulationLines(island(), [thorned], { save: 's', seeds: 2, window: 1, all: true }).join('\n');
     expect(lines).toContain('island.wasp took a fight inside the window');
     expect(lines).toContain('xp island.fighting');
   });
 
   it('lists an offer nothing could be measured at even where it came back empty-handed', () => {
     const runs: Run[] = [{ seed: 1, stoppedBy: 'stung', engagedBy: 'island.wasp', cycles: 0, worked: 10, gains: [] }];
-    const lines = simulationLines([{ subject: { at: 'island.thicket', depth: 1, use: 'use: entity.island.bramble.pick' }, runs }], { save: 's', seeds: 1, window: 1, all: false }).join('\n');
+    const lines = simulationLines(island(), [{ subject: { at: 'island.thicket', depth: 1, use: 'use: entity.island.bramble.pick' }, runs }], { save: 's', seeds: 1, window: 1, all: false }).join('\n');
     expect(lines).toContain('island.wasp took a fight inside the window');
   });
 
   it('leaves out an offer nothing came of, and lists it when asked to', () => {
     const nothing: Measured[] = [{ subject: { at: 'island.shore', depth: 0, use: 'use: entity.island.bush.examine' }, runs: [{ seed: 1, cycles: 1, worked: 0, gains: [] }] }];
-    expect(simulationLines(nothing, { save: 's', seeds: 1, window: 1, all: false }).join('\n')).not.toContain('bush.examine');
-    expect(simulationLines(nothing, { save: 's', seeds: 1, window: 1, all: true }).join('\n')).toContain('bush.examine');
+    expect(simulationLines(island(), nothing, { save: 's', seeds: 1, window: 1, all: false }).join('\n')).not.toContain('bush.examine');
+    expect(simulationLines(island(), nothing, { save: 's', seeds: 1, window: 1, all: true }).join('\n')).toContain('bush.examine');
   });
 
   it('heads each place with how far out it is, and says so where no road reaches it', () => {
     const use = 'use: entity.island.crab.pinch';
     const runs: Run[] = [{ seed: 1, cycles: 1, worked: 1000, gains: [{ kind: 'item', id: 'island.berry', amount: 2 }] }];
-    const lines = simulationLines([{ subject: { at: 'island.cove', depth: 4, use }, runs }, { subject: { at: 'island.reef', use }, runs }], { save: 's', seeds: 1, window: 1, all: true }).join('\n');
+    const lines = simulationLines(island(), [{ subject: { at: 'island.cove', depth: 4, use }, runs }, { subject: { at: 'island.reef', use }, runs }], { save: 's', seeds: 1, window: 1, all: true }).join('\n');
     expect(lines).toContain('island.cove (4 roads out)');
     expect(lines).toContain('island.reef (no road reaches here)');
   });

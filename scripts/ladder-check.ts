@@ -9,7 +9,7 @@ import { readSources } from './probe';
 import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
-import { abilityAtLevelIn, climbsDps, dpsAtLevel } from '../src/runtime/pace';
+import { abilityAtLevelIn, climbsDps } from '../src/runtime/pace';
 import { fightOf } from '../src/runtime/foeSolve';
 import { hitChance } from '../src/runtime/tuning';
 import { actorEntity } from '../src/runtime/actionLookup';
@@ -241,7 +241,8 @@ const residual = (stood: number, asked: number): string => {
 const COLUMN = 22;
 
 function rungLines(registry: Registry, activity: Activity, statId: string, level: number, sources: readonly Source[]): string[] {
-  const asked = climbsDps(registry, statId) ? dpsAtLevel(level) : abilityAtLevelIn(registry, level, statId);
+  const asked = abilityAtLevelIn(registry, level, statId);
+  if (asked === undefined) return [`  level ${String(level)} — ${statId} declares no # ladder, so nothing here has anything to say about it`];
   return [
     `  level ${String(level)} — the ladder asks ${figure(asked)}${climbsDps(registry, statId) ? ' a second' : ''}`,
     ...sources.map((source) => {

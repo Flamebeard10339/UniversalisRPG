@@ -33,6 +33,13 @@ base: 60
 # stat ward
 resists: physical
 
+# ladder max-health
+at level one: 100
+growth per level: 31
+minutes at level one: 5
+minutes growth per level: 1.07
+seconds to fell an even match: 15
+
 # resource health
 rate: regeneration
 max: max-health

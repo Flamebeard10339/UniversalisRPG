@@ -61,7 +61,7 @@ export function shapeOf(registry: Registry, state: GameState, fighter: Fighter):
   const foe = fighter.entity.id;
   const laddered = ladderedFor(registry, fight);
   const ours = (statId: string, climbs: string | undefined): number =>
-    climbs !== undefined && fighter.level !== undefined ? abilityAtLevelIn(registry, fighter.level, climbs) : statValue(statId, state, registry, PLAYER);
+    (climbs !== undefined && fighter.level !== undefined ? abilityAtLevelIn(registry, fighter.level, climbs) : undefined) ?? statValue(statId, state, registry, PLAYER);
   const factors: readonly { factor: keyof Profile & string; stat: string | undefined; climbs?: string }[] = [
     { factor: 'rate', stat: fight.rate },
     { factor: 'damage', stat: fight.damage.ours, climbs: laddered?.dealt },

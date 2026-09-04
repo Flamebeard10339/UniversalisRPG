@@ -38,6 +38,13 @@ base: 60
 # stat ward
 resists: physical
 
+# ladder max-health
+at level one: 100
+growth per level: 31
+minutes at level one: 5
+minutes growth per level: 1.07
+seconds to fell an even match: 15
+
 # resource health
 rate: regeneration
 max: max-health
@@ -154,7 +161,7 @@ describe('what a fight is made of, read off the action rather than named here', 
   });
 
   it('reads the laddered stats off the same action, dealt one and pooled one', () => {
-    expect(laddered(fighterFor('straw-man'))).toEqual({ dealt: 'arena.attack', pooled: 'arena.max-health' });
+    expect(laddered(fighterFor('straw-man'))).toMatchObject({ dealt: 'arena.attack', pooled: 'arena.max-health', pool: registry.ladders.get('arena.max-health') });
   });
 });
 
@@ -181,7 +188,7 @@ describe('three tags cut a body, and reading it back finds the tier they were cu
     const profile = fighter.profile!;
     const theirs = (statId: string): number => statValue(statId, stood, registry, fighter.entity.id);
     const ours = (statId: string): number => statValue(statId, stood, registry, 'player');
-    const dealt = perHitFor(dpsAtLevel(level), ours(fighter.fight.rate), ours(fighter.fight.accuracy.ours), registry);
+    const dealt = perHitFor(dpsAtLevel(registry, level)!, ours(fighter.fight.rate), ours(fighter.fight.accuracy.ours), registry);
     expect(theirs(fighter.fight.accuracy.ours) / ours(fighter.fight.accuracy.ours)).toBeCloseTo(profile.accuracy, 6);
     expect(theirs(fighter.fight.accuracy.theirs) / ours(fighter.fight.accuracy.ours), 'evasion is read against the accuracy it is contested with, not against the player evasion it shares a name with').toBeCloseTo(profile.evasion, 6);
     if (profile.rate !== undefined) expect(theirs(fighter.fight.rate) / ours(fighter.fight.rate)).toBeCloseTo(profile.rate, 6);

@@ -44,6 +44,58 @@
       ]
     },
     {
+      "name": "meta.section.ladder.dsl",
+      "begin": "^(#)[ \\t]+(ladder)\\b[ \\t]*(.*)$",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.section.dsl"
+        },
+        "2": {
+          "name": "keyword.control.section.dsl"
+        },
+        "3": {
+          "name": "entity.name.section.dsl"
+        }
+      },
+      "end": "(?=^#[ \\t])",
+      "patterns": [
+        {
+          "include": "#note"
+        },
+        {
+          "include": "#refused"
+        },
+        {
+          "match": "^[ \\t]*([+-]?)(seconds[ \\t]+to[ \\t]+fell[ \\t]+an[ \\t]+even[ \\t]+match|minutes[ \\t]+growth[ \\t]+per[ \\t]+level|minutes[ \\t]+at[ \\t]+level[ \\t]+one|growth[ \\t]+per[ \\t]+level|at[ \\t]+level[ \\t]+one)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*([+-]?)([A-Za-z0-9][^:\\n]*)(:)[ \\t]*$",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "entity.name.function.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "meta.section.tier.dsl",
       "begin": "^(#)[ \\t]+(tier)\\b[ \\t]*(.*)$",
       "beginCaptures": {

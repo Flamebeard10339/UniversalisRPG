@@ -4,7 +4,7 @@ import { activitiesIn, type Activity } from '../content/activities';
 import type { Registry } from '../content/registry';
 import type { Entity } from '../content/sections/entity';
 import { actorEntity } from './actionLookup';
-import { dpsAtLevel, toughnessAtLevel } from './pace';
+import { abilityOn, dpsLadder, toughnessLadder, type Ladder } from './pace';
 import { PLAYER } from './state';
 import { hitChance, minDamage } from './tuning';
 
@@ -25,6 +25,8 @@ export function fightOf(registry: Registry, entity: Entity): FightShape | undefi
 export interface LadderedStats {
   dealt: string;
   pooled: string;
+  pool: Ladder;
+  dps: Ladder;
 }
 
 export function ladderedIn(registry: Registry, activity: Activity, fight: FightShape): LadderedStats | undefined {
@@ -37,7 +39,11 @@ export function ladderedIn(registry: Registry, activity: Activity, fight: FightS
     if (registry.stats.get(stat)?.deals !== undefined) dealt = stat;
     if (stat === poolMax) pooled = stat;
   }
-  return dealt === undefined || pooled === undefined ? undefined : { dealt, pooled };
+  if (dealt === undefined || pooled === undefined) return undefined;
+  const pool = toughnessLadder(registry);
+  const dps = dpsLadder(registry);
+  if (pool === undefined || dps === undefined || pool.id !== pooled) return undefined;
+  return { dealt, pooled, pool, dps };
 }
 
 export const activityFor = (registry: Registry, fight: FightShape): Activity | undefined => activitiesIn(registry).find((activity) => ladderedIn(registry, activity, fight) !== undefined);
@@ -97,14 +103,14 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
 
   const us = actorEntity(registry, PLAYER);
   const type = registry.stats.get(laddered.dealt)?.deals;
-  const ourPool = toughnessAtLevel(level);
+  const ourPool = abilityOn(laddered.pool, level);
   const ourRate = declaredOn(registry, us, fight.rate);
   const ourAccuracy = declaredOn(registry, us, fight.accuracy.ours);
   const ourEvasion = declaredOn(registry, us, fight.accuracy.theirs);
   const ourReduction = declaredOn(registry, us, fight.damage.theirs);
   const ourResistance = resistanceDeclaredOn(registry, us, type);
   const theirResistance = resistanceDeclaredOn(registry, entity, type);
-  const ourDealt = perHitFor(dpsAtLevel(level), ourRate, ourAccuracy, registry);
+  const ourDealt = perHitFor(abilityOn(laddered.dps, level), ourRate, ourAccuracy, registry);
 
   const written = (statId: string): number | undefined => {
     const held = entity.stats[statId];
