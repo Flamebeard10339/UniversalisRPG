@@ -173,43 +173,34 @@ How this run is set up:
 ${asked.open ? '- The repository is yours to read: the engine under src/ and scripts/ is there if you want it.' : `- ${ASK_LINE}`}
 - ${BRIEF_IS_NOT_AUTHORITATIVE}
 
-The tools you have:
+The tools, and how each is pointed at the world you are writing. **Every one of them takes more
+than is shown here, and prints what with \`--help\`** — run that rather than guessing at a flag or
+believing a brief about one. What is written out below is the part no \`--help\` can know, which is
+which directory is yours.
 
-    npm run oracle                       every line that may be written, under every kind
-    npm run oracle -- <kind>...          the same, narrowed to the kinds you name
-    npm run oracle -- --at <file>        read a draft: what the engine refuses, and whether it takes the file
-    npm run oracle -- --at <file> --walk <line>
-                                         one line: where it sits, what it reads as, what may stand there
+    npm run oracle                       what may be written, under every kind; name kinds to narrow it
     npm run oracle -- --at ${corpus}
-                                         the whole world you are writing into: every line the engine
-                                         has something to say about, whether it loads, whether it
-                                         prints back to itself, whether every route in it still
-                                         walks, and anything it takes that an author probably did
-                                         not mean. This is the gate. There is no other one, and no
-                                         test suite anywhere answers for what you are writing
+                                         **the gate.** Every line the engine has something to say
+                                         about, whether the world loads, whether it prints back to
+                                         itself, whether every route in it still walks, and anything
+                                         it takes that an author probably did not mean. There is no
+                                         other gate, and no test suite anywhere answers for what you
+                                         are writing
+    npm run oracle -- --at <file>        the same for one draft file on its own
     npm run probe -- ${corpus} --test <id>
-                                         run one \`# test\` and report PASSED or FAILED
-    npm run simulate-activity -- --world ${corpus} <save> [<word>] [--ideal] [--stats <stat>=<n>,...]
-    npm run simulate-activity -- --world ${corpus} --after <test> [<word>] ...
-                                         what every offer in front of a player standing on that save,
-                                         or where that route ends, pays an hour and what it costs them,
-                                         and whether the loop it was asked for finished. **--world is
-                                         what points it at the world you are writing** — without it,
-                                         it measures the shipped corpus and none of your saves or
-                                         entities exist, so never leave it off. --ideal reads the most
-                                         an offer can pay and the least it can cost, under the god
-                                         words; --stats stands the player at a rung of the stat ladder
-    npm run ladder-check -- --world ${corpus} [<skill>...]
-                                         per skill and per rung, what the world can put on a
-                                         character of that level against what the declared ladder
-                                         asks of them. The difference is the finding: short means
-                                         gear the world has not got yet. It is a brief rather than
-                                         a pass or a fail, and chasing the number to zero by adding
-                                         a line to a general store is how a world gets sanded flat
-    npm run notes -- ${corpus}
-                                         every \`@@@\` held by the corpus you are writing into,
-                                         your own included. Bare, it reads the shipped corpus
-                                         instead and will not show you your own
+                                         walk one \`# test\` and report PASSED or FAILED
+    npm run simulate-activity -- --world ${corpus} <save>
+                                         what every offer in front of a player standing there pays an
+                                         hour and what it costs them, read off a run rather than
+                                         reckoned. **--world is what points it at your world**, and
+                                         without it none of your saves or entities exist
+    npm run ladder-check -- --world ${corpus}
+                                         what the world can put on a character of a level against what
+                                         the declared ladder asks of them. Short means gear the world
+                                         has not got yet: it is a brief for content, never a pass or a
+                                         fail, and driving it to zero by adding a line to a general
+                                         store is how a world gets sanded flat
+    npm run notes -- ${corpus}           every \`@@@\` the world holds, your own included
 
 **Balance is yours, and it is read off a run rather than reckoned.** Whether a number you wrote is a
 rat or a dragon is answered by running the world — \`npm run simulate-activity\` above — and the brief
