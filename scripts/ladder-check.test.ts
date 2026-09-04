@@ -96,6 +96,9 @@ describe('what the report is asked for', () => {
     expect(parseLadderArgs([]).levels).toEqual(defaultRungs());
     expect(parseLadderArgs(['--levels', '1,4,9']).levels).toEqual([1, 4, 9]);
     expect(parseLadderArgs(['core.digging', 'core.scavenging']).skills).toEqual(['core.digging', 'core.scavenging']);
+    expect(parseLadderArgs(['--world', 'somewhere/content']).world).toBe('somewhere/content');
+    expect(parseLadderArgs([]).world).toBeUndefined();
+    expect(() => parseLadderArgs(['--world'])).toThrow(/--world wants the directory/);
   });
 
   it('refuses a rung that is not a level, and a flag it does not know, rather than guessing', () => {

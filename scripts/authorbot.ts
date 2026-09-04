@@ -184,6 +184,13 @@ The tools you have:
                                          entities exist, so never leave it off. --ideal reads the most
                                          an offer can pay and the least it can cost, under the god
                                          words; --stats stands the player at a rung of the stat ladder
+    npm run ladder-check -- --world ${corpus} [<skill>...]
+                                         per skill and per rung, what the world can put on a
+                                         character of that level against what the declared ladder
+                                         asks of them. The difference is the finding: short means
+                                         gear the world has not got yet. It is a brief rather than
+                                         a pass or a fail, and chasing the number to zero by adding
+                                         a line to a general store is how a world gets sanded flat
     npm run notes -- ${corpus}
                                          every \`@@@\` held by the corpus you are writing into,
                                          your own included. Bare, it reads the shipped corpus

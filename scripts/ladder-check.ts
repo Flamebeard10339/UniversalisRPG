@@ -5,6 +5,7 @@ import { droptable } from '../src/content/sections/droptable';
 import { isBase, type Item } from '../src/content/sections/item';
 import type { Skill } from '../src/content/sections/skill';
 import { shippedSources } from '../src/content/shipped';
+import { readSources } from './probe';
 import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
@@ -22,11 +23,14 @@ export function defaultRungs(): number[] {
 }
 
 const usage = [
-  'Usage: npm run ladder-check [-- <skill>...] [--levels <level>[,<level>...]]',
+  'Usage: npm run ladder-check [-- <skill>...] [--world <dir>] [--levels <level>[,<level>...]]',
   '',
   '  <skill>    narrows the report to the skills named, written whole as thieving.thieving.',
   '             With none, every skill the world declares is read',
   `  --levels   the rungs to read at, in order (default ${defaultRungs().join(', ')})`,
+  '  --world    <dir> — read the world in that directory rather than the shipped corpus,',
+  '             which is what an authoring run reaches for: its draft lives in a copy of its',
+  '             own, and a residual read off the shipped tree says nothing about it',
   '',
   'Balance pins two lines. `scripts/lib/pace.ts` already says how long a level is meant to',
   'take; beside it now stands the ladder — what a character of that level is assumed to be',
@@ -76,11 +80,13 @@ const usage = [
 export interface LadderArgs {
   skills: string[];
   levels: number[];
+  world?: string;
 }
 
 export function parseLadderArgs(raw: readonly string[]): LadderArgs {
   const skills: string[] = [];
   let levels: number[] | undefined;
+  let world: string | undefined;
   for (let at = 0; at < raw.length; at += 1) {
     const arg = raw[at]!;
     if (arg === '--help' || arg === '-h') throw new Error(usage);
@@ -96,10 +102,17 @@ export function parseLadderArgs(raw: readonly string[]): LadderArgs {
       if (levels.length === 0) throw new Error('--levels wants at least one rung');
       continue;
     }
+    if (arg === '--world') {
+      const dir = raw[at + 1];
+      at += 1;
+      if (dir === undefined) throw new Error(`--world wants the directory of a world after it\n\n${usage}`);
+      world = dir;
+      continue;
+    }
     if (arg.startsWith('--')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
     skills.push(arg);
   }
-  return { skills, levels: levels ?? defaultRungs() };
+  return { skills, levels: levels ?? defaultRungs(), ...(world === undefined ? {} : { world }) };
 }
 
 export interface Source {
@@ -260,7 +273,7 @@ function main(): void {
     console.error((error as Error).message);
     process.exit(2);
   }
-  const loaded = loadUniverseWithDiagnostics(shippedSources());
+  const loaded = loadUniverseWithDiagnostics(args.world === undefined ? shippedSources() : readSources([args.world]));
   if (loaded.diagnostics.length > 0) {
     console.error(loaded.diagnostics.map(formatModuleDiagnostic).join('\n'));
     process.exit(1);
