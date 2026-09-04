@@ -5,6 +5,7 @@ import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
 import { ENGINE_MODULE_DIR } from '../src/content/engineModules';
 import { CORPUS_DIR } from '../src/content/shipped';
+import { answer, answeredBy, ask, ASK_LINE, ASKED_FOR_MINUTES, BRIEF_IS_NOT_AUTHORITATIVE, ENGINE_IS_OFF_LIMITS, nobodyAnswered, questionIn, type Question, stopAsking, waitForAnswer } from './lib/ask';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 
 export const repoRoot = path.join(import.meta.dirname, '..');
@@ -15,7 +16,8 @@ const DEFAULT_MODEL = 'claude-sonnet-5';
 export const GRACE_MINUTES = 2;
 
 const usage = [
-  'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--minutes <n>] [--model <id>]',
+  'Usage: npm run authorbot -- <brief> [--target <module>] [--open] [--turns <n>] [--minutes <n>] [--model <id>] [--ask-for <n>]',
+  '       npm run authorbot -- <brief> --answer "<sentence>"',
   '       npm run authorbot -- --watch [--once] [<brief>]',
   '',
   '  <brief>    the file saying what to write, named as a loose word or after --brief;',
@@ -35,6 +37,12 @@ const usage = [
   '             and go on saying it until they have all ended. With a brief, just that one',
   '  --once     with --watch, say it once and stop, rather than holding the terminal until',
   '             every run has ended — which is what to reach for to ask where a run stands',
+  `  --ask-for  how many minutes a run waits on an answer before going on without one (default ${String(ASKED_FOR_MINUTES)}).`,
+  '             A run reaching for the engine is put to the engine worker instead of refused, and',
+  '             it stands still until it is answered. The wall clock stops while it waits, so',
+  '             --minutes is time the run spent working rather than time it spent asking',
+  '  --answer   <sentence> — answer the run named by the brief, and let it go on. This is the',
+  '             other end of --ask-for, and --watch returns the moment a run has asked something',
   '',
   'The run works on a copy of content/ in a directory of its own and writes nothing in this',
   'checkout, so it does not count as a second writer in it. It prints where that directory is,',
@@ -50,6 +58,8 @@ export interface Asked {
   model: string;
   watch: boolean;
   once: boolean;
+  askFor: number;
+  said: string | null;
 }
 
 export const moduleNameFor = (brief: string): string =>
@@ -76,7 +86,7 @@ const requireCount = (flag: string, value: string): number => {
 };
 
 export function parseArgs(argv: readonly string[]): Asked {
-  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false, once: false };
+  const asked: Asked = { brief: null, target: null, open: false, turns: DEFAULT_TURNS, minutes: null, model: DEFAULT_MODEL, watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null };
   const named = (word: string): void => {
     if (asked.brief !== null) throw new Error(`the brief is named once, and ${JSON.stringify(word)} is a second\n\n${usage}`);
     asked.brief = word;
@@ -91,13 +101,20 @@ export function parseArgs(argv: readonly string[]): Asked {
     else if (arg === '--open') asked.open = true;
     else if (arg === '--watch') asked.watch = true;
     else if (arg === '--once') asked.once = true;
+    else if (arg === '--ask-for') asked.askFor = requireCount(arg, requireValue(arg, argv[++i]));
+    else if (arg === '--answer') asked.said = requireValue(arg, argv[++i]);
     else if (arg.startsWith('-')) throw new Error(`unknown flag ${arg}\n\n${usage}`);
     else named(arg);
   }
+  if (asked.said !== null && asked.brief === null) throw new Error(`--answer answers one run, so name the brief it is running from
+
+${usage}`);
   if (asked.brief === null && !asked.watch) throw new Error(`nothing was named to write from: the brief is a file, given as a loose word or after --brief\n\n${usage}`);
   if (asked.brief !== null && asked.target === null) asked.target = targetFor(asked.brief);
   return asked;
 }
+
+const ASK_EVERY_MS = 2_000;
 
 const LAST_MINUTE_MS = 60_000;
 
@@ -146,7 +163,7 @@ export const refusalFor = (why: 'engine' | 'elsewhere' | 'checkout', draft: stri
     ? `this run writes only ${draft}, and nothing else anywhere.`
     : why === 'checkout'
       ? `the world this run works on is ${path.dirname(draft)}, a copy of its own. The checkout's content/ is not this run's to read or write through a shell: point every command at the copy — \`npm run oracle -- --at ${path.dirname(draft)}\` is the gate, and \`npm run probe -- ${path.dirname(draft)} --test <id>\` walks a route.`
-      : "the engine's source is off limits in this run. What may be written in the language is printed by `npm run oracle` — ask it instead, and say in your next message what you were hoping to find there.";
+      : ENGINE_IS_OFF_LIMITS;
 
 export function systemFor(asked: Asked, corpus: string, draft: string): string {
   return `You are authoring content for Universalis RPG, a text game. Its content is written in a small line-based DSL: a file is a sequence of sections, each headed \`# <kind> <id>\`.
@@ -156,7 +173,8 @@ How this run is set up:
 - The world you are writing into is the corpus of .dsl files in ${corpus}. Read any of them.
 - The one file you may write is ${draft}.
 - Run every command from ${repoRoot}, which is the working directory.
-${asked.open ? '- The repository is yours to read: the engine under src/ and scripts/ is there if you want it.' : "- **The engine's source code is off limits.** Nothing under src/, scripts/ or docs/, and no .ts file, may be read. Everything about the language is printed by the oracle, and where the oracle does not answer something, that is a defect worth reporting — say so out loud in your reply, and go on."}
+${asked.open ? '- The repository is yours to read: the engine under src/ and scripts/ is there if you want it.' : `- ${ASK_LINE}`}
+- ${BRIEF_IS_NOT_AUTHORITATIVE}
 
 The tools you have:
 
@@ -219,7 +237,7 @@ export interface Reach {
   turn: number;
   tool: string;
   target: string;
-  decision: 'allow' | 'deny' | 'engine';
+  decision: 'allow' | 'deny' | 'engine' | 'asked';
   at: number;
 }
 
@@ -241,8 +259,8 @@ export function summaryLines(reaches: readonly Reach[], cost: Cost, workdir: str
     '',
     engine.length === 0
       ? 'it never reached for the engine: every question it had was answered by the oracle or by the corpus'
-      : `${engine.length} reach(es) for the engine, each one a question the oracle did not answer:`,
-    ...engine.map((each) => `  reply ${each.turn}: ${each.decision === 'deny' ? 'refused — ' : ''}${each.tool} ${each.target.replace(/\n/g, ' ; ')}`),
+      : `${engine.length} reach(es) for the engine, each one a question the oracle did not answer${engine.some((each) => each.decision === 'asked') ? `, ${String(engine.filter((each) => each.decision === 'asked').length)} of them answered by the engine worker` : ''}:`,
+    ...engine.map((each) => `  reply ${each.turn}: ${each.decision === 'deny' ? 'refused — ' : each.decision === 'asked' ? 'answered — ' : ''}${each.tool} ${each.target.replace(/\n/g, ' ; ')}`),
     '',
     `what it wrote, and the run's own account of it, are under ${workdir}`,
   ];
@@ -333,6 +351,12 @@ function statusNow(workdirs: readonly string[]): readonly RunStatus[] {
 
 const WATCH_INTERVAL_MS = 15_000;
 
+export const askedLines = (name: string, question: Question): string[] => [
+  `${name} — has asked the engine worker and is standing still`,
+  `  it reached with ${question.tool} for: ${question.asked.replace(/\n/g, ' ; ')}`,
+  '  answer it with: npm run authorbot -- <brief> --answer "<one sentence>"',
+];
+
 async function watch(brief: string | null, once: boolean): Promise<number> {
   const workdirs = brief === null ? runsInFlight(os.tmpdir()) : [workdirFor(brief)];
   if (workdirs.length === 0 || !workdirs.some((each) => existsSync(each))) {
@@ -340,9 +364,14 @@ async function watch(brief: string | null, once: boolean): Promise<number> {
     return 1;
   }
   for (;;) {
-    const held = statusNow(workdirs.filter((each) => existsSync(each)));
-    console.log([new Date().toISOString(), ...held.flatMap(statusLines), ''].join('\n'));
-    if (once || held.every((each) => each.ended)) return 0;
+    const standing = workdirs.filter((each) => existsSync(each));
+    const held = statusNow(standing);
+    const pending = standing.flatMap((each) => {
+      const question = questionIn(each);
+      return question === undefined ? [] : [{ name: path.basename(each).slice(WORKDIR_PREFIX.length), question }];
+    });
+    console.log([new Date().toISOString(), ...held.flatMap(statusLines), ...pending.flatMap((each) => askedLines(each.name, each.question)), ''].join('\n'));
+    if (once || held.every((each) => each.ended) || pending.length > 0) return 0;
     await new Promise((resolve) => setTimeout(resolve, WATCH_INTERVAL_MS));
   }
 }
@@ -373,8 +402,20 @@ async function run(asked: Asked): Promise<number> {
     appendFileSync(calls, `${JSON.stringify(reach)}\n`);
   };
 
-  const started = Date.now();
+  let started = Date.now();
   let warned = false;
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const putToTheEngineWorker = async (tool: string, target: string): Promise<{ because: string; answered: boolean }> => {
+    ask(workdir, tool, target);
+    say(`  [asked]  the engine worker, and standing still for up to ${String(asked.askFor)} minute(s)`);
+    const waitedFrom = Date.now();
+    const said = await waitForAnswer(workdir, asked.askFor, ASK_EVERY_MS, sleep);
+    started += Date.now() - waitedFrom;
+    stopAsking(workdir);
+    say(said === undefined ? '  [asked]  nobody answered, and the run goes on without one' : `  [answered]  ${said}`);
+    return said === undefined ? { because: `${nobodyAnswered(asked.askFor)} ${refusalFor('engine', draft)}`, answered: false } : { because: answeredBy(said), answered: true };
+  };
 
   const preToolUse = async (input: unknown): Promise<Record<string, unknown>> => {
     const { tool_name: tool, tool_input: held } = input as { tool_name: string; tool_input: Record<string, unknown> };
@@ -382,13 +423,16 @@ async function run(asked: Asked): Promise<number> {
     const target = String(args.file_path ?? args.path ?? args.pattern ?? args.command ?? JSON.stringify(args)).slice(0, 300);
     const verdict = verdictOf(tool, args, repoRoot, workdir);
     const refuse = verdict.reaching && (verdict.why !== 'engine' || !asked.open);
-    seen(tool, target, !verdict.reaching ? 'allow' : refuse ? 'deny' : 'engine');
     say(`  ${!verdict.reaching ? '[tool]  ' : refuse ? '[refused]' : '[engine]'} ${tool} ${target.replace(/\n/g, ' ; ')}`);
+    const why = (verdict as { why: 'engine' | 'elsewhere' | 'checkout' }).why;
+    const put = !refuse ? undefined : why === 'engine' ? await putToTheEngineWorker(tool, target) : { because: refusalFor(why, draft), answered: false };
+    seen(tool, target, !verdict.reaching ? 'allow' : !refuse ? 'engine' : put?.answered === true ? 'asked' : 'deny');
+    const because = put?.because;
     return {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: refuse ? 'deny' : 'allow',
-        ...(refuse ? { permissionDecisionReason: refusalFor((verdict as { why: 'engine' | 'elsewhere' | 'checkout' }).why, draft) } : {}),
+        ...(because === undefined ? {} : { permissionDecisionReason: because }),
       },
     };
   };
@@ -456,6 +500,16 @@ async function main(): Promise<void> {
   }
   try {
     const asked = parseArgs(argv);
+    if (asked.said !== null) {
+      const workdir = workdirFor(asked.brief!);
+      if (questionIn(workdir) === undefined) {
+        console.error(`${asked.brief!} has not asked anything, so there is nothing to answer.`);
+        process.exit(1);
+      }
+      answer(workdir, asked.said);
+      console.log(`answered: ${asked.said}`);
+      process.exit(0);
+    }
     process.exit(asked.watch ? await watch(asked.brief, asked.once) : await run(asked));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

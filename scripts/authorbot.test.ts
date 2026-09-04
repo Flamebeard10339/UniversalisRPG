@@ -2,6 +2,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { FIXTURE_CORPUS_DIR, fixtureFiles } from '../src/content/worldFixture';
 import { DEBUG_SWITCH_NAMES } from '../src/content/sections/test';
+import { ASKED_FOR_MINUTES, ENGINE_IS_OFF_LIMITS } from './lib/ask';
 import { CIRCLING_DISTINCT, CIRCLING_WINDOW, DEFAULT_TURNS, inLastMinute, parseArgs, refusalFor, statusLines, statusOf, summaryLines, systemFor, targetFor, verdictOf, workdirFor, type Reach } from './authorbot';
 
 const REPO = path.resolve('/repo');
@@ -10,7 +11,7 @@ const asked = (over: Partial<ReturnType<typeof parseArgs>> = {}) => ({ ...parseA
 
 describe('what the run was asked for', () => {
   it('is one loose word, since the brief and the module it writes were the same word twice', () => {
-    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false, once: false });
+    expect(parseArgs(['planning/A Grand Blade.md'])).toEqual({ brief: 'planning/A Grand Blade.md', target: 'a-grand-blade.dsl', open: false, turns: DEFAULT_TURNS, minutes: null, model: 'claude-sonnet-5', watch: false, once: false, askFor: ASKED_FOR_MINUTES, said: null });
     expect(parseArgs(['--brief', 'quest.md'])).toMatchObject({ brief: 'quest.md', target: 'quest.dsl' });
   });
 
@@ -56,6 +57,34 @@ describe('what the run was asked for', () => {
   it('reads the other flags, and refuses one it does not know rather than guessing what it meant', () => {
     expect(parseArgs(['b.md', '--open', '--target', 'tulsa.dsl', '--model', 'claude-opus-5'])).toMatchObject({ open: true, target: 'tulsa.dsl', model: 'claude-opus-5' });
     expect(() => parseArgs(['b.md', '--sideways'])).toThrow(/unknown flag/);
+  });
+
+  it('tells an answered reach from a refused one, since a question somebody answered is not a hole in the oracle', () => {
+    const at = 1_000_000;
+    const said = summaryLines(
+      [
+        { turn: 2, tool: 'Read', target: 'src/runtime/runtime.ts', decision: 'asked', at },
+        { turn: 9, tool: 'Bash', target: 'ls content/', decision: 'deny', at },
+      ],
+      { turns: 9, seconds: 1, calls: 2 },
+      '/work',
+    ).join(String.fromCharCode(10));
+
+    expect(said).toContain('1 of them answered by the engine worker');
+    expect(said).toContain('answered — Read src/runtime/runtime.ts');
+    expect(said).toContain('refused — Bash ls content/');
+  });
+
+  it('takes an answer for one run, and refuses one that names no run to answer', () => {
+    expect(parseArgs(['b.md', '--answer', 'yes, and it is called on refused:']).said).toBe('yes, and it is called on refused:');
+    expect(parseArgs(['b.md']).said).toBeNull();
+    expect(() => parseArgs(['--answer', 'yes'])).toThrow(/name the brief/);
+  });
+
+  it('takes how long a run stands still on a question, and has a default so nothing hangs for ever', () => {
+    expect(parseArgs(['b.md']).askFor).toBe(ASKED_FOR_MINUTES);
+    expect(parseArgs(['b.md', '--ask-for', '3']).askFor).toBe(3);
+    expect(() => parseArgs(['b.md', '--ask-for', 'ages'])).toThrow(/takes a count/);
   });
 
   it('watches without a brief, since five runs at once are watched by asking after all of them', () => {
@@ -174,6 +203,18 @@ describe('what the run is told', () => {
     const said = systemFor(asked(), '/work/content', '/work/content/x.dsl');
 
     for (const name of DEBUG_SWITCH_NAMES) expect(said).toContain(name);
+  });
+
+  it('tells the run its reach is a question somebody may answer, and that the brief is not to be trusted about what exists', () => {
+    const said = systemFor(asked(), '/work/content', '/work/content/x.dsl');
+
+    expect(said).toContain('put to the engine worker');
+    expect(said).toContain('Nothing in the brief is authoritative about what already exists');
+  });
+
+  it('says the same thing about the engine in the prompt and in the refusal, out of one home', () => {
+    expect(systemFor(asked(), '/c', '/d')).toContain(ENGINE_IS_OFF_LIMITS);
+    expect(refusalFor('engine', '/w/content/x.dsl')).toContain(ENGINE_IS_OFF_LIMITS);
   });
 
   it('says the engine is off limits, or that it is not, and never both', () => {
