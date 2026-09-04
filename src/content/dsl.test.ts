@@ -11,7 +11,7 @@ import { DslError, type Overwritten, type Written } from '../grammar/parser';
 import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
-import { DEFAULT_CONTEXT, hydrateSection, type AnySchema } from '../grammar/section';
+import { DEFAULT_CONTEXT, hydrateSection, neededAlternatives, neededWritten, type AnySchema } from '../grammar/section';
 import { BY_NAME, mergeFields, overwrittenField } from './merge';
 import { keyedUnderOwnerKind, memberKey, Namespace } from './namespace';
 import { NAMES_THE_SECTION, TOUCHED } from './sections/define';
@@ -338,30 +338,33 @@ describe('a line that only makes sense once another is written', () => {
   const offeredOn = (draft: string): string[] => offeringAt(draft, draft.length, []).offers.map((each) => each.form);
 
   for (const owner of sections()) {
-    const schema = owner.schema as { fields: Record<string, { keyword?: string }>; needs?: Record<string, string> } | undefined;
+    const schema = owner.schema as AnySchema | undefined;
     if (schema?.needs === undefined) continue;
     for (const [name, needed] of Object.entries(schema.needs)) {
       const keyword = keywordOf(schema, name);
-      const stands = keywordOf(schema, needed);
-      const writes = owner.grammar.find((line) => begins(line.form, stands) && line.example.length > stands.length);
+      const alternatives = neededAlternatives(needed);
 
-      it(`# ${owner.kind} offers ${keyword} only once ${stands} is written`, () => {
-        expect(writes, `nothing in the grammar of # ${owner.kind} writes ${stands}`).toBeDefined();
-        expect(offeredOn(`# ${owner.kind} probe\n`).filter((form) => begins(form, keyword))).toEqual([]);
-        const written = `# ${owner.kind} probe\n${writes!.example}\n`;
-        expect(offeredOn(written).filter((form) => begins(form, keyword)).length).toBeGreaterThan(0);
-      });
+      for (const stands of alternatives.map((each) => keywordOf(schema, each))) {
+        const writes = owner.grammar.find((line) => begins(line.form, stands) && line.example.length > stands.length);
+
+        it(`# ${owner.kind} offers ${keyword} once ${stands} is written, and not before`, () => {
+          expect(writes, `nothing in the grammar of # ${owner.kind} writes ${stands}`).toBeDefined();
+          expect(offeredOn(`# ${owner.kind} probe\n`).filter((form) => begins(form, keyword))).toEqual([]);
+          const written = `# ${owner.kind} probe\n${writes!.example}\n`;
+          expect(offeredOn(written).filter((form) => begins(form, keyword)).length).toBeGreaterThan(0);
+        });
+      }
 
       it(`# ${owner.kind} keeps ${keyword} back where a line it cannot read stands beside it`, () => {
         const draft = `# ${owner.kind} probe\nnothing-here-is-a-field: 3\n`;
         expect(offeredOn(draft).filter((form) => begins(form, keyword))).toEqual([]);
       });
 
-      it(`# ${owner.kind} refuses ${keyword} where ${stands} is not written`, () => {
+      it(`# ${owner.kind} refuses ${keyword} where none of ${alternatives.join(', ')} is written`, () => {
         const alone = owner.grammar.find((line) => begins(line.form, keyword) && line.example !== `${keyword}:`);
         expect(alone, `nothing in the grammar of # ${owner.kind} writes ${keyword} on a line of its own`).toBeDefined();
         const draft = `# ${owner.kind} probe\n${alone!.example}\n`;
-        const written = `${keyword}${schema.fields[name] === undefined ? '' : ':'} needs a ${stands}: line`;
+        const written = `${keyword}${schema.fields[name] === undefined ? '' : ':'} needs a ${neededWritten(schema, needed)} line`;
         expect(() => owner.build(owner.parse(splitSections(draft)[0]!), DEFAULT_CONTEXT), draft).toThrow(written);
       });
     }

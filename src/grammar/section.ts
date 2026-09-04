@@ -52,18 +52,24 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   keywordNotes?: Partial<Record<Flags, string>>;
   keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
-  exclusive?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
-  needs?: Partial<Record<Exclude<keyof H, 'id'> | Flags, Exclude<keyof H, 'id' | Flags | Entries>>>;
+  exclusive?: readonly (readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[])[];
+  needs?: Partial<Record<Exclude<keyof H, 'id'> | Flags, Exclude<keyof H, 'id' | Flags | Entries> | readonly Exclude<keyof H, 'id' | Flags | Entries>[]>>;
 }
 
 export type Authored<H extends { id: string }> = { id: string } & Partial<Omit<H, 'id'>>;
 
+export const alternativesFor = (schema: Pick<AnySchema, 'exclusive'>, name: string): readonly (readonly string[])[] | undefined =>
+  (schema.exclusive ?? []).find((choice) => choice.some((group) => group.includes(name)));
+
 export function clearedBy(schema: Pick<AnySchema, 'exclusive'>, written: Iterable<string>): string[] {
-  if (schema.exclusive === undefined) return [];
   const said = new Set(written);
-  const answered = schema.exclusive.filter((group) => group.some((key) => said.has(key)));
-  if (answered.length !== 1) return [];
-  return schema.exclusive.filter((group) => group !== answered[0]).flat();
+  const cleared: string[] = [];
+  for (const choice of schema.exclusive ?? []) {
+    const answered = choice.filter((group) => group.some((key) => said.has(key)));
+    if (answered.length !== 1) continue;
+    cleared.push(...choice.filter((group) => group !== answered[0]).flat());
+  }
+  return cleared;
 }
 
 export interface AnyField extends FieldPrinting {
@@ -82,8 +88,8 @@ export interface AnySchema {
   keywordNotes?: Record<string, string>;
   keywordsAfter?: string;
   entries?: { into: string; body: EntryBody };
-  exclusive?: readonly (readonly string[])[];
-  needs?: Record<string, string>;
+  exclusive?: readonly (readonly (readonly string[])[])[];
+  needs?: Record<string, string | readonly string[]>;
 }
 
 const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
@@ -163,10 +169,10 @@ function readSection<H extends { id: string }, F extends keyof H = never, E exte
   const authored: Record<string, unknown> = { id: section.id };
   for (const line of section.body) parseLine(line, fields, byKeyword, keywords, clauses, bare, entries, schema.kind, authored, sites);
 
-  if (schema.exclusive) {
-    const active = schema.exclusive.filter((group) => (group as readonly string[]).some((key) => authored[key] !== undefined));
+  for (const choice of (schema.exclusive ?? []) as readonly (readonly (readonly string[])[])[]) {
+    const active = choice.filter((group) => group.some((key) => authored[key] !== undefined));
     if (active.length > 1) {
-      const names = active.flat().filter((key) => authored[key as string] !== undefined);
+      const names = active.flat().filter((key) => authored[key] !== undefined);
       throw new DslError(`# ${schema.kind} ${section.id}: ${names.join(' and ')} cannot both be set`, section.span);
     }
   }
@@ -303,10 +309,18 @@ function parseLine(line: RawLine, fields: AnyFields, byKeyword: Record<string, s
 
 export const writtenAs = (schema: AnySchema, name: string): string => (schema.fields[name] === undefined ? name : `${schema.fields[name]!.keyword ?? name}:`);
 
+export const neededAlternatives = (needed: string | readonly string[]): readonly string[] => (typeof needed === 'string' ? [needed] : needed);
+
+export function neededWritten(schema: AnySchema, needed: string | readonly string[]): string {
+  const written = neededAlternatives(needed).map((each) => writtenAs(schema, each));
+  const last = written[written.length - 1]!;
+  return written.length === 1 ? last : `${written.slice(0, -1).join(', ')} or ${last}`;
+}
+
 export function unmetNeed(authored: Record<string, unknown>, schema: AnySchema): string | undefined {
   for (const [name, needed] of Object.entries(schema.needs ?? {})) {
-    if (!(name in authored) || authored[needed] !== undefined) continue;
-    return `${writtenAs(schema, name)} needs a ${writtenAs(schema, needed)} line`;
+    if (!(name in authored) || neededAlternatives(needed).some((each) => authored[each] !== undefined)) continue;
+    return `${writtenAs(schema, name)} needs a ${neededWritten(schema, needed)} line`;
   }
   return undefined;
 }

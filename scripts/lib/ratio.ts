@@ -1,5 +1,5 @@
 import { skillLevel } from '../../src/runtime/skills';
-import { rateAtLevel } from './pace';
+import { rateAtLevel } from '../../src/runtime/pace';
 
 export type Levels = Readonly<Record<string, number>>;
 

@@ -9,7 +9,7 @@ import { replayTest } from '../src/runtime/session';
 import { skillLevel } from '../src/runtime/skills';
 import { createGameState } from '../src/runtime/state';
 import { sourceFiles } from './lib/dslSources';
-import { minutesToReach } from './lib/pace';
+import { minutesToReach } from '../src/runtime/pace';
 import { readSources } from './probe';
 
 export const FLOORS_DIR = 'floors';

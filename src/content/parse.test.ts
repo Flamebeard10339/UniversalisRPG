@@ -996,7 +996,7 @@ const blockField = (field: WalkableField, authored: string): Outcome => attempt(
 
 const disagree = (a: Outcome, b: Outcome): boolean => a.read !== b.read || (a.read && b.read && a.value !== b.value);
 
-const AUTHORED = ['a', 'a b', 'a b c', '1 a', '2 a b', 'a 2.5', 'a b: c', 'a, b', 'drain: 5 health', 'drain: 5 health b'];
+const AUTHORED = ['a', 'a b', 'a b c', '1 a', '2 a b', 'a 2.5', 'a b: c', 'a, b', '+2 a', 'drain: 5 health', 'drain: 5 health b'];
 
 const OPS = ['', '+', '-'];
 

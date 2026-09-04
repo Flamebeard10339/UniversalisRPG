@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverse } from '../../src/content/load';
-import { fixtureSources } from '../../src/content/worldFixture';
-import { xpForLevel } from '../../src/runtime/skills';
+import { loadUniverse } from '../content/load';
+import { fixtureSources } from '../content/worldFixture';
+import { xpForLevel } from './skills';
 import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, BLOWS_TO_FELL_AN_EVEN_MATCH, DAMAGE_LINE, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);

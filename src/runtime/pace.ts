@@ -1,5 +1,5 @@
-import type { Registry } from '../../src/content/registry';
-import { LEVELS_PER_DOUBLING, xpForLevel } from '../../src/runtime/skills';
+import type { Registry } from '../content/registry';
+import { LEVELS_PER_DOUBLING, xpForLevel } from './skills';
 
 export interface Ladder {
   minutesAtLevelOne: number;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fixtureSources } from '../src/content/worldFixture';
 import { loadUniverse } from '../src/content/load';
 import { withEngineLocale } from '../src/content/engineLocale';
-import { minutesToReach } from './lib/pace';
+import { minutesToReach } from '../src/runtime/pace';
 import { floorLines, goalOf } from './floors';
 
 const floor = (tests: string): { name: string; text: string } => ({ name: 'town-floor', text: `# info town-floor\nversion: 1\ndependencies:\n  core\n  fixture-town\n\n${tests}` });

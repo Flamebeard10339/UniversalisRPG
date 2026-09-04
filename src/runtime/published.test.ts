@@ -64,6 +64,18 @@ const NOT_PUBLISHED: ReadonlyArray<{ type: string; why: string }> = [
     type: 'src/runtime/session.ts#PlaySession',
     why: 'the live session a driver threads through `apply`/`applyDirective`/`view`. Everything it publishes reaches this walk on its own — the view as `PlayView`, the status as `PlayStatus` — and its own `registry` field is content the walk is not about, for the same reason `OpenedUniverse.session` is passed over',
   },
+  {
+    type: 'src/runtime/foeTier.ts#Fighter',
+    why: 'a body the tier audit is reading, standing beside the fight it is read through and the tier, profile and level it names. `npm run ladder-check` is the only thing that holds one, its every field is a section the registry already declares, and nothing it carries is ever drawn to a player',
+  },
+  {
+    type: 'src/runtime/foeTier.ts#LadderedStats',
+    why: 'which stat of the fight the player climbs a ladder in and which measures the pool it empties: two machine names the audit reads off the world and puts back into it',
+  },
+  {
+    type: 'src/runtime/foeTier.ts#Reading',
+    why: 'what a body actually comes to against its tier — seconds to fell and share of survivable incoming. Two numbers `npm run ladder-check` prints as a tool line of its own',
+  },
 ];
 
 const UNPUBLISHED = new Set(NOT_PUBLISHED.map((each) => each.type));

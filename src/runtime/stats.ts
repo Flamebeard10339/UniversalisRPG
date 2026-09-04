@@ -14,6 +14,7 @@ import { skillLevel } from './skills';
 import { skillTags } from '../content/sections/skill';
 import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, parseOwnerRef, PLAYER } from './state';
+import { solvedStatsOf } from './foeTier';
 import { contestSpread, defaultActionDuration, minDamage } from './tuning';
 import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
 import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
@@ -91,7 +92,7 @@ function passiveCarrier(registry: Registry, passiveId: string, paysOut: boolean)
 export function modifierCarriers(state: GameState, registry: Registry, actorId: string): ModifierCarrier[] {
   const carriers: ModifierCarrier[] = [];
   const entity = actorEntity(registry, actorId);
-  if (entity) carriers.push({ source: titled('entity', entity.id), hooks: entity });
+  if (entity) carriers.push({ source: titled('entity', entity.id), hooks: entity, tags: entity.modifiers });
   for (const passiveId of entity?.passives ?? []) {
     const carrier = passiveCarrier(registry, passiveId, true);
     if (carrier) carriers.push(carrier);
@@ -163,7 +164,9 @@ export function statBreakdown(statId: string, state: GameState, registry: Regist
   const sheet = actorEntity(registry, actorId);
   if (sheet === undefined && actorId !== PLAYER)
     throw new RuntimeError(`${actorId} is asked for ${statId} and is no entity, so it carries no sheet to read one off — only the player is a side rather than a member of one`);
-  return { base: sheet?.stats[statId] ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
+  const written = sheet === undefined ? undefined : sheet.stats[statId];
+  const shaped = sheet === undefined || written !== undefined ? undefined : solvedStatsOf(registry, sheet)?.[statId];
+  return { base: written ?? shaped ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
 }
 
 export function foldStat({ base, parts }: StatBreakdown): Range {

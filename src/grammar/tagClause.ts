@@ -129,7 +129,41 @@ function printAmount(value: BonusAmount): string {
 
 const printCounter = (value: Counter): string => COUNTERS[value.kind].written(value.id);
 
+function printClause(value: TagClause): string {
+  switch (value.kind) {
+    case 'keyword':
+      return value.value;
+    case 'duration':
+      return duration.print(value.seconds);
+    case 'stat-bonus':
+      return `${printAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${printCounter(value.per)}`}`;
+    default: {
+      const unreached: never = value;
+      return unreached;
+    }
+  }
+}
+
 const CARRIED_KEYWORDS = keywordsOn('carrier');
+
+const MODIFIER_FORMS = ['+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'];
+
+const MODIFIER_EXAMPLES = ['+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+0.5 attack per level of melee'];
+
+export const statBonus: Parser<TagClause> = {
+  called: 'modifier',
+  parse(cursor) {
+    const start = cursor.pos;
+    const raw = (cursor.take(/[^,\n]+/) ?? '').trim();
+    const span = { start: cursor.abs(start), end: cursor.abs(cursor.pos) };
+    const clause = parseClause(raw, span);
+    if (clause.kind !== 'stat-bonus') throw new DslError(`a modifier moves a stat, and ${JSON.stringify(raw)} moves none: write one of ${MODIFIER_FORMS.join(', ')}`, span);
+    return clause;
+  },
+  print: printClause,
+  forms: MODIFIER_FORMS,
+  examples: MODIFIER_EXAMPLES,
+};
 
 export const tagClause: Parser<TagClause> = {
   called: 'tag',
@@ -141,22 +175,10 @@ export const tagClause: Parser<TagClause> = {
       end: cursor.abs(cursor.pos),
     });
   },
-  print(value) {
-    switch (value.kind) {
-      case 'keyword':
-        return value.value;
-      case 'duration':
-        return duration.print(value.seconds);
-      case 'stat-bonus':
-        return `${printAmount(value)} ${value.statId}${value.per === undefined ? '' : ` per ${printCounter(value.per)}`}`;
-      default: {
-        const unreached: never = value;
-        return unreached;
-      }
-    }
-  },
-  forms: ['<keyword>', ...CARRIED_KEYWORDS, '<duration>', '+<amount> <stat>', '-<amount> <stat>', '+<percent>% <stat>', '-<percent>% <stat>', '+<amount> <stat> per <resource>', '+<amount> <stat> per stack of <item>', '+<amount> <stat> per level of <skill>'],
-  examples: ['sharp', ...CARRIED_KEYWORDS, '30s', '2m', '1m30s', '+4-7 attack', '-2 defence', '+25% max-health', '-10% max-health', '+1 attack per mana', '+2 attack per stack of fervour', '+0.5 attack per level of melee'],
+  print: printClause,
+  forms: ['<keyword>', ...CARRIED_KEYWORDS, '<duration>', '<modifier>'],
+  examples: ['sharp', ...CARRIED_KEYWORDS, '30s', '2m', '1m30s', ...MODIFIER_EXAMPLES],
+  holds: () => ({ modifier: statBonus }),
   notes: {
     '<keyword>': 'a word of your own, carried and never read: the engine acts on the words below and on no other',
     ...Object.fromEntries(CARRIED_KEYWORDS.map((word) => [word, KEYWORDS[word].does])),
@@ -183,3 +205,4 @@ export const bonusAmount: Parser<BonusAmount> = {
   forms: ['+<float>', '-<float>', '+<percent>%', '+<least>-<most>'],
   examples: ['+1', '-3', '+0.5', '+25%', '-10%', '+4-7', '-3-6'],
 };
+

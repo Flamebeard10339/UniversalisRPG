@@ -478,3 +478,27 @@ export function actionLines(action: Action): string[] {
 const writtenAs = (name: keyof Omit<Action, 'label' | 'results'>): string => ACTION_FIELDS.find((field) => field.name === name)!.written;
 
 export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onRefused, action.onAttemptsExhausted].filter((list): list is ActionResult[] => list !== undefined);
+
+export interface Contested {
+  ours: string;
+  theirs: string;
+}
+
+export interface FightShape {
+  rate: string;
+  accuracy: Contested;
+  damage: Contested;
+  pool: string;
+}
+
+const sidedId = (held: unknown): string | undefined => (typeof held === 'object' && held !== null && 'id' in held ? String((held as { id: unknown }).id) : undefined);
+
+export function fightShapeOf(action: Action): FightShape | undefined {
+  if (!isFight(action) || action.accuracy === undefined || action.damage === undefined) return undefined;
+  const rate = typeof action.rate === 'object' ? sidedId(action.rate) : undefined;
+  const [hitOurs, hitTheirs] = [sidedId(action.accuracy.left), sidedId(action.accuracy.right)];
+  const [hurtOurs, hurtTheirs] = [sidedId(action.damage.left), sidedId(action.damage.right)];
+  const pool = sidedId(action.depletes);
+  if (!rate || !hitOurs || !hitTheirs || !hurtOurs || !hurtTheirs || !pool) return undefined;
+  return { rate, accuracy: { ours: hitOurs, theirs: hitTheirs }, damage: { ours: hurtOurs, theirs: hurtTheirs }, pool };
+}

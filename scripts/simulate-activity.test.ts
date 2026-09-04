@@ -4,7 +4,7 @@ import { loadModule, loadUniverseWithDiagnostics } from '../src/content/load';
 import { DEBUG_MARK } from '../src/content/sections/define';
 import { DEFAULT_RNG_SEED } from '../src/runtime/rng';
 import { msToSeconds, secondsToMs } from '../src/runtime/units';
-import { abilityAtLevel } from './lib/pace';
+import { abilityAtLevel } from '../src/runtime/pace';
 import path from 'node:path';
 import { FLOORS_DIR } from './floors';
 import { floorsBeside, simulate, simulationLines, baseForRung, DEFAULT_SEEDS, DEFAULT_WINDOW_MINUTES, GOD_WORDS, measure, parseSimulationArgs, probeSource, seedsFrom, standClocks, standingAt, stood, subjectsFrom, type Measured, type Run, type Start, type Stood, type Subject } from './simulate-activity';

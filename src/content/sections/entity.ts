@@ -7,9 +7,10 @@ import { list } from '../../grammar/list';
 import { DslError, Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
+import { statBonus, TagClause } from '../../grammar/tagClause';
 import { duration, id, number, text } from '../../grammar/values';
 import { localeKey } from '../locale';
-import { hooks, pruneHook, put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
+import { hooks, pruneHook, pruneTags, put, results, visitAction, visitTags, type Loose, type Pruning, type Visit } from '../refs';
 import { hiddenIf, MintedAction, section, TOUCHED } from './define';
 import { Dialogue, spokenBy } from './dialogue';
 import { GROUP_FIELD } from './group';
@@ -42,6 +43,7 @@ export interface AuthoredEntity extends HookCarrier {
   group?: string;
   capabilities: string[];
   stats: Record<string, Range>;
+  modifiers: TagClause[];
   skills: string[];
   passives: string[];
   equipmentSlots: string[];
@@ -77,9 +79,15 @@ const mintedOffers = (value: { id: string; examine?: string }): MintedAction[] =
 
 export const isMintedAction = (action: Action): boolean => declaredId(action) === EXAMINE_FIELD;
 
+export const SHAPE_FIELDS = ['tier', 'profile', 'level'] as const;
+
+const A_SHEET = ['stats', ...SHAPE_FIELDS] as const;
+
+export const carriesASheet = (entity: AuthoredEntity): boolean => Object.keys(entity.stats).length > 0 || entity.modifiers.length > 0 || SHAPE_FIELDS.some((field) => entity[field] !== undefined);
+
 export function offersNothing(entity: Entity, dialogues: ReadonlyMap<string, Dialogue>, stoodIn: string): string | undefined {
   if (entity.actions.length > 0 || entity.shop !== undefined || entity.capabilities.length > 0) return undefined;
-  if (Object.keys(entity.stats).length > 0 || spokenBy(dialogues, entity.id).length > 0) return undefined;
+  if (carriesASheet(entity) || spokenBy(dialogues, entity.id).length > 0) return undefined;
   return `stands in ${stoodIn} and offers a player nothing there: no examine:, no action of its own or named in uses:, no stations:, no keeps shop:, no stats: to fight and no # dialogue that owns it. Give it something to do, or take it out of that location's entities:.`;
 }
 
@@ -176,6 +184,13 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
       hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
       dehydrate: (held) => Object.entries(held),
       default: () => ({}),
+      note: 'the whole of a stat, written out. It stands in place of whatever a tier:, a profile: and a level: would otherwise have derived for that stat, and is what to write where a number is load-bearing for the encounter rather than a consequence of the shape',
+    },
+    modifiers: {
+      parser: list(statBonus),
+      default: () => [],
+      block: true,
+      note: 'what this body carries, laid over the stat each names rather than replacing it — so a modifier moves a derived number without pinning it. Flat and percent fold together the way they do on an item or a passive: everything added first, then every percent at once',
     },
     skills: {
       parser: list(id),
@@ -197,11 +212,12 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     ...HOOK_FIELDS,
   },
   keywords: ['aggressive'],
-  needs: { tier: 'stats', profile: 'stats', level: 'stats', respawnAfter: 'stats', onHit: 'stats', whenHit: 'stats', aggressive: 'stats', allies: 'stats' },
+  needs: { respawnAfter: A_SHEET, onHit: A_SHEET, whenHit: A_SHEET, aggressive: A_SHEET, allies: A_SHEET },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
+    visitTags(held.modifiers, where, visit);
     for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
     for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
     blocks(held.blocks, where, visit);
@@ -209,13 +225,19 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   },
   prune: (value, at, where) => {
     const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
+    const modifiers = pruneTags(value.modifiers, where, at);
     const blocks = pruneBlocks(value.blocks, where, at);
     const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
     const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
     const kept =
-      Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length && allies.length === value.allies.length && onHit === value.onHit && whenHit === value.whenHit;
-    return kept ? value : { ...value, stats, blocks, allies, onHit, whenHit };
+      Object.keys(stats).length === Object.keys(value.stats).length &&
+      modifiers.length === value.modifiers.length &&
+      blocks.length === value.blocks.length &&
+      allies.length === value.allies.length &&
+      onHit === value.onHit &&
+      whenHit === value.whenHit;
+    return kept ? value : { ...value, stats, modifiers, blocks, allies, onHit, whenHit };
   },
 });
 
@@ -232,3 +254,5 @@ function blocks(list: unknown, where: string, visit: Visit): void {
     results(block.results, at, visit);
   }
 }
+
+export const shapedByItsTags = (entity: AuthoredEntity): boolean => SHAPE_FIELDS.every((field) => entity[field] !== undefined);

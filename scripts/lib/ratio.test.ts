@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { skillLevel, xpForLevel } from '../../src/runtime/skills';
-import { rateAtLevel } from './pace';
+import { rateAtLevel } from '../../src/runtime/pace';
 import { frontiers, levelOf, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Paid } from './ratio';
 
 const paid = (skill: string, use: string, rate: number, at = 'somewhere'): Paid => ({ skill, use, at, rate });

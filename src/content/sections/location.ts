@@ -272,7 +272,7 @@ const SCHEMA: SectionSchema<Location, 'starting' | 'multicombat', 'actions'> = {
   },
   keywordsAfter: 'examine',
   bare: 'relative',
-  exclusive: [['x', 'y', 'z'], ['relative']],
+  exclusive: [[['x', 'y', 'z'], ['relative']]],
   entries: { into: 'actions', body: actionBody },
 };
 
