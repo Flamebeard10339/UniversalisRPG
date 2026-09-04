@@ -19,6 +19,25 @@ plausible pace for a lockpick either way.
 *Closes when: the three lines say the pace their shops are meant to keep, read off what a
 player can actually empty rather than left at whichever number happens not to matter.*
 
+## The tiers saves carry a hand-written pack, and it goes stale the day a module ships
+
+`tiers.dsl` is nine reference saves whose inventories are written out by hand. The three
+`cooking-tier-*` ones carry shrimp, anchovies, trout, salmon, chicken and beef — the raw
+ingredients that existed when they were written — so a sweep run from one sees only the six
+cheapest recipes in the world and reports cooking's ceiling as **flat at 2,160/h from level 1 to
+level 20, falling from 1.8x the curve to 0.99x**. Swept instead from a cook holding the eel, the
+tench, the perch and the carp that the fishing expansion added, the same world reads **6,480/h
+at level 30, 2.2x**, with five of seven offers inside the frontier.
+
+Both figures are honest readings of the save they were taken from, and the first one is the
+answer to a question nobody asked. It cost this session a wrong conclusion about cooking, in
+writing, before the second reading caught it. The `fishing-tier-*` saves are stale the same way:
+none of them carries a piece of the level 25-30 band that shipped today.
+
+*Closes when: what a tier save holds is derived from the world rather than typed into it — every
+raw input a recipe names, and a piece of every slot the skill has gear for — so a module that
+ships new ingredients or new bases is swept correctly with nothing edited.*
+
 ## A sweep re-issues one directive, so an offer that is two actions cannot be priced
 
 `npm run simulate-activity` builds a `# test` per offer that takes that offer until the window
