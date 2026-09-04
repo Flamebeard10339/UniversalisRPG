@@ -209,13 +209,12 @@ The briefs live in `.planning/combat-expansion/`, and one that has merged moves 
                 the-swampy-menace-pass   attention-to-detail-pass
                 the-bars-crawl-pass      the-grumpy-crafter
                 a-grand-blade-pass       plague-matters
-                combat-floor
+                combat-floor             passives-to-the-curve
 
-**Every waiting brief still tells its run to measure and tune numbers, and that is now
-wrong.** An author names a tier and a profile; the engine cuts the stats. A run that spends
-its turns on `simulate-activity` is spending them on work the tags already do, which is much
-of why the base run hit its turn cap. The speedrun is the one lane that still iterates,
-because a floor is walked rather than declared.
+The briefs were rewritten 2026-09-04 to ask for tags rather than numbers, and each now says
+plainly not to run `simulate-activity`. The speedrun is the one lane that still iterates,
+because a floor is walked rather than declared. `passives-to-the-curve.md` is new and is the
+brief for the passive line above.
 
 Orders to keep: `a-grand-blade-pass` after `the-grumpy-crafter`; `combat-recut` and the
 passive rename never at once; The Rat Conspiracy gets no pass. **Dispatching is on hold until
