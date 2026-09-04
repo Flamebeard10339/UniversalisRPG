@@ -61,11 +61,17 @@ climb, and price it as best-in-slot **for its tier** rather than for the game. R
 iron and post-iron weapons grant off `content/combat.dsl` and put this one above them by a
 margin a player would notice and not by one that ends the ladder.
 
-`npm run ladder-check` on the shipped corpus on 2026-09-04 read `combat.attack` at level 30
-as 5.5 **short** of what the ladder asks even counting everything that exists anywhere in the
-world. This blade is a fair place to close part of that: it is the top of what the world
-offers and the ladder says the top is slightly under. Read the residual off your own corpus,
-and say in the report what the blade moved.
+**Cut it against the ladder, not against the weapons beside it.** The damage ladder was
+corrected on 2026-09-04: a stat that deals a damage type now climbs at a fifth of the health
+ladder, so that an even fight takes about five blows. Every weapon and attack jewel already
+in the world was cut against the old line and none has been re-cut, so `ladder-check` reads
+`combat.attack` at level 30 as 58.0 **over** out of a shop and 156.9 over counting the drops
+— roughly five times what the ladder asks.
+
+That means the honest best-in-slot blade for this tier is **weaker than several things
+already shipped**, and it will look wrong beside them until the re-cut lane runs. Cut it to
+the ladder anyway, say plainly in the report what it grants against what the ladder asks at
+its tier, and name the shipped weapons it now sits under. Do not match them.
 
 ## Balance
 
@@ -75,10 +81,11 @@ stands a character on a declared rung and reads what the room actually pays and 
 gate fight should be lost at the middle of the band and won at the top of it; show both in
 the report. Nothing here asserts a number in a `# test`.
 
-One measured thing worth having: on the shipped corpus every combat room but the pasture pays
-under 0.7× the curve, because runs stop short — a faint ends the offer and the rest of the
-hour pays nothing. If the fight you write is one a player will faint in repeatedly, that is a
-finding to report rather than a reason to soften it.
+One measured thing worth having: on the shipped corpus every combat room but the pasture
+stops short of the hour in every seed — a faint ends the offer at the low rungs and the room
+runs out of things to kill at the high ones — and the rest of the window pays nothing. If the
+fight you write is one a player will faint in repeatedly, that is a finding to report rather
+than a reason to soften it.
 
 ## Done means
 

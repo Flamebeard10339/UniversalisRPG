@@ -9,11 +9,44 @@ the engine only knows how a stat enters a swing; a faint is a forced five-second
 ends at `starting-location`, hardcore taking the pack besides; there is no defense skill and
 will not be; the muster is a room; what pays for a long fight is gear, food and deaths in
 whatever mix the speedruns find; **food is gear with an upkeep cost and nothing more**, so
-the sheet never had a special case to answer; and A Grand Blade is **two** quests, a
-level-one miniquest that teaches the plane and a hard finale that pays a weapon.
+the sheet never had a special case to answer; A Grand Blade is **two** quests, a level-one
+miniquest that teaches the plane and a hard finale that pays a weapon; **damage climbs at a
+fifth of health so an even fight takes five blows**; **stats that meet in an adversarial
+check share one ladder**, or the check stops meaning what it looks like it means; and **a
+foe's toughness is typed resistance, never flat damage reduction**.
 **A line is deleted the day it closes.**
 
 ---
+
+## Every number in combat.dsl is cut against ladders that have since moved
+
+Two things changed under the world on the afternoon of 2026-09-04, after `combat.dsl` was
+written, and nothing in `content/` moved with either. A stat that deals a damage type now
+climbs at a fifth of the health ladder rather than at the same rate; and flat damage
+reduction now takes its cut of the whole blow rather than only of the untyped `attack` term.
+
+`npm run ladder-check`, read after both landed:
+
+    combat.attack (combat.physical-damage)      shop         anywhere
+      level 10   ladder asks  12.6           46.4 over     125.0 over
+      level 20   ladder asks  26.6           51.2 over     140.0 over
+      level 30   ladder asks  40.6           58.0 over     156.9 over
+
+    combat.health (core.max-health)              shop         anywhere
+      level 10   ladder asks  63.0           10.2 short    641.9 over
+      level 20   ladder asks 133.0           63.4 short    626.6 over
+      level 30   ladder asks 203.0          114.6 short    613.3 over
+
+Three faults with three different answers, which is why this is one brief and not three: the
+attack rows are five-fold over because they are the old ladder showing through; the health
+shop row is an ordinary residual wanting gear the world has not got; and the health drop row
+is 613 over **and flat across every rung**, which is not a curve fault at all but something
+granting a large fixed amount. The brief is `.planning/combat-recut.md`, and it also carries
+the sweep moving foe toughness off flat reduction and onto typed resistance.
+
+*Closes when:* `combat.dsl` is re-cut with every route in it still walking,
+`ladder-check` reads both skills within a stated band, and what the flat 613 of health turned
+out to be is written into the commit.
 
 ## The passive ids were not renamed, and were ruled to be
 
@@ -27,7 +60,8 @@ This is mechanical work rather than authoring: `npm run rename-section` writes o
 everywhere the world reads it and refuses unless the registry afterwards differs by exactly
 that id. **It was deliberately not done while the wave was in flight**, because a run holds a
 copy of `content/` taken when it started and a module that merges afterwards would name the
-old id.
+old id. For the same reason it must not run at the same time as the re-cut above: two lanes
+changing one file is how a corpus ends up half-renamed.
 
 The form that fits what is already there is the jewel items' own, one term shorter: a
 passive's id is `[<role>-]<stat>-<form>`, where the role is written only where the passive
@@ -44,111 +78,70 @@ from this paragraph — it is an illustration and not a list.
 are, each has a `title:` holding the flavour it gave up, and
 `npm run oracle -- --at content` is green.
 
-## The wave after the base run is three dispatched of eleven
+## The wave after the base run is four merged of twelve
 
 Nine briefs stood in `.planning/` on 2026-09-04, each written off a measured gap; the ruling
-on A Grand Blade added two more (`the-grumpy-crafter.md`, `a-grand-blade-pass.md`). Each is
-one `npm run authorbot -- <brief> --target <module>`, run in the background with `--watch`
+on A Grand Blade added two more and the ladder correction added a third. Each is one
+`npm run authorbot -- <brief> --target <module>`, run in the background with `--watch`
 beside it. **Three at a time**, so a fault in the tool or the oracle is caught before it has
-eaten eight runs. Orders to keep: `plague-matters.md` after `reverse-infiltration.md` has
-merged, since it names that quest's ids; `a-grand-blade-pass.md` after
-`the-grumpy-crafter.md`, since the pass hands the teaching half to it; and The Rat Conspiracy
-matches its own note and gets no pass.
+eaten eight runs.
 
-    dispatched 2026-09-04:  combat-lessons        reverse-infiltration    ball-of-a-boy-pass
-    waiting:                kill-it-with-fire-pass   birds-and-the-bees-pass
-                            the-swampy-menace-pass   attention-to-detail-pass
-                            the-bars-crawl-pass      the-grumpy-crafter
-                            a-grand-blade-pass       plague-matters
+    merged:     ball-of-a-boy-pass   combat-lessons   reverse-infiltration
+                kill-it-with-fire-pass
+    waiting:    combat-recut             birds-and-the-bees-pass
+                the-swampy-menace-pass   attention-to-detail-pass
+                the-bars-crawl-pass      the-grumpy-crafter
+                a-grand-blade-pass       plague-matters
+
+Orders to keep: `plague-matters.md` after `reverse-infiltration.md` — already merged, so it
+is free; `a-grand-blade-pass.md` after `the-grumpy-crafter.md`, since the pass hands the
+teaching half to it; `combat-recut.md` and the passive rename never at the same time as each
+other, since both write `combat.dsl`; and The Rat Conspiracy matches its own note and gets no
+pass. **Dispatching is on hold until the re-cut lands** — ruled 2026-09-04 — because a run
+that tunes a fight against the old numbers has to be re-read afterwards anyway.
 
 *Closes when:* each module is merged with `npm run oracle -- --at content` green and its
 reaches read, and the two finale quests walk start to finish.
 
-## Every combat room but the pasture stops short, and that is the balance problem
+## Every combat room but the pasture stops short of the hour
 
-Measured 2026-09-04 off the merged module, standing a character on the declared ladder at
-three rungs and reading every offer in each room over the hour window
-(`npm run simulate-activity -- combat.iron-band-in-hand --at <room> --ladder
-combat.physical-damage=<n>,core.max-health=<n>`). What the whole window paid, against what
-the curve asks:
-
-    rung                  5              12             21
-    proving-ground   A .13 H .06    A .13 H .23    A .13 H .26
-    sewer-junction   A .07 H .09    A .20 H .30    A .30 H .56
-    pasture          A .67 H .27    A .69 H .27    A .69 H .27
-    kings-road       A .29 H .09    A .29 H .41    A .29 H .66
-    north-road       A <.01 H .06   A .02 H .23    A .21 H .49
-    sewer-locked     A <.01 H .06   A .05 H .03    A .05 H .03
-    the-muster       A .08 H .07    A .63 H .32    A 1.8 H .13
-    swamp-mire       A <.01 H .06   A .19 H .15    A .19 H .15
-
+Measured 2026-09-04 across eight rooms at three rungs, and re-read after the ladder moved.
 **The pasture is the only room in the world that ran the full 3,600 seconds.** Every other
 room stopped short in every seed at every rung, and the rest of the hour paid nothing — which
-is the whole of why the column reads the way it does. Two different causes wear the same
-message: at the low rungs it is a faint ending the offer after ten seconds, and at rung 21 it
-is the room running out of things to kill. The rates *while it ran* are healthy — the muster
-pays 13,000/h of attack experience in the twelve minutes it lasts — so nothing here is
-underpaying per kill. What is missing is a reason to still be standing there at minute
-fifty-nine.
+is the whole of why every room reads under the curve. Two causes wear the same message: at
+the low rungs a faint ends the offer after ten seconds, and at the high rungs the room runs
+out of things to kill. The rates *while a room ran* are healthy, so nothing is underpaying
+per kill. What is missing is a reason to still be standing there at minute fifty-nine.
 
-*Closes when:* a lane has changed population, respawn or aggression so that at least the
-band-appropriate room of each band runs the window out at its own rung, and the table above
-is re-read against the change.
+The correction to the ladder did not touch this, which is the point: the muster went from
+1.8× attack and 0.13× health over 700 seconds to 0.43× and 0.51× over 880, and still stopped
+short in four seeds of four. **This is population, respawn and aggression, and it is the last
+thing standing between combat and a floor.**
+
+*Closes when:* at least the band-appropriate room of each band runs the window out at its own
+rung, and the room table is re-read against the change.
 
 ## Combat has no floor, so its tier saves cannot be deleted
 
 `docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets
 a floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
-thieving's; nothing walks a fighter from level one to thirty.
+thieving's; nothing walks a fighter from level one to thirty. The brief is
+`.planning/combat-floor.md` and it waits on the re-cut, since a floor measured against
+numbers about to move is measured twice.
 
 *Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
 edges and the combat saves in `content/tiers.dsl` are deleted.
 
 ## The muster is a room, and now reads as a room that runs out
 
-Crossed from `docs/tulsa/open-human.md` on the ruling of 2026-09-04, and re-measured the same
-day against the merged module. It is no longer the wall it was: at the level-21 rung a
-fighter in the iron band clears it, pays 1.8× the curve in attack experience, and **empties
-it in 734–778 seconds of the 3,600-second window in four seeds of four**. Health experience
-is 0.13× — the warriors barely mark a fighter cut for their rung, so the room trains one arm
-and not the other. Six warriors on a ninety-second respawn is a twelve-minute room.
+Crossed from `docs/tulsa/open-human.md` on the ruling of 2026-09-04. It is no longer the wall
+it was reported as, and on the corrected ladder it is no longer the one-sided thing it was
+either: a fighter at the level-21 rung now pays 0.43× attack and 0.51× health, spending 135
+health an hour rather than 39. What it still does is **empty in 880 seconds of the 3,600**,
+in four seeds of four. Six warriors on a ninety-second respawn is a fifteen-minute room.
 
-*Closes when:* the muster runs the hour out at the level-21 rung, its health experience reads
-on the curve as well as its attack experience, and the combat floor reaches it.
-
-## The shop ladder falls behind from level 20, and the drops run away above it
-
-`npm run ladder-check`, read 2026-09-04 off the merged module:
-
-    combat.attack (combat.physical-damage)      shop        anywhere
-      level 10   ladder asks  63.0            4.0 short    74.6 over
-      level 20   ladder asks 133.0           55.2 short    33.6 over
-      level 30   ladder asks 203.0          104.4 short     5.5 short
-
-    combat.health (core.max-health)             shop        anywhere
-      level 10   ladder asks  63.0           10.2 short   641.9 over
-      level 20   ladder asks 133.0           63.4 short   626.6 over
-      level 30   ladder asks 203.0          114.6 short   613.3 over
-
-The shop residual is the expected shape — shops are meant to be about a fifth of the ladder
-by thirty — and the level-20 and level-30 gaps are what an obscure seller in the world is
-for; `the-grumpy-crafter` brief is pointed at part of it and `a-grand-blade-pass` at the
-level-30 attack residual. **What is not the expected shape is `combat.health` reading 613
-over the ladder at every rung when everything in the world is counted.** Attack's two rows sit
-2× apart and health's sit 9× apart, which is the whole finding: the health jewels pay an order
-of magnitude more than the ladder wants and the attack jewels do not.
-
-**The ladder is not what is wrong — that was checked before this was written.** `ONE_LINE` in
-`scripts/lib/pace.ts` is the ladder for every skill but fishing, and it asks 203 at level 30 of
-whatever stat a skill names, which for `combat.health` is `core.max-health`. That reads like a
-unit error — 203 damage a swing and 203 health are not the same quantity — and it is not one:
-every normal foe the world declares tops out at 115 max-health, so a character with 203 at
-level 30 is on the right order of magnitude and one with 816 is not. Neither skill grants its
-stat per level, so both figures are gear and jewels alone. Do not spend the lane re-arguing the
-ladder.
-
-*Closes when:* the health jewels are re-cut so that `it exists anywhere` lands within the
-band the other skills land in, and `ladder-check` is re-read.
+*Closes when:* the muster runs the hour out at the level-21 rung and the combat floor reaches
+it.
 
 ## What pays for a long fight is ruled, and nothing has measured the mix
 
@@ -163,3 +156,19 @@ combat's.
 
 *Closes when:* the combat floor carries one route that eats and one that does not at the same
 two targets, and the sheet says which won where.
+
+## Nothing audits an adversarial pair for sharing a ladder
+
+Ruled 2026-09-04 that stats meeting in an adversarial check must sit on exactly the same
+ladder, or the check stops meaning what it looks like it means. The world declares its own
+contests — `accuracy: us.accuracy vs them.evasion` and `damage: us.attack vs them.defense` on
+`# action melee-combat`, and every `<stat> vs <stat>:` in a result — so the pairs are
+derivable, and nothing derives them. `accuracy` and `evasion` are consistent today by
+accident: neither is named by a skill, so neither is laddered at all.
+
+The shape this wants is `ladder-check` walking the actions, pairing the stats each contest
+names, and reporting a pair whose two sides read different ladders — derived from the world's
+own declarations rather than from a list of pairs kept beside them.
+
+*Closes when:* `ladder-check` reports contested pairs that disagree, and either the world has
+none or the ones it has are named in the commit that closes this.

@@ -72,14 +72,21 @@ meet, and no fight anywhere in it. Stand a save at the point a player leaves the
 read what the counter sells with `npm run simulate-activity -- <save> --world <your corpus>`
 and `npm run ladder-check` against that world.
 
-`ladder-check` on the shipped corpus on 2026-09-04 reads `combat.attack` from shops at 4.0
-short of the ladder at level 10 and 55.2 short at level 20, and `combat.health` from shops at
-10.2 short at 10 and 63.4 short at 20. **His stall is a fair place to answer part of that
-gap** — an obscure seller who fits the world is exactly what a shop-side residual wants — but
-it is a stall a man just got, not a rival armoury: what it stocks is the tier a competent
-crafter with no premises makes, and it should not close the level-20 gap on its own. Read the
-residual off your own corpus rather than trusting those figures, and say in the report what
-the stall moved.
+`ladder-check` on the shipped corpus, read 2026-09-04 **after the damage ladder was corrected
+that afternoon**, says the two halves of the kit are wrong in opposite directions.
+`combat.attack` from shops is 46.4 **over** the ladder at level 10 and 51.2 over at 20 — the
+world's weapons and attack jewels are cut for a ladder five times too steep and have not been
+re-cut yet. `combat.health` from shops is 10.2 **short** at 10 and 63.4 short at 20.
+
+**So the stall does not answer an attack gap, because there is not one.** If it stocks a
+weapon at all, that weapon is cut against the corrected ladder rather than against what the
+armoury counter happens to sell today, and it will look weak beside the counter's stock —
+say so in the report rather than matching the counter. Where the stall can honestly help is
+the health side, and only a little: it is a stall a man just got, not a rival armoury, and
+what it stocks is the tier a competent crafter with no premises makes.
+
+Read the residual off your own corpus rather than trusting those figures, and say in the
+report what the stall moved.
 
 ## Done means
 

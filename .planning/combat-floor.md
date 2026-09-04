@@ -53,15 +53,23 @@ stopped short in every seed at every rung, and two different causes wear the sam
 the low rungs a faint ends the offer after ten seconds, and at the high rungs the room runs
 out of things to kill. The muster empties in 734–778 seconds of the 3,600-second window at
 the level-21 rung while paying 1.8× the curve in attack experience for the twelve minutes it
-lasts. Rooms that stop short pay under 0.7× the curve over the window and healthily above it
-while they run.
+lasts. Rooms that stop short pay a fraction of the curve over the window and healthily above
+it while they run.
+
+**Those room figures were read before the damage ladder was corrected on the afternoon of
+2026-09-04 and the shape of them survives the correction, but the numbers do not.** On the
+corrected line the muster reads 0.43× attack and 0.51× health over 880 seconds where it read
+1.8× and 0.13× over 700. Re-read any room you lean on rather than taking a figure from here.
 
 So a floor route that stands still in one room will stall, and **the interesting floor is the
 one that moves**: a circuit of rooms walked in an order that keeps the player fighting, with
 the walk between them costing what it costs. Write that circuit and the minutes it takes.
-Where a room's health experience is starved next to its attack experience — the muster reads
-0.13× health against 1.8× attack — a fighter's two skills climb at different speeds, and a
-floor to level 30 in *both* may need different rooms for each. Say which if so.
+
+Watch whether a fighter's two skills climb together. On the old line the muster paid 1.8×
+attack against 0.13× health, so the arms were fourteen-fold apart; correcting the ladder
+brought them to 0.43× and 0.51×, which is close enough that one circuit may serve both. If
+you find a room where they part again, a floor to level 30 in *both* may need different rooms
+for each — say which if so.
 
 ## The facts you need, so you do not spend the run finding them
 
