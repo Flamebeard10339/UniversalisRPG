@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../../src/content/engineLocale';
 import { FIXTURE_WORLD } from '../../src/content/worldFixture';
-import { moved, tracedRun, traceLines } from './trace';
+import { afterAFailure, moved, tracedRun, traceLines } from './trace';
 
 const LOOPING =
   FIXTURE_WORLD +
@@ -70,6 +70,18 @@ describe('a traced run', () => {
 
     expect(run.moments[0]!.moved).toContain('flags.tapped true');
     expect(run.moments[1]!.moved).toEqual([]);
+  });
+
+  it('says what the world was doing under a failure, since the line naming a failure names the wrong subject often enough to matter', () => {
+    const said = afterAFailure(registry, 'taps-and-then-asks-for-what-is-not-there');
+
+    expect(said.some((line) => line.includes('what the world was doing over the last'))).toBe(true);
+    expect(said.some((line) => line.includes('use: entity.post.tap-it'))).toBe(true);
+    expect(said.some((line) => line.includes('flags.tapped true'))).toBe(true);
+  });
+
+  it('says so rather than inventing a tail where the route walks the second time', () => {
+    expect(afterAFailure(registry, 'taps-until-it-gives-up').some((line) => line.includes('depends on something this run did not repeat'))).toBe(true);
   });
 
   it('prints a long run as its two ends and a count of what it left out', () => {

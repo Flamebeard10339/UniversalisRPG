@@ -89,6 +89,33 @@ export function traceLines(testId: string, run: { moments: readonly Moment[]; fa
   return lines;
 }
 
+export const AFTER_A_FAILURE = 6;
+
+const MOVED_SHOWN = 12;
+
+const movedShortly = (moved: readonly string[]): string => {
+  if (moved.length === 0) return 'nothing moved';
+  if (moved.length <= MOVED_SHOWN) return moved.join(', ');
+  return `${moved.slice(0, MOVED_SHOWN).join(', ')}, and ${String(moved.length - MOVED_SHOWN)} more`;
+};
+
+export function afterAFailure(registry: Registry, testId: string, count = AFTER_A_FAILURE): string[] {
+  let run: { moments: Moment[]; failure: string | null };
+  try {
+    run = tracedRun(registry, testId);
+  } catch {
+    return [];
+  }
+  if (run.moments.length === 0) return [];
+  if (run.failure === null) return ['    it walked when it was run again, so what it does depends on something this run did not repeat'];
+  const tail = run.moments.slice(-count);
+  return [
+    `    what the world was doing over the last ${String(tail.length)} of its ${String(run.moments.length)} step(s):`,
+    ...tail.map((moment) => `      ${String(moment.at).padStart(4)}  ${moment.pass === null ? '' : `pass ${String(moment.pass)}  `}${moment.wrote}${moment.failure === null ? '' : '  ← REFUSED'}
+            ${movedShortly(moment.moved)}`),
+  ];
+}
+
 export function traceTests(registry: Registry, named: readonly string[]): { lines: string[]; ok: boolean } {
   const lines: string[] = [];
   let ok = true;

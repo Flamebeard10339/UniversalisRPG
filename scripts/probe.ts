@@ -16,7 +16,7 @@ import { replayTest, runTest, type TestRun } from '../src/runtime/session';
 import { serializeSave } from '../src/runtime/save';
 import { overLines } from '../src/content/sections/save';
 import { endSaveId } from '../src/runtime/runLog';
-import { traceTests } from './lib/trace';
+import { afterAFailure, traceTests } from './lib/trace';
 
 export type RoundTripMode = 'universe' | 'module';
 
@@ -188,7 +188,10 @@ function runTests(registry: Registry, specs: readonly string[]): { lines: string
         }
       })();
       lines.push(failure === null ? `${id}: PASSED` : `${id}: FAILED — ${failure}`);
-      if (failure !== null) ok = false;
+      if (failure !== null) {
+        lines.push(...afterAFailure(registry, id));
+        ok = false;
+      }
     }
   }
   return { lines, ok };
