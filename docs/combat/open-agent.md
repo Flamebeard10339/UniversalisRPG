@@ -286,20 +286,6 @@ player survives is the whole measurement.
 *Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
 edges, and the combat saves in `content/tiers.dsl` are deleted.
 
-## A run greps the checkout's content and is refused, four times in one run
-
-`birds-and-the-bees-pass` reached for the engine four times and every one was a `grep` at
-`content/tulsa.dsl` or an absolute path into this checkout rather than at its own copy. The
-refusal explains the copy well once it fires, but the instinct it corrects is the natural one,
-and four turns is four turns.
-
-Small, and recorded rather than fixed: worth a line in the system prompt naming the corpus path
-in the same breath as "read any of them", or worth leaving alone if a refusal that teaches once
-is cheap enough.
-
-*Closes when:* a run stops spending turns discovering which directory is its own, or this is
-ruled cheap enough to keep.
-
 ## The muster is a room, and now reads as a room that runs out
 
 It is no longer the wall it was reported as, nor the one-sided thing it was: a fighter at the
