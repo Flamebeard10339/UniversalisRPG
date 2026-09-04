@@ -749,7 +749,9 @@ berserker, physical, +3 physical-damage
 berserker, speed, +3 attack-rate
 
 # passive reckless
-berserker, physical, +10% physical-damage, -2 defense
+berserker, physical, -2 defense
+grants:
+  +2x increased physical-damage
 
 # passive rising-fury
 title: Rising Fury
@@ -771,8 +773,8 @@ juggernaut, armour, +4 defense
 
 # passive immovable
 juggernaut, life
-grants: core.max-health
-budget: 1
+grants:
+  +1x added core.max-health
 
 # passive slow-and-certain
 juggernaut, armour, +3 defense, -2 attack-rate

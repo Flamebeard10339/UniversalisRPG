@@ -389,7 +389,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|when[ \\t]+hit|examine|inflict|perform|restore|budget|credit|grants|on[ \\t]+hit|one[ \\t]+of|stands|drain|title|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open[ \\t]+modal|shake[ \\t]+off|discover|relocate|when[ \\t]+hit|examine|inflict|perform|restore|credit|grants|on[ \\t]+hit|one[ \\t]+of|stands|drain|title|unset|give|roll|take|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -410,6 +410,14 @@
             },
             "2": {
               "name": "keyword.other.dsl"
+            }
+          }
+        },
+        {
+          "match": "^[ \\t]*(-|\\+)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.dsl"
             }
           }
         },

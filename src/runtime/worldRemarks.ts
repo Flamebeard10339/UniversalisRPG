@@ -8,7 +8,8 @@ import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
 import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
-import { passiveTags, passiveTagsOf } from './passiveGrant';
+import { grantsOf, passiveTags, passiveTagsOf } from './passiveGrant';
+import { ladderForStat } from './pace';
 import { loadSave } from './save';
 import { createGameState } from './state';
 import { staleTiers } from './tierSaves';
@@ -146,6 +147,17 @@ function undealt(registry: Registry): Remark[] {
   });
 }
 
+function unladdered(registry: Registry): Remark[] {
+  return [...registry.passives.values()].flatMap((passive) =>
+    grantsOf(passive)
+      .filter((grant) => ladderForStat(registry, grant.statId) === undefined)
+      .map((grant) => ({
+        where: `# passive ${passive.id}`,
+        says: `grants ${String(grant.times)}x ${grant.axis} ${grant.statId}, and ${grant.statId} climbs no # ladder, so there is nothing to take a multiple of and the line grants nothing at all. Declare a ladder for it, or write the amount out as an ordinary modifier`,
+      })),
+  );
+}
+
 type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
 const RULES: readonly Rule[] = [
@@ -158,6 +170,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => rotted(registry),
   (_sources, registry) => lopsided(registry),
   (_sources, registry) => undealt(registry),
+  (_sources, registry) => unladdered(registry),
   (sources) => unpacked(sources),
   (sources) => rootless(sources),
   unread,

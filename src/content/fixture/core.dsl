@@ -152,8 +152,8 @@ stat: scavenging-rate
 +5% defense
 
 # passive hale
-grants: max-health
-budget: 4
+grants:
+  +0.25x added max-health
 
 # passive keen
 +4 attack
