@@ -19,24 +19,28 @@ plausible pace for a lockpick either way.
 *Closes when: the three lines say the pace their shops are meant to keep, read off what a
 player can actually empty rather than left at whichever number happens not to matter.*
 
-## The tiers saves carry a hand-written pack, and it goes stale the day a module ships
+## `tiers.dsl` is being deleted a skill at a time, as each one gets a floor
 
-`tiers.dsl` is nine reference saves whose inventories are written out by hand. The three
-`cooking-tier-*` ones carry shrimp, anchovies, trout, salmon, chicken and beef — the raw
-ingredients that existed when they were written — so a sweep run from one sees only the six
-cheapest recipes in the world and reports cooking's ceiling as **flat at 2,160/h from level 1 to
-level 20, falling from 1.8x the curve to 0.99x**. Swept instead from a cook holding the eel, the
-tench, the perch and the carp that the fishing expansion added, the same world reads **6,480/h
-at level 30, 2.2x**, with five of seven offers inside the frontier.
+Its nine reference saves have inventories written out by hand, and a hand-written pack inside a
+balance instrument drifts from the world it measures. Measured 2026-09-03: the `cooking-tier-*`
+saves carry the raw ingredients that existed when somebody typed them in, so a sweep from one
+reported cooking's ceiling as **flat at 2,160/h from level 1 to 20, falling from 1.8x the curve
+to 0.99x**. From a cook holding the fish that shipped that day, the same world reads **6,480/h
+at level 30, 2.2x**. The first figure is an honest reading of the save and the answer to a
+question nobody asked, and it was written down as a conclusion about cooking before the second
+reading caught it. They also declare no location, so each one stands where a world with no save
+location starts — the tutorial guide house — which is where those cooking figures were taken.
 
-Both figures are honest readings of the save they were taken from, and the first one is the
-answer to a question nobody asked. It cost this session a wrong conclusion about cooking, in
-writing, before the second reading caught it. The `fishing-tier-*` saves are stale the same way:
-none of them carries a piece of the level 25-30 band that shipped today.
+Ruled 2026-09-03: they go. The replacement is already built and is derived rather than typed —
+`npm run simulate-activity -- --after <test>` stands a sweep where a floor route ends, and a
+floor route buys and wears its own gear by walking. `fishing-tier-1`, `-10` and `-20` are
+deleted, because `floors/fishing-floor.dsl` covers that skill at 14, 20 and 30.
 
-*Closes when: what a tier save holds is derived from the world rather than typed into it — every
-raw input a recipe names, and a piece of every slot the skill has gear for — so a module that
-ships new ingredients or new bases is swept correctly with nothing edited.*
+What is left is combat and cooking, and they stay until the same is true of them: deleting a
+skill's tier saves before it has a floor leaves it with no reference build at all.
+
+*Closes when: combat and cooking have floor routes, their tier saves are deleted with them, and
+`tiers.dsl` is gone.*
 
 ## A sweep re-issues one directive, so an offer that is two actions cannot be priced
 
