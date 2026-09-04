@@ -130,7 +130,7 @@ describe('the subjects the report picks', () => {
 
   it('reads at exactly the rungs it was handed, and narrows to exactly the skills it was named', () => {
     const said = ladderLines(ledge(), { skills: ['ledge.tinkering'], levels: [3, 12] });
-    expect(said.lines.filter((line) => line.startsWith('# '))).toHaveLength(1);
+    expect(said.lines.filter((line) => /^# \S+ — /.test(line))).toHaveLength(1);
     expect(said.lines.filter((line) => line.trimStart().startsWith('level '))).toHaveLength(2);
     expect(said.lines.join('\n')).toContain('level 12 —');
   });

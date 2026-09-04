@@ -571,6 +571,7 @@ on death:
 title: Feral Rat
 examine: A rat the size of a cat, hairless in patches and weeping where it is not.
 stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35
+tier: mob
 uses: core.melee-combat
 faction: world
 aggressive
@@ -595,6 +596,7 @@ on death:
 title: Ratkin Warrior
 examine: A head taller than the ones in the sewer and put together properly, in scale somebody cut and fitted rather than found. It watches you the whole way in.
 stats: attack 4, defense 12, max-health 115, attack-rate 14, accuracy 70, evasion 40
+tier: elite
 uses: core.melee-combat
 faction: world
 respawn after: 90s
