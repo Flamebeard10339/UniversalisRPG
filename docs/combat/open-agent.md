@@ -44,11 +44,3 @@ that way, food is buffed or nerfed, and that is cooking's number rather than com
 
 *Closes when:* the combat floor carries one route that eats and one that does not at the
 same two targets, and the sheet says which won where.
-
-## Three quest notes pay experience into a skill that does not exist
-
-`.planning/planning_quests/` pays defense experience in The Swampy Menace, Reverse
-Infiltration and Plague Matters, and `content/the-swampy-menace.dsl` carries the `@@@`
-where it was dropped. Ruled 2026-09-04, and once before: no defense skill.
-
-*Closes when:* the three notes pay attack, health or coin and the `@@@` is gone.

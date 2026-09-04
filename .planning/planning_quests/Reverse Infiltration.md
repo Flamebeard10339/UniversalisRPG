@@ -2,8 +2,7 @@
 `Starting point:` Speak to the Guard Captain
 `Reward:` 
 12,500 attack experience
-12,500 defense experience
-6,000 health experience
+18,500 health experience
 
 1. The guard captain hires us to help infiltrate into ratkin territory and figure out what is going on. 
 2. The player travels to the ratkin border and speaks to the guards at the outpost. 

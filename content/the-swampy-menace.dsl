@@ -56,8 +56,8 @@ stage confronted:
     Oolga does not deny it. "A body my age likes a bit of quiet now and then. You were only ever running errands for the look of it."
     The captain looks at you like she is deciding whose fault that is, and settles on yours.
     give: 3000 coin
-    xp: combat.health 4000
-    "For the trouble," she says, and does not sound like she thinks it was worth it either. @@@ asked for 2,000 defense experience on top of this; the world has no defense skill to pay it into (`npm run oracle -- skill` lists only attack and health), so it is dropped rather than invented.
+    xp: combat.health 6000
+    "For the trouble," she says, and does not sound like she thinks it was worth it either.
     goto settled
   guard-captain says:
     always
@@ -66,7 +66,7 @@ stage confronted:
     Oolga, behind her, does not look sorry. "A body my age likes a bit of quiet now and then."
     "She had everything she needed the whole time," the captain says. "You were fetching for the look of it."
     give: 3000 coin
-    xp: combat.health 4000
+    xp: combat.health 6000
     "For the trouble," she says, and hands it over like it costs her something.
     goto settled
 

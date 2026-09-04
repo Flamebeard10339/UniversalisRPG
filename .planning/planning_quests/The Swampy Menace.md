@@ -1,8 +1,7 @@
 `Requirements:` [[Kill it with Fire]] and [[Ball of a Boy]]
 `Starting point:` Speak to the Guard Captain
 `Reward: `
-4,000 health experience
-2,000 defense experience
+6,000 health experience
 3,000 coins
 
 
