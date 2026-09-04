@@ -69,69 +69,55 @@ It writes nothing here and prints where its work is. Then:
 3. Read what it reached for, and whether anybody answered it. An unanswered reach is a question
    the oracle did not answer and should have; that list is the point of running it this way.
 
-## Balance is part of authoring, not a pass afterwards
+## Balance is declared, not measured
 
-A brief that says what a module is for and stops there gets a module whose numbers are
-invented. Put the balance in the brief, and the run can finish it and check its own work.
+**An author does not tune numbers.** A body that fights names three things and the engine
+cuts every stat under them:
 
-**What a repeatable mark pays in an hour is arithmetic, and it is exact:**
+- `tier:` — what it is worth fighting. How many seconds it stands against a player the ladder
+  puts at its level, what share of survivable incoming it deals, and what an hour of it pays
+  against the curve. The tiers the world offers are printed by `npm run oracle -- tier`.
+- `profile:` — the shape it fights in. How that budget is spent across how hard it hits, how
+  often, and how much it can stand. `npm run oracle -- profile` prints them, and each names
+  one side of a contested pair while the tier solves the other.
+- `level:` — the level a player is meant to meet it at, which is the character both are read
+  against.
 
-    population in the room  x  experience per success  x  3600 / seconds it stays used up
+A body naming those needs **no `stats:` line at all**. Write a stat only where it is
+load-bearing for the encounter — a resistance that punishes the wrong weapon, a bite that
+must be fire so that a route about fire resistance means anything — and write it as a
+modifier (`-20% fire-resistance`) so it survives a rebalance. Everything else is the
+engine's, and a number typed by hand is a number that goes stale the next time a ladder moves.
 
-That is the ceiling a player with enough ability reaches. Below that they are limited by
-missing, and below *that* by dying. Measured against real runs it holds to about four percent.
+**So do not spend a run on `simulate-activity` or on tuning passes.** That was the old
+procedure and it is why the base run hit its turn cap with the work half done. The tags are
+the balance. `npm run ladder-check` will tell you whether a body matches the tags it names,
+and a body that does not is either mis-tagged or met at the wrong level — both of which are
+one word to change rather than six numbers to solve.
 
-So a mark is two numbers and both are derived:
+**What is still the author's:** which tier a thing is, what shape it fights in, what level it
+is met at, what it drops, and what a room holds. Those are judgements about the world. A room
+that a tier says should pay a certain amount per hour reaches that only if its population and
+respawn let a player kill fast enough, so how many stand there and how quickly they come back
+is authoring rather than arithmetic.
 
-- **Difficulty is the declared ladder read at the mark's own gate level.** `abilityAtLevel` in
-  `scripts/lib/pace.ts` is what a character of that level can stand at, and `ladderFor` beside it
-  says the ladder is per skill rather than one line for the world. A mark cut to it opens at
-  about a coin toss for somebody standing on its rung. What the odds then are is `hitChance` in
-  `src/runtime/stats.ts`, over a spread a world may write as `# variable contest-spread`.
-- **Payout is set from the ceiling**, chosen so the marks rank in gate order for a character at
-  the top of the band. Do *not* set it so a mark pays its share of the curve at its own gate:
-  that reimburses an expensive miss with experience which turns free the moment the player stops
-  missing, and a fast action then out-earns every slow one above it.
-
-**Do not restate any of those numbers in a brief.** The slope, the spread and the curve are
-declared, they move, and a run cannot read `src/` to notice that a constant you typed out has
-gone stale. Name the function and let the run ask the tool. What the curve asks at a level is
-`rateAtLevel`, in the same file. A cadence is `60/rate` seconds where a `rate:` is written and
-flat seconds where a `time:` is; a miss costs three seconds a hop walking back, the daze duration
-on a pocket, nothing at all on a lock, and about twenty seconds if it puts the player in a cell.
-
-**A repeatable mark has to run out, or a speed stat scales without limit.** Combat's does not,
-because its enemies die and come back on a timer. Give a mark the same floor with
-`stands: <guise> for <duration>` — the thing stays itself with that one action gone, ninety
-seconds is the house number — and the room empties, the offer leaves the sheet, and the player
-moves on or waits.
+**A repeatable mark has to run out**, or a speed stat scales without limit. Combat's does,
+because its enemies die and come back on a timer. Give a non-combat mark the same floor with
+`stands: <guise> for <duration>` — ninety seconds is the house number — and the room empties,
+the offer leaves the sheet, and the player moves on or waits.
 
 **Ability comes from jewels, not from gear.** A worn base with no jewel socketed into it is
-worth almost nothing; what a jewel is worth is the stat it returns per plane point, and how many
-points exist is the base's item level. So the interesting question about a new piece is never its
-flat bonus. Tiers are scarcity: **common** is sold in a shop and point-inefficient, **uncommon**
-drops at one in sixteen to sixty-four and carries utility and variety, **rare** at one in a
-hundred and twenty-eight is point-efficient endgame, **unique** comes off a boss at one in two
-hundred and fifty-six or worse and does something nothing else does. Shops carry a character to
-about level seven and are roughly a fifth of the ladder by thirty; they keep selling every slot,
-just a worse version than the world drops.
+worth almost nothing; what a jewel is worth is the stat it returns per plane point, and how
+many points exist is the base's item level. Rarity is scarcity: **common** is sold in a shop
+and point-inefficient, **uncommon** drops at one in sixteen to sixty-four and carries utility,
+**rare** at one in a hundred and twenty-eight is point-efficient endgame, **unique** comes off
+a boss and does something nothing else does.
 
-`npm run ladder-check` prints, per skill and rung, what a shop stocks and what exists anywhere
-against what the ladder asks. **Its residual is a brief for content, never a pass or a fail** —
-a gap at level eight is answered by an obscure seller in an alley who fits the world, not by
-adding a line to the general store because that makes a number go green.
-
-**Then have the run check itself.** `npm run simulate-activity` reads what an offer actually pays
-an hour, and stands a player on a rung of the declared ladder to read it there rather than at
-whatever base a save happens to hold. `npm run probe` walks a staged `# test` and records the
-clock it ended on. Both take the draft's own world rather than the shipped one, and both print
-their flags with `--help`. Stage the routes so each opens with `run:` of the one before, stand
-what they read beside what the curve asks for the level reached: a route that walks and lands
-near the curve is the module balanced, and one that cannot walk at all is the finding.
+**The one lane that still iterates is the speedrun**, because a floor is walked rather than
+declared: what the fastest route to a level actually costs is only knowable by walking it.
 
 Two habits that cost nothing. Ids carry what a thing *is* — `rare-general-thieving` — and the
-flavour lives in `title:`; naming a set precisely is how a jewel was found to be a second copy of
-another with a bigger number on it. And prefer round numbers: multiples of two or five.
+flavour lives in `title:`. And prefer round numbers: multiples of two or five.
 
 ## What this skill does not cover
 
