@@ -1,0 +1,88 @@
+# A Grand Blade: the pass it is owed
+
+This is a pass over `content/a-grand-blade.dsl`, the only file this run may write. Read the
+module and its note, `.planning/planning_quests/A Grand Blade.md`, before changing a line.
+Keep the route in the file walking, or say plainly what changed and why.
+
+Do not edit `tulsa.dsl`, `combat.dsl`, `smithing.dsl` or any other module. A change that
+seems to need one is an overlay written here: a `when:` node laid over
+`# dialogue tulsa.<entity>`, a `# location tulsa.<room>` body with `+entities:`, a
+`# entity tulsa.<id>` body with an action of its own. Match the style of `thieving.dsl`.
+Mark what the grammar cannot say with `@@@` and do not work around one. Ask `npm run oracle`
+what the language allows; never read `src/`.
+
+## What was ruled, and what it changes
+
+The quest was one thing doing two jobs: teaching the plane, and paying out the best weapon in
+the game. Ruled 2026-09-04 that it is two quests. **The teaching half has left this module** —
+it is `.planning/the-grumpy-crafter.md`, a level-one miniquest, and it is not this run's. Do
+not teach the plane here, do not hand out a first jewel, and do not lower anything to reach a
+beginner.
+
+**What is left is the hard one.** A Grand Blade is the difficult quest of the combat push and
+it pays a best-in-slot weapon for its tier. The bladesmith's son, his father's hidden notes,
+the riddle and the paving stone all stand — that is the quest and it is good. What is wrong
+is that nothing about it is difficult, and the blade it pays is not cut for the world the
+base run left behind.
+
+**The anvil stays.** The smithing skill is being cut, and that does not mean the world may
+never have an anvil in it: this quest is a one-off where the player stands at one, and the
+schematic-and-recipe shape is the reward. Keep `# recipe grand-blade`, keep the schematic
+item, keep the station. What must not stand is a gate that only a levelled smithing skill can
+pass — read what `skill: smithing 650` costs a player who has not trained it, and if it walls
+the quest off from a fighter, make the requirement something a fighter can meet: bars they can
+buy or be given, the son's hands on the work beside theirs, a `@@@` if the grammar cannot say
+what you want.
+
+## Make it hard
+
+Right now the quest is: talk, search under the anvil, talk, craft. The only obstacle is
+knowing to search the anvil, and the riddle gives that away. Put real work between the riddle
+and the blade, and make the work *fighting*, because this is combat's finale quest and it is
+what the tier is measured in.
+
+What the difficulty is made of is yours to invent from what the world holds — read
+`content/combat.dsl` for the foes, the damage types, the resistances and the bands, and
+`content/tulsa.dsl` for the rooms. Some shapes that fit: the notes name materials the son
+cannot get and the player has to take them off something that is holding them; the pattern
+calls for a bar nobody in town can make and the ore is somewhere that fights back; the blade
+comes off the anvil unfinished and wants quenching in something a room will not give up
+quietly. Whatever you choose, it must be **a fight a character at the top of the band can win
+and a character in the middle of it cannot**, and it must be typed: a foe with a resistance
+that punishes the wrong weapon is the whole reason damage types were built.
+
+## Cut the blade for the world it ships into
+
+`# item grand-blade` currently reads `weapon, +28 attack` and `requires: level.combat.attack
+>= 25`. The base run moved every weapon onto `physical-damage` and gave the iron set typed
+resistances; this item did not move with them and is the last one still written the old way.
+Re-cut it: name its type or types, set its item level so the plane it carries is worth the
+climb, and price it as best-in-slot **for its tier** rather than for the game. Read what the
+iron and post-iron weapons grant off `content/combat.dsl` and put this one above them by a
+margin a player would notice and not by one that ends the ladder.
+
+`npm run ladder-check` on the shipped corpus on 2026-09-04 read `combat.attack` at level 30
+as 5.5 **short** of what the ladder asks even counting everything that exists anywhere in the
+world. This blade is a fair place to close part of that: it is the top of what the world
+offers and the ladder says the top is slightly under. Read the residual off your own corpus,
+and say in the report what the blade moved.
+
+## Balance
+
+Every fight this quest stages must be measured rather than guessed:
+`npm run simulate-activity -- <save> --world <your corpus> --at <room> --ladder <stat>=<level>`
+stands a character on a declared rung and reads what the room actually pays and costs. The
+gate fight should be lost at the middle of the band and won at the top of it; show both in
+the report. Nothing here asserts a number in a `# test`.
+
+One measured thing worth having: on the shipped corpus every combat room but the pasture pays
+under 0.7× the curve, because runs stop short — a faint ends the offer and the rest of the
+hour pays nothing. If the fight you write is one a player will faint in repeatedly, that is a
+finding to report rather than a reason to soften it.
+
+## Done means
+
+`npm run oracle -- --at <your corpus>` green, the existing start-to-finish route still
+walking, a route that walks the new hard section and one that shows it refusing a character
+who is not ready, and a report saying what the difficulty became, what the blade grants, what
+the ladder residual moved, and every `@@@` you wrote.
