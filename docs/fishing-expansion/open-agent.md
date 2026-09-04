@@ -7,50 +7,66 @@ cooking three. **A line is deleted the day it closes.**
 
 ---
 
-## A dialogue choice whose `take:` cannot be paid vanishes, and nothing anywhere says why
+## `take:` of an item held several times over should put up a choose-item modal
 
-Measured 2026-09-03, on the Rook beat. `-> Here. (when inventory.small-fishing-net >= 2)`
-carrying `take: 1 small-fishing-net` is filtered out of the choice list at the moment
-`has small-fishing-net` is true, `inventory.small-fishing-net` reads 2, and the `when` on the
-choice holds. The reason is that `take:` of a bare item id spends `stack + worn`
-(`spendable` in `src/runtime/itemInstance.ts`) while `inventory.` reads `stack + grown + worn`
-(`heldCount`, same file), so the two disagree about a rolled copy in the pack — and every item
-with an `item-level:` is rolled.
+Ruled 2026-09-04, and none of the three answers that were on the table. `take: 1 <item>` where
+the player holds more than one copy is not the engine's choice to make by a rule: **it puts up a
+choose-item modal and the player picks**, showing each copy as the inventory shows it, which is
+enough for somebody to tell their spare from their build. That makes `take:` safe for several
+copies rather than a thing an author has to write around.
 
-Whether `take:` **should** reach one is a ruling and lives in `open-human.md`. What is a defect
-either way is that an author has no way to find out: the choice is not offered, no line is
-logged, the oracle's page for `take:` says nothing about which copies it can spend, and the
-route that hits it fails with *no choice matches*, naming the text rather than the reason. It
-cost a trace and four narrowing experiments to find, on a beat where the condition and the
-`take:` name the same item three lines apart.
+What stands today is that `take:` spends `stack + worn` (`spendable` in
+`src/runtime/itemInstance.ts`) and cannot reach a rolled copy in the pack at all, while
+`inventory.` reads `stack + grown + worn` (`heldCount`, same file). The two disagreeing is what
+made the Rook beat's choice vanish with nothing said: `has small-fishing-net` true,
+`inventory.small-fishing-net` 2, and the choice filtered out of the list. It cost a trace and
+four narrowing experiments to find, on a beat where the condition and the `take:` name the same
+item three lines apart.
 
-*Closes when: the page for `take:` says which copies it spends, and a choice or an action
-turned away because it cannot pay one says so where the author can see it — with one home for
-what "can pay" means, so `spendable` and the page cannot drift.*
+The Rook beat is written round it with `take: worn mainhand`, so nothing is blocked; that line
+goes back to `take: 1 small-fishing-net` when this closes.
 
-## The mire costs more than it is priced for, and it is the whole of the top band's overrun
+*Closes when: `take:` of an item the player holds more than one of raises the modal and spends
+the copy that was picked; a route can answer it the way a route answers any other modal; and
+what "can pay" means has one home, so `spendable`, `heldCount` and the page cannot drift again.*
 
-`tulsa.swamp-mire` holds `tulsa.bog-lurker`, which is aggressive, jumps a player standing there
-before any action is armed, and comes back every five minutes. The eel bed and the tench hole
-are both in it by design, so a route that fishes them fights first —
-`use: core.melee-combat on tulsa.bog-lurker until done` — and a climb that takes hours fights
-again, and again.
+## The mire is dangerous water and its fish are owed a premium for it
 
-What that costs is now two measurements rather than a suspicion:
+Ruled 2026-09-04. `top-floor-to-30` reading **626 game-minutes against the curve's 437, 1.43x**,
+is **correct and stands** — a floor route walked by somebody who never fights better than the
+bare minimum is meant to read slow, and thieving's own floors span 0.78x to 2.08x across the
+same band.
 
-- at its ceiling, the tench reads **4,767/h against the 5,040 it is cut for**, where the perch
-  and the carp at the uncontested mere hit their marks exactly
-- walked, `top-floor-to-30` spends **458 game-minutes on the stretch from 20 to 30 where the
-  curve budgets 250** — 1.8× — and its cumulative 626 against 437 is 1.43×
+What follows from it is not a re-cut of the difficulty. `tulsa.swamp-mire` is the purest example
+the world has of a **dangerous activity**: `tulsa.bog-lurker` is aggressive, jumps a player
+before any action is armed, and comes back every five minutes, so a climb that takes hours
+fights it again and again. The fish that live only there — the tench and the eels — are owed
+better rewards to compensate, and the ruling leaves the shape open: a higher `value:`, a better
+buff on the cooked item, or more experience, whichever reads best.
 
-The water itself is priced right, so this is time spent not fishing: the refights, and the walk
-from the mire back to Market Row for bread paste. Nothing in the module tells a player deciding
-to walk out there that the water costs a fight, and no number in it is set with the fight in it.
+Explicitly **not** the answer: sweeping the mire without `unkillable` and cutting the numbers to
+whatever that reads, and moving a bread-paste seller nearer the water. Both were considered and
+refused.
 
-*Closes when: the mire's two waters are either cut with the fight priced in — a sweep of them
-that does not stand under `unkillable`, and payouts read off that — or left as they are with
-the prose saying what standing there costs, and `top-floor-to-30` re-read against whichever it
-is.*
+One thing to be careful of, because it is the shape this repository keeps having to undo: once a
+premium is paid, *why* it is paid lives only in the size of a number. If the tench or the eel is
+ever put in a second location that is not dangerous, the premium travels with it and nobody will
+know. Whatever is written should say on the fish that it carries a danger premium, rather than
+leaving that in a commit message.
+
+*Closes when: the tench and the eels are paid for the risk, the premium is recorded where the
+fish is rather than only in its numbers, and `top-floor-to-30` is re-read so the new figure is
+the one on the sheet.*
+
+## Five minutes is the contest's window, and nothing has played it
+
+Ruled 2026-09-04: five minutes of game time is the right length for the match. What is owed is
+the check that it is *possible* — nothing has walked the contest at a level where landing a fish
+worth weighing is uncertain, because every route that proves it stands on a save handed the gear.
+
+*Closes when: a route or a sweep says how many casts five minutes buys at the contest's own band,
+and that a fish that beats Fenn's salmon can be landed inside it by somebody who is not already
+kitted.*
 
 ## The eel trap is the one offer in the module with no price on it
 
