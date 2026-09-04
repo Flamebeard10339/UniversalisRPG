@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { loadUniverse } from '../../src/content/load';
+import { fixtureSources } from '../../src/content/worldFixture';
 import { xpForLevel } from '../../src/runtime/skills';
-import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, GROWTH_CEILING, Ladder, ladderFor, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
+import { ABILITY_AT_LEVEL_ONE, ABILITY_GROWTH_PER_LEVEL, abilityAtLevel, abilityAtLevelIn, BLOWS_TO_FELL_AN_EVEN_MATCH, DAMAGE_LINE, GROWTH_CEILING, Ladder, ladderFor, ladderForStat, MINUTES_AT_LEVEL_ONE, MINUTES_GROWTH_PER_LEVEL, minutesForLevel, minutesToReach, ONE_LINE, rateAtLevel } from './pace';
 
 const costOfLevel = (level: number): number => xpForLevel(level + 1) - xpForLevel(level);
 
@@ -73,6 +75,34 @@ describe('a ladder per stat, rather than one line for all of them', () => {
       const named = ladderFor('fishing.fishing');
       expect(abilityAtLevel(level, 'fishing.fishing')).toBeCloseTo(readOff(named, level), 9);
       expect(minutesForLevel(level, 'fishing.fishing')).toBeCloseTo(named.minutesAtLevelOne * named.minutesGrowthPerLevel ** (level - 1), 9);
+    }
+  });
+});
+
+describe('a stat that deals a damage type climbs at a share of the pool it empties', () => {
+  const registry = loadUniverse(fixtureSources());
+
+  const deals = (): string[] => [...registry.stats.values()].filter((stat) => stat.deals !== undefined).map((stat) => stat.id);
+  const dealsNothing = (): string[] => [...registry.stats.values()].filter((stat) => stat.deals === undefined).map((stat) => stat.id);
+
+  it('has something of each kind to read, or the claims under it are vacuous', () => {
+    expect(deals().length).toBeGreaterThan(0);
+    expect(dealsNothing().length).toBeGreaterThan(0);
+  });
+
+  it('reads every dealing stat off the damage line, whichever type it deals', () => {
+    for (const statId of deals()) expect(ladderForStat(registry, statId)).toBe(DAMAGE_LINE);
+  });
+
+  it('reads every stat that deals nothing off the line its own id names', () => {
+    for (const statId of dealsNothing()) expect(ladderForStat(registry, statId)).toBe(ladderFor(statId));
+  });
+
+  it('asks a fifth as much of a dealing stat at every rung, so an even match takes that many blows', () => {
+    for (let level = 1; level < 100; level += 1) {
+      for (const statId of deals()) {
+        expect(abilityAtLevelIn(registry, level, statId) * BLOWS_TO_FELL_AN_EVEN_MATCH).toBeCloseTo(abilityAtLevel(level), 9);
+      }
     }
   });
 });

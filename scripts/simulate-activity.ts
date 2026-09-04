@@ -16,7 +16,7 @@ import { createGameState, type GameState } from '../src/runtime/state';
 import { fromMilliUnits, MS_PER_MINUTE, msToSeconds } from '../src/runtime/units';
 import { FLOORS_DIR } from './floors';
 import { readSources } from './probe';
-import { abilityAtLevel } from './lib/pace';
+import { abilityAtLevelIn } from './lib/pace';
 import { frontiers, levelsIn, meanRate, ratioFor, ratioOf, WITHIN, type Levels, type Paid } from './lib/ratio';
 
 type Walked = ReturnType<typeof createGameState>;
@@ -369,7 +369,7 @@ export function baseForRung(sources: readonly ModuleSource[], dependencies: read
   if (perPoint === 0) {
     throw new Error(`--ladder ${rung.id}=${String(rung.level)}: a point of ${rung.id} written on the sheet moves what the player stands at by nothing at all, so no base of it stands them on that rung`);
   }
-  return lower + (abilityAtLevel(rung.level) - stoodLow) / perPoint;
+  return lower + (abilityAtLevelIn(stoodIn(sources, dependencies, start), rung.level, rung.id) - stoodLow) / perPoint;
 }
 
 export interface Gain {

@@ -9,7 +9,7 @@ import { readSources } from './probe';
 import { midpoint } from '../src/grammar/range';
 import { wearable } from '../src/runtime/equipment';
 import { itemContribution } from '../src/runtime/itemContribution';
-import { abilityAtLevel } from './lib/pace';
+import { abilityAtLevelIn } from './lib/pace';
 import { activitiesIn, type Activity } from './lib/tiers';
 import { buildTier, tierState } from './tier-build';
 
@@ -226,7 +226,7 @@ const residual = (stood: number, asked: number): string => {
 const COLUMN = 22;
 
 function rungLines(registry: Registry, activity: Activity, statId: string, level: number, sources: readonly Source[]): string[] {
-  const asked = abilityAtLevel(level, statId);
+  const asked = abilityAtLevelIn(registry, level, statId);
   return [
     `  level ${String(level)} — the ladder asks ${figure(asked)}`,
     ...sources.map((source) => {
