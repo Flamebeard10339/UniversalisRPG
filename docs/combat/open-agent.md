@@ -51,6 +51,15 @@ reduction now takes its cut of the whole blow rather than only of the untyped `a
       level 20   ladder asks 133.0           63.4 short    626.6 over
       level 30   ladder asks 203.0          114.6 short    613.3 over
 
+**A skill's level grants its own stat, which is what makes the attack row so stark.** A bare
+character with no gear at all stands at physical-damage 1.01 / 11 / 24 / 39 at levels
+1 / 10 / 20 / 30, against a ladder asking 0 / 12.6 / 26.6 / 40.6 — so levelling alone very
+nearly *is* the damage ladder. That is an independent confirmation of the one-fifth figure,
+and it means every point of damage on a weapon or a jewel is overshoot rather than most of
+the climb. Health runs the other way: levelling gives 31 / 44 / 60 / 78 against a ladder
+asking 0 / 63 / 133 / 203, so the rest is meant to come off gear, which is why that row reads
+short from a shop.
+
 Three faults with three different answers, which is why this is one brief and not three: the
 attack rows are five-fold over because they are the old ladder showing through; the health
 shop row is an ordinary residual wanting gear the world has not got; and the health drop row
@@ -173,25 +182,6 @@ combat's.
 
 *Closes when:* the combat floor carries one route that eats and one that does not at the same
 two targets, and the sheet says which won where.
-
-## Nothing reads a foe against the tier it declares
-
-`# tier` and `# entity`'s `tier:` exist and the four tiers are declared, and **no tool reads
-them**. `ladder-check` audits what the world can put on a *player* and has never had an
-opinion about a foe. Until it does, a tier is a comment: an author can write `tier: elite`
-on something that dies in four seconds and nothing says a word.
-
-What it should say, per rung: for each foe that names a tier, how long it actually stands
-against a player the ladder puts at its level, what share of survivable incoming it deals,
-and — where it stands in a room — what an hour of that room pays against the curve. The
-third is the one that matters most, because it makes population and respawn part of the same
-sum rather than a separate open line.
-
-Every foe in the world names no tier at all yet, which is the other half of this: the sweep
-that classifies them is `.planning/combat-expansion/combat-recut.md`.
-
-*Closes when:* `ladder-check` reports foes against their declared tiers, and a foe that
-names none is reported as unaudited rather than passing.
 
 ## Nothing audits an adversarial pair for sharing a ladder
 
