@@ -70,3 +70,104 @@ until level.fishing >= 20:
   travel: tulsa.deep-water
   travel: tulsa.the-narrows
 assert: level.fishing >= 20
+
+# test top-floor-to-30
+unkillable
+run: kitted-floor-to-20
+until level.fishing >= 22:
+  use: entity.fishing.sturgeon-hole.cast until level.fishing >= 22 or not has fishing.dried-fish-bait
+  travel: tulsa.deep-water
+  travel: tulsa.riverside
+  travel: tulsa.market-square
+  travel: tulsa.market-row
+  shop: fishing.fishing-supplies
+  until not has fishing.raw-sturgeon:
+    submit-modal: item=sell:fishing.raw-sturgeon
+  submit-modal: item=more:buy:fishing.dried-fish-bait
+  submit-modal: count=100
+  submit-modal: item=more:buy:fishing.bread-paste
+  submit-modal: count=40
+  submit-modal: item=close
+  travel: tulsa.market-square
+  travel: tulsa.riverside
+  travel: tulsa.deep-water
+  travel: tulsa.the-narrows
+assert: level.fishing >= 22
+travel: tulsa.deep-water
+travel: tulsa.riverside
+travel: tulsa.market-square
+travel: tulsa.swamp-edge
+travel: tulsa.swamp-mire
+equip: fishing.bread-paste
+until level.fishing >= 25:
+  use: core.melee-combat on tulsa.bog-lurker until done
+  until level.fishing >= 25 or not has fishing.bread-paste:
+    use: entity.fishing.tench-hole.cast until done
+  travel: tulsa.swamp-edge
+  travel: tulsa.market-square
+  travel: tulsa.market-row
+  shop: fishing.fishing-supplies
+  until not has fishing.raw-tench:
+    submit-modal: item=sell:fishing.raw-tench
+  submit-modal: item=more:buy:fishing.bread-paste
+  submit-modal: count=40
+  submit-modal: item=close
+  travel: tulsa.market-square
+  travel: tulsa.swamp-edge
+  travel: tulsa.swamp-mire
+assert: level.fishing >= 25
+travel: tulsa.swamp-edge
+travel: tulsa.market-square
+travel: tulsa.market-row
+shop: fishing.fishing-supplies
+until not has fishing.raw-tench:
+  submit-modal: item=sell:fishing.raw-tench
+submit-modal: item=buy:fishing.greenheart-rod
+submit-modal: item=close
+assert: has fishing.greenheart-rod
+equip: fishing.greenheart-rod
+travel: tulsa.market-square
+travel: tulsa.riverside
+travel: tulsa.deep-water
+travel: tulsa.the-narrows
+travel: fishing.the-mere
+equip: fishing.dried-fish-bait
+until level.fishing >= 26:
+  use: entity.fishing.perch-shoal.cast until level.fishing >= 26 or not has fishing.dried-fish-bait
+  travel: tulsa.the-narrows
+  travel: tulsa.deep-water
+  travel: tulsa.riverside
+  travel: tulsa.market-square
+  travel: tulsa.market-row
+  shop: fishing.fishing-supplies
+  until not has fishing.raw-perch:
+    submit-modal: item=sell:fishing.raw-perch
+  submit-modal: item=more:buy:fishing.dried-fish-bait
+  submit-modal: count=100
+  submit-modal: item=close
+  travel: tulsa.market-square
+  travel: tulsa.riverside
+  travel: tulsa.deep-water
+  travel: tulsa.the-narrows
+  travel: fishing.the-mere
+assert: level.fishing >= 26
+equip: fishing.bread-paste
+until level.fishing >= 30:
+  use: entity.fishing.carp-hole.cast until level.fishing >= 30 or not has fishing.bread-paste
+  travel: tulsa.the-narrows
+  travel: tulsa.deep-water
+  travel: tulsa.riverside
+  travel: tulsa.market-square
+  travel: tulsa.market-row
+  shop: fishing.fishing-supplies
+  until not has fishing.raw-carp:
+    submit-modal: item=sell:fishing.raw-carp
+  submit-modal: item=more:buy:fishing.bread-paste
+  submit-modal: count=40
+  submit-modal: item=close
+  travel: tulsa.market-square
+  travel: tulsa.riverside
+  travel: tulsa.deep-water
+  travel: tulsa.the-narrows
+  travel: fishing.the-mere
+assert: level.fishing >= 30
