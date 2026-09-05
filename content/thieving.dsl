@@ -365,7 +365,7 @@ one of:
 +entities: house-chest
 
 # location tulsa.castle-quarters
-+entities: 2 house-chest
++entities: 2 house-chest, jewellery-box
 
 # location tulsa.castle-cellar
 +entities: treasure-chest
@@ -483,6 +483,8 @@ title: Lift From the Stall
 extends: steal
 continuous
 rate: us.thieving-rate
++on attempts exhausted:
+  roll: caught-at-the-stalls
 
 # action cross
 title: Cross
@@ -763,8 +765,6 @@ lift-from-the-stall:
       give: 1 apple
       add: fruit-stolen 1
       say: An apple off the near corner, and the pile settles to cover the gap.
-  +on attempts exhausted:
-    roll: caught-at-the-stalls
 
 # entity tam
 title: Tam
@@ -805,8 +805,6 @@ lift-from-the-stall:
       give: 1 pear
       add: fruit-stolen 1
       say: A pear from under the cloth, where she has not counted.
-  +on attempts exhausted:
-    roll: caught-at-the-stalls
 
 # entity bess
 title: Bess
@@ -1755,9 +1753,6 @@ entities:
 
 # location tulsa.market-square
 +entities: market-watch, pear-cart, bess, street-urchins
-
-# location tulsa.castle-quarters
-+entities: jewellery-box
 
 # location tulsa.sha-dynastys
 +entities: tavern-lockbox
