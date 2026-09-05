@@ -1189,8 +1189,12 @@ over: in-town
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}
 
+# save holding-a-hand-axe
+{"version":13,"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+
 # save axe-at-the-swamp-edge
-{"version":13,"location":"tulsa.swamp-edge","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+over: holding-a-hand-axe
+{"version":13,"location":"tulsa.swamp-edge"}
 
 # save a-netful-on-well-lane
 {"version":13,"location":"tulsa.well-lane","inventory":{"fishing.raw-shrimp":4}}

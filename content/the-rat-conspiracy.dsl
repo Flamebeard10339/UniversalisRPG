@@ -140,8 +140,8 @@ lay the charge:
 +adjacent: tunnels while not tunnel-sealed
 
 # save ready-to-hear-the-rumblings
-over: tulsa.in-town
-{"version":13,"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"birds-and-the-bees.kelsas-hives.settled":true}}
+over: tulsa.in-town, tulsa.holding-a-hand-axe
+{"version":13,"flags":{"birds-and-the-bees.kelsas-hives.settled":true}}
 
 # test the-rat-conspiracy-start-to-finish
 unkillable

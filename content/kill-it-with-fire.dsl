@@ -154,8 +154,8 @@ drink:
   say: It goes down easy and sits warm, and whatever it is doing, it is doing it already.
 
 # save sent-out-for-oolga
-over: tulsa.in-town
-{"version":13,"inventory":{"core.royal-jelly":1,"core.mollusk-venom":1,"core.coin":200},"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+over: tulsa.in-town, tulsa.holding-a-hand-axe
+{"version":13,"inventory":{"core.royal-jelly":1,"core.mollusk-venom":1,"core.coin":200}}
 
 # test kill-it-with-fire-start-to-finish
 unkillable

@@ -155,8 +155,8 @@ hidden if: kelsas-hives.settled
 # flag queen-fell
 
 # save nothing-said-about-the-bees
-over: tulsa.in-town
-{"version":13,"instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+over: tulsa.in-town, tulsa.holding-a-hand-axe
+{"version":13}
 
 # test birds-and-the-bees-start-to-finish
 unkillable
@@ -218,7 +218,8 @@ assert: tulsa.george.helpful.visits = 1
 assert: kelsas-hives.hired
 
 # save sent-to-the-hives
-{"version":13,"location":"tulsa.bee-gate","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"birds-and-the-bees.kelsas-hives.hired":true,"birds-and-the-bees.kelsas-hives.ask-george":true,"birds-and-the-bees.kelsas-hives.the-hives":true}}
+over: tulsa.holding-a-hand-axe
+{"version":13,"location":"tulsa.bee-gate","flags":{"birds-and-the-bees.kelsas-hives.hired":true,"birds-and-the-bees.kelsas-hives.ask-george":true,"birds-and-the-bees.kelsas-hives.the-hives":true}}
 
 # test the-way-down-opens-under-whichever-hive-is-gone-through-last
 unkillable
@@ -236,7 +237,8 @@ travel: inside-the-hive
 assert: kelsas-hives.the-third-hive
 
 # save at-the-third-hive
-{"version":13,"location":"birds-and-the-bees.inside-the-hive","instances":{"next":2,"byId":{"1":{"kind":"item","template":"core.hand-axe","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"flags":{"tulsa.hive-mouth.discovered":true,"tulsa.hives-searched":3,"tulsa.the-third-search-was-at-the-mouth":true,"birds-and-the-bees.kelsas-hives.the-hives":true,"birds-and-the-bees.kelsas-hives.the-third-hive":true}}
+over: tulsa.holding-a-hand-axe
+{"version":13,"location":"birds-and-the-bees.inside-the-hive","flags":{"tulsa.hive-mouth.discovered":true,"tulsa.hives-searched":3,"tulsa.the-third-search-was-at-the-mouth":true,"birds-and-the-bees.kelsas-hives.the-hives":true,"birds-and-the-bees.kelsas-hives.the-third-hive":true}}
 
 # test losing-the-queen-is-a-walk-back-rather-than-a-dead-end
 unkillable
