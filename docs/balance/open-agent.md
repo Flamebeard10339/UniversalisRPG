@@ -242,28 +242,26 @@ marks are cut against a ladder no floor route stands on.
 *Closes when: a floor route buys or wins the band's gear, so the marks of levels eleven to
 thirty are walked by a thief who has what they were cut for.*
 
-## A route asserts balance numbers, so a balance pass breaks paths that still walk
+## A route cannot report what it cost, so what it cost goes unrecorded
 
-41 of the 66 numeric `assert:` lines in the corpus sit on roots a `# save` sheet is already
-blind to — inventory 28, xp 10, resource 3. `expect:` cannot pin a balance-derived field
-however it was recorded, because `WALKED_FIELDS` in `src/runtime/save.ts` filters the state a
-route ends on before it is compared; `assert:` has no such filter.
+The asserting half of this is closed: `ENGINE_ROOTS` declares per root whether what it reads
+churns, `worldRemarks` reads that, and the corpus holds no pinned figure. What a route may
+*say* is settled; what a route may *report* was never built. A route that spends an hour and
+two hundred coin reaching its end says so nowhere, so the only way to learn what a path costs
+is still to walk it by hand and watch.
 
-Ruled 2026-09-05: **a route proves that a sequence of events yields a result, and reports its
-cost and reward — how long it took, what it paid. It does not assert either.** An
-`assert: inventory.coin = 0` after a purchase is a unit test confirming that shops remove
-coin from a player's inventory, and it belongs in the fixture world at most.
+*Closes when:* a route records what it took and what it paid, and something reads that back.
 
-The concrete cost, paid on a recent pass: changing balance figures broke several routes that
-were still perfectly walkable, because they tried and failed to buy from a shop that was out
-of stock. The workaround in the corpus today is a hand-rolled loop with a wait condition.
-**That wants a shorthand — buy until we have enough — which a speedrun prefers**, on the
-understanding that if restock balance moves the run spends the difference waiting rather
-than failing.
+## A shop that is out of stock is a red rather than a wait
 
-*Closes when:* a route reports its cost and reward instead of asserting them, the 41
-balance-asserting lines are gone or moved to the fixture, and a shop that is out of stock
-costs a run time rather than a red.
+Changing figures broke several routes that were still perfectly walkable, because they tried
+and failed to buy from a shop that was out of stock. The workaround in the corpus today is a
+hand-rolled loop with a wait condition. **That wants a shorthand — buy until we have enough —
+which a speedrun prefers**, on the understanding that if restock moves, the run spends the
+difference waiting rather than failing.
+
+*Closes when:* a route can ask a counter for a count and wait for it, and the hand-rolled
+loops in the corpus are written that way instead.
 
 ## Turning a pack off mid-game eats a save with no way back
 
