@@ -1,3 +1,55 @@
+## An `# entity` cannot extend another, so a variant of a world body is retyped whole
+
+`# action` takes `extends:` — "that action's whole body, with every line written here laid
+over it" — and thieving leans on it three times. `# entity` has none (`npm run oracle -- entity`
+names no such line), and laying a second body over an entity's id is not the same thing: it
+changes the entity every other module sees.
+
+So a quest wanting a variant of a world body has to copy it. `# entity cellar-rat`
+(`content/kill-it-with-fire.dsl:82-93`) repeats `combat.feral-rat`'s title, examine, `uses:`,
+faction, `aggressive`, respawn and drop table (`content/combat.dsl:601-608`) to add one
+`hidden if:` and one kill counter — and it genuinely cannot lay them over `combat.feral-rat`,
+because the gate and the counter would then reach every feral rat in the game. The same gap
+is what `content/the-swampy-menace.dsl:51` reports as a different impossibility: staging a
+character in another room needs a second, hidden copy of them, which is a hand-copy of
+tulsa's.
+
+*Closes when:* `# entity` takes `extends:` the way `# action` does, and `cellar-rat` declares
+only its gate and its counter.
+
+## A single-text field cannot be extended, so a module appending a clause restates the sentence
+
+`+<line>` adds to a body that holds a list. A single-text keyword has nothing to add to, and
+says so: `+examine:` on another module's entity is refused with *"entity field examine is not
+a list, so it cannot take +"*.
+
+So a quest that wants to hang one conditional clause on a place's `examine:` writes the whole
+sentence again. `content/ball-of-a-boy.dsl:77,80` restate two of tulsa's
+(`content/tulsa.dsl:670,674`) to append a `{…}` fragment each, and
+`content/kill-it-with-fire.dsl:113` restates a third (`content/tulsa.dsl:642`). Reword tulsa's
+line and the quest keeps saying the old one, in the world, with every gate green.
+
+*Closes when:* a text field takes `+`, appending rather than replacing, and the three quests
+above write only the clause they are adding.
+
+## A condition has no name, so one worth naming is written out wherever it is asked
+
+`# flag <id>` takes one word, `bundle`, and nothing else — a flag cannot stand for a
+condition. Nor can a route or a body ask which stage a quest is standing on: the engine states
+a condition may read are `time`, `player.`, `setting.`, `xp.`, `level.`, `highest-level`,
+`resource.`, `inventory.`, `count.`, `stat.`, `us.`, `them.` and `changed.`, and none of them
+is a quest.
+
+A stage flag is a latch, so "standing on stage X" is written by hand as `X and not <the stage
+after it>`, in `content/ball-of-a-boy.dsl:64,71`, `content/kill-it-with-fire.dsl:100,107`,
+`content/fishing.dsl:1126` and `content/the-swampy-menace.dsl:97,105,113`. Inserting a stage
+between two of them means finding every such condition; nothing derives them. The same gap
+makes `content/combat.dsl:300,309,318,327,336` write one armour requirement five times.
+
+*Closes when:* a condition worth naming can be named once and asked for by name, or a
+condition can read the stage a quest stands on — and the compound conditions above are written
+through it.
+
 ## Market Square is ruled legible, and still carries more than any room in town
 
 Ruled 2026-09-03: **legible**. The square holds more entities and more roads than any other

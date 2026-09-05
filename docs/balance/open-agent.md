@@ -1,3 +1,32 @@
+## A body carrying a typed stat hits harder than its tier says, and every instrument reads it as on tier
+
+The engine's blow is the action's `damage:` stat plus every `deals:` stat the swinger
+carries, each resisted by the stats that `resists:` its own type
+(`src/runtime/runtime.ts:279-281` over `typedDamage`). `foeSolve` prices one lump scaled by
+one aggregate resistance. So a foe with a typed stat on its sheet deals more than the tier
+budgeted and the solver, `ladder-check` and every reading built on them say it is on tier.
+
+Measured on `# entity swamp-mollusk` (`content/combat.dsl:645-651`, `chaos-damage 6`): the
+runtime deals **45.31** where the solver believes **39.31**, 15.3% over the tier's damage
+share. `content/plague-matters.dsl:133` and `content/reverse-infiltration.dsl:136,157` carry
+typed stats too. Nothing catches it — a `# test` has no opinion on a number, and `floors`
+only reddens where a route stops walking.
+
+**The obvious fix is wrong, and the reason is the open question.** Having the solver add the
+typed share drops `foeTier`'s round-trip from 0.8 to 1.68, because the fixture's
+`# stat attack` (`src/runtime/foeTier.test.ts:18-20`) declares `deals: physical` *and* is the
+action's `damage:` stat — so the runtime already counts it twice, once as the lump and once
+as a typed stat. Whether an action's own `damage:` stat is part of the typed system is a fact
+about the game and belongs in a declaration, not in either model's reading of the other.
+
+The pieces are in place either way: `resistanceTo` and `typedShare` in
+`src/runtime/damageModel.ts` read no state and take a reader, so a predictor can ask the
+model as soon as the model is settled.
+
+*Closes when:* a stat says whether the damage it deals is typed, the runtime counts it once,
+and `foeSolve` prices a swing by asking `damageModel` rather than by re-deriving it — with
+`foeTier`'s round-trip still exact.
+
 ## Health outruns attack about two to one, and the curve by nine
 
 Read off `combat-floor` the day it landed. A fighter climbing to `attack 30` arrives at

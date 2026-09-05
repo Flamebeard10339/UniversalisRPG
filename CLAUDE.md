@@ -233,6 +233,13 @@ merely moves the figures along the way must not. An `assert: inventory.coin = 0`
 purchase is a unit test confirming that shops take coin, and it belongs in the fixture
 world at most.
 
+**A `# test` marked `DEBUG` may pin what it likes**, because nothing tunes the numbers of a
+world written to be walked by the engine — which is what the fixture's routes are, and why
+ten of them carry the mark. `worldRemarks.ts` reads `isDebug` for exactly that, so the mark
+now says two things: that nothing a player reaches may name the section, and that its figures
+do not churn. In `content/` the second is a promise about a route rather than a fact about a
+world, so do not reach for `DEBUG` to quiet a remark there.
+
 This is why `expect:` compares only what a path is made of. The state a route ends on is
 filtered before it is compared, in one place, so a sheet **cannot** pin a churning field
 however it was recorded — see `WALKED_FIELDS` in `src/runtime/save.ts`. The filter is
