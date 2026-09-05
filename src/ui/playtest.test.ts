@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeEntry, NOTE_FIELDS, parseRun, PLAYTEST_SLOT, runId, serializeRun, startSaveId, turnRecord, type RunLogEntry, type RunNotes } from '../runtime/runLog';
+import { describeEntry, NOTE_FIELDS, parseRun, partSlot, PLAYTEST_SLOT, runId, serializeRun, startSaveId, turnRecord, TURNS_PER_PART, type RunLogEntry, type RunNotes } from '../runtime/runLog';
 import { SAVE_VERSION } from '../runtime/save';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { qualify } from '../content/namespace';
@@ -25,7 +25,7 @@ const store = () => slotStore(memoryDriver(), () => 0);
 const PLAYED = { at: '2026-08-23T00:00:00.000Z', built: 'abc1234' };
 const NEW_GAME = '{"version":1}';
 
-const recorder = (kept = store()) => ({ kept, record: createRecorder(kept, () => {}, () => PLAYED) });
+const recorder = (kept = store()) => ({ kept, record: createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME) });
 
 describe('what the feedback sheet is about', () => {
   it('is the last turn played, since an author writes having seen what the line did', () => {
@@ -122,12 +122,12 @@ describe('the recorder', () => {
 
   it('picks a run back up where a reload left it, since a kept run is what recording is', () => {
     const kept = store();
-    const first = createRecorder(kept, () => {}, () => PLAYED);
+    const first = createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME);
     first.start(NEW_GAME);
     first.opened('travel:beach', took, ['travel: beach']);
     first.attach(1, { ...emptyNotes(), expected: 'to be able to swim' });
 
-    const second = createRecorder(kept, () => {}, () => PLAYED);
+    const second = createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME);
     expect(second.written()).toContain('expected: to be able to swim');
     expect(second.run()?.id).toBe(first.run()?.id);
     expect(turnsPlayed(second.run()?.log ?? [])).toBe(1);
@@ -140,14 +140,14 @@ describe('the recorder', () => {
     record.stop();
 
     expect(kept.read(PLAYTEST_SLOT)).toBeNull();
-    expect(createRecorder(kept, () => {}, () => PLAYED).run()).toBeNull();
+    expect(createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME).run()).toBeNull();
   });
 
   it('opens on no run rather than refusing where what was kept cannot be read', () => {
     const kept = store();
     kept.write(PLAYTEST_SLOT, 'not a run at all');
     expect(parseRun('not a run at all')).toBeNull();
-    expect(createRecorder(kept, () => {}, () => PLAYED).run()).toBeNull();
+    expect(createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME).run()).toBeNull();
   });
 
   it('says so rather than throwing where the run cannot be kept', () => {
@@ -163,7 +163,7 @@ describe('the recorder', () => {
       },
       () => 0,
     );
-    createRecorder(refusing, (text) => void said.push(text), () => PLAYED).start(NEW_GAME);
+    createRecorder(refusing, (text) => void said.push(text), () => PLAYED, () => NEW_GAME).start(NEW_GAME);
     expect(said).toEqual(['the playtest run could not be kept: the quota has been exceeded']);
   });
 });
@@ -386,5 +386,64 @@ describe('watching a filed run back', () => {
         .transcript.entries.map((entry) => String(entry.text))
         .join(' '),
     ).toContain('unknown test');
+  });
+});
+
+describe('a long run is kept in parts, so no one write grows with it (c11)', () => {
+  const walked = (turns: number): ReturnType<typeof recorder> => {
+    const held = recorder();
+    held.record.start(NEW_GAME);
+    for (let turn = 1; turn <= turns; turn += 1) held.record.opened(`travel:beach-${turn}`, took, [`travel: beach-${turn}`]);
+    return held;
+  };
+
+  it('keeps one part until the run is long enough to want a second', () => {
+    const { kept, record } = walked(TURNS_PER_PART);
+
+    expect(record.parts()).toBe(0);
+    expect(turnsPlayed(record.run()?.log ?? [])).toBe(TURNS_PER_PART);
+    expect(kept.read(partSlot(1))).toBeNull();
+  });
+
+  it('sets the full part aside and goes on in a fresh one, rather than writing a bigger slot every turn', () => {
+    const { kept, record } = walked(TURNS_PER_PART + 1);
+
+    expect(record.parts()).toBe(1);
+    expect(turnsPlayed(record.run()?.log ?? [])).toBe(1);
+    expect(parseRun(kept.read(partSlot(1))!.payload)?.run.log.length).toBe(TURNS_PER_PART);
+  });
+
+  it('stops the biggest slot growing with the run, which is the whole reason for the parts', () => {
+    const biggest = (turns: number): number => {
+      const { kept } = walked(turns);
+      return Math.max(...kept.list().map((name) => kept.read(name)!.payload.length));
+    };
+
+    const short = biggest(TURNS_PER_PART);
+    const long = biggest(TURNS_PER_PART * 8);
+
+    expect(short).toBeGreaterThan(0);
+    expect(long / short, 'the biggest slot grew with the run rather than staying the size of a part').toBeLessThan(1.1);
+  });
+
+  it('walks every turn it was given, across the parts, and each part carries its own start', () => {
+    const { record } = walked(TURNS_PER_PART * 2 + 3);
+    const every = record.everyPart();
+
+    expect(every.map((part) => part.run.log.length)).toEqual([TURNS_PER_PART, TURNS_PER_PART, 3]);
+    expect(every.map((part) => part.run.id)).toHaveLength(new Set(every.map((part) => part.run.id)).size);
+    for (const part of every) expect(part.from, part.run.id).not.toBeUndefined();
+    expect(record.written().match(/^# test /gm)).toHaveLength(3);
+  });
+
+  it('drops every part when recording stops, so a later sitting does not open on an old one', () => {
+    const { kept, record } = walked(TURNS_PER_PART + 1);
+    expect(kept.read(partSlot(1))).not.toBeNull();
+
+    record.stop();
+
+    expect(kept.read(partSlot(1))).toBeNull();
+    expect(kept.read(PLAYTEST_SLOT)).toBeNull();
+    expect(createRecorder(kept, () => {}, () => PLAYED, () => NEW_GAME).parts()).toBe(0);
   });
 });

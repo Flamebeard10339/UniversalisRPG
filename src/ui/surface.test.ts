@@ -51,6 +51,10 @@ function calls(source: { text: string }): string[] {
 const DISPATCHES = [
   'amounts',
   'speedKept',
+  'partsHeld',
+  'partRunId',
+  'partSlot',
+  'TURNS_PER_PART',
   'askedOption',
   'madeOf',
   'partsOf',

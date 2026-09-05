@@ -76,6 +76,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
       },
       attach: (turn) => void calls.push(`playtest:attach:${turn}`),
       moved: (where) => void calls.push(`playtest:moved:${where}`),
+      parts: () => 0,
       written: () => '',
       filed: () => [],
       drop: (run) => void calls.push(`playtest:drop:${run}`),

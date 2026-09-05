@@ -134,6 +134,15 @@ describe('where the author was is on the screen when the page opens (c10)', () =
     expect(html).not.toContain('data-floor="-1" data-drawn="yes"');
   });
 
+  it('opens on the page it was left on, so a reload does not put the tab back to the start', () => {
+    const held: Editing = { ...FORGOTTEN, where: { layer: 1, subpage: ['map', 'settings', 'journal'] } };
+
+    const html = reopened(held);
+
+    expect(html).toContain('data-subpage="settings" data-drawn="yes"');
+    expect(reopened(null)).not.toContain('data-subpage="settings" data-drawn="yes"');
+  });
+
   it('opens holding the cursor and the scroll it was left with', () => {
     const storage = pageStorage();
     const slots = browserSlots(() => storage);

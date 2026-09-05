@@ -47,19 +47,25 @@ function Sheet({ turn, line, held, words, localizer, onKeep, onDiscard }: { turn
   );
 }
 
-export function PlaytestBar({ run, words, localizer, onAttach, onCopy, onStop }: { run: RecordedRun; words: Words; localizer: Localizer; onAttach: (turn: number, notes: RunNotes) => void; onCopy: () => void; onStop: () => void }): JSX.Element {
+export function PlaytestBar({ run, parts, words, localizer, onAttach, onCopy, onDownload, onStop }: { run: RecordedRun; parts: number; words: Words; localizer: Localizer; onAttach: (turn: number, notes: RunNotes) => void; onCopy: () => void; onDownload: () => void; onStop: () => void }): JSX.Element {
   const [asking, setAsking] = useState(false);
   const { log } = run;
   const about = feedbackOn(log);
 
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border bg-panel px-3 py-1">
-      <span className="mr-auto truncate text-xs text-text-subtle">{about === null ? words('playtest-nothing') : words('playtest-turn', { turn: turnsPlayed(log) })}</span>
+      <span className="mr-auto truncate text-xs text-text-subtle">
+        {about === null ? words('playtest-nothing') : words('playtest-turn', { turn: turnsPlayed(log) })}
+        {parts === 0 ? null : <span className="ml-2 tabular-nums">{words('playtest-chunk', { part: parts + 1 })}</span>}
+      </span>
       <button data-drive="none: opens the sheet, which playtest.attach answers without one being open" type="button" disabled={about === null} onClick={() => setAsking(true)} className={CONTROL}>
         {words('playtest-attach')}
       </button>
       <button data-drive="none: the clipboard is the browser's; an agent reads the same words off the surface's own written state" type="button" onClick={onCopy} className={CONTROL}>
         {words('playtest-copy')}
+      </button>
+      <button data-drive="none: saving a file is the browser's; an agent reads the same words off the surface's own written state" type="button" onClick={onDownload} className={CONTROL}>
+        {words('playtest-download')}
       </button>
       <button data-drive="none: recording is one fact, turned off through playtest.recording" type="button" onClick={onStop} className={CONTROL}>
         {words('playtest-stop')}

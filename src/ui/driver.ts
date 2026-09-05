@@ -71,6 +71,7 @@ export interface PlaytestControls {
   stop(): Filing;
   attach(turn: number, notes: RunNotes): void;
   moved(where: string): void;
+  parts(): number;
   written(): string;
   filed(): readonly FiledRun[];
   drop(run: string): void;
@@ -145,7 +146,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const header = (): RunHeader => ({ at: new Date(save.now()).toISOString(), built: typeof __BUILT_FROM__ === 'string' ? __BUILT_FROM__ : 'unknown' });
 
-  const record = createRecorder(save.store, (text) => complain(text), header);
+  const record = createRecorder(save.store, (text) => complain(text), header, () => serializeSession(context.session));
 
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
@@ -380,17 +381,19 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   };
 
   const fileAndStop = (): Filing => {
-    const kept = record.kept();
-    if (kept === null) return { filed: false, because: 'nothing is being recorded' };
+    const every = record.everyPart();
+    if (every.length === 0) return { filed: false, because: 'nothing is being recorded' };
 
-    const result = fileRun(context, kept, header());
-    current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
-    if (refusedLine(result)) {
-      publish();
-      return { filed: false, because: result.output.flatMap((output) => (output.kind === 'message' && output.words === 'tool' && output.tone === 'error' ? [output.text, ...(output.detail ?? [])] : [])).join(' ') };
+    for (const kept of every) {
+      const result = fileRun(context, kept, header());
+      current = settled({ ...current, view: context.view, transcript: appendOutputs(current.transcript, result.output) });
+      if (refusedLine(result)) {
+        publish();
+        return { filed: false, because: result.output.flatMap((output) => (output.kind === 'message' && output.words === 'tool' && output.tone === 'error' ? [output.text, ...(output.detail ?? [])] : [])).join(' ') };
+      }
     }
     changing(() => record.stop());
-    return { filed: true, at: qualify(LOCAL_CHANGES_MODULE_ID, kept.run.id) };
+    return { filed: true, at: qualify(LOCAL_CHANGES_MODULE_ID, every[every.length - 1].run.id) };
   };
 
   const driver: Driver = {
@@ -453,6 +456,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       stop: fileAndStop,
       attach: (turn, notes) => changing(() => record.attach(turn, notes)),
       moved: (where) => changing(() => record.moved(where)),
+      parts: () => record.parts(),
       written: () => record.written(),
       filed: () => stagedRuns(context),
       drop: (run) => filing(dropRun(context, run)),

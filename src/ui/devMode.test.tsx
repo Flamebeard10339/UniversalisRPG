@@ -13,7 +13,7 @@ import { slotStore, type SlotDriver } from '../runtime/store';
 import { pageStorage } from './agent/pageStorage';
 import { App } from './App';
 import { browserSlots } from './browserStore';
-import { devLine, devRefusal, speedLine, tappedPlace } from './devMode';
+import { devLine, devRefusal, speedLine, speedReachable, tappedPlace } from './devMode';
 import { createDriver, type Driver } from './driver';
 import { mapFixtureFor } from '../runtime/mapFixture';
 import { LAYERS, OPENING, toLayer, toSubpage } from './nav';
@@ -280,6 +280,32 @@ describe('there is one time multiplier (c10)', () => {
       expect(said(driver)[said(driver).length - 1], typed).toContain('/speed requires a positive number');
       expect(driver.snapshot().speed, typed).toBe(4);
     }
+  });
+
+  it('opens at the rate the dial was left on, so a reload does not put the world back to 1x', () => {
+    const { driver, slots } = playing();
+    driver.send(speedLine('16'));
+    expect(driver.snapshot().speed).toBe(16);
+
+    const reopened = createDriver(fixtureSources(), { slots, ticker: () => () => undefined });
+
+    expect(reopened.snapshot().speed).toBe(16);
+    expect(createDriver(fixtureSources(), { slots: pageSlots(), ticker: () => () => undefined }).snapshot().speed).toBe(1);
+  });
+
+  it('hands the dial to a player in a development build, and to nobody but a developer in a published one', () => {
+    expect([speedReachable(false, false), speedReachable(false, true), speedReachable(true, false), speedReachable(true, true)]).toEqual([false, true, true, true]);
+
+    const { driver } = playing();
+    const published = renderToStaticMarkup(<App driver={driver} devBuild={false} />);
+    const development = renderToStaticMarkup(<App driver={driver} devBuild />);
+    driver.send(devLine(true));
+    const authoring = renderToStaticMarkup(<App driver={driver} devBuild={false} />);
+
+    expect(published, 'a published build offers a player the dial').not.toContain('data-rate');
+    expect(development, 'a development build keeps the dial from a player').toContain('data-rate');
+    expect(authoring, 'a published build keeps the dial from a developer').toContain('data-rate');
+    expect(published, "the dial is drawn through the dev-only gate, which would mark a player page").not.toContain('data-dev');
   });
 
   it('declares no second multiplier in src/ui, no default and no clamp', () => {

@@ -134,6 +134,24 @@ export function runAsSections(kept: KeptRun, header?: RunHeader): string[][] {
 
 export const PLAYTEST_SLOT = 'playtest';
 
+export const PLAYTEST_PART_PREFIX = 'playtest-part-';
+
+export const TURNS_PER_PART = 500;
+
+export const partSlot = (part: number): string => `${PLAYTEST_PART_PREFIX}${part}`;
+
+export function partNumber(slot: string): number | null {
+  if (!slot.startsWith(PLAYTEST_PART_PREFIX)) return null;
+  const at = Number(slot.slice(PLAYTEST_PART_PREFIX.length));
+  return Number.isInteger(at) && at > 0 ? at : null;
+}
+
+export const partsHeld = (slots: readonly string[]): number[] =>
+  slots.flatMap((slot) => {
+    const at = partNumber(slot);
+    return at === null ? [] : [at];
+  }).sort((one, other) => one - other);
+
 export interface RecordedRun {
   readonly id: Answer;
   readonly log: readonly RunLogEntry[];
@@ -156,6 +174,8 @@ export interface KeptRun {
 }
 
 export const runId = (at: string): Answer => `run-${at.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')}`;
+
+export const partRunId = (at: string, part: number): Answer => (part <= 1 ? runId(at) : `${runId(at)}-part-${part}`);
 
 export function serializeRun(kept: KeptRun): string {
   return JSON.stringify({ ...kept.run, from: kept.from, ends: kept.ends });

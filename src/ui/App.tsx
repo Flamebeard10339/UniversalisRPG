@@ -48,6 +48,7 @@ import { columnsIn } from './gesture';
 import { wordsOf, type Words } from './words';
 import { TransientProvider, type TransientChannel } from './transient';
 import { WelcomeBack } from './WelcomeBack';
+import { handOver } from './download';
 import { VStack } from './VStack';
 
 function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[]; generation: number } {
@@ -310,6 +311,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           {snapshot.playtest === null ? null : (
             <PlaytestBar
               run={snapshot.playtest}
+              parts={driver.playtest.parts()}
               words={words}
               localizer={localizer}
               onAttach={driver.playtest.attach}
@@ -317,6 +319,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
                 if (typeof navigator !== 'undefined') void navigator.clipboard?.writeText(driver.playtest.written());
                 driver.transient.note({ key: 'playtest-copied', count: 0, words: words('playtest-copied') });
               }}
+              onDownload={() => handOver(`${snapshot.playtest?.id ?? 'playtest'}.dsl`, driver.playtest.written())}
               onStop={() => {
                 const filing = driver.playtest.stop();
                 driver.transient.note({ key: 'playtest-stopped', count: 0, words: filing.filed ? words('playtest-filed', { at: localizer.identifier(filing.at) }) : words('playtest-unfiled', { because: localizer.identifier(filing.because) }) });

@@ -98,6 +98,7 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
       recording: run !== null,
       id: run?.id ?? null,
       turns: log?.length ?? 0,
+      parts: controls.parts(),
       about: log === null ? null : feedbackOn(log),
       written: controls.written(),
       filed: controls.filed().map((each) => ({ id: each.id, sections: each.sections.map((at) => `# ${at.kind} ${at.id}`) })),
