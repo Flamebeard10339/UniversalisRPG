@@ -681,30 +681,40 @@ delete any of the four tests.
 *Closes when:* a `CommandSpec` declares what a player types for it, and each driver test
 supplies only its own directive line.
 
-## Five routes are written twice from the gate to the middle
+## `run:` composes a head and nothing else, so every repeated tail still reads twice
 
-Long stretches of `# test` routes are typed out again rather than composed, though `run: <test>`
-is in the grammar and `content/first-steps.dsl:200` already uses it:
+Every head that `run:` could reach has been taken, and the decision on the rest is recorded
+below. What is left needs the grammar to grow.
 
-- `content/the-swampy-menace.dsl:169` and `:239` share 46 of about 52 lines — the whole approach
-  through the castle gate, the strike, and the six-line hand-in. They differ only in the order
-  the three herbs come out, which the module's own droptable is symmetric in.
-- `content/ball-of-a-boy.dsl:138`, `:168`, `:196`, `:223` — the twelve-line sewer descent, four
-  times.
-- `content/first-steps.dsl:195` and `:249` — a twelve-line tail.
-- `content/combat-lessons.dsl:164` and `:188` — a thirteen-line head.
-- `content/kill-it-with-fire.dsl:161` and `:210` — a nine-line head.
+**`run: <test>` splices the whole of the named route in where it stands.** So a stretch two
+routes share is expressible only where it is a *prefix* of both. A shared tail cannot be lifted
+into a fragment, because the gate walks every `# test` and a tail fragment has no state to start
+from except a `load:` — and a `load:` inside a `run:` replaces whatever the caller had reached.
+Measured 2026-09-05 with a scratch module: a caller holding no fen-root that runs a fragment
+loading `ambushed-in-the-mire` comes back holding one.
 
-Shape 3, in the corpus's own vocabulary. Move a room or rename a place and each of these has to
-be found by hand.
+What that leaves, each read again rather than assumed:
 
-**It is a judgement rather than a defect**, which is why it is a line and not a commit: a route
-read end to end is a route a human can check, and `run:` trades that for one edit site. The
-swampy pair is the one where the trade clearly pays, since the second route exists only to say
-the herb order does not matter.
+- **`content/the-swampy-menace.dsl` — the six-line hand-in, twice.** The 32-line approach is now
+  `# test oolga-sends-you-into-the-mire` and both routes `run:` it. The hand-in follows the herbs
+  and cannot.
+- **`content/ball-of-a-boy.dsl` — the twelve-line sewer descent, four times.** It is a *middle*,
+  not a head: the four routes diverge at the toll (paid, haggled with a herring, and the back way
+  through Oolga's cellar) and converge on the descent afterwards. `run:` reaches none of it. The
+  head they genuinely share is five lines, and one of the four loads a different save.
+- **`content/first-steps.dsl:195` and `:249` — a twelve-line tail.** Not reachable.
+- **`content/kill-it-with-fire.dsl` — a nine-line head, twice.** Reachable, and **decided
+  against**: extracting it costs a third listed route the gate must walk, which for nine lines
+  once is a wash. It reads whole on purpose.
 
-*Closes when:* the swampy pair shares its approach and its hand-in, and a decision is recorded
-about whether the other four are meant to read whole.
+`content/combat-lessons.dsl` is off this list — its thirteen-line head was already a listed route
+(`the-drunk-is-left-where-he-fell`), so the mauled route now runs it and the extraction cost
+nothing.
+
+*Closes when:* two routes can share a tail — either a `# test` that may be declared composable
+and so is not walked on its own by the gate, or a form of `run:` that starts the named route from
+the caller's state rather than from its own `load:`. Whichever lands, the swampy hand-in and the
+first-steps tail each get one home.
 
 ## Small constants still spelled twice
 

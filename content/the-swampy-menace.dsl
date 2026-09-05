@@ -166,7 +166,7 @@ over: tulsa.in-town, tulsa.holding-a-hand-axe
 over: both-prior-quests-done
 {"version":13,"location":"tulsa.swamp-mire","inventory":{"core.marsh-thistle":1,"core.fen-root":1,"core.adders-tongue":1},"flags":{"oolgas-errands.errands":true,"oolgas-errands.swamp-bound":true,"oolga-struck":true}}
 
-# test the-swampy-menace-start-to-finish
+# test oolga-sends-you-into-the-mire
 load: both-prior-quests-done
 equip: 1
 travel: castle-gate
@@ -198,6 +198,9 @@ travel: tavern-street
 travel: market-square
 travel: swamp-edge
 travel: swamp-mire
+
+# test the-swampy-menace-start-to-finish
+run: oolga-sends-you-into-the-mire
 use: entity.herb-patch.pull-root
 assert: has fen-root
 travel: swamp-edge
@@ -234,33 +237,7 @@ travel: market-square
 assert: not fainted
 
 # test the-swampy-menace-with-the-herbs-found-in-a-different-order
-load: both-prior-quests-done
-equip: 1
-travel: castle-gate
-talk: castle-guard
-choose: continue
-travel: guard-barracks
-talk: guard-captain
-choose: oolgas-errands.sent-to-oolga.guard-captain.0.said
-choose: continue
-assert: oolgas-errands.errands
-travel: castle-gate
-travel: market-square
-travel: tavern-street
-travel: oolga-house
-talk: oolga
-choose: oolgas-errands.errands.oolga.0.said
-choose: What needs doing now?
-use: melee-combat on oolga until oolga-struck
-assert: oolga-struck
-talk: oolga
-choose: oolgas-errands.swamp-bound.oolga.0.said
-choose: continue
-assert: oolgas-errands.swamp-bound
-travel: tavern-street
-travel: market-square
-travel: swamp-edge
-travel: swamp-mire
+run: oolga-sends-you-into-the-mire
 use: entity.herb-patch.pick-thistle
 assert: has marsh-thistle
 travel: swamp-edge
