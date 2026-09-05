@@ -4,12 +4,12 @@ import path from 'node:path';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
-import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
+import { LOCAL_CHANGES_FILE, SHIPPED_DIRS } from '../src/content/shipped';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
 
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 
-const defaultContent = CORPUS_DIR;
+const defaultContent = SHIPPED_DIRS.join(',');
 const defaultLocal = LOCAL_CHANGES_FILE;
 
 interface Args {

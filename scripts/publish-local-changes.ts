@@ -9,11 +9,11 @@ import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { MOD_PENDING_LABEL } from '../src/content/modportal';
-import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
+import { LOCAL_CHANGES_FILE, SHIPPED_DIRS } from '../src/content/shipped';
 import { ModuleSource } from '../src/content/universe';
 
 
-const defaultContent = CORPUS_DIR;
+const defaultContent = SHIPPED_DIRS.join(',');
 const defaultLocal = LOCAL_CHANGES_FILE;
 
 interface Args {
