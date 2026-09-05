@@ -6,8 +6,8 @@ import { IMPLICIT_TARGET_FULL } from './encounter';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import { openModalNamed } from './modalStack';
-import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_VERSION, serializeSave, type SaveField } from './save';
-import { parseSaveSection, type ParsedSave } from '../content/sections/save';
+import { compareSave, compareSaveOnly, diffState, initialState, loadSave, pruneStateForRegistry, SAVE_FIELDS, SAVE_FIELD_NAMES, SAVE_VERSION, serializeSave, type SaveField } from './save';
+import { parseSaveSection, SAVE_IDS, type ParsedSave } from '../content/sections/save';
 import { runTest } from './session';
 import { travelAction, TRAVEL_ADDRESS } from './actionLookup';
 import { actionAddress, actionWords } from '../content/sections/action';
@@ -57,6 +57,18 @@ describe('initialState', () => {
   it('places a fresh game at the registry starting location, like startSession', () => {
     const registry = loadInEnglish(MODULE);
     expect(initialState(registry).location).toBe('camp');
+  });
+});
+
+describe('a save field the loader prunes by a registry id', () => {
+  const pruned = SAVE_FIELD_NAMES.filter((field) => typeof SAVE_FIELDS[field].prune !== 'string');
+
+  it('is most of them, so the claim below is not vacuous', () => {
+    expect(pruned.length).toBeGreaterThan(4);
+  });
+
+  it('says which kind that id belongs to, so a body written short is resolved rather than quietly dropped', () => {
+    expect(pruned.filter((field) => SAVE_IDS[field] === undefined)).toEqual([]);
   });
 });
 

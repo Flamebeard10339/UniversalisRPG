@@ -25,7 +25,7 @@ const exclude = [
   '**/.claude/worktrees/**',
 ];
 
-const DOM_TESTS = 'src/**/*.dom.test.tsx';
+const DOM_TESTS = 'src/**/*.dom.test.{ts,tsx}';
 
 export default defineConfig({
   // Relative, so the same bundle works under itch.io's subdirectory hosting and

@@ -85,6 +85,7 @@ export const SAVE_IDS: Readonly<Record<string, { kind: string; at: 'value' | 'ke
   location: { kind: 'location', at: 'value' },
   inventory: { kind: 'item', at: 'key' },
   flags: { kind: 'flag', at: 'key' },
+  bundles: { kind: 'flag', at: 'key' },
   visits: { kind: 'node', at: 'key' },
   xp: { kind: 'skill', at: 'key' },
   resources: { kind: 'resource', at: 'key' },

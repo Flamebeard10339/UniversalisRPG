@@ -212,7 +212,7 @@ export interface Named {
 export const hiddenIf = (note: string) => ({ parser: condition, keyword: 'hidden if', note }) as const;
 
 const conditionFields = (schema: AnySchema): readonly { field: string; site: string }[] =>
-  Object.entries(schema.fields).flatMap(([field, spec]) => (spec.parser === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
+  Object.entries(schema.fields).flatMap(([field, spec]) => (valueOf(spec.parser as Parser<unknown>) === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
 
 const tagFields = (schema: AnySchema): readonly string[] =>
   Object.entries(schema.fields).flatMap(([field, spec]) => (TAG_PARSERS.has(valueOf(spec.parser as Parser<unknown>)) ? [field] : []));
