@@ -19,9 +19,36 @@ action's `damage:` stat — so the runtime already counts it twice, once as the 
 as a typed stat. Whether an action's own `damage:` stat is part of the typed system is a fact
 about the game and belongs in a declaration, not in either model's reading of the other.
 
+**The divergence runs the other way too, and it is sharper.** `foeSolve.landed` (`:82`) takes
+resistance off the *whole* of `fight.damage.ours`, typed or not, while the engine resists only
+what a `deals:` stat declares. `# action core.melee-combat` contests on `core.attack`, which
+declares no type, so a foe's `physical-resistance` is priced by the solver and ignored by the
+runtime.
+
+Measured 2026-09-05 on `# entity a-grand-blade.ratkin-warchief`
+(`content/a-grand-blade.dsl:92-95`, `tier: elite`, `level: 24`, `stats: physical-resistance 55`),
+by solving the shipped world and then a copy with that one line removed:
+
+    with physical-resistance 55 → core.defense = -18.15
+    without it                  → core.defense = +114.21
+
+`core.max-health` is 1052.87 either way. The solver hands the boss 132 points of *negative*
+flat reduction to pay for a 55% resistance nobody will apply, so at play the warchief takes an
+unresisted blow and has its defense added to the player's swing rather than subtracted.
+
+Read this next to the finding above rather than instead of it: one says the solver
+under-counts a foe's typed output, this says it over-counts a foe's resistance. Both are the
+same root — `foeSolve` states the damage formula a second time — and both close together.
+
+A caution for whoever measures this: negative `core.defense` is **not** by itself the symptom.
+Eleven shipped entities solve negative, and for the chicken, the cow and the feral rat that is
+just how the solver makes a weak body fall inside its tier's seconds. The warchief is the case
+where a declared resistance is what drove it there.
+
 The pieces are in place either way: `resistanceTo` and `typedShare` in
 `src/runtime/damageModel.ts` read no state and take a reader, so a predictor can ask the
-model as soon as the model is settled.
+model as soon as the model is settled. `typedShare` should also be calling `resistanceTo`
+rather than spelling the same `(1 - resistance / 100)` four lines below it.
 
 *Closes when:* a stat says whether the damage it deals is typed, the runtime counts it once,
 and `foeSolve` prices a swing by asking `damageModel` rather than by re-deriving it — with

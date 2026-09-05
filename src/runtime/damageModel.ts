@@ -100,7 +100,7 @@ export function typedShare(registry: Registry, read: DamageReading): number {
   let total = 0;
   for (const [type, amount] of amounts) {
     if (amount <= 0) continue;
-    const resistance = (model.resisted.get(type) ?? []).reduce((sum, statId) => sum + read.resists(statId), 0);
+    const resistance = resistanceTo(registry, type, read.resists);
     total += Math.max(0, amount * (1 - resistance / 100));
   }
   return total;
