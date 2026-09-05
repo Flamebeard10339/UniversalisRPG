@@ -637,6 +637,7 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
     } else if (met && evaluateCondition(met, state, registry)) {
       return over(true, say.engine('engine.stopped.condition', { condition: say.identifier(describeCondition(met)) }));
     }
+    if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return over(false, say.engine('engine.stopped.bound', { hours: UNDER_WAY_LIMIT_HOURS }));
     if (!state.activeAction && !state.journey) {
       if (state.time < state.engagesAt && aggressorHere(state, registry)) {
         resolve(state, registry, state.engagesAt);
@@ -647,7 +648,6 @@ export function resolveUnderWay(state: GameState, registry: Registry, terminator
       if (counted) return over(false, say.engine('engine.stopped.short-count', { because, times: counted.cycled(), wanted: counted.wanted }));
       return over(false, say.engine('engine.stopped.short', { because, condition: say.identifier(describeCondition(met!)) }));
     }
-    if (state.time - startedAt >= UNDER_WAY_LIMIT_MS) return over(false, say.engine('engine.stopped.bound', { hours: UNDER_WAY_LIMIT_HOURS }));
     const unit = underWayUnit(state, registry);
     if (!(unit > 0)) return over(false, say.engine('engine.stopped.still'));
     advanceUnderWayCycle(state, registry);

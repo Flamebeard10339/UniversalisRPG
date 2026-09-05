@@ -327,6 +327,7 @@ export const ENGINE_KEYS = [
   'engine.stopped.pack-full',
   'engine.stopped.short',
   'engine.stopped.round',
+  'engine.stopped.outstayed',
   'engine.setting.stands',
   'engine.setting.takes',
   'engine.setting.on',

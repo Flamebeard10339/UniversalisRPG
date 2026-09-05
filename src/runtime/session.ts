@@ -175,12 +175,16 @@ export interface PlaySession {
   readonly registry: Registry;
 }
 
+export const SECONDS_A_ROUTE_MAY_WALK = 120;
+
 interface SessionInternals {
   registry: Registry;
   state: GameState;
   logCursor: number;
   watch?: (step: Step) => void;
   pass: number | null;
+  seconds: number;
+  walkUntil: number | null;
 }
 
 interface Step {
@@ -191,6 +195,10 @@ interface Step {
 
 export function watchSteps(session: PlaySession, watch: (step: Step) => void): void {
   own(session).watch = watch;
+}
+
+export function walkWithin(session: PlaySession, seconds: number): void {
+  own(session).seconds = seconds;
 }
 
 const INTERNALS = new WeakMap<PlaySession, SessionInternals>();
@@ -213,7 +221,7 @@ function stateOf(session: PlaySession): GameState {
 
 export function sessionOver(registry: Registry, state: GameState): PlaySession {
   initResources(state, registry);
-  const internals: SessionInternals = { registry, state, logCursor: state.log.length, pass: null };
+  const internals: SessionInternals = { registry, state, logCursor: state.log.length, pass: null, seconds: SECONDS_A_ROUTE_MAY_WALK, walkUntil: null };
   const session: PlaySession = { get registry() { return internals.registry; } };
   INTERNALS.set(session, internals);
   return session;
@@ -950,6 +958,8 @@ export interface TestResult {
   failure?: string;
 }
 
+const outstayed = (session: PlaySession, seconds: number): string => sessionLocalizer(session).engine('engine.stopped.outstayed', { seconds });
+
 function refusalFrom(session: PlaySession, directive: Directive): string | null {
   try {
     return applyDirective(session, directive).failure ?? null;
@@ -981,27 +991,35 @@ export interface Replayed {
 
 export function walkTest(session: PlaySession, steps: readonly Directive[], upTo: number = steps.length, from = 0): Replayed {
   const walked: Directive[] = [];
+  const held = own(session);
+  const stopAt = held.walkUntil ?? Date.now() + held.seconds * 1000;
+  const opened = held.walkUntil === null;
+  if (opened) held.walkUntil = stopAt;
 
-  for (const [at, directive] of steps.entries()) {
-    if (at < from) continue;
-    if (at >= upTo) break;
-    if (directive.kind === 'refused') {
+  try {
+    for (const [at, directive] of steps.entries()) {
+      if (at < from) continue;
+      if (at >= upTo) break;
+      if (Date.now() > stopAt) return { walked, failure: outstayed(session, held.seconds) };
+      if (directive.kind === 'refused') {
+        walked.push(directive);
+        continue;
+      }
+
+      const pass = held.pass;
+      const refusal = refusalFrom(session, directive);
+      const claimed = steps[at + 1]?.kind === 'refused';
       walked.push(directive);
-      continue;
+      held.watch?.({ directive, pass, failure: claimed ? null : refusal });
+
+      if (refusal !== null && !claimed) return { walked, failure: refusal };
+      if (refusal === null && claimed) return { walked, failure: `refused: ${printDirective(directive)} was not refused` };
     }
 
-    const seen = INTERNALS.get(session);
-    const pass = seen?.pass ?? null;
-    const refusal = refusalFrom(session, directive);
-    const claimed = steps[at + 1]?.kind === 'refused';
-    walked.push(directive);
-    seen?.watch?.({ directive, pass, failure: claimed ? null : refusal });
-
-    if (refusal !== null && !claimed) return { walked, failure: refusal };
-    if (refusal === null && claimed) return { walked, failure: `refused: ${printDirective(directive)} was not refused` };
+    return { walked, failure: null };
+  } finally {
+    if (opened) held.walkUntil = null;
   }
-
-  return { walked, failure: null };
 }
 
 export interface TestRun {
