@@ -27,6 +27,11 @@ title: Daze Duration
 base: 4
 group: core.skilling
 
+# stat pickpocket-cooldown
+title: Pickpocket Cooldown
+base: 90
+group: core.skilling
+
 # stat luck
 base: 0
 group: skilling
@@ -226,7 +231,7 @@ value: 150
 +stats: npc-thieving-difficulty 20, npc-thieving-xp 4, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  stands: picked-townsman for 90s
+  stands: picked-townsman for pickpocket-cooldown
   one of:
     100x: give: 3 core.coin
     8x: roll: townsmans-wardrobe
@@ -244,7 +249,7 @@ one of:
 +stats: npc-thieving-difficulty 55, npc-thieving-xp 10, npc-thieving-damage 1
 +uses: pick-pocket
 pick-pocket:
-  stands: picked-guardsman for 90s
+  stands: picked-guardsman for pickpocket-cooldown
   give: 7 core.coin
   +on attempts exhausted:
     say: He turns into you rather than away, and the pommel of his sword arrives before you have finished deciding what to do, and then he has a fistful of your collar.
@@ -254,7 +259,7 @@ pick-pocket:
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 11
-  stands: picked-knight for 90s
+  stands: picked-knight for pickpocket-cooldown
   give: 12 core.coin
   +on attempts exhausted:
     say: There is a great deal of iron in the way and then a great deal of iron coming the other way, and he holds you at arm's length while he decides whether you are worth the walk to the gate.
@@ -272,7 +277,7 @@ on death:
     1 in 14: give: 1 steel-lockpicks
 pick-pocket:
   requires: level.thieving >= 11
-  stands: picked-thief for 90s
+  stands: picked-thief for pickpocket-cooldown
   one of:
     250x: give: 18 core.coin
     5x: give: 1 fingerless-gloves
@@ -1419,7 +1424,7 @@ pick-the-lock:
 +uses: pick-pocket
 pick-pocket:
   requires: level.thieving >= 25
-  stands: picked-duke for 90s
+  stands: picked-duke for pickpocket-cooldown
   one of:
     120x: give: 40-90 core.coin
     10x: give: 1 signet-ring

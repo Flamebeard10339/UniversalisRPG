@@ -325,8 +325,6 @@ cut for bait:
 
 # flag fenn-was-robbed
 
-# flag fenns-salmon-lifted
-
 # flag fishing-contest-barred
 
 # flag marle-catches
@@ -1157,13 +1155,12 @@ node robbed:
 # entity fenns-keepnet
 title: Fenn's Keepnet
 examine: A net staked at the peg below yours, and something heavy in it keeps turning over.
-hidden if: not stat.match-clock >= 1 or fenns-salmon-lifted
+hidden if: not stat.match-clock >= 1 or fenn-was-robbed
 stats: keepnet-difficulty 70
 lift the salmon out:
   attempts: 1
   accuracy: us.fishing vs them.keepnet-difficulty
   on success:
-    set: fenns-salmon-lifted
     set: fenn-was-robbed
     give: 1 raw-salmon
     say: The salmon comes out of the net without a splash, and goes into your own creel instead of his.
