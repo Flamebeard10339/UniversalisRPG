@@ -3,8 +3,10 @@ import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import { everyDirective, type Directive } from '../content/sections/test';
 import { keywordsIn, type TagClause } from '../grammar/tagClause';
+import { DEFAULT_CONTEXT } from '../grammar/section';
+import type { Parser } from '../grammar/parser';
 import { CHURNING_ROOTS, everyCondition, printCondition } from '../grammar/condition';
-import { DEBUG_MARK, isDebug } from '../content/sections';
+import { DEBUG_MARK, isDebug, sectionFor } from '../content/sections';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
@@ -103,6 +105,34 @@ function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] 
   ];
 }
 
+function saidAnyway(sources: readonly ModuleSource[]): Remark[] {
+  return sources.flatMap((source) =>
+    parseModuleSource(source).sections.flatMap((section) => {
+      const schema = sectionFor(section.kind)?.schema;
+      if (schema === undefined) return [];
+      const authored = section.value as Record<string, unknown>;
+      return Object.entries(schema.fields).flatMap(([name, spec]) => {
+        if (spec.printed !== 'unless-default' || spec.default === undefined || authored[name] === undefined) return [];
+        const parser = spec.parser as Parser<unknown>;
+        let printed;
+        try {
+          printed = parser.print(authored[name]);
+          if (parser.print(spec.default(authored as never, DEFAULT_CONTEXT)) !== printed) return [];
+        } catch {
+          return [];
+        }
+        const keyword = spec.keyword ?? name;
+        return [
+          {
+            where: `# ${section.kind} ${String(authored.id ?? '')}`,
+            says: `writes ${keyword}: ${printed}, which is what ${keyword}: reads when it is left out. Nothing tells that apart from a copy of the default, so move the default and this line keeps the old answer while every body that stayed quiet follows. Take the line out, or write the value you mean.`,
+          },
+        ];
+      });
+    }),
+  );
+}
+
 function unpacked(sources: readonly ModuleSource[]): Remark[] {
   return sources.flatMap((source) => {
     const info = parseModuleSource(source).info;
@@ -195,6 +225,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => lopsided(registry),
   (_sources, registry) => undealt(registry),
   (_sources, registry) => unladdered(registry),
+  (sources) => saidAnyway(sources),
   (sources) => unpacked(sources),
   (sources) => rootless(sources),
   unread,
