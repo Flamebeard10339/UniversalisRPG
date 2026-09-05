@@ -3,7 +3,8 @@ import { qualify } from '../content/namespace';
 import type { Addressed } from '../content/completion';
 import { declaredBy } from '../content/references';
 import { withModulesOff, type ModuleSource } from '../content/universe';
-import { shadowed } from './authoringSurface';
+import { addressable, shadowed, type Section } from './authoringSurface';
+import type { Registry } from '../content/registry';
 import { devRefusal } from './devMode';
 import { type AuthoringContext, createTicker, liveAgain, newContext, outcomeOf, refusedLine, resumptionNotes, type CommandContext, type CommandOutput, type CommandResult, type LiveProgress, type LiveRun, runLine, type Ticker } from '../runtime/command';
 import { type Localizer } from '../runtime/localized';
@@ -94,6 +95,7 @@ export interface Driver {
   serialized(): string;
   localChanges(): string | null;
   baseSources(): readonly ModuleSource[];
+  sections(): readonly Section[];
   declared(): readonly Addressed[];
   editorMemory: { read(): string | null; write(text: string): void };
   note(text: string): void;
@@ -409,6 +411,21 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     return { filed: true, at: qualify(LOCAL_CHANGES_MODULE_ID, every[every.length - 1].run.id) };
   };
 
+  let surfaced: { of: string; sections: readonly Section[] } | null = null;
+  let addressed: { of: Registry; declared: readonly Addressed[] } | null = null;
+
+  const sectionsNow = (): readonly Section[] => {
+    const text = readLocal().text;
+    if (surfaced?.of !== text) surfaced = { of: text, sections: addressable([...shipped, { name: LOCAL_CHANGES_MODULE_ID, text }]) };
+    return surfaced.sections;
+  };
+
+  const declaredNow = (): readonly Addressed[] => {
+    const registry = context.session.registry;
+    if (addressed?.of !== registry) addressed = { of: registry, declared: declaredBy(registry) };
+    return addressed.declared;
+  };
+
   const driver: Driver = {
     subscribe(listener) {
       listeners.add(listener);
@@ -435,7 +452,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       }
     },
     baseSources: () => shipped,
-    declared: () => declaredBy(context.session.registry),
+    sections: sectionsNow,
+    declared: declaredNow,
     note: complain,
     replay: {
       watching: (test) => {

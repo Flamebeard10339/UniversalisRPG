@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
-import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
+import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { dismissal } from './asking';
-import { addressable, type Standing } from './authoringSurface';
+import type { Standing } from './authoringSurface';
 import type { Driver } from './driver';
-import { editControls } from './editControls';
+import { editControls, type EditHeld } from './editControls';
 import { EditPane } from './EditPane';
 import { DevBanner } from './DevBanner';
 import { FaultBanner } from './FaultBanner';
@@ -199,29 +198,28 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   const shell = { where, go };
   const crossed = useCrossings(rows, subpageOf(where) === 'skills');
 
-  const sections = useMemo(
-    () => addressable([...driver.baseSources(), { name: LOCAL_CHANGES_MODULE_ID, text: driver.localChanges() ?? '' }]),
-    [snapshot],
-  );
-  const declared = useMemo(() => driver.declared(), [snapshot]);
-  const held = {
-    sections,
-    declared,
-    standing: standingIn(view),
-    places: [...view.discovered, ...view.undiscovered],
-    editing,
-    controls: editControls(
-      { sections, declared, editing },
-      {
-        send: driver.send,
-        note: driver.note,
-        move: setEditing,
-        hand: () => {
-          const text = driver.localChanges();
-          if (text !== null && typeof navigator !== 'undefined') void navigator.clipboard?.writeText(text);
+  const heldForEditing = (): EditHeld => {
+    const sections = driver.sections();
+    const declared = driver.declared();
+    return {
+      sections,
+      declared,
+      standing: standingIn(view),
+      places: [...view.discovered, ...view.undiscovered],
+      editing,
+      controls: editControls(
+        { sections, declared, editing },
+        {
+          send: driver.send,
+          note: driver.note,
+          move: setEditing,
+          hand: () => {
+            const text = driver.localChanges();
+            if (text !== null && typeof navigator !== 'undefined') void navigator.clipboard?.writeText(text);
+          },
         },
-      },
-    ),
+      ),
+    };
   };
 
   useTestSurface('shell', { ...shell, dev, commandLine: editing.commandLine, showCommandLine: (shown) => setEditing({ ...editing, commandLine: shown }) });
@@ -236,7 +234,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
     if (layer.id === 'home') {
       if (subpage.id === 'home')
         return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onSend={driver.send} />;
-      if (subpage.id === 'edit') return <EditPane held={held} words={words} />;
+      if (subpage.id === 'edit') return <EditPane held={heldForEditing()} words={words} />;
       return subpage.id === 'settings' ? (
         <SettingsPane
           dev={dev}

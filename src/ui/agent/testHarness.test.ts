@@ -94,6 +94,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     serialized: () => '',
     localChanges: () => null,
     baseSources: () => [],
+    sections: () => [],
     editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },
     note: (text) => void calls.push(`note:${text}`),
     reopen: () => void calls.push('reopen'),

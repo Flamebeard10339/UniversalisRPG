@@ -122,7 +122,7 @@ export function appendOutputs(transcript: Transcript, outputs: readonly CommandO
       entries.push({ ...held!, repeats: held!.repeats + 1 });
     }
   }
-  return { entries, nextId, place: cursor.place, described: cursor.described };
+  return trimmedTranscript({ entries, nextId, place: cursor.place, described: cursor.described });
 }
 
 export { TRANSCRIPT_SLOT } from '../runtime/saveSlots';

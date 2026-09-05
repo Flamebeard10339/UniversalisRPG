@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { COMPASS, compassOf, sheetOf } from '../runtime/map';
 import type { Localized } from '../runtime/localized';
 import { sheetOffers, type PlayView } from '../runtime/session';
@@ -16,16 +16,21 @@ import type { Words } from './words';
 
 const WORDS_CLASS: Record<LogEntry['words'], string> = { player: '', tool: 'font-mono text-text-muted' };
 
-function Line({ entry, measure }: { entry: LogEntry; measure: (element: HTMLElement | null) => void }): JSX.Element {
+type Drawn = MutableRefObject<Map<number, HTMLElement>>;
+
+const Line = memo(function Line({ entry, drawn }: { entry: LogEntry; drawn: Drawn }): JSX.Element {
   const tone = entry.kind === 'message' ? TONE_CLASS[entry.tone] : '';
   const arrived = useMoment('arrival', true, String(entry.id));
   return (
-    <p ref={measure} className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}>
+    <p
+      ref={(element) => void (element === null ? drawn.current.delete(entry.id) : drawn.current.set(entry.id, element))}
+      className={`${arrived} -mx-1 whitespace-pre-wrap break-words rounded px-1 text-sm leading-snug ${SHAPE_CLASS[entry.kind]} ${WORDS_CLASS[entry.words]} ${VOICE_CLASS[entry.kind]} ${tone}`}
+    >
       {entry.repeats > 1 ? <span className="tabular-nums text-text-subtle">{`(${entry.repeats}) `}</span> : null}
       {entry.text}
     </p>
   );
-}
+});
 
 function Compass({ compass, here, onChoose }: { compass: ReturnType<typeof compassOf>; here: Localized; onChoose: (position: number) => void }): JSX.Element {
   return (
@@ -126,7 +131,7 @@ export function Home({
     const line = drawn.current.get(anchor);
     const top = line === undefined ? scroller.scrollHeight : line.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
     scroller.scrollTop = restingAt(top, scroller.scrollHeight, scroller.clientHeight);
-  });
+  }, [snapshot.transcript]);
 
   return (
     <>
@@ -138,11 +143,7 @@ export function Home({
         >
           <div className="mx-auto flex max-w-2xl flex-col gap-1">
             {entries.map((entry) => (
-              <Line
-                key={entry.id}
-                entry={entry}
-                measure={(element) => void (element === null ? drawn.current.delete(entry.id) : drawn.current.set(entry.id, element))}
-              />
+              <Line key={entry.id} entry={entry} drawn={drawn} />
             ))}
           </div>
         </div>
