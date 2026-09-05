@@ -850,27 +850,6 @@ the herb order does not matter.
 *Closes when:* the swampy pair shares its approach and its hand-in, and a decision is recorded
 about whether the other four are meant to read whole.
 
-## An action result's facts live in three files
-
-Each kind of `<result>` is declared in `src/grammar/actionResult.ts:347-447` (`LEAVES` — its
-opener, forms, examples and parse), printed in the same file by a second switch
-(`printResultLine`, `:555-628`), and has its reference sites listed a third time in
-`src/content/refs.ts:147-230`. Adding a result kind next month means remembering three places.
-
-Both switches carry a `const unreached: never`, so a *missing case* is a compile error. What is
-unguarded is a case that forgets a **field** — a new result naming a `# droptable` whose entry
-in `refs.ts` omits its `put(...)` line. That reference then goes unvalidated and unpruned, in
-silence.
-
-The shape is the one `sections/<kind>.ts` already solves one level up: give `Leaf` optional
-`print` and `visit` members and move each case body onto its leaf, leaving the two switches as
-loops. It is the largest item in this file — roughly 250 lines relocated — and it crosses a
-layer boundary, since `refs.ts` is content and `actionResult.ts` is grammar, so the visit half
-may have to move down rather than across.
-
-*Closes when:* a result kind is declared in one place, and `printResultLine` and `refs.results`
-are loops over `LEAVES`.
-
 ## Small constants still spelled twice
 
 - `HEADING_KIND` (`src/content/sectionSource.ts:24`) names the kind that heads a module, and

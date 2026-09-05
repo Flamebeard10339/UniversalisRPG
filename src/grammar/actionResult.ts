@@ -14,6 +14,7 @@ import {
   durationOrStat,
   fallingAmount,
   id,
+  isStatAmount,
   numberOrStat,
   opensStatAmount,
   printAmount,
@@ -552,72 +553,144 @@ export function printResult(value: ActionResult): string {
   return value.into === undefined ? printResultLine(value) : `${value.into} = ${printResultLine(value)}`;
 }
 
-function printResultLine(value: ActionResult): string {
-  switch (value.kind) {
-    case 'say':
-      return `say: ${value.text}`;
-    case 'set':
-      return `set: ${value.variable}`;
-    case 'unset':
-      return `unset: ${value.variable}`;
-    case 'add':
-      return `add: ${value.variable} ${value.amount}`;
-    case 'give':
-      return `give: ${produced.print(value)}`;
-    case 'take':
-      return `take: ${value.atMost === true ? 'up to ' : ''}${quantified.print({ item: value.item, amount: value.amount })}`;
-    case 'take-worn':
-      return `take: worn ${value.slot}`;
-    case 'strip':
-      return `take: ${EVERYTHING}`;
-    case 'empty':
-      return `give: ${EVERYTHING} in ${value.bundle}`;
-    case 'xp':
-      return `xp: ${value.skill} ${printAmount(value.amount)}`;
-    case 'relocate':
-      return `relocate: ${value.location}`;
-    case 'discover':
-      return `discover: ${value.location}`;
-    case 'open-modal':
-      return `open modal: ${value.modal}`;
-    case 'perform':
-      return `perform: ${value.action}`;
-    case 'pool': {
+export const INFLICT_SITE = 'inflict:';
+
+export const TIMED_INFLICT_SITE = `${INFLICT_SITE} … for:`;
+
+export const WEIGHT_SITE = 'one of: row';
+
+export const BOUND_SITE = 'bound to';
+
+export const BUNDLE_SITES: readonly string[] = [BOUND_SITE, `give: ${EVERYTHING} in`];
+
+export type ResultKind = ResultLine['kind'];
+
+type Of<K extends ResultKind> = Extract<ActionResult, { kind: K }>;
+
+type Site<K extends ResultKind> = string | ((value: Of<K>) => string);
+
+type Holders<K extends ResultKind> = (value: Of<K>) => readonly object[];
+
+export type ResultWalk<K extends ResultKind = ResultKind> =
+  | { how: 'ref'; field: string; names: string; at: Site<K>; on?: Holders<K> }
+  | { how: 'location'; field: string; at: Site<K>; on?: Holders<K> }
+  | { how: 'prose'; field: string; at: Site<K>; on?: Holders<K> }
+  | { how: 'condition'; field: string; at: Site<K>; on?: Holders<K> };
+
+interface Declared<K extends ResultKind> {
+  readonly print: (value: Of<K>) => string;
+  readonly walks: readonly ResultWalk<K>[];
+}
+
+const spansLinesInstead = <K extends ResultKind>(walks: readonly ResultWalk<K>[] = []): Declared<K> => ({
+  print: (value) => {
+    throw new DslError(`a ${value.kind} result spans lines and cannot be inlined`);
+  },
+  walks,
+});
+
+const statIn = <K extends ResultKind>(field: keyof Of<K> & string, at: Site<K>): ResultWalk<K> => ({
+  how: 'ref',
+  field: 'id',
+  names: 'stat',
+  at,
+  on: (value) => {
+    const written = (value as unknown as Record<string, unknown>)[field];
+    return isStatAmount(written as Amount) ? [written as object] : [];
+  },
+});
+
+const poolSite = (value: Of<'pool'>): string => `${amountFalls(value.delta) ? 'drain' : 'restore'}:`;
+
+const inflictSite = (value: Of<'inflict'>): string => (value.lasts === undefined ? INFLICT_SITE : TIMED_INFLICT_SITE);
+
+const RESULTS: { readonly [K in ResultKind]: Declared<K> } = {
+  say: { print: (value) => `say: ${value.text}`, walks: [{ how: 'prose', field: 'text', at: 'say:' }] },
+  set: { print: (value) => `set: ${value.variable}`, walks: [{ how: 'ref', field: 'variable', names: 'flag', at: 'set:' }] },
+  unset: { print: (value) => `unset: ${value.variable}`, walks: [{ how: 'ref', field: 'variable', names: 'flag', at: 'unset:' }] },
+  add: { print: (value) => `add: ${value.variable} ${value.amount}`, walks: [{ how: 'ref', field: 'variable', names: 'flag', at: 'add:' }] },
+  give: { print: (value) => `give: ${produced.print(value)}`, walks: [{ how: 'ref', field: 'item', names: 'item', at: 'give:' }] },
+  take: {
+    print: (value) => `take: ${value.atMost === true ? 'up to ' : ''}${quantified.print({ item: value.item, amount: value.amount })}`,
+    walks: [{ how: 'ref', field: 'item', names: 'item', at: 'take:' }],
+  },
+  'take-worn': { print: (value) => `take: worn ${value.slot}`, walks: [{ how: 'ref', field: 'slot', names: 'slot', at: 'take: worn' }] },
+  strip: { print: () => `take: ${EVERYTHING}`, walks: [] },
+  empty: { print: (value) => `give: ${EVERYTHING} in ${value.bundle}`, walks: [{ how: 'ref', field: 'bundle', names: 'flag', at: `give: ${EVERYTHING} in` }] },
+  xp: {
+    print: (value) => `xp: ${value.skill} ${printAmount(value.amount)}`,
+    walks: [{ how: 'ref', field: 'skill', names: 'skill', at: 'xp:' }, statIn<'xp'>('amount', 'xp:')],
+  },
+  relocate: { print: (value) => `relocate: ${value.location}`, walks: [{ how: 'location', field: 'location', at: 'relocate:' }] },
+  discover: { print: (value) => `discover: ${value.location}`, walks: [{ how: 'location', field: 'location', at: 'discover:' }] },
+  'open-modal': { print: (value) => `open modal: ${value.modal}`, walks: [] },
+  perform: { print: (value) => `perform: ${value.action}`, walks: [{ how: 'ref', field: 'action', names: 'action', at: 'perform:' }] },
+  pool: {
+    print: (value) => {
       const magnitude = risingAmount(value.delta);
       const verb = amountFalls(value.delta) ? 'drain' : 'restore';
       const party = value.party === undefined ? '' : ` ${PREPOSITION[verb]} ${value.party}`;
       return `${verb}: ${printAmount(magnitude)} ${value.resource}${party}`;
-    }
-    case 'fill': {
+    },
+    walks: [{ how: 'ref', field: 'resource', names: 'resource', at: poolSite }, statIn<'pool'>('delta', poolSite)],
+  },
+  fill: {
+    print: (value) => {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.restore} ${value.party}`;
       return `restore: ${value.resource}${party}`;
-    }
-    case 'stands':
-      return `stands: ${value.guise} for ${durationOrStat.print(value.lasts)}`;
-    case 'inflict': {
+    },
+    walks: [{ how: 'ref', field: 'resource', names: 'resource', at: 'restore:' }],
+  },
+  stands: {
+    print: (value) => `stands: ${value.guise} for ${durationOrStat.print(value.lasts)}`,
+    walks: [
+      { how: 'ref', field: 'guise', names: 'guise', at: 'stands:' },
+      { how: 'ref', field: 'lasts', names: 'stat', at: 'stands: … for:' },
+    ],
+  },
+  inflict: {
+    print: (value) => {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
       const lasts = value.lasts === undefined ? '' : ` for ${durationOrStat.print(value.lasts)}`;
       return `inflict: ${value.buff}${party}${lasts}`;
-    }
-    case 'shake-off': {
+    },
+    walks: [
+      { how: 'ref', field: 'buff', names: 'item', at: inflictSite },
+      { how: 'ref', field: 'lasts', names: 'stat', at: inflictSite },
+    ],
+  },
+  'shake-off': {
+    print: (value) => {
       const party = value.party === undefined ? '' : ` ${PREPOSITION.inflict} ${value.party}`;
       return `shake off: ${value.buff ?? EVERYTHING}${party}`;
-    }
-    case 'roll':
-      return `roll: ${value.table}`;
-    case 'stop':
-      return 'stop';
-    case 'chance':
-    case 'contest':
-    case 'gate':
-    case 'credit':
-    case 'one-of':
-      throw new DslError(`a ${value.kind} result spans lines and cannot be inlined`);
-    default: {
-      const unreached: never = value;
-      return unreached;
-    }
-  }
+    },
+    walks: [{ how: 'ref', field: 'buff', names: 'item', at: 'shake off:', on: (value) => (value.buff === null ? [] : [value]) }],
+  },
+  roll: { print: (value) => `roll: ${value.table}`, walks: [{ how: 'ref', field: 'table', names: 'droptable', at: 'roll:' }] },
+  stop: { print: () => 'stop', walks: [] },
+  chance: spansLinesInstead<'chance'>(),
+  contest: spansLinesInstead<'contest'>([
+    { how: 'ref', field: 'left', names: 'stat', at: 'vs:' },
+    { how: 'ref', field: 'right', names: 'stat', at: 'vs:' },
+  ]),
+  gate: spansLinesInstead<'gate'>([{ how: 'condition', field: 'condition', at: 'if:' }]),
+  credit: spansLinesInstead<'credit'>(),
+  'one-of': spansLinesInstead<'one-of'>([
+    { how: 'ref', field: 'weight', names: 'stat', at: WEIGHT_SITE, on: (value) => value.rows },
+    { how: 'condition', field: 'requires', at: `${WEIGHT_SITE} if`, on: (value) => value.rows },
+  ]),
+};
+
+const declaredFor = (value: ActionResult): Declared<ResultKind> => RESULTS[value.kind] as Declared<ResultKind>;
+
+const printResultLine = (value: ActionResult): string => declaredFor(value).print(value);
+
+export function resultWalks(value: ActionResult): { walk: ResultWalk; site: string; holders: readonly object[] }[] {
+  return declaredFor(value).walks.map((walk) => ({
+    walk,
+    site: typeof walk.at === 'string' ? walk.at : walk.at(value),
+    holders: walk.on === undefined ? [value] : walk.on(value),
+  }));
 }
 
 function rowLines(row: DropRow): string[] {
