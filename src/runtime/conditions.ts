@@ -65,6 +65,16 @@ const derived = new Map<string, boolean | number | string | undefined>();
 
 let deriveDepth = 0;
 
+export function whileNothingChanges<T>(read: () => T): T {
+  deriveDepth += 1;
+  try {
+    return read();
+  } finally {
+    deriveDepth -= 1;
+    if (deriveDepth === 0) derived.clear();
+  }
+}
+
 export function answerReference(reference: Reference, state: GameState, registry: Registry): Answered {
   const { path } = reference;
   const spelt = spelling(path);

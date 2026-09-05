@@ -3,7 +3,7 @@ import type { Condition } from '../grammar/condition';
 import type { Registry } from '../content/registry';
 import { begun, stageNow, stagesReached, type Quest, type QuestStage, type QuestStanding } from '../content/sections/quest';
 import { listedToPlayer } from '../content/sections';
-import { evaluateCondition, renderSegments } from './conditions';
+import { evaluateCondition, renderSegments, whileNothingChanges } from './conditions';
 import { groupStandingFor, type GroupRow } from './grouping';
 import { localizerOf, type Answer, type Localized, type Localizer } from './localized';
 import { withoutNote } from '../grammar/note';
@@ -61,5 +61,5 @@ function entryFor(registry: Registry, state: GameState, quest: Quest, localizer:
 
 export function journal(registry: Registry, state: GameState): JournalEntry[] {
   const localizer = localizerOf(registry, state);
-  return listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest, localizer) ?? []);
+  return whileNothingChanges(() => listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest, localizer) ?? []));
 }
