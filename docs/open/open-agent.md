@@ -14,8 +14,22 @@ is what `content/the-swampy-menace.dsl:51` reports as a different impossibility:
 character in another room needs a second, hidden copy of them, which is a hand-copy of
 tulsa's.
 
-*Closes when:* `# entity` takes `extends:` the way `# action` does, and `cellar-rat` declares
-only its gate and its counter.
+**One thing to settle before that lands, because `extends:` would decide it silently.** The two
+bodies do not carry their numbers the same way: `feral-rat` says `tier: mob` / `profile: brute`
+/ `level: 4` and is audited against the ladder, while `cellar-rat` writes
+`stats: attack 9, defense 1, max-health 24, attack-rate 18, accuracy 65, evasion 35` and, the
+oracle's `# entity` page says of a body naming no tier, "is not audited against any of them".
+
+They are not the same rat. Solved 2026-09-05, `combat.feral-rat` comes out at
+**max-health 221.27, attack 14.27, accuracy 100, evasion 70, attack-rate 15** — against the
+cellar rat's hand-written 24 health and 9 attack. Nine times the body. So this is not a copy
+that drifted; either the cellar is deliberately full of weaker rats and should say so, or the
+quest has been fighting a different animal than it named since it was written. An `extends:`
+that inherits the tier would quietly make it the harder one.
+
+*Closes when:* `# entity` takes `extends:` the way `# action` does, `cellar-rat` declares only
+its gate and its counter, and whichever of the two rats it is meant to be is the one the ladder
+sees.
 
 ## A single-text field cannot be extended, so a module appending a clause restates the sentence
 
