@@ -96,6 +96,10 @@ export function nestedResults(result: ActionResult): ActionResult[][] {
   return 'results' in result ? [result.results] : [];
 }
 
+export function everyResult(results: readonly ActionResult[]): ActionResult[] {
+  return results.flatMap((result) => [result, ...nestedResults(result).flatMap(everyResult)]);
+}
+
 function parseVariable(cursor: Cursor): string {
   const raw = cursor.take(REFERENCE);
   if (raw === null)

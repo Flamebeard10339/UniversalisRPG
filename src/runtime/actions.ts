@@ -1,5 +1,5 @@
 import { RuntimeError } from './error';
-import { ActionResult, itemCost } from '../grammar/actionResult';
+import { ActionResult, everyResult, itemCost } from '../grammar/actionResult';
 import { actionResultLists } from '../grammar/action';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
@@ -27,7 +27,7 @@ export function findActiveAction(state: GameState, registry: Registry): Action {
 export type FightOutcome = 'completion' | 'unfinished';
 
 export function leavesHere(action: Action): boolean {
-  return actionResultLists(action).some((list) => list.some((result) => result.kind === 'relocate'));
+  return actionResultLists(action).some((list) => everyResult(list).some((result) => result.kind === 'relocate'));
 }
 
 export function resolvesPerAttempt(action: Action): boolean {
@@ -91,7 +91,7 @@ export function outcomeResults(action: Action, outcome: FightOutcome): ActionRes
 }
 
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {
-  return outcomeResults(action, outcome).some((result) => result.kind === 'stop');
+  return everyResult(outcomeResults(action, outcome)).some((result) => result.kind === 'stop');
 }
 
 export function fightBatch(action: Action, count: number, outcome: FightOutcome): { results: ActionResult[]; count: number } {
