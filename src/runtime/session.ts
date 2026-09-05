@@ -40,7 +40,7 @@ import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { ResourceDisplay } from '../content/sections/resource';
 import { compareSave, compareSaveOnly, initialState, loadSave, pruneStateForRegistry, serializeSave } from './save';
 import type { PruneWarning } from './pruning';
-import { Directive, isCycles, parseUseChoiceId, printDirective, printRounds, printTerminator, Terminator, useChoiceId } from '../content/sections/test';
+import { choiceId, Directive, isCycles, parseChoiceId, printDirective, printRounds, printTerminator, Terminator } from '../content/sections/test';
 import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './localized';
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
@@ -295,7 +295,7 @@ function fightChoices(entityId: string, registry: Registry, state: GameState, lo
     if (id === undefined || !isFight(action)) continue;
     if (!actionVisible(action, state, registry)) continue;
     if (action.depletes.side === 'them' && !hasPool(state, registry, entityId, action.depletes.id)) continue;
-    choices.push({ id: `fight:${id}:${entityId}`, kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });
+    choices.push({ id: choiceId({ kind: 'use-on', action: id, target: entityId }), kind: 'action', label: localizer.actionLabel('action', id, action), ...offeredBy(registry, localizer, 'entity', entityId) });
   }
   return choices;
 }
@@ -310,16 +310,16 @@ function entityOffers(stood: StoodHere, registry: Registry, state: GameState, lo
   const source = stoodTitle(registry, localizer, stood, masked);
   const offers: Offered[] = [];
   if (!masked && reachedNow(registry, state, entityId) !== null) {
-    offers.push({ choice: { id: `talk:${entityId}`, kind: 'talk', label: localizer.engine('engine.talk.to', { entity: source.detail }), ...source }, minted: false });
+    offers.push({ choice: { id: choiceId({ kind: 'talk', entity: entityId }), kind: 'talk', label: localizer.engine('engine.talk.to', { entity: source.detail }), ...source }, minted: false });
   }
   if (!masked && shopOpen(registry, state, entity.shop)) {
-    offers.push({ choice: { id: `shop:${entity.shop}`, kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
+    offers.push({ choice: { id: choiceId({ kind: 'shop', shop: entity.shop as string }), kind: 'shop', label: localizer.engine('engine.shop.label', { entity: source.detail }), ...source }, minted: false });
   }
   for (const action of availableActions(stood.offers, state, registry)) {
     if (masked && !isMintedAction(action)) continue;
     const slug = actionAddress(action);
     offers.push({
-      choice: { id: useChoiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), ...source, leadsTo: movesTo(action) },
+      choice: { id: choiceId({ kind: 'use', obj: 'entity', objId: entityId, actionId: slug }), kind: 'action', label: localizer.actionLabel('entity', entityId, action), ...source, leadsTo: movesTo(action) },
       minted: isMintedAction(action),
     });
   }
@@ -351,7 +351,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const action of availableActions(location, state, registry)) {
     const slug = actionAddress(action);
-    choices.push({ id: useChoiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), ...offeredBy(registry, localizer, 'location', location.id) });
+    choices.push({ id: choiceId({ kind: 'use', obj: 'location', objId: location.id, actionId: slug }), kind: 'action', label: localizer.actionLabel('location', location.id, action), ...offeredBy(registry, localizer, 'location', location.id) });
   }
 
   for (const [itemId] of itemCopies(state)) {
@@ -359,7 +359,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     if (!item) continue;
     for (const action of availableActions(item, state, registry)) {
       const slug = actionAddress(action);
-      choices.push({ id: useChoiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), ...offeredBy(registry, localizer, 'item', itemId) });
+      choices.push({ id: choiceId({ kind: 'use', obj: 'item', objId: itemId, actionId: slug }), kind: 'action', label: localizer.actionLabel('item', itemId, action), ...offeredBy(registry, localizer, 'item', itemId) });
     }
   }
 
@@ -372,13 +372,13 @@ function locationChoices(session: PlaySession): PlayChoice[] {
       : undefined;
     if (station !== undefined && masked.has(station)) continue;
     const source = station === undefined ? {} : offeredBy(registry, localizer, 'entity', station);
-    choices.push({ id: `craft:${recipe.id}`, kind: 'craft', label: craftLabel(localizer, recipe.id), ...source });
+    choices.push({ id: choiceId({ kind: 'craft', recipe: recipe.id }), kind: 'craft', label: craftLabel(localizer, recipe.id), ...source });
   }
 
   for (const edge of effectiveAdjacent(registry, location.id)) {
     if (edge.condition && !evaluateCondition(edge.condition, state, registry)) continue;
     if (entityAliasesTravelTo(here, edge.target, registry, state, masked)) continue;
-    choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
+    choices.push({ id: choiceId({ kind: 'travel', location: edge.target }), kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
   }
 
   return choices;
@@ -405,7 +405,7 @@ function journeyChoices(session: PlaySession, local: PlayChoice[]): PlayChoice[]
 
   for (const [target, legs] of reachable(state.location, registry, state)) {
     if (already.has(target)) continue;
-    choices.push({ id: `travel:${target}`, kind: 'travel', label: travelLabel(localizer, target), leadsTo: target, legs });
+    choices.push({ id: choiceId({ kind: 'travel', location: target }), kind: 'travel', label: travelLabel(localizer, target), leadsTo: target, legs });
   }
 
   return choices;
@@ -422,23 +422,9 @@ function computeChoices(session: PlaySession): PlayChoice[] {
 }
 
 export function choiceToDirective(choice: PlayChoice): Directive {
-  switch (choice.kind) {
-    case 'talk':
-      return { kind: 'talk', entity: choice.id.slice('talk:'.length) };
-    case 'action': {
-      const fight = /^fight:([a-z0-9.-]+):([a-z0-9.-]+)$/.exec(choice.id);
-      if (fight) return { kind: 'use-on', action: fight[1], target: fight[2] };
-      const use = parseUseChoiceId(choice.id);
-      if (!use) throw new RuntimeError(`malformed action choice id: ${choice.id}`);
-      return use;
-    }
-    case 'travel':
-      return { kind: 'travel', location: choice.id.slice('travel:'.length) };
-    case 'craft':
-      return { kind: 'craft', recipe: choice.id.slice('craft:'.length) };
-    case 'shop':
-      return { kind: 'shop', shop: choice.id.slice('shop:'.length) };
-  }
+  const parsed = parseChoiceId(choice.id);
+  if (parsed === null) throw new RuntimeError(`malformed choice id: ${choice.id}`);
+  return parsed;
 }
 
 export function startSession(registry: Registry, language: string = DEFAULT_LANGUAGE): PlaySession {
@@ -792,23 +778,6 @@ export function submitModal(session: PlaySession, answers: Record<string, string
   return view(session);
 }
 
-function choiceIdFor(inner: Extract<Directive, { kind: 'use' | 'use-on' | 'travel' | 'craft' }>): string {
-  switch (inner.kind) {
-    case 'use':
-      return useChoiceId(inner);
-    case 'use-on':
-      return `fight:${inner.action}:${inner.target}`;
-    case 'travel':
-      return `travel:${inner.location}`;
-    case 'craft':
-      return `craft:${inner.recipe}`;
-    default: {
-      const unreached: never = inner;
-      return unreached;
-    }
-  }
-}
-
 export interface DirectiveOutcome {
   failure?: string;
   pruned?: readonly PruneWarning[];
@@ -877,7 +846,7 @@ function performDirective(session: PlaySession, directive: Directive): Directive
       return {};
     }
     case 'begin':
-      beginAction(session, choiceIdFor(directive.inner));
+      beginAction(session, choiceId(directive.inner));
       return {};
     case 'assert':
       if (!evaluateCondition(directive.condition, state, registry)) return { failure: describeCondition(directive.condition) };

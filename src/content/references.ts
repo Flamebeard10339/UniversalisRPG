@@ -5,7 +5,8 @@ import { Directive, Test } from './sections/test';
 import { } from './namespace';
 import { isCheckedKind } from './sections';
 import { DEBUG_MARK, isActionOwnerKind, isDebug, registryMapOf, sectionOf, type ModuleSection } from './sections';
-import { BUNDLE_SITES, INFLICT_SITE, Visit } from './refs';
+import { BUNDLE_SITES, INFLICT_SITE } from '../grammar/actionResult';
+import { Visit } from './refs';
 import { visitSection } from './sections';
 import { mapOf } from './registry';
 

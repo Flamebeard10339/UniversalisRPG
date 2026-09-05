@@ -21,7 +21,7 @@ import { everySaid, GENERATED_FIELD, localeKey } from './locale';
 import { contentSectionMaps, isCheckedKind, isDebug, parseModule, registryMapOf, sections, sectionFor, textFieldsOf, type Section } from './sections';
 import { givenByQuest } from './sections/dialogue';
 import { groupOf } from './sections/group';
-import { WEIGHT_SITE } from './refs';
+import { WEIGHT_SITE } from '../grammar/actionResult';
 import { tagClause } from '../grammar/tagClause';
 import { fixtureSources } from './worldFixture';
 

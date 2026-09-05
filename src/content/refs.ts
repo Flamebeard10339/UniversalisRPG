@@ -2,22 +2,14 @@ import { A_LITERAL_BRACE, fragment, OPENS_A_FRAGMENT, printSegments, type TextSe
 import { noteIn, withoutNote } from '../grammar/note';
 import { parseWhole } from '../grammar/parser';
 import { Action, actionResultLists, Sided } from '../grammar/action';
-import { ActionResult, EVERYTHING, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
+import { ActionResult, BOUND_SITE, nestedResults, resultWalks, STARTING_LOCATION } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
 import { namesACopy } from './instanceId';
-import { amountFalls, isStatAmount, Quantified } from '../grammar/values';
+import { Quantified } from '../grammar/values';
 import { COUNTERS, TagClause } from '../grammar/tagClause';
 import { HOOK_FIELDS } from '../grammar/hook';
-
-export const INFLICT_SITE = 'inflict:';
-
-export const TIMED_INFLICT_SITE = `${INFLICT_SITE} … for:`;
-
-export const WEIGHT_SITE = 'one of: row';
-
-export const BUNDLE_SITES: readonly string[] = ['bound to', `give: ${EVERYTHING} in`];
 
 export type ReferenceKind = string;
 
@@ -147,83 +139,14 @@ export function condition(value: Condition | undefined, where: string, visit: Vi
 export function results(list: ActionResult[] | undefined, where: string, visit: Visit): void {
   for (const result of list ?? []) {
     for (const nested of nestedResults(result)) results(nested, where, visit);
-    put(result, 'into', 'flag', `${where} ${result.kind}: bound to`, visit);
-    switch (result.kind) {
-      case 'give':
-      case 'take':
-        put(result, 'item', 'item', `${where} ${result.kind}:`, visit);
-        break;
-      case 'take-worn':
-        put(result, 'slot', 'slot', `${where} take: worn`, visit);
-        break;
-      case 'roll':
-        put(result, 'table', 'droptable', `${where} roll:`, visit);
-        break;
-      case 'inflict': {
-        const site = result.lasts === undefined ? INFLICT_SITE : TIMED_INFLICT_SITE;
-        put(result, 'buff', 'item', `${where} ${site}`, visit);
-        put(result, 'lasts', 'stat', `${where} ${site}`, visit);
-        break;
-      }
-      case 'shake-off':
-        if (result.buff !== null) put(result, 'buff', 'item', `${where} shake off:`, visit);
-        break;
-      case 'contest':
-        for (const side of ['left', 'right'] as const) put(result, side, 'stat', `${where} vs:`, visit);
-        break;
-      case 'gate':
-        condition(result.condition, `${where} if:`, visit);
-        break;
-      case 'one-of':
-        for (const row of result.rows) {
-          put(row, 'weight', 'stat', `${where} ${WEIGHT_SITE}`, visit);
-          condition(row.requires, `${where} ${WEIGHT_SITE} if`, visit);
-        }
-        break;
-      case 'stands':
-        put(result, 'guise', 'guise', `${where} stands:`, visit);
-        put(result, 'lasts', 'stat', `${where} stands: … for:`, visit);
-        break;
-      case 'xp':
-        put(result, 'skill', 'skill', `${where} xp:`, visit);
-        if (isStatAmount(result.amount)) put(result.amount, 'id', 'stat', `${where} xp:`, visit);
-        break;
-      case 'relocate':
-      case 'discover':
-        putLocation(result, 'location', `${where} ${result.kind}:`, visit);
-        break;
-      case 'perform':
-        put(result, 'action', 'action', `${where} perform:`, visit);
-        break;
-      case 'pool': {
-        const site = `${where} ${amountFalls(result.delta) ? 'drain' : 'restore'}:`;
-        put(result, 'resource', 'resource', site, visit);
-        if (isStatAmount(result.delta)) put(result.delta, 'id', 'stat', site, visit);
-        break;
-      }
-      case 'fill':
-        put(result, 'resource', 'resource', `${where} restore:`, visit);
-        break;
-      case 'set':
-      case 'unset':
-      case 'add':
-        put(result, 'variable', 'flag', `${where} ${result.kind}:`, visit);
-        break;
-      case 'empty':
-        put(result, 'bundle', 'flag', `${where} give: ${EVERYTHING} in`, visit);
-        break;
-      case 'say':
-        prose(result as unknown as Loose, 'text', `${where} say:`, visit);
-        break;
-      case 'open-modal':
-      case 'stop':
-      case 'strip':
-      case 'chance':
-      case 'credit':
-        break;
-      default: {
-        const unreached: never = result;
-        void unreached;
+    put(result, 'into', 'flag', `${where} ${result.kind}: ${BOUND_SITE}`, visit);
+    for (const { walk, site, holders } of resultWalks(result)) {
+      const at = `${where} ${site}`;
+      for (const held of holders as Loose[]) {
+        if (walk.how === 'ref') put(held, walk.field, walk.names, at, visit);
+        else if (walk.how === 'location') putLocation(held, walk.field, at, visit);
+        else if (walk.how === 'prose') prose(held, walk.field, at, visit);
+        else condition(held[walk.field] as Condition | undefined, at, visit);
       }
     }
   }

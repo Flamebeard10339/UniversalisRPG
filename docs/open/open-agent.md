@@ -507,30 +507,23 @@ records the gap.
 *Closes when:* a comparison's right-hand side may name a stat, the four obstacles declare
 `npc-thieving-damage` and the guard is written once on `# action cross`.
 
-## A choice id is a string the engine spells in three places and parses back by slicing
+## What an id looks like is written out eleven times outside `grammar/values.ts`
 
-`src/runtime/session.ts` mints the ids the interface hands back — `fight:`, `talk:`, `shop:`,
-`craft:`, `travel:` — as template strings at six sites (`:298`, `:313`, `:316`, `:375`, `:381`,
-`:408`), reads them back in `choiceToDirective` (`:424-442`) with `.slice('talk:'.length)` and
-friends, and mints them a third time in `choiceIdFor` (`:795-811`). The round trip is
-load-bearing: `:880` builds an id, `beginAction` looks it up among what `computeChoices`
-minted, and hands it to `choiceToDirective`. Three spellings must agree or a `begin:` silently
-finds no choice.
+`REFERENCE` (`src/grammar/values.ts:95`) is the one home for the shape of a reference, and
+`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*` is spelt again, byte for byte, in
+`sections/dialogue.ts:52` (as its own `PATH`), `sections/entity.ts:107`, `sections/item.ts:47`,
+`sections/quest.ts:46`, `sections/save.ts:22`, `grammar/actionResult.ts:137`,
+`grammar/structure.ts:18`, `grammar/tagClause.ts:67` and `runtime/command.ts:1180,1197,1277`.
+Shape 3. Measured 2026-09-05 by sweeping `src/` for the literal.
 
-The right shape is three files away and already half-used: `useChoiceId` / `parseUseChoiceId`
-(`src/content/sections/test.ts:229-231`) is one print/parse pair, and `use` is the only one of
-the six not duplicated here — precisely because it goes through that pair. The `# test`
-directive grammar (`test.ts:114-131`) already declares `talk:`, `travel:`, `craft:`, `shop:`
-and `use:` with printers and parsers built on one shared `PATH`.
+Two of them are not obviously the same fact and that is why this is a line rather than a
+commit. `completion.ts:75-79` spells `[a-z0-9.-]*` — *an id half-typed*, which is a different
+question and should stay its own. And `grammar/structure.ts` importing `values.ts` may close a
+cycle within `grammar`, since `values.ts` reads `section.ts`; `npm run layer-check` is the
+thing to ask before assuming it may.
 
-A fourth copy rides along: `session.ts:429` hand-writes an id pattern as
-`/^fight:([a-z0-9.-]+):([a-z0-9.-]+)$/`, where `REFERENCE` (`src/grammar/values.ts:95`) is the
-one home for what an id looks like. The copy is looser — it accepts `9foo` and `..` — and is
-greedy on both sides of a literal `:`.
-
-*Closes when:* `sections/test.ts` exports a `choiceId` / `parseChoiceId` pair covering all five
-kinds, `session.ts` calls it at every mint and both reads, and no module outside
-`grammar/values.ts` spells what an id looks like.
+*Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
+it, and a decision is recorded about the partial-id spelling in `completion.ts`.
 
 ## Three listed screens are consolidated and then unpacked into twenty-one aliases
 
@@ -825,27 +818,6 @@ the herb order does not matter.
 
 *Closes when:* the swampy pair shares its approach and its hand-in, and a decision is recorded
 about whether the other four are meant to read whole.
-
-## An action result's facts live in three files
-
-Each kind of `<result>` is declared in `src/grammar/actionResult.ts:347-447` (`LEAVES` — its
-opener, forms, examples and parse), printed in the same file by a second switch
-(`printResultLine`, `:555-628`), and has its reference sites listed a third time in
-`src/content/refs.ts:147-230`. Adding a result kind next month means remembering three places.
-
-Both switches carry a `const unreached: never`, so a *missing case* is a compile error. What is
-unguarded is a case that forgets a **field** — a new result naming a `# droptable` whose entry
-in `refs.ts` omits its `put(...)` line. That reference then goes unvalidated and unpruned, in
-silence.
-
-The shape is the one `sections/<kind>.ts` already solves one level up: give `Leaf` optional
-`print` and `visit` members and move each case body onto its leaf, leaving the two switches as
-loops. It is the largest item in this file — roughly 250 lines relocated — and it crosses a
-layer boundary, since `refs.ts` is content and `actionResult.ts` is grammar, so the visit half
-may have to move down rather than across.
-
-*Closes when:* a result kind is declared in one place, and `printResultLine` and `refs.results`
-are loops over `LEAVES`.
 
 ## Small constants still spelled twice
 
