@@ -131,6 +131,15 @@ Every line names the thing that would close it, and `npm run handoff` reports on
 that names none: a reader who cannot tell an open question from a decision already
 taken invents work rather than doing it.
 
+Done means deleted at the scale of the file too: **a half whose last line closes is
+deleted rather than kept as a stub**, and the folder goes when its second file does.
+Git holds trees rather than directories, so a file that closes today and is written
+again next month costs nothing to bring back. An absent half is silence; a file
+standing there with no open line in it is what `npm run handoff` complains about.
+**Neither file carries a header** — the tool prints it, from `HEADER` in
+`scripts/handoff.ts`, so thirteen hand-typed ones cannot become thirteen accounts of
+one format.
+
 **A line about behaviour may name a proof instead of describing one.** Two more
 files may stand in the folder, and no others: `open-tests.dsl` holds a route with
 nowhere yet to stand, and `open-tests.test.ts` holds everything a route cannot say —
@@ -184,7 +193,7 @@ every vitest project but `open`, which is the proofs standing under an open line
 `docs/<feature>/` — red on purpose, and described under *Work that outlives a
 session*.
 
-**The world the suite stands in is `src/content/fixture/`.** Three modules under two
+**The world the suite stands in is `src/content/fixture/`.** Four modules under two
 packs, small and complete: a rule with nothing there to fire on is a rule the suite
 cannot reach, so a test that needs a shape the fixture has not got adds it rather than
 reaching into `content/`. `FIXTURE_WORLD` in `worldFixture.ts` is still the cheaper

@@ -1,12 +1,3 @@
-# What is still wrong that a lane can take
-
-The town's own ladder: one to three activities per ten levels per skill, standing
-without a quest in the world. **A line is deleted the day it closes.**
-
-The sheet is `npm run simulate-activity -- tiers.<activity>-tier-<level> --off quests`.
-
----
-
 ## Eight commits of town dialogue sit unmerged on a branch
 
 `claude/game-text-rewrite-007476` holds a rewrite pass over how Tulsa's people talk — Miki

@@ -1,21 +1,39 @@
-# Map — open, for a lane
+## An author cannot read a location's outgoing roads off its own DSL
 
-## The map cannot tell a one-way road from a two-way one
+`adjacent:` answers from both ends: unless the far end writes a road back of its own, the
+engine lays that road down there too, and the oracle names this as how a module reaches a
+place another module declared. So the roads out of a location are the ones its own body
+writes **plus** whatever any other module wrote towards it, and no reading of the file shows
+the second set.
 
-`Road.mutual` is now simply true: every road the load path publishes is walked both
-ways, because `closeAdjacency` closes each authored edge back before anything sees it.
-It used to be derived by asking whether the far end listed this one, which is a
-question about **discovery** and not about direction — a found place publishes only
-the roads to places the player has found, so on an author's map most roads read as
-one-way and drew a dashed line with an arrow on it that nobody had written. The
-derivation is gone; the dashed line and the arrowhead in `MapPane.tsx`, and the `->`
-in `scripts/lib/mapText.ts`, are unreachable again. The authored direction still never
-leaves the registry, so `/unlink` also stages its removal at whichever end was named
-rather than at the end that wrote the road.
-*Closes when:* `publishPlaces` says which end of each road authored it, both renderers
-draw a one-way road from that, and `joining` takes a road away at the end that wrote
-it. Waits on the ruling in `open-human.md` about what one-way should mean on the
-shipped map.
+That is also what made `Road.mutual` lie. It was derived by asking whether the far end listed
+this one, which is a question about **discovery** rather than direction — a found place
+publishes only the roads to places the player has found — so on an author's map most roads
+read as one-way and drew a dashed line with an arrow that nobody had written. The derivation
+is gone and `Road.mutual` is now simply true, which is honest and says nothing.
+
+Ruled 2026-09-05: **an author reading a location's DSL must know every outgoing connection
+from it.** The ideal is not derived. That makes each end declaring its own outgoing roads the
+shape to build towards, and one-way falls out of it rather than being inferred: a road is
+one-way when only one end writes it. It is also what gives `/unlink` an end to remove a road
+at, since the authored direction never leaves the registry today.
+
+*Closes when:* a location's outgoing roads are what its own body writes, `publishPlaces` says
+which end authored each road, both renderers draw a one-way road from that, and `joining`
+takes a road away at the end that wrote it. The dashed line and arrowhead in `MapPane.tsx`
+and the `->` in `scripts/lib/mapText.ts` are unreachable until it does.
+
+## Up and down fall in with everything the grid has no heading for
+
+The middle square of the 3×3 names where you are standing, and a floor up or down falls back
+to an ordinary cell above the grid with everything else no heading points at. A guildhouse
+with a cellar and an upstairs is the common case rather than the odd one.
+
+Ruled 2026-09-05: **up and down take the middle square.** The middle stops naming where you
+stand and carries the floors instead.
+
+*Closes when:* the middle square of the grid draws the floor above and the floor below, and
+where the player is standing is said by something other than a cell the floors now want.
 
 ## A region's shape waits for the drop when one of its rooms is dragged
 

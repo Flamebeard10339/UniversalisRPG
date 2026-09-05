@@ -1,14 +1,3 @@
-# The harness that authors the world — what a lane can take
-
-`npm run authorbot` hands one brief to an agent over a copy of `content/`, refuses it the
-engine, and counts every reach. `--floors` gives it `floors/` instead and tells it the opposite
-thing about balance. `.authorbot/runs.jsonl` records what every run was asked for and what it
-cost. This folder is that machinery's, not any one world's.
-
-**A line is deleted the day it closes.**
-
----
-
 ## Whether parallel runs that share their best would beat runs seeded one after another
 
 Raised by the author 2026-09-04: three speedrun agents at once, sharing their best route every

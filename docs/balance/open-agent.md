@@ -1,11 +1,3 @@
-# What is still wrong that a lane can take
-
-The instrument is built and the curve has landed. **A line is deleted the day it
-closes.** The work order it all serves is `.planning/balance-plan-2026-08-31.md`;
-what is below is what that plan does not already say to do next.
-
----
-
 ## Health outruns attack about two to one, and the curve by nine
 
 Read off `combat-floor` the day it landed. A fighter climbing to `attack 30` arrives at
@@ -249,3 +241,74 @@ marks are cut against a ladder no floor route stands on.
 
 *Closes when: a floor route buys or wins the band's gear, so the marks of levels eleven to
 thirty are walked by a thief who has what they were cut for.*
+
+## A route asserts balance numbers, so a balance pass breaks paths that still walk
+
+41 of the 66 numeric `assert:` lines in the corpus sit on roots a `# save` sheet is already
+blind to — inventory 28, xp 10, resource 3. `expect:` cannot pin a balance-derived field
+however it was recorded, because `WALKED_FIELDS` in `src/runtime/save.ts` filters the state a
+route ends on before it is compared; `assert:` has no such filter.
+
+Ruled 2026-09-05: **a route proves that a sequence of events yields a result, and reports its
+cost and reward — how long it took, what it paid. It does not assert either.** An
+`assert: inventory.coin = 0` after a purchase is a unit test confirming that shops remove
+coin from a player's inventory, and it belongs in the fixture world at most.
+
+The concrete cost, paid on a recent pass: changing balance figures broke several routes that
+were still perfectly walkable, because they tried and failed to buy from a shop that was out
+of stock. The workaround in the corpus today is a hand-rolled loop with a wait condition.
+**That wants a shorthand — buy until we have enough — which a speedrun prefers**, on the
+understanding that if restock balance moves the run spends the difference waiting rather
+than failing.
+
+*Closes when:* a route reports its cost and reward instead of asserting them, the 41
+balance-asserting lines are gone or moved to the fixture, and a shop that is out of stock
+costs a run time rather than a red.
+
+## Turning a pack off mid-game eats a save with no way back
+
+Reopening the world prunes a save of everything it can no longer name, so a player mid-quest
+who turns quests off and back on has the quest gone rather than paused. That is the honest
+behaviour of the machinery and it is not what a player should meet.
+
+Ruled 2026-09-05: **this is an autosave feature.**
+
+1. A player may enable or disable any number of mods, doing as much or as little damage to
+   their save as they like.
+2. The next action they take in the world triggers autosave, which sees a modlist different
+   from the one the save was written under and offers them the choice: overwrite this save,
+   write a new one under a name, or revert to the previous modlist.
+
+A confused player reverts and loses no progress. A player who knows what they are doing
+presses one button and keeps playing without interruption.
+
+*Closes when:* toggling a pack does nothing on its own, the next action raises that choice,
+and reverting restores the save exactly as it stood.
+
+## The passives are flavour ids where the jewels are systematic
+
+The jewels were renamed to `<rarity>-<role>-<skill>` with the flavour kept in `title:`, so a
+reader can reason about them without holding seven titles in their head — `content/thieving.dsl`
+carries six of them, `common-general-thieving` titled Light Touch through
+`unique-luck-thieving` titled Fence's Eye.
+
+The passives have the same problem and are what one actually reasons about when pricing a
+jewel per point. `flat-thieving-small` and `increased-thieving-small` are already systematic;
+`cutpurse`, `patience`, `casing`, `sleight`, `iron-nerve` and `hard-knuckles` are pure
+flavour.
+
+Ruled 2026-09-05: **they are renamed too, in one pass across every skill.** Doing thieving's
+alone would leave two conventions standing in one world, which is the thing the jewel rename
+was for.
+
+*Closes when:* no passive id in the corpus is flavour, every one carries its flavour in
+`title:`, and `npm run oracle -- --at content` is clean.
+
+## The tier matrix should report a jewel that wins nothing without calling it a finding
+
+Ruled 2026-09-05: **a jewel with no winning build at any tier is accepted, not a defect.**
+`crossroads` is a connector whose whole function is reaching other jewels, and it may never
+win a tier by design.
+
+*Closes when:* the matrix says which jewels win nothing as a fact about the world rather than
+as something to go and fix.

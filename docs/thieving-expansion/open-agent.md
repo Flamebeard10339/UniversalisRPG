@@ -1,9 +1,3 @@
-# What is still wrong that a lane can take
-
-**A line is deleted the day it closes.**
-
----
-
 ## A second body at a nested action id eats the first, and one of thieving's beats is already gone
 
 `content/thieving.dsl` and `content/attention-to-detail.dsl` both write a plain, non-`+` body
@@ -72,3 +66,52 @@ verbatim — two long `say:` bodies, `roll: the-lookouts-share`, `goto kept-watc
 scene or re-gate the roll and the second-thoughts path plays the old one.
 
 *Closes when:* the accept and the second-thoughts path reach one scene.
+
+## Nothing fires on a player entering a room, so the warden jails whoever speaks to him
+
+The brief sends anyone the warden finds in a room with him back to the cells. There is no
+trigger for entering a place, so he does it to anybody who speaks to him, and the way past
+him in the cells is to walk past. The rest of the brief stands as asked: he is lured down by
+a racket or out to the mess by doughnuts, is gone five minutes, and the office door and the
+lockbox both check whether he is back before they open.
+
+Ruled 2026-09-05: **build `on enter:`** — a result a `# location` takes, fired when the
+player arrives.
+
+*Closes when:* a location may carry `on enter:`, the oracle prints it, and the warden jails
+on sight rather than on speech.
+
+## Luck is fed by three jewels' worth of passives and read by one line in the world
+
+`# stat luck` is fed by `luck-1`, `luck-2` and `unique-luck-thieving`, and the only line in
+the whole corpus that reads it is a `luck vs 60:` on the tutorial dresser at
+`content/first-steps.dsl:601`. `rewards scaled by: <stat>` exists on the action page — it
+reaches every amount an action hands over, wherever that amount was written, so no list has
+to know the stat exists — and the only action carrying one is fishing's `haul`.
+
+Ruled 2026-09-05: **`rewards scaled by: luck` goes on `# action steal`**, and every pocket
+and chest follows it.
+
+*Closes when:* the line is written in `content/thieving.dsl` and the routes through the
+pockets and chests still walk.
+
+## The rogue's outfit boosts two stats where the brief asked for a worn cluster effect
+
+The brief says each piece boosts *thieving related stats of allocated passives by 15%*, which
+is a cluster effect worn as clothing. What ships is `+15% thieving-ability` on the hood and
+chestwrap and `+15% thieving-rate` on the legwraps and sandals, at level 30.
+
+Ruled 2026-09-05: **the passive reading is the one that was meant.** The mechanism exists —
+`cluster-effect:` is what the orbs carry, and `orb-of-vitality` says it plainly: *an orb is
+spent on a cluster, and scales what that cluster already gives*. It cannot be worn. The
+oracle refuses a piece that tries:
+
+    cluster-effect: makes probe-hood an orb, which is exclusive with
+    the item-level: that makes it a base
+
+and the four outfit pieces must be bases, since `item-level:` is what lets them take a jewel
+at all. So this is a language question rather than a content edit: either the exclusion is
+lifted for a worn base, or gear gets its own way to scale the cluster socketed into it.
+
+*Closes when:* a worn base can scale what its own jewel gives, and the four pieces say the
+15% the brief asked for rather than two stats standing in for it.

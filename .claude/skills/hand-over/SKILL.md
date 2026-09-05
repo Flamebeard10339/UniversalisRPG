@@ -98,6 +98,22 @@ reasoning, and the commit that closed a line is where the reasoning belongs. A
 folder where an open heading and a finished one look alike has stopped answering the
 one question it exists for.
 
+**This holds at the scale of the file, and of the folder.** A half whose last line
+closes is deleted, not kept as a stub saying nothing waits; and when the second file
+goes the folder goes with it. Git stores trees rather than directories, so a file
+that closes today and is written again next month costs nothing to bring back, and
+`git log --follow` walks straight through the gap — fading in and out across a
+feature's life is the shape this wants. An absent half is therefore silence in
+`npm run handoff`. **A file standing there with no open line in it is the
+complaint.**
+
+## No file carries a header
+
+`npm run handoff` prints it, once, from `HEADER` in `scripts/handoff.ts`. A file
+holds its open lines and nothing above the first `##`, and the tool reports anything
+that does. Thirteen hand-typed headers were thirteen accounts of one format, drifting
+apart — which is the failure mode `CLAUDE.md` opens with.
+
 ## A line that changes hands crosses; it is never marked in place
 
 The two files are one queue split by who is blocked, so a line moves between them in
@@ -121,9 +137,10 @@ has no corpus line that could carry one.
 
     npm run handoff
 
-It reports a third file, a missing half of the queue, what is struck through, **an
-item that names nothing that would close it**, and — the part no reader can see —
-**how many commits have landed since the docs were last written**. Then:
+It prints the header, then reports a third file, a half kept as a stub after its
+last line closed, a header written into a file, what is struck through, **an item
+that names nothing that would close it**, and — the part no reader can see — **how
+many commits have landed since the docs were last written**. Then:
 
     git log --oneline <last doc commit>..HEAD
 
@@ -175,8 +192,9 @@ session that did not update them.
 
 ## Starting a folder that does not exist yet
 
-Write both. An empty one says so in a line; it does not get a placeholder, and it is
-not left absent. Nothing else goes in the folder — not a plan, not a phase log, not
+Write the half that has lines in it. The other is not written at all — an empty file
+is deleted rather than kept, so writing one to say nothing waits is writing the thing
+the next session has to delete. Nothing else goes in the folder — not a plan, not a phase log, not
 a record of what the branch is for. The branch name and the open lines carry that,
 and anything more becomes the file this format deleted.
 

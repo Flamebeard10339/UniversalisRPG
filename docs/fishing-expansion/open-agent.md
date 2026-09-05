@@ -1,12 +1,3 @@
-# What is still wrong that a lane can take
-
-The push covered both halves of the fishing/cooking split. The design doc is
-`.planning/fishing-expansion.md` and its last section holds the balance marks and how they were
-derived; `.planning/cooking-pass.md` is cooking's. Fishing walks twelve routes, the floor four,
-cooking three. **A line is deleted the day it closes.**
-
----
-
 ## Dusk is two facts in two places, and a third water would make it three
 
 `fishing.dsl` writes `wait for dusk` twice, with identical `hidden if:`, `time: 20` and

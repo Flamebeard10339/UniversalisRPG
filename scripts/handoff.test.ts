@@ -2,13 +2,13 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { besideThem, citedIn, complaintsIn, declaredIn, featureFolders, folderLines, handoffLines, proofComplaints } from './handoff';
 
-const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', open: ['open-agent.md', 'open-human.md'], proofs: [], missing: [], strays: [], items: 4, complaints: [], passing: [], ran: false, since: 0, lastWrote: 'abc1234 something', ...over });
+const folder = (over: Partial<Parameters<typeof folderLines>[0]> = {}) => folderLines({ name: 'a-feature', open: ['open-agent.md', 'open-human.md'], proofs: [], strays: [], items: 4, complaints: [], passing: [], ran: false, since: 0, lastWrote: 'abc1234 something', ...over });
 
 const item = (...body: string[]) => ['## The region wall', '', ...body].join('\n');
 
 describe('what a folder has to say before a session hands it over', () => {
   it('names a line that was struck through instead of deleted', () => {
-    expect(complaintsIn('open.md', ['# What is still wrong', '', '- ~~the road is missing~~ — closed', '', item('*Closes when:* the road is written.')].join('\n')).map((each) => each.says)).toEqual(['line 3 is struck through, and done means deleted']);
+    expect(complaintsIn('open.md', item('- ~~the road is missing~~ — closed', '', '*Closes when:* the road is written.')).map((each) => each.says)).toEqual(['line 3 is struck through, and done means deleted']);
   });
 
   it('names a heading that calls itself finished, whatever word it uses', () => {
@@ -29,8 +29,20 @@ describe('what a folder has to say before a session hands it over', () => {
     expect(complaintsIn('open.md', item('**Closes when: somebody decides.**')).map((each) => each.says.slice(0, 4))).toEqual(['line']);
   });
 
-  it('says a folder missing half the queue is missing it, rather than letting a reader assume', () => {
-    expect(folder({ open: ['open-agent.md'], missing: ['open-human.md'] }).join('\n')).toContain('no open-human.md');
+  it('says nothing at all about the half that is not there, since a queue that empties is deleted', () => {
+    expect(folder({ open: ['open-agent.md'] }).join('\n')).not.toContain('open-human.md');
+  });
+
+  it('names a file kept as a stub after its last line closed', () => {
+    expect(complaintsIn('open-human.md', ['Nothing waits on the author.', '', 'Every line here closed.'].join('\n')).map((each) => each.says)).toEqual([expect.stringContaining('holds no open line')]);
+  });
+
+  it('names a header written into a file, since the one there is is the one this prints', () => {
+    expect(complaintsIn('open.md', ['# What is still wrong that waits on the author', '', '**A line is deleted the day it closes.**', '', item('*Closes when:* the road is written.')].join('\n')).map((each) => each.says)).toEqual([expect.stringContaining('line 1 stands above the first open line')]);
+  });
+
+  it('says nothing about a file that opens on its first line', () => {
+    expect(complaintsIn('open.md', item('*Closes when:* the road is written.'))).toEqual([]);
   });
 
   it('says a third file beside the open ones does not belong to this format', () => {
