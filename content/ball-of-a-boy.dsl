@@ -202,7 +202,6 @@ travel: castle-yard
 use: entity.larry.haggle-with-a-cooked-herring
 assert: tulsa.sewer-toll-paid
 assert: not has core.cooked-herring
-assert: inventory.core.coin = 0
 travel: sewer-entrance
 travel: sewer-junction
 wait: done

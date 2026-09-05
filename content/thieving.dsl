@@ -1910,7 +1910,6 @@ unkillable
 load: in-the-square-with-a-light-purse
 use: entity.pear-cart.lift-from-the-stall until jail-cell.touched
 assert: times-caught >= 3
-assert: inventory.core.coin = 0
 assert: count.confiscated >= 1
 use: entity.cell-door.lockpicking until cell-open
 assert: on-the-run

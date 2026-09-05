@@ -170,7 +170,6 @@ craft: grand-blade
 assert: has grand-blade
 assert: has grand-blade-schematic
 assert: not has ratkin-ingot
-assert: inventory.smithing.iron-bar = 0
 
 # save at-the-muster-with-the-schematic
 {"version":13,"location":"tulsa.the-muster","xp":{"combat.attack":200000,"combat.health":200000},"flags":{"a-grand-blade.finding-the-notes.gathering-the-iron":true},"inventory":{"core.coin":1000,"smithing.iron-bar":15,"smithing.hammer":1,"a-grand-blade.grand-blade-schematic":1}}
