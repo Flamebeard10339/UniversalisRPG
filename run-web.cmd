@@ -10,6 +10,11 @@ if not exist "node_modules\vite\bin\vite.js" (
   if errorlevel 1 goto :error
 )
 
+rem 5174 rather than 5173 on purpose, and not a stale copy of it: 5173 is Vite's
+rem default and is what an agent's dev server and `dev:android` take, so a human
+rem starting this script would otherwise be told the port is already in use, or
+rem would kill the run they were about to look at.
+rem
 rem A previous run that didn't get closed cleanly (e.g. the terminal
 rem window was closed instead of Ctrl+C) can leave an orphaned server still
 rem bound to this port. Since anything listening on 5174 right now is

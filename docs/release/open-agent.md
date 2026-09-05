@@ -1,30 +1,15 @@
-## The app's name, its id and its version are each spelled in several files and derived from none
+## The dev server's port is written three times and defaulted a fourth
 
-Nothing composes what the built app calls itself, so every one of these is a hand-kept copy and
-the build will not notice when they part.
+`.claude/launch.json:8-9` pins 5173 twice, `package.json`'s `dev:android` waits on
+`http://localhost:5173`, and `capacitor.config.ts:11` points the emulator at
+`http://10.0.2.2:5173` — none of which chose the number. `npm run dev` names no port at all,
+so what all three are copies of is Vite's own default, and moving off it breaks the two that
+are not `launch.json`, silently and only under `dev:android`.
 
-- **Android bundle id** `org.universalis.rpg` — five places across `android/` and the Capacitor
-  config. `npx cap sync` does not rewrite them.
-- **Display name** — seven spellings, including `index.html`'s `<title>` and three in
-  `run-web.cmd`.
-- **Version** — `public/changelog.txt` states one, `android/app/build.gradle` states one, and
-  `package.json` is the file that owns it.
-- **Theme colour** — `index.html:7` sets `<meta name="theme-color" content="#111827">`, which is
-  `--color-surface` in `src/index.css:8`, spelled again as a literal. Worth noting the two
-  already read as a disagreement about intent: the browser chrome is painted *surface* while
-  `body` is painted `--color-background` (`src/index.css:26`), so retuning the palette splits
-  the chrome from the page.
-- **Dev port** — `.claude/launch.json` and `package.json`'s `dev:android` both say 5173, which
-  is also Vite's default; `run-web.cmd` deliberately uses 5174 so a human's server does not
-  fight an agent's. That last one is a real second fact and should stay — but it should say so.
+`run-web.cmd`'s 5174 is not one of these: it is a second, deliberate fact and now says so
+where a reader will find it.
 
-Shape 3 throughout. The awkward part is that most of these live in files nothing generates —
-a Gradle file, a manifest, a `.cmd` — so "derive it" means a build step that writes them from
-`package.json`, which is a decision about the build rather than a tidy-up.
-
-The theme colour is the one that can be derived cheaply and alone: a Vite `transformIndexHtml`
-hook substituting the token read out of `src/index.css`, about eight lines.
-
-*Closes when:* the name, the id and the version each have one home that the others are written
-from at build time, or each copy is annotated with what it is a copy of — and `run-web.cmd`'s
-port says why it differs.
+*Closes when:* one file states the port the dev server listens on and the other two are read
+from it — `vite.config.ts`'s `server.port` is the candidate, since it is what would stop the
+number being a default nobody wrote — or the three are each annotated as copies of Vite's
+default and of nothing in this repository.

@@ -3,6 +3,8 @@ import { availableParallelism } from 'node:os';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+import { fillIndexHtml, stylesheet } from './scripts/lib/indexHtml';
+
 // Which build a page is. A playtest run recorded against a tree nobody can name is a list of
 // findings nobody can check, so the commit rides into the bundle and out again on the run's own
 // first line. A checkout without git says so rather than guessing.
@@ -32,7 +34,11 @@ export default defineConfig({
   // inside the Capacitor WebView. An absolute /assets/... 404s under both.
   base: './',
   define: { __BUILT_FROM__: JSON.stringify(builtFrom()) },
-  plugins: [react()],
+  // The browser chrome is painted from the stylesheet's own token rather than
+  // from a hex literal in index.html, which was a hand-kept copy of it. The
+  // fill throws if either end has gone, so a retuned palette cannot leave the
+  // chrome behind quietly.
+  plugins: [react(), { name: 'chrome-from-stylesheet', transformIndexHtml: (html: string) => fillIndexHtml(html, stylesheet()) }],
   server: {
     headers: {
       'Cache-Control': 'no-store',
