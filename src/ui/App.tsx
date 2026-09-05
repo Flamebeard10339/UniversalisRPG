@@ -25,7 +25,7 @@ import { noticesBetween } from './notice';
 import { declaredFor, type Declared } from './modalManner';
 import { ModalSheet } from './ModalSheet';
 import type { LabelId } from './labels';
-import { drawnPanes, LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
+import { drawnPanes, LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Subpage, type SubpageId, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaytestBar } from './PlaytestBar';
 import { ReplayBar } from './ReplayBar';
@@ -230,12 +230,24 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
   useTestSurface('replay', { replay: snapshot.replay, controls: driver.replay });
   const wide = useWide();
 
-  const pane = (layer: Layer, subpage: Subpage): JSX.Element | null => {
-    if (layer.id === 'home') {
-      if (subpage.id === 'home')
-        return <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onSend={driver.send} />;
-      if (subpage.id === 'edit') return <EditPane held={heldForEditing()} words={words} />;
-      return subpage.id === 'settings' ? (
+  const pane = (subpage: Subpage): JSX.Element => {
+    const panes: Record<SubpageId, () => JSX.Element> = {
+      map: () => (
+        <MapPane
+          view={view}
+          arrivals={arrivals}
+          generation={generation}
+          words={words}
+          dev={dev}
+          where={editing.map}
+          onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
+          onSend={driver.send}
+          onNote={driver.note}
+        />
+      ),
+      edit: () => <EditPane held={heldForEditing()} words={words} />,
+      home: () => <Home snapshot={snapshot} words={words} commandLine={editing.commandLine} onChoose={driver.choose} onSend={driver.send} />,
+      settings: () => (
         <SettingsPane
           dev={dev}
           devBuild={devBuild}
@@ -255,28 +267,14 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           mods={snapshot.mods}
           onTurnMods={turnMods}
         />
-      ) : null;
-    }
-    if (layer.id === 'map') {
-      return (
-        <MapPane
-          view={view}
-          arrivals={arrivals}
-          generation={generation}
-          words={words}
-          dev={dev}
-          where={editing.map}
-          onWhere={(map: MapWhere) => setEditing({ ...editing, map })}
-          onSend={driver.send}
-          onNote={driver.note}
-        />
-      );
-    }
-    if (subpage.id === 'stats') return <StatsPane view={view} localizer={localizer} onOpen={driver.readStat} />;
-    if (subpage.id === 'skills') return <SkillsPane view={view} crossed={crossed} onOpen={driver.readSkill} />;
-    if (subpage.id === 'equipment') return <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />;
-    if (subpage.id === 'journal') return <JournalPane view={view} words={words} onOpen={driver.readQuest} />;
-    return <Ledger entries={carried(view.carried, view.planes, localizer)} layout="grid" onOpen={driver.open} onSwap={driver.swap} />;
+      ),
+      stats: () => <StatsPane view={view} localizer={localizer} onOpen={driver.readStat} />,
+      skills: () => <SkillsPane view={view} crossed={crossed} onOpen={driver.readSkill} />,
+      equipment: () => <Ledger entries={worn(view.equipment, view.carried, view.planes, localizer, words('empty'))} layout="doll" onOpen={driver.open} />,
+      inventory: () => <Ledger entries={carried(view.carried, view.planes, localizer)} layout="grid" onOpen={driver.open} onSwap={driver.swap} />,
+      journal: () => <JournalPane view={view} words={words} onOpen={driver.readQuest} />,
+    };
+    return panes[subpage.id]();
   };
 
   const paging = (at: number): { shown: readonly Subpage[]; columns: number; page: number } => {
@@ -295,7 +293,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         index={page}
         columns={columns}
         onIndex={(index) => go((held) => toSubpage(held, at, shown[index].id))}
-        panes={shown.map((subpage, index) => (drawn(at, index) ? pane(layer, subpage) : null))}
+        panes={shown.map((subpage, index) => (drawn(at, index) ? pane(subpage) : null))}
       />
     );
   });

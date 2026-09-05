@@ -525,31 +525,6 @@ thing to ask before assuming it may.
 *Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
 it, and a decision is recorded about the partial-id spelling in `completion.ts`.
 
-## `App.tsx`'s pane falls through to the inventory, so a derived test proves nothing about a new page
-
-`pane()` (`src/ui/App.tsx:233-280`) dispatches over subpage ids by if-chain and ends, on the
-character layer, in an unconditional fallthrough to the inventory `Ledger` (`:279`). The home
-layer returns `null` for an id it does not know; the character layer returns a screen.
-
-`src/ui/render.test.tsx:89` and `:305` do the right thing — they derive their subjects from
-`everyPage(dev)` in `nav.ts:94`. But because a subpage `pane()` has never heard of still draws
-a perfectly good inventory, `everyPage` visits it, the assertions pass, and the derived proof
-goes green on a page nobody wrote. The fallthrough turns a derived test into a vacuous one,
-which is worse than a listed one.
-
-The declaration is right there: `LAYERS` (`nav.ts:18-40`) states the subpages. A
-`Record<SubpageId, …>` keyed off it makes TypeScript refuse a subpage with no renderer.
-
-**The break that discriminates is an addition, which `npm run mutate` cannot express.** Add
-`{ id: 'settings' }` to the character layer in `nav.ts` and run `render.test.tsx` and
-`pages.test.ts`: both should be green today, and that is the finding. Do not test it by
-deleting the `journal` branch — `render.test.tsx:305` reads page text and would catch that,
-which proves nothing about the gap. Note `pages.test.ts:13` slices `App.tsx` by the literal
-text `'const pane = ('` and `'const bodies = '`, so keep both markers.
-
-*Closes when:* `pane()` is a record keyed by the subpage ids `nav.ts` declares, and adding a
-subpage without a renderer does not compile.
-
 ## An item's colour is read off what the player can do with it today, not off what it is
 
 `lookOf` (`src/ui/itemLook.ts:12-17`) decides whether a carried thing is a jewel, gear, a
