@@ -2,7 +2,7 @@ import type { Registry } from '../content/registry';
 import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, ENGAGEMENT_SECONDS, INVENTORY_SLOTS, MAP_GRID, MIN_DAMAGE, TRAVEL_SECONDS, type TuningId } from '../content/tuningVariables';
 import { secondsToMs, toMilliUnits } from './units';
 
-const knob = (registry: Registry, id: TuningId): number | undefined => knob(registry, id);
+const knob = (registry: Registry, id: TuningId): number | undefined => registry.variables.get(id)?.value;
 
 const DEFAULT_TRAVEL_SECONDS = 3;
 
