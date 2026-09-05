@@ -1,4 +1,4 @@
-## Dusk is two facts in two places, and a third water would make it three
+## Dusk is two facts in two places, and the grammar has no way to make it one
 
 `fishing.dsl` writes `wait for dusk` twice, with identical `hidden if:`, `time: 20` and
 `inflict: the-rise for 3m`. How long dusk takes and how long the rise lasts are one fact each,
@@ -6,9 +6,21 @@ written once per water.
 
 Found beside a worse one now fixed: ten waters each wrote out which rod and bait a cast needs,
 and the tenth had drifted so a player with an upgraded rod could not fish the blowfish hole at
-all. That gate now lives on `# action cast`. This is the same shape, smaller.
+all. That gate now lives on `# action cast`. This is the same shape, smaller — **and it cannot
+be fixed the same way.** Both dusk actions hang off a `# location`, and a location has neither
+of the two doors an entity has onto a declared `# action`: no `uses:`, and no `extends:` on an
+inline action block. The hives in `tulsa.dsl` share `search-the-comb` because they are entities.
 
-*Closes when:* one action holds the wait and the rise, and each water says only where it is.
+Two answers were measured on 2026-09-05 and both are wrong. Writing `# action wait-for-dusk` and
+leaving each water an `after: say:` **loads, round-trips clean and walks all 105 routes green
+while dusk silently does nothing** — the location declares its own empty action of that name
+rather than laying over the declared one; a probe put the run at under a second with the rise
+never inflicted. And hanging the action off an entity in each water buries it behind an examine,
+which is a worse screen than the duplication.
+
+*Closes when:* a `# location` can reach a declared `# action` — either a `uses:` line of its own,
+or `extends:` on an inline action block — and dusk's twenty seconds and three minutes live on one
+`# action wait-for-dusk` that each water names, saying only its own words.
 
 ## `take:` of an item held several times over should put up a choose-item modal
 
