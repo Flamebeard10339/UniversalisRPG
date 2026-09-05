@@ -163,14 +163,17 @@ const ACTION_FIELDS: readonly (Filled & {
   parser: Parser<unknown>;
   family: string;
   note?: string;
+  appends?: true;
+  block?: true;
 })[] = [
-  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when', note: WHILE_IT_RUNS },
+  { written: 'requires', label: /(?:requires|require):[ \t]*/, name: 'requires', parser: optionalCondition, family: 'offered when', note: WHILE_IT_RUNS, appends: true },
   {
     written: 'hidden if',
     label: /hidden if:[ \t]*/,
     name: 'hiddenIf',
     parser: optionalCondition,
     family: 'offered when',
+    appends: true,
     note: `the action is not offered at all while this holds, rather than offered and refused. ${WHILE_IT_RUNS}`,
   },
   {
@@ -179,6 +182,8 @@ const ACTION_FIELDS: readonly (Filled & {
     name: 'onSuccess',
     parser: results,
     family: 'and afterwards',
+    appends: true,
+    block: true,
     note: 'runs after the body of a cycle that completed, and the body runs with it — the two together are what completing means',
   },
   {
@@ -187,6 +192,8 @@ const ACTION_FIELDS: readonly (Filled & {
     name: 'onRefused',
     parser: results,
     family: 'and afterwards',
+    appends: true,
+    block: true,
     note: 'runs instead of the body where the action is turned away before it begins — a `requires:` that does not hold, a thing that is not here, an input it has not got — and writing it is what says those words in the world rather than the engine saying them plainly. A cast that missed, a lock that did not open, a check inside the body falling the wrong way: none of those is this, and `on attempts exhausted:` is the one that is',
   },
   {
@@ -195,6 +202,8 @@ const ACTION_FIELDS: readonly (Filled & {
     name: 'onAttemptsExhausted',
     parser: results,
     family: 'and afterwards',
+    appends: true,
+    block: true,
     note: 'runs where a cycle spends its `attempts:` without completing, and at no other ending: an action called off, or one ended by a gate of its own coming to hold, reaches none of these three',
   },
   { written: 'time', label: /time:[ \t]*/, name: 'time', parser: seconds, family: 'how long it takes' },
@@ -203,7 +212,7 @@ const ACTION_FIELDS: readonly (Filled & {
   { written: 'damage', label: /damage:[ \t]*/, name: 'damage', parser: contest, family: 'what it is contested on' },
   { written: 'depletes', label: /depletes:[ \t]*/, name: 'depletes', parser: depleted, family: 'what it is contested on' },
   { written: 'attempts', label: /attempts:[ \t]*/, name: 'attempts', parser: positiveCount, family: 'how long it takes', note: ATTEMPTS_BUDGET },
-  { written: 'stops on', label: /stops on:[ \t]*/, name: 'stopsOn', parser: stoppers, family: 'how long it takes' },
+  { written: 'stops on', label: /stops on:[ \t]*/, name: 'stopsOn', parser: stoppers, family: 'how long it takes', appends: true },
   {
     written: 'rewards scaled by',
     label: /rewards scaled by:[ \t]*/,
@@ -254,7 +263,7 @@ function parseActionLine(line: RawLine, action: Omit<Action, 'label'>, label: st
   requireEnd(cursor, 'an action field');
 }
 
-const APPENDABLE: ReadonlySet<string> = new Set(['requires', 'hidden if', 'on success', 'on refused', 'on attempts exhausted', 'stops on']);
+const APPENDABLE: ReadonlySet<string> = new Set(ACTION_FIELDS.filter((field) => field.appends).map((field) => field.written));
 
 function parseActionField(line: RawLine, cursor: Cursor, action: Omit<Action, 'label'>, label: string): void {
   const held = action as Record<string, unknown>;
@@ -432,52 +441,43 @@ function printResultBlock(lines: string[], label: string, values: readonly Actio
   lines.push(`${label}:`, ...indentLines(values.flatMap(resultLines), childSpaces));
 }
 
+const KEYWORDS_AFTER = 'hiddenIf';
+
+const heldBy = (action: Action, name: keyof Omit<Action, 'label' | 'results'>): unknown => action[name];
+
+const filled = (held: unknown): boolean => held !== undefined && held !== null && !(Array.isArray(held) && held.length === 0);
+
+const keywordLines = (action: Action): string[] => {
+  const lines: string[] = [];
+  if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
+  const tags = withoutKeywords(action.tags ?? [], TAGGED_ACTION_KINDS);
+  if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);
+  return lines;
+};
+
 export function actionLines(action: Action): string[] {
-  const modifiers =
-    action.requires ||
-    action.hiddenIf ||
-    action.tags?.length ||
-    action.onSuccess?.length ||
-    action.onRefused?.length ||
-    action.onAttemptsExhausted?.length ||
-    (action.kind !== undefined && action.kind !== 'duration') ||
-    action.time !== undefined ||
-    action.rate !== undefined ||
-    action.accuracy ||
-    action.damage ||
-    action.depletes ||
-    action.attempts !== undefined ||
-    action.stopsOn?.length ||
-    action.rewardScale !== undefined;
+  const written = ACTION_FIELDS.filter((field) => filled(heldBy(action, field.name)));
+  const modifiers = written.length > 0 || keywordLines(action).length > 0;
 
   if (!modifiers && action.results.length === 1 && !spansLines(action.results)) return [`${action.label}: ${resultList.print(action.results)}`];
 
   const appended = new Set(action.appended ?? []);
-  const at = (name: keyof Action): string => (appended.has(name) ? '  +' : '  ');
+  const at = (name: string): string => (appended.has(name) ? '  +' : '  ');
   const lines: string[] = [`${action.label}:`];
-  if (action.requires) lines.push(`${at('requires')}requires: ${condition.print(action.requires)}`);
-  if (action.hiddenIf) lines.push(`${at('hiddenIf')}hidden if: ${condition.print(action.hiddenIf)}`);
-  if (action.kind !== undefined && action.kind !== 'duration') lines.push(`  ${action.kind}`);
-  const tags = withoutKeywords(action.tags ?? [], TAGGED_ACTION_KINDS);
-  if (tags.length > 0) lines.push(`  ${tags.map((each) => tagClause.print(each)).join(', ')}`);
-  if (action.time !== undefined) lines.push(`  time: ${action.time}`);
-  if (action.rate !== undefined) lines.push(`  rate: ${typeof action.rate === 'number' ? action.rate : printSided(action.rate)}`);
-  if (action.accuracy) lines.push(`  accuracy: ${printContest(action.accuracy)}`);
-  if (action.damage) lines.push(`  damage: ${printContest(action.damage)}`);
-  if (action.depletes) lines.push(`  depletes: ${printSided(action.depletes)}`);
-  if (action.attempts !== undefined) lines.push(`  attempts: ${action.attempts}`);
-  if (action.stopsOn?.length) lines.push(`${at('stopsOn')}stops on: ${stoppers.print(action.stopsOn)}`);
-  if (action.rewardScale !== undefined) lines.push(`  rewards scaled by: ${action.rewardScale}`);
+  for (const field of ACTION_FIELDS) {
+    if (!field.block && filled(heldBy(action, field.name))) lines.push(`${at(field.name)}${field.written}: ${field.parser.print(heldBy(action, field.name))}`);
+    if (field.name === KEYWORDS_AFTER) lines.push(...keywordLines(action));
+  }
   lines.push(...indentLines(action.results.flatMap(resultLines)));
-  for (const name of ['onSuccess', 'onRefused', 'onAttemptsExhausted'] as const) {
-    printResultBlock(lines, `${at(name)}${writtenAs(name)}`, action[name], 4);
+  for (const field of ACTION_FIELDS) {
+    if (field.block) printResultBlock(lines, `${at(field.name)}${field.written}`, heldBy(action, field.name) as readonly ActionResult[] | undefined, 4);
   }
   return lines;
 }
 
-const writtenAs = (name: keyof Omit<Action, 'label' | 'results'>): string => ACTION_FIELDS.find((field) => field.name === name)!.written;
+const blockLists = (action: Action): (ActionResult[] | undefined)[] => ACTION_FIELDS.filter((field) => field.block).map((field) => heldBy(action, field.name) as ActionResult[] | undefined);
 
-export const actionResultLists = (action: Action): ActionResult[][] => [action.results, action.onSuccess, action.onRefused, action.onAttemptsExhausted].filter((list): list is ActionResult[] => list !== undefined);
+export const actionResultLists = (action: Action): ActionResult[][] => [action.results, ...blockLists(action)].filter((list): list is ActionResult[] => list !== undefined);
 
 export interface Contested {
   ours: string;
