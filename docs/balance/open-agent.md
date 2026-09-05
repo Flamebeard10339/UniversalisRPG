@@ -243,13 +243,25 @@ thirty are walked by a thief who has what they were cut for.*
 
 ## A route cannot report what it cost, so what it cost goes unrecorded
 
-The asserting half of this is closed: `ENGINE_ROOTS` declares per root whether what it reads
-churns, `worldRemarks` reads that, and the corpus holds no pinned figure. What a route may
-*say* is settled; what a route may *report* was never built. A route that spends an hour and
+The asserting half of this is mostly closed: `ENGINE_ROOTS` declares per root whether what it
+reads churns, `worldRemarks` reads that, and no comparison in the corpus pins a churning root
+against anything but zero.
+
+One door is still open, and it is the one the remark's own advice points at. `pinned` reads
+comparisons; `has <count> <item>` is a different condition kind and its count is never looked
+at, so `has 5 core.coin` says exactly what `inventory.core.coin >= 5` says and is not
+remarked. Whether that count churns is not derivable — it is a price in one body and a
+handover in the next, and `not has 2 small-fishing-net` is a count that has to stand, because
+it is the only line proving Rook is handed exactly one net. So this wants a ruling rather than
+a rule.
+
+What a route may *say* is otherwise settled; what a route may *report* was never built. A route that spends an hour and
 two hundred coin reaching its end says so nowhere, so the only way to learn what a path costs
 is still to walk it by hand and watch.
 
-*Closes when:* a route records what it took and what it paid, and something reads that back.
+*Closes when:* a route records what it took and what it paid, something reads that back, and
+`has <count>` is ruled either a figure the remark should read or a claim about the path that
+it should not.
 
 ## A shop that is out of stock is a red rather than a wait
 

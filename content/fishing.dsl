@@ -1610,7 +1610,7 @@ talk: rook
 choose: Here.
 assert: has-taught-rook
 assert: the-boy-at-the-narrows.taught
-assert: has small-fishing-net
+assert: not has 2 small-fishing-net
 
 # save on-the-shingle-with-a-rod
 {"version":13,"location":"tulsa.riverside","xp":{"fishing.fishing":20000},"inventory":{"core.coin":40,"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.1,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.2,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}

@@ -1313,7 +1313,7 @@ use: entity.broken-wall.squeeze-through
 assert: heard-of-the-back-way
 assert: sewer-junction.discovered
 
-# test a-log-costs-four-swings-of-an-axe
+# test an-axe-takes-a-log-out-of-a-dead-alder-and-pays-woodcutting
 load: axe-at-the-swamp-edge
 use: entity.dead-alder.chop-a-log
 assert: has core.log

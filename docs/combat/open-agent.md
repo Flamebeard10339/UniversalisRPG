@@ -127,16 +127,24 @@ somewhere better would close this line on fourteen assertions that never had tee
 is `combat-lessons`'s *the iron shield turns a highwayman's fire*, whose only survival claim is
 the one the switch guarantees; its real proof is the two `fire-resistance` lines above it.
 
-The exception is `combat.a-feral-rat-picks-the-fight-itself`, which is not under `unkillable` —
-and whose *other* assertion is `resource.core.health < 31.31` against a player whose max-health
-is 30. That is above the ceiling, so it holds before the rat has swung. The route is named for
-the rat opening the fight and nothing in it checks that.
+The three absolute-pool asserts are gone — the route-figures rule took them, `resource` being
+a root that churns — and the only pool line left in `content/` is `resource.combat.rage > 0`,
+which asks whether rage rose at all rather than what it reached.
 
-So the answer is **deletion, not relocation**, and the three absolute-pool asserts go with them.
-Where survival is genuinely the question, `simulate-activity` is the tool and a route is not.
+The exception remains `combat.a-feral-rat-picks-the-fight-itself`, which is not under
+`unkillable`. Its `resource.core.health < 31.31` was above the ceiling of a player whose
+max-health is 30, so it held before the rat had swung; that line went with the other three,
+and what is left is a route named for the rat opening the fight with nothing in it that checks
+so. Adding a claim that does is not free: removing `aggressive` from `# entity feral-rat`
+already reddens `the-sewer-pays-a-beginner-in-both-halves-of-a-fight` on its attack xp, so the
+engagement is proved next door and a second proof here would be a duplicate.
 
-*Closes when:* no route in `content/` asserts `not core.fainted` or an absolute pool value, and
-`a-feral-rat-picks-the-fight-itself` either checks what its name promises or is deleted.
+So the answer is **deletion, not relocation**. Where survival is genuinely the question,
+`simulate-activity` is the tool and a route is not.
+
+*Closes when:* no route in `content/` asserts `not core.fainted`, and
+`a-feral-rat-picks-the-fight-itself` is deleted or given a claim its neighbour does not
+already make.
 
 ## Five resistance caps are one fact in five bodies
 
