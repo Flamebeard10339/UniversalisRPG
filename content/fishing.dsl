@@ -316,13 +316,7 @@ cut for bait:
 
 # flag hob-lifts
 
-# flag hob-asked
-
 # flag eel-bed-found
-
-# flag has-own-trap
-
-# flag kept-hobs-eels
 
 # flag has-taught-rook
 
@@ -1240,7 +1234,6 @@ stocks:
   1 rod-and-winch
   2 dressed-silk-line
   1 creel
-replenish: 60s
 hidden if: not hobs-traps.trusted
 
 # quest hobs-traps
@@ -1259,7 +1252,6 @@ stage offered:
       say: "Out past the reed line, where the water goes black. You will smell it before you see it." He settles back in the chair. "Bring me word on how it's going, now and again."
       goto lifting
     -> Not today.
-      add: hob-asked 1
       say: "Suit yourself." He looks back at the door.
 
 stage lifting:
@@ -1280,11 +1272,9 @@ stage reckoning:
     ask: About the traps.
     "Three times now, by my count." He looks at you rather than the door, for once. "How's it been going, out there?"
     -> Good. Here is your share, honestly.
-      set: has-own-trap
       say: "Here." He holds out a battered wicker pot, mended more than once. "Yours, this one. Set it, lift it, whatever's in it is whatever's in it. I've three of my own left, so leave the near one be." He looks almost embarrassed about it. "Glad of the company, is the truth of it."
       goto trusted
     -> Empty, mostly. Bad luck.
-      set: kept-hobs-eels
       say: "Empty." He says it flatly, and looks at you a moment too long. "Three pots, thirty years, and empty is not a word I have used about them once in that time." He does not call you a liar. He does not need to.
       goto keeping-the-eels
 
@@ -1567,7 +1557,6 @@ assert: hobs-traps.reckoning
 talk: hob
 choose: Good. Here is your share, honestly.
 assert: hobs-traps.trusted
-assert: has-own-trap
 shop: hobs-tackle
 submit-modal: item=close
 

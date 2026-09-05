@@ -103,10 +103,6 @@ read the book:
 
 # flag escaped-through-the-lock
 
-# flag ratmen-killed
-
-# flag killed-both-ratmen
-
 # entity barred-door-from-inside
 title: The Barred Door
 examine: The door you came in by, seen from the wrong side of it, and it does not give from here the way it did from there.
@@ -122,12 +118,6 @@ pick the lock from the inside:
 -adjacent: sewer-outfall
 +adjacent: sewer-outfall while has tulsa.sewer-key or escaped-through-the-lock
 +entities: barred-door-from-inside
-
-# entity combat.ratman
-on death:
-  add: ratmen-killed 1
-  if ratmen-killed >= 2:
-    set: killed-both-ratmen
 
 # save at-the-grate
 {"version":13,"location":"tulsa.market-square","inventory":{"core.coin":1000,"core.lockpick":1}}

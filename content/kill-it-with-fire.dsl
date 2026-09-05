@@ -121,7 +121,6 @@ stocks:
   3 cinderward-draught
   3 foulward-draught
   3 quickmend-draught
-replenish: 60s
 hidden if: not oolgas-basement.cellar-cleared
 
 # item cinderward-draught

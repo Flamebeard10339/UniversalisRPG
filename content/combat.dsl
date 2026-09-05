@@ -536,7 +536,6 @@ stocks:
   2 iron-platelegs
   2 iron-boots
   2 iron-shield
-replenish: 60s
 
 # entity chicken
 title: Chicken
