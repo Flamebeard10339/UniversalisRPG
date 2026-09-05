@@ -78,29 +78,71 @@ export const BASE_LANGUAGE = 'en';
 
 const contentKey = (registry: Registry, kind: string, id: string, field: string): string => localeKey(registry.namespace.ownerOf(kind, id) ?? null, kind, id, field);
 
+const SPEAKING = new WeakMap<Registry, Map<string, Localizer>>();
+
 export function localizerFor(registry: Registry, language: string): Localizer {
+  let spoken = SPEAKING.get(registry);
+  if (spoken === undefined) {
+    spoken = new Map<string, Localizer>();
+    SPEAKING.set(registry, spoken);
+  }
+  const held = spoken.get(language);
+  if (held !== undefined) return held;
+  const made = speaking(registry, language);
+  spoken.set(language, made);
+  return made;
+}
+
+function speaking(registry: Registry, language: string): Localizer {
   const { locales } = registry;
-  const keyed = (key: string, params: Params): Localized => {
+  const declared = new Map<string, string | undefined>();
+  const spelt = new Map<string, string>();
+  const titles = new Map<string, Localized>();
+
+  const written = (key: string): string | undefined => {
+    if (declared.has(key)) return declared.get(key);
     const found = pattern(locales, language, key);
+    declared.set(key, found);
+    return found;
+  };
+
+  const named = (kind: string, id: string, field: string): string => {
+    const asked = `${kind} ${id} ${field}`;
+    const held = spelt.get(asked);
+    if (held !== undefined) return held;
+    const key = contentKey(registry, kind, id, field);
+    spelt.set(asked, key);
+    return key;
+  };
+
+  const keyed = (key: string, params: Params): Localized => {
+    const found = written(key);
     if (found === undefined) return key as Localized;
     return (isEngineKey(key) ? substitute(found, key, params) : plainly(found)) as Localized;
   };
   const self: Localizer = {
     language,
     engine: (key, params = {}) => keyed(key, params),
-    content: (kind, id, field, params = {}) => keyed(contentKey(registry, kind, id, field), params),
+    content: (kind, id, field, params = {}) => keyed(named(kind, id, field), params),
     words: (kind, id, field, params = {}) => {
-      const key = contentKey(registry, kind, id, field);
-      const found = pattern(locales, language, key);
+      const key = named(kind, id, field);
+      const found = written(key);
       if (found === undefined) return undefined;
       return (isEngineKey(key) ? substitute(found, key, params) : plainly(found)) as Localized;
     },
-    title: (kind, id) => self.content(kind, id, 'title'),
+    title: (kind, id) => {
+      const asked = `${kind} ${id}`;
+      const held = titles.get(asked);
+      if (held !== undefined) return held;
+      const said = self.content(kind, id, 'title');
+      titles.set(asked, said);
+      return said;
+    },
     actionLabel: (kind, ownerId, action) => keyed(actionTextKey(actionTextOwner(registry.namespace, kind, ownerId, action)), {}),
-    line: (key, weigh) => weigh(parseSegments(pattern(locales, language, key) ?? key, 0)) as Localized,
+    line: (key, weigh) => weigh([...segmentsOf(written(key) ?? key)]) as Localized,
     prose: (kind, id, field, weigh) => {
-      const found = pattern(locales, language, contentKey(registry, kind, id, field));
-      return found === undefined ? undefined : (weigh(parseSegments(found, 0)) as Localized);
+      const found = written(named(kind, id, field));
+      return found === undefined ? undefined : (weigh([...segmentsOf(found)]) as Localized);
     },
     identifier: (id) => id as Localized,
     minted: (id) => mintedName(id, language) as Localized,

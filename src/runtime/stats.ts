@@ -143,11 +143,24 @@ const contributes = (fold: StatFold): boolean => fold.increased !== 0 || fold.ad
 
 const addressOf = (source: StatSource): string => [source.kind, source.id, source.field].join(' ');
 
-export function statBreakdown(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
-  const counter = counterLevels(state, actorId);
+export interface StatSources {
+  readonly counter: ReturnType<typeof counterLevels>;
+  readonly carriers: readonly ModifierCarrier[];
+}
+
+export function statSources(state: GameState, registry: Registry, actorId: string = PLAYER): StatSources {
   const carriers = modifierCarriers(state, registry, actorId);
   const seated = performing(state, registry, actorId);
   if (seated) carriers.unshift(seated);
+  return { counter: counterLevels(state, actorId), carriers };
+}
+
+export function statBreakdown(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
+  return statFrom(statId, statSources(state, registry, actorId), state, registry, actorId);
+}
+
+export function statFrom(statId: string, sources: StatSources, state: GameState, registry: Registry, actorId: string = PLAYER): StatBreakdown {
+  const { counter, carriers } = sources;
   const parts = new Map<string, StatPart>();
 
   for (const carrier of carriers) {

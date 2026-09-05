@@ -112,9 +112,19 @@ function reachedWhen(quest: Quest, at: number, held: Map<number, Condition | und
   return answer;
 }
 
+const BY_ITSELF = new WeakMap<Quest, Map<string, Condition | undefined>>();
+
 export function reachedByItself(quest: Quest, stage: string): Condition | undefined {
+  let held = BY_ITSELF.get(quest);
+  if (held === undefined) {
+    held = new Map<string, Condition | undefined>();
+    BY_ITSELF.set(quest, held);
+  }
+  if (held.has(stage)) return held.get(stage);
   const at = quest.stages.findIndex((each) => each.name === stage);
-  return at <= 0 ? undefined : any(byItself(quest, at, new Map()));
+  const shaped = at <= 0 ? undefined : any(byItself(quest, at, new Map()));
+  held.set(stage, shaped);
+  return shaped;
 }
 
 function whileOn(quest: Quest, at: number): Condition | undefined {

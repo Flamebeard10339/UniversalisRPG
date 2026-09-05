@@ -45,6 +45,10 @@ function questReach(path: string[], registry: Registry): Condition | undefined {
 
 const deriving = new Set<string>();
 
+const derived = new Map<string, boolean | number | string | undefined>();
+
+let deriveDepth = 0;
+
 export function answerReference(reference: Reference, state: GameState, registry: Registry): Answered {
   const { path } = reference;
   if (isEngineRoot(path)) return ROOTED[path[0] as EngineRoot](path.slice(1).join('.'), state, registry);
@@ -53,13 +57,19 @@ export function answerReference(reference: Reference, state: GameState, registry
   const key = path.join('.');
   const flag = state.flags[key];
   if (truthy(flag) || deriving.has(key)) return { value: flag };
+  if (derived.has(key)) return { value: derived.get(key) };
   const reach = questReach(path, registry);
   if (reach === undefined) return { value: flag };
   deriving.add(key);
+  deriveDepth += 1;
   try {
-    return { value: evaluateCondition(reach, state, registry) || flag };
+    const value = evaluateCondition(reach, state, registry) || flag;
+    derived.set(key, value);
+    return { value };
   } finally {
     deriving.delete(key);
+    deriveDepth -= 1;
+    if (deriveDepth === 0) derived.clear();
   }
 }
 

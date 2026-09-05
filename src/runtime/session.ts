@@ -19,7 +19,7 @@ export { standingLine } from './journal';
 export type { JournalEntry, JournalLine, QuestStanding } from './journal';
 import { IMPLICIT_TARGET_FULL, playerCadence } from './encounter';
 import { armedAction } from './roster';
-import { foldStat, hasPool, statBreakdown } from './stats';
+import { foldStat, hasPool, statFrom, statSources, type StatSources } from './stats';
 import { midpoint } from '../grammar/range';
 import { PLAYER, PLAYER_FIELDS, PLAYER_SHEET, templateOf, type PlayerField } from './state';
 import { heldEffects, type HeldEffect } from './buffs';
@@ -250,18 +250,18 @@ function isFreeTravelAction(action: Action, target: string): boolean {
   return movesTo(action) === target;
 }
 
-function entityAliasesTravelTo(location: Location, target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
-  return stoodHere(state, registry, location).some((stood) => {
+function entityAliasesTravelTo(stood: readonly StoodHere[], target: string, registry: Registry, state: GameState, masked: ReadonlySet<string>): boolean {
+  return stood.some((stood) => {
     if (masked.has(stood.id)) return false;
     return availableActions(stood.offers, state, registry).some((action) => isFreeTravelAction(action, target) && requiresMet(action, state, registry));
   });
 }
 
-function maskedHere(registry: Registry, state: GameState, location: Location): ReadonlySet<string> {
+function maskedHere(state: GameState, here: readonly StoodHere[]): ReadonlySet<string> {
   if (settingStands(state.settings, 'masking') !== true) return new Set();
   const fighting = new Set(Object.keys(state.activeAction?.actors ?? {}).map(templateOf));
   const masked = new Set<string>();
-  for (const stood of stoodHere(state, registry, location)) {
+  for (const stood of here) {
     if (truthy(state.flags[`${stood.id}.${TOUCHED}`]) || fighting.has(stood.id)) continue;
     if (stood.offers.actions.some(isMintedAction)) masked.add(stood.id);
   }
@@ -341,10 +341,11 @@ function locationChoices(session: PlaySession): PlayChoice[] {
   const location = registry.locations.get(state.location);
   if (!location) return [];
   const localizer = localizerOf(registry, state);
-  const masked = maskedHere(registry, state, location);
+  const here = stoodHere(state, registry, location);
+  const masked = maskedHere(state, here);
   const choices: PlayChoice[] = [];
 
-  for (const stood of stoodHere(state, registry, location)) {
+  for (const stood of here) {
     choices.push(...mintedSecond(entityOffers(stood, registry, state, localizer, masked.has(stood.id))));
   }
 
@@ -362,10 +363,12 @@ function locationChoices(session: PlaySession): PlayChoice[] {
     }
   }
 
+  const capable = new Set(here.flatMap((stood) => stood.entity.capabilities));
   for (const recipe of listedToPlayer(registry.recipes.values())) {
+    if (recipe.requiresCapability !== undefined && !capable.has(recipe.requiresCapability)) continue;
     if (!recipeCraftable(recipe, registry, state)) continue;
     const station = recipe.requiresCapability
-      ? stoodHere(state, registry, location).find((stood) => stood.entity.capabilities.includes(recipe.requiresCapability!))?.id
+      ? here.find((stood) => stood.entity.capabilities.includes(recipe.requiresCapability!))?.id
       : undefined;
     if (station !== undefined && masked.has(station)) continue;
     const source = station === undefined ? {} : offeredBy(registry, localizer, 'entity', station);
@@ -374,7 +377,7 @@ function locationChoices(session: PlaySession): PlayChoice[] {
 
   for (const edge of effectiveAdjacent(registry, location.id)) {
     if (edge.condition && !evaluateCondition(edge.condition, state, registry)) continue;
-    if (entityAliasesTravelTo(location, edge.target, registry, state, masked)) continue;
+    if (entityAliasesTravelTo(here, edge.target, registry, state, masked)) continue;
     choices.push({ id: `travel:${edge.target}`, kind: 'travel', label: travelLabel(localizer, edge.target), leadsTo: edge.target, legs: 1 });
   }
 
@@ -518,9 +521,10 @@ export function sessionStatus(session: PlaySession): PlayStatus {
   if (!location) throw new RuntimeError(`unknown location: ${state.location}`);
 
   const localizer = localizerOf(registry, state);
-  const masked = maskedHere(registry, state, location);
+  const here = stoodHere(state, registry, location);
+  const masked = maskedHere(state, here);
   const entities: PlayStatus['entities'] = [];
-  for (const stood of stoodHere(state, registry, location)) {
+  for (const stood of here) {
     entities.push({ id: stood.id, masked: masked.has(stood.id), title: stoodTitle(registry, localizer, stood, masked.has(stood.id)).detail });
   }
 
@@ -543,9 +547,7 @@ export function sessionStatus(session: PlaySession): PlayStatus {
     focus: modalFocus(state),
     equipment: wornRows(state, registry),
     xp: listedToPlayer(registry.skills.values()).map(({ id }) => skillRow(id, state.xp[id] ?? 0, localizer)),
-    stats: listedToPlayer(registry.stats.values())
-      .filter((stat) => stat.hiddenIf === undefined || !evaluateCondition(stat.hiddenIf, state, registry))
-      .map((stat) => statRow(stat.id, state, registry, localizer)),
+    stats: statRows(state, registry, localizer),
     flags: { ...state.flags },
     ...publishPlaces(state, registry),
     mapGrid: mapGrid(registry),
@@ -627,8 +629,15 @@ function publishResources(state: GameState, registry: Registry): PlayStatus['res
     }));
 }
 
-function statRow(statId: string, state: GameState, registry: Registry, localizer: Localizer): StatRow {
-  const breakdown = statBreakdown(statId, state, registry);
+function statRows(state: GameState, registry: Registry, localizer: Localizer): StatRow[] {
+  const sources = statSources(state, registry);
+  return listedToPlayer(registry.stats.values())
+    .filter((stat) => stat.hiddenIf === undefined || !evaluateCondition(stat.hiddenIf, state, registry))
+    .map((stat) => statRow(stat.id, sources, state, registry, localizer));
+}
+
+function statRow(statId: string, sources: StatSources, state: GameState, registry: Registry, localizer: Localizer): StatRow {
+  const breakdown = statFrom(statId, sources, state, registry);
   return {
     id: statId,
     title: localizer.title('stat', statId),
