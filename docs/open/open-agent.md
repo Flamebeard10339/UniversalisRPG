@@ -674,15 +674,3 @@ a room any way to get it.
 *Closes when:* a `# location` can reach a declared `# action`, by a `uses:` of its own or an
 `extends:` on an inline block, and fishing's two dusk waits are one.
 
-## Small constants still spelled twice
-
-- `HEADING_KIND` (`src/content/sectionSource.ts:24`) names the kind that heads a module, and
-  `src/content/universe.ts:39,53` — the module that actually enforces one-`# info`-per-module —
-  compares against the bare string instead. The constant's home by CLAUDE.md's own rule is
-  `sections/info.ts`, the kind's own file; moving it there avoids the import cycle that pointing
-  `universe.ts` at `sectionSource.ts` would close.
-- `COMPASS` (`src/runtime/map.ts:222`) restates the eight bearing names that `HEADINGS` (`:29-37`)
-  already derives. The membership is duplicated; the 3x3 screen ordering beside it is a genuinely
-  separate fact, so only half of this is worth taking.
-
-*Closes when:* both read the declaration beside them.

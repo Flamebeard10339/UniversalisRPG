@@ -1,6 +1,6 @@
 import { ENGINE_ROOT_NAMES } from '../grammar/condition';
 import { formatDependency, formatVersion, satisfies } from '../grammar/dependency';
-import { ModuleInfo, info as infoSection } from './sections/info';
+import { HEADING_KIND, ModuleInfo, info as infoSection } from './sections/info';
 import { DEFAULT_CONTEXT } from '../grammar/section';
 import { ModuleSection, parseModule } from './sections';
 import { sectionKinds } from './sections';
@@ -36,8 +36,8 @@ const MODULE_ID = /^[a-z][a-z0-9-]*$/;
 
 export function parseModuleSource(source: ModuleSource): ParsedModule {
   const parsed = parseModule(source.text);
-  const infos = parsed.filter((section) => section.kind === 'info');
-  if (infos.length > 1) throw new DslError(`module ${source.name} declares # info more than once`);
+  const infos = parsed.filter((section) => section.kind === HEADING_KIND);
+  if (infos.length > 1) throw new DslError(`module ${source.name} declares # ${HEADING_KIND} more than once`);
 
   const authored = (infos[0]?.value ?? {
     id: source.name,
@@ -50,7 +50,7 @@ export function parseModuleSource(source: ModuleSource): ParsedModule {
     source,
     info,
     namespace: infos.length > 0 ? info.id : null,
-    sections: parsed.filter((section) => section.kind !== 'info'),
+    sections: parsed.filter((section) => section.kind !== HEADING_KIND),
   };
 }
 

@@ -1,7 +1,8 @@
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { sameSection } from '../content/namespace';
 import { patchedInto, refused, travelsWhole } from '../content/patch';
-import { addressedSections, HEADING_KIND, oneNewline, type WrittenModule } from '../content/sectionSource';
+import { addressedSections, oneNewline, type WrittenModule } from '../content/sectionSource';
+import { HEADING_KIND } from '../content/sections/info';
 import { sectionFor } from '../content/sections';
 import { parseUniverse, type ModuleSource } from '../content/universe';
 import { refusalOf } from '../content/completion';
