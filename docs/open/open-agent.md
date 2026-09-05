@@ -280,3 +280,56 @@ silence an authoring run once met actually lives, and it is the GUI rather than 
 
 *Moves when: he says whether a growth directive may name a template — and if it may, what it
 picks when several copies stand, since that is the thing the claim says cannot be silent.*
+
+## The modals have no API, so every agent that touches one invents a way in
+
+Modals are drawn by `ModalSheet` and raised through `openModal`, and there is no stated
+surface between them and the code that raises them. Each lane that has needed a modal has
+reached for a new interface method rather than an existing one, which is how the same beat
+comes to be spelled three ways.
+
+The `welcome-back` screen is where this was noticed: it wants to say *do not typewrite this*,
+and there is nowhere to say it.
+
+*Closes when:* raising a modal, answering one, and saying how its body is revealed all go
+through one declared surface, and a lane adding a modal has nothing to invent. Whatever that
+surface is, it derives what a modal may say rather than listing the modals.
+
+## The typewriter cannot be skipped and its speed is a constant
+
+`reveal.ts` drives the typewriter and `Modal.tsx` reads it. Two things are wrong with it as
+played. It is about three times slower than it should be, and its speed is written in the code
+rather than declared, so it cannot be moved without a build. And there is no way past it: a
+screen the player is reading rather than being told to — the away summary above all — types
+itself out at them with no way to ask for the whole thing at once.
+
+*Closes when:* the speed is a `# variable` the world declares and the settings page can move,
+it defaults about three times faster than it reads today, and a modal may be raised saying its
+body is not typewritten — which is the API line above.
+
+## No setting the player changes survives a reload
+
+`localStorage` is reached in exactly one place under `src/`: `browserStore.ts:18`, which keeps
+save slots. Nothing else is persisted, so every setting the player changes — dev mode above
+all — is back to its default the next time the page opens. Measured 2026-09-05 by sweeping
+`src/` for every storage reach.
+
+Dev mode is the one that bites, because it is the setting somebody working on the world
+changes every single session.
+
+*Closes when:* the settings a player changes are kept beside the save slots and read back on
+open, and the sweep for storage reaches still finds one home rather than two.
+
+## Something leaves a node process running after the tools exit
+
+Reported 2026-09-05: a node process outlives whatever started it and holds system resources
+indefinitely. Which tool starts it is not known, and it is not reproduced here — this line is
+the report, not a diagnosis.
+
+The candidates worth eliminating first are the ones that spawn: `npm run handoff` shells out
+to `npx vitest run` per proof file, `npm run authorbot` runs an agent over a copy of the
+corpus, `npm run mutate` runs suites in a loop, and the dev server is started through the
+preview tooling rather than through the shell.
+
+*Closes when:* the tool is named, reproduced, and the process it leaves either exits with its
+parent or is documented as something the caller must reap.

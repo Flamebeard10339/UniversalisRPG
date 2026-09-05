@@ -258,3 +258,19 @@ own declarations rather than from a list kept beside them.
 
 *Closes when:* `ladder-check` reports contested pairs that disagree, and either the world has
 none or the ones it has are named in the commit that closes this.
+
+## An entity that carries a content action is also fightable by the engine's own verb
+
+`sparring-guardsman` in `content/combat-lessons.dsl` carries `uses: bout` — a six-attempt
+sparring action that ends in a guise and pays three attack xp — and also carries the combat
+stats and faction that make the engine offer its own attack verb on the same body. So the
+player is shown two ways to hit the same man, one of which is a lesson and one of which is a
+fight, with nothing on the screen saying which is which.
+
+Reported from play as *why is there both fight and bout*. Whether the engine's verb should
+stand down where a body offers a combat action of its own, or whether both are meant to be
+there and want distinguishing on the screen, is the question.
+
+*Closes when:* a body carrying its own combat action shows one verb, or shows both with the
+difference legible, and whichever it is falls out of what the body declares rather than being
+written per entity.

@@ -95,23 +95,51 @@ and chest follows it.
 *Closes when:* the line is written in `content/thieving.dsl` and the routes through the
 pockets and chests still walk.
 
-## The rogue's outfit boosts two stats where the brief asked for a worn cluster effect
+## `cluster-effect:` is its own keyword where it should be an ordinary modifier
 
-The brief says each piece boosts *thieving related stats of allocated passives by 15%*, which
-is a cluster effect worn as clothing. What ships is `+15% thieving-ability` on the hood and
-chestwrap and `+15% thieving-rate` on the legwraps and sandals, at level 30.
-
-Ruled 2026-09-05: **the passive reading is the one that was meant.** The mechanism exists —
-`cluster-effect:` is what the orbs carry, and `orb-of-vitality` says it plainly: *an orb is
-spent on a cluster, and scales what that cluster already gives*. It cannot be worn. The
-oracle refuses a piece that tries:
+`cluster-effect: +25% max-health` is a keyword of its own on `# item`, and declaring it makes
+that item an **orb** — which the oracle refuses to combine with the `item-level:` that makes an
+item a base:
 
     cluster-effect: makes probe-hood an orb, which is exclusive with
     the item-level: that makes it a base
 
-and the four outfit pieces must be bases, since `item-level:` is what lets them take a jewel
-at all. So this is a language question rather than a content edit: either the exclusion is
-lifted for a worn base, or gear gets its own way to scale the cluster socketed into it.
+Ruled 2026-09-05: **it should read like any other mod** — `+10% increased effect of allocated
+thieving passives`, written where `tools, +15% thieving-ability` is written and folding into
+the flat-then-percent arithmetic every other modifier folds into. Then an orb is not a kind of
+item at all: it is an item carrying that modifier, and the exclusivity goes with the keyword
+rather than being lifted as a special case.
 
-*Closes when:* a worn base can scale what its own jewel gives, and the four pieces say the
-15% the brief asked for rather than two stats standing in for it.
+What that needs is a modifier whose subject is a set of allocated passives rather than a stat.
+`<modifier>` today is `+<amount> <stat>` and `+<percent>% <stat>`; this is the first one that
+names something else.
+
+The rogue's outfit is what the change is for. The brief asks that each piece boost *thieving
+related stats of allocated passives by 15%*, and because gear cannot say that, what ships is
+`+15% thieving-ability` on the hood and chestwrap and `+15% thieving-rate` on the legwraps and
+sandals at level 30 — two stats standing in for one effect.
+
+*Closes when:* the effect of allocated passives is a modifier an item may carry beside its
+others, `cluster-effect:` is gone as a keyword, the five orbs in `content/combat.dsl` are
+ordinary items written with it, and the four outfit pieces say the 15% the brief asked for.
+
+## A timed buff shows in the carried list, so the world's own timers read as the player's
+
+`the-warden-is-downstairs`, `the-warden-is-at-his-doughnuts`, `the-watch-is-elsewhere` and
+`the-sand-is-running` are `# item` buffs that exist to hold a stretch of world time — the
+warden being gone five minutes, the watch being elsewhere. They are carried, so they show up
+beside the things the player is actually carrying, and read as something they have rather than
+as a clock running somewhere else.
+
+*Closes when:* a buff that only marks a stretch of time is not shown in the carried list, and
+which buffs those are is derived from what they do rather than listed by id.
+
+## Failing the market stall takes the player's action away with nothing said
+
+Reported from play: failing the theft at the market square stall should raise a dialogue that
+stops the action and has to be clicked through, so the player knows what happened and the run
+does not simply continue. What happens today is the ordinary refusal, which says its line into
+the log while the action carries on.
+
+*Closes when:* the stall's failure raises a dialogue that ends the action under way, and the
+player clicks through it before anything else happens.

@@ -87,3 +87,40 @@ measured zero.
 *Closes when:* the lattice leaves a vertical lane beside each column — offset 15 of
 17 is free of every label, slope and vertical — for a road to run down past the rows
 between its two ends.
+
+## A floor up or down is hazed the same way an undiscovered place is
+
+Both directions off the current floor are drawn faded, so a player cannot tell a cellar from
+an attic, and cannot see which places on the floors either side are reachable from where they
+stand. Reported from play; the hazing is one treatment doing two jobs.
+
+*Closes when:* a lower floor darkens and an upper floor lightens rather than both hazing, and
+the places one floor away that a road from here reaches are drawn as reachable — in dev mode
+and out of it alike.
+
+## A region is one tone, so a region inside a region cannot be seen
+
+All of Tulsa is a region, and there are regions inside Tulsa. Both draw in the same blob
+colour, so the nesting is invisible: an inner region reads as part of the outer one rather
+than as a thing of its own.
+
+*Closes when:* nested regions alternate between the background colour and the blob colour, so
+depth is readable at a glance however many levels deep it goes.
+
+## Box mode draws one rectangle where it should take the coordinates
+
+`box` was built as one rectangle around everything a region holds. What was wanted is a region
+that names x,y coordinates, so it can be a concave grid-like polygon rather than the bounding
+box of its rooms — which is what a town shaped round a river or a wall actually looks like.
+
+*Closes when:* a region may name the cells it covers rather than only the rooms it holds, and
+box mode fills those cells.
+
+## A place pinned to another can be dragged off its parent without being unpinned
+
+A location written at coordinates relative to another is still movable in `place` mode, so a
+drag silently breaks the relationship the pin expressed rather than being refused. Reported
+from play and not re-measured since.
+
+*Closes when:* dragging a relatively-placed location is refused until it is unpinned from its
+parent, and unpinning is something the map pane offers.
