@@ -842,7 +842,7 @@ describe('a second body written at an id a first body already holds', () => {
     expect(first, `the corpus writes no # ${kind}`).toBeDefined();
     const seconds = secondBodies(owner, (first as { id: string }).id);
     expect(seconds.length).toBeGreaterThan(0);
-    for (const second of seconds) expect(owner.merge(structuredClone(first!), structuredClone(second))).toEqual(second);
+    for (const second of seconds) expect(owner.merge(structuredClone(first!), structuredClone(second))).toEqual(isDebug(first!) ? { ...second, debug: true } : second);
   });
 
   it.each(MAPPED.map((each) => each.kind))('%s says what it means, rather than keeping the first and dropping the second', (kind) => {

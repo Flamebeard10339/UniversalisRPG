@@ -4,7 +4,7 @@ import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModa
 import { choose, cursorProblem, menuChoices, standsAtWords } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
 import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
-import { holdsQuest, questFocus, questOptions, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
+import { holdsQuest, questFocus, questOptions, questStale, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
 import { holdsStat, statFocus, statOptions, statStale, statSubmit, LEAVE as STAT_LEAVE } from './statScreen';
 import { holdsSkill, skillFocus, skillOptions, skillStale, skillSubmit, LEAVE as SKILL_LEAVE } from './skillScreen';
 import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, BACK as SHOP_BACK, LEAVE as SHOP_LEAVE } from './shopScreen';
@@ -27,15 +27,25 @@ export interface Modal {
   leaving: Answer | null;
 }
 
-interface ModalDefinition<F extends ModalFrame> {
+interface ModalBehaviour<F extends ModalFrame> {
   options(frame: F, state: GameState, registry: Registry): readonly ModalOption[];
   submit(frame: F, state: GameState, registry: Registry): ModalFrame | null;
-  holds?(value: Record<string, unknown>): boolean;
-  stale?(frame: F, state: GameState, registry: Registry): Localized | null;
   focus?(frame: F): Focus | undefined;
   leaves?: Answer;
   asksNothing?(frame: F): boolean;
 }
+
+interface KeyedById<F extends ModalFrame> {
+  holds(value: Record<string, unknown>): boolean;
+  stale(frame: F, state: GameState, registry: Registry): Localized | null;
+}
+
+interface Unkeyed<F extends ModalFrame> {
+  holds?: undefined;
+  stale?(frame: F, state: GameState, registry: Registry): Localized | null;
+}
+
+type ModalDefinition<F extends ModalFrame> = ModalBehaviour<F> & (KeyedById<F> | Unkeyed<F>);
 
 function carriedWords(localizer: Localizer, tag: TagClause): Localized {
   if (tag.kind !== 'stat-bonus' || tag.per !== undefined) return localizer.identifier(tagClause.print(tag));
@@ -86,6 +96,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     options: (frame, state, registry) => questOptions(frame, state, registry),
     submit: (frame) => questSubmit(frame),
     holds: holdsQuest,
+    stale: questStale,
     focus: questFocus,
     leaves: QUEST_LEAVE,
   },

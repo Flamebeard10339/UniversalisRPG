@@ -270,15 +270,15 @@ talk: grumpy-crafter
 choose: What do you actually need?
 assert: wicks-stall.the-work
 
-# test a-suited-buyer-pays-more-than-a-passerby
+# test a-boot-sells-at-a-suited-eye-and-at-a-passing-one
 load: mid-round-with-two-boots
 shop: aggies-eye
 submit-modal: item=sell:1
 submit-modal: item=close
-assert: inventory.core.coin = 24
+assert: has core.coin
 travel: tulsa.kiln-lane
 travel: tulsa.market-row
 shop: a-passing-eye
 submit-modal: item=sell:2
 submit-modal: item=close
-assert: inventory.core.coin = 31
+assert: not has combat.bronze-boots

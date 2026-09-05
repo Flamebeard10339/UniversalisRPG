@@ -4,6 +4,7 @@ import type { ModuleSource } from '../content/universe';
 import { everyDirective, type Directive } from '../content/sections/test';
 import { keywordsIn, type TagClause } from '../grammar/tagClause';
 import { CHURNING_ROOTS, everyCondition, printCondition } from '../grammar/condition';
+import { DEBUG_MARK, isDebug } from '../content/sections';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
@@ -69,24 +70,25 @@ function unspoken(registry: Registry): Remark[] {
     });
 }
 
+const pinnedBy = (test: { id: string; directives: readonly Directive[] }, churning: ReadonlySet<string>): Remark[] =>
+  everyDirective(test.directives).flatMap((directive) =>
+    directive.kind !== 'assert'
+      ? []
+      : everyCondition(directive.condition).flatMap((each) =>
+          each.kind === 'comparison' && each.right.value !== 0 && churning.has(each.left.path[0] ?? '')
+            ? [
+                {
+                  where: `# test ${test.id}`,
+                  says: `pins ${printCondition(each)}, a figure that moves whenever the world's numbers do, so a pass over them breaks this route while the path it walks is still perfectly walkable. A route proves that a sequence of events yields a result and reports its cost and its reward rather than asserting either. Against zero the same line asks whether the thing happened at all and is fine; against any other number, say it with \`has <item>\` instead, or take it out. A route marked ${DEBUG_MARK} may pin what it likes: nothing tunes the numbers a world written to be walked by the engine holds.`,
+                },
+              ]
+            : [],
+        ),
+  );
+
 function pinned(registry: Registry): Remark[] {
   const churning = new Set<string>(CHURNING_ROOTS);
-  return [...registry.tests.values()].flatMap((test) =>
-    everyDirective(test.directives).flatMap((directive) =>
-      directive.kind !== 'assert'
-        ? []
-        : everyCondition(directive.condition).flatMap((each) =>
-            each.kind === 'comparison' && each.right.value !== 0 && churning.has(each.left.path[0] ?? '')
-              ? [
-                  {
-                    where: `# test ${test.id}`,
-                    says: `pins ${printCondition(each)}, a figure that moves whenever the world's numbers do, so a pass over them breaks this route while the path it walks is still perfectly walkable. A route proves that a sequence of events yields a result and reports its cost and its reward rather than asserting either. Against zero the same line asks whether the thing happened at all and is fine; against any other number, say it with \`has <item>\` instead, or take it out, or move the claim into src/content/fixture/ where it is a unit test the suite can own.`,
-                  },
-                ]
-              : [],
-          ),
-    ),
-  );
+  return [...registry.tests.values()].flatMap((test) => (isDebug(test) ? [] : pinnedBy(test, churning)));
 }
 
 function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] {

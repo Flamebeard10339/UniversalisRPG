@@ -1313,13 +1313,6 @@ use: entity.broken-wall.squeeze-through
 assert: heard-of-the-back-way
 assert: sewer-junction.discovered
 
-# test the-bench-is-where-health-comes-back
-load: hurt-in-town
-assert: resource.core.health = 11
-wait: 60
-use: entity.bench.sit-down
-wait: 60
-
 # test a-log-costs-four-swings-of-an-axe
 load: axe-at-the-swamp-edge
 use: entity.dead-alder.chop-a-log

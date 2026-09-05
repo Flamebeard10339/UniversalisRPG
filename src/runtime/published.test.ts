@@ -106,6 +106,8 @@ const EN_ROUTE: ReadonlyArray<{ type: string; why: string }> = [
   { type: 'src/runtime/effects.ts#Segment', why: 'why what is under way is over, carried from the result that said so to the `endAction` that writes it onto the state' },
   { type: 'src/runtime/runtime.ts#WaitedOut', why: 'why a span the engine ran unattended could not finish, said to the player in the log and answered to whoever issued the directive' },
   { type: 'src/runtime/modalOption.ts#ChoicePart', why: 'the published cells of one option gathered under the side they name, on their way from the `ModalChoice` list a view publishes to the tabs and headings a surface draws it as' },
+  { type: 'src/runtime/listedScreen.ts#ListedSpec', why: 'what one screen over a registry collection declares: where its choices come from and which locale keys head them. The words it names are fetched from the registry as the options are built, on their way to the `ModalOption` list `publishModal` draws' },
+  { type: 'src/runtime/listedScreen.ts#Listed', why: 'the seven members `listedScreen` builds from that declaration. Its `stale` hands one reason back to `pruneModals` and its `options` hands the same `ModalOption` list every other screen does, so both reach a player through the walk that already covers them' },
 ];
 
 const RUNTIME = 'src/runtime';

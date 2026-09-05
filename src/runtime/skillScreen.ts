@@ -1,36 +1,29 @@
-import type { EngineKey } from '../content/locale';
-import type { Registry } from '../content/registry';
 import { listedToPlayer } from '../content/sections';
-import type { ModalOption } from './modalOption';
-import { type Answer, type Localized, localizerOf } from './localized';
-import type { GameState, ModalFrame } from './state';
+import { LEAVE, listedScreen } from './listedScreen';
+import { localizerOf } from './localized';
+import type { ModalFrame } from './state';
 
-export const LEAVE: Answer = 'close';
-const LEAVE_SHOWN: EngineKey = 'engine.skill.close';
+export { LEAVE };
 
 export type SkillFrame = Extract<ModalFrame, { name: 'skill-breakdown' }>;
 
-export const skillFrame = (skill = ''): SkillFrame => ({ name: 'skill-breakdown', answers: {}, skill });
+const screen = listedScreen({
+  name: 'skill-breakdown',
+  field: 'skill',
+  which: 'engine.skill.which',
+  reading: 'engine.skill.reading',
+  close: 'engine.skill.close',
+  choices: (registry, state) => {
+    const localizer = localizerOf(registry, state);
+    return listedToPlayer(registry.skills.values()).map((skill) => ({ value: skill.id, shown: localizer.title('skill', skill.id) }));
+  },
+  known: (registry, chosen) => registry.skills.has(chosen),
+});
 
-export const skillFocus = (frame: { skill: string }): { kind: 'skill'; skill: Answer } | undefined =>
-  frame.skill === '' ? undefined : { kind: 'skill', skill: frame.skill as Answer };
-
-export function skillOptions(frame: { skill: string }, state: GameState, registry: Registry): readonly ModalOption[] {
-  const localizer = localizerOf(registry, state);
-  if (frame.skill !== '') return [{ key: LEAVE, label: localizer.engine('engine.skill.reading'), values: [{ value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
-  const skills = listedToPlayer(registry.skills.values()).map((skill) => ({ value: skill.id as Answer, shown: localizer.title('skill', skill.id) }));
-  return [{ key: 'skill', label: localizer.engine('engine.skill.which'), values: [...skills, { value: LEAVE, shown: localizer.engine(LEAVE_SHOWN) }] }];
-}
-
-export function skillSubmit(frame: { skill: string; answers: Record<string, unknown> }): ModalFrame | null {
-  if (frame.skill !== '') return null;
-  const asked = String(frame.answers.skill ?? '');
-  return asked === LEAVE || asked === '' ? null : skillFrame(asked);
-}
-
-export const sameSkill = (a: { skill: string }, b: { skill: string }): boolean => a.skill === b.skill;
-
-export const holdsSkill = (value: Record<string, unknown>): boolean => typeof value.skill === 'string';
-
-export const skillStale = (frame: { skill: string }, state: GameState, registry: Registry): Localized | null =>
-  frame.skill === '' || registry.skills.has(frame.skill) ? null : localizerOf(registry, state).engine('engine.modal.stale.unknown');
+export const skillFrame = screen.frame;
+export const skillFocus = screen.focus;
+export const skillOptions = screen.options;
+export const skillSubmit = screen.submit;
+export const sameSkill = screen.same;
+export const holdsSkill = screen.holds;
+export const skillStale = screen.stale;

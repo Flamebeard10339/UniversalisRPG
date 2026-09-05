@@ -212,9 +212,11 @@ choose: continue
 assert: shy-ghost.greeting.visits = 1
 
 # test the-green-is-where-a-game-begins
+DEBUG
 assert: resource.health >= 30
 
 # test digging-pays-in-tails-and-experience
+DEBUG
 goto: green
 use: location.green.dig
 wait: done
@@ -245,6 +247,7 @@ submit-modal: item=close
 assert: has 2 core.bread
 
 # test the-counter-sells-what-it-stocks
+DEBUG
 goto: green
 use: location.green.dig
 wait: done
@@ -272,6 +275,7 @@ load: at-the-well
 assert: fixture-town.well.touched
 
 # test a-save-puts-the-player-back-where-it-left-them
+DEBUG
 load: dug-in
 assert: inventory.rat-tail >= 1
 assert: xp.digging >= 4
@@ -288,6 +292,7 @@ load: kitted
 assert: stat.attack >= 16
 
 # test a-save-written-over-another-keeps-what-that-one-says
+DEBUG
 load: dug-in-and-fed
 assert: inventory.rat-tail >= 1
 assert: has bread

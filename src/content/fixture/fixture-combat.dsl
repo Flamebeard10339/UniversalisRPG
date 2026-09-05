@@ -110,12 +110,14 @@ sit:
 {"version":13,"location":"fixture-town.green","resources":{"core.health":12000}}
 
 # test rage-rises-as-swings-land
+DEBUG
 goto: pump
 use: core.melee-combat on proving-post
 wait: 4
 assert: resource.rage >= 3
 
 # test poison-holds-the-struck-enemy
+DEBUG
 goto: pump
 use: core.melee-combat on proving-post
 wait: 4
@@ -131,6 +133,7 @@ wait: 30
 assert: resource.rage >= 0
 
 # test striking-a-thorned-enemy-costs-the-striker
+DEBUG
 goto: pump
 use: core.melee-combat on proving-post
 wait: 4
@@ -145,6 +148,7 @@ equip: 1
 assert: stat.attack > 10
 
 # test the-bench-is-where-health-comes-back
+DEBUG
 load: hurt-in-town
 use: entity.fixture-combat.bench.sit
 wait: 30
@@ -214,6 +218,7 @@ daub with clay:
 {"version":13,"location":"fixture-town.loft"}
 
 # test a-dealt-type-lands-and-a-resistance-takes-its-share
+DEBUG
 load: in-the-loft
 unkillable
 use: core.melee-combat on ember
