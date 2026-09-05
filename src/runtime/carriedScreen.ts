@@ -70,8 +70,16 @@ function verbsFor(entry: CarriedEntry, state: GameState, registry: Registry): re
 
 export const verbsOffered = (entry: CarriedEntry, state: GameState, registry: Registry): Answer[] => verbsFor(entry, state, registry).map((verb) => verb.value);
 
-export const socketsInto = (entry: CarriedEntry, state: GameState, registry: Registry): boolean =>
-  registry.items.get(itemTemplate(state, entry.id))?.clusterJewel !== undefined;
+export interface ItemNature {
+  readonly base: boolean;
+  readonly slotted: boolean;
+  readonly sockets: boolean;
+}
+
+export function natureOf(entry: CarriedEntry, state: GameState, registry: Registry): ItemNature {
+  const item = registry.items.get(itemTemplate(state, entry.id));
+  return { base: item !== undefined && isBase(item), slotted: item?.slot !== undefined, sockets: item?.clusterJewel !== undefined };
+}
 
 function heading(localizer: Localizer, entry: CarriedEntry, state: GameState, registry: Registry): Localized {
   const examine = itemExamine(localizer, itemTemplate(state, entry.id), weighing(state, registry));

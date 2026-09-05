@@ -1,19 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { itemStyle, lookOf } from './itemLook';
 
-const row = (verbs: readonly string[], sockets = false) => ({ verbs, sockets });
+const row = (nature: { base?: boolean; slotted?: boolean; sockets?: boolean }) => ({ base: false, slotted: false, sockets: false, ...nature });
 
 describe('what a carried thing looks like', () => {
-  it('reads the look off what the screen offers to do with it', () => {
-    expect(lookOf(row(['grow', 'equip', 'destroy']))).toBe('gear');
-    expect(lookOf(row(['equip', 'destroy']))).toBe('wearable');
-    expect(lookOf(row(['unequip', 'destroy']))).toBe('wearable');
-    expect(lookOf(row(['destroy']))).toBe('stuff');
+  it('reads the look off what the item is', () => {
+    expect(lookOf(row({ base: true, slotted: true }))).toBe('gear');
+    expect(lookOf(row({ slotted: true }))).toBe('wearable');
+    expect(lookOf(row({}))).toBe('stuff');
   });
 
-  it('calls a thing that sockets a jewel, whatever else it offers', () => {
-    expect(lookOf(row(['destroy'], true))).toBe('jewel');
-    expect(lookOf(row(['grow', 'destroy'], true))).toBe('jewel');
+  it('calls a thing that sockets a jewel, whatever else it is', () => {
+    expect(lookOf(row({ sockets: true }))).toBe('jewel');
+    expect(lookOf(row({ base: true, sockets: true }))).toBe('jewel');
   });
 
   it('fills by the look and edges by whether it has been grown, so the two axes never collide', () => {

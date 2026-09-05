@@ -525,39 +525,6 @@ thing to ask before assuming it may.
 *Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
 it, and a decision is recorded about the partial-id spelling in `completion.ts`.
 
-## An item's colour is read off what the player can do with it today, not off what it is
-
-`lookOf` (`src/ui/itemLook.ts:12-17`) decides whether a carried thing is a jewel, gear, a
-wearable or stuff by looking at which verbs the screen currently offers. `equip` is offered
-only when `wearable()` holds (`src/runtime/carriedScreen.ts:35`, `equipment.ts:21-25`), and
-`wearable` evaluates the item's `requires:`. So a wearable whose requirement the player has not
-met yet is drawn the same grey as a log, and turns green on level-up. Nothing about the item
-changed.
-
-The facts that say what the thing is — `item.slot`, `isBase(item)`, whether it sockets — do not
-move with the player, and `PlayStatus['carried']` (`session.ts:509-514`) already publishes a
-row the look could be computed onto.
-
-Scope, re-measured 2026-09-05 after the first sweep got it wrong: `grow` is gated only on
-`isBase`, which ignores `requires:`, so anything with an `item-level:` escapes. Sweeping
-`content/` and the fixture for an item with a `slot:` and a `requires:` and **no**
-`item-level:` gives **no shipped item at all** — the only section anywhere that hits it is the
-fixture's `# item ledger` (`src/content/fixture/fixture-town.dsl:127-131`). The first sweep
-named `eight-a-swing-hammer`, which carries no `requires:` and is `DEBUG`; it is neither.
-
-So this is a design point with no live instance, and should be ranked as one. It is worth
-closing because the next requirement-gated wearable without an item level will hit it silently,
-not because a player is looking at a grey hammer today.
-
-`src/ui/itemLook.test.ts:7` reads *"reads the look off what the screen offers to do with it"*,
-which describes the mechanism rather than deciding the behaviour — nothing in that file
-exercises `requires:` at all. Read it as unexamined rather than as a ruling. The break that
-settles it: make `equipment.ts:24` ignore `requires:` and see whether `itemLook.test.ts` has
-any opinion. It should not.
-
-*Closes when:* the carried row publishes what the item is, `lookOf` reads it, and an item the
-player cannot yet wear is the colour of the thing it is.
-
 ## `location` declares fields and overrides the printer anyway, so the contract's one rule has one exception
 
 `CLAUDE.md` says a kind either declares `fields` and gets its parser, printer and merge from
