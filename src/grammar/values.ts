@@ -242,6 +242,25 @@ export function decimalRange(cursor: Cursor, what: string): Range {
   return refuseZero(range, span, `${what} of 0 does nothing`);
 }
 
+export interface Counted {
+  count?: number;
+  entity: string;
+}
+
+export const counted = (zeroSays: string, examples: readonly string[]): Parser<Counted> => ({
+  parse(cursor) {
+    const start = cursor.pos;
+    const count = cursor.take(/\d+(?![\w-])/);
+    if (count === null) return { entity: id.parse(cursor) };
+    if (Number(count) === 0) throw new DslError(zeroSays, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
+    cursor.take(/[ 	]+/);
+    return { count: Number(count), entity: id.parse(cursor) };
+  },
+  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  forms: ['<entity>', '<count> <entity>'],
+  examples,
+});
+
 export const quantified: Parser<Quantified> = {
   parse(cursor) {
     const start = cursor.pos;

@@ -5,7 +5,7 @@ import { list } from '../../grammar/list';
 import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { DslError, Parser } from '../../grammar/parser';
 import { AnySchema, PrintContext, SectionSchema, isFieldEdits, listMembers, printSection } from '../../grammar/section';
-import { id, lastSegment, number, text } from '../../grammar/values';
+import { counted, id, lastSegment, number, text } from '../../grammar/values';
 import { actions, condition as visitCondition, pruneActions, put, type Loose } from '../refs';
 import { mergeFields } from '../merge';
 import { section, TOUCHED } from './define';
@@ -49,19 +49,7 @@ export interface Location {
   actions: Action[];
 }
 
-export const populationValue: Parser<Population> = {
-  parse(cursor) {
-    const start = cursor.pos;
-    const count = cursor.take(/\d+(?![\w-])/);
-    if (count === null) return { entity: id.parse(cursor) };
-    if (Number(count) === 0) throw new DslError('a count of 0 puts nothing here, so leave the entry out', { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    cursor.take(/[ \t]+/);
-    return { count: Number(count), entity: id.parse(cursor) };
-  },
-  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
-  forms: ['<entity>', '<count> <entity>'],
-  examples: ['rat', '3 rat'],
-};
+export const populationValue: Parser<Population> = counted('a count of 0 puts nothing here, so leave the entry out', ['rat', '3 rat']);
 
 export const edgeValue: Parser<Edge> = {
   parse(cursor) {

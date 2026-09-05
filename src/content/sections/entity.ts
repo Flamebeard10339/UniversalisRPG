@@ -4,11 +4,11 @@ import { ActionResult, resultBlock, resultGrammar, resultList } from '../../gram
 import { Condition } from '../../grammar/condition';
 import { HOOK_FAMILY, HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
-import { DslError, Parser } from '../../grammar/parser';
+import { Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { EntryBody, listMembers } from '../../grammar/section';
 import { statBonus, TagClause } from '../../grammar/tagClause';
-import { duration, id, number, text } from '../../grammar/values';
+import { counted, duration, id, number, text } from '../../grammar/values';
 import { localeKey } from '../locale';
 import { put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { hiddenIf, MintedAction, section, TOUCHED } from './define';
@@ -102,22 +102,7 @@ export const statAssignmentValue: Parser<[string, Range]> = {
   examples: ['attack 4', 'attack 4-7'],
 };
 
-export const allyValue: Parser<Ally> = {
-  parse(cursor) {
-    const count = cursor.take(/\d+(?![\w-])/);
-    if (count === null) return { entity: id.parse(cursor) };
-    if (Number(count) === 0)
-      throw new DslError('a roster of 0 brings nobody, so leave the line out', {
-        start: cursor.abs(cursor.pos),
-        end: cursor.abs(cursor.pos),
-      });
-    cursor.take(/[ \t]+/);
-    return { count: Number(count), entity: id.parse(cursor) };
-  },
-  print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
-  forms: ['<entity>', '<count> <entity>'],
-  examples: ['bandit', '2 bandit'],
-};
+export const allyValue: Parser<Ally> = counted('a roster of 0 brings nobody, so leave the line out', ['bandit', '2 bandit']);
 
 const HANDLER_LABEL = /^on[ \t]+(?<event>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
 
