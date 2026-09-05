@@ -1,63 +1,80 @@
 # What is still wrong that a lane can take
 
-A frame of live play is 10 a second and now costs about 4ms of the 100 it has:
-1.5ms rebuilding the view, ~1ms simulating, ~2.6ms rendering the App over the
-shipped world. It was 70ms and more. The gate that keeps it there is
-`src/ui/frameCost.dom.test.tsx`, which mounts the real App on the fixture world,
-leaves an action under way and drives the clock. Reach for it before believing
-any line below: it prints what a frame reads, wakes and draws.
+A frame of live play is ten a second and costs about 2ms of the 100 it has:
+0.5-0.6ms rebuilding the view, ~0.2ms simulating, ~1ms rendering the App with the
+production React a player runs. It was 70ms and more. In a real Chrome on the
+production build, nothing is dropped at any speed on a desktop.
 
-The two lines here are one piece of work in two halves, and the second pays only
-after the first. **A line is deleted the day it closes.**
+Two gates keep it there. `src/ui/frameCost.dom.test.tsx` mounts the real App on
+the fixture world, leaves an action under way and drives the clock: a frame must
+read no DSL at all, wake the screen exactly once, cost what it cost at the start
+of the session however long the session has run, and draw a log that stops
+growing. `journal.test.ts` holds that doubling a quest's stages does not multiply
+what the journal costs. Reach for both before believing any line below.
+
+**Measure before believing any number here.** Every share in this file has moved
+at least once, and two of the four things that turned out to matter most were not
+in it. **A line is deleted the day it closes.**
 
 ---
 
-## Every pane of every layer is drawn on every frame
-
-`App.tsx` builds `bodies = LAYERS.map(...)`, `Pager` renders all of a layer's
-panes into one strip and `VStack` stacks every layer, so a player standing on the
-home screen is also drawing the map, the settings page, the stats and skills
-pages, both ledgers and the journal — 351 elements, eight panes, one of them
-visible. Offscreen panes are hidden by a CSS transform, not by not existing.
-
-Measured on the shipped world: the whole tree is 2.6ms per render and roughly
-1.5ms of that is panes nobody can see. Nothing is memoized, and memoizing would
-not bite anyway while `view` is a fresh object every tick and `words`, `localizer`
-and every inline arrow prop are fresh identities per render.
-
-What makes this more than a saving: a pane that is never drawn need not have its
-data built either, which is the line below.
-
-The reason it was left is that `render.test.tsx` reads several claims off one
-render — that every field the runtime publishes is drawn somewhere, and what each
-page draws — and those are the author's claims, not an agent's. Culling means
-teaching them to walk to the page they are asking about. A swipe can only reach an
-adjacent page, so drawing the current page and its neighbours is enough.
-
-*Closes when:* `a-frame-draws-only-what-a-swipe-can-reach` passes, and
-`render.test.tsx` still proves every published field is drawn somewhere.
-
 ## The whole PlayView is rebuilt every frame, most of it for panes nobody opened
 
-`sessionStatus` returns 25 freshly-mapped arrays every 100ms. Timed on
-`combat-lessons.fresh-off-the-sewer` before the pattern cache landed, the shares
-were: the quest journal 31%, 53 stat breakdowns 26%, every recipe in the world
-tested for craftability 8%, and the titles of all 75 undiscovered places 4%. It is
-1.48ms now, down from 2.33ms, and the shares will have moved — measure again
-before choosing a target.
+`sessionStatus` returns 26 freshly-mapped arrays every 100ms. It is 0.5-0.6ms now,
+down from 2.3ms, and the world-sized share of it was measured at 80-91%: the quest
+journal, every stat's breakdown, every recipe tested for craftability, and the
+titles of all 75 undiscovered places — which no player ever sees, because
+`undiscovered` is read only by the map in author mode and by the editing page.
+`undiscovered` is 12KB of the 32KB view and `journal` another 8KB.
 
-None of it is wrong to publish; it is wrong to publish ten times a second when the
-journal is one subpage and the recipe list another. The shape that fits is lazy
-memoized fields on the returned view, so a collection is built when a pane reads
-it — but that pays nothing while every pane is mounted, so it is second.
+**Laziness is the obvious shape and it is unsound. Do not reach for it again
+without reading this.** Making the fields memoized getters was tried and reverted:
+a lazy view stops being a snapshot, because the getter reads the state as it is
+when someone looks rather than as it was when the view was made. Three tests found
+it immediately by holding a view across a mutation, and the same pattern is in
+production — `useNotices` in `App.tsx` keeps the previous view in a ref and
+compares it to the new one *in an effect*, which runs after ticks have moved the
+world, so quest and level notices would silently stop being raised.
 
-Watch two things. `viewLeaves` and `published.test.ts` walk the view's own fields
-and would walk getters, and `serializeSession` must not start building collections
-it did not need.
+What is left that is sound: publish less, or make what is published keep its
+identity. A view field that has not changed can keep the object it had —
+`JSON.stringify` over all 26 fields costs 0.09ms against a 0.55ms build, so the
+comparison is nearly free — and that is the unlock for `React.memo`, which cannot
+bite today because every field is a fresh array every tick. The panes would then
+have to take the slices they draw rather than the whole view.
 
 *Closes when:* a frame with only the home pane drawn does not build the journal,
 the stat breakdowns or the recipe list, and `npm run oracle -- --at content` and
 the suite are unchanged.
+
+## React re-renders the whole tree ten times a second
+
+`advance` publishes a new snapshot every tick and `App` renders from the root.
+There is one `React.memo` in the UI, on the transcript's `Line`. Measured on the
+shipped world with production react-dom under jsdom: ~1ms of the ~2ms frame.
+
+The case for doing something is not the millisecond, it is the rate. Instrumented
+over the shipped world at player speed, the fraction of ticks that change anything
+outside `time`, the action's progress and the pools that regenerate: **0.77%
+fishing, 1.0% poaching, 6.9% in a fight, 3.3% travelling.** So more than nine in
+ten renders draw the same screen twice.
+
+Two ways in, and the first is a prerequisite for the second. Keep field identity
+(above), then memoize the panes on their slices. Or publish the continuously
+moving numbers as ramps — the engine already holds `Cadence { progress, span }`
+in `state.ts` and publishes only a sample of it — so two quiet views are
+structurally identical and `publish()` can be gated on a plain deep-equal with
+nothing excluded and no list.
+
+Watch: `driver.snapshot()` is what React subscribes to *and* what the agent test
+harness reads (`testState` asserts on `live.progress` right after a tick), so a
+gate needs `snapshot()` and a fresh `latest()` split apart. And
+`frameCost.dom.test.tsx` asserts exactly one publish per tick, which a gate makes
+false by construction; it becomes at most one, plus a claim about the rate, and
+that rate claim is the real gate for this work.
+
+*Closes when:* a run of a hundred quiet ticks renders the App fewer than ten
+times, and the test harness still reads a live progress that moved.
 
 ## The modal beat restarts whenever the world speaks under it
 
@@ -76,3 +93,17 @@ this line.
 
 *Closes when:* a modal being read a character at a time keeps its place while the
 world speaks under it, proved in a `*.dom.test.tsx` beside `Modal.tsx`.
+
+## The log's scroll anchor forces a layout on every batch of new lines
+
+`Home.tsx`'s scroll effect reads two `getBoundingClientRect`s, `scrollHeight` and
+`clientHeight`, then writes `scrollTop`. It runs when the transcript changed,
+which at 64x is every tick. Measured in production Chrome: 135ms of every 15
+seconds of play, which is the one app-side cost that survives minification into
+the top three.
+
+It is small next to what has already gone, and it is named here because it is the
+last forced synchronous layout on the frame path rather than because it is urgent.
+
+*Closes when:* anchoring the log reads layout once per batch rather than four
+times, or not at all, and `logRest.test.ts` still holds.
