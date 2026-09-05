@@ -22,6 +22,7 @@ import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { unpriceableStock } from './sections/shop';
 import { statRing } from './sections/stat';
+import { flagRing } from './sections/flag';
 import { selfRollingDropTable } from './sections/droptable';
 import { twoToughnessLines } from './sections/ladder';
 import { actionAddresses, carriedIds, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
@@ -585,6 +586,7 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     twoStartingLocations(registry.locations) ??
     selfRollingDropTable(registry.dropTables) ??
     statRing(registry.stats) ??
+    flagRing(registry.flags) ??
     twoToughnessLines(registry.ladders) ??
     unperformableAction(authoredResults(registry), registry.actions);
   if (refused) return blamedOn(owners, refused);

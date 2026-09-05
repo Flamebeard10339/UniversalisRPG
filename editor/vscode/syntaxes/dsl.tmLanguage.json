@@ -1425,6 +1425,20 @@
           "include": "#refused"
         },
         {
+          "match": "^[ \\t]*([+-]?)(is)[ \\t]*(:)",
+          "captures": {
+            "1": {
+              "name": "keyword.operator.written-again.dsl"
+            },
+            "2": {
+              "name": "keyword.other.field.dsl"
+            },
+            "3": {
+              "name": "punctuation.separator.key-value.dsl"
+            }
+          }
+        },
+        {
           "match": "^[ \\t]*([+-]?)(bundle)\\b",
           "captures": {
             "1": {

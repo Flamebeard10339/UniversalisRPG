@@ -209,6 +209,28 @@ describe('a member key is owned by every kind that declares it', () => {
   });
 });
 
+describe('a flag standing for a condition', () => {
+  it('refuses a name the condition it stands for does not know, the same as anywhere else', () => {
+    expect(() => loadModule(['# flag tide-out', '# flag beachcombing', 'is: tide-out and dayligth'].join('\n'))).toThrow(/names an unknown flag: dayligth/);
+  });
+
+  it('cannot also be a bundle, because a bundle holds what a line moved into it', () => {
+    expect(() => loadModule(['# flag tide-out', '# flag confiscated', 'bundle', 'is: tide-out'].join('\n'))).toThrow(/holds what a line moved into it rather than a standing test/);
+  });
+
+  it('refuses a ring, which could never be read', () => {
+    expect(() => loadModule(['# flag one', 'is: two', '# flag two', 'is: one'].join('\n'))).toThrow(/one -> two -> one/);
+    expect(() => loadModule(['# flag alone', 'is: alone'].join('\n'))).toThrow(/alone -> alone/);
+    expect(() => loadModule(['# flag one', 'is: two', '# flag two', 'is: three', '# flag three', 'is: not one'].join('\n'))).toThrow(/may not name one that names it/);
+  });
+
+  it('goes away with the object it hung under, so a flag standing on it no longer resolves', () => {
+    const doomed = module('doomed', '# entity door', 'flags: unlocked');
+    const wrecker = module('wrecker', 'dependencies: doomed', '# remove entity.doomed.door', '# flag worth-a-look', 'is: door.unlocked');
+    expect(() => loadUniverse([doomed, wrecker])).toThrow(/names an unknown flag: doomed.door.unlocked/);
+  });
+});
+
 describe('an action a field edit takes away', () => {
   const BASE = module('base', '# action pry', 'instant', 'say: creak', '# entity dresser', 'uses: pry');
   const cut = (id: string): ModuleSource => module(id, 'dependencies: base', '# entity base.dresser', '-uses: pry');

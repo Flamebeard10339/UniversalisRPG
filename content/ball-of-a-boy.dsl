@@ -59,16 +59,19 @@ stage reported:
 # entity tulsa.mouse
 hidden if: down-the-grate.back-up
 
+# flag still-looking-for-a-way-down
+is: down-the-grate.asked and not down-the-grate.back-up
+
 # dialogue tulsa.town-crier
 node the-back-way:
-  when: down-the-grate.asked and not down-the-grate.back-up
+  when: still-looking-for-a-way-down
   ask: About the sewers.
   again: Same as I said. The old witch's cellar, if the hatch is shut to you.
   "The sewers? Everyone goes at the hatch, and the hatch wants paying." He does not quite lower the bell, which is as close as he gets to lowering his voice. "There's a wall down in Oolga's cellar that's been open for years and nobody minding it. I don't cry that one. Free, though, same as everything else I say."
 
 # dialogue tulsa.oolga
 node the-cellar-wall:
-  when: down-the-grate.asked and not down-the-grate.back-up
+  when: still-looking-for-a-way-down
   ask: About your cellar.
   again: Still down there. Still my sacks, whatever's left of them.
   "My cellar wall came down into the sewer years ago, and I have never once had it mended." She looks at you the way she looks at everything, over the top of it. "Go and look, if the front way is shut to you. Mind the sacks. Something's been at them."

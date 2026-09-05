@@ -75,6 +75,14 @@ set: sifted-twice
 
 # flag short-odds-held
 
+# flag both-latches-open
+is: hidden-latch-open and required-latch-open
+
+# flag the-loft-is-open
+is: both-latches-open
+
+# flag walked-out
+
 # location fixture-town.loft
 sift:
   instant
@@ -122,6 +130,10 @@ lean on the shutter:
   instant
   1000 vs core.digging-rate:
     set: short-odds-held
+walk out of the loft:
+  instant
+  requires: the-loft-is-open
+  set: walked-out
 
 # test a-hidden-if-an-action-sets-itself-ends-the-run
 goto: fixture-town.loft
@@ -192,6 +204,28 @@ goto: fixture-town.loft
 use: location.fixture-town.loft.sift
 assert: sifted-once
 assert: not sifted-twice
+
+# test a-flag-standing-for-a-condition-is-false-until-the-condition-holds
+DEBUG
+goto: fixture-town.loft
+assert: not both-latches-open
+assert: not the-loft-is-open
+use: location.fixture-town.loft.pick-the-hidden-latch until done
+assert: hidden-latch-open
+assert: not both-latches-open
+use: location.fixture-town.loft.walk-out-of-the-loft
+refused
+assert: not walked-out
+
+# test a-flag-standing-for-a-condition-holds-wherever-it-is-named-once-the-condition-does
+DEBUG
+goto: fixture-town.loft
+use: location.fixture-town.loft.pick-the-hidden-latch until done
+use: location.fixture-town.loft.pick-the-required-latch until done
+assert: both-latches-open
+assert: the-loft-is-open
+use: location.fixture-town.loft.walk-out-of-the-loft
+assert: walked-out
 
 # test an-entity-hidden-by-its-own-condition-refuses-its-actions
 goto: fixture-town.green
