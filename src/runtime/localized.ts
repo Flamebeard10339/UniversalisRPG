@@ -20,18 +20,35 @@ export type AnswerTable<V extends Answer | number | boolean> = Readonly<Record<A
 export type Params = Readonly<Record<string, Localized | number>>;
 
 
+const TOKENIZED = new Map<string, readonly TextSegment[]>();
+
+const segmentsOf = (words: string): readonly TextSegment[] => {
+  const held = TOKENIZED.get(words);
+  if (held !== undefined) return held;
+  const parsed = parseSegments(words, 0);
+  TOKENIZED.set(words, parsed);
+  return parsed;
+};
+
 function substitute(pattern: string, key: string, params: Params): string {
   try {
-    return weighInFrame(parseSegments(pattern, 0), params, key);
+    return weighInFrame(segmentsOf(pattern), params, key);
   } catch (error) {
     throw error instanceof DslError ? new RuntimeError(error.message) : error;
   }
 }
 
-const plainly = (words: string): string =>
-  parseSegments(words, 0)
+const READ_AS = new Map<string, string>();
+
+const plainly = (words: string): string => {
+  const held = READ_AS.get(words);
+  if (held !== undefined) return held;
+  const said = segmentsOf(words)
     .map((segment) => (segment.kind === 'literal' ? segment.text : ''))
     .join('');
+  READ_AS.set(words, said);
+  return said;
+};
 
 function pattern(locales: Locales, language: string, key: string): string | undefined {
   const declared = locales.declared.get(language)?.get(key);
