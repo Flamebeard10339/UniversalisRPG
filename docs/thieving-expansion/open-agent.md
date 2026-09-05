@@ -131,8 +131,15 @@ warden being gone five minutes, the watch being elsewhere. They are carried, so 
 beside the things the player is actually carrying, and read as something they have rather than
 as a clock running somewhere else.
 
-*Closes when:* a buff that only marks a stretch of time is not shown in the carried list, and
-which buffs those are is derived from what they do rather than listed by id.
+**The engine must not work out which buffs these are.** Whether a buff is shown is a fact
+about it that the author states, exactly as `food` and `stacks` are stated: the oracle's
+`<tag>` line says a tag is *a word of your own, carried and never read — the engine acts on
+the words below and on no other*, so a tag the engine reads is the mechanism already there.
+Inferring visibility from what a buff does would be a guess standing where a declaration
+belongs, and the four above are only alike by accident.
+
+*Closes when:* a buff declares whether it is shown in the carried list, the four warden and
+watch timers declare that they are not, and nothing in the engine asks what a buff is for.
 
 ## Failing the market stall takes the player's action away with nothing said
 

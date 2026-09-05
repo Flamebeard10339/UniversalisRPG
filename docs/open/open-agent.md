@@ -292,8 +292,9 @@ The `welcome-back` screen is where this was noticed: it wants to say *do not typ
 and there is nowhere to say it.
 
 *Closes when:* raising a modal, answering one, and saying how its body is revealed all go
-through one declared surface, and a lane adding a modal has nothing to invent. Whatever that
-surface is, it derives what a modal may say rather than listing the modals.
+through one declared surface, and a lane adding a modal has nothing to invent. The surface
+states what a modal may say; it does not work out what a given modal wants from what that
+modal is — a caller that has to be guessed at is the thing being replaced.
 
 ## The typewriter cannot be skipped and its speed is a constant
 

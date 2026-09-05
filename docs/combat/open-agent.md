@@ -271,6 +271,10 @@ Reported from play as *why is there both fight and bout*. Whether the engine's v
 stand down where a body offers a combat action of its own, or whether both are meant to be
 there and want distinguishing on the screen, is the question.
 
-*Closes when:* a body carrying its own combat action shows one verb, or shows both with the
-difference legible, and whichever it is falls out of what the body declares rather than being
-written per entity.
+**The engine must not read `uses: bout` as an instruction to stand its own verb down.** That
+would be a guess about what the author meant from the presence of an action, and an entity
+may perfectly well want both. Which verbs a body offers is the body's to declare.
+
+*Closes when:* an entity says whether it is fightable by the engine's own verb, the sparring
+guardsman says what it means to offer, and no part of the engine decides the question by
+looking at what actions the body happens to carry.
