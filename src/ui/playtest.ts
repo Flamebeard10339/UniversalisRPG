@@ -55,11 +55,12 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
   const partsKept = (): number[] => {
     try {
       return partsHeld(store.list());
-    } catch (error) {
-      complain(`the parts of this run already kept could not be listed: ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
       return [];
     }
   };
+
+  let parts = partsKept().length;
 
   const keep = (): void => {
     try {
@@ -78,6 +79,7 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
         complain(`part ${part} of the last run could not be dropped: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    parts = partsKept().length;
   };
 
   const rollOver = (): void => {
@@ -89,6 +91,7 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
       complain(`part ${next} of this run could not be set aside, so it goes on in one piece: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
+    parts = next;
     held = { run: { id: partRunId(header().at, next + 1), log: [] }, from: { bytes: taken() } };
   };
 
@@ -114,7 +117,7 @@ export function createRecorder(store: SlotStore, complain: (text: string) => voi
   return {
     run: () => held?.run ?? null,
     kept: () => held,
-    parts: () => partsKept().length,
+    parts: () => parts,
     everyPart,
     start: (from) => {
       clear();
