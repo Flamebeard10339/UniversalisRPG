@@ -492,8 +492,9 @@ function linkActions(registry: Registry): ExtendsFailure | null {
     const base = resolve(declared.extends, [...trail, id]);
     open.delete(id);
 
-    const laid = { ...overlayAction(base, declared), label: declared.label, wrote: actionResultLists(declared) } as ActionDeclaration;
-    if (declared.generatedLabel) laid.generatedLabel = true;
+    const inherits = declared.generatedLabel === true && base.generatedLabel !== true;
+    const laid = { ...overlayAction(base, declared), label: inherits ? base.label : declared.label, wrote: actionResultLists(declared) } as ActionDeclaration;
+    if (declared.generatedLabel && !inherits) laid.generatedLabel = true;
     else delete laid.generatedLabel;
     delete laid.appended;
 

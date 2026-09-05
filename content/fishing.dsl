@@ -91,28 +91,23 @@ on attempts exhausted:
   drain: 1 line-health
 
 # action net-cast
-title: Fish
 extends: cast
 requires: has small-fishing-net or has large-fishing-net
 
 # action rod-cast
-title: Fish
 extends: cast
 requires: has fishing-rod or has greenheart-rod or has rod-and-winch
 rate: us.rod-cast-rate
 
 # action bait-cast
-title: Fish
 extends: rod-cast
 +requires: has dried-fish-bait or has wrigglers
 
 # action paste-cast
-title: Fish
 extends: rod-cast
 +requires: has bread-paste
 
 # action herring-cast
-title: Fish
 extends: rod-cast
 +requires: has herring-strip
 

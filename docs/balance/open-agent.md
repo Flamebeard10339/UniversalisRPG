@@ -50,9 +50,34 @@ The pieces are in place either way: `resistanceTo` and `typedShare` in
 model as soon as the model is settled. `typedShare` should also be calling `resistanceTo`
 rather than spelling the same `(1 - resistance / 100)` four lines below it.
 
+Ruled 2026-09-05: **the solver uses the engine's own functions directly.** It does not keep a
+second arithmetic that agrees with the first by inspection. `resistanceTo` and `typedShare`
+take a reader and read no state, so a predictor can call exactly what a swing calls; whatever
+`foeSolve` cannot answer that way is a hole in the model rather than a reason to restate it.
+
 *Closes when:* a stat says whether the damage it deals is typed, the runtime counts it once,
-and `foeSolve` prices a swing by asking `damageModel` rather than by re-deriving it — with
+and `foeSolve` prices a swing by calling `damageModel` rather than by re-deriving it — with
 `foeTier`'s round-trip still exact.
+
+## The solver reaches its tier by handing out negative defence, where it should be taking health off
+
+Ruled 2026-09-05: **prefer reducing health over negative flat defence.**
+
+To make a body fall in the seconds its `# tier` declares, `foeSolve` solves for `core.defense`
+and will go below zero to get there. Eleven of the shipped world's entities solve negative
+today — `combat.feral-rat` at -63.31, `tulsa.civilian` at -50.40, `combat.cow` at -47.45,
+`birds-and-the-bees.calm-drone` at -41.39, down to `combat.highwayman` at -0.00. Negative flat
+reduction is not a thing the DSL can write or a player can read: it means every blow that
+lands is *increased* by the foe's own defence, which is the opposite of what the word says and
+is why the `ratkin-warchief` reading above is so hard to interpret.
+
+Health is the honest knob. A weak body is one with little health, not one that makes your
+sword hit harder, and `core.max-health` is already what the solver scales for a tier's
+`seconds to fell`.
+
+*Closes when:* `foeSolve` reaches a tier by lowering health once defence would go below zero,
+no shipped entity solves to a negative `core.defense`, and `npm run floors` and the tier audit
+still read what they read.
 
 ## Health outruns attack about two to one, and the curve by nine
 

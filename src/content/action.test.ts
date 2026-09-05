@@ -27,11 +27,18 @@ describe('# action extends:', () => {
     expect(declared(source, 'steal').label).toBe('Steal');
   });
 
-  it('takes the name its id makes where it writes no title:, rather than the name it extends', () => {
+  it('takes the name of what it extends where it writes no title:, since a name is a line like any other', () => {
     const action = declared(stealing('# action pick-pocket', 'extends: steal'), 'pick-pocket');
 
-    expect(action.label).toBe('pick-pocket');
-    expect(action.generatedLabel).toBe(true);
+    expect(action.label).toBe('Steal');
+    expect(action.generatedLabel).toBeUndefined();
+  });
+
+  it('takes the name its own id makes where nothing up the chain wrote one either', () => {
+    const source = module('# action rummage', '', '# action pick-pocket', 'extends: rummage');
+
+    expect(declared(source, 'pick-pocket').label).toBe('pick-pocket');
+    expect(declared(source, 'pick-pocket').generatedLabel).toBe(true);
   });
 
   it('replaces what it writes bare and adds to what it writes with +', () => {

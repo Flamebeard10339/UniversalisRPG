@@ -87,7 +87,6 @@ continuous
 time: 6
 
 # action pick-the-lock
-title: Pick the Lock
 extends: lockpicking
 +on success:
   stands: open-chest for 3s
