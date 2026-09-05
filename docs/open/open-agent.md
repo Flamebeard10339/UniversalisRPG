@@ -635,3 +635,37 @@ already knows and currently expresses as code instead of as a declaration.
 `location`'s schema, `location.ts` declares no `print` and no `merge`, and `CLAUDE.md`'s
 sentence is true again — with the corpus still round-tripping, which is what would catch a
 coordinate line printed wrong.
+
+## `continuous` is checked against the body as typed, so an action cannot inherit its own pace
+
+`assembledActionProblem` (`src/grammar/action.ts:337`) refuses a continuous action with no
+`time:` or `rate:`. It is called twice on the merged body — `load.ts:331` and `:501` — which is
+right, and once more at parse time from `resolveKind` (`action.ts:373`), which is not: at that
+point `extends:` has supplied nothing, because `extends:` is a `# action` section field
+(`sections/action.ts:54`) and `actionBody.parseBlock` never sees it.
+
+Measured 2026-09-05 with two drafts through `npm run oracle -- --at`:
+
+    extends: core.melee-combat / attempts: 6                → taken into the world
+    extends: core.melee-combat / continuous / attempts: 6   → refused,
+      *action "swing-again": a continuous action needs a time: or rate: to set its pace*
+
+The second is the same action saying out loud what the first inherits silently, and the parent
+supplies `rate:` in both.
+
+Shape 1 — a check re-deriving from the body as typed what the merged body already states. It
+costs one real line today: `# action core.melee-combat` restates `rate: us.attack-rate` that
+`melee-swing` could hold, because writing `continuous` without it is refused before the merge
+happens.
+
+The fix is not a one-liner and that is why it is a line rather than a commit. Either the parse
+gets told the body extends something — a flag through `EntryBody.parseBlock`, crossing the
+grammar/content boundary that keeps `extends:` out of the body parser today — or the assembled
+check leaves parse time entirely and lives only at the two load sites, which moves where an
+author sees the refusal and costs it its span. `src/content/parse.test.ts:571` and
+`src/content/completion.test.ts:218` both pin the parse-time refusal, so whichever way it goes,
+they say what the answer was.
+
+*Closes when:* an action that extends a continuous parent may write `continuous` without
+restating its pace, `melee-combat` holds no `rate:` that `melee-swing` could, and a body that
+extends nothing is still refused with a span.
