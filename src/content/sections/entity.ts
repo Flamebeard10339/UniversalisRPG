@@ -112,6 +112,7 @@ export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL
 export const isHandlerBlock = (block: EntityBlock): block is HandlerBlock => 'event' in block;
 
 const entityBlock: EntryBody = {
+  reads: [...actionBody.reads, ['on <event>', resultList]],
   grammar: [...actionBody.grammar, { form: 'on <event>:', example: 'on death:', family: HOOK_FAMILY, block: resultGrammar }],
   parse(cursor, label) {
     const event = handlerEvent(label);

@@ -596,28 +596,6 @@ helper for the readers that want a map — or a field can declare that its held 
 by one hole of its parser and valued by another, and `landings` reads that. Prefer the first:
 `Record<number, string>` is read in six places and none of them needs it to be a record.
 
-## The round-trip proof's root set skips action bodies, so four parsers are unproved
-
-`dsl.test.ts:741-747` derives its subjects, correctly, from `schema.fields` — but an action
-body's fields are `ACTION_FIELDS` in `grammar/action.ts`, reached through `schema.entries.body`,
-which the root set does not walk. Measured against `exportedCodecs` (`grammar/codec.ts:24`),
-exactly four parsers are outside it: `action#perMinute`, `actionResult#resultList`,
-`segment#fragment` and `tagClause#bonusAmount`. `hookResultList` is checked; its twin
-`resultList` is not, because it is only ever an action-body field.
-
-All four are clean today, so this is coverage rather than a bug. `exportedCodecs` is exported
-and called from nowhere — grep across `src/` and `scripts/` — so it is either the fix's raw
-material or dead.
-
-**The break that discriminates** — do not break `resultList.print`, which the fixture round-trip
-catches; that would prove nothing. Add a form to `perMinute.forms` in `grammar/action.ts` with
-no matching example. `shapeFailures` is the only thing asserting forms against examples,
-`perMinute` is outside its roots, and the per-kind walk at `dsl.test.ts:718` drops a form with
-no example silently. If nothing reddens, the gap is real.
-
-*Closes when:* an entry body can offer its parsers to the root set, the four are covered, and
-`exportedCodecs` is used or deleted.
-
 ## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
 
 `{ '<N>': '1', '<enter>': '', '<directive>': … }` — what to type where a command spec's name is

@@ -1,6 +1,6 @@
 import { deepStrictEqual } from 'node:assert';
 import { describe, expect, it } from 'vitest';
-import { collectionFailures, formFailures, nameFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
+import { collectionFailures, exportedCodecs, formFailures, nameFailures, reachableCodecs, shapeFailures } from '../grammar/codec';
 import { kindNamed, offeringAt } from './completion';
 import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
@@ -46,6 +46,14 @@ const GRAMMAR: { kind: string; line: Written; under: string; indent: number }[] 
   };
   for (const owner of sections()) walk(owner.kind, owner.grammar, `# ${owner.kind} probe`, 0);
 }
+
+const SPELLED_OUT = import.meta.glob(['../grammar/**/*.ts', './**/*.ts', '!./**/*.test.ts', '!../grammar/**/*.test.ts'], { eager: true }) as Record<string, object>;
+
+const offeredRoots = (): (readonly [string, unknown])[] => [
+  ...sections().flatMap((owner) => Object.entries(owner.schema?.fields ?? {}).map(([field, spec]) => [`${owner.kind}.${field}`, spec.parser] as const)),
+  ...sections().flatMap((owner) => (owner.schema?.entries === undefined ? [] : owner.schema.entries.body.reads.map(([written, parser]) => [`${owner.kind} ${written}`, parser] as const))),
+  ...GRAMMAR.flatMap((at) => Object.entries(at.line.holds?.() ?? {}).map(([hole, parser]) => [`${at.kind} ${at.line.form} <${hole}>`, parser] as const)),
+];
 
 const HOLES = GRAMMAR.flatMap((at) =>
   (holesIn(at.line.form, at.line.example) ?? []).map((hole) => ({
@@ -748,8 +756,8 @@ describe('every section kind', () => {
   });
 
   it('is read by parsers that print back what they parsed', () => {
-    const codecs = reachableCodecs(sections().flatMap((section) => Object.entries(section.schema?.fields ?? {}).map(([field, spec]) => [`${section.kind}.${field}`, spec.parser] as const)));
-    expect(codecs.size).toBeGreaterThan(20);
+    const codecs = reachableCodecs([...offeredRoots(), ...[...exportedCodecs(SPELLED_OUT)].map(([parser, name]) => [name, parser] as const)]);
+    expect(codecs.size).toBeGreaterThan(80);
     expect(collectionFailures(codecs)).toEqual([]);
     expect(shapeFailures(codecs)).toEqual([]);
     expect(nameFailures(codecs)).toEqual([]);

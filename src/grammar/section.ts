@@ -40,6 +40,7 @@ export interface EntryBody {
   parse(cursor: Cursor, label: string): object;
   parseBlock(lines: RawLine[], label: string): object;
   grammar: readonly Written[];
+  reads: readonly (readonly [string, Parser<unknown>])[];
 }
 
 export interface SectionSchema<H extends { id: string }, Flags extends keyof H = never, Entries extends keyof H = never> {
