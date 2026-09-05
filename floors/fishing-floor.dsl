@@ -25,8 +25,10 @@ until 200 times:
   submit-modal: item=sell:fishing.raw-shrimp
 submit-modal: item=buy:fishing.fishing-rod
 submit-modal: item=buy:fishing.gut-line
-until 40 times:
-  submit-modal: item=buy:fishing.dried-fish-bait
+until has 40 fishing.dried-fish-bait:
+  wait: 60
+  submit-modal: item=more:buy:fishing.dried-fish-bait
+  submit-modal: count=40
 submit-modal: item=close
 assert: has fishing.fishing-rod
 assert: has fishing.gut-line
@@ -46,8 +48,10 @@ until level.fishing >= 11:
   shop: fishing.fishing-supplies
   until not has fishing.raw-trout:
     submit-modal: item=sell:fishing.raw-trout
-  submit-modal: item=more:buy:fishing.dried-fish-bait
-  submit-modal: count=100
+  until has 100 fishing.dried-fish-bait:
+    wait: 60
+    submit-modal: item=more:buy:fishing.dried-fish-bait
+    submit-modal: count=100
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.riverside
@@ -63,8 +67,10 @@ until level.fishing >= 20:
   shop: fishing.fishing-supplies
   until not has fishing.raw-pike:
     submit-modal: item=sell:fishing.raw-pike
-  submit-modal: item=more:buy:fishing.dried-fish-bait
-  submit-modal: count=100
+  until has 100 fishing.dried-fish-bait:
+    wait: 60
+    submit-modal: item=more:buy:fishing.dried-fish-bait
+    submit-modal: count=100
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.riverside
@@ -84,10 +90,14 @@ until level.fishing >= 22:
   shop: fishing.fishing-supplies
   until not has fishing.raw-sturgeon:
     submit-modal: item=sell:fishing.raw-sturgeon
-  submit-modal: item=more:buy:fishing.dried-fish-bait
-  submit-modal: count=100
-  submit-modal: item=more:buy:fishing.bread-paste
-  submit-modal: count=40
+  until has 100 fishing.dried-fish-bait:
+    wait: 60
+    submit-modal: item=more:buy:fishing.dried-fish-bait
+    submit-modal: count=100
+  until has 40 fishing.bread-paste:
+    wait: 60
+    submit-modal: item=more:buy:fishing.bread-paste
+    submit-modal: count=40
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.riverside
@@ -110,8 +120,10 @@ until level.fishing >= 25:
   shop: fishing.fishing-supplies
   until not has fishing.raw-tench:
     submit-modal: item=sell:fishing.raw-tench
-  submit-modal: item=more:buy:fishing.bread-paste
-  submit-modal: count=40
+  until has 40 fishing.bread-paste:
+    wait: 60
+    submit-modal: item=more:buy:fishing.bread-paste
+    submit-modal: count=40
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.swamp-edge
@@ -143,8 +155,10 @@ until level.fishing >= 26:
   shop: fishing.fishing-supplies
   until not has fishing.raw-perch:
     submit-modal: item=sell:fishing.raw-perch
-  submit-modal: item=more:buy:fishing.dried-fish-bait
-  submit-modal: count=100
+  until has 100 fishing.dried-fish-bait:
+    wait: 60
+    submit-modal: item=more:buy:fishing.dried-fish-bait
+    submit-modal: count=100
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.riverside
@@ -163,8 +177,10 @@ until level.fishing >= 30:
   shop: fishing.fishing-supplies
   until not has fishing.raw-carp:
     submit-modal: item=sell:fishing.raw-carp
-  submit-modal: item=more:buy:fishing.bread-paste
-  submit-modal: count=40
+  until has 40 fishing.bread-paste:
+    wait: 60
+    submit-modal: item=more:buy:fishing.bread-paste
+    submit-modal: count=40
   submit-modal: item=close
   travel: tulsa.market-square
   travel: tulsa.riverside
