@@ -1764,10 +1764,12 @@ entities:
 {"version":13,"location":"tulsa.well-lane","inventory":{"core.coin":1100},"xp":{"thieving.thieving":1382}}
 
 # save in-the-square-with-a-light-purse
-{"version":13,"location":"tulsa.market-square","inventory":{"core.coin":300}}
+over: tulsa.in-town
+{"version":13,"inventory":{"core.coin":300}}
 
 # save in-the-square-with-a-full-purse
-{"version":13,"location":"tulsa.market-square","inventory":{"core.coin":400},"xp":{"thieving.thieving":1382}}
+over: tulsa.in-town
+{"version":13,"inventory":{"core.coin":400},"xp":{"thieving.thieving":1382}}
 
 # save in-the-lock-up-owed-a-purse
 {"version":13,"location":"thieving.lock-up","inventory":{"core.coin":40},"xp":{"thieving.thieving":5345},"bundles":{"thieving.confiscated":{"stacks":{"core.coin":200},"copies":[]}}}

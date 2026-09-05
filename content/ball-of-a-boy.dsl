@@ -120,10 +120,12 @@ pick the lock from the inside:
 +entities: barred-door-from-inside
 
 # save at-the-grate
-{"version":13,"location":"tulsa.market-square","inventory":{"core.coin":1000,"core.lockpick":1}}
+over: tulsa.in-town
+{"version":13,"inventory":{"core.coin":1000,"core.lockpick":1}}
 
 # save at-the-grate-with-a-herring
-{"version":13,"location":"tulsa.market-square","inventory":{"core.coin":200,"core.lockpick":1,"core.cooked-herring":1}}
+over: tulsa.in-town
+{"version":13,"inventory":{"core.coin":200,"core.lockpick":1,"core.cooked-herring":1}}
 
 # save fresh-at-the-barred-door
 over: tulsa.at-the-sewer-junction

@@ -217,7 +217,8 @@ entities:
   plague-ledger, the-twins
 
 # save both-quests-settled
-{"version":13,"location":"tulsa.market-square","flags":{"the-rat-conspiracy.rat-conspiracy.settled":true,"the-swampy-menace.oolgas-errands.settled":true,"tulsa.ratkin-border.discovered":true}}
+over: tulsa.in-town
+{"version":13,"flags":{"the-rat-conspiracy.rat-conspiracy.settled":true,"the-swampy-menace.oolgas-errands.settled":true,"tulsa.ratkin-border.discovered":true}}
 
 # save at-the-twins-for-balance
 DEBUG

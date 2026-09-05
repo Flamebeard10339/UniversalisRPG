@@ -1179,10 +1179,12 @@ node over-the-barrel:
 {"version":13,"location":"tulsa.market-row","instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # save in-town-with-bent-coins
-{"version":13,"location":"tulsa.market-square","inventory":{"core.bent-coin":8}}
+over: in-town
+{"version":13,"inventory":{"core.bent-coin":8}}
 
 # save hurt-in-town
-{"version":13,"location":"tulsa.market-square","resources":{"core.health":11000}}
+over: in-town
+{"version":13,"resources":{"core.health":11000}}
 
 # save at-the-sewer-junction
 {"version":13,"location":"tulsa.sewer-junction","inventory":{"core.lockpick":1},"flags":{"tulsa.heard-of-the-back-way":true}}

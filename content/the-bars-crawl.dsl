@@ -142,7 +142,8 @@ stage poured:
     again: Out on the bar already, if you want to see how it's going over.
 
 # save fresh-for-the-brew
-{"version":13,"location":"tulsa.market-square","xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.dried-fish-bait":30},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
+over: tulsa.in-town
+{"version":13,"xp":{"fishing.fishing":6725,"cooking.cooking":6725},"inventory":{"fishing.dried-fish-bait":30},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.13564288965426385,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.6093358164653182,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.794003525050357,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.47681119898334146,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}
 
 # test the-bars-crawl-start-to-finish
 load: fresh-for-the-brew

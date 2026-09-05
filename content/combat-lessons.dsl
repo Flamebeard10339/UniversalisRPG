@@ -157,7 +157,8 @@ node about-sal:
   "Sal give you the talk? Types, resistances, the whole business?" He nods at the bronze on the racks behind him. "None of that turns anything. She'll have set you up better than the counter does, if you took it."
 
 # save fresh-off-the-sewer
-{"version":13,"location":"tulsa.market-square","xp":{"combat.attack":15,"combat.health":45},"inventory":{"core.coin":50},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"equipped":{"mainhand":"1","offhand":"2"}}
+over: tulsa.in-town
+{"version":13,"xp":{"combat.attack":15,"combat.health":45},"inventory":{"core.coin":50},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"equipped":{"mainhand":"1","offhand":"2"}}
 
 # test the-drunk-is-found-mauled-and-helped-up
 unkillable
