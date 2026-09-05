@@ -5,14 +5,10 @@ type CarriedRow = PlayStatus['carried'][number];
 
 export type ItemLook = 'gear' | 'wearable' | 'jewel' | 'stuff';
 
-const GROW = 'grow';
-const EQUIP = 'equip';
-const UNEQUIP = 'unequip';
-
-export function lookOf(row: Pick<CarriedRow, 'verbs' | 'sockets'>): ItemLook {
+export function lookOf(row: Pick<CarriedRow, 'base' | 'slotted' | 'sockets'>): ItemLook {
   if (row.sockets) return 'jewel';
-  if (row.verbs.includes(GROW)) return 'gear';
-  if (row.verbs.includes(EQUIP) || row.verbs.includes(UNEQUIP)) return 'wearable';
+  if (row.base) return 'gear';
+  if (row.slotted) return 'wearable';
   return 'stuff';
 }
 

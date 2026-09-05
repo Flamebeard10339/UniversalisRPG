@@ -32,7 +32,7 @@ import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishMod
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { heldByForce } from './perform';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
-import { socketsInto, verbsOffered } from './carriedScreen';
+import { type ItemNature, natureOf, verbsOffered } from './carriedScreen';
 import { Registry } from '../content/registry';
 import { listedToPlayer } from '../content/sections';
 import { type ParsedSave } from '../content/sections/save';
@@ -491,13 +491,12 @@ export function view(session: PlaySession): PlayView {
   return { ...status, said };
 }
 
-export interface CarriedRow extends CarriedEntry {
+export interface CarriedRow extends CarriedEntry, ItemNature {
   readonly verbs: readonly Answer[];
-  readonly sockets: boolean;
 }
 
 function carriedRows(state: GameState, registry: Registry): CarriedRow[] {
-  return carriedEntries(state, registry).map((entry) => ({ ...entry, verbs: verbsOffered(entry, state, registry), sockets: socketsInto(entry, state, registry) }));
+  return carriedEntries(state, registry).map((entry) => ({ ...entry, verbs: verbsOffered(entry, state, registry), ...natureOf(entry, state, registry) }));
 }
 
 export function sessionStatus(session: PlaySession): PlayStatus {

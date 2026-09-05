@@ -852,8 +852,8 @@ describe('what the engine publishes', () => {
     expect(statValueOf(carried, 'might')).toBe(4);
 
     expect(carried.carried).toEqual([
-      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], sockets: false },
-      { id: grown.instance, name: 'Gauntlet', count: 1, shown: 'Gauntlet', grown: true, verbs: ['grow', 'equip', 'destroy'], sockets: false },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], base: false, slotted: true, sockets: false },
+      { id: grown.instance, name: 'Gauntlet', count: 1, shown: 'Gauntlet', grown: true, verbs: ['grow', 'equip', 'destroy'], base: true, slotted: true, sockets: false },
     ]);
 
     applyDirective(session, { kind: 'equip', item: grown.instance });
@@ -861,7 +861,7 @@ describe('what the engine publishes', () => {
     expect(armed.equipment).toEqual([{ slot: 'hand', title: 'Hand', item: grown.instance, name: 'Gauntlet' }]);
     expect(statValueOf(armed, 'might')).toBe(7);
     expect(armed.carried).toEqual([
-      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], sockets: false },
+      { id: 'mitten', name: 'Mitten', count: 1, shown: 'Mitten x1', grown: false, verbs: ['equip', 'destroy'], base: false, slotted: true, sockets: false },
       {
         id: grown.instance,
         name: 'Gauntlet',
@@ -870,6 +870,8 @@ describe('what the engine publishes', () => {
         grown: true,
         worn: { slot: 'hand', title: 'Hand' },
         verbs: ['grow', 'unequip', 'destroy'],
+        base: true,
+        slotted: true,
         sockets: false,
       },
     ]);

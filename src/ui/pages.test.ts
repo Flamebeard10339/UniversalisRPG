@@ -11,13 +11,13 @@ const APP = read('App.tsx');
 
 const PANE = APP.slice(APP.indexOf('const pane = ('), APP.indexOf('const bodies = '));
 
-const PAGES = [...new Set([...PANE.matchAll(/<([A-Z]\w+)/g)].map(([, name]) => name))];
+const PAGES = [...new Set([...PANE.matchAll(/<([A-Z]\w+)[\s/>]/g)].map(([, name]) => name))];
 
 const MOVERS = ['Pager.tsx', 'VStack.tsx'];
 
 describe('what a page may open over itself', () => {
   it('reads the pages off the shell rather than off a list', () => {
-    expect(PANE).toContain('layer.id');
+    expect(PANE).toContain('Record<SubpageId,');
     expect(PAGES.length).toBeGreaterThan(3);
     expect(PAGES).toContain('SkillsPane');
   });

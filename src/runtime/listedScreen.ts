@@ -14,6 +14,8 @@ type Answering<F extends string> = Chosen<F> & { answers: Record<string, unknown
 export type ListedFocus<F extends string> = { readonly kind: F } & Readonly<Record<F, Answer>>;
 
 export interface Listed<N extends ListedName, F extends string> {
+  readonly name: N;
+  readonly field: F;
   readonly frame: (chosen?: string) => Extract<ModalFrame, { name: N }>;
   readonly focus: (frame: Chosen<F>) => ListedFocus<F> | undefined;
   readonly options: (frame: Chosen<F>, state: GameState, registry: Registry) => readonly ModalOption[];
@@ -40,6 +42,8 @@ export function listedScreen<N extends ListedName, F extends string>(spec: Liste
     ({ name: spec.name, answers: {}, [spec.field]: chosen }) as unknown as Extract<ModalFrame, { name: N }>;
 
   return {
+    name: spec.name,
+    field: spec.field,
     frame,
     focus: (held) => (chosenIn(held) === '' ? undefined : ({ kind: spec.field, [spec.field]: chosenIn(held) as Answer } as unknown as ListedFocus<F>)),
     options: (held, state, registry) => {

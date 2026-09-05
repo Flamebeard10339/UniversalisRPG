@@ -7,7 +7,7 @@ import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
 import { withoutNote } from '../grammar/note';
 import { publishModal } from './modals';
-import { carriedOptions, carriedSubmit, CONFIRMED } from './carriedScreen';
+import { carriedOptions, carriedSubmit, CONFIRMED, natureOf, verbsOffered } from './carriedScreen';
 import { carriedEntries, carriedFrame } from './carried';
 import { equip } from './equipment';
 import { packedCount, receiveItem } from './itemInstance';
@@ -272,5 +272,25 @@ describe('an item the corpus writes examine: on', () => {
     });
 
     expect(unread.map((each) => each.id)).toEqual([]);
+  });
+});
+
+describe('what a carried item is, as against what may be done with it today', () => {
+  const shipped = loadUniverse(fixtureSources());
+  const gated = [...shipped.items.values()].filter((each) => each.slot !== undefined && each.requires !== undefined);
+
+  it('finds an item in the fixture whose slot the player has not earned', () => {
+    expect(gated.length).toBeGreaterThan(0);
+  });
+
+  it('is slotted whether or not the requirement is met, though the verb is withheld', () => {
+    for (const item of gated) {
+      const state = initialState(shipped);
+      state.inventory[item.id] = 1;
+      const entry = carriedEntries(state, shipped).find((each) => each.id === item.id)!;
+
+      expect(verbsOffered(entry, state, shipped), `${item.id} offers equip to a player who cannot wear it`).not.toContain('equip');
+      expect(natureOf(entry, state, shipped).slotted, `${item.id} stops being a thing with a slot when it cannot be worn`).toBe(true);
+    }
   });
 });

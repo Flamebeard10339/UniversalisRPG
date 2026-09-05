@@ -4,7 +4,7 @@ import type { LabelId } from './labels';
 export type LayerId = 'map' | 'home' | 'character';
 
 export interface Subpage {
-  id: LabelId;
+  id: SubpageId;
   dev?: true;
 }
 
@@ -14,7 +14,7 @@ export interface Layer {
   opens: LabelId;
 }
 
-export const LAYERS: readonly Layer[] = [
+const DECLARED = [
   {
     id: 'map',
     opens: 'map',
@@ -40,7 +40,11 @@ export const LAYERS: readonly Layer[] = [
       { id: 'journal' },
     ],
   },
-];
+] as const;
+
+export type SubpageId = (typeof DECLARED)[number]['subpages'][number]['id'];
+
+export const LAYERS: readonly Layer[] = DECLARED;
 
 export const HOME_LAYER = LAYERS.findIndex((layer) => layer.id === 'home');
 

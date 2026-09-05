@@ -15,7 +15,7 @@ const slot = (id: string, title: string): WornSlot => ({ slot: id, title: asLoca
 const EMPTY = asLocalized('Empty');
 type Plane = PlayStatus['planes'][number];
 
-const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, verbs: ['destroy'], sockets: false, ...over });
+const row = (over: Partial<CarriedRow> = {}): CarriedRow => ({ id: 'rope', name: asLocalized('Rope'), count: 1, shown: asLocalized('Rope x1'), grown: false, verbs: ['destroy'], base: false, slotted: false, sockets: false, ...over });
 
 const plane = (over: Partial<Plane> = {}): Plane => ({
   instance: '1',

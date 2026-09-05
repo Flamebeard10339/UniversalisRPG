@@ -12,7 +12,7 @@ import { carriedFrame } from './carried';
 import { MODAL_NAMES, publishModal } from './modals';
 import { planeReport } from './planeReport';
 import { planeFrame } from './planeScreen';
-import { questFrame } from './questScreen';
+import { questScreen } from './questScreen';
 import { grownItems, receiveItem } from './itemInstance';
 import { initialState, SAVE_VERSION } from './save';
 import { apply, applyDirective, startSession, view } from './session';
@@ -173,7 +173,7 @@ function planes(registry: Registry, state: ReturnType<typeof initialState>, held
 const journals = (registry: Registry, state: ReturnType<typeof initialState>): string[] =>
   [...registry.quests.keys()].flatMap((quest) => {
     const said: string[] = [];
-    soak(publishModal(questFrame(quest), state, registry), said);
+    soak(publishModal(questScreen.frame(quest), state, registry), said);
     return said;
   });
 
