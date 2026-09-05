@@ -83,7 +83,8 @@ export function VStack({
 
   useLayoutEffect(() => {
     const node = column.current;
-    if (node) node.style.transform = restingAt(layer);
+    const resting = restingAt(layer);
+    if (node && node.style.transform !== resting) node.style.transform = resting;
   });
 
   const begin = (y: number, at: number, release: () => void): void => {

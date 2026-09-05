@@ -1,7 +1,7 @@
 import type { ModalOption } from './modalOption';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { createGameState } from './runtime';
+import { createGameState, UNDER_WAY_LIMIT_MS } from './runtime';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
 import { type Registry } from '../content/registry';
 import { loadUniverse, loadUniverseWithDiagnostics } from '../content/load';
@@ -26,6 +26,7 @@ import {
   isChoiceLine,
   LINE_BREAK,
   LIVE_TICK_MS,
+  carriedInto,
   newContext,
   parseLine,
   runCommand,
@@ -886,6 +887,19 @@ describe('the live clock', () => {
     expect(progress.time).toBe(1);
     expect(progress.view.time).toBe(1);
     expect(progress.active).toBe(true);
+  });
+
+  it('carries no more game time in one tick than a run may cover unattended, however long the page was away', () => {
+    expect(carriedInto(500, 2)).toBe(1000);
+    expect(carriedInto(LIVE_TICK_MS, 64)).toBe(LIVE_TICK_MS * 64);
+    expect(carriedInto(8 * 60 * 60 * 1000, 16)).toBe(UNDER_WAY_LIMIT_MS);
+    expect(carriedInto(Number.MAX_SAFE_INTEGER, 64)).toBe(UNDER_WAY_LIMIT_MS);
+  });
+
+  it('leaves the clock inside that limit when a hidden page comes back after a day', () => {
+    const { started } = liveFixture(LIVE_MODULE, 'use:entity.oven.roast', 64);
+    const progress = started.live!.tick(24 * 60 * 60 * 1000);
+    expect(progress.view.time).toBeLessThanOrEqual(UNDER_WAY_LIMIT_MS / 1000);
   });
 
   it('reads the dial /speed turns, rather than a copy taken when the run began', () => {

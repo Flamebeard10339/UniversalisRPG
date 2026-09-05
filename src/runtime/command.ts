@@ -24,7 +24,7 @@ import type { Resumption } from './openUniverse';
 import { runAsSections, runBlocks, runStart, RUN_SECTION, startsAtSave, turnRecord, type KeptRun, type SectionAddress, type TurnOutcome } from './runLog';
 import { savedGameFromSerialized } from './save';
 import { type PruneWarning } from './pruning';
-import { describeCondition } from './runtime';
+import { describeCondition, UNDER_WAY_LIMIT_MS } from './runtime';
 import { grouped } from './grouping';
 import { sessionJournal, type JournalEntry } from './session';
 import { wornCopySlot } from './itemInstance';
@@ -1559,9 +1559,11 @@ function livePools(status: PlayStatus): LivePool[] {
   ];
 }
 
+export const carriedInto = (elapsedMs: number, speed: number): number => Math.min(Math.max(0, elapsedMs) * speed, UNDER_WAY_LIMIT_MS);
+
 function tickOnce(ctx: CommandContext, previous: PlayStatus, elapsedMs: number, armed: Localized): LiveProgress {
   const label = previous.action?.label ?? armed;
-  const next = wait(ctx.session, (elapsedMs / 1000) * ctx.live.speed);
+  const next = wait(ctx.session, carriedInto(elapsedMs, ctx.live.speed) / 1000);
   ctx.view = next;
 
   const action = next.action;

@@ -56,7 +56,12 @@ const ANSWERING = new WeakSet<(section: never) => unknown>();
 
 export const answersForItsBlocks = (parse: (section: never) => unknown): boolean => ANSWERING.has(parse);
 
+let sourceRead = 0;
+
+export const dslRead = (): number => sourceRead;
+
 export function splitSections(source: string): RawSection[] {
+  sourceRead += source.length;
   const sections: RawSection[] = [];
   let current: RawSection | null = null;
   let stack: { indent: number; line: RawLine }[] = [];

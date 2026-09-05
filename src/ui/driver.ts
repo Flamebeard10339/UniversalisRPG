@@ -27,6 +27,10 @@ export const REMEDIES = ['clear-local', 'reopen'] as const;
 
 export type Filing = { readonly filed: true; readonly at: string } | { readonly filed: false; readonly because: string };
 
+export const LOG_KEPT_MS = 1000;
+
+type Logging = 'at once' | 'when the clock next allows';
+
 export type Remedy = (typeof REMEDIES)[number];
 
 const asRead = (problems: readonly UniverseProblem[]): string => problems.map((problem) => `${problem.modules.join(' ')}: ${problem.message}`).join('\n');
@@ -154,12 +158,16 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let authoring!: AuthoringContext;
 
   let logKept: Transcript | null = null;
+  let logKeptAt = 0;
   let keepingTheLog = true;
 
-  function keepLog(): void {
+  function keepLog(logging: Logging): void {
     const transcript = current.transcript;
     if (!keepingTheLog || transcript === logKept) return;
+    const at = save.now();
+    if (logging === 'when the clock next allows' && at - logKeptAt < LOG_KEPT_MS) return;
     logKept = transcript;
+    logKeptAt = at;
     try {
       save.store.write(TRANSCRIPT_SLOT, JSON.stringify(trimmedTranscript(transcript)));
     } catch (error) {
@@ -228,8 +236,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   let running: LiveRun | null = null;
   let stopTicking: (() => void) | null = null;
 
-  function publish(): void {
-    keepLog();
+  function publish(logging: Logging = 'at once'): void {
+    keepLog(logging);
     for (const listener of listeners) listener();
   }
 
@@ -283,7 +291,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       close(false);
       return;
     }
-    publish();
+    publish('when the clock next allows');
   };
 
   function runOnUnderWay(): void {

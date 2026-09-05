@@ -9,12 +9,15 @@ const BUNDLED = {
 
 const moduleName = (path: string): string => path.replace(/^.*\//, '').replace(/\.[^.]*$/, '');
 
+let held: readonly ModuleSource[] | null = null;
+
 const bundled = (): readonly ModuleSource[] => {
   shut();
-  return Object.entries(BUNDLED)
+  held ??= Object.entries(BUNDLED)
     .map(([path, text]) => ({ name: moduleName(path), text }))
     .filter((source) => source.name !== LOCAL_CHANGES_MODULE_ID)
     .sort((a, b) => a.name.localeCompare(b.name));
+  return held;
 };
 
 export const SHIPPED_SOURCES: readonly ModuleSource[] = new Proxy([] as ModuleSource[], {
