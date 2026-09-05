@@ -1,3 +1,4 @@
+import { repoPath, splitFiles } from './lib/repo';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,7 +12,7 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { patchedInto, type Patching } from '../src/content/patch';
 import { registryDiff } from '../src/content/registryDiff';
 import { sectionFor } from '../src/content/sections';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
 import type { Removal } from '../src/content/sections/remove';
 import type { ModuleSource, ParsedModule } from '../src/content/universe';
 
@@ -229,8 +230,7 @@ export function consolidate(base: readonly ModuleSource[], local: ModuleSource):
   return { sources, local: text, placed, unplaced, diagnostics: [], differences: [] };
 }
 
-const repoRoot = path.join(import.meta.dirname, '..');
-const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
+const defaultLocal = LOCAL_CHANGES_FILE;
 const contentDirectory = CORPUS_DIR;
 
 export interface Args {
@@ -252,7 +252,6 @@ function usage(): never {
   process.exit(1);
 }
 
-const splitFiles = (value: string): string[] => value.split(',').map((file) => file.trim()).filter(Boolean);
 
 export function parseArgs(raw: readonly string[]): Args {
   const args: Args = { contentFiles: null, localFile: defaultLocal, dryRun: false };
@@ -275,7 +274,6 @@ export function parseArgs(raw: readonly string[]): Args {
   return args;
 }
 
-const repoPath = (file: string): string => path.resolve(repoRoot, file);
 
 const sourceName = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
 

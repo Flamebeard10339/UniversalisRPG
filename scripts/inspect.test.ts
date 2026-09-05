@@ -1,10 +1,10 @@
+import { repoRoot } from './lib/repo';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 import { compile, format, loaderFor } from './inspect';
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const load = loaderFor(repoRoot);
 const run = async (source: string): Promise<unknown> => {
   const compiled = compile(source);

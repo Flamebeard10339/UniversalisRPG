@@ -1,9 +1,9 @@
+import { repoRoot } from './lib/repo';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspect } from 'node:util';
 
-const repoRoot = path.resolve(import.meta.dirname, '..');
 
 const usage = [
   'Usage: npm run inspect -- "<expression>"',

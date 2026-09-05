@@ -1,3 +1,5 @@
+import { repoRoot } from './lib/repo';
+export { repoRoot } from './lib/repo';
 import { sourceFiles } from './lib/dslSources';import { mkdtempSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +20,6 @@ import { fileAuthoring } from './play-cli';
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 import { formatFocus, formatOutput, printed } from './lib/replLines';
 
-export const repoRoot = path.join(import.meta.dirname, '..');
 
 export interface PlaybotModeSpec {
   readonly framing: string;

@@ -1,3 +1,4 @@
+import { repoPath, splitFiles } from './lib/repo';
 import { sourceFiles } from './lib/dslSources';import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,13 +9,12 @@ import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
 import { MOD_PENDING_LABEL } from '../src/content/modportal';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
 import { ModuleSource } from '../src/content/universe';
 
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = CORPUS_DIR;
-const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
+const defaultLocal = LOCAL_CHANGES_FILE;
 
 interface Args {
   contentFiles: string[];
@@ -35,10 +35,6 @@ function usage(): never {
     ].join('\n'),
   );
   process.exit(1);
-}
-
-function splitFiles(value: string): string[] {
-  return value.split(',').map((file) => file.trim()).filter(Boolean);
 }
 
 export function parseArgs(raw: string[]): Args {
@@ -89,10 +85,6 @@ export function parseArgs(raw: string[]): Args {
   }
 
   return args;
-}
-
-function repoPath(file: string): string {
-  return path.resolve(repoRoot, file);
 }
 
 function sourceName(file: string): string {

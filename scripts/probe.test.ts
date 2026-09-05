@@ -1,3 +1,4 @@
+import { repoRoot } from './lib/repo';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -333,7 +334,6 @@ describe('probe: arguments', () => {
 });
 
 describe('probe: the command seam', () => {
-  const repoRoot = path.join(import.meta.dirname, '..');
   const script = path.join(repoRoot, 'scripts/probe.ts');
 
   const run = (args: string[], input?: string) => {

@@ -1,3 +1,4 @@
+import { repoRoot } from './lib/repo';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -6,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 import { run } from './modportal';
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const script = path.join(repoRoot, 'scripts/modportal.ts');
 
 interface Run {

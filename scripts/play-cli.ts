@@ -1,3 +1,4 @@
+import { repoPath } from './lib/repo';
 import { sourceFiles } from './lib/dslSources';import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -60,7 +61,6 @@ export function formatResult(result: CommandResult, localizer: Localizer): ReplL
   return result.output.flatMap((output) => formatOutput(output, localizer));
 }
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = SHIPPED_DIRS.join(',');
 const defaultLocalChanges = 'content/local-changes.dsl';
 const defaultSaves = '.saves';
@@ -253,10 +253,6 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
     process.exit(1);
   }
   return { files: splitContentArg(positional[0]), liveRequested, localFile, modportalDir, savesDir };
-}
-
-function repoPath(file: string): string {
-  return path.resolve(repoRoot, file);
 }
 
 function sourceName(file: string): string {

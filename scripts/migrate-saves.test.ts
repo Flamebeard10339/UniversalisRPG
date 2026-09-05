@@ -1,3 +1,4 @@
+import { repoRoot } from './lib/repo';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -293,7 +294,6 @@ describe('c5: inputs and recordings are not confused', () => {
 });
 
 describe('the command seam', () => {
-  const repoRoot = path.join(import.meta.dirname, '..');
 
   const run = (args: string[]) => {
     try {

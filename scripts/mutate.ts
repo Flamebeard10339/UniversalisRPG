@@ -1,3 +1,4 @@
+import { repoRoot } from './lib/repo';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -403,7 +404,6 @@ export function formatReport(report: MutationReport): string {
   return lines.join('\n');
 }
 
-const repoRoot = path.join(import.meta.dirname, '..');
 
 const usage = [
   'Usage: npm run mutate -- <manifest.json>',

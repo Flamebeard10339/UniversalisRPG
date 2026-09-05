@@ -1,3 +1,4 @@
+import { escaped } from './lib/idForms';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DIRECTIONS } from '../src/content/hex';
@@ -14,7 +15,6 @@ import { fixtureSources } from '../src/content/worldFixture';
 
 const modules = shippedModules();
 
-const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const asTemplate = (pattern: string): RegExp => {
   const parts = pattern.split(/\{[a-z-]+\}/).map(escaped);

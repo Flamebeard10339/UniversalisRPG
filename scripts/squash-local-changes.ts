@@ -1,16 +1,16 @@
+import { repoPath, splitFiles } from './lib/repo';
 import { sourceFiles } from './lib/dslSources';import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { formatModuleDiagnostic } from '../src/content/registry';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
-import { CORPUS_DIR } from '../src/content/shipped';
+import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
 import { ModuleSource, parseModuleSource, ParsedModule } from '../src/content/universe';
 
 import { declaredGlobalIds, roundTripModule } from '../src/content/serialize';
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = CORPUS_DIR;
-const defaultLocal = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
+const defaultLocal = LOCAL_CHANGES_FILE;
 
 interface Args {
   contentFiles: string[];
@@ -28,10 +28,6 @@ function usage(): never {
     ].join('\n'),
   );
   process.exit(1);
-}
-
-function splitFiles(value: string): string[] {
-  return value.split(',').map((file) => file.trim()).filter(Boolean);
 }
 
 function parseArgs(raw: string[]): Args {
@@ -58,10 +54,6 @@ function parseArgs(raw: string[]): Args {
     usage();
   }
   return args;
-}
-
-function repoPath(file: string): string {
-  return path.resolve(repoRoot, file);
 }
 
 function sourceName(file: string): string {

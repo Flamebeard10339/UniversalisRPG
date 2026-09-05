@@ -1,3 +1,5 @@
+import { repoRoot } from './lib/repo';
+export { repoRoot } from './lib/repo';
 import { appendFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,7 +11,6 @@ import { answer, answeredBy, ask, ASK_BEFORE_YOU_DESIGN_AROUND_IT, ASK_LINE, FLO
 import { BRIEF_IS_A_FILE, readBrief } from './lib/brief';
 import { FLOORS_DIR } from './floors';
 
-export const repoRoot = path.join(import.meta.dirname, '..');
 
 export const DEFAULT_TURNS = 150;
 const DEFAULT_MODEL = 'claude-sonnet-5';

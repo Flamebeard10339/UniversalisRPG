@@ -7,6 +7,8 @@ import { standingWithin, worldWithin } from './worlds';
 
 export const CORPUS_DIR = 'content';
 
+export const LOCAL_CHANGES_FILE = `${CORPUS_DIR}/${LOCAL_CHANGES_MODULE_ID}.dsl`;
+
 export const SHIPPED_DIRS: readonly string[] = [ENGINE_MODULE_DIR, CORPUS_DIR];
 
 const moduleId = (fileName: string): string => fileName.replace(/\.dsl$/, '');

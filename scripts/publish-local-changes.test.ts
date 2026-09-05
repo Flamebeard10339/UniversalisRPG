@@ -1,3 +1,4 @@
+import { repoRoot } from './lib/repo';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -5,7 +6,6 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { tsxCli } from './lib/tsxCli';
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const script = path.join(repoRoot, 'scripts/publish-local-changes.ts');
 
 interface Run {

@@ -1,3 +1,4 @@
+import { escaped } from './lib/idForms';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -24,7 +25,6 @@ interface Pattern {
   include?: string;
 }
 
-const escaped = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const spaced = (literal: string): string => escaped(literal).split(/\s+/).join('[ \\t]+');
 

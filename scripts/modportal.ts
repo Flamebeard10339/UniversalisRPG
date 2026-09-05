@@ -1,3 +1,4 @@
+import { repoPath, repoRoot, splitFiles } from './lib/repo';
 import { sourceFiles } from './lib/dslSources';import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -11,10 +12,11 @@ import type { ModuleSource } from '../src/content/universe';
 
 import { DEFAULT_MODPORTAL_CACHE, MODPORTAL_MANIFEST_FILE, modportalEntryPath, orphanEntryFiles, readEntryText, readModportalCache } from './lib/modportalCache';
 
-const repoRoot = path.join(import.meta.dirname, '..');
 const defaultContent = SHIPPED_DIRS.join(',');
 
-type Command = 'sync' | 'list' | 'enable' | 'disable' | 'sources' | 'show';
+const COMMANDS = ['sync', 'list', 'enable', 'disable', 'sources', 'show'] as const;
+
+type Command = (typeof COMMANDS)[number];
 
 interface Args {
   command: Command;
@@ -34,7 +36,7 @@ class ExitSignal extends Error {
 function usage(): never {
   console.error(
     [
-      'Usage: tsx scripts/modportal.ts <sync|list|enable|disable|sources|show> [target] [--cache <dir>] [--repo owner/name] [--from issues.json] [content=<a.dsl,b.dsl>]',
+      `Usage: tsx scripts/modportal.ts <${COMMANDS.join('|')}> [target] [--cache <dir>] [--repo owner/name] [--from issues.json] [content=<a.dsl,b.dsl>]`,
       '',
       `sync reads open GitHub issues labelled ${LISTABLE_MOD_LABELS.map((tier) => tier.label).join(' or ')} through gh issue list,`,
       'unless --from supplies a local JSON issue list. A mod-approved issue syncs available but switched',
@@ -44,14 +46,10 @@ function usage(): never {
   throw new ExitSignal(1);
 }
 
-function splitFiles(value: string): string[] {
-  return value.split(',').map((file) => file.trim()).filter(Boolean);
-}
-
 function parseArgs(raw: string[]): Args {
   if (raw.length === 0 || raw[0] === '--help' || raw[0] === '-h') usage();
   const command = raw[0] as Command;
-  if (!['sync', 'list', 'enable', 'disable', 'sources', 'show'].includes(command)) usage();
+  if (!COMMANDS.includes(command as Command)) usage();
   const args: Args = { command, cacheDir: DEFAULT_MODPORTAL_CACHE, contentFiles: splitFiles(defaultContent) };
 
   for (let i = 1; i < raw.length; i++) {
@@ -85,10 +83,6 @@ function parseArgs(raw: string[]): Args {
 
   if ((command === 'enable' || command === 'disable' || command === 'show') && !args.target) usage();
   return args;
-}
-
-function repoPath(file: string): string {
-  return path.resolve(repoRoot, file);
 }
 
 function cachePath(args: Args, file = ''): string {
