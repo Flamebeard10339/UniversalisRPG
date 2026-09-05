@@ -1,24 +1,3 @@
-# What is still wrong that a lane can take
-
-A frame of live play is ten a second and costs about 2.5ms of the 100 it has:
-~0.5ms rebuilding the view, ~0.2ms simulating, ~1ms rendering the App with the
-production React a player runs. Measured on the same rig against `main`, a frame
-was 77-92ms — the app spent most of a core running its own clock. In a real
-Chrome on the production build, nothing is dropped at any speed on a desktop.
-
-Two gates keep it there. `src/ui/frameCost.dom.test.tsx` mounts the real App on
-the fixture world, leaves an action under way and drives the clock: a frame must
-read no DSL at all, wake the screen exactly once, cost what it cost at the start
-of the session however long the session has run, and draw a log that stops
-growing. `journal.test.ts` holds that doubling a quest's stages does not multiply
-what the journal costs. Reach for both before believing any line below.
-
-**Measure before believing any number here.** Every share in this file has moved
-at least once, and two of the four things that turned out to matter most were not
-in it. **A line is deleted the day it closes.**
-
----
-
 ## The whole PlayView is rebuilt every frame, most of it for panes nobody opened
 
 `sessionStatus` returns 26 freshly-mapped arrays every 100ms. It is 0.5-0.6ms now,
@@ -28,14 +7,21 @@ titles of all 75 undiscovered places — which no player ever sees, because
 `undiscovered` is read only by the map in author mode and by the editing page.
 `undiscovered` is 12KB of the 32KB view and `journal` another 8KB.
 
-**Laziness is the obvious shape and it is unsound. Do not reach for it again
-without reading this.** Making the fields memoized getters was tried and reverted:
-a lazy view stops being a snapshot, because the getter reads the state as it is
-when someone looks rather than as it was when the view was made. Three tests found
-it immediately by holding a view across a mutation, and the same pattern is in
-production — `useNotices` in `App.tsx` keeps the previous view in a ref and
-compares it to the new one *in an effect*, which runs after ticks have moved the
-world, so quest and level notices would silently stop being raised.
+**Laziness is the obvious shape and it was tried and reverted. Do not reach for it
+again without reading this.** Making the fields memoized getters stops the view
+being a snapshot: the getter reads the state as it is when someone looks rather
+than as it was when the view was made. Three tests found it immediately by holding
+a view across a mutation, and the same pattern is in production — `useNotices` in
+`App.tsx` keeps the previous view in a ref and compares it to the new one *in an
+effect*, which runs after ticks have moved the world, so quest and level notices
+would silently stop being raised.
+
+What makes a lazy view unsound is therefore not the laziness but what is reading
+it: something downstream treats the view as a record of when things happened. That
+production half is a line of its own below, and laziness is worth another pass once
+it closes — but only then, and measured rather than assumed, because the tests
+holding a view across a mutation are a second reader and closing the notices line
+says nothing about them.
 
 What is left that is sound: publish less, or make what is published keep its
 identity. A view field that has not changed can keep the object it had —
@@ -47,6 +33,31 @@ have to take the slices they draw rather than the whole view.
 *Closes when:* a frame with only the home pane drawn does not build the journal,
 the stat breakdowns or the recipe list, and `npm run oracle -- --at content` and
 the suite are unchanged.
+
+## Quest and level notices are a diff where they should be an event
+
+`useNotices` reconstructs by comparison something the runtime already knew when it
+happened. A level is gained in the engine; a notice about it is independent of what
+the player is looking at, and of whether anyone rendered the frame it landed on.
+The same ref-and-effect shape is at `useCrossings` and `useArrivals` beside it,
+comparing through `crossings` and `newlyFound`, so this is a shape rather than a
+site.
+
+Having the runtime raise these as events the app reacts to retires all three
+comparators, and with them the reason a lazy view is unsound in production. The
+push half already exists on the UI side — `TransientChannel` in `transient.ts`,
+held by the driver and drained by `Notices.tsx`. What does not exist is the runtime
+end, and the layer rule is the constraint: `runtime` sits below `ui`, so the
+runtime raises events of its own and the driver forwards them onto that channel.
+The channel cannot move down to meet it.
+
+Watch `RAISED_BY` in `notice.ts`: it is a list every new kind of notice has to be
+added to, so what replaces it should derive its subjects rather than be the same
+list re-homed one layer down.
+
+*Closes when:* a quest step and a level are noticed from events the runtime raised,
+no hook in `App.tsx` holds a previous view or a previous row set in a ref, and the
+notices still arrive with the run at 64x.
 
 ## React re-renders the whole tree ten times a second
 
@@ -95,11 +106,21 @@ This is the same shape as the quest depth that was found and fixed: not a cost
 today, a cliff a player walks off later. The fix is the one the first line names —
 a plane's body is read by the plane modal and nothing else, while the ledgers want
 only its name and level, and `modalFocus(state)` already says which plane is open.
-Splitting the header from the body is smaller than making the whole view lazy and
-does not have laziness's soundness problem.
+Splitting the header from the body is smaller than making the whole view lazy.
+
+The body may then be built on demand, because laziness's soundness problem does not
+reach this far. A lattice is not a live reading of the world the way a pool or a
+progress bar is — it is settled by the item — so a body built when the modal opens
+says what a body built on the tick would have said. Where the two disagree the item
+has been edited under the engine, or the save predates a version bump. So the modal
+checks the lattice it opened against the stats recorded on the item and, where they
+disagree, clears the item and draws an empty tree rather than a wrong one.
+Migration is what should stop a player ever seeing that, and a disagreement
+standing at all is the signal that migration did not.
 
 *Closes when:* `view()` on a save carrying 28 grown items costs what it costs on a
-save carrying one, and the plane modal still draws its lattice.
+save carrying one, the plane modal still draws its lattice, and a lattice that
+disagrees with the item's recorded stats draws an empty tree instead.
 
 ## The modal beat restarts whenever the world speaks under it
 
