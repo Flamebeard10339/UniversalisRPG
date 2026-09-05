@@ -54,7 +54,9 @@ a condition may read are `time`, `player.`, `setting.`, `xp.`, `level.`, `highes
 `resource.`, `inventory.`, `count.`, `stat.`, `us.`, `them.` and `changed.`, and none of them
 is a quest.
 
-A stage flag is a latch, so "standing on stage X" is written by hand as `X and not <the stage
+Measured 2026-09-05, the largest single instance is not a stage at all: `stat.match-clock >= 1`
+— "the fishing match is running" — is written **ten times** in `content/fishing.dsl`. A stage
+flag is a latch, so "standing on stage X" is written by hand as `X and not <the stage
 after it>`, in `content/ball-of-a-boy.dsl:64,71`, `content/kill-it-with-fire.dsl:100,107`,
 `content/fishing.dsl:1126` and `content/the-swampy-menace.dsl:97,105,113`. Inserting a stage
 between two of them means finding every such condition; nothing derives them. The same gap
@@ -471,3 +473,36 @@ override.
 *Closes when:* `# station` takes a body declaring the tags it is worked with and the defaults its
 recipes inherit, the 34 hammer lines and the 45 cooking lines are gone, and a recipe that wants
 tongs rather than a hammer says so.
+
+## A condition compares against a number and nothing else, so a threshold is typed where it is asked
+
+`<condition>`'s comparison form is `<engine state> <comparison> <float>`, and the right-hand
+side is a literal. A stat may stand where an *amount* stands — `drain: them.npc-thieving-damage
+core.health` is fine — but not on the right of a `>`. Measured 2026-09-05 rather than read off
+the parser: a draft writing `if not resource.core.health > them.npc-thieving-damage:` through
+`npm run oracle -- --at` comes back *"unrecognized action result"*.
+
+What it costs, in the corpus's largest instance: the four obstacles of thieving's initiation run
+(`content/thieving.dsl:1279-1333`) each write
+
+    +on attempts exhausted:
+      if not resource.core.health > N:
+        roll: hauled-out
+      if resource.core.health > N:
+        drain: N core.health
+        say: <its own line>
+
+with N of 12, 20, 16 and 25 — the structure four times, and each obstacle's number three times
+inside it. The number wants to be `npc-thieving-damage` on each entity's `stats:` line, which
+`# action steal` already drains off; the *guard* — would this blow put me under, or should the
+run haul me out — cannot be written once until a comparison can read a stat. Raise a pit's
+drain and miss one of its two guards and a player just above the old threshold is drained past
+zero instead of hauled out, and the `smirking-rogue` dialogue that only fires off `hauled-out`
+stops being reachable at that band.
+
+This is the same family as the tag line above: both are the grammar being able to name a thing
+but not a property of one. `docs/thieving-expansion/open-agent.md` records the site; this
+records the gap.
+
+*Closes when:* a comparison's right-hand side may name a stat, the four obstacles declare
+`npc-thieving-damage` and the guard is written once on `# action cross`.
