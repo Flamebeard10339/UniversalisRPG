@@ -7,6 +7,10 @@ export interface Filled {
   holds?: Holds;
 }
 
+export type Sited = (value: never) => string;
+
+export type ValueWalk = { how: 'ref'; field: string; names: string; at?: Sited } | { how: 'condition'; field: string; at?: Sited };
+
 export interface Parser<T> extends Filled {
   parse(cursor: Cursor): T;
   print(value: T): string;
@@ -14,6 +18,7 @@ export interface Parser<T> extends Filled {
   examples: readonly string[];
   called?: string;
   notes?: Readonly<Record<string, string>>;
+  lands?: readonly ValueWalk[];
 }
 
 const CALLED = Symbol.for('grammar.block.called');

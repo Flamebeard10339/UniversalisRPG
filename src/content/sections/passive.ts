@@ -4,7 +4,6 @@ import { listMembers } from '../../grammar/section';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { text } from '../../grammar/values';
 import { baselineGrant, type BaselineGrant } from '../../grammar/baselineGrant';
-import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -43,12 +42,5 @@ export const passive = section<Passive>()({
     const zero = listMembers<BaselineGrant>(value.grants).find((grant) => grant.times === 0);
     if (zero) return `grants: +0x ${zero.axis} ${zero.statId} is worth nothing at any rung, so it grants nothing: write what it is worth, or leave the line out`;
     return undefined;
-  },
-  visit: (value, where, visit) => {
-    for (const grant of listMembers<BaselineGrant>(value.grants)) put(grant, 'statId', 'stat', `${where} grants:`, visit);
-  },
-  prune: (value, at, where) => {
-    const grants = value.grants.filter((grant) => !at.gone('stat', grant.statId, `${where} grants:`));
-    return grants.length === value.grants.length ? value : { ...value, grants };
   },
 });

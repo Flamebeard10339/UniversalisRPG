@@ -6,7 +6,7 @@ import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { DslError, Parser } from '../../grammar/parser';
 import { AnySchema, PrintContext, SectionSchema, isFieldEdits, listMembers, printSection } from '../../grammar/section';
 import { counted, id, lastSegment, number, text } from '../../grammar/values';
-import { actions, condition as visitCondition, pruneActions, put, type Loose } from '../refs';
+import { actions, pruneActions, type Loose } from '../refs';
 import { mergeFields } from '../merge';
 import { section, TOUCHED } from './define';
 import { TITLE_FIELD } from './info';
@@ -62,6 +62,10 @@ export const edgeValue: Parser<Edge> = {
   },
   print: (value) => (value.severed === true ? `-${id.print(value.target)}` : value.condition === undefined ? value.target : `${value.target} while ${condition.print(value.condition)}`),
   holds: () => ({ condition }),
+  lands: [
+    { how: 'ref', field: 'target', names: 'location' },
+    { how: 'condition', field: 'condition', at: (value: Edge) => `${value.target} while` },
+  ],
   forms: ['<location>', '<location> while <condition>', '-<location>'],
   examples: ['clearing', 'clearing while has-key', '-clearing'],
 };
@@ -99,6 +103,7 @@ export const relativeValue: Parser<Relative> = {
     return { direction, of: id.parse(cursor) };
   },
   print: (value) => `${RELATIVE_WORDS[value.direction]} ${id.print(value.of)}`,
+  lands: [{ how: 'ref', field: 'of', names: 'location' }],
   forms: RELATIVE_ORDER.map((direction) => `${RELATIVE_WORDS[direction]} <location>`),
   examples: RELATIVE_ORDER.map((direction) => `${RELATIVE_WORDS[direction]} clearing`),
 };
@@ -327,21 +332,9 @@ export const location = section<Location, 'starting' | 'multicombat', 'actions'>
   validate: (value) => (lastSegment(value.id) === STARTING_LOCATION ? `${STARTING_LOCATION} is the name the engine answers with whichever location is marked starting, so nothing may be called it` : undefined),
   merge: mergeLocations,
   print: printLocation,
-  visit: (value, where, visit) => {
-    const held = value as unknown as Loose;
-    for (const entry of listMembers<Population>(held.entities)) put(entry, 'entity', 'entity', `${where} entities:`, visit);
-    for (const edge of listMembers<Edge>(held.adjacent)) {
-      put(edge, 'target', 'location', `${where} adjacent:`, visit);
-      visitCondition(edge.condition, `${where} adjacent: ${edge.target} while`, visit);
-    }
-    if (held.relative) put(held.relative as Relative, 'of', 'location', `${where} relative`, visit);
-    actions(held.actions, where, visit);
-  },
+  visit: (value, where, visit) => actions((value as unknown as Loose).actions, where, visit),
   prune: (value, at, where) => {
-    if (value.relative && at.gone('location', value.relative.of, `${where} relative`)) return null;
-    const entities = value.entities.filter((entry) => !at.gone('entity', entry.entity, `${where} entities:`));
-    const adjacent = value.adjacent.filter((edge) => !at.gone('location', edge.target, `${where} adjacent:`) && at.intact(() => visitCondition(edge.condition, `${where} adjacent: ${edge.target} while`, at.visit)));
     const kept = pruneActions(value.actions, where, at);
-    return entities.length === value.entities.length && adjacent.length === value.adjacent.length && kept.length === value.actions.length ? value : { ...value, entities, adjacent, actions: kept };
+    return kept.length === value.actions.length ? value : { ...value, actions: kept };
   },
 });

@@ -27,6 +27,7 @@ export const baselineGrant: Parser<BaselineGrant> = {
     return { times: Number(groups.sign === '-' ? `-${groups.times!}` : groups.times!), axis: groups.axis as Axis, statId: groups.stat! };
   },
   print: ({ times, axis, statId }) => `${times < 0 ? '-' : '+'}${String(Math.abs(times))}x ${axis} ${statId}`,
+  lands: [{ how: 'ref', field: 'statId', names: 'stat' }],
   forms: AXES.flatMap((axis) => [`+<float>x ${axis} <stat>`, `-<float>x ${axis} <stat>`]),
   examples: ['+2x added physical-damage', '-1x added defense', '+3x increased physical-damage', '-0.5x increased defense'],
 };

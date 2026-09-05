@@ -8,7 +8,7 @@ import { range, Range } from '../../grammar/range';
 import { REFERENCE } from '../../grammar/structure';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, pruneActions, put, type Loose } from '../refs';
+import { actions, pruneActions, type Loose } from '../refs';
 import { carriedJewel, ClusterJewel, clusterJewel as clusterJewelSection, jewelCarried } from './clusterJewel';
 import { section } from './define';
 import { GROUP_FIELD } from './group';
@@ -59,6 +59,7 @@ export const clusterEffectValue: Parser<ClusterEffect> = {
     };
   },
   print: (value) => `${value.percent < 0 ? '-' : '+'}${Math.abs(value.percent)}% ${value.statId}`,
+  lands: [{ how: 'ref', field: 'statId', names: 'stat' }],
   forms: ['+<percent>% <stat>', '-<percent>% <stat>'],
   examples: ['+25% max-health', '-10% max-health'],
 };
@@ -126,7 +127,7 @@ export const item = section<AuthoredItem, never, 'actions'>()({
       dehydrate: (held) => (typeof held === 'string' ? undefined : [held]),
     },
     originCluster: { parser: id, keyword: 'origin-cluster', names: { id: 'cluster-jewel' }, standsWithout: true },
-    clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect' },
+    clusterEffect: { parser: clusterEffectValue, keyword: 'cluster-effect', standsWithout: true },
     value: { parser: number, note: 'what one of these is worth in coin, and the only thing that makes it tradable: an item declaring no value is one no shop will price' },
     ...HOOK_FIELDS,
   },
@@ -136,14 +137,12 @@ export const item = section<AuthoredItem, never, 'actions'>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     actions(held.actions, where, visit);
-    if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
     if (held.jewel !== null && typeof held.jewel === 'object') clusterJewelSection.visit(held.jewel as ClusterJewel, `${where} cluster-jewel:`, visit);
   },
   prune: (value, at, where) => {
     const kept = pruneActions(value.actions, where, at);
-    const clusterEffect = value.clusterEffect?.statId === undefined || !at.gone('stat', value.clusterEffect.statId, `${where} cluster-effect:`) ? value.clusterEffect : undefined;
     const carried = jewelCarriedBy(value);
     const jewel = carried === undefined ? value.jewel : (clusterJewelSection.prune(carried, at, `${where} cluster-jewel:`) ?? undefined);
-    return kept.length === value.actions.length && clusterEffect === value.clusterEffect && jewel === value.jewel ? value : { ...value, actions: kept, clusterEffect, jewel };
+    return kept.length === value.actions.length && jewel === value.jewel ? value : { ...value, actions: kept, jewel };
   },
 });

@@ -3,7 +3,6 @@ import { DslError, type Parser } from '../../grammar/parser';
 import { point, Range, range } from '../../grammar/range';
 import { decimal, id, numberOrStat } from '../../grammar/values';
 import { firstCycle } from '../cycle';
-import type { Loose } from '../refs';
 import { hiddenIf, section } from './define';
 import { GROUP_FIELD } from './group';
 import { TITLE_FIELD } from './info';
@@ -35,6 +34,10 @@ const conversion: Parser<Conversion> = {
     return { from, to: id.parse(cursor) };
   },
   print: ({ from, to }) => `${from} to ${to}`,
+  lands: [
+    { how: 'ref', field: 'from', names: 'damage-type' },
+    { how: 'ref', field: 'to', names: 'damage-type' },
+  ],
   forms: ['<damage-type> to <damage-type>'],
   examples: ['physical to fire'],
 };
@@ -70,6 +73,7 @@ export const stat = section<Stat>()({
     },
     converts: {
       parser: conversion,
+      standsWithout: true,
       note: `${IN_A_SWING} this stat's value is the percent of the first type whoever carries it would have dealt that lands as the second instead, moved before either type is resisted. Conversions are read in one pass in the order they chain, so a chain that comes back round to a type is refused when the world loads, and stats that together convert more than the whole of a type share the whole of it`,
     },
     roundsTo: {
@@ -92,18 +96,6 @@ export const stat = section<Stat>()({
     if (value.atMost === value.id) return 'at most: names itself, so it could never be read';
     if (value.roundsTo !== undefined && value.roundsTo <= 0) return `rounds to: ${String(value.roundsTo)} is not a step anything could be rounded to; a step is more than zero`;
     return undefined;
-  },
-  visit: (value, where, visit) => {
-    const held = (value as unknown as Loose).converts as Conversion | undefined;
-    if (held === undefined) return;
-    held.from = visit('damage-type', held.from, `${where} converts:`);
-    held.to = visit('damage-type', held.to, `${where} converts:`);
-  },
-  prune: (value, at, where) => {
-    const held = value.converts;
-    if (held === undefined) return value;
-    const site = `${where} converts:`;
-    return at.gone('damage-type', held.from, site) || at.gone('damage-type', held.to, site) ? { ...value, converts: undefined } : value;
   },
 });
 

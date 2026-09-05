@@ -262,6 +262,7 @@ export const counted = (zeroSays: string, examples: readonly string[]): Parser<C
     return { count: Number(count), entity: id.parse(cursor) };
   },
   print: (value) => (value.count === undefined ? value.entity : `${value.count} ${id.print(value.entity)}`),
+  lands: [{ how: 'ref', field: 'entity', names: 'entity' }],
   forms: ['<entity>', '<count> <entity>'],
   examples,
 });
@@ -282,6 +283,7 @@ export const quantified: Parser<Quantified> = {
     return { item, amount: Number(raw) };
   },
   print: (value) => (value.amount === undefined ? value.item : `${number.print(value.amount)} ${id.print(value.item)}`),
+  lands: [{ how: 'ref', field: 'item', names: 'item' }],
   forms: ['<item>', '<count> <item>'],
   examples: ['plank', '3 plank'],
 };
@@ -298,6 +300,7 @@ export const produced: Parser<Produced> = {
     };
   },
   print: (value) => (value.amount === undefined ? value.item : `${range.print(value.amount)} ${id.print(value.item)}`),
+  lands: [{ how: 'ref', field: 'item', names: 'item' }],
   forms: ['<item>', '<count> <item>', '<least>-<most> <item>'],
   examples: ['arrow', '5 arrow', '5-10 arrow'],
 };

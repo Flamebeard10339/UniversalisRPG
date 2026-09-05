@@ -438,6 +438,7 @@ export const actionLinesWritten = (): readonly Written[] => [
 ];
 
 export const actionBody: EntryBody = {
+  reads: [['<action>', resultList], ...ACTION_FIELDS.map((field) => [field.written, field.parser] as const)],
   grammar: [
     { form: '<action>: <result>, …', example: 'chop-wood: give: log', family: 'an action', names: { action: null }, holds: () => ({ result: actionResult }) },
     { form: '<action>:', example: 'chop-wood:', family: 'an action', names: { action: null }, block: actionLinesWritten },
