@@ -1,6 +1,5 @@
 import { list } from '../../grammar/list';
-import { Cursor, DslError, Parser } from '../../grammar/parser';
-import { decimal, duration, id, Quantified, quantified } from '../../grammar/values';
+import { decimal, duration, id, oneOf, Quantified, quantified } from '../../grammar/values';
 import { quantified as quantifiedItems, type Loose, type Pruning, type Visit } from '../refs';
 import type { Condition } from '../../grammar/condition';
 import { hiddenIf, section } from './define';
@@ -25,19 +24,7 @@ export interface Shop {
   hiddenIf?: Condition;
 }
 
-const acceptsValue: Parser<Accepts> = {
-  parse(cursor: Cursor) {
-    const start = cursor.pos;
-    const raw = cursor.take(/[a-z][a-z0-9-]*/);
-    if (raw === null || !(ACCEPTS as readonly string[]).includes(raw)) {
-      throw new DslError(`a shop accepts one of ${ACCEPTS.join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    }
-    return raw as Accepts;
-  },
-  print: (value) => value,
-  forms: [...ACCEPTS],
-  examples: [...ACCEPTS],
-};
+const acceptsValue = oneOf('accepts', ACCEPTS, { complaint: 'what a shop accepts' });
 
 export const isTradable = (item: Item | undefined): boolean => item?.value !== undefined;
 

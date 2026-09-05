@@ -1,7 +1,7 @@
 import { Cursor, DslError, Parser, Span } from './parser';
 import { range, Range, scaleRange } from './range';
 import { DEFAULT_LANGUAGE } from './section';
-import { REFERENCE } from './structure';
+import { REFERENCE, WORD } from './structure';
 
 export function refuseRange(cursor: Cursor, complaint: string): void {
   const start = cursor.pos;
@@ -108,6 +108,23 @@ export const id: Parser<string> = {
   examples: ['rusty-sword', 'forest.clearing'],
 };
 
+export const oneOf = <T extends string>(called: string, words: readonly T[], said: { complaint: string; token?: RegExp }): Parser<T> => ({
+  called,
+  parse(cursor) {
+    const start = cursor.pos;
+    const raw = cursor.take(said.token ?? WORD)?.replace(/[ \t]+/g, ' ');
+    if (raw === undefined || !(words as readonly string[]).includes(raw))
+      throw new DslError(`${said.complaint} must be one of ${words.join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, {
+        start: cursor.abs(start),
+        end: cursor.abs(cursor.pos),
+      });
+    return raw as T;
+  },
+  print: (value) => value,
+  forms: [...words],
+  examples: [...words],
+});
+
 export const durationOrStat: Parser<number | string> = {
   called: 'duration',
   parse: (cursor) => (cursor.peek(/\d/) === null ? id.parse(cursor) : duration.parse(cursor)),
@@ -127,20 +144,9 @@ export const SIDES: readonly Side[] = ['us', 'them'];
 
 export const SIDE_MARK = '.';
 
-const SIDE = new RegExp(`(?:${SIDES.join('|')})`);
-
 const MARKED_SIDE = new RegExp(`(?:${SIDES.join('|')})\\${SIDE_MARK}`);
 
-export const side: Parser<Side> = {
-  parse(cursor) {
-    const raw = cursor.take(SIDE);
-    if (raw === null) throw new DslError(`expected ${SIDES.join(' or ')}`, { start: cursor.abs(cursor.pos), end: cursor.abs(cursor.pos) });
-    return raw as Side;
-  },
-  print: (value) => value,
-  forms: [...SIDES],
-  examples: [...SIDES],
-};
+export const side: Parser<Side> = oneOf('side', SIDES, { complaint: 'a side' });
 
 export const printSided = (value: Sided): string => (value.side === undefined ? value.id : `${value.side}${SIDE_MARK}${value.id}`);
 

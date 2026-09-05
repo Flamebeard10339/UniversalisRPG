@@ -15,7 +15,7 @@ export interface RawSection {
   span: Span;
 }
 
-const WORD = /[a-z][a-z0-9-]*/;
+export const WORD = /[a-z][a-z0-9-]*/;
 
 export const REFERENCE = new RegExp(`${WORD.source}(?:\\.${WORD.source})*`);
 

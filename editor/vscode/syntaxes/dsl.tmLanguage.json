@@ -460,7 +460,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(open-connections|mod-slots|passives|examine|title)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(open-connections|mod-slots|passives|examine|shape|title)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -512,7 +512,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|open-connections|origin-cluster|cluster-jewel|item-level|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|mod-slots|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stops[ \\t]+on|when[ \\t]+hit|examine|inflict|perform|restore|before|credit|on[ \\t]+hit|one[ \\t]+of|stands|after|drain|group|title|unset|value|give|rate|roll|slot|take|time|add|say|set|xp)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(on[ \\t]+attempts[ \\t]+exhausted|rewards[ \\t]+scaled[ \\t]+by|open-connections|origin-cluster|cluster-jewel|item-level|on[ \\t]+refused|on[ \\t]+success|open[ \\t]+modal|hidden[ \\t]+if|mod-slots|shake[ \\t]+off|attempts|depletes|discover|passives|relocate|requires|stops[ \\t]+on|when[ \\t]+hit|examine|inflict|perform|restore|before|credit|on[ \\t]+hit|one[ \\t]+of|stands|after|drain|group|shape|title|unset|value|give|rate|roll|slot|take|time|add|say|set|xp)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -575,7 +575,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|replenish|selling|buying|stocks|coin)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(hidden[ \\t]+if|replenish|accepts|selling|buying|stocks|coin)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -665,7 +665,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(standard[ \\t]+for|colour|title)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(standard[ \\t]+for|stands[ \\t]+for|colour|title)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -717,7 +717,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(resource|title)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(resource|trigger|title)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"
@@ -1168,7 +1168,7 @@
           "include": "#refused"
         },
         {
-          "match": "^[ \\t]*([+-]?)(start|title|rate|max)[ \\t]*(:)",
+          "match": "^[ \\t]*([+-]?)(display|start|title|rate|max)[ \\t]*(:)",
           "captures": {
             "1": {
               "name": "keyword.operator.written-again.dsl"

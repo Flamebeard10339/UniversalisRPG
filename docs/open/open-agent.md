@@ -672,29 +672,6 @@ and drops only the stock line. Nobody chose that difference.
 walk, and `shop`, `skill`, `passive`, `recipe`, `stat` and `clusterJewel` declare no `visit` or
 `prune` of their own.
 
-## A set of words with two half-parsers, and six more sets written out by hand
-
-`MODAL_SCREENS` (`src/grammar/actionResult.ts:32-38`) is read twice in its own file: by
-`modalScreen` (`:668-679`), which offers the words to the editing page and refuses nothing, and
-by `parseOpenModal`/`isModalScreen`/`modalScreenRefusal`, which refuse and offer nothing. One
-set, two halves, neither whole.
-
-Six kinds then wrote the same shape again — `shapeNamed` (`clusterJewel.ts:64`), `triggerValue`
-(`event.ts:40`), `standingValue` (`group.ts:24`), `displayValue` (`resource.ts:19`),
-`acceptsValue` (`shop.ts:28`) and `side` (`values.ts:135`) — and they have drifted the way six
-copies do. The complaints read *must be one of*, *is one of*, *a shop accepts one of* and
-*expected us or them*; the token is a bare word regex in three, `id.parse` in two, and
-prefix-tolerant in the sixth.
-
-**Note what is *not* the fix**, since the obvious one deletes six refusals: `oneOf`'s `parse`
-is `id.parse`, so it refuses nothing at all. It is a grammar shim that gives the page a hole
-with alternatives. Folding the six into it as it stands would lose every one of their refusals.
-
-*Closes when:* one `oneOf(called, words, {complaint, token})` in `grammar/values.ts` both offers
-the words and refuses anything else, `MODAL_SCREENS` has one reader, and the six kinds each
-declare one line — with `event.ts`'s optional prefix passed as a token rather than kept as an
-exception.
-
 ## The round-trip proof's root set skips action bodies, so four parsers are unproved
 
 `dsl.test.ts:741-747` derives its subjects, correctly, from `schema.fields` — but an action

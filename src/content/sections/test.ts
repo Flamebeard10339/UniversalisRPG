@@ -1,5 +1,5 @@
 import { Condition, condition } from '../../grammar/condition';
-import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreen, modalScreenRefusal, place } from '../../grammar/actionResult';
+import { ModalScreen, modalScreen, place } from '../../grammar/actionResult';
 import { DslError, parseWhole, type Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { hasBlock, indentLines, REFERENCE, takeBlock, type RawLine } from '../../grammar/structure';
@@ -455,8 +455,7 @@ export function parseDirectiveLine(text: string, base = 0): Directive | null {
 
   const opening = OPEN_MODAL.exec(text)?.groups;
   if (opening) {
-    if (!isModalScreen(opening.name)) throw new DslError(modalScreenRefusal(opening.name));
-    return { kind: 'open-modal', modal: opening.name };
+    return { kind: 'open-modal', modal: parseWhole(modalScreen, opening.name!, 0, 'a modal screen') };
   }
 
   if (SUBMIT_MODAL_VERB.test(text)) {
@@ -718,7 +717,7 @@ export const test = section<Test>()({
     },
     { form: 'apply: <item> at <q>,<r> with <effect item>', example: 'apply: cluster-jewel at 0,0 with polish' },
     { form: 'refuse: <the growth directive that must not take>', example: 'refuse: slot cluster-jewel at 0,0 ne with small-jewel' },
-    { form: 'open-modal: <modal>', example: `open-modal: ${MODAL_SCREENS[0]}`, holds: () => ({ modal: modalScreen }) },
+    { form: 'open-modal: <modal>', example: `open-modal: ${modalScreen.examples[0]!}`, holds: () => ({ modal: modalScreen }) },
     { form: 'submit-modal: <key>=<value>', example: 'submit-modal: name=Ash' },
     ...NOTE_FIELDS.map((field) => ({
       form: `${field.name}: <${field.records}>`,

@@ -1,5 +1,4 @@
-import { DslError, Parser } from '../../grammar/parser';
-import { decimal, id } from '../../grammar/values';
+import { decimal, id, oneOf } from '../../grammar/values';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -16,19 +15,7 @@ export interface Resource {
 
 const RESOURCE_DISPLAYS = ['full', 'minimal'] as const;
 
-const displayValue: Parser<ResourceDisplay> = {
-  parse(cursor) {
-    const start = cursor.pos;
-    const raw = id.parse(cursor);
-    if (!(RESOURCE_DISPLAYS as readonly string[]).includes(raw)) {
-      throw new DslError(`resource display must be one of ${RESOURCE_DISPLAYS.join(', ')}, got ${JSON.stringify(raw)}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    }
-    return raw as ResourceDisplay;
-  },
-  print: (value) => value,
-  forms: [...RESOURCE_DISPLAYS],
-  examples: [...RESOURCE_DISPLAYS],
-};
+const displayValue = oneOf('display', RESOURCE_DISPLAYS, { complaint: 'a resource display' });
 
 export const resource = section<Resource>()({
   kind: 'resource',

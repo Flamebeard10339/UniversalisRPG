@@ -2,7 +2,7 @@ import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser, Span, Written } from '../../grammar/parser';
 import { AnySchema, HydrateContext, listMembers, parseAnySection, printSection } from '../../grammar/section';
 import { RawLine } from '../../grammar/structure';
-import { id, number, text } from '../../grammar/values';
+import { id, number, oneOf, text } from '../../grammar/values';
 import { DIRECTIONS, Direction } from '../hex';
 import { getShape, Shape, SHAPES } from '../shapes';
 import { type Loose } from '../refs';
@@ -61,19 +61,11 @@ export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): s
   return undefined;
 }
 
-const shapeNamed: Parser<string> = {
-  parse(cursor) {
-    const start = cursor.pos;
-    const raw = cursor.take(/[a-z][a-z0-9-]*/);
-    if (raw === null || !SHAPES.some((each) => each.name === raw)) {
-      throw new DslError(`a shape is one of ${SHAPES.map((each) => each.name).join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    }
-    return raw;
-  },
-  print: (value) => value,
-  forms: SHAPES.map((each) => each.name),
-  examples: SHAPES.map((each) => each.name),
-};
+const shapeNamed = oneOf(
+  'shape',
+  SHAPES.map((each) => each.name),
+  { complaint: 'a shape' },
+);
 
 export const clusterJewel = section<ClusterJewel>()({
   kind: 'cluster-jewel',
