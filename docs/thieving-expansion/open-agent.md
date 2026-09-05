@@ -24,31 +24,11 @@ it — thieving's first-look payout and attention-to-detail's contest are not in
 *Closes when:* a second plain body at a nested action id is refused with a message naming both
 modules, and `castle-watched` is either set by something or deleted.
 
-## `# action cross` restates `# action steal` in the file where four siblings extend it
-
-`thieving.dsl`'s `cross` writes `attempts: 1`, `accuracy: us.thieving-ability vs
-them.npc-thieving-difficulty` and `on success: xp: thieving them.npc-thieving-xp` — all three
-byte-identical to `# action steal` above it, which `pick-pocket`, `lockpicking`, `slip-past`
-and `lift-from-the-stall` all reach with `extends: steal` — and `pick-the-lock` reaches through
-`lockpicking`.
-
-Re-point what a thieving contest is rolled on, or change how thieving xp is credited, and every
-thieving action in the game follows except the initiation run, which keeps the old rule with
-nothing red.
-
-The one line `cross` does not want from `steal` is its `on attempts exhausted: drain:`, which
-is the same knot as the line below. Measured 2026-09-05: a declaring body cannot decline it —
-`-on attempts exhausted:` is refused with *"unrecognized tag clause"*, because `-<line>` is for
-a second body laid over a section that is already there, and `cross` declares itself. So this
-closes on the line below rather than on its own.
-
-*Closes when:* `cross` extends `steal` and states only what is its own.
-
 ## The four cross obstacles type their damage twice each, and the sheet field for it is empty
 
 Each of the four writes `if not resource.core.health > N: roll: hauled-out` and `if
 resource.core.health > N: drain: N core.health` — the same N twice, per obstacle, four times
-over. They omit `npc-thieving-damage`, which `# action steal` already reads, while sixteen marks in
+over. They omit `npc-thieving-damage`, which `# action steal` already reads, while twenty-two marks in
 the file now declare it — so these four are the exception rather than, as this line first said,
 the rule.
 

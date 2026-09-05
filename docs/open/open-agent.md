@@ -586,10 +586,16 @@ The facts that say what the thing is — `item.slot`, `isBase(item)`, whether it
 move with the player, and `PlayStatus['carried']` (`session.ts:509-514`) already publishes a
 row the look could be computed onto.
 
-Scope, measured: `grow` is gated only on `isBase`, which ignores `requires:`, so anything with
-an `item-level:` escapes. Sweeping `content/` and the fixture for an item with a `slot:` and a
-`requires:` and **no** `item-level:` gives exactly one live subject today,
-`eight-a-swing-hammer`.
+Scope, re-measured 2026-09-05 after the first sweep got it wrong: `grow` is gated only on
+`isBase`, which ignores `requires:`, so anything with an `item-level:` escapes. Sweeping
+`content/` and the fixture for an item with a `slot:` and a `requires:` and **no**
+`item-level:` gives **no shipped item at all** — the only section anywhere that hits it is the
+fixture's `# item ledger` (`src/content/fixture/fixture-town.dsl:127-131`). The first sweep
+named `eight-a-swing-hammer`, which carries no `requires:` and is `DEBUG`; it is neither.
+
+So this is a design point with no live instance, and should be ranked as one. It is worth
+closing because the next requirement-gated wearable without an item level will hit it silently,
+not because a player is looking at a grey hammer today.
 
 `src/ui/itemLook.test.ts:7` reads *"reads the look off what the screen offers to do with it"*,
 which describes the mechanism rather than deciding the behaviour — nothing in that file

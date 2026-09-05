@@ -47,8 +47,7 @@ where a declared resistance is what drove it there.
 
 The pieces are in place either way: `resistanceTo` and `typedShare` in
 `src/runtime/damageModel.ts` read no state and take a reader, so a predictor can ask the
-model as soon as the model is settled. `typedShare` should also be calling `resistanceTo`
-rather than spelling the same `(1 - resistance / 100)` four lines below it.
+model as soon as the model is settled.
 
 Ruled 2026-09-05: **the solver uses the engine's own functions directly.** It does not keep a
 second arithmetic that agrees with the first by inspection. `resistanceTo` and `typedShare`
