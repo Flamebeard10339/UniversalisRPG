@@ -133,7 +133,7 @@ export type Condition =
 
 export const ALWAYS = 'always';
 
-const ALWAYS_WRITTEN = new RegExp(`${ALWAYS}(?![\w-])`);
+const ALWAYS_WRITTEN = new RegExp(`${ALWAYS}(?![\\w-])`);
 
 const COMPARISON = /[ \t]*(>=|<=|!=|>|<|=)[ \t]*/;
 

@@ -8,6 +8,7 @@ import { refusalOf } from '../content/completion';
 import { DslError } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { LINE_BREAK } from '../runtime/command';
+import { MAPPED_KIND } from '../runtime/mapEdit';
 
 export interface Section {
   kind: string;
@@ -21,7 +22,7 @@ export const SURFACES = ['map', 'local', 'global'] as const;
 
 export type SurfaceId = (typeof SURFACES)[number];
 
-export const MAPPED_KIND = 'location';
+export { MAPPED_KIND };
 
 export function sectionsIn(source: ModuleSource): Section[] {
   let written: WrittenModule;

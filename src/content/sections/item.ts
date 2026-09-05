@@ -7,7 +7,7 @@ import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { range, Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, condition as visitCondition, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
 import { carriedJewel, ClusterJewel, clusterJewel as clusterJewelSection, jewelCarried } from './clusterJewel';
 import { section } from './define';
 import { GROUP_FIELD } from './group';
@@ -135,14 +135,12 @@ export const item = section<AuthoredItem, never, 'actions'>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     visitTags(held.tags, where, visit);
-    visitCondition(value.requires, `${where} requires:`, visit);
     actions(held.actions, where, visit);
     hooks(held, where, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
     if (held.jewel !== null && typeof held.jewel === 'object') clusterJewelSection.visit(held.jewel as ClusterJewel, `${where} cluster-jewel:`, visit);
   },
   prune: (value, at, where) => {
-    if (!at.intact(() => visitCondition(value.requires, `${where} requires:`, at.visit))) return null;
     const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);
     const onHit = pruneHook(value.onHit, `${where} on hit:`, at);

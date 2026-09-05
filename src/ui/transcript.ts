@@ -133,9 +133,9 @@ export function trimmedTranscript(transcript: Transcript): Transcript {
   return transcript.entries.length <= TRANSCRIPT_KEPT ? transcript : { ...transcript, entries: transcript.entries.slice(-TRANSCRIPT_KEPT) };
 }
 
-const TONES: readonly MessageTone[] = ['plain', 'ok', 'warn', 'error'];
+const TONES = new Set<string>(Object.keys({ plain: 0, ok: 0, warn: 0, error: 0 } satisfies Record<MessageTone, 0>));
 
-const KINDS: readonly LogKind[] = ['said', 'place', 'describe', 'message', 'detail'];
+const KINDS = new Set<string>(Object.keys({ said: 0, place: 0, describe: 0, message: 0, detail: 0 } satisfies Record<LogKind, 0>));
 
 export type Minting = (text: string) => Localized;
 
@@ -145,7 +145,7 @@ function readEntry(value: unknown, minted: Minting): LogEntry | null {
   if (typeof id !== 'number' || !Number.isFinite(id)) return null;
   if (typeof repeats !== 'number' || !Number.isFinite(repeats)) return null;
   if (typeof text !== 'string') return null;
-  if (!KINDS.includes(kind as LogKind) || !TONES.includes(tone as MessageTone)) return null;
+  if (typeof kind !== 'string' || !KINDS.has(kind) || typeof tone !== 'string' || !TONES.has(tone)) return null;
   if (words === 'player') return { id, words, kind: kind as LogKind, tone: tone as MessageTone, text: minted(text), repeats };
   if (words === 'tool') return { id, words, kind: kind as LogKind, tone: tone as MessageTone, text, repeats };
   return null;

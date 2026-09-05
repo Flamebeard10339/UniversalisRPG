@@ -49,8 +49,8 @@ and neither one's gate answers for the other.
 **No test may read a line of `content/`.** A contributor editing the world inside the
 game cannot run vitest, so a suite that could go red on their edit is a gate nobody
 can answer. The suite stands on `src/content/fixture/` — a world the engine owns and
-no author touches — and `docs/authoring-split/open-tests.test.ts` is the rule's own
-proof, deriving both the doors into the corpus and every test that must not reach one.
+no author touches — and `scripts/corpusReach.test.ts` is the rule's own proof, deriving
+both the doors into the corpus and every test that must not reach one.
 
 **So do not run `npm test` for DSL work, and do not fix a red suite by editing
 content.** The corpus's whole verdict is `npm run oracle -- --at content`: every line
@@ -304,7 +304,8 @@ before handing over.
 
 Web: Vite build, tag-triggered publish to itch.io (`.github/workflows/publish.yml`).
 Android: Capacitor sync + Gradle release build, APK signed and attached to the release.
-CI runs `tsc --noEmit`, `npm test`, `npm run layer-check` and `npm run comment-check`.
+The gates are the steps of `.github/workflows/test.yml`, which is the list; this file
+names none, because the sentence that named four of them stood while CI grew to six.
 
 # Harness bugs
 

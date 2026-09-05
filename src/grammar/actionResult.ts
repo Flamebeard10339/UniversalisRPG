@@ -92,9 +92,8 @@ export function itemCost(results: readonly ActionResult[]): Map<string, number> 
 }
 
 export function nestedResults(result: ActionResult): ActionResult[][] {
-  if (result.kind === 'one-of') return result.rows.map((row) => row.results);
-  if (result.kind === 'chance' || result.kind === 'contest' || result.kind === 'gate' || result.kind === 'credit') return [result.results];
-  return [];
+  if ('rows' in result) return result.rows.map((row) => row.results);
+  return 'results' in result ? [result.results] : [];
 }
 
 function parseVariable(cursor: Cursor): string {
