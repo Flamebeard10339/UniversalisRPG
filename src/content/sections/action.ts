@@ -72,7 +72,7 @@ export const action = section<ActionDeclaration>()({
       form: 'extends: <action>',
       example: 'extends: chop-wood',
       names: { action: 'action' },
-      note: "that action's whole body, with every line written here laid over it and `+` adding to what it holds rather than replacing it. The name is this action's own either way, since a name is what an author extends an action to change",
+      note: "that action's whole body, with every line written here laid over it and `+` adding to what it holds rather than replacing it. `title:` is one of those lines, so an action that writes none is called what it extends — which is how one mechanic split into several still reads as one thing to a player. Where nothing up the chain writes a title: either, an action falls back to the name its own id makes rather than wearing another's",
     },
     ...actionLinesWritten(),
   ],
