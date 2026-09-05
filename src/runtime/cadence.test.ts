@@ -226,12 +226,12 @@ describe('two cadences stay associative', () => {
 describe('the rat sheet', () => {
   it('parses its own bases, leaving the player defaults alone', () => {
     const registry = loaded();
-    expect(registry.entities.get('giant-rat')!.stats).toEqual({
-      attack: point(4),
-      dr: point(2),
-      'max-health': point(10000),
-      'attack-rate': point(16),
-    });
+    expect(registry.entities.get('giant-rat')!.stats).toEqual([
+      ['attack', point(4)],
+      ['dr', point(2)],
+      ['max-health', point(10000)],
+      ['attack-rate', point(16)],
+    ]);
   });
 
   it('answers with the first action in uses: whose depletes: names a pool the attacker has', () => {

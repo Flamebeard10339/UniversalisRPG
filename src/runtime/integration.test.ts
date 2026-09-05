@@ -14,6 +14,7 @@ import { fixtureModule, fixtureSources } from '../content/worldFixture';
 import { runTest } from './session';
 import { initialState } from './save';
 import { secondsToMs, toMilliUnits } from './units';
+import { statWritten } from '../content/sections/entity';
 
 const source = fixtureModule('core').text;
 const world = (text: string) => loadUniverse(fixtureSources().map((each) => (each.name === 'core' ? { name: 'core', text } : each)));
@@ -38,7 +39,7 @@ describe('core content', () => {
 
 describe("an actor's swing is spent out of the range it stands at", () => {
   const ATTACK = 'core.attack';
-  const ranged = [...registry.entities.values()].filter((entity) => entity.stats[ATTACK] !== undefined && !isPoint(entity.stats[ATTACK]));
+  const ranged = [...registry.entities.values()].filter((entity) => statWritten(entity, ATTACK) !== undefined && !isPoint(statWritten(entity, ATTACK)!));
 
   it('is written by more than one of them, so neither side of a fight carries this alone', () => {
     expect(ranged.length).toBeGreaterThan(1);

@@ -542,30 +542,6 @@ they say what the answer was.
 restating its pace, `melee-combat` holds no `rate:` that `melee-swing` could, and a body that
 extends nothing is still refused with a span.
 
-## Two fields hydrate a pair list into a record, so their walk cannot be derived from the parser
-
-A value parser now declares `lands` — where each of its holes lands on the value it parsed, and
-of what kind — and `landings` in `src/content/sections/define.ts` reads it into the walk that
-resolves, validates and prunes. Fourteen ref sites and one condition site derive that way, and
-`shop`, `skill`, `passive`, `recipe` and `stat` declare no `visit` or `prune` at all.
-
-Two fields are left out, and for one reason: their `hydrate` reshapes the list the parser
-produced into a `Record`, so the held value is not the parsed value and no landing declared on
-the parser can be found in it. `clusterJewel.positions` parses `[<position>, <passive>]` pairs
-and holds `Record<number, string>`; `entity.stats` parses `[<stat>, <range>]` pairs and holds
-`Record<string, Range>`. Both walk by hand in their `section()` call, and both walk the
-*authored* shape in `visit` and the *hydrated* shape in `prune` — which is the same fact written
-twice, in two shapes.
-
-`dehydrate` is not the way through: it rebuilds fresh pairs, so a rename written onto one is
-thrown away, and putting a filtered record back needs the `hydrate` that only the load path
-holds a context for.
-
-*Closes when:* either both fields hold what their parser parsed — a pair list, with a lookup
-helper for the readers that want a map — or a field can declare that its held record is keyed
-by one hole of its parser and valued by another, and `landings` reads that. Prefer the first:
-`Record<number, string>` is read in six places and none of them needs it to be a record.
-
 ## `run:` composes a head and nothing else, so every repeated tail still reads twice
 
 Every head that `run:` could reach has been taken, and the decision on the rest is recorded

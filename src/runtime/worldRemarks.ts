@@ -1,4 +1,5 @@
 import { isBase } from '../content/sections/item';
+import { passivesCarried, type FilledPositions } from '../content/sections/clusterJewel';
 import { declaredId } from '../content/sections/entity';
 import { namesSection } from '../content/namespace';
 import { everyActionTable, formatModuleDiagnostic, type Registry } from '../content/registry';
@@ -174,7 +175,7 @@ function lopsided(registry: Registry): Remark[] {
     const wordsOn = (tags: readonly TagClause[]): string[] => keywordsIn(tags, []).beyond;
     const shared = new Set([...registry.passives.values()].filter((passive) => !own(passive.id)).flatMap((passive) => wordsOn(passiveTags(registry, passive))));
     const jewels = [...registry.clusterJewels.values()].filter((jewel) => own(jewel.id));
-    const carried = (jewel: { positions: Record<number, string> }): TagClause[] => Object.values(jewel.positions).flatMap((passiveId) => passiveTagsOf(registry, passiveId));
+    const carried = (jewel: FilledPositions): TagClause[] => passivesCarried(jewel).flatMap((passiveId) => passiveTagsOf(registry, passiveId));
 
     const by = new Map<string, string[]>();
     for (const jewel of jewels) {

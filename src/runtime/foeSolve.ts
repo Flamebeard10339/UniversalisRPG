@@ -2,7 +2,7 @@ import { fightShapeOf, type FightShape } from '../grammar/action';
 import { midpoint, point, type Range } from '../grammar/range';
 import { activitiesIn, type Activity } from '../content/activities';
 import type { Registry } from '../content/registry';
-import type { Entity } from '../content/sections/entity';
+import { statWritten, type Entity } from '../content/sections/entity';
 import { profile, type Profile } from '../content/sections/profile';
 import { actorEntity } from './actionLookup';
 import { abilityOn, dpsLadder, toughnessLadder, type Ladder } from './pace';
@@ -93,7 +93,7 @@ export const dpsFor = (perHit: number, rate: number, accuracy: number, registry:
 const dealtFor = (hit: number, resistance: number, reduction: number): number => (resistance >= 100 ? Infinity : (hit + reduction) / (1 - resistance / 100));
 
 function declaredOn(registry: Registry, sheet: Entity | undefined, statId: string): number {
-  const held = sheet?.stats[statId] ?? registry.stats.get(statId)?.base;
+  const held = statWritten(sheet, statId) ?? registry.stats.get(statId)?.base;
   return held === undefined ? 0 : midpoint(held);
 }
 
@@ -132,7 +132,7 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
   const ourResistance = resistanceTo(registry, type, (statId) => declaredOn(registry, us, statId));
 
   const written = (statId: string): number | undefined => {
-    const held = entity.stats[statId];
+    const held = statWritten(entity, statId);
     return held === undefined ? undefined : midpoint(held);
   };
   const shaped = (factor: Factor): number | undefined => {

@@ -1,4 +1,5 @@
 import { Registry } from '../content/registry';
+import { passiveAt } from '../content/sections/clusterJewel';
 import { isPoint, point, sampleCount } from '../grammar/range';
 import { BonusAmount, Counter } from '../grammar/tagClause';
 import { Hex, hexKey, PlaneNode } from '../content/hex';
@@ -29,7 +30,7 @@ export function positionPayloads(registry: Registry, plane: Plane, hex: Hex, pos
   const cluster = clusterAt(plane, hex);
   const placement = placementAt(registry, plane, hex);
   if (!cluster || !placement) return [];
-  const passiveId: string | undefined = placement.jewel.positions[position];
+  const passiveId = passiveAt(placement.jewel, position);
   if (passiveId === undefined) return [];
   const node: PlaneNode = { hex, kind: 'position', position };
   const payloads: ScaledPayload[] = [];
@@ -51,10 +52,9 @@ export function allocatedPositions(registry: Registry, plane: Plane): { hex: Hex
   for (const { hex } of planeClusters(plane)) {
     const placement = placementAt(registry, plane, hex);
     if (!placement) continue;
-    for (const key of Object.keys(placement.jewel.positions)) {
-      const position = Number(key);
+    for (const [position, passiveId] of placement.jewel.positions) {
       if (!isAllocated(registry, plane, { hex, kind: 'position', position })) continue;
-      allocated.push({ hex, position, passiveId: placement.jewel.positions[position] });
+      allocated.push({ hex, position, passiveId });
     }
   }
   return allocated;

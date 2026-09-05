@@ -1,5 +1,5 @@
 import { RuntimeError } from './error';
-import { Action } from '../content/sections/entity';
+import { Action, statWritten } from '../content/sections/entity';
 import { actionAddress, actionTextSection } from '../content/sections/action';
 import { actionKind } from '../grammar/action';
 import { addRanges, isPoint, midpoint, point, Range, sampleRange, scaleRange } from '../grammar/range';
@@ -176,7 +176,7 @@ export function statFrom(statId: string, sources: StatSources, state: GameState,
   const sheet = actorEntity(registry, actorId);
   if (sheet === undefined && actorId !== PLAYER)
     throw new RuntimeError(`${actorId} is asked for ${statId} and is no entity, so it carries no sheet to read one off — only the player is a side rather than a member of one`);
-  const written = sheet === undefined ? undefined : sheet.stats[statId];
+  const written = statWritten(sheet, statId);
   const shaped = sheet === undefined || written !== undefined ? undefined : solvedStatsOf(registry, sheet)?.[statId];
   return { base: written ?? shaped ?? registry.stats.get(statId)?.base ?? point(0), parts: [...parts.values()] };
 }

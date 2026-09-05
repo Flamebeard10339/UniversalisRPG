@@ -7,6 +7,7 @@ import { perHitFor } from './foeSolve';
 import { dpsAtLevel } from './pace';
 import { statValue } from './stats';
 import { minDamage } from './tuning';
+import { statWritten } from '../content/sections/entity';
 
 const ARENA = `
 # info arena
@@ -199,7 +200,7 @@ describe('three tags cut a body, and reading it back finds the tier they were cu
   it('leaves a body that writes its own stat alone, and solves only what it left unwritten', () => {
     const written = loadModule([WORLD, ['# entity quick-even-60', '+stats: max-health 12345'].join('\n')].join('\n\n'));
     const entity = written.entities.get('arena.quick-even-60')!;
-    expect(midpoint(entity.stats['arena.max-health']!)).toBe(12345);
+    expect(midpoint(statWritten(entity, 'arena.max-health')!)).toBe(12345);
     expect(statValue("arena.max-health", referencePlayer(written), written, entity.id)).toBe(12345);
     expect(Object.keys(solvedStatsOf(written, entity)!)).toContain('arena.attack-rate');
   });

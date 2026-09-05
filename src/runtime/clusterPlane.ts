@@ -31,7 +31,7 @@ const BASE_CLUSTER: ClusterJewel = {
   title: 'base',
   shape: 'point',
   openConnections: ['e'],
-  positions: {},
+  positions: [],
   modSlots: DEFAULT_MOD_SLOTS,
 };
 

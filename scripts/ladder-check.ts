@@ -2,6 +2,7 @@ import path from 'node:path';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { droptable } from '../src/content/sections/droptable';
+import { passivesCarried } from '../src/content/sections/clusterJewel';
 import { isBase, type Item } from '../src/content/sections/item';
 import type { Skill } from '../src/content/sections/skill';
 import { shippedSources } from '../src/content/shipped';
@@ -171,7 +172,7 @@ export function jewelReaches(registry: Registry, itemId: string, statId: string)
   const carried = registry.items.get(itemId)?.clusterJewel;
   const jewel = carried === undefined ? undefined : registry.clusterJewels.get(carried);
   if (jewel === undefined) return false;
-  return Object.values(jewel.positions).some((passiveId) => passiveTagsOf(registry, passiveId).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
+  return passivesCarried(jewel).some((passiveId) => passiveTagsOf(registry, passiveId).some((tag) => tag.kind === 'stat-bonus' && tag.statId === statId));
 }
 
 export function effectReaches(registry: Registry, itemId: string, statId: string): boolean {

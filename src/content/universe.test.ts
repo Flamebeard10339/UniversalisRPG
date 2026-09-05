@@ -69,7 +69,7 @@ describe('load order', () => {
     const expected = {
       order: ['base', 'addon', 'bestiary', 'flavor'],
       attack: { min: 7, max: 7 },
-      ogre: { 'base.attack': { min: 4, max: 7 } },
+      ogre: [['base.attack', { min: 4, max: 7 }]],
     };
     const sourceOrders = [
       [base, addon, bestiary, flavor],
@@ -142,7 +142,7 @@ describe('loadUniverse', () => {
   it('resolves references across module boundaries in either direction', () => {
     const stats = module('stats', '# info stats', '# stat attack');
     const uses = module('uses', '# info uses', 'dependencies: stats', '# entity ogre', 'stats: attack 4-7');
-    expect(loadUniverse([uses, stats]).entities.get('uses.ogre')!.stats).toEqual({ 'stats.attack': { min: 4, max: 7 } });
+    expect(loadUniverse([uses, stats]).entities.get('uses.ogre')!.stats).toEqual([['stats.attack', { min: 4, max: 7 }]]);
   });
 });
 
@@ -203,9 +203,7 @@ describe('loadUniverseWithDiagnostics', () => {
     expect(result.loadedModules).toEqual(['base']);
     expect(result.diagnostics).toEqual([]);
     expect(result.registry.entities.get('base.chest')!.actions).toEqual([]);
-    expect(result.registry.entities.get('base.chest')!.stats).toEqual({
-      'base.guile': { min: 4, max: 4 },
-    });
+    expect(result.registry.entities.get('base.chest')!.stats).toEqual([['base.guile', { min: 4, max: 4 }]]);
     expect(result.registry.items.get('base.charm')!.tags.map((tag) => (tag.kind === 'stat-bonus' ? tag.statId : tag.kind))).toEqual(['base.guile']);
     expect(result.registry.recipes.has('base.charm')).toBe(false);
     expect(result.registry.locations.get('base.camp')!.entities).toEqual([{ entity: 'base.chest' }]);
@@ -242,9 +240,7 @@ describe('loadUniverseWithDiagnostics', () => {
       diagnostics: [],
     });
     expect(registry.entities.get('base.urchin')!.passives).toEqual(['base.spined']);
-    expect(registry.clusterJewels.get('base.band')!.positions).toEqual({
-      1: 'base.spined',
-    });
+    expect(registry.clusterJewels.get('base.band')!.positions).toEqual([[1, 'base.spined']]);
 
     const spined = registry.passives.get('base.spined')!;
     expect(spined.tags.map((tag) => (tag.kind === 'stat-bonus' ? tag.statId : tag.kind))).toEqual(['base.guile']);
