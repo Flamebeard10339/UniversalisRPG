@@ -841,11 +841,16 @@ on success:
   if hives-searched >= 3:
     say: Three hives gone through, and the humming behind you drops a whole tone. There is a gallery cut down through this comb that was not in it when you started, and the edges of it are wet.
 
+# action harvest-comb
+title: Harvest Comb
+time: 8
+give: 1 honeycomb
+
 # entity first-hive
 title: The First Hive
 examine: A hive, working. The comb is whole and the bees ignore you.
 flags: searched
-uses: search-the-comb
+uses: search-the-comb, harvest-comb
 search-the-comb:
   hidden if: searched
   +on success:
@@ -853,16 +858,15 @@ search-the-comb:
     say: You lift the frames out one at a time. Comb, brood, bees, and nothing between them that is not a bee's.
     if hives-searched >= 3:
       set: the-third-search-was-in-the-field
-harvest comb:
-  time: 8
-  give: 1 honeycomb
-  say: You cut a slab of comb out and leave the rest.
+harvest-comb:
+  +on success:
+    say: You cut a slab of comb out and leave the rest.
 
 # entity second-hive
 title: The Second Hive
 examine: A hive, working, and louder than the first. The comb is whole.
 flags: searched
-uses: search-the-comb
+uses: search-the-comb, harvest-comb
 search-the-comb:
   hidden if: searched
   +on success:
@@ -870,10 +874,9 @@ search-the-comb:
     say: This one goes the same way and takes longer about it. Whatever has been at these hives is not sitting in the comb waiting to be found.
     if hives-searched >= 3:
       set: the-third-search-was-in-the-field
-harvest comb:
-  time: 8
-  give: 1 honeycomb
-  say: You cut what you came for and step back before they mind.
+harvest-comb:
+  +on success:
+    say: You cut what you came for and step back before they mind.
 
 # entity chewed-hive
 title: The Chewed Hive

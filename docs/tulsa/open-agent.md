@@ -40,19 +40,6 @@ routes walk; what is wrong is only that its shape was chosen to avoid something 
 and any jewel as the design asked or the narrowing is defended on its own merits rather than
 on the engine's.
 
-## Two of Kelsa's hives write the harvest out, beside a shared action that shows the answer
-
-`tulsa.dsl` writes `harvest comb:` twice — `time: 8`, `give: 1 honeycomb`, differing only in
-`say:`. Fourteen lines above it, `# action tulsa.search-the-comb` is exactly the pattern that
-answers it: one action, three hives `uses:` it, each writing only its own `+on success:`. The
-file gets it right on the line above and wrong on the line below.
-
-Change the harvest to two comb or twelve seconds and one hive silently pays differently; a
-fourth hive gets no harvest at all unless somebody remembers.
-
-*Closes when:* a `# action harvest-the-comb` holds the time and the give, and each hive says
-only its own words.
-
 ## The muster is ungated, so the tenth level's best fight is the twentieth's room
 
 Read at tier-10 with the tiers dressed, attack inside the town makes a good ladder —
