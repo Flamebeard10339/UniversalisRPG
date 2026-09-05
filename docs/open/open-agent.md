@@ -506,3 +506,96 @@ records the gap.
 
 *Closes when:* a comparison's right-hand side may name a stat, the four obstacles declare
 `npc-thieving-damage` and the guard is written once on `# action cross`.
+
+## A choice id is a string the engine spells in three places and parses back by slicing
+
+`src/runtime/session.ts` mints the ids the interface hands back — `fight:`, `talk:`, `shop:`,
+`craft:`, `travel:` — as template strings at six sites (`:298`, `:313`, `:316`, `:375`, `:381`,
+`:408`), reads them back in `choiceToDirective` (`:424-442`) with `.slice('talk:'.length)` and
+friends, and mints them a third time in `choiceIdFor` (`:795-811`). The round trip is
+load-bearing: `:880` builds an id, `beginAction` looks it up among what `computeChoices`
+minted, and hands it to `choiceToDirective`. Three spellings must agree or a `begin:` silently
+finds no choice.
+
+The right shape is three files away and already half-used: `useChoiceId` / `parseUseChoiceId`
+(`src/content/sections/test.ts:229-231`) is one print/parse pair, and `use` is the only one of
+the six not duplicated here — precisely because it goes through that pair. The `# test`
+directive grammar (`test.ts:114-131`) already declares `talk:`, `travel:`, `craft:`, `shop:`
+and `use:` with printers and parsers built on one shared `PATH`.
+
+A fourth copy rides along: `session.ts:429` hand-writes an id pattern as
+`/^fight:([a-z0-9.-]+):([a-z0-9.-]+)$/`, where `REFERENCE` (`src/grammar/values.ts:95`) is the
+one home for what an id looks like. The copy is looser — it accepts `9foo` and `..` — and is
+greedy on both sides of a literal `:`.
+
+*Closes when:* `sections/test.ts` exports a `choiceId` / `parseChoiceId` pair covering all five
+kinds, `session.ts` calls it at every mint and both reads, and no module outside
+`grammar/values.ts` spells what an id looks like.
+
+## Three listed screens are consolidated and then unpacked into twenty-one aliases
+
+`listedScreen()` (`src/runtime/listedScreen.ts:35`) already takes the five fields quest, stat
+and skill differ in and returns one object with seven members. Each caller then re-exports
+those seven under its own prefix — `questScreen.ts:18-23`, `statScreen.ts:23-28`,
+`skillScreen.ts:15-21`, twenty-one lines carrying nothing but a name — and the aliases are
+gathered again into three keyed tables: `modals.ts`'s `DEFINITIONS`, and `modalStack.ts`'s
+`OPENERS` (`:25-27`) and `SAME` (`:37-39`).
+
+A fourth listed screen is one `listedScreen()` call plus about ten hand-written lines across
+three files. Two of the three tables are mapped types and so are exhaustive-checked, but only
+after the frame name is added; the aliases and the `DEFINITIONS` body are transcription.
+
+*Closes when:* each screen exports its `Listed` object whole, one list of them stands
+somewhere, and the three tables are built from it rather than typed out.
+
+## `App.tsx`'s pane falls through to the inventory, so a derived test proves nothing about a new page
+
+`pane()` (`src/ui/App.tsx:233-280`) dispatches over subpage ids by if-chain and ends, on the
+character layer, in an unconditional fallthrough to the inventory `Ledger` (`:279`). The home
+layer returns `null` for an id it does not know; the character layer returns a screen.
+
+`src/ui/render.test.tsx:89` and `:305` do the right thing — they derive their subjects from
+`everyPage(dev)` in `nav.ts:94`. But because a subpage `pane()` has never heard of still draws
+a perfectly good inventory, `everyPage` visits it, the assertions pass, and the derived proof
+goes green on a page nobody wrote. The fallthrough turns a derived test into a vacuous one,
+which is worse than a listed one.
+
+The declaration is right there: `LAYERS` (`nav.ts:18-40`) states the subpages. A
+`Record<SubpageId, …>` keyed off it makes TypeScript refuse a subpage with no renderer.
+
+**The break that discriminates is an addition, which `npm run mutate` cannot express.** Add
+`{ id: 'settings' }` to the character layer in `nav.ts` and run `render.test.tsx` and
+`pages.test.ts`: both should be green today, and that is the finding. Do not test it by
+deleting the `journal` branch — `render.test.tsx:305` reads page text and would catch that,
+which proves nothing about the gap. Note `pages.test.ts:13` slices `App.tsx` by the literal
+text `'const pane = ('` and `'const bodies = '`, so keep both markers.
+
+*Closes when:* `pane()` is a record keyed by the subpage ids `nav.ts` declares, and adding a
+subpage without a renderer does not compile.
+
+## An item's colour is read off what the player can do with it today, not off what it is
+
+`lookOf` (`src/ui/itemLook.ts:12-17`) decides whether a carried thing is a jewel, gear, a
+wearable or stuff by looking at which verbs the screen currently offers. `equip` is offered
+only when `wearable()` holds (`src/runtime/carriedScreen.ts:35`, `equipment.ts:21-25`), and
+`wearable` evaluates the item's `requires:`. So a wearable whose requirement the player has not
+met yet is drawn the same grey as a log, and turns green on level-up. Nothing about the item
+changed.
+
+The facts that say what the thing is — `item.slot`, `isBase(item)`, whether it sockets — do not
+move with the player, and `PlayStatus['carried']` (`session.ts:509-514`) already publishes a
+row the look could be computed onto.
+
+Scope, measured: `grow` is gated only on `isBase`, which ignores `requires:`, so anything with
+an `item-level:` escapes. Sweeping `content/` and the fixture for an item with a `slot:` and a
+`requires:` and **no** `item-level:` gives exactly one live subject today,
+`eight-a-swing-hammer`.
+
+`src/ui/itemLook.test.ts:7` reads *"reads the look off what the screen offers to do with it"*,
+which describes the mechanism rather than deciding the behaviour — nothing in that file
+exercises `requires:` at all. Read it as unexamined rather than as a ruling. The break that
+settles it: make `equipment.ts:24` ignore `requires:` and see whether `itemLook.test.ts` has
+any opinion. It should not.
+
+*Closes when:* the carried row publishes what the item is, `lookOf` reads it, and an item the
+player cannot yet wear is the colour of the thing it is.
