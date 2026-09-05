@@ -430,9 +430,26 @@ The same gap is what `docs/fishing-expansion/open-agent.md` records under the bl
 drifting out of the rod set, and what makes `# station` unable to say an anvil needs a hammer —
 see the line below.
 
+Two things a lane should know before starting, from reading the ground on 2026-09-05. The
+**shape is cheap**: `Condition` is a union whose every consumer switches on it with a
+`const unreached: never`, so adding a kind makes the compiler name each site that must handle
+it — `parsePrimary`/`printCondition` in `src/grammar/condition.ts`, `evaluateCondition` and
+`itemMissingFor` in `src/runtime/conditions.ts`, and `condition` in `src/content/refs.ts`,
+where a tag is the one reference kind that names no declared section and so must not `put`.
+
+The **cost is where the care goes**. `requires:` is re-read every cycle of a continuous action
+and again for every action a screen offers, so the answer has to be cheap. The carried half is:
+`itemCopies(state)` already gives every template the player holds, wears or has grown, so the
+tags of an item are one registry lookup away. The passive half is not — reaching what a passive
+supplies means walking each worn item's plane through `allocatedPositions` and
+`passiveTagsOf` per evaluation, and that lands squarely on the tick
+`src/ui/frameCost.dom.test.tsx` gates. Whatever supplies tags wants to be one set derived once
+per change to the player rather than once per ask. **Run that file before putting it on the
+tick**, and read the `# save`-shaped tag set back through it.
+
 *Closes when:* a condition can name a tag rather than an item, satisfied by any combination of
 what the player carries and what their passives supply; `# action rod-cast` requires `rod` and
-`bait-cast` requires `bait`; and adding a rod is declaring one.
+`bait-cast` requires `bait`; adding a rod is declaring one; and a frame still reads no DSL.
 
 ## A station cannot say what it is worked with, so 49 recipes each carry the tool
 
