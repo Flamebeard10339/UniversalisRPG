@@ -11,7 +11,7 @@ import { section, writtenWhole } from './define';
 import { condition as visitCondition, put, putCarried, putLocation, type Visit } from '../refs';
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
-import { lastSegment } from '../../grammar/values';
+import { lastSegment, REFERENCE } from '../../grammar/values';
 import { WORN_COPY } from '../../grammar/worn';
 
 export interface NoteField {
@@ -112,7 +112,7 @@ export interface Test {
 
 export const everyDirective = (directives: readonly Directive[]): Directive[] => directives.flatMap((directive) => (directive.kind === 'loop' ? [directive, ...everyDirective(directive.body)] : [directive]));
 
-const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
+const PATH = REFERENCE.source;
 const SLUG = '[a-z0-9][a-z0-9-]*';
 const USE_PAYLOAD = `(?<obj>[a-z][a-z0-9-]*)\\.(?<objId>${PATH})\\.(?<actionId>${SLUG})`;
 const USE_ON_PAYLOAD = `(?<action>${PATH})[ \\t]+on[ \\t]+(?<target>${PATH})`;
@@ -226,9 +226,68 @@ export function parseUsePayload(payload: string): UseDirective | null {
     : null;
 }
 
-export const useChoiceId = (value: UseDirective): string => `${USE_VERB}${usePayload(value)}`;
+export type ChoiceDirective = Extract<Directive, { kind: 'use' | 'use-on' | 'talk' | 'travel' | 'craft' | 'shop' }>;
 
-export const parseUseChoiceId = (choiceId: string): UseDirective | null => (choiceId.startsWith(USE_VERB) ? parseUsePayload(choiceId.slice(USE_VERB.length)) : null);
+type ChoiceKind = ChoiceDirective['kind'];
+
+type Choice<K extends ChoiceKind> = Extract<ChoiceDirective, { kind: K }>;
+
+interface ChoiceSpelling<K extends ChoiceKind> {
+  readonly verb: string;
+  readonly payload: (value: Choice<K>) => string;
+  readonly parse: (payload: string) => Choice<K> | null;
+}
+
+const ONE_ID = new RegExp(`^${PATH}$`);
+const FIGHT_ID = new RegExp(`^(?<action>${PATH}):(?<target>${PATH})$`);
+
+function named<K extends ChoiceKind, F extends string>(kind: K, field: F, verb: string): ChoiceSpelling<K> {
+  return {
+    verb,
+    payload: (value) => (value as unknown as Record<F, string>)[field],
+    parse: (payload) => (ONE_ID.test(payload) ? ({ kind, [field]: payload } as unknown as Choice<K>) : null),
+  };
+}
+
+const CHOICE_SPELLINGS: { readonly [K in ChoiceKind]: ChoiceSpelling<K> } = {
+  use: { verb: USE_VERB, payload: usePayload, parse: parseUsePayload },
+  'use-on': {
+    verb: 'fight:',
+    payload: (value) => `${value.action}:${value.target}`,
+    parse: (payload) => {
+      const groups = FIGHT_ID.exec(payload)?.groups;
+      return groups ? { kind: 'use-on', action: groups.action as string, target: groups.target as string } : null;
+    },
+  },
+  talk: named('talk', 'entity', 'talk:'),
+  travel: named('travel', 'location', 'travel:'),
+  craft: named('craft', 'recipe', 'craft:'),
+  shop: named('shop', 'shop', 'shop:'),
+};
+
+const spelling = (kind: ChoiceKind): ChoiceSpelling<ChoiceKind> => CHOICE_SPELLINGS[kind] as ChoiceSpelling<ChoiceKind>;
+
+export function choiceId(value: ChoiceDirective): string {
+  const spelt = spelling(value.kind);
+  return `${spelt.verb}${spelt.payload(value)}`;
+}
+
+export function parseChoiceId(id: string): ChoiceDirective | null {
+  for (const kind of Object.keys(CHOICE_SPELLINGS) as ChoiceKind[]) {
+    const spelt = spelling(kind);
+    if (!id.startsWith(spelt.verb)) continue;
+    const parsed = spelt.parse(id.slice(spelt.verb.length));
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+export const useChoiceId = (value: UseDirective): string => choiceId(value);
+
+export function parseUseChoiceId(id: string): UseDirective | null {
+  const parsed = parseChoiceId(id);
+  return parsed !== null && parsed.kind === 'use' ? parsed : null;
+}
 
 type Groups = Record<string, string | undefined>;
 
