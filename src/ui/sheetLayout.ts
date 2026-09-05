@@ -10,6 +10,8 @@ export const SLOTS = `${GRID} auto-rows-[6rem]`;
 
 export const NAME = 'whitespace-normal break-words';
 
+export const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
+
 export interface Doll {
   body: readonly Entry[];
   beneath: readonly Entry[];

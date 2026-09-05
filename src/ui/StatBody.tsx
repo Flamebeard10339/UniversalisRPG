@@ -1,3 +1,4 @@
+import { CARD } from './sheetLayout';
 import type { StatRow } from '../runtime/session';
 import { madeOf } from '../runtime/statScreen';
 import { tidy } from './format';
@@ -9,7 +10,7 @@ export function StatBody({ row }: { row: StatRow }): JSX.Element {
   useTestSurface('stat', { row });
 
   return (
-    <div style={fillOf(row.group)} className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
+    <div style={fillOf(row.group)} className={CARD}>
       <div className="flex items-baseline justify-between gap-3">
         <h3 className={`min-w-0 text-base font-semibold ${NAME}`}>{row.title}</h3>
         <p className="shrink-0 text-base tabular-nums">{tidy(row.value)}</p>

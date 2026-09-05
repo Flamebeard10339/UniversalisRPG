@@ -1,3 +1,4 @@
+import { CARD } from './sheetLayout';
 import type { JournalEntry } from '../runtime/session';
 import { inkOf } from './lineStyle';
 import { useTestSurface } from './useTestSurface';
@@ -7,7 +8,7 @@ export function QuestBody({ entry, words }: { entry: JournalEntry; words: Words 
   useTestSurface('quest', { entry });
 
   return (
-    <div data-standing={entry.standing} className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
+    <div data-standing={entry.standing} className={CARD}>
       <h3 style={inkOf(entry.group)} className="text-base font-semibold">
         {entry.title}
       </h3>

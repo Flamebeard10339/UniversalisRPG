@@ -1,5 +1,5 @@
 import type { Answer } from '../../runtime/localized';
-import { SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
+import { EDITED_SURFACES, type Standing, type SurfaceId } from '../authoringSurface';
 import type { Bearing, Sheet } from '../../runtime/map';
 import { colourIn, draftIn, kindsIn, offeringIn, rowsIn, sectionKey, type EditHeld } from '../editControls';
 import { modeNamed, type MapMode } from '../mapEdit';
@@ -283,7 +283,7 @@ export interface EditState {
 export function editState(held: EditHeld): EditState {
   return {
     surface: held.editing.surface,
-    surfaces: SURFACES,
+    surfaces: EDITED_SURFACES,
     kind: held.editing.kind,
     kinds: kindsIn(held),
     query: held.editing.query,
@@ -307,7 +307,7 @@ export function offerNamed(held: EditHeld, value: unknown): string {
 }
 
 export function surfaceNamed(value: unknown): SurfaceId {
-  const found = SURFACES.find((each) => each === value);
+  const found = EDITED_SURFACES.find((each) => each === value);
   if (!found) throw new Error(`no editing surface is named ${String(value)}`);
   return found;
 }

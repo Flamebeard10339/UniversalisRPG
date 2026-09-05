@@ -1,3 +1,4 @@
+import { CARD } from './sheetLayout';
 import type { Localized } from '../runtime/localized';
 import { formatClock, tidy } from './format';
 import { NAME } from './sheetLayout';
@@ -21,7 +22,7 @@ export function SkillBody({ panel, first, now, words }: { panel: SkillPanel; fir
   useTestSurface('skill', { panel, rate });
 
   return (
-    <div className="mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4">
+    <div className={CARD}>
       <h3 className={`min-w-0 text-base font-semibold ${NAME}`}>{panel.title}</h3>
       <dl className="mt-2 flex flex-col gap-1">
         <Fact name={words('level')} value={tidy(panel.level)} />

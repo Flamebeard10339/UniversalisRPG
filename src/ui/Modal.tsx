@@ -5,8 +5,7 @@ import type { Localized } from '../runtime/localized';
 import { arriving, A_CHARACTER, landed, OPENS, pressed, typedOn } from './reveal';
 import { useMoment, useMotionless } from './transient';
 import { useTestSurface } from './useTestSurface';
-
-const CARD = 'mx-auto w-full max-w-2xl rounded-2xl border border-border bg-surface-raised p-4';
+import { CARD } from './sheetLayout';
 
 export function ModalCard({ subject, title, children }: { subject?: string; title?: ReactNode; children: ReactNode }): JSX.Element {
   const risen = useMoment('rise', true, subject);

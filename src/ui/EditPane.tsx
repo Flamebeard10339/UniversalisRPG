@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { searching, searchHint } from './authoringSurface';
+import { EDITED_SURFACES, searching, searchHint } from './authoringSurface';
 import { amissWith, colourIn, draftIn, kindsIn, offeringIn, openedIn, rowsIn, sectionKey, tonesIn, type EditHeld } from './editControls';
 import { pathOf } from './grammarPath';
 import { splitFrom } from './gesture';
@@ -50,7 +50,7 @@ export function EditPane({ held, words }: { held: EditHeld; words: Words }): JSX
   return (
     <div ref={surface} className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface-raised px-3 py-2">
-        {(['local', 'global'] as const).map((surface) => (
+        {EDITED_SURFACES.map((surface) => (
           <button
             key={surface}
             data-drive="edit.surface"

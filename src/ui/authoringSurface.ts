@@ -22,6 +22,8 @@ export const SURFACES = ['map', 'local', 'global'] as const;
 
 export type SurfaceId = (typeof SURFACES)[number];
 
+export const EDITED_SURFACES: readonly SurfaceId[] = ['local', 'global'];
+
 export { MAPPED_KIND };
 
 export function sectionsIn(source: ModuleSource): Section[] {
