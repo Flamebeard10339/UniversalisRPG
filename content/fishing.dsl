@@ -234,6 +234,11 @@ value: 150
 item-level: 20-26
 tackle, +2 fishing-rate
 
+# droptable salmon-rarity
+1 in 200:
+  give: 1 anglers-knot-jewel
+  say: There is something wound into the gill plate that was not put there by a fish.
+
 # droptable parted-tackle
 take: worn gloves
 
@@ -416,9 +421,7 @@ cast:
   give: 1 raw-salmon
   xp: fishing 11
   add: honest-catches 1
-  1 in 200:
-    give: 1 anglers-knot-jewel
-    say: There is something wound into the gill plate that was not put there by a fish.
+  roll: salmon-rarity
   +on attempts exhausted:
     roll: spend-bait
     say: Something enormous takes it and simply keeps going.
@@ -434,9 +437,7 @@ cast:
   roll: spend-bait
   give: 1 raw-salmon
   xp: fishing 11
-  1 in 200:
-    give: 1 anglers-knot-jewel
-    say: There is something wound into the gill plate that was not put there by a fish.
+  roll: salmon-rarity
   +on attempts exhausted:
     roll: spend-bait
     roll: marle-catches-you
