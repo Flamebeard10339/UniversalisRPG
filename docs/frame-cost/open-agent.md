@@ -1,9 +1,10 @@
 # What is still wrong that a lane can take
 
-A frame of live play is ten a second and costs about 2ms of the 100 it has:
-0.5-0.6ms rebuilding the view, ~0.2ms simulating, ~1ms rendering the App with the
-production React a player runs. It was 70ms and more. In a real Chrome on the
-production build, nothing is dropped at any speed on a desktop.
+A frame of live play is ten a second and costs about 2.5ms of the 100 it has:
+~0.5ms rebuilding the view, ~0.2ms simulating, ~1ms rendering the App with the
+production React a player runs. Measured on the same rig against `main`, a frame
+was 77-92ms — the app spent most of a core running its own clock. In a real
+Chrome on the production build, nothing is dropped at any speed on a desktop.
 
 Two gates keep it there. `src/ui/frameCost.dom.test.tsx` mounts the real App on
 the fixture world, leaves an action under way and drives the clock: a frame must
@@ -75,6 +76,30 @@ that rate claim is the real gate for this work.
 
 *Closes when:* a run of a hundred quiet ticks renders the App fewer than ten
 times, and the test harness still reads a live progress that moved.
+
+## A pack full of grown gear puts the frame over its whole budget
+
+`sessionStatus` builds `planeReports(registry, state)` on every tick, for every
+grown item the player is carrying, whether or not a plane is on screen. Each
+report walks the item's whole cluster lattice — every position, every slot, every
+link across, and a stat contribution per node.
+
+It costs about 40µs today, because a shipped save carries one grown item with a
+one-cluster plane. Measured on synthetic saves, `view()` goes 1 grown item on an
+8-cluster plane **1.14ms**, 4 items **2.27ms**, 16 items **7.51ms**, 28 items
+**14.48ms**. The pack is 28 slots. So a late player who has built and kept a pack
+of gear takes the frame from two per cent of a core to a hundred and forty, and
+nothing between here and there says so.
+
+This is the same shape as the quest depth that was found and fixed: not a cost
+today, a cliff a player walks off later. The fix is the one the first line names —
+a plane's body is read by the plane modal and nothing else, while the ledgers want
+only its name and level, and `modalFocus(state)` already says which plane is open.
+Splitting the header from the body is smaller than making the whole view lazy and
+does not have laziness's soundness problem.
+
+*Closes when:* `view()` on a save carrying 28 grown items costs what it costs on a
+save carrying one, and the plane modal still draws its lattice.
 
 ## The modal beat restarts whenever the world speaks under it
 
