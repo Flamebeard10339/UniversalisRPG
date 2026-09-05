@@ -2,7 +2,7 @@ import { Condition, condition } from '../../grammar/condition';
 import { isModalScreen, MODAL_SCREENS, ModalScreen, modalScreen, modalScreenRefusal, place } from '../../grammar/actionResult';
 import { DslError, parseWhole, type Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { hasBlock, indentLines, takeBlock, type RawLine } from '../../grammar/structure';
+import { hasBlock, indentLines, REFERENCE, takeBlock, type RawLine } from '../../grammar/structure';
 import type { Span } from '../../grammar/parser';
 import { Direction, DIRECTIONS, Hex, hexKey, parseHexKey, PlaneNode } from '../hex';
 import type { EngineKey } from '../locale';
@@ -11,7 +11,7 @@ import { section, writtenWhole } from './define';
 import { condition as visitCondition, put, putCarried, putLocation, type Visit } from '../refs';
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
-import { lastSegment, REFERENCE } from '../../grammar/values';
+import { lastSegment } from '../../grammar/values';
 import { WORN_COPY } from '../../grammar/worn';
 
 export interface NoteField {

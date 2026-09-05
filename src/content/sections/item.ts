@@ -5,6 +5,7 @@ import { HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { range, Range } from '../../grammar/range';
+import { REFERENCE } from '../../grammar/structure';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
 import { actions, pruneActions, put, type Loose } from '../refs';
@@ -44,7 +45,7 @@ const jewelCarriedBy = (item: AuthoredItem): ClusterJewel | undefined => (typeof
 
 const CARRIES_ONE = 'the jewel it is, written out where nothing else names one. It stands at this item\'s own id and says this item\'s title: and examine:. A jewel is slotted into any base — anything worn that carries an item-level: — and the base\'s points are spent on its passives';
 
-const CLUSTER_EFFECT = /^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
+const CLUSTER_EFFECT = new RegExp(String.raw`^(?<sign>[+-])(?<amount>\d+)%[ \t]+(?<stat>${REFERENCE.source})$`);
 
 export const clusterEffectValue: Parser<ClusterEffect> = {
   parse(cursor: Cursor) {

@@ -1,6 +1,7 @@
 import { Cursor, DslError, Parser, Span } from './parser';
 import { range, Range, scaleRange } from './range';
 import { DEFAULT_LANGUAGE } from './section';
+import { REFERENCE } from './structure';
 
 export function refuseRange(cursor: Cursor, complaint: string): void {
   const start = cursor.pos;
@@ -91,8 +92,6 @@ export const duration: Parser<number> = {
   forms: ['<seconds>s', '<minutes>m', '<minutes>m<seconds>s'],
   examples: ['30s', '2m', '1m30s'],
 };
-
-export const REFERENCE = /[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*/;
 
 export const id: Parser<string> = {
   parse: (cursor) => {

@@ -1,5 +1,5 @@
 import { DslError, Parser } from './parser';
-import { REFERENCE } from './values';
+import { REFERENCE } from './structure';
 
 export const AXES = ['added', 'increased'] as const;
 

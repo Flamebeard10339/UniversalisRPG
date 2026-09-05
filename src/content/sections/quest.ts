@@ -2,7 +2,7 @@ import { ActionResult } from '../../grammar/actionResult';
 import { Condition, condition } from '../../grammar/condition';
 import { DslError, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { indentLines, RawLine, requireNoBlock, takeBlock } from '../../grammar/structure';
+import { indentLines, RawLine, REFERENCE, requireNoBlock, takeBlock } from '../../grammar/structure';
 import { lastSegment, text } from '../../grammar/values';
 import { overlay } from '../merge';
 import { condition as visitCondition, put, results, type Visit } from '../refs';
@@ -43,7 +43,7 @@ const UNSTAGE = /^-[ \t]*stage[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
 const LOG = /^log:[ \t]?(?<said>.*)$/;
 const DONE = /^done when:[ \t]*(?<cond>.+)$/;
 const GOTO = /^goto[ \t]+(?<name>[a-z][a-z0-9-]*)$/;
-const SAYS = /^(?<owner>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]+says:$/;
+const SAYS = new RegExp(`^(?<owner>${REFERENCE.source})[ \\t]+says:$`);
 
 const NEVER_ENDS = 'never ends';
 

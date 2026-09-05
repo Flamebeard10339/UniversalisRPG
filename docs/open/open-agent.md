@@ -507,24 +507,6 @@ records the gap.
 *Closes when:* a comparison's right-hand side may name a stat, the four obstacles declare
 `npc-thieving-damage` and the guard is written once on `# action cross`.
 
-## What an id looks like is written out eleven times outside `grammar/values.ts`
-
-`REFERENCE` (`src/grammar/values.ts:95`) is the one home for the shape of a reference, and
-`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*` is spelt again, byte for byte, in
-`sections/dialogue.ts:52` (as its own `PATH`), `sections/entity.ts:107`, `sections/item.ts:47`,
-`sections/quest.ts:46`, `sections/save.ts:22`, `grammar/actionResult.ts:137`,
-`grammar/structure.ts:18`, `grammar/tagClause.ts:67` and `runtime/command.ts:1180,1197,1277`.
-Shape 3. Measured 2026-09-05 by sweeping `src/` for the literal.
-
-Two of them are not obviously the same fact and that is why this is a line rather than a
-commit. `completion.ts:75-79` spells `[a-z0-9.-]*` — *an id half-typed*, which is a different
-question and should stay its own. And `grammar/structure.ts` importing `values.ts` may close a
-cycle within `grammar`, since `values.ts` reads `section.ts`; `npm run layer-check` is the
-thing to ask before assuming it may.
-
-*Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
-it, and a decision is recorded about the partial-id spelling in `completion.ts`.
-
 ## Three listed screens are consolidated and then unpacked into twenty-one aliases
 
 `listedScreen()` (`src/runtime/listedScreen.ts:35`) already takes the five fields quest, stat

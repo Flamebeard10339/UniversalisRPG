@@ -3,7 +3,7 @@ import { writtenFrom } from './codec';
 import { ListParser } from './list';
 import { Cursor, DslError, Holds, Parser, Span, Written, calledBlock, requireEnd } from './parser';
 import { Range } from './range';
-import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
+import { RawLine, REFERENCE, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import {
   Amount,
   amount,
@@ -22,7 +22,6 @@ import {
   Produced,
   quantified,
   refuseRange,
-  REFERENCE,
   risingAmount,
 } from './values';
 
@@ -135,7 +134,7 @@ const AT_MOST = /up[ \t]+to[ \t]+/;
 
 export const BUNDLE = 'bundle';
 
-const BOUND = /(?<name>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]*=[ \t]*/;
+const BOUND = new RegExp(`(?<name>${REFERENCE.source})[ \\t]*=[ \\t]*`);
 
 const PREPOSITION = { drain: 'from', restore: 'to', inflict: 'on' } as const;
 const MOVES = {
