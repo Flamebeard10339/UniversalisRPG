@@ -104,9 +104,18 @@ and the file it names.
 `src/content/sections/define.ts` is the contract. `section()` takes a kind's
 declaration and fills in the schema-driven half. A kind that declares `fields`
 gets its parser, printer and merge from them; a kind whose grammar does not fit
-key/value declares its own `parse` and `print`. **That is the whole difference,
-and it is not an exception** — there is no table of special cases, and adding
-one would be the failure mode above.
+key/value declares its own `parse` and `print`. **That is meant to be the whole
+difference** — there is no table of special cases, and adding one would be the
+failure mode above.
+
+One kind is currently outside it, and it is a hole in the contract rather than a
+licence to make another: `location` declares `fields` **and** overrides `print`
+and `merge`, because its coordinates print on one joined line and its roads merge
+from both ends. Nothing in `section()` gates that — `print` and `merge` sit on
+the common half — so the sentence above is an intention, not a rule, until the
+join is declarable. `docs/open/open-agent.md` holds the line. Do not read
+`location` as permission; if a kind you are adding wants it, that is the line to
+close.
 
 Read `sections/item.ts` (fields, entries, validation, references),
 `sections/droptable.ts` (its own parser and printer, in 25 lines) and
