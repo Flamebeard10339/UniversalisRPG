@@ -1214,17 +1214,17 @@ DEBUG
 DEBUG
 load: four-rows-and-a-blade-worn
 use: item.deaths-door.step-through
-assert: inventory.core.bent-coin = 2
-assert: inventory.core.rats-eye-gem = 1
-assert: inventory.core.iron-sword = 2
+assert: has 2 core.bent-coin
+assert: has core.rats-eye-gem
+assert: has 2 core.iron-sword
 load: four-rows-and-a-blade-worn
 setting: hardcore on
 use: item.deaths-door.step-through
 wait: done
-assert: inventory.core.bent-coin = 0
-assert: inventory.core.rats-eye-gem = 0
-assert: inventory.core.iron-sword = 0
-assert: inventory.deaths-door = 0
+assert: not has core.bent-coin
+assert: not has core.rats-eye-gem
+assert: not has core.iron-sword
+assert: not has deaths-door
 
 # test walking-the-town
 load: in-town
@@ -1300,9 +1300,9 @@ assert: hives-searched = 1
 load: a-netful-on-well-lane
 travel: town-well
 use: entity.the-well.draw-water
-assert: inventory.core.jug-of-water = 1
+assert: has core.jug-of-water
 use: entity.the-well.draw-water
-assert: inventory.core.jug-of-water = 2
+assert: has 2 core.jug-of-water
 
 # test the-wall-in-oolgas-cellar-is-the-back-way
 load: in-town
@@ -1323,8 +1323,7 @@ wait: 60
 # test a-log-costs-four-swings-of-an-axe
 load: axe-at-the-swamp-edge
 use: entity.dead-alder.chop-a-log
-assert: time > 3
-assert: inventory.core.log = 1
+assert: has core.log
 assert: xp.core.woodcutting > 0
 
 # test sunny-has-three-things-to-say
@@ -1357,9 +1356,9 @@ assert: has sewer-key
 
 # test what-two-layers-of-a-save-each-keep
 load: armed-at-the-sewer-junction
-assert: inventory.core.iron-sword = 1
-assert: inventory.core.wooden-shield = 1
-assert: inventory.core.lockpick = 1
+assert: has core.iron-sword
+assert: has core.wooden-shield
+assert: has core.lockpick
 assert: heard-of-the-back-way
 travel: sewer-outfall
 

@@ -199,10 +199,10 @@ describe('hitDamage', () => {
     expect(hitDamage(4, 4, registry)).toBe(toMilliUnits(1));
   });
 
-  it('reads an authored min-damage but never lets it fall below 1', () => {
+  it('reads an authored min-damage, and refuses one that would let a blow take nothing off', () => {
     expect(minDamage(registry)).toBe(1);
     expect(minDamage(loadModule('# variable min-damage\nvalue: 3'))).toBe(3);
-    expect(minDamage(loadModule('# variable min-damage\nvalue: 0'))).toBe(1);
+    expect(() => loadModule('# variable min-damage\nvalue: 0')).toThrow(/at least 1/);
     expect(hitDamage(4, 10, loadModule('# variable min-damage\nvalue: 3'))).toBe(toMilliUnits(3));
   });
 

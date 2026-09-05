@@ -1483,7 +1483,6 @@ use: entity.trout-run.cast until has raw-trout
 assert: has raw-trout
 use: entity.salmon-pool-poaching.cast until has raw-salmon
 assert: has raw-salmon
-assert: inventory.dried-fish-bait < 40
 
 # test the-tackle-stall-is-where-the-herring-is
 load: tulsa.in-town-with-bent-coins
@@ -1493,7 +1492,7 @@ submit-modal: item=more:sell:core.bent-coin
 submit-modal: count=6
 submit-modal: item=close
 assert: inventory.core.coin > 0
-assert: inventory.core.bent-coin = 2
+assert: has 2 core.bent-coin
 shop: fishing-supplies
 submit-modal: item=buy:core.herring
 submit-modal: item=close
@@ -1507,10 +1506,10 @@ assert: not has core.herring
 load: tulsa.a-netful-on-well-lane
 travel: tulsa.hasks-house
 craft: cooked-shrimp
-assert: inventory.raw-shrimp = 3
+assert: has 3 raw-shrimp
 travel: tulsa.nans-house
 craft: cooked-shrimp
-assert: inventory.raw-shrimp = 2
+assert: has 2 raw-shrimp
 assert: xp.cooking.cooking > 0
 
 # save geared-for-the-new-water
@@ -1611,7 +1610,7 @@ talk: rook
 choose: Here.
 assert: has-taught-rook
 assert: the-boy-at-the-narrows.taught
-assert: inventory.small-fishing-net = 1
+assert: has small-fishing-net
 
 # save on-the-shingle-with-a-rod
 {"version":13,"location":"tulsa.riverside","xp":{"fishing.fishing":20000},"inventory":{"core.coin":40,"fishing.dried-fish-bait":40},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"fishing.fishing-rod","payload":{"roll":0.1,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"fishing.braided-fiber-line","payload":{"roll":0.2,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}}}

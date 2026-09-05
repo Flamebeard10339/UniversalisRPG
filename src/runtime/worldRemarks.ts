@@ -3,6 +3,7 @@ import type { Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import { everyDirective, type Directive } from '../content/sections/test';
 import { keywordsIn, type TagClause } from '../grammar/tagClause';
+import { CHURNING_ROOTS, everyCondition, printCondition } from '../grammar/condition';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { formatModuleDiagnostic } from '../content/registry';
@@ -66,6 +67,26 @@ function unspoken(registry: Registry): Remark[] {
       const only = sheets.length > 0 ? `save ${sheets.join(' and ')}` : 'nowhere at all';
       return { where: `# test ${each.id}`, says: `states no claim: what it proves lives in ${only}. Write the claim as assert: lines — \`npm run oracle -- test\` lists what a condition may read — or, where nothing a condition can read names it, close on expect: and say why in a comment.` };
     });
+}
+
+function pinned(registry: Registry): Remark[] {
+  const churning = new Set<string>(CHURNING_ROOTS);
+  return [...registry.tests.values()].flatMap((test) =>
+    everyDirective(test.directives).flatMap((directive) =>
+      directive.kind !== 'assert'
+        ? []
+        : everyCondition(directive.condition).flatMap((each) =>
+            each.kind === 'comparison' && each.right.value !== 0 && churning.has(each.left.path[0] ?? '')
+              ? [
+                  {
+                    where: `# test ${test.id}`,
+                    says: `pins ${printCondition(each)}, a figure that moves whenever the world's numbers do, so a pass over them breaks this route while the path it walks is still perfectly walkable. A route proves that a sequence of events yields a result and reports its cost and its reward rather than asserting either. Against zero the same line asks whether the thing happened at all and is fine; against any other number, say it with \`has <item>\` instead, or take it out, or move the claim into src/content/fixture/ where it is a unit test the suite can own.`,
+                  },
+                ]
+              : [],
+          ),
+    ),
+  );
 }
 
 function unread(sources: readonly ModuleSource[], registry: Registry): Remark[] {
@@ -166,6 +187,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => stackedBases(registry),
   (_sources, registry) => restated(registry),
   (_sources, registry) => unspoken(registry),
+  (_sources, registry) => pinned(registry),
   (_sources, registry) => stale(registry),
   (_sources, registry) => rotted(registry),
   (_sources, registry) => lopsided(registry),

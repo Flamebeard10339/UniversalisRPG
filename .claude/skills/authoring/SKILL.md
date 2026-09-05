@@ -69,10 +69,9 @@ It writes nothing here and prints where its work is. Then:
 3. Read what it reached for, and whether anybody answered it. An unanswered reach is a question
    the oracle did not answer and should have; that list is the point of running it this way.
 
-## Balance is declared, not measured
+## What the engine cuts, and what the author writes
 
-**An author does not tune numbers.** A body that fights names three things and the engine
-cuts every stat under them:
+A body that fights names three things and the engine cuts every stat under them:
 
 - `tier:` — what it is worth fighting. How many seconds it stands against a player the ladder
   puts at its level, what share of survivable incoming it deals, and what an hour of it pays
@@ -86,14 +85,15 @@ cuts every stat under them:
 A body naming those needs **no `stats:` line at all**. Write a stat only where it is
 load-bearing for the encounter — a resistance that punishes the wrong weapon, a bite that
 must be fire so that a route about fire resistance means anything — and write it as a
-modifier (`-20% fire-resistance`) so it survives a rebalance. Everything else is the
-engine's, and a number typed by hand is a number that goes stale the next time a ladder moves.
+modifier (`-20% fire-resistance`) so it survives the ladder moving under it. Everything else
+is the engine's, and a number typed by hand is a number that goes stale the next time a
+ladder moves.
 
-**So do not spend a run on `simulate-activity` or on tuning passes.** That was the old
-procedure and it is why the base run hit its turn cap with the work half done. The tags are
-the balance. `npm run ladder-check` will tell you whether a body matches the tags it names,
-and a body that does not is either mis-tagged or met at the wrong level — both of which are
-one word to change rather than six numbers to solve.
+**Tuning the world's numbers is not this skill's business.** Do it if you want to, or if the
+brief you were handed asks for it; otherwise write the tags and let the engine cut the rest.
+`npm run ladder-check` will tell you whether a body matches the tags it names, and a body
+that does not is either mis-tagged or met at the wrong level — both of which are one word to
+change rather than six numbers to solve.
 
 **What is still the author's:** which tier a thing is, what shape it fights in, what level it
 is met at, what it drops, and what a room holds. Those are judgements about the world. A room

@@ -1,4 +1,4 @@
-import { Condition, holds, printReference, Reference } from './condition';
+import { childConditions, Condition, everyCondition, holds, printReference, Reference, referencesOf } from './condition';
 import { DslError } from './parser';
 import { parseSegments, printSegments, TextSegment } from './segment';
 
@@ -13,23 +13,7 @@ export const namedBy = (reference: Reference): string => printReference(referenc
 export function referencesIn(words: string): string[] {
   const found: string[] = [];
   const walk = (condition: Condition): void => {
-    switch (condition.kind) {
-      case 'reference':
-        found.push(namedBy(condition.reference));
-        return;
-      case 'comparison':
-        found.push(namedBy(condition.left));
-        return;
-      case 'not':
-        walk(condition.condition);
-        return;
-      case 'and':
-      case 'or':
-        for (const each of condition.conditions) walk(each);
-        return;
-      default:
-        return;
-    }
+    for (const each of everyCondition(condition)) for (const reference of referencesOf(each)) found.push(namedBy(reference));
   };
   for (const segment of parseSegments(words, 0)) {
     if (segment.kind === 'interpolate') found.push(namedBy(segment.reference));
@@ -84,13 +68,8 @@ const asksWhatIsCarried = (condition: Condition): boolean => {
   switch (condition.kind) {
     case 'has':
       return true;
-    case 'not':
-      return asksWhatIsCarried(condition.condition);
-    case 'and':
-    case 'or':
-      return condition.conditions.some(asksWhatIsCarried);
     default:
-      return false;
+      return childConditions(condition).some(asksWhatIsCarried);
   }
 };
 

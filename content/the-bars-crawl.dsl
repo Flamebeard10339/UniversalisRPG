@@ -160,7 +160,7 @@ travel: market-square
 travel: riverside
 travel: deep-water
 use: entity.blowfish-hole.cast until inventory.raw-blowfish >= 3
-assert: inventory.raw-blowfish >= 3
+assert: has 3 raw-blowfish
 travel: riverside
 travel: market-square
 travel: tavern-street
@@ -169,7 +169,7 @@ craft: cleaned-blowfish
 craft: cleaned-blowfish
 craft: cleaned-blowfish
 assert: not has raw-blowfish
-assert: inventory.blowfish-bones >= 1
+assert: has blowfish-bones
 assert: sunnys-brew.dissolving
 craft: blowfish-brew
 assert: has blowfish-brew

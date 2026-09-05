@@ -172,8 +172,6 @@ travel: castle-yard
 talk: tulsa.larry
 choose: down-the-grate.back-up.larry.0.said
 assert: down-the-grate.reported
-assert: xp.combat.health >= 1000
-assert: xp.thieving.thieving >= 1500
 
 # test the-captain-pays-a-bounty-for-the-news
 load: at-the-grate
@@ -201,9 +199,7 @@ travel: guard-barracks
 talk: tulsa.guard-captain
 choose: down-the-grate.back-up.guard-captain.1.said
 assert: down-the-grate.reported
-assert: xp.combat.health >= 1000
-assert: xp.thieving.thieving >= 1500
-assert: inventory.core.coin >= 500
+assert: has core.coin
 
 # test a-cooked-herring-haggles-the-toll-down
 load: at-the-grate-with-a-herring

@@ -49,6 +49,7 @@ function calls(source: { text: string }): string[] {
 }
 
 const DISPATCHES = [
+  'MAPPED_KIND',
   'amounts',
   'speedKept',
   'greetingBack',

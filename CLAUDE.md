@@ -217,26 +217,28 @@ snapshot put a whole-corpus parse on the render path and cost 263ms a frame in t
 browser, which is what "the whole interface is laggy" turned out to be. **Before
 putting work on the tick or the render path, run that file.**
 
-**A test may not assert a balance number.** Balance churns continuously, and a change
-to it must not redden the suite. Test that the mechanism works — that rage rises when
-a blow lands, that a cap bites, that two swings differ — never that a number is the
+**A test may not assert a number that churns.** The world's figures move continuously, and
+a change to them must not redden the suite. Test that the mechanism works — that rage rises
+when a blow lands, that a cap bites, that two swings differ — never that a number is the
 number it is today.
 
 **A `# test` in the corpus asks one question: is this path still walkable?** Does this
-sequence of actions, taken in order, reach the end it names. Nothing else. Not how much
-xp it earned, not what the pools stood at, not what the clock or the rng cursor read,
-not what the loot rolled. A balance pass that makes the path *impossible* must fail here
-— that is the whole point of the test — and a balance pass that merely changes the
-numbers along the way must not. Balance is answered by running the world —
-`npm run simulate-activity`, below — so a `# test` still gets no opinion about it. The reason
-has changed rather than the rule: balance has somewhere better to live than an
-assertion, not nowhere at all.
+sequence of actions, taken in order, reach the end it names. Nothing else. **A route proves
+that a sequence of events yields a result, and reports its cost and reward — how long it
+took, what it paid. It does not assert either.** Not how much xp it earned, not what the
+pools stood at, not what it was carrying or what that came to, not what the clock or the
+rng cursor read, not what the loot rolled. A change to the world's numbers that makes the
+path *impossible* must fail here — that is the whole point of the test — and one that
+merely moves the figures along the way must not. An `assert: inventory.coin = 0` after a
+purchase is a unit test confirming that shops take coin, and it belongs in the fixture
+world at most.
 
 This is why `expect:` compares only what a path is made of. The state a route ends on is
-filtered before it is compared, in one place, so a sheet **cannot** pin a balance-derived
-field however it was recorded — see `WALKED_FIELDS` in `src/runtime/save.ts`. The filter is
+filtered before it is compared, in one place, so a sheet **cannot** pin a churning field
+however it was recorded — see `WALKED_FIELDS` in `src/runtime/save.ts`. The filter is
 the rule's proof: there is nothing to keep in sync, and a sheet written next month is
-covered by having been written at all.
+covered by having been written at all. `assert:` has no such filter, which is why the rule
+above has to be written down at all.
 
 **A test is not added until it has been shown not to be redundant, and a duplicate
 found is deleted rather than glossed over.** A proof has one home like anything else:
@@ -275,9 +277,9 @@ Tools, none of which are gates:
 
 - `npm run play` — interactive REPL over a live session; `# test` scripts run with `/test`
 - `npm run probe -- <source>...` — ask the load path a question without building a runner; `--test <id>` runs one `# test` (or a module's own) in about a second, `--help` prints the rest. A directory source stands for the `.dsl` files in it, so `content` names the corpus
-- `npm run simulate-activity -- <save> [<action-spec>]` — what every offer the engine puts in front of a player standing on that save pays over one hour of game time. **Every figure is read off a run rather than reckoned**: it writes a `# test` per offer and walks it under several seeds, so a buff, a proc, an on-kill effect or a fight something else started is priced by having happened. The window is the only denominator and every run spends all of it, so dying at seven seconds costs the rest of the hour, and where an offer did not last the window out the pace inside the time it did run is printed beside the rate — a ceiling, not an hour anything held. Beside what an offer paid it prints what it cost. Reach for this whenever there is a balance question and before changing any stat, drop or rate; it is never a gate, it asserts nothing, and it is seconds for a room and minutes for a world. `--help` says what it takes, including how to stand a player on a rung of the declared ladder, how to read the ceiling under the god words, and how to point it at a world that is not the shipped one
+- `npm run simulate-activity -- <save> [<action-spec>]` — what every offer the engine puts in front of a player standing on that save pays over one hour of game time. **Every figure is read off a run rather than reckoned**: it writes a `# test` per offer and walks it under several seeds, so a buff, a proc, an on-kill effect or a fight something else started is priced by having happened. The window is the only denominator and every run spends all of it, so dying at seven seconds costs the rest of the hour, and where an offer did not last the window out the pace inside the time it did run is printed beside the rate — a ceiling, not an hour anything held. Beside what an offer paid it prints what it cost. It is never a gate, it asserts nothing, and it is seconds for a room and minutes for a world. `--help` says what it takes, including how to stand a player on a rung of the declared ladder, how to read the ceiling under the god words, and how to point it at a world that is not the shipped one
 - `npm run oracle [-- <kind>... | --at <draft.dsl> [--walk [<line>]] | --at <dir>]` — print the grammar the editing page offers, as a tree per kind, short enough with no kind named to read whole; or read a draft: every line the engine refuses, then its word on the whole file stood beside the shipped world. `--walk <line>` goes on to say, of one line, where it sits, what it is read as and what may stand there, which is what to reach for when one line has you stuck. **A directory in place of a draft is the whole world in it, and is the gate** — `npm run oracle -- --at content` is the corpus's entire verdict and exits non-zero, which is what a contributor runs and what CI runs, since no test reads a line of `content/`. `--help` prints the rest. Reach for this before writing anything under `content/`, and again after each pass
-- `npm run floors` — walks every `# test` under `floors/`, the folder beside the world where the speedrun runs leave the fastest route anyone has walked to each goal, and prints per route the level it reached, the game-minutes it took and the minutes the curve allows for that level. A route's goal is read off its own closing `assert: level.<skill> >= <n>`. Nothing about the minutes is asserted — a floor slower than the curve is the finding, read off the sheet — and it exits non-zero only where a route no longer walks, which is what a rebalance that killed the floor looks like. CI runs it. A speedrun brief seeds its run from these and hands back a faster one to put here
+- `npm run floors` — walks every `# test` under `floors/`, the folder beside the world where the speedrun runs leave the fastest route anyone has walked to each goal, and prints per route the level it reached, the game-minutes it took and the minutes the curve allows for that level. A route's goal is read off its own closing `assert: level.<skill> >= <n>`. Nothing about the minutes is asserted — a floor slower than the curve is the finding, read off the sheet — and it exits non-zero only where a route no longer walks, which is what a change to the world's numbers that killed the floor looks like. CI runs it. A speedrun brief seeds its run from these and hands back a faster one to put here
 - `npm run authorbot -- <brief>` — hand one brief to a coding agent over a copy of `content/` and count what it reached for. The engine is refused unless `--open`, and every reach for it is a question the oracle did not answer, which is what the run is for — a run may now put that question to whoever dispatched it and stand still until it is answered, so a run is watched rather than forgotten. It writes nothing in this checkout. **This is how a module gets authored**; the `authoring` skill is the procedure and `--help` is the flags, and a hand-rolled subagent throws the measurement away
 - `npm run friction [-- <agent id>]` — what a subagent had to work out for itself before its first real edit: engine source read, scratch worlds built, tools re-run to learn their output. A `SubagentStop` hook prints the one-line verdict; this prints the rest. Experimentation is a signal rather than a fault — a lane briefed on the engine reads engine source because that is the job, while a lane told to ask the oracle that builds a scratch world names a hole that will cost the next lane the same time. Read it after dispatching, and fix what it names at the source
 - `npm run inspect -- "<expression>"` — evaluate against the repo's own module resolution, leaving no file behind

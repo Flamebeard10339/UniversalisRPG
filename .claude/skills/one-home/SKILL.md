@@ -127,8 +127,9 @@ Two things the measurement will not tell you. It reads which tests *assert*
 against a break, not which *depend on a route as a fixture* — grep `src/` and
 `scripts/` for a `# test` id before deleting it, because three of those nine were
 replayed by runtime tests as scenario builders and cutting them took good tests
-down with them. And it has no word on *what* a test may assert: that is the
-balance rule, and `CLAUDE.md` owns it.
+down with them. And it has no word on *what* a test may assert — a route proves a
+sequence yields a result and does not assert its cost or its reward — which is a
+rule of its own, and `CLAUDE.md` owns it.
 
 ## Does not apply
 

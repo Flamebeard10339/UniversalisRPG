@@ -9,37 +9,43 @@ export const TIME = 'time';
 export const PLAYER = 'player';
 export const SETTING = 'setting';
 
-interface Rooted {
+interface Churning {
+  churns: boolean;
+}
+
+interface Rooted extends Churning {
   kind: string;
   stands: string;
   against?: number;
   means?: string;
 }
 
-interface Named {
+interface Named extends Churning {
   stands: string;
 }
 
-interface Bare {
+interface Bare extends Churning {
   means: string;
   against: number;
 }
 
 export const ENGINE_ROOTS = {
-  [TIME]: { means: 'seconds of game time this run has taken', against: 30 },
-  [PLAYER]: { stands: 'race' },
-  [SETTING]: { stands: 'hardcore' },
-  xp: { kind: 'skill', stands: 'thieving', against: 4 },
-  level: { kind: 'skill', stands: 'mining', against: 2 },
-  'highest-level': { means: 'the level of whichever skill stands highest, so a bound on it is a bound on any one skill', against: 2 },
-  resource: { kind: 'resource', stands: 'health', against: 10 },
-  inventory: { kind: 'item', stands: 'plank', against: 3 },
-  count: { kind: 'flag', stands: 'confiscated', against: 1, means: 'how much a bundle holds, all told — a `# variable` marked `bundle`. It is the only reading a bundle answers: what is inside it is moved rather than looked at' },
-  stat: { kind: 'stat', stands: 'attack', against: 1.5 },
-  us: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whoever is acting, which is the player wherever no action is under way' },
-  them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at, so a line with no action under way — a dialogue — and one whose action is aimed at a place rather than an entity are both refused as they are said, rather than going quiet' },
-  changed: { kind: 'stat', stands: 'attack', means: 'whether that stat stands anywhere other than the base it was declared with, which is how a line asks whether anything has moved it without writing down what it started at' },
+  [TIME]: { means: 'seconds of game time this run has taken', against: 30, churns: true },
+  [PLAYER]: { stands: 'race', churns: false },
+  [SETTING]: { stands: 'hardcore', churns: false },
+  xp: { kind: 'skill', stands: 'thieving', against: 4, churns: true },
+  level: { kind: 'skill', stands: 'mining', against: 2, churns: false },
+  'highest-level': { means: 'the level of whichever skill stands highest, so a bound on it is a bound on any one skill', against: 2, churns: false },
+  resource: { kind: 'resource', stands: 'health', against: 10, churns: true },
+  inventory: { kind: 'item', stands: 'plank', against: 3, churns: true },
+  count: { kind: 'flag', stands: 'confiscated', against: 1, means: 'how much a bundle holds, all told — a `# variable` marked `bundle`. It is the only reading a bundle answers: what is inside it is moved rather than looked at', churns: false },
+  stat: { kind: 'stat', stands: 'attack', against: 1.5, churns: false },
+  us: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whoever is acting, which is the player wherever no action is under way', churns: false },
+  them: { kind: 'stat', stands: 'attack', against: 1.5, means: 'a stat of whatever the action under way is aimed at, so a line with no action under way — a dialogue — and one whose action is aimed at a place rather than an entity are both refused as they are said, rather than going quiet', churns: false },
+  changed: { kind: 'stat', stands: 'attack', means: 'whether that stat stands anywhere other than the base it was declared with, which is how a line asks whether anything has moved it without writing down what it started at', churns: false },
 } as const satisfies Readonly<Record<string, Rooted | Named | Bare>>;
+
+export const CHURNING_ROOTS: readonly EngineRoot[] = (Object.keys(ENGINE_ROOTS) as EngineRoot[]).filter((root) => ENGINE_ROOTS[root].churns);
 
 export type EngineRoot = keyof typeof ENGINE_ROOTS;
 
@@ -130,6 +136,16 @@ export type Condition =
   | { kind: 'has'; item: string; count: number }
   | { kind: 'always' }
   | { kind: 'reference'; reference: Reference };
+
+export const childConditions = (condition: Condition): readonly Condition[] =>
+  'conditions' in condition ? condition.conditions : 'condition' in condition ? [condition.condition] : [];
+
+export const referencesOf = (condition: Condition): readonly Reference[] =>
+  condition.kind === 'reference' ? [condition.reference] : condition.kind === 'comparison' ? [condition.left] : [];
+
+export function everyCondition(condition: Condition): readonly Condition[] {
+  return [condition, ...childConditions(condition).flatMap(everyCondition)];
+}
 
 export const ALWAYS = 'always';
 

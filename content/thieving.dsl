@@ -1829,7 +1829,6 @@ assert: has-the-word
 travel: doss-house
 use: entity.den-hatch.give-the-word
 assert: tulsa.rogue-den.touched
-assert: inventory.core.coin = 1100
 
 # test locked-out-through-the-cellar-after-the-guard-and-a-thousand-at-the-hatch
 lock-pools
@@ -1841,7 +1840,6 @@ travel: swamp-edge
 talk: guardsman
 choose: Here is twenty-five.
 assert: locked-out.let-in-by-the-guard
-assert: inventory.core.coin = 1075
 travel: well-lane
 travel: widows-yard
 use: entity.cellar-new-lock.pick-the-door until widows-cellar.touched
@@ -1858,7 +1856,6 @@ travel: well-lane
 travel: doss-house
 use: entity.den-hatch.pay-your-way-down
 assert: tulsa.rogue-den.touched
-assert: inventory.core.coin = 75
 
 # test the-back-window-is-the-third-way-in
 load: on-well-lane-with-a-purse
@@ -1898,8 +1895,6 @@ shop: pear-cart
 submit-modal: item=more:buy:thieving.pear
 submit-modal: count=30
 submit-modal: item=close
-assert: inventory.pear = 60
-assert: inventory.apple = 40
 talk: street-urchins
 choose: Here. Twenty pears.
 talk: street-urchins
@@ -1955,7 +1950,6 @@ travel: motts-house
 talk: mott
 choose: Send one up now. I will pay.
 assert: stat.warden-away = 2
-assert: inventory.core.coin = 20
 travel: kiln-lane
 travel: market-row
 travel: market-square
@@ -1966,7 +1960,6 @@ use: entity.wardens-door.pick-the-door until wardens-office.touched
 assert: wardens-door.unlocked
 use: entity.wardens-lockbox.pick-the-lock until count.confiscated < 1
 cancel
-assert: inventory.core.coin = 220
 use: entity.office-door-inside.let-yourself-out
 assert: not wardens-door.unlocked
 assert: lock-up.touched

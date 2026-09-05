@@ -972,15 +972,14 @@ assert: not core.fainted
 # test a-feral-rat-picks-the-fight-itself
 load: at-the-sewer-junction
 wait: 10
-assert: resource.core.health < 31.31
 assert: not core.fainted
 
 # test a-build-and-a-run-that-each-grew-something-keep-both
 load: the-grown-blades-and-the-one-in-hand
 unequip: mainhand
-assert: inventory.combat.proving-blade = 1
-assert: inventory.combat.heartwood-blade = 1
-assert: inventory.core.iron-sword = 1
+assert: has proving-blade
+assert: has heartwood-blade
+assert: has core.iron-sword
 
 # test growing-a-heartwood-blade
 DEBUG
@@ -1110,7 +1109,7 @@ succeed-checks
 load: at-aggies-stove-with-a-chicken
 craft: cooked-chicken
 assert: has cooked-chicken
-assert: inventory.cooking.raw-chicken = 1
+assert: has cooking.raw-chicken
 use: item.cooked-chicken.eat
 assert: not has cooked-chicken
 
