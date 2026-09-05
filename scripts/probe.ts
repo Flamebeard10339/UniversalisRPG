@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { sourceFiles } from './lib/dslSources';
+import { withEngineLocale } from '../src/content/engineLocale';
 import { everyDirective } from '../src/content/sections/test';
 import { formatVersion } from '../src/grammar/dependency';
 import {  formatModuleDiagnostic, type Registry } from '../src/content/registry';
@@ -364,7 +365,7 @@ function main(): void {
   let args: ProbeArgs;
   try {
     args = parseProbeArgs(process.argv.slice(2));
-    sources = readSources(args.sources);
+    sources = withEngineLocale(readSources(args.sources));
     if (args.off.length > 0) sources = withModulesOff(sources, modulesNamed(loadUniverseWithDiagnostics(sources).modules, args.off));
   } catch (error) {
     console.error((error as Error).message);

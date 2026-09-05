@@ -1,8 +1,8 @@
 import { Registry } from '../content/registry';
-import { namesSection } from '../content/namespace';
 import { lastSegment } from '../grammar/values';
 import { Shop } from '../content/sections/shop';
 import { heldName } from './carried';
+import { itemTemplate } from './itemInstance';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
 import type { ModalChoice, ModalOption } from './modalOption';
 import { GameState, type ModalFrame } from './state';
@@ -46,13 +46,18 @@ export function rowOf(answer: Answer | undefined): { side: Side; item: string; a
   return { side, item: written.slice(at + 1), asked };
 }
 
+export const namesOfRow = (state: GameState, item: string): string[] => {
+  const template = itemTemplate(state, item);
+  return [...new Set([item, lastSegment(item), template, lastSegment(template)])];
+};
+
 const rows = (side: Side, trades: readonly Trade[], state: GameState, localizer: Localizer): ModalChoice[] =>
   trades.map((trade) => {
     const item = heldName(state, localizer, trade.item);
     return {
       value: rowAnswer(side, trade.item),
       held: moreAnswer(side, trade.item),
-      also: [rowAnswer(side, lastSegment(trade.item)), moreAnswer(side, lastSegment(trade.item))],
+      also: namesOfRow(state, trade.item).flatMap((name) => [rowAnswer(side, name), moreAnswer(side, name)]),
       shown: localizer.engine(side === 'buy' ? 'engine.shop.buy' : 'engine.shop.sell', { item, price: trade.coin, count: trade.count }),
       cell: {
         under: side,
@@ -84,8 +89,9 @@ export function shopOptions(frame: ShopFrame, state: GameState, registry: Regist
 
 function stockNamed(shop: Shop, state: GameState, registry: Registry, side: Side, written: string): string {
   const trades = side === 'buy' ? forSale(shop, state, registry) : wanted(shop, state, registry);
-  const found = trades.filter((trade) => namesSection(trade.item, written));
-  return found.length === 1 ? found[0]!.item : written;
+  const found = trades.filter((trade) => namesOfRow(state, trade.item).includes(written));
+  const named = new Set(found.map((trade) => itemTemplate(state, trade.item)));
+  return named.size === 1 ? found[0]!.item : written;
 }
 
 export function shopSubmit(frame: ShopFrame, state: GameState, registry: Registry): ModalFrame | null {

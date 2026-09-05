@@ -6,7 +6,7 @@ import { ActionResult, EVERYTHING, nestedResults, STARTING_LOCATION } from '../g
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
 import { isFieldEdits, listMembers } from '../grammar/section';
-import { mayBeInstanceId } from './instanceId';
+import { namesACopy } from './instanceId';
 import { amountFalls, isStatAmount, Quantified } from '../grammar/values';
 import { COUNTERS, TagClause } from '../grammar/tagClause';
 
@@ -39,7 +39,7 @@ export function put<T extends object>(holder: T, key: keyof T & string, kind: Re
 
 export function putCarried<T extends object>(holder: T, key: keyof T & string, where: string, visit: Visit): void {
   const current = (holder as Loose)[key];
-  if (typeof current === 'string' && mayBeInstanceId(current)) return;
+  if (typeof current === 'string' && namesACopy(current)) return;
   put(holder, key, 'item', where, visit);
 }
 

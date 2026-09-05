@@ -2,6 +2,7 @@ import { Direction, Hex, PlaneNode } from '../content/hex';
 import { isBase, Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
 import { sampleCount } from '../grammar/range';
+import { wornCopySlot } from '../grammar/worn';
 import { allocateNode, basePlane, fillSlot, isPlane, Plane, pointsSpent, repairPlane, unallocateNode } from './clusterPlane';
 import { createInstance, defineInstanceKind, instance, removeInstance } from './instances';
 import { Localized, localizerOf } from './localized';
@@ -56,15 +57,7 @@ export function isGrownCopy(state: GameState, id: string): boolean {
   return grown(state, named(state, id)) !== undefined;
 }
 
-const WORN = 'worn:';
-
-export function wornCopy(slot: string): string {
-  return `${WORN}${slot}`;
-}
-
-export function wornCopySlot(id: string): string | undefined {
-  return id.startsWith(WORN) ? id.slice(WORN.length) : undefined;
-}
+export { wornCopy, wornCopySlot } from '../grammar/worn';
 
 function named(state: GameState, id: string): string {
   const slot = wornCopySlot(id);

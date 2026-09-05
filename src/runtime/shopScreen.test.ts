@@ -3,12 +3,13 @@ import { loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import type { Registry } from '../content/registry';
 import { partsOf } from './modalOption';
-import { BACK, countFrame, countOptions, countSubmit, LEAVE, shopFrame, shopOptions } from './shopScreen';
+import { BACK, countFrame, countOptions, countSubmit, LEAVE, shopFrame, shopOptions, shopSubmit } from './shopScreen';
 import { TOUCHED } from '../content/sections/define';
 import { initialState } from './save';
+import { sellPrice } from '../content/sections/shop';
 import { shopkeeperHere, shopOpen } from './session';
 import type { GameState } from './state';
-import { receiveItem } from './itemInstance';
+import { packRows, receiveItem } from './itemInstance';
 
 const MODULE =
   FIXTURE_WORLD +
@@ -27,6 +28,12 @@ value: 3
 # item pin
 title: Pin
 value: 1
+
+# item file
+title: File
+value: 6
+slot: main-hand
+item-level: 3
 
 # shop stall
 coin: coin
@@ -122,6 +129,29 @@ describe('the two sides of a counter, as the screen publishes them', () => {
 
     expect(walked.map((each) => each.at)).toEqual(option.values!.map((_choice, at) => at));
     expect(walked.map((each) => each.choice)).toEqual([...option.values!]);
+  });
+});
+
+describe('what a counter makes of the name it is handed', () => {
+  const handed = (state: GameState, written: string) => shopSubmit({ ...shopFrame('stall'), answers: { item: written } }, state, registry);
+  const rowsOf = (state: GameState, item: string) => packRows(state).filter((row) => row.template === item).length;
+
+  it('takes a copy grown of its own, named by the item it is a copy of, the way equipping one is', () => {
+    const state = carrying({ coin: 0, file: 3 });
+    expect(rowsOf(state, 'file')).toBe(3);
+
+    handed(state, 'sell:file');
+
+    expect(rowsOf(state, 'file')).toBe(2);
+    expect(state.inventory.coin).toBe(sellPrice(registry.shops.get('stall')!, registry.items.get('file'))!);
+  });
+
+  it('takes one copy per turn, so the same name handed over and over empties the pack of them', () => {
+    const state = carrying({ coin: 0, file: 3 });
+
+    for (let turn = 0; turn < 3; turn += 1) handed(state, 'sell:file');
+
+    expect(rowsOf(state, 'file')).toBe(0);
   });
 });
 

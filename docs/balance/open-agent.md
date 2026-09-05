@@ -6,37 +6,6 @@ what is below is what that plan does not already say to do next.
 
 ---
 
-## A route can still run for ever, and nobody has found where
-
-`npm run floors` walks every route in a process of its own, as many at once as there are cores,
-and kills one still going after sixty seconds — so a hung route is reported as failed by name
-while every healthy route still reports, and the walk went from 82 seconds to 23 along the way.
-Routes share nothing: each starts from a fresh state and walks whatever it `run:`s from the
-beginning, so the only thing a hung route costs is itself.
-
-**That is a cap, not a cure, and `npm run probe` still has neither.** The route runs for ever;
-it is stopped from outside.
-
-**Where the loop is remains unknown, and the places it is not are worth having.** The obvious
-candidate is `wentRound` in `session.ts`, whose `for (let passes = 0; ; passes++)` is bounded
-only by a guard refusing a pass that leaves the world exactly as it found it — which never fires
-once the clock has moved. It is not there. A wall-clock check was put at the top of that pass
-loop, at the top of `resolveUnderWay`'s `for (;;)`, and inside `resolve`'s
-`while (state.time < toTimeMs)`, with an already-expired clock proved to throw in isolation, and
-**none of the three ever fired**. That machinery was deleted rather than left in: one check sat
-in the innermost loop every simulation runs through.
-
-One lead found on the way, true whether or not it is this bug: `resolveUnderWay`'s aggressor
-branch does `resolve(...); continue;`, which jumps over its own `UNDER_WAY_LIMIT_MS` bound, so a
-room that keeps re-arming `engagesAt` is unbounded by construction.
-
-The route that reproduces it is `# test noeating-hard` in the module `combat-floor` was cut down
-from, in the run's workdir rather than the corpus: it loops `until level.combat.attack >= 30`
-over `tulsa.the-muster`, a room that empties.
-
-*Closes when:* a route that cannot reach its condition fails with a message naming the loop, and
-`npm run probe` is as safe to run as `npm run floors`.
-
 ## Health outruns attack about two to one, and the curve by nine
 
 Read off `combat-floor` the day it landed. A fighter climbing to `attack 30` arrives at

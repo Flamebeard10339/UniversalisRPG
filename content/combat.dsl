@@ -23,7 +23,7 @@ gain 0.1 * amount experience on damage-dealt
 # skill health
 title: Health
 stat: core.max-health
-gain 0.1 * amount experience on damage-taken
+gain 0.45 * amount experience on damage-taken
 
 # damage-type physical
 

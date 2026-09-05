@@ -14,7 +14,7 @@ import { isMintedAction } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
 import { SaveDiff, SAVE_VERSION, serializeSave } from './save';
 import { secondsToMs } from './units';
-import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionStatus, sheetOffers, startSession, submitModal, view, wait } from './session';
+import { adoptRegistry, apply, applyDirective, beginAction, cancelAction, choiceToDirective, PlayChoice, PlaySession, PlayView, readRoom, runTest, SAID_HEAD_KEPT, SAID_TAIL_KEPT, serializeSession, sessionOver, sessionStatus, sheetOffers, startSession, submitModal, testSteps, view, wait, walkTest, walkWithin } from './session';
 import { skillLevel, xpForLevel } from './skills';
 import { BASE_LANGUAGE, localizerFor } from './localized';
 
@@ -2299,6 +2299,11 @@ travel: camp
 until inventory.roasted-chestnut >= 3:
   use: entity.oven.roast until done
   assert: inventory.roasted-chestnut < 2
+
+# test a-loop-that-never-closes
+travel: camp
+until inventory.roasted-chestnut >= 3:
+  use: entity.oven.scald until done
 `;
 
   it('stops the moment the condition holds, or after the passes asked for', () => {
@@ -2334,6 +2339,17 @@ until inventory.roasted-chestnut >= 3:
     const state = createGameState();
     const { failure } = runTest('a-pass-that-moves-nothing', registry, state);
     expect(failure).toContain(localizerFor(registry, BASE_LANGUAGE).engine('engine.stopped.round'));
+  });
+
+  it('refuses a route still walking when its real time is up, naming the loop it was going round', () => {
+    const registry = loadInEnglish(module);
+    const session = sessionOver(registry, createGameState());
+    walkWithin(session, 0.25);
+    const { failure } = walkTest(session, testSteps('a-loop-that-never-closes', registry));
+    const said = localizerFor(registry, BASE_LANGUAGE).engine('engine.stopped.outstayed', { seconds: 0.25 });
+    expect(said).toContain('0.25 seconds of real time');
+    expect(failure).toContain(said);
+    expect(failure).toContain('until inventory.roasted-chestnut >= 3:');
   });
 
   it('names the pass a failing line was on', () => {

@@ -1,4 +1,4 @@
-import { mayBeInstanceId } from './instanceId';
+import { namesACopy } from './instanceId';
 import { Registry } from './registry';
 import { visitDirective } from './sections/test';
 import { Directive } from './sections/test';
@@ -9,6 +9,6 @@ export function resolveDirective(directive: Directive, registry: Registry): Dire
 }
 
 export function resolveCarried(id: string, registry: Registry, where: string): string {
-  if (mayBeInstanceId(id)) return id;
+  if (namesACopy(id)) return id;
   return registry.namespace.resolve('item', id, null, registry.namespace.all, where);
 }

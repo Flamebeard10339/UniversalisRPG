@@ -12,6 +12,7 @@ import { condition as visitCondition, put, putCarried, putLocation, type Visit }
 import { isActionOwnerKind } from './define';
 import { ACTION_MEMBER, memberKey } from '../namespace';
 import { lastSegment } from '../../grammar/values';
+import { WORN_COPY } from '../../grammar/worn';
 
 export interface NoteField {
   readonly name: 'note' | 'expected' | 'confusion' | 'blocked';
@@ -171,7 +172,7 @@ function parseRounds(text: string, span: Span): Rounds {
   if (rounds === 'done') throw new DslError(`\`until done:\` opens nothing: a block has no one action under way to be done with, so it goes round ${LOOP_FORM}`, span);
   return rounds;
 }
-const CARRIED = `(?:${PATH}|[0-9]+)`;
+const CARRIED = `(?:${PATH}|[0-9]+|${WORN_COPY})`;
 const HEX = '-?\\d+,-?\\d+';
 const DIRECTION = [...DIRECTIONS].sort((a, b) => b.length - a.length).join('|');
 
@@ -639,7 +640,11 @@ export const test = section<Test>()({
     { form: 'equip: <item>', example: 'equip: rusty-sword' },
     { form: 'unequip: <slot>', example: 'unequip: main-hand' },
     { form: 'swap: <item> with <item>', example: 'swap: rusty-sword with bread', note: 'exchanges where two things sit in the pack, which is the order the pack is drawn in and the order a save carries' },
-    { form: 'slot: <item> at <q>,<r> <direction> with <jewel item>', example: 'slot: cluster-jewel at 0,0 ne with small-jewel' },
+    {
+      form: 'slot: <item> at <q>,<r> <direction> with <jewel item>',
+      example: 'slot: cluster-jewel at 0,0 ne with small-jewel',
+      note: 'a plane belongs to one copy rather than to the item, so the item every growth line here names is a copy: the number the world minted it under, or `worn:<slot>` for whatever is worn there right now — which is how a route grows what it has just put on without knowing which copy it was handed',
+    },
     { form: 'allocate: <item> at <q>,<r> position <n>', example: 'allocate: cluster-jewel at 0,0 position 1' },
     { form: 'allocate: <item> at <q>,<r> slot <direction>', example: 'allocate: cluster-jewel at 0,0 slot ne' },
     {

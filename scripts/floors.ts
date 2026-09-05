@@ -7,7 +7,7 @@ import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import { everyDirective } from '../src/content/sections/test';
 import { CORPUS_DIR } from '../src/content/shipped';
 import type { ModuleSource } from '../src/content/universe';
-import { replayTest } from '../src/runtime/session';
+import { replayTest, SECONDS_A_ROUTE_MAY_WALK } from '../src/runtime/session';
 import { skillLevel } from '../src/runtime/skills';
 import { createGameState } from '../src/runtime/state';
 import { sourceFiles } from './lib/dslSources';
@@ -16,7 +16,9 @@ import { readSources } from './probe';
 
 export const FLOORS_DIR = 'floors';
 
-export const SECONDS_A_ROUTE_MAY_TAKE = 60;
+export const SECONDS_TO_LOAD_A_WORLD = 60;
+
+export const SECONDS_A_ROUTE_MAY_TAKE = SECONDS_A_ROUTE_MAY_WALK + SECONDS_TO_LOAD_A_WORLD;
 
 const usage = [
   'Usage: npm run floors [-- --world <dir>]',
@@ -35,10 +37,14 @@ const usage = [
   '           the shipped ones. This is what points it at a copy of the world rather than at this',
   '           checkout, and without it the shipped folders are what it reads.',
   '',
-  `Each route is walked in a process of its own, as many at once as there are cores, and one`,
-  `still going after ${String(SECONDS_A_ROUTE_MAY_TAKE)} seconds is stopped from outside and reported as failed by name. Routes share`,
+  `Each route is walked in a process of its own, as many at once as there are cores. Routes share`,
   'nothing: every one starts from a fresh state and walks whatever it `run:`s from the beginning,',
   'so the only thing a hung route costs is itself.',
+  '',
+  `A route that cannot reach what it waits for is refused by the runtime after ${String(SECONDS_A_ROUTE_MAY_WALK)} seconds of`,
+  'real time, naming the loop it was going round, and that bound is the runtime\'s for every tool',
+  `that walks a route. A process still going ${String(SECONDS_TO_LOAD_A_WORLD)} seconds past it has wedged below the directive`,
+  'the runtime counts, so it is killed from outside and reported as failed by name.',
 ].join('\n');
 
 const MS_PER_MINUTE = 60_000;
@@ -129,7 +135,7 @@ interface Walked {
   ok: boolean;
 }
 
-const stoppedLine = (id: string): string => `${id}: FAILED — still walking after ${String(SECONDS_A_ROUTE_MAY_TAKE)}s of real time, and stopped from outside. A route that cannot reach what it waits for runs for ever rather than failing.`;
+const stoppedLine = (id: string): string => `${id}: FAILED — still going after ${String(SECONDS_A_ROUTE_MAY_TAKE)}s of real time, past the ${String(SECONDS_A_ROUTE_MAY_WALK)}s the runtime refuses a route at, and killed from outside. Something below the directive the runtime counts is not coming back.`;
 
 function walkApart(id: string, args: readonly string[]): Promise<Walked> {
   return new Promise((settle) => {

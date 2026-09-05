@@ -334,6 +334,7 @@ engine.stopped.unloadable: what was under way could not be picked up again
 engine.stopped.short: {because}, and {condition} never came true
 engine.stopped.short-count: {because}, and it came round {times} of the {wanted} times asked for
 engine.stopped.round: a pass through the block left the world exactly as it found it, so going round again would never end
+engine.stopped.outstayed: {seconds} seconds of real time went by and this was still walking, so what it waits for it is never going to reach
 engine.setting.stands: {setting}: {value}
 engine.setting.takes: takes {choices}
 engine.setting.on: On

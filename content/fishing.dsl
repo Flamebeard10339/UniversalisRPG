@@ -1000,7 +1000,7 @@ stocks:
   2 fishermans-gansey
   2 waders
   2 hobnailed-river-boots
-replenish: 30s
+replenish: 5s
 
 # entity fishing-supplies
 title: Fishing Supplies

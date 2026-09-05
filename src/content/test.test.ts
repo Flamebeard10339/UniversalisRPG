@@ -317,12 +317,14 @@ describe('the three growth verbs', () => {
     });
   });
 
-  it('takes a target spelled as an item id or as a minted instance id, and nothing else', () => {
+  it('takes a target spelled as an item id, as a minted instance id or as the slot it is worn in, and nothing else', () => {
     expect(parsed('apply: mod.heartwood-blade at 0,0 with lesser-orb')).toMatchObject({
       target: 'mod.heartwood-blade',
     });
     expect(parsed('apply: 12 at 0,0 with lesser-orb')).toMatchObject({ target: '12' });
+    expect(parsed('apply: worn:mainhand at 0,0 with lesser-orb')).toMatchObject({ target: 'worn:mainhand' });
     expect(() => parsed('apply: 1a at 0,0 with lesser-orb')).toThrow(/malformed apply: payload/);
+    expect(() => parsed('apply: worn: at 0,0 with lesser-orb')).toThrow(/malformed apply: payload/);
   });
 
   it('names the offending line for a malformed payload rather than reading as an unknown directive', () => {

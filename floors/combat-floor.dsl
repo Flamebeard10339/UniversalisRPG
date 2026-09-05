@@ -47,6 +47,8 @@ until inventory.core.coin >= 280:
 travel: tulsa.market-row
 travel: tulsa.forge
 shop: combat.armoury-counter
+until not has combat.iron-dagger:
+  submit-modal: item=sell:combat.iron-dagger
 submit-modal: item=buy:combat.bronze-dagger
 submit-modal: item=buy:combat.bronze-shield
 submit-modal: item=buy:combat.bronze-helmet
@@ -93,6 +95,8 @@ until inventory.core.coin >= 850:
 travel: tulsa.market-row
 travel: tulsa.forge
 shop: combat.armoury-counter
+until not has combat.iron-dagger:
+  submit-modal: item=sell:combat.iron-dagger
 submit-modal: item=buy:combat.iron-dagger
 submit-modal: item=buy:combat.iron-shield
 submit-modal: item=buy:combat.iron-helmet
@@ -114,9 +118,9 @@ equip: combat.iron-helmet
 equip: combat.iron-platebody
 equip: combat.iron-platelegs
 equip: combat.iron-boots
-allocate: 9 at 0,0 slot e
-slot: 9 at 0,0 e with combat.keen-edge-jewel
-allocate: 9 at 1,0 position 1
+allocate: worn:mainhand at 0,0 slot e
+slot: worn:mainhand at 0,0 e with combat.keen-edge-jewel
+allocate: worn:mainhand at 1,0 position 1
 assert: stat.physical-damage > 0
 travel: tulsa.market-square
 
