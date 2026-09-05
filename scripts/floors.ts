@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
@@ -105,16 +106,39 @@ export function floorLines(sources: readonly ModuleSource[], floors: readonly st
   return { lines, ok };
 }
 
-function main(): void {
-  if (process.argv.slice(2).some((arg) => arg === '--help' || arg === '-h')) {
-    console.log(usage);
-    return;
-  }
+export const SECONDS_FLOORS_MAY_TAKE = 300;
+
+const WALKING = '--walking';
+
+function walk(): void {
   const { corpus, floors } = foldersOf(process.argv.slice(2));
   const sources = readSources([corpus, floors]);
   const report = floorLines(sources, floorIds(sources, floors));
   console.log(report.lines.join('\n'));
   if (!report.ok) process.exit(1);
+}
+
+function main(): void {
+  if (process.argv.slice(2).some((arg) => arg === '--help' || arg === '-h')) {
+    console.log(usage);
+    return;
+  }
+  if (process.argv.includes(WALKING)) {
+    walk();
+    return;
+  }
+  const child = spawnSync(process.execPath, [...process.execArgv, process.argv[1]!, ...process.argv.slice(2), WALKING], {
+    stdio: 'inherit',
+    timeout: SECONDS_FLOORS_MAY_TAKE * 1000,
+    killSignal: 'SIGKILL',
+  });
+  if (child.error !== undefined && (child.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+    console.error(
+      `\nStopped after ${String(SECONDS_FLOORS_MAY_TAKE)} seconds. A route that cannot reach what it waits for runs for ever rather than failing, and the routes printed above are the ones that finished: the next one is where it stuck.`,
+    );
+    process.exit(1);
+  }
+  if (child.status !== 0) process.exit(child.status ?? 1);
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
