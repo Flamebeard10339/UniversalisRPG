@@ -119,6 +119,7 @@ function liveWrittenAt(save: SaveContext): number | null {
 export function autosaveDue(save: SaveContext): boolean {
   const cadence = cadenceOrUnreadable(save);
   if (cadence === null || cadence === NEVER) return false;
+  if (cadence === 0) return true;
   const writtenAt = liveWrittenAt(save);
   return writtenAt === null || save.now() - writtenAt >= cadence * 1000;
 }

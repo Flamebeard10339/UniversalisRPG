@@ -63,7 +63,14 @@ const deriving = new Set<string>();
 
 const derived = new Map<string, boolean | number | string | undefined>();
 
+const leanedOn = new Set<string>();
+
 let deriveDepth = 0;
+
+function settled(key: string, before: ReadonlySet<string>): boolean {
+  for (const leant of leanedOn) if (leant !== key && !before.has(leant)) return false;
+  return true;
+}
 
 export function whileNothingChanges<T>(read: () => T): T {
   deriveDepth += 1;
@@ -71,7 +78,10 @@ export function whileNothingChanges<T>(read: () => T): T {
     return read();
   } finally {
     deriveDepth -= 1;
-    if (deriveDepth === 0) derived.clear();
+    if (deriveDepth === 0) {
+      derived.clear();
+      leanedOn.clear();
+    }
   }
 }
 
@@ -83,20 +93,28 @@ export function answerReference(reference: Reference, state: GameState, registry
   if (node) return { value: state.visits[node.join('.')] ?? 0 };
   const key = spelt.key;
   const flag = state.flags[key];
-  if (truthy(flag) || deriving.has(key)) return { value: flag };
+  if (truthy(flag)) return { value: flag };
+  if (deriving.has(key)) {
+    leanedOn.add(key);
+    return { value: flag };
+  }
   if (derived.has(key)) return { value: derived.get(key) };
   const reach = questReach(path, registry);
   if (reach === undefined) return { value: flag };
+  const before = new Set(leanedOn);
   deriving.add(key);
   deriveDepth += 1;
   try {
     const value = evaluateCondition(reach, state, registry) || flag;
-    derived.set(key, value);
+    if (settled(key, before)) derived.set(key, value);
     return { value };
   } finally {
     deriving.delete(key);
     deriveDepth -= 1;
-    if (deriveDepth === 0) derived.clear();
+    if (deriveDepth === 0) {
+      derived.clear();
+      leanedOn.clear();
+    }
   }
 }
 

@@ -133,14 +133,22 @@ export function stepToward(from: { x: number; y: number; z: number }, to: { x: n
   return going.reduce((best, direction) => (runs(direction) > runs(best) ? direction : best));
 }
 
-const STOOD = new WeakMap<ReadonlyMap<string, Location>, { of: number; stood: Map<string, string> }>();
+const STOOD = new WeakMap<ReadonlyMap<string, Location>, { of: readonly Location[]; stood: Map<string, string> }>();
+
+const theSameOnes = (before: readonly Location[], locations: ReadonlyMap<string, Location>): boolean => {
+  if (before.length !== locations.size) return false;
+  let at = 0;
+  for (const location of locations.values()) if (before[at++] !== location) return false;
+  return true;
+};
 
 export function entitiesStood(locations: ReadonlyMap<string, Location>): Map<string, string> {
   const held = STOOD.get(locations);
-  if (held !== undefined && held.of === locations.size) return held.stood;
+  if (held !== undefined && theSameOnes(held.of, locations)) return held.stood;
+  const of = [...locations.values()];
   const stood = new Map<string, string>();
-  for (const location of locations.values()) for (const entry of location.entities) if (!stood.has(entry.entity)) stood.set(entry.entity, location.id);
-  STOOD.set(locations, { of: locations.size, stood });
+  for (const location of of) for (const entry of location.entities) if (!stood.has(entry.entity)) stood.set(entry.entity, location.id);
+  STOOD.set(locations, { of, stood });
   return stood;
 }
 

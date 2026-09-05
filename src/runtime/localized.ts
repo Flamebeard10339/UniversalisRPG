@@ -20,36 +20,6 @@ export type AnswerTable<V extends Answer | number | boolean> = Readonly<Record<A
 export type Params = Readonly<Record<string, Localized | number>>;
 
 
-const TOKENIZED = new Map<string, readonly TextSegment[]>();
-
-const segmentsOf = (words: string): readonly TextSegment[] => {
-  const held = TOKENIZED.get(words);
-  if (held !== undefined) return held;
-  const parsed = parseSegments(words, 0);
-  TOKENIZED.set(words, parsed);
-  return parsed;
-};
-
-function substitute(pattern: string, key: string, params: Params): string {
-  try {
-    return weighInFrame(segmentsOf(pattern), params, key);
-  } catch (error) {
-    throw error instanceof DslError ? new RuntimeError(error.message) : error;
-  }
-}
-
-const READ_AS = new Map<string, string>();
-
-const plainly = (words: string): string => {
-  const held = READ_AS.get(words);
-  if (held !== undefined) return held;
-  const said = segmentsOf(words)
-    .map((segment) => (segment.kind === 'literal' ? segment.text : ''))
-    .join('');
-  READ_AS.set(words, said);
-  return said;
-};
-
 function pattern(locales: Locales, language: string, key: string): string | undefined {
   const declared = locales.declared.get(language)?.get(key);
   if (declared !== undefined) return withoutNote(declared);
@@ -98,6 +68,34 @@ function speaking(registry: Registry, language: string): Localizer {
   const declared = new Map<string, string | undefined>();
   const spelt = new Map<string, string>();
   const titles = new Map<string, Localized>();
+  const tokenized = new Map<string, readonly TextSegment[]>();
+  const readAs = new Map<string, string>();
+
+  const segmentsOf = (words: string): readonly TextSegment[] => {
+    const held = tokenized.get(words);
+    if (held !== undefined) return held;
+    const parsed = parseSegments(words, 0);
+    tokenized.set(words, parsed);
+    return parsed;
+  };
+
+  const substitute = (pattern: string, key: string, params: Params): string => {
+    try {
+      return weighInFrame(segmentsOf(pattern), params, key);
+    } catch (error) {
+      throw error instanceof DslError ? new RuntimeError(error.message) : error;
+    }
+  };
+
+  const plainly = (words: string): string => {
+    const held = readAs.get(words);
+    if (held !== undefined) return held;
+    const said = segmentsOf(words)
+      .map((segment) => (segment.kind === 'literal' ? segment.text : ''))
+      .join('');
+    readAs.set(words, said);
+    return said;
+  };
 
   const written = (key: string): string | undefined => {
     if (declared.has(key)) return declared.get(key);

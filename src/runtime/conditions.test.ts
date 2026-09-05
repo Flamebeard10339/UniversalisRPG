@@ -41,6 +41,34 @@ stage waiting:
   goto arrived
 stage arrived:
   complete
+
+# quest open-one
+stage waiting:
+  done when: open-two.arrived or always
+  goto arrived
+stage arrived:
+  complete
+
+# quest open-two
+stage waiting:
+  done when: open-one.arrived
+  goto arrived
+stage arrived:
+  complete
+
+# quest reads-both
+stage waiting:
+  done when: open-one.arrived and open-two.arrived
+  goto arrived
+stage arrived:
+  complete
+
+# quest reads-both-the-other-way
+stage waiting:
+  done when: open-two.arrived and open-one.arrived
+  goto arrived
+stage arrived:
+  complete
 `;
 
 const quests: Registry = loadInEnglish(QUESTS);
@@ -110,5 +138,15 @@ describe('a quest stage flag reads as the stage having been reached', () => {
 
   it('reads two quests each waiting on the other as neither of them arriving', () => {
     expect(asks('circle-one.arrived', createGameState('camp'))).toBe(false);
+  });
+
+  it('answers a stage reached through two quests the same whichever of them is asked about first', () => {
+    const state = createGameState('camp');
+    expect(asks('open-one.arrived', state), 'the one that leaves on its own').toBe(true);
+    expect(asks('open-two.arrived', state), 'the one waiting on it').toBe(true);
+
+    expect(asks('reads-both.arrived', createGameState('camp'))).toBe(true);
+    expect(asks('reads-both-the-other-way.arrived', createGameState('camp'))).toBe(true);
+    expect(asks('reads-both.arrived', state)).toBe(asks('reads-both-the-other-way.arrived', state));
   });
 });
