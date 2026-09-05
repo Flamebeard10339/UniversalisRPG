@@ -133,9 +133,14 @@ export function stepToward(from: { x: number; y: number; z: number }, to: { x: n
   return going.reduce((best, direction) => (runs(direction) > runs(best) ? direction : best));
 }
 
+const STOOD = new WeakMap<ReadonlyMap<string, Location>, { of: number; stood: Map<string, string> }>();
+
 export function entitiesStood(locations: ReadonlyMap<string, Location>): Map<string, string> {
+  const held = STOOD.get(locations);
+  if (held !== undefined && held.of === locations.size) return held.stood;
   const stood = new Map<string, string>();
   for (const location of locations.values()) for (const entry of location.entities) if (!stood.has(entry.entity)) stood.set(entry.entity, location.id);
+  STOOD.set(locations, { of: locations.size, stood });
   return stood;
 }
 

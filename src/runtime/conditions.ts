@@ -37,9 +37,25 @@ const ROOTED: Readonly<Record<EngineRoot, (id: string, state: GameState, registr
   changed: (id, state, registry) => ({ value: statChanged(id, state, registry) }),
 };
 
+interface Spelling {
+  readonly key: string;
+  readonly under: string;
+  readonly owner: string;
+}
+
+const SPELLING = new WeakMap<readonly string[], Spelling>();
+
+function spelling(path: string[]): Spelling {
+  const held = SPELLING.get(path);
+  if (held !== undefined) return held;
+  const spelt: Spelling = { key: path.join('.'), under: path.slice(1).join('.'), owner: path.slice(0, -1).join('.') };
+  SPELLING.set(path, spelt);
+  return spelt;
+}
+
 function questReach(path: string[], registry: Registry): Condition | undefined {
   if (path.length < 2) return undefined;
-  const quest = registry.quests.get(path.slice(0, -1).join('.'));
+  const quest = registry.quests.get(spelling(path).owner);
   return quest === undefined ? undefined : reachedByItself(quest, path[path.length - 1]!);
 }
 
@@ -51,10 +67,11 @@ let deriveDepth = 0;
 
 export function answerReference(reference: Reference, state: GameState, registry: Registry): Answered {
   const { path } = reference;
-  if (isEngineRoot(path)) return ROOTED[path[0] as EngineRoot](path.slice(1).join('.'), state, registry);
+  const spelt = spelling(path);
+  if (isEngineRoot(path)) return ROOTED[path[0] as EngineRoot](spelt.under, state, registry);
   const node = visitedNode(path);
   if (node) return { value: state.visits[node.join('.')] ?? 0 };
-  const key = path.join('.');
+  const key = spelt.key;
   const flag = state.flags[key];
   if (truthy(flag) || deriving.has(key)) return { value: flag };
   if (derived.has(key)) return { value: derived.get(key) };
