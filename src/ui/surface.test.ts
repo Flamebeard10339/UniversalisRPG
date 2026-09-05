@@ -66,12 +66,10 @@ const DISPATCHES = [
   'carriedWith',
   'compassOf',
   'COMPASS',
-  'BASE_LANGUAGE',
   'createTicker',
   'liveAgain',
   'LINE_BREAK',
   'LIVE_TICK_MS',
-  'localizerFor',
   'newContext',
   'openUniverse',
   'openWithLocalCleared',
@@ -94,9 +92,7 @@ const DISPATCHES = [
   'startSession',
   'testSteps',
   'walkTest',
-  'runId',
   'isPlayed',
-  'NO_NOTES',
   'NOTE_FIELDS',
   'parseRun',
   'outcomeOf',
@@ -184,6 +180,13 @@ describe('the rules the driver is held to', () => {
       for (const name of calls(source)) expect(DISPATCHES, `${source.file} brings in ${name}`).toContain(name);
       expect(source.text, source.file).not.toMatch(/import\s+\*\s+as\s+\w+\s+from\s*['"`][^'"`]*\/runtime\//);
     }
+  });
+
+  it('names nothing it no longer brings in, so the list cannot grow a name and keep it', () => {
+    const brought = new Set(SOURCES.flatMap(calls));
+
+    expect(brought.size, 'nothing under src/ui brings anything in, so the check above holds vacuously').toBeGreaterThan(20);
+    expect(DISPATCHES.filter((name) => !brought.has(name))).toEqual([]);
   });
 
   it('calls nothing that moves the world, however the name reached it', () => {

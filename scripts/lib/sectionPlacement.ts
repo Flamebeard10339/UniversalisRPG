@@ -1,4 +1,4 @@
-import { splitSections } from '../../src/grammar/structure';
+import { isCommentLine, splitSections } from '../../src/grammar/structure';
 
 export interface Block {
   cut: { start: number; end: number };
@@ -27,7 +27,7 @@ function lineAt(starts: readonly number[], offset: number): number {
 
 export function blockOf(text: string, starts: readonly number[], span: { start: number; end: number }): Block {
   let first = lineAt(starts, span.start);
-  while (first > 0 && lineTextAt(text, starts, first - 1).trim().startsWith('//')) first -= 1;
+  while (first > 0 && isCommentLine(lineTextAt(text, starts, first - 1))) first -= 1;
   const last = lineAt(starts, span.end);
   const keepEnd = starts[last] + lineTextAt(text, starts, last).length;
   let after = last;

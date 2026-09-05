@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { findCycles } from './acyclic';
-import { checkLayers, importedPaths, resolveModule, shippedModules, sweptFiles } from './layers';
-import { trackedFiles } from './sourceFiles';
-import { readFileSync } from 'node:fs';
 
 const graph = (edges: Record<string, string[]>) => (node: string) => edges[node] ?? [];
 
@@ -42,33 +39,5 @@ describe('findCycles', () => {
 
   it('does not read two cycles sharing no module as one, even when one reaches the other', () => {
     expect(findCycles(['a', 'b', 'x', 'y'], graph({ a: ['b'], b: ['a', 'x'], x: ['y'], y: ['x'] })).map((cycle) => cycle.members.length)).toEqual([2, 2]);
-  });
-});
-
-describe('the shipped tree', () => {
-  const files = sweptFiles(trackedFiles());
-  const report = checkLayers(files, (file) => readFileSync(file, 'utf8'));
-
-  it('has an order: no module imports its way back to itself', () => {
-    expect(report.cycles.map((cycle) => ({ members: cycle.members, closedBy: cycle.closedBy.map(({ from, to }) => `${from} -> ${to}`) }))).toEqual([]);
-  });
-
-  it('sweeps enough of the tree for that to mean something', () => {
-    expect(files.length).toBeGreaterThan(100);
-  });
-
-  describe('the graph that answer was read off', () => {
-    const shipped = shippedModules(files, () => true);
-    const inShipped = new Set(shipped);
-    const swept = new Set(files);
-    const edges = shipped.flatMap((file) => importedPaths(file, readFileSync(file, 'utf8')).map((target) => resolveModule(target, swept))).filter((target) => target !== null && inShipped.has(target));
-
-    it('holds the modules this repository ships', () => {
-      expect(shipped.length).toBeGreaterThan(100);
-    });
-
-    it('holds the imports between them, resolved to modules', () => {
-      expect(edges.length).toBeGreaterThan(500);
-    });
   });
 });

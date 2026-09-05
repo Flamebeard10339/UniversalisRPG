@@ -113,8 +113,8 @@ Read `sections/item.ts` (fields, entries, validation, references),
 `sections/stat.ts` (the minimum) before writing a new one.
 
 A module that a section file imports may not read the section list — that closes
-a cycle and yields a list with an undefined in it. `scripts/lib/acyclic.test.ts`
-is the guard.
+a cycle and yields a list with an undefined in it. `npm run layer-check` is the
+guard: it walks the shipped tree and exits non-zero on any cycle in it.
 
 # Work that outlives a session
 
@@ -294,6 +294,13 @@ Tools, none of which are gates:
 - `npm run contribution:consolidate` — writes every section staged in the local-changes module back into the file that declared its id, and empties it. It refuses as a whole rather than in part, so a batch that would load into a different universe is not half-applied; `--dry-run` says what it would place and what it could not
 - `npm run contribution:squash` — prints one module's canonical source with the staged changes folded in, so an edit can be read as the file it would become before anything is written. `--module <id>` picks which, `--out <file>` writes it rather than printing it
 - `npm run contribution:issue` — prints the issue body a contributor's staged changes make. Only `--create` calls `gh issue create`, so nothing leaves the machine until it is asked for
+- `npm run ladder-check [-- <skill>...]` — reads every skill the world declares at each rung of the declared ladder and reports where a body does not match the tags it names. `--levels` picks the rungs, `--world <dir>` reads a world that is not the shipped corpus. A residual is a brief for content, never a pass or a fail
+- `npm run tier-build -- <activity> <level> [<item>...]` — stands a player of that activity at that level, hands over the gear named and puts it on, and prints the `# save` body it reached. `--grow <stat>` spends plane points on the stat; `--list` prints the activities. This is where a reference build comes from rather than being modelled by hand
+- `npm run playbot -- [<source>...]` — hands the running game to a model and lets it play, printing what it did and what each turn was billed. `--mode` picks how it plays, `--brief <file>` gives it something to try for, `--turns` and `--save` bound the run
+- `npm run migrate-saves -- [<dir>]` — rewrites every `# save` body under the directory to the current `SAVE_VERSION` through the `SHAPE_CHANGE` declared in the script, leaving every other byte alone. A body already stamped is skipped, so a second run changes nothing
+- `npm run repair-saves -- [<dir>] [--write]` — a `# save` body names ids and nothing checks them, so renaming or moving a section leaves the recording parsing and no longer meaning what it says. This finds every body the loader has to prune, looks back through git for what each missing id became, and puts it back
+- `npm run modportal -- <sync|list|enable|disable|sources|show>` — reads the open GitHub issues that offer mods and keeps the local portal in step with them. A mod-approved issue arrives switched off; only mod-auto-enabled defaults on, and only if the enabled set still loads with it
+- `npm run tmgrammar` — writes `editor/vscode/syntaxes/dsl.tmLanguage.json` from the section declarations, which is what colours the DSL in the editor. The file is checked in and `scripts/tmgrammar.test.ts` asserts the checked-in bytes are what this prints, so running it is how you make that true again
 
 **A UI feature is tested by the author, not by the agent.** Build it, hand it
 over in one line, stop. Put the pure decisions in a `.ts` beside the component
