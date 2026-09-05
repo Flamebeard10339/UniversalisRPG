@@ -548,7 +548,7 @@ look in again:
   on success:
     say: The coin goes somewhere behind the frame. The glass clears, and waits to be told who you are this time.
   on refused:
-    say: You need 1000 coin to perform this action.
+    say: The glass looks past you at the room, and stays a room. Whatever it wants for a second name, you are not carrying it.
 
 # entity oven
 examine: A stone oven, its coals still glowing. The top of it is flat and takes a pan, which is the whole difference between an oven and a kitchen.

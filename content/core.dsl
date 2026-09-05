@@ -162,13 +162,16 @@ at: 2 4
 
 # station stove
 
-# action melee-combat
+# action melee-swing
 title: Fight
-continuous
-rate: us.attack-rate
 accuracy: us.accuracy vs them.evasion
 damage: us.attack vs them.defense
 depletes: them.health
+
+# action melee-combat
+extends: melee-swing
+continuous
+rate: us.attack-rate
 
 # action faint
 title: Fainted

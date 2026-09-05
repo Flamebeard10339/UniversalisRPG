@@ -67,11 +67,9 @@ node the-state-he-came-back-in:
 
 # action bout
 title: Bout
+extends: core.melee-swing
 attempts: 6
 rate: us.attack-rate
-accuracy: us.accuracy vs them.evasion
-damage: us.attack vs them.defense
-depletes: them.health
 on attempts exhausted:
   stands: winded-sparring-guardsman for 20s
   xp: combat.attack 3
