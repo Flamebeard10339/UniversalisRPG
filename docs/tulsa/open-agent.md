@@ -7,6 +7,23 @@ The sheet is `npm run simulate-activity -- tiers.<activity>-tier-<level> --off q
 
 ---
 
+## Eight commits of town dialogue sit unmerged on a branch
+
+`claude/game-text-rewrite-007476` holds a rewrite pass over how Tulsa's people talk — Miki
+keeping a house rather than a tutorial, Oolga saying no first and counting her rats out loud,
+Larry unsurprised, the duke stalling in his own voice, the captain not wanting to hear what
+Oolga asked for. Eight commits, none of them in `main`.
+
+It was kept when every other branch was deleted on 2026-09-04, because it is real writing and
+nothing else holds it. Its worktree is gone; the branch is all there is.
+
+It has not been read against the world as it now stands, and the world moved a long way that
+day — the whole combat re-cut, the passives, five quest passes. Prose does not conflict with
+balance, so the merge should be quiet, but the lines were written against the old town.
+
+*Closes when:* the pass is merged with `npm run oracle -- --at content` green, or it is read and
+deliberately dropped, and either way the branch is gone.
+
 ## The grumpy crafter was narrowed around an engine limit that does not exist
 
 The run that wrote `content/the-grumpy-crafter.dsl` reported that a dialogue `when:`, a
