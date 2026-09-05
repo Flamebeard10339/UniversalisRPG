@@ -179,7 +179,7 @@ export function nearestFreeSquare(taken: ReadonlySet<string>, at: Spot): Spot {
   }
 }
 
-export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): string | undefined {
+export function stackedLocations(placed: Iterable<{ id: string; x: number; y: number; z: number }>): { at: string; says: string } | undefined {
   const all = [...placed];
   const standing = new Map<string, string>();
   const stacked: { location: Spot & { id: string }; already: string }[] = [];
@@ -190,13 +190,14 @@ export function stackedLocations(placed: Iterable<{ id: string; x: number; y: nu
   }
   if (stacked.length === 0) return undefined;
   const taken = new Set(all.map(squareOf));
-  return stacked
+  const says = stacked
     .map(({ location, already }) => {
       const free = nearestFreeSquare(taken, location);
       taken.add(squareOf(free));
       return `location '${location.id}' stands at ${squareOf(location)}, and so does '${already}'; two places on one square draw on top of each other. The nearest square nothing stands on is ${squareOf(free)}`;
     })
     .join(NEWLINE);
+  return { at: stacked[0]!.location.id, says };
 }
 
 const answersWith = (locations: ReadonlyMap<string, Location>, from: string, to: string): boolean =>
@@ -210,9 +211,17 @@ export function dropUnansweredSeverances(locations: Map<string, Location>): void
   }
 }
 
+export const blameLocation = (id: string, says: string): DslError => new DslError(says, undefined, { kind: 'location', id });
+
 export function refuseStackedLocations(locations: ReadonlyMap<string, Location>): void {
   const stacked = stackedLocations(locations.values());
-  if (stacked !== undefined) throw new DslError(stacked);
+  if (stacked !== undefined) throw blameLocation(stacked.at, stacked.says);
+}
+
+export function twoStartingLocations(locations: ReadonlyMap<string, Location>): DslError | null {
+  const starting = [...locations.values()].filter((location) => location.starting);
+  if (starting.length < 2) return null;
+  return blameLocation(starting[1]!.id, `# location ${starting[1]!.id} is marked starting, and so is ${starting[0]!.id}; a new game begins in exactly one place`);
 }
 
 export function recursivelyResolveRelativeCoordinates(locations: Map<string, Location>): void {
@@ -227,11 +236,11 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
       coords.set(location.id, absolute);
       return absolute;
     }
-    if (placing.has(location.id)) throw new DslError(`location coordinates form a cycle at '${location.id}'`);
+    if (placing.has(location.id)) throw blameLocation(location.id, `location coordinates form a cycle at '${location.id}'`);
     placing.add(location.id);
 
     const origin = locations.get(location.relative.of);
-    if (!origin) throw new DslError(`location '${location.id}' is placed relative to unknown location '${location.relative.of}'`);
+    if (!origin) throw blameLocation(location.id, `location '${location.id}' is placed relative to unknown location '${location.relative.of}'`);
     const [ox, oy, oz] = place(origin);
     const [dx, dy, dz] = DIRECTION_VECTORS[location.relative.direction];
     const stepped: [number, number, number] = [ox + dx, oy + dy, oz + dz];

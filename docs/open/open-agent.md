@@ -720,25 +720,6 @@ the words and refuses anything else, `MODAL_SCREENS` has one reader, and the six
 declare one line — with `event.ts`'s optional prefix passed as a token rather than kept as an
 exception.
 
-## Which section failed is recovered by regex over the prose of its own error
-
-`validateBuiltRegistry` (`src/content/load.ts:627-751`) runs fourteen cross-registry checks and
-attributes each failure to a kind and an id. Most read the id from the value. Three do not:
-`refuseStackedLocations` and `recursivelyResolveRelativeCoordinates` throw a `DslError` whose
-**message** is then re-parsed by `locationIdFromMessage` (`:294`) to recover which location to
-blame, and `validateItemSlots` does the same for an item at `:727`.
-
-Shape 4 — a fact filed under the words one author chose and read back by another. Reword either
-message and the blame silently becomes unattributed: no test reddens, the author just stops
-being told which module to look in.
-
-Three of the fourteen checks also sit in `load.ts` rather than in their kind's file, unlike the
-rest: `startingLocationFailure` (`:619`) is a location fact, `dropTableCycle` (`:406`) a
-droptable one, `performedProblem` (`:422`) an action one.
-
-*Closes when:* `DslError` carries an optional `at: { kind, id }` the throwers set, the three
-regexes are gone, and the three homeless checks live in the files of the kinds they are about.
-
 ## The round-trip proof's root set skips action bodies, so four parsers are unproved
 
 `dsl.test.ts:741-747` derives its subjects, correctly, from `schema.fields` — but an action

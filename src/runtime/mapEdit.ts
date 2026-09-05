@@ -88,7 +88,7 @@ const landing = (registry: Registry, held: readonly string[], by: Spot3): Map<st
 
 function stackedAfter(registry: Registry, landed: ReadonlyMap<string, Spot3>): string | undefined {
   const still = everyPlace(registry).filter((place) => !landed.has(place.id));
-  return stackedLocations([...still.map((place) => ({ id: place.id, x: place.x, y: place.y, z: place.z })), ...[...landed].map(([id, at]) => ({ id, ...at }))]);
+  return stackedLocations([...still.map((place) => ({ id: place.id, x: place.x, y: place.y, z: place.z })), ...[...landed].map(([id, at]) => ({ id, ...at }))])?.says;
 }
 
 function making(registry: Registry, local: string, id: string, at: Spot3, lines: readonly string[]): Editing {

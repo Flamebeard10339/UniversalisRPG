@@ -107,19 +107,15 @@ export const stat = section<Stat>()({
   },
 });
 
-export interface StatRing {
-  stats: string[];
-  says: string;
-}
-
-export function statRing(stats: ReadonlyMap<string, Stat>): StatRing | null {
+export function statRing(stats: ReadonlyMap<string, Stat>): DslError | null {
+  const blame = (along: readonly string[], says: string): DslError => new DslError(says, undefined, { kind: 'stat', id: along[0]! });
   const capped = [...stats.values()].filter((each) => typeof each.atMost === 'string').map((each) => each.id);
   const caps = firstCycle(capped, (statId) => {
     const cap = stats.get(statId)?.atMost;
     return typeof cap === 'string' ? [cap] : [];
   });
   if (caps) {
-    return { stats: caps.slice(0, -1), says: `# stat ${caps[0]} is capped in a ring — ${caps.join(' -> ')} — so none of them could ever be read: an \`at most:\` may not come back round to the stat it caps` };
+    return blame(caps.slice(0, -1), `# stat ${caps[0]} is capped in a ring — ${caps.join(' -> ')} — so none of them could ever be read: an \`at most:\` may not come back round to the stat it caps`);
   }
 
   const converting = new Map<string, Stat[]>();
@@ -130,5 +126,5 @@ export function statRing(stats: ReadonlyMap<string, Stat>): StatRing | null {
   const types = firstCycle([...converting.keys()], (type) => (converting.get(type) ?? []).map((each) => each.converts!.to));
   if (!types) return null;
   const along = types.slice(0, -1).map((from, at) => (converting.get(from) ?? []).find((each) => each.converts!.to === types[at + 1])!.id);
-  return { stats: along, says: `${along.map((statId) => `# stat ${statId}`).join(' and ')} convert in a ring — ${types.join(' -> ')} — which would never finish: damage is read in one pass, so a type may not come back round to itself` };
+  return blame(along, `${along.map((statId) => `# stat ${statId}`).join(' and ')} convert in a ring — ${types.join(' -> ')} — which would never finish: damage is read in one pass, so a type may not come back round to itself`);
 }

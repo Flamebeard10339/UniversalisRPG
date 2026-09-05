@@ -40,10 +40,16 @@ export interface Span {
   end: number;
 }
 
+export interface Blamed {
+  kind: string;
+  id: string;
+}
+
 export class DslError extends Error {
   constructor(
     message: string,
     readonly span?: Span,
+    readonly at?: Blamed,
   ) {
     super(message);
     this.name = 'DslError';

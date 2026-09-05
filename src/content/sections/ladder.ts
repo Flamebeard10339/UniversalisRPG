@@ -1,3 +1,4 @@
+import { DslError } from '../../grammar/parser';
 import { decimal } from '../../grammar/values';
 import type { Loose } from '../refs';
 import { section } from './define';
@@ -16,9 +17,15 @@ export interface Ladder {
 const TWO_HALVES =
   'A stat is worked out the way the engine works one out: every flat grant summed into what is added, every percent summed into what is increased, and the first multiplied by the second. A ladder therefore climbs on two lines rather than one, and what it asks at a level is the added line times the increased line. How much of the climb each half carries is the choice this makes available: the same total can be reached by a stat that grows mostly by being added to and one that grows mostly by being multiplied, and they play differently.';
 
-export function twoToughnessLines(ladders: ReadonlyMap<string, Ladder>): Ladder[] {
+export function twoToughnessLines(ladders: ReadonlyMap<string, Ladder>): DslError | null {
   const named = [...ladders.values()].filter((each) => each.secondsToFellAnEvenMatch !== undefined);
-  return named.length > 1 ? named : [];
+  if (named.length < 2) return null;
+  const said = named.map((each) => `# ladder ${each.id}`).join(' and ');
+  return new DslError(
+    `${said} both say \`seconds to fell an even match\`, and that line names the one ladder every stat carrying \`deals:\` is read against: a world with two of them would pick whichever loaded first. Say it on one.`,
+    undefined,
+    { kind: 'ladder', id: named[0]!.id },
+  );
 }
 
 export const ladder = section<Ladder>()({

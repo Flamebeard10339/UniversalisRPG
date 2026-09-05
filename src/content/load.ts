@@ -1,15 +1,15 @@
 import type { LocaleSection } from './sections/locale';
 import { ActionResult, nestedResults } from '../grammar/actionResult';
-import { Action, actionKind, actionProblem, actionResultLists, assembledActionProblem, fightShapeOf, isFight, isTwoSided, sidedFields } from '../grammar/action';
+import { Action, actionProblem, actionResultLists, assembledActionProblem, fightShapeOf, isFight, isTwoSided, sidedFields } from '../grammar/action';
 import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
-import { actionAddress, actionTextKey, actionTextOwner, actionWords, type ActionDeclaration } from './sections/action';
+import { actionAddress, actionTextKey, actionTextOwner, actionWords, unperformableAction, type ActionDeclaration } from './sections/action';
 import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing, shapedByItsTags } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unframedProblem, unsuppliedParameters } from './locale';
 import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
-import { closeAdjacency, dropUnansweredSeverances, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations } from './sections/location';
+import { closeAdjacency, dropUnansweredSeverances, entitiesStood, recursivelyResolveRelativeCoordinates, refuseStackedLocations, twoStartingLocations } from './sections/location';
 import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, isActionOwnerKind, isDebug, isSectionKind, mergeSection, ModuleSection, sectionOf, SectionKind } from './sections';
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
@@ -22,8 +22,8 @@ import { Pruning, ReferenceKind, Visit } from './refs';
 import { Removal } from './sections/remove';
 import { unpriceableStock } from './sections/shop';
 import { statRing } from './sections/stat';
+import { selfRollingDropTable } from './sections/droptable';
 import { twoToughnessLines } from './sections/ladder';
-import { firstCycle } from './cycle';
 import { actionAddresses, carriedIds, declareMembers, Member, MemberOwner, RESOLUTION_PASSES } from './resolve';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
 import { validateTuningVariable } from './tuningVariables';
@@ -291,10 +291,6 @@ function sectionOwner(owners: ReadonlyMap<string, ParsedModule>, kind: string, i
   return owners.get(ownerKey(kind, id));
 }
 
-function locationIdFromMessage(message: string): string | undefined {
-  return /^location '([^']+)'/.exec(message)?.[1] ?? /^location coordinates form a cycle at '([^']+)'/.exec(message)?.[1];
-}
-
 function namesDanglingRoot(kind: ReferenceKind, id: string, danglingRoots: ReadonlySet<string>): boolean {
   const segments = spelledSegments(kind, id, null);
   return segments.length > 1 && danglingRoots.has(segments[0]);
@@ -403,47 +399,6 @@ function pruneRegistryDanglingReferences(registry: Registry, danglingRoots: Read
   }
 }
 
-function dropTableCycle(registry: Registry): string[] | null {
-  const rolls = new Map<string, string[]>();
-  const collect = (results: readonly ActionResult[], into: string[]): void => {
-    for (const result of results) {
-      if (result.kind === 'roll') into.push(result.table);
-      for (const nested of nestedResults(result)) collect(nested, into);
-    }
-  };
-  for (const [id, table] of registry.dropTables) {
-    const targets: string[] = [];
-    collect(table.results, targets);
-    rolls.set(id, targets);
-  }
-  return firstCycle(rolls.keys(), (id) => rolls.get(id) ?? []);
-}
-
-function performedProblem(registry: Registry): { action: string; says: string } | null {
-  for (const [kind, id, lists] of authoredResults(registry)) {
-    const performed: string[] = [];
-    const collect = (results: readonly ActionResult[]): void => {
-      for (const result of results) {
-        if (result.kind === 'perform') performed.push(result.action);
-        for (const nested of nestedResults(result)) collect(nested);
-      }
-    };
-    for (const list of lists) collect(list);
-    for (const actionId of performed) {
-      const action = registry.actions.get(actionId);
-      if (!action) continue;
-      const by = `# ${kind} ${id}`;
-      if (actionKind(action) === 'continuous') {
-        return { action: actionId, says: `# action ${actionId} is performed by ${by} and is continuous, so it would hold the player for good: a performed action ends on its own, with a time: and no continuous` };
-      }
-      if (isTwoSided(action)) {
-        return { action: actionId, says: `# action ${actionId} is performed by ${by} and is a contest between two sides, and a performed action has nobody across from the player: write it with a time: and results of its own` };
-      }
-    }
-  }
-  return null;
-}
-
 function compileFactionBits(registry: Registry): void {
   registry.factionBits.clear();
   let next = 0;
@@ -470,11 +425,8 @@ function overlayAction(base: Action, over: Action): Action {
 }
 
 class ExtendsFailure extends DslError {
-  constructor(
-    readonly at: string,
-    message: string,
-  ) {
-    super(message);
+  constructor(id: string, message: string) {
+    super(message, undefined, { kind: 'action', id });
   }
 }
 
@@ -584,11 +536,7 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
   compileFactionBits(registry);
 
   const overlaid = linkActions(registry);
-  if (overlaid) {
-    const module = sectionOwner(owners, 'action', overlaid.at);
-    if (!module) throw overlaid;
-    return { module, stage: 'validate', error: overlaid };
-  }
+  if (overlaid) return blamedOn(owners, overlaid);
 
   const players: Entity[] = [];
   const stood = entitiesStood(registry.locations);
@@ -601,28 +549,30 @@ function linkRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModu
       if (namesSection(id, PLAYER_ENTITY)) players.push(linked);
     } catch (raw) {
       if (!(raw instanceof DslError)) throw raw;
-      const error = new DslError(`# entity ${id}: ${raw.message}`, raw.span);
-      const module = sectionOwner(owners, 'entity', id);
-      if (!module) throw error;
-      return { module, stage: 'validate', error };
+      return blamedOn(owners, new DslError(`# entity ${id}: ${raw.message}`, raw.span, { kind: 'entity', id }));
     }
   }
   if (players.length > 1) {
-    const module = sectionOwner(owners, 'entity', players[1].id);
-    const error = new DslError(`# entity ${players[1].id} and # entity ${players[0].id} are both the player, and a game is played as one entity`);
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
+    return blamedOn(owners, new DslError(`# entity ${players[1].id} and # entity ${players[0].id} are both the player, and a game is played as one entity`, undefined, { kind: 'entity', id: players[1].id }));
   }
   registry.player = players[0];
   return null;
 }
 
-function startingLocationFailure(registry: Registry, owners: ReadonlyMap<string, ParsedModule>): BuildFailure | null {
-  const starting = [...registry.locations.values()].filter((location) => location.starting);
-  if (starting.length < 2) return null;
-  const module = sectionOwner(owners, 'location', starting[1].id);
-  const error = new DslError(`# location ${starting[1].id} is marked starting, and so is ${starting[0].id}; a new game begins in exactly one place`);
-  return module ? { module, stage: 'validate', error } : null;
+function blamedOn(owners: ReadonlyMap<string, ParsedModule>, error: DslError): BuildFailure {
+  const module = error.at ? sectionOwner(owners, error.at.kind, error.at.id) : undefined;
+  if (!module) throw error;
+  return { module, stage: 'validate', error };
+}
+
+function refusedBy(owners: ReadonlyMap<string, ParsedModule>, run: () => void): BuildFailure | null {
+  try {
+    run();
+    return null;
+  } catch (error) {
+    if (!(error instanceof DslError)) throw error;
+    return blamedOn(owners, error);
+  }
 }
 
 function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, ParsedModule>, danglingRoots: ReadonlySet<string>): BuildFailure | null {
@@ -631,53 +581,20 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
   const linked = linkRegistry(registry, owners);
   if (linked) return linked;
 
-  const starting = startingLocationFailure(registry, owners);
-  if (starting) return starting;
+  const refused =
+    twoStartingLocations(registry.locations) ??
+    selfRollingDropTable(registry.dropTables) ??
+    statRing(registry.stats) ??
+    twoToughnessLines(registry.ladders) ??
+    unperformableAction(authoredResults(registry), registry.actions);
+  if (refused) return blamedOn(owners, refused);
 
-  const cycle = dropTableCycle(registry);
-  if (cycle) {
-    const module = sectionOwner(owners, 'droptable', cycle[0]);
-    const error = new DslError(`# droptable ${cycle[0]} rolls itself: ${cycle.join(' -> ')}`);
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
-
-  const ring = statRing(registry.stats);
-  if (ring) {
-    const module = sectionOwner(owners, 'stat', ring.stats[0]!);
-    const error = new DslError(ring.says);
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
-
-  const toughness = twoToughnessLines(registry.ladders);
-  if (toughness.length > 1) {
-    const said = toughness.map((each) => `# ladder ${each.id}`).join(' and ');
-    const module = sectionOwner(owners, 'ladder', toughness[0]!.id);
-    const error = new DslError(`${said} both say \`seconds to fell an even match\`, and that line names the one ladder every stat carrying \`deals:\` is read against: a world with two of them would pick whichever loaded first. Say it on one.`);
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
-
-  const performed = performedProblem(registry);
-  if (performed) {
-    const module = sectionOwner(owners, 'action', performed.action);
-    const error = new DslError(performed.says);
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
-
-  try {
+  const placed = refusedBy(owners, () => {
     recursivelyResolveRelativeCoordinates(registry.locations);
     dropUnansweredSeverances(registry.locations);
     refuseStackedLocations(registry.locations);
-  } catch (error) {
-    if (!(error instanceof DslError)) throw error;
-    const id = locationIdFromMessage(error.message);
-    const module = id ? sectionOwner(owners, 'location', id) : undefined;
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
+  });
+  if (placed) return placed;
 
   for (const variable of registry.variables.values()) {
     try {
@@ -721,15 +638,8 @@ function validateBuiltRegistry(registry: Registry, owners: ReadonlyMap<string, P
     }
   }
 
-  try {
-    validateItemSlots(registry);
-  } catch (error) {
-    if (!(error instanceof DslError)) throw error;
-    const id = /^# item (\S+)/.exec(error.message)?.[1];
-    const module = id ? sectionOwner(owners, 'item', id) : undefined;
-    if (!module) throw error;
-    return { module, stage: 'validate', error };
-  }
+  const slots = refusedBy(owners, () => validateItemSlots(registry));
+  if (slots) return slots;
 
   for (const shop of registry.shops.values()) {
     const problem = unpriceableStock(shop, registry.items);
