@@ -180,9 +180,11 @@ not stall hunting for a past ruling that would license the change.
 # Layers
 
 `grammar < content < runtime < ui < scripts`. Imports point downward only, gated
-by `npm run layer-check`. Cycles within a layer are allowed; reaching up is not.
-A file that needs something from the layer above is usually two files. Tests
-live in the folder of the layer they drive.
+by `npm run layer-check`. Reaching up is refused, and so is a cycle — including
+one wholly inside a single layer, which the check walks the shipped tree for and
+exits non-zero on. A file that needs something from the layer above is usually
+two files, and so is a pair that wants to import each other. Tests live in the
+folder of the layer they drive.
 
 # Comments
 
