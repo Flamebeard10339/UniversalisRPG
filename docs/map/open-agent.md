@@ -18,6 +18,14 @@ shape to build towards, and one-way falls out of it rather than being inferred: 
 one-way when only one end writes it. It is also what gives `/unlink` an end to remove a road
 at, since the authored direction never leaves the registry today.
 
+The corpus is most of the way there already: nearly every road is written from both ends, and
+the handful still leaning on the mirror are the cross-module ones — a quest reaching into the
+town, where the far end cannot name the quest's place without depending on the quest. That is
+not a reason to keep the mirror, because the corpus already holds the answer: `thieving.dsl`
+writes `# location tulsa.tavern-street` / `+adjacent: back-alley` from its own file, laying
+the road back onto another module's place under an addressed heading. The remaining roads want
+the same treatment before the mirror can go.
+
 *Closes when:* a location's outgoing roads are what its own body writes, `publishPlaces` says
 which end authored each road, both renderers draw a one-way road from that, and `joining`
 takes a road away at the end that wrote it. The dashed line and arrowhead in `MapPane.tsx`
