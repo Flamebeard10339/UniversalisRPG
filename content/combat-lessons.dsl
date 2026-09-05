@@ -158,30 +158,6 @@ node about-sal:
 over: tulsa.in-town
 {"version":13,"xp":{"combat.attack":15,"combat.health":45},"inventory":{"core.coin":50},"instances":{"next":3,"byId":{"1":{"kind":"item","template":"core.iron-sword","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}},"2":{"kind":"item","template":"core.wooden-shield","payload":{"roll":0.5,"plane":{"0,0":{"jewel":null,"entry":null,"roll":0.5,"allocatedPositions":[],"allocatedSlots":[],"effects":[]}}}}}},"equipped":{"mainhand":"1","offhand":"2"}}
 
-# test the-drunk-is-found-mauled-and-helped-up
-unkillable
-load: fresh-off-the-sewer
-travel: tulsa.tavern-street
-travel: tulsa.sha-dynastys
-talk: tulsa.drunk-patron
-choose: Go on, then. I'll watch.
-choose: continue
-travel: tulsa.tavern-street
-travel: tulsa.market-square
-travel: tulsa.kings-road
-travel: tulsa.north-road
-travel: tulsa.pinewood
-wait: 5
-use: entity.mauled-patron.help-him-up
-assert: drunk-helped
-travel: tulsa.north-road
-travel: tulsa.kings-road
-travel: tulsa.market-square
-travel: tulsa.tavern-street
-travel: tulsa.sha-dynastys
-talk: tulsa.drunk-patron
-assert: not core.fainted
-
 # test the-drunk-is-left-where-he-fell
 unkillable
 load: fresh-off-the-sewer
@@ -197,6 +173,18 @@ travel: tulsa.north-road
 travel: tulsa.pinewood
 wait: 5
 assert: not drunk-helped
+assert: not core.fainted
+
+# test the-drunk-is-found-mauled-and-helped-up
+run: the-drunk-is-left-where-he-fell
+use: entity.mauled-patron.help-him-up
+assert: drunk-helped
+travel: tulsa.north-road
+travel: tulsa.kings-road
+travel: tulsa.market-square
+travel: tulsa.tavern-street
+travel: tulsa.sha-dynastys
+talk: tulsa.drunk-patron
 assert: not core.fainted
 
 # test the-guardsman-yields-a-bout-well-fought
