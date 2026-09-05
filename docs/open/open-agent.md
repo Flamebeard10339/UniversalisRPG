@@ -32,6 +32,26 @@ line and the quest keeps saying the old one, in the world, with every gate green
 *Closes when:* a text field takes `+`, appending rather than replacing, and the three quests
 above write only the clause they are adding.
 
+## An action's own result list cannot be added to, so a module extending one restates it whole
+
+A second body at a nested action id may add to a keyed block — `+on success:` parses, and
+`content/thieving.dsl:373` lays xp onto tulsa's `lift an axe off the rack:` with nothing else.
+The action's own results take no such line: `+xp: core.woodcutting 1` written straight into
+the body is refused with *"unrecognized tag clause"*. And a plain second body replaces the
+result list rather than adding to it, which is what
+`docs/thieving-expansion/open-agent.md`'s first line is about.
+
+So a module wanting one more step in another's action has two options, and where order
+matters it has none. `content/the-swampy-menace.dsl:126-143` restates all nine lines of
+tulsa's `# entity herb-patch` (`content/tulsa.dsl:904-916`) — the timings, the gives and all
+three `say:` sentences — to insert one `if not has <herb>: roll: herb-find` before each
+`give:`. It cannot use `+on success:`, because `on success:` runs after the body and the
+condition it needs is `not has marsh-thistle`, which the `give:` in the body has by then made
+false. Rewrite a herb's prose in tulsa and the quest keeps saying the old words.
+
+*Closes when:* a second body can add a result to an action's own list at a stated position, or
+say that it means to replace it — and `the-swampy-menace` writes only its three roll blocks.
+
 ## A condition has no name, so one worth naming is written out wherever it is asked
 
 `# flag <id>` takes one word, `bundle`, and nothing else — a flag cannot stand for a
