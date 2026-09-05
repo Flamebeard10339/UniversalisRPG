@@ -750,10 +750,13 @@ export function ranWhileAway(session: PlaySession, elapsedRealMs: number, speed:
   if (span < 1) return false;
 
   const start = spanStart(state);
+  const toldBefore = state.log.length;
   resolve(state, registry, state.time + Math.floor(span));
   const say = localizerOf(registry, state);
   const because = say.engine(capped ? 'engine.away.capped' : 'engine.away.ran', { hours: UNDER_WAY_LIMIT_HOURS });
-  state.log.push(...spanSummary(start, state, registry, because));
+  const summary = spanSummary(start, state, registry, because);
+  const told = summary.length > 1 ? summary : [...summary, say.engine('engine.away.nothing')];
+  state.log.splice(toldBefore, state.log.length - toldBefore, ...told);
   openModal(state, { name: 'welcome-back', answers: {} });
   return true;
 }

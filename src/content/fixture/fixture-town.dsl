@@ -17,6 +17,9 @@ dig:
     give: 1 rat-tail
     give: 1 spade
     give: 20 copper-coin
+loiter:
+  time: 4
+  continuous
 
 # location well
 title: The Well

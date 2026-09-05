@@ -5,8 +5,8 @@ import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
 import type { PruneWarning } from './pruning';
 import { savedGameFromSerialized } from './save';
-import { liveHolding, liveSlot, speedKept, type SaveContext } from './saveSlots';
-import { loadSaved, ranWhileAway, startSession, type PlaySession } from './session';
+import { autosave, liveHolding, liveSlot, speedKept, type SaveContext } from './saveSlots';
+import { loadSaved, ranWhileAway, serializeSession, startSession, type PlaySession } from './session';
 
 export interface UniverseProblem {
   modules: readonly Answer[];
@@ -80,6 +80,14 @@ function resume(session: PlaySession, save: SaveContext): Resumption {
   }
 }
 
+function banked(save: SaveContext, session: PlaySession): void {
+  try {
+    autosave(save, () => serializeSession(session));
+  } catch {
+    return;
+  }
+}
+
 export function openUniverse(sources: readonly ModuleSource[], options: { save?: SaveContext } = {}): OpenedUniverse {
   const loaded = loadUniverseWithDiagnostics(sources);
   const disabled = loaded.diagnostics.map((diagnostic): UniverseProblem => ({ modules: [diagnostic.moduleId], words: 'tool', message: formatModuleDiagnostic(diagnostic) }));
@@ -99,7 +107,10 @@ export function openUniverse(sources: readonly ModuleSource[], options: { save?:
 
   const session = startSession(loaded.registry);
   const resumed: Resumption = options.save ? resume(session, options.save) : { kind: 'new' };
-  if (options.save) options.save.synced = resumed.kind === 'kept' ? null : liveSlot(options.save);
+  if (options.save) {
+    options.save.synced = resumed.kind === 'kept' ? null : liveSlot(options.save);
+    if (resumed.kind === 'resumed') banked(options.save, session);
+  }
   return { session, modules: loaded.loadedModules, statuses: loaded.modules, problems: disabled, unmet: [], resumed };
 }
 

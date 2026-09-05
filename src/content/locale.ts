@@ -303,6 +303,7 @@ export const ENGINE_KEYS = [
   'engine.away.ran',
   'engine.away.capped',
   'engine.away.carry-on',
+  'engine.away.nothing',
   'engine.modal.welcome-back',
   'engine.playtest.download',
   'engine.playtest.chunk',

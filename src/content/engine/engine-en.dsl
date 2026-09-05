@@ -303,6 +303,7 @@ engine.repl.plane.holds: holds {beyond}
 engine.away.ran: you came back
 engine.away.capped: the world had run {hours} hours on your behalf, which is as far as it runs unattended
 engine.away.carry-on: Carry on
+engine.away.nothing: Nothing came of it.
 engine.modal.welcome-back: Welcome back
 engine.playtest.download: Download
 engine.playtest.chunk: part {part}

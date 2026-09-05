@@ -10,9 +10,13 @@ import { speedLine } from './devMode';
 
 const DIGGING = 'use:location.fixture-town.green.dig';
 
+const WAITING = 'use:location.fixture-town.green.loiter';
+
 const AN_HOUR_MS = 60 * 60 * 1000;
 
 const AN_HOUR_S = 60 * 60;
+
+const A_MINUTE_MS = 60 * 1000;
 
 const noTicks = (): (() => void) => () => undefined;
 
@@ -76,6 +80,51 @@ describe('the world runs on while the page is closed (c1)', () => {
 
     expect(back.snapshot().view.time - before.time).toBe(UNDER_WAY_LIMIT_HOURS * AN_HOUR_S);
     expect(said(back)).toContain(String(UNDER_WAY_LIMIT_HOURS));
+  });
+
+  it('says what came of the time away rather than every blow struck in it', () => {
+    const toldAfter = (awayMs: number): number => {
+      const shelf = shelved();
+      leftUnderWay(shelf);
+      shelf.wait(awayMs);
+      return shelf.open().snapshot().view.said.length;
+    };
+
+    const brief = toldAfter(A_MINUTE_MS);
+    const long = toldAfter(UNDER_WAY_LIMIT_HOURS * AN_HOUR_MS);
+
+    expect(brief).toBeGreaterThan(0);
+    expect(long, 'the screen grew with the time away, so it is telling the run rather than summing it').toBe(brief);
+  });
+
+  it('banks what it ran, so reloading spends the time since rather than the window again', () => {
+    const shelf = shelved();
+    leftUnderWay(shelf);
+    shelf.wait(AN_HOUR_MS);
+    const back = shelf.open();
+    const carried = back.snapshot().view.inventory;
+
+    shelf.wait(A_MINUTE_MS);
+    const again = shelf.open();
+
+    expect(said(back)).toContain(`${AN_HOUR_S}s`);
+    expect(said(again), 'the second opening spent the whole window over again, so a reload re-rolls it').not.toContain(`${AN_HOUR_S}s`);
+    for (const [item, count] of Object.entries(carried)) {
+      expect(again.snapshot().view.inventory[item] ?? 0, `${item} was not kept across the reload`).toBeGreaterThanOrEqual(count);
+    }
+  });
+
+  it('says so where the time away came to nothing, rather than showing an empty screen', () => {
+    const shelf = shelved();
+    const driver = shelf.open();
+    driver.choose(position(driver, WAITING));
+    if (driver.snapshot().view.action === null) throw new Error('nothing was left under way, so this claim holds vacuously');
+    shelf.wait(A_MINUTE_MS);
+
+    const back = shelf.open();
+
+    expect(greeting(back)).toBe(true);
+    expect(back.snapshot().view.said.length).toBeGreaterThan(1);
   });
 
   it('runs nothing on for a page closed with nothing under way', () => {
