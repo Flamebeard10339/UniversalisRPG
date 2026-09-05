@@ -5,7 +5,7 @@ import { Hex, PlaneNode } from '../content/hex';
 import { clusterAt, ORIGIN, pointsSpent } from './clusterPlane';
 import { equip } from './equipment';
 import { instance, instanceIsLive } from './instances';
-import { allocate, carriesItem, destroyItem, Growth, Destruction, itemInstance, itemLevel, packedCount, pointsRemaining, receiveItem, slotJewel } from './itemInstance';
+import { allocate, carriesItem, destroyItem, Growth, Destruction, itemInstance, itemLevel, packedCount, pointsRemaining, receiveItem, slotJewel, wornCopy } from './itemInstance';
 import { initialState, loadSave, pruneStateForRegistry, SAVE_VERSION, serializeSave } from './save';
 import { GameState } from './state';
 import { inEnglish } from './sayFixture';
@@ -124,6 +124,16 @@ describe('an item with no level has no plane', () => {
   it('refuses a base named by its template, because the points belong to a copy and not to the item', () => {
     const state = carrying({ 'iron-sword': 1 });
     expect(refusalOf(allocate(state, registry, 'iron-sword', slot(ORIGIN)))).toBe('iron-sword is not a base: only an item you can wear has a plane to grow');
+  });
+
+  it('reaches the copy worn in a slot when the target names that slot, since a slot holds one copy and a template stands for none', () => {
+    const state = carrying({ 'iron-sword': 2 });
+    equip(state, registry, '2');
+
+    expect(allocate(state, registry, wornCopy('mainhand'), slot(ORIGIN)).ok).toBe(true);
+
+    expect(pointsSpent(itemInstance(state, '2')!.plane)).toBe(1);
+    expect(pointsSpent(itemInstance(state, '1')!.plane)).toBe(0);
   });
 
   it('refuses a target naming nothing at all', () => {
