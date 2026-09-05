@@ -32,26 +32,6 @@ line and the quest keeps saying the old one, in the world, with every gate green
 *Closes when:* a text field takes `+`, appending rather than replacing, and the three quests
 above write only the clause they are adding.
 
-## An action's own result list cannot be added to, so a module extending one restates it whole
-
-A second body at a nested action id may add to a keyed block — `+on success:` parses, and
-`content/thieving.dsl:373` lays xp onto tulsa's `lift an axe off the rack:` with nothing else.
-The action's own results take no such line: `+xp: core.woodcutting 1` written straight into
-the body is refused with *"unrecognized tag clause"*. And a plain second body replaces the
-result list rather than adding to it, which is what
-`docs/thieving-expansion/open-agent.md`'s first line is about.
-
-So a module wanting one more step in another's action has two options, and where order
-matters it has none. `content/the-swampy-menace.dsl:126-143` restates all nine lines of
-tulsa's `# entity herb-patch` (`content/tulsa.dsl:904-916`) — the timings, the gives and all
-three `say:` sentences — to insert one `if not has <herb>: roll: herb-find` before each
-`give:`. It cannot use `+on success:`, because `on success:` runs after the body and the
-condition it needs is `not has marsh-thistle`, which the `give:` in the body has by then made
-false. Rewrite a herb's prose in tulsa and the quest keeps saying the old words.
-
-*Closes when:* a second body can add a result to an action's own list at a stated position, or
-say that it means to replace it — and `the-swampy-menace` writes only its three roll blocks.
-
 ## A condition has no name, so one worth naming is written out wherever it is asked
 
 `# flag <id>` takes one word, `bundle`, and nothing else — a flag cannot stand for a
@@ -296,29 +276,6 @@ what makes it dangerous is that the question reaching it can now be a bad one.
 *Closes when:* a rooted reference's tail is checked for every root that has one, derived from
 the root's own declaration rather than from a second list of which roots are checked, and a
 `describe` in this folder's `open-tests.test.ts` pins the refusal an author sees.
-
-## Four growth directives still refuse a rolled base by name
-
-`equip:` resolves a written template to the first unworn copy since 14f72baf. `swap:`,
-`slot:`, `allocate:` and `apply:` take the same `<carried>` token through `growItem` and do
-not, so `floors/thieving-floor.dsl` still writes `allocate: 3` where it now writes
-`equip: core.unassuming-cap` two lines above.
-
-**This is a question rather than an oversight, and it was tried.** A `copyToGrow` preferring
-the worn copy made the whole floor writable by name and reddened an authored claim in
-`src/runtime/itemInstance.test.ts` — *refuses a base named by its template, because the points
-belong to a copy and not to the item*. That claim is right about the distinction: you equip a
-copy and any will do, while you allocate onto one particular plane, and a player holding three
-swords with three planes has three answers. Naming a template there has to pick, and the pick
-would be silent.
-
-The other half of the same fix, also unbuilt: `carriedSubmit` in
-`src/runtime/carriedScreen.ts` finds no entry for an unknown item id and returns null with no
-refusal at all, and `carriedScreen` discards `equip`'s return besides. That is where the
-silence an authoring run once met actually lives, and it is the GUI rather than the loop.
-
-*Moves when: he says whether a growth directive may name a template — and if it may, what it
-picks when several copies stand, since that is the thing the claim says cannot be silent.*
 
 ## The modals have no API, so every agent that touches one invents a way in
 

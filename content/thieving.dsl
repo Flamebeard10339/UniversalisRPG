@@ -488,12 +488,9 @@ rate: us.thieving-rate
 
 # action cross
 title: Cross
-attempts: 1
+extends: steal
 continuous
 time: 5
-accuracy: us.thieving-ability vs them.npc-thieving-difficulty
-on success:
-  xp: thieving them.npc-thieving-xp
 
 # passive cutpurse
 title: Cutpurse
@@ -676,6 +673,11 @@ one of:
 # droptable the-lookouts-share
 roll: strongbox-contents
 roll: strongbox-contents
+
+# droptable the-lookouts-payoff
+say: He is gone before you have finished nodding. You stand at the mouth of the alley and look at the street, and the street looks back, and nobody coughs. When he comes out he is walking slowly, which is how people walk who are carrying more than they went in with.
+roll: the-lookouts-share
+say: "Half," he says, and it is. "If you ever want more of that, come and find me. I am not going to tell you where." He is halfway up the street before you think to ask.
 
 # droptable sent-to-jail
 unset: cell-open
@@ -897,9 +899,7 @@ stage an-offer:
     He does not jump, which tells you something. "Have I." He looks past you to the mouth of the alley, and back. "There is a door here that wants going through, and a street out there that wants watching while I do. I cannot do both. I was going to wait for dark."
     "Stand at the end and look bored. Anybody turns in, you cough. That is the whole job." He weighs something in his pocket. "Half of what is in there, and you do not have to see what is in there."
     -> Go on, then. I will watch the street.
-      say: He is gone before you have finished nodding. You stand at the mouth of the alley and look at the street, and the street looks back, and nobody coughs. When he comes out he is walking slowly, which is how people walk who are carrying more than they went in with.
-      roll: the-lookouts-share
-      say: "Half," he says, and it is. "If you ever want more of that, come and find me. I am not going to tell you where." He is halfway up the street before you think to ask.
+      roll: the-lookouts-payoff
       goto kept-watch
     -> Not for me.
       say: "No." He does not argue. "I will be here a while yet. Door is not going anywhere."
@@ -913,9 +913,7 @@ stage thinking-it-over:
     ask: About that door.
     "Changed your mind?" He has not moved. "Mouth of the alley. Cough if anybody turns in."
     -> All right. I will watch.
-      say: He is gone before you have finished nodding. You stand at the mouth of the alley and look at the street, and the street looks back, and nobody coughs. When he comes out he is walking slowly, which is how people walk who are carrying more than they went in with.
-      roll: the-lookouts-share
-      say: "Half," he says, and it is. "If you ever want more of that, come and find me. I am not going to tell you where." He is halfway up the street before you think to ask.
+      roll: the-lookouts-payoff
       goto kept-watch
     -> No.
       say: "Suit yourself." He goes back to looking at the door.

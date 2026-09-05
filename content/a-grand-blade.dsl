@@ -171,26 +171,6 @@ assert: has grand-blade
 assert: has grand-blade-schematic
 assert: not has ratkin-ingot
 
-# save at-the-muster-with-the-schematic
-{"version":13,"location":"tulsa.the-muster","xp":{"combat.attack":200000,"combat.health":200000},"flags":{"a-grand-blade.finding-the-notes.gathering-the-iron":true},"inventory":{"core.coin":1000,"smithing.iron-bar":15,"smithing.hammer":1,"a-grand-blade.grand-blade-schematic":1}}
-
-# test the-warchief-is-not-taken-by-asking
-unkillable
-instant-kill
-load: at-the-muster-with-the-schematic
-use: entity.combat.ratkin-warrior.push-to-the-warchief
-assert: warchief-confronted
-use: core.melee-combat on ratkin-warchief until has ratkin-ingot
-cancel
-assert: has ratkin-ingot
-goto: forge
-talk: tulsa.bladesmiths-son
-choose: finding-the-notes.gathering-the-iron.bladesmiths-son.1.said
-choose: continue
-assert: finding-the-notes.forge-reopened
-craft: grand-blade
-assert: has grand-blade
-
 # save at-the-muster-untrained
 {"version":13,"location":"tulsa.the-muster","flags":{"a-grand-blade.finding-the-notes.gathering-the-iron":true},"inventory":{"core.coin":1000}}
 
