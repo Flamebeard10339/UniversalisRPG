@@ -16,10 +16,10 @@ import { passiveTags } from './passiveGrant';
 import { buffsOf, stackCount } from './buffs';
 import { type BuffInstance, GameState, parseOwnerRef, PLAYER } from './state';
 import { solvedStatsOf } from './foeSolve';
-import { defaultActionDuration, hitChance, minDamage } from './tuning';
+import { defaultActionDuration, hitChance, hitDamage } from './tuning';
 
-export { hitChance };
-import { fromMilliUnits, MS_PER_MINUTE, secondsToMs, toMilliUnits } from './units';
+export { hitChance, hitDamage };
+import { fromMilliUnits, MS_PER_MINUTE, secondsToMs } from './units';
 import { BonusAmount, Counter, TagClause } from '../grammar/tagClause';
 import { HookCarrier } from '../grammar/hook';
 
@@ -210,11 +210,6 @@ export function statValue(statId: string, state: GameState, registry: Registry, 
 export function sampleStat(statId: string, state: GameState, registry: Registry, actorId: string = PLAYER): number {
   const range = statRange(statId, state, registry, actorId);
   return isPoint(range) ? range.min : sampleRange(range, nextRandom(state));
-}
-
-export function hitDamage(attack: number, dr: number, registry: Registry): number {
-  const floor = Math.max(1, Math.min(toMilliUnits(minDamage(registry)), toMilliUnits(attack)));
-  return Math.max(floor, toMilliUnits(attack - dr));
 }
 
 export function attemptDuration(action: Action, state: GameState, registry: Registry, actorId: string = PLAYER, other: string = actorId): number {

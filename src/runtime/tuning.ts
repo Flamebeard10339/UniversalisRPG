@@ -1,6 +1,6 @@
 import type { Registry } from '../content/registry';
 import { CONTEST_SPREAD, DEFAULT_ACTION_DURATION, ENGAGEMENT_SECONDS, INVENTORY_SLOTS, MAP_GRID, MIN_DAMAGE, TRAVEL_SECONDS } from '../content/tuningVariables';
-import { secondsToMs } from './units';
+import { secondsToMs, toMilliUnits } from './units';
 
 const DEFAULT_TRAVEL_SECONDS = 3;
 
@@ -42,4 +42,12 @@ export function mapGrid(registry: Registry): number {
 
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {
   return 1 / (1 + 10 ** ((evasion - accuracy) / contestSpread(registry)));
+}
+
+export function landedDamage(attack: number, dr: number, registry: Registry): number {
+  return Math.max(Math.min(minDamage(registry), Math.max(attack, 0)), attack - dr);
+}
+
+export function hitDamage(attack: number, dr: number, registry: Registry): number {
+  return Math.max(1, toMilliUnits(landedDamage(attack, dr, registry)));
 }

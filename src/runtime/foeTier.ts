@@ -9,6 +9,7 @@ import { hitChance, statValue } from './stats';
 import { abilityOn } from './pace';
 import type { GameState } from './state';
 import { PLAYER } from './state';
+import { resistanceTo } from './damageModel';
 
 export { fightShapeOf } from '../grammar/action';
 export type { Contested, FightShape } from '../grammar/action';
@@ -37,19 +38,9 @@ export interface Reading {
   damageShare: number;
 }
 
-export function resistanceTo(registry: Registry, type: string | undefined, state: GameState, actorId: string): number {
-  if (type === undefined) return 0;
-  let share = 0;
-  for (const stat of registry.stats.values()) {
-    if (stat.resists === type) share += statValue(stat.id, state, registry, actorId);
-  }
-  return share;
-}
-
 export function readingAt(registry: Registry, state: GameState, fighter: Fighter, laddered: LadderedStats, level: number): Reading {
   const { entity, fight } = fighter;
   const foe = entity.id;
-  const type = registry.stats.get(laddered.dealt)?.deals;
 
   const ourPool = abilityOn(laddered.pool, level);
   const ourRateNow = statValue(fight.rate, state, registry, PLAYER);
@@ -60,11 +51,13 @@ export function readingAt(registry: Registry, state: GameState, fighter: Fighter
   const ourEvasion = statValue(fight.accuracy.theirs, state, registry, PLAYER);
   const ourReduction = statValue(fight.damage.theirs, state, registry, PLAYER);
 
-  const ourHit = landed(ourDealt, resistanceTo(registry, type, state, foe), statValue(fight.damage.theirs, state, registry, foe), registry);
+  const type = registry.stats.get(laddered.dealt)?.deals;
+  const theirResistance = resistanceTo(registry, type, (statId) => statValue(statId, state, registry, foe));
+  const ourHit = landed(ourDealt, theirResistance, statValue(fight.damage.theirs, state, registry, foe), registry);
   const ourDps = ourHit * perSecond(ourRate) * hitChance(ourAccuracy, statValue(fight.accuracy.theirs, state, registry, foe), registry);
 
   const theirDealt = statValue(fight.damage.ours, state, registry, foe);
-  const theirHit = landed(theirDealt, resistanceTo(registry, type, state, PLAYER), ourReduction, registry);
+  const theirHit = landed(theirDealt, resistanceTo(registry, type, (statId) => statValue(statId, state, registry, PLAYER)), ourReduction, registry);
   const theirDps = theirHit * perSecond(statValue(fight.rate, state, registry, foe)) * hitChance(statValue(fight.accuracy.ours, state, registry, foe), ourEvasion, registry);
 
   const theirPool = statValue(registry.resources.get(fight.pool)!.max, state, registry, foe);

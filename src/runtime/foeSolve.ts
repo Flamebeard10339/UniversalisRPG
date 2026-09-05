@@ -7,7 +7,8 @@ import { profile, type Profile } from '../content/sections/profile';
 import { actorEntity } from './actionLookup';
 import { abilityOn, dpsLadder, toughnessLadder, type Ladder } from './pace';
 import { PLAYER } from './state';
-import { hitChance, minDamage } from './tuning';
+import { resistanceTo } from './damageModel';
+import { hitChance, landedDamage } from './tuning';
 
 export const SURVIVAL_WINDOW_SECONDS = 60;
 export const SECONDS_PER_MINUTE = 60;
@@ -78,10 +79,7 @@ export function weighedFor(registry: Registry, fight: FightShape, laddered: Ladd
   };
 }
 
-export function landed(dealt: number, resistance: number, reduction: number, registry: Registry): number {
-  const through = dealt * (1 - resistance / 100);
-  return Math.max(Math.min(minDamage(registry), Math.max(through, 0)), through - reduction);
-}
+export const landed = (dealt: number, resistance: number, reduction: number, registry: Registry): number => landedDamage(dealt * (1 - resistance / 100), reduction, registry);
 
 export const swingsPerSecond = (rate: number, accuracy: number, registry: Registry): number => perSecond(rate) * hitChance(accuracy, accuracy, registry);
 
@@ -97,15 +95,6 @@ const dealtFor = (hit: number, resistance: number, reduction: number): number =>
 function declaredOn(registry: Registry, sheet: Entity | undefined, statId: string): number {
   const held = sheet?.stats[statId] ?? registry.stats.get(statId)?.base;
   return held === undefined ? 0 : midpoint(held);
-}
-
-function resistanceDeclaredOn(registry: Registry, sheet: Entity | undefined, type: string | undefined): number {
-  if (type === undefined) return 0;
-  let share = 0;
-  for (const stat of registry.stats.values()) {
-    if (stat.resists === type) share += declaredOn(registry, sheet, stat.id);
-  }
-  return share;
 }
 
 const derived = new WeakMap<Registry, Map<string, Readonly<Record<string, Range>> | null>>();
@@ -131,7 +120,6 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
   if (laddered === undefined) return null;
 
   const us = actorEntity(registry, PLAYER);
-  const type = registry.stats.get(laddered.dealt)?.deals;
   const weighed = weighedFor(registry, fight, laddered, level, (statId) => declaredOn(registry, us, statId));
   const ourPool = weighed.pool.against;
   const ourRate = weighed.rate.against;
@@ -139,8 +127,9 @@ function solve(registry: Registry, entity: Entity): Readonly<Record<string, Rang
   const ourDealt = weighed.damage.against;
   const ourEvasion = declaredOn(registry, us, fight.accuracy.theirs);
   const ourReduction = declaredOn(registry, us, fight.damage.theirs);
-  const ourResistance = resistanceDeclaredOn(registry, us, type);
-  const theirResistance = resistanceDeclaredOn(registry, entity, type);
+  const type = registry.stats.get(laddered.dealt)?.deals;
+  const theirResistance = resistanceTo(registry, type, (statId) => declaredOn(registry, entity, statId));
+  const ourResistance = resistanceTo(registry, type, (statId) => declaredOn(registry, us, statId));
 
   const written = (statId: string): number | undefined => {
     const held = entity.stats[statId];
