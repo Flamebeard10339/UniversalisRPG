@@ -195,6 +195,19 @@ gate an author's world does: `npm run oracle -- --at src/content/fixture`.
 gate, not the loop — the twenty seconds are import and transform, a function of how
 many test files there are, so nothing you cache moves them.
 
+**The game is ten frames a second, and what a frame costs is gated.**
+`src/ui/frameCost.dom.test.tsx` mounts the real App on the fixture world, leaves an
+action under way and drives the clock. A frame must read no DSL at all, wake the
+screen exactly once, cost what it cost at the start of the session however long the
+session has run, and draw a log that stops growing. The first of those is the one
+that bites: `splitSections` is the single door every read of DSL text goes through,
+so the gate counts the characters it has read and derives its own subjects — nothing
+is listed, and a frame that starts parsing the world again fails whatever parses it
+and wherever from. This is not a style rule. Keying a `useMemo` on the driver
+snapshot put a whole-corpus parse on the render path and cost 263ms a frame in the
+browser, which is what "the whole interface is laggy" turned out to be. **Before
+putting work on the tick or the render path, run that file.**
+
 **A test may not assert a balance number.** Balance churns continuously, and a change
 to it must not redden the suite. Test that the mechanism works — that rage rises when
 a blow lands, that a cap bites, that two swings differ — never that a number is the
