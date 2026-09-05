@@ -122,24 +122,6 @@ standing at all is the signal that migration did not.
 save carrying one, the plane modal still draws its lattice, and a lattice that
 disagrees with the item's recorded stats draws an empty tree instead.
 
-## The modal beat restarts whenever the world speaks under it
-
-`Modal.tsx` draws the typewriter as `<Beat key={spoken.join('\n')} …>`, and
-`spoken` is `view.said`, which is drained and rebuilt on every view. So a line
-being read a character at a time appears to restart from the first character when
-anything else says anything, and goes entirely when a quiet tick leaves `said`
-empty.
-
-This is read off the code and was **not** reproduced: it needs a live run ticking
-under an open modal, and the paths that put a modal up mostly stop the run first.
-No proof stands beside it because a remount can only be seen from a mounted root,
-and the `open` project has no jsdom — so the first job is to find out whether it
-happens at all, in a `*.dom.test.tsx` beside `Modal.tsx`. If it does not, delete
-this line.
-
-*Closes when:* a modal being read a character at a time keeps its place while the
-world speaks under it, proved in a `*.dom.test.tsx` beside `Modal.tsx`.
-
 ## The log's scroll anchor forces a layout on every batch of new lines
 
 `Home.tsx`'s scroll effect reads two `getBoundingClientRect`s, `scrollHeight` and
