@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { WORLD_EXTENSION } from '../src/grammar/structure';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { keyedUnderOwnerKind, namesSection, spelledSegments } from '../src/content/namespace';
 import { formatModuleDiagnostic } from '../src/content/registry';
@@ -260,7 +261,7 @@ const dslUnder = (root: string): string[] => {
     for (const entry of readdirSync(at, { withFileTypes: true })) {
       const here = path.join(at, entry.name);
       if (entry.isDirectory()) walk(here);
-      else if (entry.name.endsWith('.dsl')) found.push(posix(here));
+      else if (entry.name.endsWith(WORLD_EXTENSION)) found.push(posix(here));
     }
   };
   walk(root);

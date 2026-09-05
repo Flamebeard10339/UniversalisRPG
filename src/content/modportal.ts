@@ -1,3 +1,4 @@
+import { WORLD_EXTENSION } from '../grammar/structure';
 import { globalSectionKinds, sectionOf, type SectionKind } from './sections';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
@@ -180,7 +181,7 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources
     tier: issueTier(issue),
     base: contribution,
     moduleId,
-    file: `${issue.number}-${moduleId}.dsl`,
+    file: `${issue.number}-${moduleId}${WORLD_EXTENSION}`,
     text,
   };
 }

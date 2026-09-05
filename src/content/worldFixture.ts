@@ -1,6 +1,6 @@
-import { readdirSync, readFileSync } from 'fs';
 import { engineModules } from './engineModules';
 import type { ModuleSource } from './universe';
+import { worldFileNames, worldModule, worldModules } from './worldDir';
 
 export const FIXTURE_WORLD = `
 # location camp
@@ -25,16 +25,8 @@ base: 4
 
 export const FIXTURE_CORPUS_DIR = 'src/content/fixture';
 
-const moduleId = (fileName: string): string => fileName.replace(/\.dsl$/, '');
+export const fixtureFiles = (): readonly string[] => worldFileNames(FIXTURE_CORPUS_DIR);
 
-export function fixtureFiles(): readonly string[] {
-  return readdirSync(FIXTURE_CORPUS_DIR).filter((name) => name.endsWith('.dsl')).sort((a, b) => moduleId(a).localeCompare(moduleId(b)));
-}
+export const fixtureModule = (id: string): ModuleSource => worldModule(FIXTURE_CORPUS_DIR, id);
 
-export function fixtureModule(id: string): ModuleSource {
-  return { name: id, text: readFileSync(`${FIXTURE_CORPUS_DIR}/${id}.dsl`, 'utf8') };
-}
-
-export function fixtureSources(): readonly ModuleSource[] {
-  return [...engineModules(), ...fixtureFiles().map((file) => fixtureModule(moduleId(file)))];
-}
+export const fixtureSources = (): readonly ModuleSource[] => [...engineModules(), ...worldModules(FIXTURE_CORPUS_DIR)];

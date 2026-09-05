@@ -1,6 +1,6 @@
 import { repoPath, splitFiles } from './lib/repo';
 import { sourceName } from './lib/dslSources';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { moduleLocalId } from '../src/grammar/section';
@@ -14,6 +14,7 @@ import { patchedInto, type Patching } from '../src/content/patch';
 import { registryDiff } from '../src/content/registryDiff';
 import { sectionFor } from '../src/content/sections';
 import { CORPUS_DIR, LOCAL_CHANGES_FILE } from '../src/content/shipped';
+import { worldFileNames } from '../src/content/worldDir';
 import type { Removal } from '../src/content/sections/remove';
 import type { ModuleSource, ParsedModule } from '../src/content/universe';
 
@@ -279,8 +280,7 @@ export function parseArgs(raw: readonly string[]): Args {
 export function contentFiles(args: Args): string[] {
   if (args.contentFiles) return args.contentFiles;
   const local = repoPath(args.localFile);
-  return readdirSync(repoPath(contentDirectory))
-    .filter((name) => name.endsWith('.dsl'))
+  return worldFileNames(repoPath(contentDirectory))
     .map((name) => `${contentDirectory}/${name}`)
     .filter((file) => repoPath(file) !== local);
 }

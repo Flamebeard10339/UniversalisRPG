@@ -8,13 +8,13 @@ import { covers } from './lib/layers';
 import { occurrencesOf } from './lib/idForms';
 import { posix, trackedFiles } from './lib/sourceFiles';
 import { sourceName } from './lib/dslSources';
+import { WORLD_EXTENSION } from '../src/grammar/structure';
 
 export { occurrencesOf };
 
 export const SCOPE: readonly string[] = [CORPUS_DIR, 'src', 'scripts', 'package.json'];
 
 const CORPUS = CORPUS_DIR;
-const MODULE_EXTENSION = '.dsl';
 
 export interface TextFile {
   path: string;
@@ -30,7 +30,7 @@ export interface RenameReport {
 
 export const sourceOf = (file: TextFile): ModuleSource => ({ name: sourceName(file.path), text: file.text });
 
-export const corpusOf = (files: readonly TextFile[], root: string = CORPUS): TextFile[] => files.filter((file) => covers(root, file.path) && file.path.endsWith(MODULE_EXTENSION));
+export const corpusOf = (files: readonly TextFile[], root: string = CORPUS): TextFile[] => files.filter((file) => covers(root, file.path) && file.path.endsWith(WORLD_EXTENSION));
 
 const refused = (lines: string[]): RenameReport => ({ lines: [...lines, '', 'Refused: no file was written.'], ok: false, files: [], moved: null });
 

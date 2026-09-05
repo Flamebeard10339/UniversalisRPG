@@ -1,12 +1,16 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { WORLD_EXTENSION } from '../../src/grammar/structure';
+import { moduleIdOf } from '../../src/content/worldDir';
 import { emptyModportalManifest, MODPORTAL_MANIFEST_VERSION } from '../../src/content/modportal';
 import type { ModportalEntry, ModportalManifest, ModTier } from '../../src/content/modportal';
 
 export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
 export const MODPORTAL_MANIFEST_FILE = 'manifest.json';
 
-const ENTRY_FILE = /^\d+-[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*\.dsl$/;
+const ENTRY_STEM = /^\d+-[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
+
+const namesEntry = (file: string): boolean => file.endsWith(WORLD_EXTENSION) && ENTRY_STEM.test(moduleIdOf(file));
 
 export interface ModportalCache {
   manifest: ModportalManifest;
@@ -47,7 +51,7 @@ export function readEntryText(root: string, entry: ModportalEntry): EntryText {
 
 export function orphanEntryFiles(root: string, entries: readonly ModportalEntry[]): string[] {
   const kept = new Set(entries.map((entry) => entry.file));
-  return readdirSync(root).filter((file) => ENTRY_FILE.test(file) && !kept.has(file));
+  return readdirSync(root).filter((file) => namesEntry(file) && !kept.has(file));
 }
 
 export function readModportalCache(root: string): ModportalCache {

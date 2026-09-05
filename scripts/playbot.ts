@@ -10,6 +10,8 @@ import { loadUniverseWithDiagnostics } from '../src/content/load';
 import { formatModuleDiagnostic, type Registry } from '../src/content/registry';
 import type { ParsedSave } from '../src/content/sections/save';
 import { SHIPPED_DIRS } from '../src/content/shipped';
+import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
+import { worldFileName } from '../src/content/worldDir';
 import type { ModuleSource } from '../src/content/universe';
 import { askedOption, COMMANDS, findCommand, newContext, outcomeOf, runLine, type AuthoringContext, type CommandAudience, type CommandContext, type CommandOutput, type CommandResult, type CommandSpec } from '../src/runtime/command';
 import type { Localizer } from '../src/runtime/localized';
@@ -512,7 +514,7 @@ export function createSdkModelClient(cwd: string): ModelClient {
 export const DEFAULT_SOURCES = [...SHIPPED_DIRS];
 
 export function localChangesFile(named: string | undefined): string {
-  return named ?? path.join(isolatedDir(), 'local-changes.dsl');
+  return named ?? path.join(isolatedDir(), worldFileName(LOCAL_CHANGES_MODULE_ID));
 }
 
 export const authorsTheWorld = (mode: PlaybotMode): boolean => modeSpec(mode).audiences.includes('author');

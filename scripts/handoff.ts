@@ -1,6 +1,7 @@
 import { execFileSync, execSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { WORLD_EXTENSION } from '../src/grammar/structure';
 import { probe, readSources } from './probe';
 
 const usage = [
@@ -108,7 +109,7 @@ export function complaintsIn(file: string, text: string): Complaint[] {
 }
 
 const DECLARES: Readonly<Record<string, RegExp>> = {
-  '.dsl': /^#[ \t]+test[ \t]+(\S+)/gm,
+  [WORLD_EXTENSION]: /^#[ \t]+test[ \t]+(\S+)/gm,
   '.ts': /^describe\([ \t]*['"`]([^'"`]+)['"`]/gm,
 };
 
@@ -178,7 +179,7 @@ function suiteVerdicts(file: string, ids: readonly string[]): Verdict[] {
   return ids.map((id) => ({ file, id, passes: held.get(id) === true }));
 }
 
-const verdictsFor = (dir: string, name: string, ids: readonly string[]): Verdict[] => (name.endsWith('.dsl') ? routeVerdicts : suiteVerdicts)(path.join(dir, name), ids);
+const verdictsFor = (dir: string, name: string, ids: readonly string[]): Verdict[] => (name.endsWith(WORLD_EXTENSION) ? routeVerdicts : suiteVerdicts)(path.join(dir, name), ids);
 
 export interface Folder {
   name: string;
