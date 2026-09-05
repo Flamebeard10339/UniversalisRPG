@@ -28,7 +28,9 @@ export const info = section<ModuleInfo>()({
   },
 });
 
-export const defaultTitle = (self: { id: string }, { language }: HydrateContext): string => mintedName(self.id, language);
+export const HEADING_KIND = info.kind;
+
+export const defaultTitle =(self: { id: string }, { language }: HydrateContext): string => mintedName(self.id, language);
 
 export const TITLE_FIELD = {
   parser: text,

@@ -219,7 +219,13 @@ export function sheetOf(status: Standing, asked: number | null, showing: Showing
   return { plane, planes: planesFrom(places, showing === 'every' ? undefined : standing), here, grid: status.mapGrid, nodes, roads: [...roads.values()], ways, regions: regionsOn(status.regions, places, [...status.discovered, ...status.undiscovered], plane, nodes, regionShape(status.settings ?? [])) };
 }
 
-export const COMPASS: readonly (Bearing | null)[] = ['north-west', 'north', 'north-east', 'west', null, 'east', 'south-west', 'south', 'south-east'];
+const screenRun = (axis: 0 | 1, first: Direction): readonly number[] => [DIRECTION_VECTORS[first][axis], 0, -DIRECTION_VECTORS[first][axis]];
+
+const TOP_TO_BOTTOM = screenRun(1, 'north');
+
+const LEFT_TO_RIGHT = screenRun(0, 'west');
+
+export const COMPASS: readonly (Bearing | null)[] = TOP_TO_BOTTOM.flatMap((y) => LEFT_TO_RIGHT.map((x) => bearingOf({ x: 0, y: 0, z: 0 }, { x, y, z: 0 })));
 
 export interface Compass {
   cells: (Way | null)[];

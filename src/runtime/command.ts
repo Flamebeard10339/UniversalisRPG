@@ -230,9 +230,12 @@ export interface CommandSpec<K extends ArgKind = ArgKind> {
   readonly summary: string;
   readonly audience: CommandAudience;
   readonly edits: boolean;
+  readonly typedAs?: string;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }
+
+export const typedFor = (spec: CommandSpec, directive: string): string => (spec.match === 'directive' ? directive : (spec.typedAs ?? spec.name));
 
 function define<K extends ArgKind>(spec: {
   name: string;
@@ -243,6 +246,7 @@ function define<K extends ArgKind>(spec: {
   summary: string;
   audience?: CommandAudience;
   edits?: boolean;
+  typedAs?: string;
   parse(rest: string, ctx: CommandContext): ArgTypes[K] | CommandProblem;
   run(ctx: CommandContext, arg: ArgTypes[K]): CommandResult;
 }): CommandSpec {
@@ -944,6 +948,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '<N>',
     match: 'choice',
+    typedAs: '1',
     arg: 'choice',
     summary: 'choose option N',
     parse: (rest, ctx) => {
@@ -955,6 +960,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   define({
     name: '<enter>',
     match: 'blank',
+    typedAs: '',
     arg: 'none',
     summary: 'list the current choices',
     parse: nothing,

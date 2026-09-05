@@ -1,6 +1,7 @@
 import { Span } from '../grammar/parser';
 import { splitSections } from '../grammar/structure';
 import { declaredKey } from './resolve';
+import { HEADING_KIND } from './sections/info';
 import type { ModuleSource } from './universe';
 
 export interface WrittenSection {
@@ -21,7 +22,6 @@ export function writtenSections(source: string): WrittenSection[] {
   }));
 }
 
-export const HEADING_KIND = 'info';
 
 export interface AddressedSection {
   kind: string;

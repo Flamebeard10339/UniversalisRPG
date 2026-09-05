@@ -31,6 +31,7 @@ import {
   parseLine,
   runCommand,
   runLine,
+  typedFor,
   NOT_LOADED,
   UNAVAILABLE,
   type AuthoringContext,
@@ -1938,9 +1939,18 @@ describe('a command says whose words it answered in (c4)', () => {
     expect(spoken(answered, 'tool')).toEqual(['no modal is open to answer: verb']);
   });
 
+  it('says what a player types for every entry in the table, so no driver test is left guessing at a symbol', () => {
+    const typed = COMMANDS.map((spec) => ({ name: spec.name, line: typedFor(spec, 'use: entity.camp.chest.open') }));
+
+    expect(typed.filter((each) => /[<>]/.test(each.line)).map((each) => each.name)).toEqual([]);
+    expect(typed.filter((each) => /[<>]/.test(each.name)).length).toBeGreaterThan(0);
+  });
+
   it('moves every player message with the language and no authoring message, over the whole table', () => {
-    const shaped: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.camp.chest.open' };
-    const script = COMMANDS.flatMap((spec) => [shaped[spec.name] ?? spec.name, `${shaped[spec.name] ?? spec.name} 1`]);
+    const script = COMMANDS.flatMap((spec) => {
+      const bare = typedFor(spec, 'use: entity.camp.chest.open');
+      return [bare, `${bare} 1`];
+    });
     const sweep = (registry: Registry, language: string) => {
       const ctx = playing(registry, language);
       return script.flatMap((line) => messages(runLine(ctx, line)).map((out) => ({ line, words: out.words, text: out.text })));
