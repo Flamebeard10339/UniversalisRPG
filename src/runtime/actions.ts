@@ -1,6 +1,6 @@
 import { RuntimeError } from './error';
 import { ActionResult, everyResult, itemCost } from '../grammar/actionResult';
-import { actionResultLists } from '../grammar/action';
+import { actionResultLists, bodyResults } from '../grammar/action';
 import { evaluateCondition } from './conditions';
 import { Action } from '../content/sections/entity';
 import { actionAddress } from '../content/sections/action';
@@ -69,7 +69,7 @@ export interface InputLimit {
 }
 
 export function inputLimit(action: Action, state: GameState): InputLimit {
-  return costLimit(itemCost(action.results), state);
+  return costLimit(itemCost(bodyResults(action)), state);
 }
 
 export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): InputLimit {
@@ -87,7 +87,7 @@ export function costLimit(cost: ReadonlyMap<string, number>, state: GameState): 
 }
 
 export function outcomeResults(action: Action, outcome: FightOutcome): ActionResult[] {
-  return outcome === 'completion' ? [...action.results, ...(action.onSuccess ?? [])] : (action.onAttemptsExhausted ?? []);
+  return outcome === 'completion' ? [...bodyResults(action), ...(action.onSuccess ?? [])] : (action.onAttemptsExhausted ?? []);
 }
 
 export function stopsOnOutcome(action: Action, outcome: FightOutcome): boolean {

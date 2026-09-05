@@ -125,23 +125,17 @@ if has marsh-thistle and has fen-root and not has adders-tongue or has marsh-thi
 
 # entity tulsa.herb-patch
 pick thistle:
-  time: 4
-  if not has marsh-thistle:
-    roll: herb-find
-  give: 1 marsh-thistle
-  say: You take the head off a marsh thistle.
+  +before:
+    if not has marsh-thistle:
+      roll: herb-find
 pull root:
-  time: 6
-  if not has fen-root:
-    roll: herb-find
-  give: 1 fen-root
-  say: The root comes out of the mud with a sound you would rather not have heard.
+  +before:
+    if not has fen-root:
+      roll: herb-find
 take the leaf:
-  time: 12
-  if not has adders-tongue:
-    roll: herb-find
-  give: 1 adders-tongue
-  say: One split leaf, taken whole.
+  +before:
+    if not has adders-tongue:
+      roll: herb-find
 
 # entity rat-toad
 title: Rat-Toad

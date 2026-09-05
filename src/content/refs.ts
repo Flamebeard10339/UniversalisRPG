@@ -1,7 +1,7 @@
 import { A_LITERAL_BRACE, fragment, OPENS_A_FRAGMENT, printSegments, type TextSegment } from '../grammar/segment';
 import { noteIn, withoutNote } from '../grammar/note';
 import { parseWhole } from '../grammar/parser';
-import { Action, Sided } from '../grammar/action';
+import { Action, actionResultLists, Sided } from '../grammar/action';
 import { ActionResult, EVERYTHING, nestedResults, STARTING_LOCATION } from '../grammar/actionResult';
 import { Condition, isEngineRoot, Reference, rootedKind, VISITS, visitedNode } from '../grammar/condition';
 import { DslError } from '../grammar/parser';
@@ -275,7 +275,7 @@ export function visitAction(action: Action, where: string, visit: Visit): void {
   strings(action as unknown as Loose, 'stopsOn', 'event', `${where} stops on:`, visit);
   condition(action.requires, `${where} requires:`, visit);
   condition(action.hiddenIf, `${where} hidden if:`, visit);
-  for (const group of [action.results, action.onSuccess, action.onRefused, action.onAttemptsExhausted]) results(group, where, visit);
+  for (const group of actionResultLists(action)) results(group, where, visit);
 }
 
 export function actions(list: unknown, where: string, visit: Visit): void {

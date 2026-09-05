@@ -29,6 +29,8 @@ export interface Action {
   hiddenIf?: Condition;
   tags?: TagClause[];
   results: ActionResult[];
+  before?: ActionResult[];
+  after?: ActionResult[];
   onSuccess?: ActionResult[];
   onRefused?: ActionResult[];
   onAttemptsExhausted?: ActionResult[];
@@ -175,6 +177,26 @@ const ACTION_FIELDS: readonly (Filled & {
     family: 'offered when',
     appends: true,
     note: `the action is not offered at all while this holds, rather than offered and refused. ${WHILE_IT_RUNS}`,
+  },
+  {
+    written: 'before',
+    label: /before:[ \t]*/,
+    name: 'before',
+    parser: results,
+    family: 'and what a second body adds',
+    appends: true,
+    block: true,
+    note: 'runs ahead of the results the action already holds. A bare result line written in a second body stands in place of what is there rather than adding to it, so this is how another module adds a step — and the only way to add one that has to run before what is there, as a line reading `not has <item>` must run before the `give:` that answers it',
+  },
+  {
+    written: 'after',
+    label: /after:[ \t]*/,
+    name: 'after',
+    parser: results,
+    family: 'and what a second body adds',
+    appends: true,
+    block: true,
+    note: 'runs behind the results the action already holds and still inside the body, so `on success:` follows it — the same as `before:` for a step that reads what the body has already done',
   },
   {
     written: 'on success',
@@ -476,6 +498,8 @@ export function actionLines(action: Action): string[] {
 }
 
 const blockLists = (action: Action): (ActionResult[] | undefined)[] => ACTION_FIELDS.filter((field) => field.block).map((field) => heldBy(action, field.name) as ActionResult[] | undefined);
+
+export const bodyResults = (action: Action): ActionResult[] => [...(action.before ?? []), ...action.results, ...(action.after ?? [])];
 
 export const actionResultLists = (action: Action): ActionResult[][] => [action.results, ...blockLists(action)].filter((list): list is ActionResult[] => list !== undefined);
 
