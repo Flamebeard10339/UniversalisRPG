@@ -6,6 +6,32 @@ what is below is what that plan does not already say to do next.
 
 ---
 
+## Nothing asks what every room pays, so the room table is swept by hand
+
+`simulate-activity --at <location>` reads one room; with no `--at` the sweep stands where the
+save left the player. So comparing rooms means one call per room, and the room table the
+handovers keep referring to was built that way and goes stale whenever balance moves.
+
+**Measured on a live run 2026-09-04**, which is what makes this a line rather than a hunch: the
+combat-floor run spent nine of its first thirty-six calls on `--at` one room at a time —
+pasture, tunnels, proving-ground, apiary-field, and back round again — because there was no way
+to ask the question once. It is the single largest use of its turns, and it is a question the
+tool could answer in one pass.
+
+The author also asked for a tool printing every location with what stands in it and each body's
+tier and profile. The same run says that one is worth less: it read `combat.dsl` and `tulsa.dsl`
+whole and had all of it, and one of its dozen greps was about enemies at all. Worth folding into
+the sweep as columns rather than building beside it — a room, what stands in it and at what
+tier, and what an hour there pays, is one table and answers both.
+
+Not trivial: a room takes seconds, so a world takes minutes, and what to print is most of the
+work. `npm run floors` and `ladder-check` both already take `--world`, so the seam is the same
+one.
+
+*Closes when:* one command prints every room a player can fight in, what stands there, and what
+an hour of it pays, and the handovers stop saying the room table was re-read by hand.
+
+
 ## Three `replenish:` lines still read as whole-shelf times, and mean per-unit ones
 
 `c049e157` made `replenish:` the time **one unit** of stock takes to come back, and all five
