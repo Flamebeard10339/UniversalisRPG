@@ -7,7 +7,9 @@ import { itemInstance, itemLevel, itemTemplate } from './itemInstance';
 import { pointsSpent } from './clusterPlane';
 import { wearable } from './equipment';
 
-const TIER = /^(?:.+\.)?(.+)-tier-(\d+)(?:-[a-z]+)?$/;
+const TIER = /^(?:.+\.)?(.+)-tier-(\d+)$/;
+
+export const tierSaveId = (activity: string, level: number): string => `${activity}-tier-${String(level)}`;
 
 export interface TierSave {
   id: string;

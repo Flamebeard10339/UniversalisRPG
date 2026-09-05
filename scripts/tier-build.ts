@@ -10,6 +10,7 @@ import { equip } from '../src/runtime/equipment';
 import { allocate, itemInstance, itemTemplate, pointsRemaining, receiveItem, slotJewel, type ItemInstance } from '../src/runtime/itemInstance';
 import { initialState, serializeSave } from '../src/runtime/save';
 import { statValue } from '../src/runtime/stats';
+import { tierSaveId } from '../src/runtime/tierSaves';
 import type { GameState } from '../src/runtime/state';
 import { activitiesIn, poolForTier, type Activity } from './lib/tiers';
 
@@ -307,7 +308,7 @@ export function tierLines(registry: Registry, args: TierArgs): { lines: string[]
   const refused = built.worn.filter((each) => each.refused !== undefined);
   return {
     lines: [
-      `# save ${activity.id}-tier-${String(args.level)}`,
+      `# save ${tierSaveId(activity.id, args.level)}`,
       built.save,
       '',
       `${activity.id} at level ${String(args.level)}: ${String(poolForTier(activity, args.level))} experience across ${activity.skills.join(' and ')}`,
