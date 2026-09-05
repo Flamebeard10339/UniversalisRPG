@@ -82,7 +82,6 @@ stat: fishing
 
 # action cast
 title: Fish
-requires: has fishing-rod and has dried-fish-bait or has fishing-rod and has wrigglers or has greenheart-rod and has dried-fish-bait or has greenheart-rod and has wrigglers or has rod-and-winch and has dried-fish-bait or has rod-and-winch and has wrigglers
 continuous
 attempts: 1
 rate: us.fishing-rate
@@ -90,6 +89,27 @@ accuracy: us.fishing vs them.depth
 rewards scaled by: haul
 on attempts exhausted:
   drain: 1 line-health
+
+# action net-cast
+extends: cast
+requires: has small-fishing-net or has large-fishing-net
+
+# action rod-cast
+extends: cast
+requires: has fishing-rod or has greenheart-rod or has rod-and-winch
+rate: us.rod-cast-rate
+
+# action bait-cast
+extends: rod-cast
++requires: has dried-fish-bait or has wrigglers
+
+# action paste-cast
+extends: rod-cast
++requires: has bread-paste
+
+# action herring-cast
+extends: rod-cast
++requires: has herring-strip
 
 # item small-fishing-net
 title: Small Fishing Net
@@ -366,9 +386,8 @@ value: 70
 title: Shrimp Shoal
 examine: A dark shifting patch a foot under, moving the way one thing moves.
 stats: depth 0
-uses: cast
-cast:
-  requires: has small-fishing-net or has large-fishing-net
+uses: net-cast
+net-cast:
   give: 1 raw-shrimp
   xp: fishing 3
   +on attempts exhausted:
@@ -378,9 +397,8 @@ cast:
 title: Anchovy Shoal
 examine: A shoal turning over on itself, all of it silver on one beat and gone on the next.
 stats: depth 14
-uses: cast
-cast:
-  requires: has small-fishing-net or has large-fishing-net
+uses: net-cast
+net-cast:
   give: 1 raw-anchovies
   xp: fishing 4
   +on attempts exhausted:
@@ -390,9 +408,8 @@ cast:
 title: Trout Run
 examine: Fast water over stones, and every so often something turns in it.
 stats: depth 28
-uses: cast
-cast:
-  rate: us.rod-cast-rate
+uses: bait-cast
+bait-cast:
   roll: spend-bait
   give: 1 raw-trout
   xp: fishing 9
@@ -408,9 +425,8 @@ title: Salmon Pool
 examine: Slow black water under the far bank, deep enough that you cannot see the bottom of it in summer.
 hidden if: not stat.river-clear >= 1
 stats: depth 49
-uses: cast
-cast:
-  rate: us.rod-cast-rate
+uses: bait-cast
+bait-cast:
   roll: spend-bait
   give: 1 raw-salmon
   xp: fishing 11
@@ -425,9 +441,8 @@ title: Salmon Pool
 examine: Slow black water under the far bank. The castle's water, and the castle is watching it today.
 hidden if: stat.river-clear >= 1
 stats: depth 102
-uses: cast
-cast:
-  rate: us.rod-cast-rate
+uses: bait-cast
+bait-cast:
   roll: spend-bait
   give: 1 raw-salmon
   xp: fishing 11
@@ -440,10 +455,9 @@ cast:
 title: Pike Reach
 examine: A straight of dark water under the willows where nothing smaller than your forearm is showing itself.
 stats: depth 70
-uses: cast
-cast:
+uses: bait-cast
+bait-cast:
   hidden if: level.fishing < 11
-  rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-pike
   xp: fishing 16
@@ -458,10 +472,9 @@ cast:
 title: Sturgeon Hole
 examine: Where the bed drops away and the water goes the colour of slate. Something down there is older than the town.
 stats: depth 105
-uses: cast
-cast:
+uses: bait-cast
+bait-cast:
   hidden if: level.fishing < 16
-  rate: us.rod-cast-rate
   roll: spend-bait
   give: 1 raw-sturgeon
   xp: fishing 17
@@ -533,11 +546,9 @@ one of:
 title: Tench Hole
 examine: Slack water under the reeds, and a patch of fine bubbles working up through it that were not there a moment ago.
 stats: depth 147
-uses: cast
-cast:
+uses: paste-cast
+paste-cast:
   hidden if: level.fishing < 22
-  requires: has fishing-rod and has bread-paste or has greenheart-rod and has bread-paste or has rod-and-winch and has bread-paste
-  rate: 4
   roll: spend-bread-paste
   give: 1 raw-tench
   xp: fishing 21
@@ -550,10 +561,9 @@ cast:
 title: Perch Shoal
 examine: Striped fish holding tight to a line of old posts, spined down the back and in no hurry to move off them.
 stats: depth 161
-uses: cast
-cast:
+uses: bait-cast
+bait-cast:
   hidden if: level.fishing < 24
-  rate: 4
   roll: spend-bait
   give: 1 raw-perch
   xp: fishing 22
@@ -565,10 +575,9 @@ cast:
 title: Carp Hole
 examine: A deep slow bend of the mere where the water goes brown-green and nothing about the bottom of it is visible.
 stats: depth 175
-uses: cast
-cast:
+uses: paste-cast
+paste-cast:
   hidden if: level.fishing < 26
-  requires: has fishing-rod and has bread-paste or has greenheart-rod and has bread-paste or has rod-and-winch and has bread-paste
   rate: 2
   roll: spend-bread-paste
   give: 1 raw-carp
@@ -585,9 +594,9 @@ title: Something in the Sturgeon Hole
 examine: A shape at the edge of where the light gives out, longer than anything that has ever come up out of this water before, and it has not moved since you first saw it.
 hidden if: not level.fishing >= 30 or old-slate-landed
 stats: depth 203
-uses: cast
-cast:
-  requires: not old-slate-landed and has fishing-rod and has herring-strip and has dressed-silk-line or not old-slate-landed and has greenheart-rod and has herring-strip and has dressed-silk-line or not old-slate-landed and has rod-and-winch and has herring-strip and has dressed-silk-line
+uses: herring-cast
+herring-cast:
+  +requires: not old-slate-landed and has dressed-silk-line
   roll: spend-herring-strip
   set: old-slate-landed
   give: 1 old-slate-head
@@ -1467,9 +1476,9 @@ load: rodded-up-at-the-deep-water
 equip: 1
 equip: dried-fish-bait
 equip: 2
-use: entity.trout-run.cast until has raw-trout
+use: entity.trout-run.bait-cast until has raw-trout
 assert: has raw-trout
-use: entity.salmon-pool-poaching.cast until has raw-salmon
+use: entity.salmon-pool-poaching.bait-cast until has raw-salmon
 assert: has raw-salmon
 
 # test the-tackle-stall-is-where-the-herring-is
@@ -1513,16 +1522,16 @@ equip: 4
 equip: 5
 equip: bread-paste
 use: core.melee-combat on combat.bog-lurker until done
-use: entity.tench-hole.cast until has raw-tench
+use: entity.tench-hole.paste-cast until has raw-tench
 assert: has raw-tench
 goto: the-mere
-use: entity.perch-shoal.cast until has raw-perch
+use: entity.perch-shoal.bait-cast until has raw-perch
 assert: has raw-perch
-use: entity.carp-hole.cast until has raw-carp
+use: entity.carp-hole.paste-cast until has raw-carp
 assert: has raw-carp
 goto: tulsa.the-narrows
 equip: herring-strip
-use: entity.old-slate.cast until old-slate-landed
+use: entity.old-slate.herring-cast until old-slate-landed
 assert: old-slate-landed
 assert: has old-slate-head
 assert: has the-priest-jewel
@@ -1534,9 +1543,9 @@ equip: 1
 equip: 2
 equip: herring-strip
 goto: tulsa.the-narrows
-use: entity.old-slate.cast until old-slate-landed
+use: entity.old-slate.herring-cast until old-slate-landed
 assert: old-slate-landed
-use: entity.old-slate.cast
+use: entity.old-slate.herring-cast
 refused
 
 # save at-the-mire-with-a-shrimp-net
@@ -1566,7 +1575,7 @@ load: rodded-up-at-the-deep-water
 equip: 1
 equip: dried-fish-bait
 equip: 2
-use: entity.salmon-pool-poaching.cast
+use: entity.salmon-pool-poaching.bait-cast
 assert: marle-catches >= 1
 
 # save rodded-up-at-the-deep-water-with-coin
@@ -1581,7 +1590,7 @@ assert: not stat.river-clear >= 1
 talk: marle
 choose: Sell me a day on the water.
 assert: stat.river-clear >= 1
-use: entity.salmon-pool.cast until has raw-salmon
+use: entity.salmon-pool.bait-cast until has raw-salmon
 assert: has raw-salmon
 
 # save at-the-narrows-with-a-spare-net
@@ -1610,7 +1619,7 @@ goto: tulsa.the-narrows
 equip: 1
 equip: dried-fish-bait
 equip: 2
-use: entity.pike-reach.cast until has raw-pike
+use: entity.pike-reach.bait-cast until has raw-pike
 assert: has raw-pike
 goto: tulsa.riverside
 talk: weigh-master

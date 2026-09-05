@@ -243,7 +243,7 @@ assert: not has 2 fishing.small-fishing-net
 equip: 1
 assert: stat.max-line-health >= 1
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
+use: entity.fishing.shrimp-shoal.net-cast until highest-level >= 2
 assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki
@@ -304,7 +304,7 @@ choose: continue
 assert: has fishing.small-fishing-net
 equip: 1
 use: entity.back-door.step-out-back
-use: entity.fishing.shrimp-shoal.cast until highest-level >= 2
+use: entity.fishing.shrimp-shoal.net-cast until highest-level >= 2
 assert: highest-level >= 2
 use: entity.back-door-in.step-inside
 talk: first-steps.miki

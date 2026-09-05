@@ -16,8 +16,8 @@ value: 4
 title: The Blowfish Hole
 examine: A slack backwater off the main current, and whatever lives in it does not have to swim fast to eat.
 stats: depth 86
-uses: fishing.cast
-cast:
+uses: fishing.bait-cast
+bait-cast:
   rate: 15
   roll: spend-bait
   one of:
@@ -159,7 +159,7 @@ travel: tavern-street
 travel: market-square
 travel: riverside
 travel: deep-water
-use: entity.blowfish-hole.cast until inventory.raw-blowfish >= 3
+use: entity.blowfish-hole.bait-cast until inventory.raw-blowfish >= 3
 assert: has 3 raw-blowfish
 travel: riverside
 travel: market-square
