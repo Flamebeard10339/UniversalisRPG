@@ -1,5 +1,5 @@
 import { repoPath, splitFiles } from './lib/repo';
-import { sourceFiles } from './lib/dslSources';import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { sourceFiles, sourceName } from './lib/dslSources';import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -85,10 +85,6 @@ export function parseArgs(raw: string[]): Args {
   }
 
   return args;
-}
-
-function sourceName(file: string): string {
-  return path.basename(file).replace(/\.[^.]*$/, '');
 }
 
 function source(file: string): ModuleSource {

@@ -7,6 +7,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { covers } from './lib/layers';
 import { occurrencesOf } from './lib/idForms';
 import { posix, trackedFiles } from './lib/sourceFiles';
+import { sourceName } from './lib/dslSources';
 
 export { occurrencesOf };
 
@@ -27,9 +28,7 @@ export interface RenameReport {
   moved: { from: string; to: string } | null;
 }
 
-const stemOf = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
-
-export const sourceOf = (file: TextFile): ModuleSource => ({ name: stemOf(file.path), text: file.text });
+export const sourceOf = (file: TextFile): ModuleSource => ({ name: sourceName(file.path), text: file.text });
 
 export const corpusOf = (files: readonly TextFile[], root: string = CORPUS): TextFile[] => files.filter((file) => covers(root, file.path) && file.path.endsWith(MODULE_EXTENSION));
 
@@ -61,7 +60,7 @@ export function rename(files: readonly TextFile[], from: string, to: string): Re
   }
 
   const held = corpus[sources.indexOf(named.source)]!;
-  const moved = stemOf(held.path) === from ? { from: held.path, to: posix(path.join(path.dirname(held.path), `${to}${path.extname(held.path)}`)) } : null;
+  const moved = sourceName(held.path) === from ? { from: held.path, to: posix(path.join(path.dirname(held.path), `${to}${path.extname(held.path)}`)) } : null;
   if (moved !== null && files.some((file) => file.path === moved.to)) {
     return refused([`${moved.to} already exists, so the module's own file has nowhere to go.`]);
   }

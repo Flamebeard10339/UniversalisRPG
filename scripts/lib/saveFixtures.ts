@@ -1,5 +1,5 @@
-import { globSync, readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { sourceFiles, sourceName } from './dslSources';
 import { qualify } from '../../src/content/namespace';
 import { everyDirective } from '../../src/content/sections/test';
 import { formatModuleDiagnostic, type Registry } from '../../src/content/registry';
@@ -47,13 +47,10 @@ export interface Judged {
 
 export type Classification = 'recording' | 'input' | 'unreferenced';
 
-export const moduleSourceOf = (file: ContentFile): ModuleSource => ({ name: path.basename(file.path).replace(/\.[^.]*$/, ''), text: file.text });
+export const moduleSourceOf = (file: ContentFile): ModuleSource => ({ name: sourceName(file.path), text: file.text });
 
 export function readContent(directory: string): ContentFile[] {
-  return globSync('**/*.dsl', { cwd: directory })
-    .map((relative) => path.join(directory, relative).replace(/\\/g, '/'))
-    .sort()
-    .map((file) => ({ path: file, text: readFileSync(file, 'utf8') }));
+  return sourceFiles(directory).map((file) => ({ path: file.replace(/\\/g, '/'), text: readFileSync(file, 'utf8') }));
 }
 
 export function writeFiles(files: readonly ContentFile[]): void {

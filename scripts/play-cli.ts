@@ -1,5 +1,5 @@
 import { repoPath } from './lib/repo';
-import { sourceFiles } from './lib/dslSources';import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { sourceFiles, sourceName } from './lib/dslSources';import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
@@ -253,10 +253,6 @@ function parseCliArgs(rawArgs: string[]): CliArgs {
     process.exit(1);
   }
   return { files: splitContentArg(positional[0]), liveRequested, localFile, modportalDir, savesDir };
-}
-
-function sourceName(file: string): string {
-  return path.basename(file).replace(/\.[^.]*$/, '');
 }
 
 function loadContent(files: string[]): ModuleSource[] {

@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import path from 'node:path';
 import type { Change, Heading, RenameHistory } from './renameHistory';
+import { sourceName } from './dslSources';
 
 const MARK = String.fromCharCode(1);
 
@@ -12,7 +12,7 @@ const TITLE = /^(?<sign>[-+])title:[ \t]*(?<title>.*)$/;
 
 const DEPTH = 40;
 
-const qualified = (file: string, id: string): string => (id.includes('.') ? id : `${path.basename(file).replace(/\.dsl$/, '')}.${id}`);
+const qualified = (file: string, id: string): string => (id.includes('.') ? id : `${sourceName(file)}.${id}`);
 
 interface Carried {
   heading: Heading;

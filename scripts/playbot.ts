@@ -1,6 +1,6 @@
 import { repoRoot } from './lib/repo';
 export { repoRoot } from './lib/repo';
-import { sourceFiles } from './lib/dslSources';import { mkdtempSync, readFileSync } from 'node:fs';
+import { sourceFiles, sourceName } from './lib/dslSources';import { mkdtempSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -525,7 +525,7 @@ export function fileContentReader(sources: readonly string[]): ContentReader {
       sources
         .flatMap((source) => sourceFiles(path.resolve(repoRoot, source)))
         .map((file) => ({
-          name: path.basename(file).replace(/\.[^.]*$/, ''),
+          name: sourceName(file),
           text: readFileSync(file, 'utf8'),
         })),
     );

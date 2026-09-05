@@ -781,37 +781,6 @@ would be shape 6 — a guess made more accurate.
 *Closes when:* `renamedStats` and the entity branch beside it are gone and the kind's own
 declaration carries it.
 
-## Turning a file name into a module id is written out eleven times
-
-`path.basename(file).replace(/\.[^.]*$/, '')` — "the module id is the file name without its
-extension" — stands in `consolidate.ts:278`, `floors.ts:68`, `lib/saveFixtures.ts:50`,
-`modportal.ts`, `oracle.ts`, `play-cli.ts`, `playbot.ts`, `probe.ts`,
-`publish-local-changes.ts`, `rename-module.ts` and `squash-local-changes.ts`. Two more are the
-same fact spelled differently: `lib/gitHistory.ts` strips `.dsl` by name, and `oracle.ts` goes
-on to slugify because a draft's file name may hold anything.
-
-Shape 3. `scripts/lib/repo.ts` already exists as the home for this sort of thing after today's
-pass; `sourceName(file)` belongs beside `repoRoot` and `splitFiles`, with the slugifying variant
-declared once beside it rather than inline in the oracle.
-
-*Closes when:* one exported `sourceName` is what every script calls, and the two variants are
-named rather than repeated.
-
-## Two modules disagree about what a world directory holds
-
-`sourceFiles` (`scripts/lib/sourceFiles.ts:4-7`) reads a directory with `readdirSync` and takes
-the `.dsl` files **in it**. `readContent` (`scripts/lib/saveFixtures.ts:52-57`) reads the same
-kind of directory with `globSync('**/*.dsl')` and takes them **recursively**.
-
-So "what a world is, given a folder" has two answers, and a world with a subfolder is a
-different world depending on which tool opened it. Nothing today ships a nested corpus, which
-is why nothing has noticed; `--world <dir>` on any tool is where it would first bite.
-
-Shape 3, and the variety that costs most — two modules answering one question, both believed.
-
-*Closes when:* one function answers what `.dsl` files a directory offers, and both callers use
-it — with a decision recorded about whether a world may nest.
-
 ## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
 
 `{ '<N>': '1', '<enter>': '', '<directive>': … }` — what to type where a command spec's name is
