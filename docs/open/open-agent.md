@@ -406,3 +406,51 @@ cannot read `runtime`.
 *Closes when:* one declaration answers whether a figure churns, `pinned` can tell a claim about
 zero from a balance that landed on zero, and `first-steps`'s mirror pair is either covered by it
 or moved to the fixture.
+
+## An action asks for named items, so what a thing *is* cannot be required
+
+Ruled 2026-09-05: **an action should be able to require an arbitrary series of tags, satisfied
+across whatever the player has.** One item tagged both `rod` and `bait` satisfies a `rod`+`bait`
+requirement; so do two items carrying one each; so does a passive sitting on the character that
+supplies bait forever.
+
+`<condition>` today reads `has <item>`, `inventory.<item>`, a flag, a quest stage and the engine
+roots. Every one of those names a *thing*, never a kind of thing. So an action that wants "any
+rod" writes the rods out, and one that wants "any rod and any bait" writes the cross product:
+`# action cast` carried all six pairings of three rods against two baits until 2026-09-05, and
+three waters wrote the pairing again for their own bait.
+
+That was closed by `extends:` — `# action rod-cast` holds the rod set and each bait is a child
+adding `+requires:` — which groups correctly and is a real improvement, but it still enumerates
+the rods, and a fourth rod is still an edit to a list. `tackle` is already a tag every rod and
+net carries (`npm run oracle -- item` calls a tag *a word of your own, carried and never read*),
+so the world already says what these things are; nothing can ask.
+
+The same gap is what `docs/fishing-expansion/open-agent.md` records under the blowfish hole
+drifting out of the rod set, and what makes `# station` unable to say an anvil needs a hammer —
+see the line below.
+
+*Closes when:* a condition can name a tag rather than an item, satisfied by any combination of
+what the player carries and what their passives supply; `# action rod-cast` requires `rod` and
+`bait-cast` requires `bait`; and adding a rod is declaring one.
+
+## A station cannot say what it is worked with, so 49 recipes each carry the tool
+
+Ruled 2026-09-05: **a `# station` declares the tools it needs, as tags** — see the line above —
+**and if that generalizes, an action inherits a recipe class and the required tools fall out of
+it. Failing that, one shared tag checker.**
+
+`npm run oracle -- station` prints, in full, *nothing but the heading, which is what declares the
+name*. A station is a bare id, so every fact about working at one is filed on the recipes
+instead. Seventeen anvil recipes write `1 hammer` in their `in:` and again in their `out:` — 34
+lines saying the tool is kept, and an eighteenth that forgets the `out:` half silently eats the
+player's hammer with nothing to catch it. Fifteen stove and oven recipes each write `burnt:`,
+`accuracy: cooking.cooking` and `rate: core.cooking-rate` — 45 lines, no exceptions among them.
+
+Both are one fact about the station, filed once per recipe that stands at it. The tool half wants
+the tag condition above; the cooking half wants the station to carry defaults a recipe may
+override.
+
+*Closes when:* `# station` takes a body declaring the tags it is worked with and the defaults its
+recipes inherit, the 34 hammer lines and the 45 cooking lines are gone, and a recipe that wants
+tongs rather than a hammer says so.

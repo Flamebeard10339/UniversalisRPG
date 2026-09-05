@@ -108,3 +108,34 @@ fishing drops.
 *Closes when: the level-30 orb the thieving pass is also waiting on is readable, and fishing's
 top rung is sized against the residual rather than guessed — the same line `docs/balance` holds
 for thieving, and neither closes without it.*
+
+## Every piece of fishing speed gear in the world reaches two waters out of eleven
+
+Ruled 2026-09-05: **the carp hole is buffable, and ideally every fishing action is improved by
+`fishing-rate`. A harder water may declare a higher default, the way a guard, a knight and a
+civilian each daze for their own duration.**
+
+What is there today does not do that, and the gap is a live bug rather than untidiness.
+`# stat fishing-rate` (`content/fishing.dsl:31`, base 6) is what every piece of fishing gear
+feeds: `hobnailed-river-boots` (+2), and the five passives of the fishing tree — `quick-cast`
+(+1), `practised-throw` (+2), `fast-hands` (+12%), `full-wind` (+5), `clean-turn` (+20%). It is
+read by exactly two waters, the shrimp and anchovy shoals, because those are the two that cast
+with a net. The other nine read `rod-cast-rate` (base 4), which nothing but `the-rise` feeds, or
+a literal — carp 2, blowfish 15.
+
+So a fisher who takes the whole passive tree and the boots casts faster at the two lowest waters
+in the game and at no other. `# item rod-and-winch` is the sharpest instance: it carries
+`-15% fishing-rate` as the price of its `+130 max-line-health`, and that penalty reaches nothing
+at all — it is a rod, rods are mainhand, and holding it makes the two net waters unavailable.
+
+**The shape the ruling asks for is not expressible today, which is the thing to settle first.**
+`npm run oracle -- stat` gives a stat a `base:`, an `at most:` and a rounding, and no way to
+derive one stat from another. A per-water rate stat therefore either sits on the player — where
+gear can reach it, but every future item has to name every water's stat — or on the water, where
+gear cannot reach it at all. Collapsing every water onto `us.fishing-rate` reaches the gear and
+throws away the authored difference between a net, a rod, the deep slow carp bend and the
+blowfish hole.
+
+*Closes when:* a stat can be declared as another stat scaled or offset — so `carp-cast-rate` is
+`fishing-rate` at a third and the boots and the passives reach it — and every water names one,
+including the two that name a literal today.
