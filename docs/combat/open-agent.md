@@ -146,21 +146,6 @@ So the answer is **deletion, not relocation**. Where survival is genuinely the q
 `a-feral-rat-picks-the-fight-itself` is deleted or given a claim its neighbour does not
 already make.
 
-## Five resistance caps are one fact in five bodies
-
-`physical/fire/cold/lightning/chaos-resistance-cap` in `combat.dsl` are byte-identical —
-`base: 75`, `group: core.combat`, `hidden if: always`, `at most: 90` — and nothing anywhere
-moves one without the others. Move the world's cap to 80 and miss one and fire stops at 75
-while everything else stops at 80, with no test, no remark and no round-trip failure.
-
-`at most: <stat>` already reads another stat off the same carrier and one shared cap makes no
-ring, so this needs no engine change: one `# stat resistance-cap`, and every `<type>-resistance`
-says `at most: resistance-cap`. Whether the per-type split is deliberate headroom for a future
-item is the author's call, and that is the only reason it is a line rather than a commit.
-
-*Closes when:* one stat says where resistances stop, or the five are named as deliberately
-independent in the commit that keeps them.
-
 ## The passive ids were not renamed, and were ruled to be
 
 The base run renamed the six jewel items it wrote to `<rarity>-<role>-<skill>` and stopped

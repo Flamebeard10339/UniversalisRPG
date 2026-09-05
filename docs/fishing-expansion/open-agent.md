@@ -139,3 +139,41 @@ blowfish hole.
 *Closes when:* a stat can be declared as another stat scaled or offset — so `carp-cast-rate` is
 `fishing-rate` at a third and the boots and the passives reach it — and every water names one,
 including the two that name a literal today.
+
+## Two of the three bait tables are one table with the item swapped
+
+`# droptable spend-bread-paste` (`content/fishing.dsl:275-279`) and `spend-herring-strip`
+(`:281-285`) are the same four lines with one id changed:
+
+    one of:
+      bait-persistance: nothing
+      100x:
+        take: 1 <the bait>
+
+`spend-bait` (`:265`) is genuinely different — it branches on wrigglers — and should not be
+folded in with them.
+
+Re-weight what a cast costs, or change how `bait-persistance` is read, and one of the two
+follows. A fourth bait is a fourth copy.
+
+A droptable takes no parameter and cannot name the bait it is rolled for, so this does not
+close in the grammar today. It is the smallest instance of the same want as the tag line in
+`docs/open/open-agent.md` — a body that could say *take one of whatever bait this cast used*
+rather than naming it.
+
+*Closes when:* a droptable can be rolled for a named thing, or a cast spends its own bait
+without a table per bait.
+
+## `old-slate` says it has not been landed twice over
+
+`content/fishing.dsl` hides the entity once it is landed — `hidden if: not level.fishing >= 30
+or old-slate-landed` — and the cast then writes `not old-slate-landed` again in its
+`+requires:`.
+
+Both are load-bearing for different moments: the `hidden if:` stops it being offered, and the
+`requires:` is re-read every cycle, which is what stops a cast already under way from landing it
+twice. So this is not simply a copy — but nothing says which is which, and a reader deleting
+either has to work out the distinction from first principles.
+
+*Closes when:* the two are distinguished where they are written, or the engine ends an action
+whose subject has become hidden and the second one goes.

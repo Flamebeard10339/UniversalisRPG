@@ -780,3 +780,113 @@ would be shape 6 — a guess made more accurate.
 
 *Closes when:* `renamedStats` and the entity branch beside it are gone and the kind's own
 declaration carries it.
+
+## Turning a file name into a module id is written out eleven times
+
+`path.basename(file).replace(/\.[^.]*$/, '')` — "the module id is the file name without its
+extension" — stands in `consolidate.ts:278`, `floors.ts:68`, `lib/saveFixtures.ts:50`,
+`modportal.ts`, `oracle.ts`, `play-cli.ts`, `playbot.ts`, `probe.ts`,
+`publish-local-changes.ts`, `rename-module.ts` and `squash-local-changes.ts`. Two more are the
+same fact spelled differently: `lib/gitHistory.ts` strips `.dsl` by name, and `oracle.ts` goes
+on to slugify because a draft's file name may hold anything.
+
+Shape 3. `scripts/lib/repo.ts` already exists as the home for this sort of thing after today's
+pass; `sourceName(file)` belongs beside `repoRoot` and `splitFiles`, with the slugifying variant
+declared once beside it rather than inline in the oracle.
+
+*Closes when:* one exported `sourceName` is what every script calls, and the two variants are
+named rather than repeated.
+
+## Two modules disagree about what a world directory holds
+
+`sourceFiles` (`scripts/lib/sourceFiles.ts:4-7`) reads a directory with `readdirSync` and takes
+the `.dsl` files **in it**. `readContent` (`scripts/lib/saveFixtures.ts:52-57`) reads the same
+kind of directory with `globSync('**/*.dsl')` and takes them **recursively**.
+
+So "what a world is, given a folder" has two answers, and a world with a subfolder is a
+different world depending on which tool opened it. Nothing today ships a nested corpus, which
+is why nothing has noticed; `--world <dir>` on any tool is where it would first bite.
+
+Shape 3, and the variety that costs most — two modules answering one question, both believed.
+
+*Closes when:* one function answers what `.dsl` files a directory offers, and both callers use
+it — with a decision recorded about whether a world may nest.
+
+## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
+
+`{ '<N>': '1', '<enter>': '', '<directive>': … }` — what to type where a command spec's name is
+a symbol — stands at `scripts/drift.test.ts:39`, `scripts/printedWords.test.ts:144`,
+`scripts/play-cli.test.ts:1398` (as `SHAPED_IN_DEV`) and `src/runtime/command.test.ts:1942`.
+The first two are byte-identical; the other two differ only in the directive line, which is
+per-world and genuinely theirs.
+
+The key set is derivable — exactly the `COMMANDS` entries whose `name` is bracketed. The two
+world-independent substitutions are not: they are facts about the spec, and belong on it as a
+declared `typedAs`.
+
+**`npm run mutate` will not discriminate these**, and that is the point: they duplicate a fact,
+not a proof. Rename a symbolic spec and all four maps go stale at once, each test then types
+the literal `<blank>` and quietly stops exercising the command rather than going red. Do not
+delete any of the four tests.
+
+*Closes when:* a `CommandSpec` declares what a player types for it, and each driver test
+supplies only its own directive line.
+
+## Five routes are written twice from the gate to the middle
+
+Long stretches of `# test` routes are typed out again rather than composed, though `run: <test>`
+is in the grammar and `content/first-steps.dsl:200` already uses it:
+
+- `content/the-swampy-menace.dsl:169` and `:239` share 46 of about 52 lines — the whole approach
+  through the castle gate, the strike, and the six-line hand-in. They differ only in the order
+  the three herbs come out, which the module's own droptable is symmetric in.
+- `content/ball-of-a-boy.dsl:138`, `:168`, `:196`, `:223` — the twelve-line sewer descent, four
+  times.
+- `content/first-steps.dsl:195` and `:249` — a twelve-line tail.
+- `content/combat-lessons.dsl:164` and `:188` — a thirteen-line head.
+- `content/kill-it-with-fire.dsl:161` and `:210` — a nine-line head.
+
+Shape 3, in the corpus's own vocabulary. Move a room or rename a place and each of these has to
+be found by hand.
+
+**It is a judgement rather than a defect**, which is why it is a line and not a commit: a route
+read end to end is a route a human can check, and `run:` trades that for one edit site. The
+swampy pair is the one where the trade clearly pays, since the second route exists only to say
+the herb order does not matter.
+
+*Closes when:* the swampy pair shares its approach and its hand-in, and a decision is recorded
+about whether the other four are meant to read whole.
+
+## An action result's facts live in three files
+
+Each kind of `<result>` is declared in `src/grammar/actionResult.ts:347-447` (`LEAVES` — its
+opener, forms, examples and parse), printed in the same file by a second switch
+(`printResultLine`, `:555-628`), and has its reference sites listed a third time in
+`src/content/refs.ts:147-230`. Adding a result kind next month means remembering three places.
+
+Both switches carry a `const unreached: never`, so a *missing case* is a compile error. What is
+unguarded is a case that forgets a **field** — a new result naming a `# droptable` whose entry
+in `refs.ts` omits its `put(...)` line. That reference then goes unvalidated and unpruned, in
+silence.
+
+The shape is the one `sections/<kind>.ts` already solves one level up: give `Leaf` optional
+`print` and `visit` members and move each case body onto its leaf, leaving the two switches as
+loops. It is the largest item in this file — roughly 250 lines relocated — and it crosses a
+layer boundary, since `refs.ts` is content and `actionResult.ts` is grammar, so the visit half
+may have to move down rather than across.
+
+*Closes when:* a result kind is declared in one place, and `printResultLine` and `refs.results`
+are loops over `LEAVES`.
+
+## Small constants still spelled twice
+
+- `HEADING_KIND` (`src/content/sectionSource.ts:24`) names the kind that heads a module, and
+  `src/content/universe.ts:39,53` — the module that actually enforces one-`# info`-per-module —
+  compares against the bare string instead. The constant's home by CLAUDE.md's own rule is
+  `sections/info.ts`, the kind's own file; moving it there avoids the import cycle that pointing
+  `universe.ts` at `sectionSource.ts` would close.
+- `COMPASS` (`src/runtime/map.ts:222`) restates the eight bearing names that `HEADINGS` (`:29-37`)
+  already derives. The membership is duplicated; the 3x3 screen ordering beside it is a genuinely
+  separate fact, so only half of this is worth taking.
+
+*Closes when:* both read the declaration beside them.
