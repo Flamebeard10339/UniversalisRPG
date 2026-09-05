@@ -3,7 +3,7 @@ import { Condition, condition } from '../../grammar/condition';
 import { Cursor, DslError, calledBlock, parseWhole, Written } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import { fragment, parseSegments, printSegments, TextSegment } from '../../grammar/segment';
-import { indentLines, RawLine, takeBlock } from '../../grammar/structure';
+import { indentLines, RawLine, REFERENCE, takeBlock } from '../../grammar/structure';
 import { overlay } from '../merge';
 import { DIALOGUE_NODE } from '../namespace';
 import { section } from './define';
@@ -49,7 +49,7 @@ export interface Dialogue {
 
 export const givenByQuest = (dialogue: Dialogue): boolean => dialogue.fromQuest !== undefined;
 
-const PATH = '[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*';
+const PATH = REFERENCE.source;
 const OWNER = new RegExp(`^owner[ \\t]*=[ \\t]*(?<id>${PATH})$`);
 const NODE = /^node[ \t]+(?<name>[a-z][a-z0-9-]*):$/;
 const WHEN = /^when:[ \t]*(?<cond>.+)$/;

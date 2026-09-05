@@ -1,6 +1,7 @@
 import type { ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { Cursor, DslError } from '../grammar/parser';
+import { REFERENCE } from '../grammar/structure';
 import { formatModuleDiagnostic, type ModuleDiagnostic, type Registry } from '../content/registry';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { type ModuleSource } from '../content/universe';
@@ -1177,7 +1178,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'print a loaded section as its author wrote it, comments and all; any id a view printed will do, an action id reading out the entity, location or item it is written in; with no kind, every section written under that id; with no id, the ids loaded of that kind',
     audience: 'author',
     parse: (rest) => {
-      const match = /^(?:(?<kind>[a-z][a-z0-9-]*)[ \t]+)?(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest.trim())?.groups;
+      const match = new RegExp(`^(?:(?<kind>[a-z][a-z0-9-]*)[ \\t]+)?(?<id>${REFERENCE.source})$`).exec(rest.trim())?.groups;
       if (!match) return { problem: '/source requires <kind>, <id> or <kind> <id>' };
       if (match.kind === undefined && isSectionKind(match.id!)) return { kind: match.id!, id: null };
       return { kind: match.kind ?? null, id: match.id! };
@@ -1194,7 +1195,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     audience: 'author',
     parse: (rest) => {
       const [head = '', ...more] = rest.split('\n');
-      const match = /^(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?(?:[ \t]+(?<body>.*))?$/.exec(head)?.groups;
+      const match = new RegExp(`^(?<kind>[a-z][a-z0-9-]*)(?:[ \\t]+(?<id>${REFERENCE.source}))?(?:[ \\t]+(?<body>.*))?$`).exec(head)?.groups;
       if (!match?.kind || !match.id) return { problem: `/dsl requires <kind> <module>.<id> [body]; it read ${readAs(head, 0)} as the kind and ${readAs(head, 1)} as the id` };
       const homeless = homelessId(match.kind, match.id);
       if (homeless !== null) return { problem: `/dsl ${match.kind} ${homeless}` };
@@ -1274,7 +1275,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       if (rest === '' || rest === 'list') return { op: 'list' };
       if (rest === 'show' || rest === 'export') return { op: 'show' };
       if (rest === 'clear') return { op: 'clear' };
-      const remove = /^delete[ \t]+(?<kind>[a-z][a-z0-9-]*)[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/.exec(rest)?.groups;
+      const remove = new RegExp(`^delete[ \\t]+(?<kind>[a-z][a-z0-9-]*)[ \\t]+(?<id>${REFERENCE.source})$`).exec(rest)?.groups;
       if (remove) return { op: 'delete', kind: remove.kind, id: remove.id };
       return { problem: `unknown /local command: ${rest}` };
     },

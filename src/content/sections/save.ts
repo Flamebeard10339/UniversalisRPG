@@ -1,6 +1,6 @@
 import { DslError } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
-import { RawLine, RawSection, sectionParser, takeBlock } from '../../grammar/structure';
+import { RawLine, RawSection, REFERENCE, sectionParser, takeBlock } from '../../grammar/structure';
 import { keyedBy, put, strings, type Loose, type Visit } from '../refs';
 import { section, writtenWhole } from './define';
 
@@ -19,7 +19,7 @@ const OVER_LAYERS =
 
 const OVER_VERB = /^over:/;
 const OVER = /^over:[ \t]*(?<ids>.*)$/;
-const SAVE_ID = /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*$/;
+const SAVE_ID = new RegExp(`^${REFERENCE.source}$`);
 
 export const isOverLine = (text: string): boolean => OVER_VERB.test(text);
 

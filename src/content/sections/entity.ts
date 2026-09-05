@@ -6,6 +6,7 @@ import { HOOK_FAMILY, HOOK_FIELDS, HookCarrier } from '../../grammar/hook';
 import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
+import { REFERENCE } from '../../grammar/structure';
 import { EntryBody, listMembers } from '../../grammar/section';
 import { statBonus, TagClause } from '../../grammar/tagClause';
 import { counted, duration, id, number, text } from '../../grammar/values';
@@ -104,7 +105,7 @@ export const statAssignmentValue: Parser<[string, Range]> = {
 
 export const allyValue: Parser<Ally> = counted('a roster of 0 brings nobody, so leave the line out', ['bandit', '2 bandit']);
 
-const HANDLER_LABEL = /^on[ \t]+(?<event>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)$/;
+const HANDLER_LABEL = new RegExp(`^on[ \\t]+(?<event>${REFERENCE.source})$`);
 
 export const handlerEvent = (label: string): string | undefined => HANDLER_LABEL.exec(label)?.groups?.event;
 

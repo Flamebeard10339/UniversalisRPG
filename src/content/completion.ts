@@ -2,12 +2,11 @@ import { align, bare, exampleOf, holeNames, holesIn, soleHole, valueIn, type Ali
 import { elementOf } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
-import { indentLines, splitSections } from '../grammar/structure';
+import { indentLines, REFERENCE, splitSections } from '../grammar/structure';
 import { addressedNote, EVERY_SECTION, parseSectionOf, Section, sectionFor, sectionKinds } from './sections';
 import { PLUS_BY_NAME } from './merge';
 import { namesSection, sameSection } from './namespace';
 import { filledBy } from '../grammar/codec';
-import { REFERENCE } from '../grammar/values';
 
 export interface Addressed {
   kind: string;

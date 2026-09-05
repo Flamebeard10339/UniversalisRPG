@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import { WORLD_EXTENSION } from '../../src/grammar/structure';
+import { REFERENCE, WORLD_EXTENSION } from '../../src/grammar/structure';
 import { moduleIdOf } from '../../src/content/worldDir';
 import { emptyModportalManifest, MODPORTAL_MANIFEST_VERSION } from '../../src/content/modportal';
 import type { ModportalEntry, ModportalManifest, ModTier } from '../../src/content/modportal';
@@ -8,7 +8,7 @@ import type { ModportalEntry, ModportalManifest, ModTier } from '../../src/conte
 export const DEFAULT_MODPORTAL_CACHE = 'content/modportal.local';
 export const MODPORTAL_MANIFEST_FILE = 'manifest.json';
 
-const ENTRY_STEM = /^\d+-[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/;
+const ENTRY_STEM = new RegExp(String.raw`^\d+-${REFERENCE.source}$`);
 
 const namesEntry = (file: string): boolean => file.endsWith(WORLD_EXTENSION) && ENTRY_STEM.test(moduleIdOf(file));
 

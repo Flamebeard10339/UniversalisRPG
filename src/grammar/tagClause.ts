@@ -1,5 +1,6 @@
 import { DslError, Parser, Span } from './parser';
 import { isRange, Range } from './range';
+import { REFERENCE } from './structure';
 import { duration } from './values';
 
 export type BonusAmount = { percent: false; amount: Range } | { percent: true; amount: number };
@@ -64,7 +65,7 @@ export function isTagClause(value: unknown): boolean {
 const SECONDS_PER_MINUTE = 60;
 
 const AMOUNT = String.raw`(?<sign>[+-])(?<lo>\d+(?:\.\d+)?)(?:-(?<hi>\d+(?:\.\d+)?))?(?<percent>%?)`;
-const NAME = String.raw`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*`;
+const NAME = REFERENCE.source;
 
 const DURATION = /^(?:(?<minutes>\d+)m)?(?:(?<seconds>\d+)s)?$/;
 const STAT_BONUS = new RegExp(`^${AMOUNT}[ \t]+(?<stat>${NAME})(?:[ \t]+per[ \t]+(?:stack[ \t]+of[ \t]+(?<stack>${NAME})|level[ \t]+of[ \t]+(?<level>${NAME})|(?<per>${NAME})))?$`);

@@ -1,5 +1,5 @@
 import { DslError, Parser } from './parser';
-import { REFERENCE } from './values';
+import { REFERENCE } from './structure';
 
 export interface SkillGrant {
   coefficient: number;

@@ -15,7 +15,11 @@ export interface RawSection {
   span: Span;
 }
 
-const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
+export const WORD = /[a-z][a-z0-9-]*/;
+
+export const REFERENCE = new RegExp(`${WORD.source}(?:\\.${WORD.source})*`);
+
+const HEADING = new RegExp(`^#[ \\t]+(?<kind>${WORD.source})(?:[ \\t]+(?<id>${REFERENCE.source}))?[ \\t]*$`);
 
 export const WORLD_EXTENSION = '.dsl';
 

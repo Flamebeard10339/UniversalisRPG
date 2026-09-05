@@ -1,6 +1,6 @@
 import { HOOK_LABELS } from '../../grammar/hook';
-import { DslError, Parser } from '../../grammar/parser';
-import { id } from '../../grammar/values';
+import { WORD } from '../../grammar/structure';
+import { id, oneOf } from '../../grammar/values';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -37,20 +37,7 @@ export interface GameEvent {
   trigger: EventTrigger;
 }
 
-const triggerValue: Parser<EventTrigger> = {
-  parse(cursor) {
-    const start = cursor.pos;
-    const raw = cursor.take(/(?:on[ \t]+)?[a-z][a-z0-9-]*/);
-    const normalized = raw?.replace(/[ \t]+/, ' ');
-    if (!normalized || !(TRIGGER_NAMES as readonly string[]).includes(normalized)) {
-      throw new DslError(`event trigger must be one of ${TRIGGER_NAMES.join(', ')}, got ${JSON.stringify(raw ?? cursor.rest())}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    }
-    return normalized as EventTrigger;
-  },
-  print: (value) => value,
-  forms: [...TRIGGER_NAMES],
-  examples: [...TRIGGER_NAMES],
-};
+const triggerValue = oneOf('trigger', TRIGGER_NAMES, { complaint: 'an event trigger', token: new RegExp(String.raw`(?:on[ \t]+)?${WORD.source}`) });
 
 function answeredByAHook(event: GameEvent): string | undefined {
   const answered = event.id.split('.').pop()!;

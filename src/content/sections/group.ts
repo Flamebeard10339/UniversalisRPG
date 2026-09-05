@@ -1,7 +1,7 @@
 import { colour } from '../../grammar/colour';
 import { list } from '../../grammar/list';
-import { DslError, Parser } from '../../grammar/parser';
-import { id } from '../../grammar/values';
+import { Parser } from '../../grammar/parser';
+import { id, oneOf } from '../../grammar/values';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 import { QUEST_STANDINGS, type QuestStanding } from './quest';
@@ -21,19 +21,7 @@ export const kindName: Parser<string> = {
   examples: ['item', 'entity'],
 };
 
-const standingValue: Parser<QuestStanding> = {
-  parse(cursor) {
-    const start = cursor.pos;
-    const raw = id.parse(cursor);
-    if (!(QUEST_STANDINGS as readonly string[]).includes(raw)) {
-      throw new DslError(`stands for: must be one of ${QUEST_STANDINGS.join(', ')}, got ${JSON.stringify(raw)}`, { start: cursor.abs(start), end: cursor.abs(cursor.pos) });
-    }
-    return raw as QuestStanding;
-  },
-  print: (value) => value,
-  forms: [...QUEST_STANDINGS],
-  examples: [...QUEST_STANDINGS],
-};
+const standingValue = oneOf('standing', QUEST_STANDINGS, { complaint: 'stands for:' });
 
 export const group = section<Group>()({
   kind: 'group',

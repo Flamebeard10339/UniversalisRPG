@@ -1,6 +1,6 @@
 import { Condition, condition, printReference, Reference } from './condition';
 import { Cursor, DslError, Parser, parseWhole } from './parser';
-import { REFERENCE } from './values';
+import { REFERENCE } from './structure';
 
 export type TextSegment = { kind: 'literal'; text: string } | { kind: 'interpolate'; reference: Reference } | { kind: 'conditional'; condition: Condition; text: string };
 

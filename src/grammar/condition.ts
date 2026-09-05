@@ -1,5 +1,6 @@
 import { Cursor, DslError, Parser } from './parser';
-import { DECIMAL, decimal, id, number, REFERENCE } from './values';
+import { REFERENCE } from './structure';
+import { DECIMAL, decimal, id, number } from './values';
 
 export interface Reference {
   path: string[];

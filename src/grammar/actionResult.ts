@@ -3,7 +3,7 @@ import { writtenFrom } from './codec';
 import { ListParser } from './list';
 import { Cursor, DslError, Holds, Parser, Span, Written, calledBlock, requireEnd } from './parser';
 import { Range } from './range';
-import { RawLine, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
+import { RawLine, REFERENCE, hasBlock, indentLines, requireNoBlock, takeBlock } from './structure';
 import {
   Amount,
   amount,
@@ -16,13 +16,13 @@ import {
   id,
   isStatAmount,
   numberOrStat,
+  oneOf,
   opensStatAmount,
   printAmount,
   produced,
   Produced,
   quantified,
   refuseRange,
-  REFERENCE,
   risingAmount,
 } from './values';
 
@@ -34,9 +34,7 @@ export const MODAL_SCREENS = ['choose-name', 'choose-race', 'carried-items', 'qu
 
 export type ModalScreen = (typeof MODAL_SCREENS)[number];
 
-export const isModalScreen = (raw: string): raw is ModalScreen => (MODAL_SCREENS as readonly string[]).includes(raw);
-
-export const modalScreenRefusal = (raw: string): string => `a modal screen must be one of ${MODAL_SCREENS.join(', ')}, got ${JSON.stringify(raw)}`;
+export const modalScreen = oneOf('modal', MODAL_SCREENS, { complaint: 'a modal screen', token: REFERENCE });
 
 export type ActionResult = ResultLine & { into?: string };
 
@@ -135,7 +133,7 @@ const AT_MOST = /up[ \t]+to[ \t]+/;
 
 export const BUNDLE = 'bundle';
 
-const BOUND = /(?<name>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*)[ \t]*=[ \t]*/;
+const BOUND = new RegExp(`(?<name>${REFERENCE.source})[ \\t]*=[ \\t]*`);
 
 const PREPOSITION = { drain: 'from', restore: 'to', inflict: 'on' } as const;
 const MOVES = {
@@ -391,7 +389,7 @@ const LEAVES: readonly Leaf[] = [
   },
   { opens: /relocate:[ \t]*/, forms: ['relocate: <place>'], examples: ['relocate: camp'], read: (cursor) => ({ kind: 'relocate', location: id.parse(cursor) }) },
   { opens: /discover:[ \t]*/, forms: ['discover: <place>'], examples: ['discover: camp'], read: (cursor) => ({ kind: 'discover', location: id.parse(cursor) }) },
-  { opens: /open modal:[ \t]*/, forms: ['open modal: <modal>'], examples: [`open modal: ${MODAL_SCREENS[0]}`], read: parseOpenModal },
+  { opens: /open modal:[ \t]*/, forms: ['open modal: <modal>'], examples: [`open modal: ${modalScreen.examples[0]!}`], read: parseOpenModal },
   {
     opens: /perform:[ \t]*/,
     forms: ['perform: <action>'],
@@ -460,10 +458,7 @@ function parseResult(cursor: Cursor, into?: string): ActionResult {
 }
 
 function parseOpenModal(cursor: Cursor): ActionResult {
-  const at = cursor.pos;
-  const named = id.parse(cursor);
-  if (!isModalScreen(named)) throw new DslError(modalScreenRefusal(named), { start: cursor.abs(at), end: cursor.abs(cursor.pos) });
-  return { kind: 'open-modal', modal: named };
+  return { kind: 'open-modal', modal: modalScreen.parse(cursor) };
 }
 
 function parseResults(cursor: Cursor, line: RawLine | null): ActionResult[] {
@@ -738,18 +733,14 @@ const LEAF_NOTES: Readonly<Record<string, string>> = Object.assign(
   ...LEAVES.flatMap((leaf) => (leaf.yields === undefined ? [] : [Object.fromEntries(leaf.forms.map((form) => [bound(leaf.yields!, form), BINDING_NOTE]))])),
 );
 
-const oneOf = (called: string, forms: readonly string[], said: Partial<Parser<string>> = {}): Parser<string> => ({
+export const place: Parser<string> = {
+  called: 'place',
   parse: (cursor) => id.parse(cursor),
   print: (value) => value,
-  called,
-  forms,
-  examples: forms.filter((form) => !form.includes('<')),
-  ...said,
-});
-
-export const place = oneOf('place', ['<location>', STARTING_LOCATION], { names: { location: 'location' }, examples: ['camp', STARTING_LOCATION] });
-
-export const modalScreen = oneOf('modal', MODAL_SCREENS);
+  names: { location: 'location' },
+  forms: ['<location>', STARTING_LOCATION],
+  examples: ['camp', STARTING_LOCATION],
+};
 
 export const actionResult: Parser<ActionResult> = {
   parse: (cursor) => parseResult(cursor, binds(cursor)),

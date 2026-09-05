@@ -507,23 +507,6 @@ records the gap.
 *Closes when:* a comparison's right-hand side may name a stat, the four obstacles declare
 `npc-thieving-damage` and the guard is written once on `# action cross`.
 
-## What an id looks like is written out eleven times outside `grammar/values.ts`
-
-`REFERENCE` (`src/grammar/values.ts:95`) is the one home for the shape of a reference, and
-`[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*` is spelt again, byte for byte, in
-`sections/dialogue.ts:52` (as its own `PATH`), `sections/entity.ts:107`, `sections/item.ts:47`,
-`sections/quest.ts:46`, `sections/save.ts:22`, `grammar/actionResult.ts:137`,
-`grammar/structure.ts:18`, `grammar/tagClause.ts:67` and `runtime/command.ts:1180,1197,1277`.
-Shape 3. Measured 2026-09-05 by sweeping `src/` for the literal.
-
-Two of them are not obviously the same fact and that is why this is a line rather than a
-commit. `completion.ts:75-79` spells `[a-z0-9.-]*` — *an id half-typed*, which is a different
-question and should stay its own. And `grammar/structure.ts` importing `values.ts` may close a
-cycle within `grammar`, since `values.ts` reads `section.ts`; `npm run layer-check` is the
-thing to ask before assuming it may.
-
-*Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
-it, and a decision is recorded about the partial-id spelling in `completion.ts`.
 
 ## `location` declares fields and overrides the printer anyway, so the contract's one rule has one exception
 
@@ -615,29 +598,6 @@ and drops only the stock line. Nobody chose that difference.
 *Closes when:* a value parser declares where each of its holes lands, `namedFields` derives the
 walk, and `shop`, `skill`, `passive`, `recipe`, `stat` and `clusterJewel` declare no `visit` or
 `prune` of their own.
-
-## A set of words with two half-parsers, and six more sets written out by hand
-
-`MODAL_SCREENS` (`src/grammar/actionResult.ts:32-38`) is read twice in its own file: by
-`modalScreen` (`:668-679`), which offers the words to the editing page and refuses nothing, and
-by `parseOpenModal`/`isModalScreen`/`modalScreenRefusal`, which refuse and offer nothing. One
-set, two halves, neither whole.
-
-Six kinds then wrote the same shape again — `shapeNamed` (`clusterJewel.ts:64`), `triggerValue`
-(`event.ts:40`), `standingValue` (`group.ts:24`), `displayValue` (`resource.ts:19`),
-`acceptsValue` (`shop.ts:28`) and `side` (`values.ts:135`) — and they have drifted the way six
-copies do. The complaints read *must be one of*, *is one of*, *a shop accepts one of* and
-*expected us or them*; the token is a bare word regex in three, `id.parse` in two, and
-prefix-tolerant in the sixth.
-
-**Note what is *not* the fix**, since the obvious one deletes six refusals: `oneOf`'s `parse`
-is `id.parse`, so it refuses nothing at all. It is a grammar shim that gives the page a hole
-with alternatives. Folding the six into it as it stands would lose every one of their refusals.
-
-*Closes when:* one `oneOf(called, words, {complaint, token})` in `grammar/values.ts` both offers
-the words and refuses anything else, `MODAL_SCREENS` has one reader, and the six kinds each
-declare one line — with `event.ts`'s optional prefix passed as a token rather than kept as an
-exception.
 
 ## The round-trip proof's root set skips action bodies, so four parsers are unproved
 

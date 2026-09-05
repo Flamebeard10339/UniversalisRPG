@@ -1,6 +1,6 @@
 import { Cursor, DslError, Filled, Parser, Span, Written } from './parser';
 import { isList, ListParser } from './list';
-import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
+import { RawLine, RawSection, WORD, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
 export interface HydrateContext {
   language: string;
@@ -130,8 +130,7 @@ type AnyFields = Record<
 type EntryConfig = { into: string; body: EntryBody };
 
 const KEY = /(?<op>[+-][ \t]*)?(?<key>[a-z][a-z0-9 -]*(?:\.[a-z][a-z0-9 -]*)*?):/;
-const WORD = /[a-z][a-z0-9-]*/;
-const MARKED_WORD = /(?<op>[+-][ \t]*)(?<word>[a-z][a-z0-9-]*)/;
+const MARKED_WORD = new RegExp(String.raw`(?<op>[+-][ \t]*)(?<word>${WORD.source})`);
 
 function parseBlock(parser: Parser<unknown>, children: RawLine[], span: Span): unknown {
   if (!('parseBlock' in parser)) throw new DslError('this field cannot be written as a block', span);
