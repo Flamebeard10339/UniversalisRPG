@@ -25,9 +25,7 @@ export const OUTSIDE_STACK: Readonly<Record<string, string>> = {
   'src/vite-env.d.ts': 'an ambient declaration for the bundler, with no runtime and nothing to import',
 };
 
-const DEPTH: Record<Layer, number> = { grammar: 0, content: 1, runtime: 2, ui: 3, scripts: 4 };
-
-export const pointsUpward = (from: Layer, to: Layer): boolean => DEPTH[to] > DEPTH[from];
+export const pointsUpward = (from: Layer, to: Layer): boolean => LAYERS.indexOf(to) > LAYERS.indexOf(from);
 
 const IMPORT_PATTERN = /\b(?:from|import|require)\s*\(?\s*(['"`])(\.[^'"`]*)\1/g;
 

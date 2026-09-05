@@ -1,3 +1,4 @@
+import { BACK } from './modalOption';
 import { describe, expect, it } from 'vitest';
 import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
@@ -10,7 +11,7 @@ import { equip } from './equipment';
 import { growLine } from './growth';
 import { grownItems, receiveItem, wornCopy } from './itemInstance';
 import { planeReport } from './planeReport';
-import { BACK, PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
+import { PLANE, PlaneFrame, planeFocus, planeFrame, planeOptions, planeStale, planeSubmit } from './planeScreen';
 import { initialState } from './save';
 import { GameState, type ModalFrame } from './state';
 import { inEnglish } from './sayFixture';

@@ -4,13 +4,11 @@ import { Shop } from '../content/sections/shop';
 import { heldName } from './carried';
 import { itemTemplate } from './itemInstance';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
-import type { ModalChoice, ModalOption } from './modalOption';
+import { BACK, LEAVE, type ModalChoice, type ModalOption } from './modalOption';
 import { GameState, type ModalFrame } from './state';
 import { buy, coinHeld, countAsked, forSale, sell, Trade, wanted, type Refusal } from './trade';
 
-export const LEAVE: Answer = 'close';
 
-export const BACK: Answer = 'back';
 
 export type Side = 'buy' | 'sell';
 

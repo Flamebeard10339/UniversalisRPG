@@ -1,4 +1,4 @@
-import type { ModalChoice, ModalOption } from './modalOption';
+import { BACK, type ModalChoice, type ModalOption } from './modalOption';
 import { hexKey } from '../content/hex';
 import { Item } from '../content/sections/item';
 import { Registry } from '../content/registry';
@@ -12,7 +12,6 @@ import { itemCopies, wornCopySlot } from './itemInstance';
 import { ClusterReport, PlaneFocus, PlaneReport, planeReport } from './planeReport';
 import { GameState, type ModalFrame } from './state';
 
-export const BACK: Answer = 'back';
 
 export const PLANE: Answer = 'plane';
 

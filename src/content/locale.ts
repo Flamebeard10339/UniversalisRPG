@@ -357,7 +357,7 @@ const ENGINE_KEY_SET: ReadonlySet<string> = new Set(ENGINE_KEYS);
 
 export const isEngineKey = (key: string): key is EngineKey => ENGINE_KEY_SET.has(key);
 
-export const GENERATED_FIELD = 'title';
+export { NAMES_THE_SECTION as GENERATED_FIELD } from './sections/define';
 
 export function localeKey(namespace: string | null, kind: string, id: string, field: string): string {
   return [namespace, kind, localId(namespace, id), field].filter((segment) => segment !== null).join('.');

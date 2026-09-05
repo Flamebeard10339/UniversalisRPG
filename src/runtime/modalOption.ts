@@ -1,5 +1,9 @@
 import type { Answer, Localized } from './localized';
 
+export const LEAVE: Answer = 'close';
+
+export const BACK: Answer = 'back';
+
 export interface ChoiceCell {
   readonly under: Answer;
   readonly heading: Localized;

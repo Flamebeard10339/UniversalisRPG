@@ -1,10 +1,9 @@
 import type { EngineKey } from '../content/locale';
 import type { Registry } from '../content/registry';
-import type { ModalOption } from './modalOption';
+import { LEAVE, type ModalOption } from './modalOption';
 import { type Answer, type Localized, localizerOf } from './localized';
 import type { GameState, ModalFrame } from './state';
 
-export const LEAVE: Answer = 'close';
 
 export type ListedName = Extract<ModalFrame, { name: string }>['name'];
 

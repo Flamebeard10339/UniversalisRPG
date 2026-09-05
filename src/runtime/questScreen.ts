@@ -1,8 +1,6 @@
 import { journal } from './journal';
-import { LEAVE, listedScreen } from './listedScreen';
+import { listedScreen } from './listedScreen';
 import type { ModalFrame } from './state';
-
-export { LEAVE };
 
 export type QuestFrame = Extract<ModalFrame, { name: 'quest-journal' }>;
 

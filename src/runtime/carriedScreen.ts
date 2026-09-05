@@ -1,4 +1,4 @@
-import type { ModalChoice, ModalOption } from './modalOption';
+import { LEAVE, type ModalChoice, type ModalOption } from './modalOption';
 import { isBase, Item } from '../content/sections/item';
 import type { EngineKey } from '../content/locale';
 import { Registry } from '../content/registry';
@@ -10,7 +10,6 @@ import { carriedEntries, carriedFrame, type CarriedEntry } from './carried';
 import { planeFrame } from './planeScreen';
 import { GameState, type ModalAnswers, type ModalFrame } from './state';
 
-export const LEAVE: Answer = 'close';
 const LEAVE_SHOWN: EngineKey = 'engine.carried.close';
 
 export const CONFIRMED: Answer = 'go-ahead';

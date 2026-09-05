@@ -1,13 +1,13 @@
-import { offersAnswer, type ModalOption } from './modalOption';
+import { BACK, LEAVE, offersAnswer, type ModalOption } from './modalOption';
 import { RuntimeError } from './error';
 import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModal } from './modalStack';
 import { choose, cursorProblem, menuChoices, standsAtWords } from './dialogue-runtime';
-import { carriedOptions, carriedSubmit, LEAVE } from './carriedScreen';
-import { BACK, isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
-import { holdsQuest, questFocus, questOptions, questStale, questSubmit, LEAVE as QUEST_LEAVE } from './questScreen';
-import { holdsStat, statFocus, statOptions, statStale, statSubmit, LEAVE as STAT_LEAVE } from './statScreen';
-import { holdsSkill, skillFocus, skillOptions, skillStale, skillSubmit, LEAVE as SKILL_LEAVE } from './skillScreen';
-import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit, BACK as SHOP_BACK, LEAVE as SHOP_LEAVE } from './shopScreen';
+import { carriedOptions, carriedSubmit } from './carriedScreen';
+import { isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
+import { holdsQuest, questFocus, questOptions, questStale, questSubmit } from './questScreen';
+import { holdsStat, statFocus, statOptions, statStale, statSubmit } from './statScreen';
+import { holdsSkill, skillFocus, skillOptions, skillStale, skillSubmit } from './skillScreen';
+import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
 
@@ -98,7 +98,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: holdsQuest,
     stale: questStale,
     focus: questFocus,
-    leaves: QUEST_LEAVE,
+    leaves: LEAVE,
   },
   'stat-breakdown': {
     options: (frame, state, registry) => statOptions(frame, state, registry),
@@ -106,7 +106,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: holdsStat,
     stale: statStale,
     focus: statFocus,
-    leaves: STAT_LEAVE,
+    leaves: LEAVE,
   },
   'skill-breakdown': {
     options: (frame, state, registry) => skillOptions(frame, state, registry),
@@ -114,21 +114,21 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     holds: holdsSkill,
     stale: skillStale,
     focus: skillFocus,
-    leaves: SKILL_LEAVE,
+    leaves: LEAVE,
   },
   shop: {
     options: shopOptions,
     submit: shopSubmit,
     holds: holdsShop,
     stale: shopStale,
-    leaves: SHOP_LEAVE,
+    leaves: LEAVE,
   },
   'shop-count': {
     options: countOptions,
     submit: countSubmit,
     holds: holdsCount,
     stale: shopStale,
-    leaves: SHOP_BACK,
+    leaves: BACK,
   },
   'welcome-back': {
     options: (_frame, state, registry) => {

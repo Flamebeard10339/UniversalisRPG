@@ -1,11 +1,9 @@
 import { listedToPlayer } from '../content/sections';
 import { amounts, signed } from './figures';
-import { LEAVE, listedScreen } from './listedScreen';
+import { listedScreen } from './listedScreen';
 import { type Localized, localizerOf } from './localized';
 import type { StatShare } from './statShare';
 import type { ModalFrame } from './state';
-
-export { LEAVE };
 
 export type StatFrame = Extract<ModalFrame, { name: 'stat-breakdown' }>;
 

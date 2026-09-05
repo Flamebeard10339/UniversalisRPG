@@ -1,6 +1,6 @@
 export const FIRST_LEVEL_COST = 100;
 export const LEVELS_PER_DOUBLING = 7;
-const RATIO = 2 ** (1 / LEVELS_PER_DOUBLING);
+export const RATIO = 2 ** (1 / LEVELS_PER_DOUBLING);
 
 export const xpForLevel = (level: number): number => (level <= 1 ? 0 : Math.ceil((FIRST_LEVEL_COST * (RATIO ** (level - 1) - 1)) / (RATIO - 1)));
 

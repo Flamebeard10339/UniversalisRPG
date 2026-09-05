@@ -1,9 +1,7 @@
 import { listedToPlayer } from '../content/sections';
-import { LEAVE, listedScreen } from './listedScreen';
+import { listedScreen } from './listedScreen';
 import { localizerOf } from './localized';
 import type { ModalFrame } from './state';
-
-export { LEAVE };
 
 export type SkillFrame = Extract<ModalFrame, { name: 'skill-breakdown' }>;
 

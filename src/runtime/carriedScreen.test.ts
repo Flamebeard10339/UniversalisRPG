@@ -1,3 +1,4 @@
+import { LEAVE } from './modalOption';
 import { describe, expect, it } from 'vitest';
 import { Registry } from '../content/registry';
 import { loadInEnglish } from '../content/engineLocale';
@@ -6,7 +7,7 @@ import { loadUniverse } from '../content/load';
 import { fixtureSources } from '../content/worldFixture';
 import { withoutNote } from '../grammar/note';
 import { publishModal } from './modals';
-import { carriedOptions, carriedSubmit, CONFIRMED, LEAVE } from './carriedScreen';
+import { carriedOptions, carriedSubmit, CONFIRMED } from './carriedScreen';
 import { carriedEntries, carriedFrame } from './carried';
 import { equip } from './equipment';
 import { packedCount, receiveItem } from './itemInstance';

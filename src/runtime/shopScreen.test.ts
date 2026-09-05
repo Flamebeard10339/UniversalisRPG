@@ -1,9 +1,10 @@
+import { BACK, LEAVE } from './modalOption';
 import { describe, expect, it } from 'vitest';
 import { loadInEnglish } from '../content/engineLocale';
 import { FIXTURE_WORLD } from '../content/worldFixture';
 import type { Registry } from '../content/registry';
 import { partsOf } from './modalOption';
-import { BACK, countFrame, countOptions, countSubmit, LEAVE, shopFrame, shopOptions, shopSubmit } from './shopScreen';
+import { countFrame, countOptions, countSubmit, shopFrame, shopOptions, shopSubmit } from './shopScreen';
 import { TOUCHED } from '../content/sections/define';
 import { initialState } from './save';
 import { sellPrice } from '../content/sections/shop';

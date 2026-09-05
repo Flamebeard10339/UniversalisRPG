@@ -43,11 +43,9 @@ export function readingAt(registry: Registry, state: GameState, fighter: Fighter
   const foe = entity.id;
 
   const ourPool = abilityOn(laddered.pool, level);
-  const ourRateNow = statValue(fight.rate, state, registry, PLAYER);
-  const ourAccuracyNow = statValue(fight.accuracy.ours, state, registry, PLAYER);
-  const ourDealt = perHitFor(abilityOn(laddered.dps, level), ourRateNow, ourAccuracyNow, registry);
   const ourRate = statValue(fight.rate, state, registry, PLAYER);
   const ourAccuracy = statValue(fight.accuracy.ours, state, registry, PLAYER);
+  const ourDealt = perHitFor(abilityOn(laddered.dps, level), ourRate, ourAccuracy, registry);
   const ourEvasion = statValue(fight.accuracy.theirs, state, registry, PLAYER);
   const ourReduction = statValue(fight.damage.theirs, state, registry, PLAYER);
 
