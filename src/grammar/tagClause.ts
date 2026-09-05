@@ -192,6 +192,8 @@ export function unrolledProblem(tags: readonly TagClause[], noMoment: string): s
   return undefined;
 }
 
+export const TAG_PARSERS: ReadonlySet<unknown> = new Set([statBonus, tagClause]);
+
 export const bonusAmount: Parser<BonusAmount> = {
   parse(cursor) {
     const start = cursor.pos;

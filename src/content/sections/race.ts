@@ -1,6 +1,5 @@
 import { list } from '../../grammar/list';
 import { TagClause, tagClause, unrolledProblem } from '../../grammar/tagClause';
-import { pruneTags, visitTags, type Loose } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -22,9 +21,4 @@ export const race = section<Race>()({
   },
   clauses: 'tags',
   validate: (value) => unrolledProblem(value.tags, 'a race is carried from birth with no moment to roll one'),
-  visit: (value, where, visit) => visitTags((value as unknown as Loose).tags, where, visit),
-  prune: (value, at, where) => {
-    const tags = pruneTags(value.tags, where, at);
-    return tags.length === value.tags.length ? value : { ...value, tags };
-  },
 });

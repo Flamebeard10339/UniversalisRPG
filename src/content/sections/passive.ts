@@ -4,7 +4,7 @@ import { listMembers } from '../../grammar/section';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { text } from '../../grammar/values';
 import { baselineGrant, type BaselineGrant } from '../../grammar/baselineGrant';
-import { hooks, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -45,16 +45,10 @@ export const passive = section<Passive>()({
     return undefined;
   },
   visit: (value, where, visit) => {
-    const held = value as unknown as Loose;
-    visitTags(held.tags, where, visit);
     for (const grant of listMembers<BaselineGrant>(value.grants)) put(grant, 'statId', 'stat', `${where} grants:`, visit);
-    hooks(held, where, visit);
   },
   prune: (value, at, where) => {
-    const tags = pruneTags(value.tags, where, at);
     const grants = value.grants.filter((grant) => !at.gone('stat', grant.statId, `${where} grants:`));
-    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
-    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
-    return tags.length === value.tags.length && grants.length === value.grants.length && onHit === value.onHit && whenHit === value.whenHit ? value : { ...value, tags, grants, onHit, whenHit };
+    return grants.length === value.grants.length ? value : { ...value, grants };
   },
 });

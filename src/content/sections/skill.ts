@@ -4,7 +4,7 @@ import { listMembers } from '../../grammar/section';
 import { SkillGrant, skillGrant } from '../../grammar/skillGrant';
 import { Counter, TagClause, tagClause } from '../../grammar/tagClause';
 import { id } from '../../grammar/values';
-import { put, pruneTags, visitTags, type Loose } from '../refs';
+import { put } from '../refs';
 import { section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -33,14 +33,11 @@ export const skill = section<Skill>()({
   },
   clauses: 'grants',
   visit: (value, where, visit) => {
-    const held = value as unknown as Loose;
-    visitTags(held.tags, where, visit);
     for (const grant of listMembers<SkillGrant>(value.grants)) put(grant, 'event', 'event', `${where} gain`, visit);
   },
   prune: (value, at, where) => {
-    const tags = pruneTags(value.tags, where, at);
     const grants = value.grants.filter((grant) => !at.gone('event', grant.event, `${where} gain`));
-    return tags.length === value.tags.length && grants.length === value.grants.length ? value : { ...value, tags, grants };
+    return grants.length === value.grants.length ? value : { ...value, grants };
   },
 });
 

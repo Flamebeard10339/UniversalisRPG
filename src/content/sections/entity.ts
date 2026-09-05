@@ -10,7 +10,7 @@ import { EntryBody, listMembers } from '../../grammar/section';
 import { statBonus, TagClause } from '../../grammar/tagClause';
 import { duration, id, number, text } from '../../grammar/values';
 import { localeKey } from '../locale';
-import { hooks, pruneHook, pruneTags, put, results, visitAction, visitTags, type Loose, type Pruning, type Visit } from '../refs';
+import { put, results, visitAction, type Loose, type Pruning, type Visit } from '../refs';
 import { hiddenIf, MintedAction, section, TOUCHED } from './define';
 import { Dialogue, spokenBy } from './dialogue';
 import { GROUP_FIELD } from './group';
@@ -217,27 +217,16 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   entries: { into: 'blocks', body: entityBlock },
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
-    visitTags(held.modifiers, where, visit);
     for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
     for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
     blocks(held.blocks, where, visit);
-    hooks(held, where, visit);
   },
   prune: (value, at, where) => {
     const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
-    const modifiers = pruneTags(value.modifiers, where, at);
     const blocks = pruneBlocks(value.blocks, where, at);
     const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));
-    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
-    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
-    const kept =
-      Object.keys(stats).length === Object.keys(value.stats).length &&
-      modifiers.length === value.modifiers.length &&
-      blocks.length === value.blocks.length &&
-      allies.length === value.allies.length &&
-      onHit === value.onHit &&
-      whenHit === value.whenHit;
-    return kept ? value : { ...value, stats, modifiers, blocks, allies, onHit, whenHit };
+    const kept = Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length && allies.length === value.allies.length;
+    return kept ? value : { ...value, stats, blocks, allies };
   },
 });
 

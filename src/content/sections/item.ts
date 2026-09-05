@@ -7,7 +7,7 @@ import { Cursor, DslError, Parser } from '../../grammar/parser';
 import { range, Range } from '../../grammar/range';
 import { TagClause, tagClause } from '../../grammar/tagClause';
 import { id, number, text } from '../../grammar/values';
-import { actions, hooks, pruneActions, pruneHook, pruneTags, put, visitTags, type Loose } from '../refs';
+import { actions, pruneActions, put, type Loose } from '../refs';
 import { carriedJewel, ClusterJewel, clusterJewel as clusterJewelSection, jewelCarried } from './clusterJewel';
 import { section } from './define';
 import { GROUP_FIELD } from './group';
@@ -134,22 +134,15 @@ export const item = section<AuthoredItem, never, 'actions'>()({
   validate: roleProblem,
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
-    visitTags(held.tags, where, visit);
     actions(held.actions, where, visit);
-    hooks(held, where, visit);
     if (held.clusterEffect) put(held.clusterEffect as Loose & { statId: string }, 'statId', 'stat', `${where} cluster-effect:`, visit);
     if (held.jewel !== null && typeof held.jewel === 'object') clusterJewelSection.visit(held.jewel as ClusterJewel, `${where} cluster-jewel:`, visit);
   },
   prune: (value, at, where) => {
-    const tags = pruneTags(value.tags, where, at);
     const kept = pruneActions(value.actions, where, at);
-    const onHit = pruneHook(value.onHit, `${where} on hit:`, at);
-    const whenHit = pruneHook(value.whenHit, `${where} when hit:`, at);
     const clusterEffect = value.clusterEffect?.statId === undefined || !at.gone('stat', value.clusterEffect.statId, `${where} cluster-effect:`) ? value.clusterEffect : undefined;
     const carried = jewelCarriedBy(value);
     const jewel = carried === undefined ? value.jewel : (clusterJewelSection.prune(carried, at, `${where} cluster-jewel:`) ?? undefined);
-    return tags.length === value.tags.length && kept.length === value.actions.length && onHit === value.onHit && whenHit === value.whenHit && clusterEffect === value.clusterEffect && jewel === value.jewel
-      ? value
-      : { ...value, tags, actions: kept, onHit, whenHit, clusterEffect, jewel };
+    return kept.length === value.actions.length && clusterEffect === value.clusterEffect && jewel === value.jewel ? value : { ...value, actions: kept, clusterEffect, jewel };
   },
 });

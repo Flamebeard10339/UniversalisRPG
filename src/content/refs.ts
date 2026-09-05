@@ -9,6 +9,7 @@ import { isFieldEdits, listMembers } from '../grammar/section';
 import { namesACopy } from './instanceId';
 import { amountFalls, isStatAmount, Quantified } from '../grammar/values';
 import { COUNTERS, TagClause } from '../grammar/tagClause';
+import { HOOK_FIELDS } from '../grammar/hook';
 
 export const INFLICT_SITE = 'inflict:';
 
@@ -236,9 +237,15 @@ export function visitTags(list: unknown, where: string, visit: Visit): void {
   }
 }
 
+const hookSites = (): readonly { field: string; site: string }[] =>
+  Object.entries(HOOK_FIELDS).map(([field, spec]) => ({ field, site: `${spec.keyword}:` }));
+
 export function hooks(carrier: Loose, where: string, visit: Visit): void {
-  results(listMembers<ActionResult>(carrier.onHit), `${where} on hit:`, visit);
-  results(listMembers<ActionResult>(carrier.whenHit), `${where} when hit:`, visit);
+  for (const each of hookSites()) results(listMembers<ActionResult>(carrier[each.field]), `${where} ${each.site}`, visit);
+}
+
+export function pruneHooks(carrier: Loose, where: string, at: Pruning): Record<string, ActionResult[]> {
+  return Object.fromEntries(hookSites().map((each) => [each.field, pruneHook(listMembers<ActionResult>(carrier[each.field]) as ActionResult[], `${where} ${each.site}`, at)]));
 }
 
 function sidedNames(action: Action): { held: Sided; kind: ReferenceKind; written: string }[] {

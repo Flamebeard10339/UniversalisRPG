@@ -6,8 +6,10 @@ import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../.
 import { ListParser } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, alternativesFor, hydrateSection, isListField, neededAlternatives, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
-import { Loose, Pruning, Visit, condition as visitCondition, put, strings } from '../refs';
+import { Loose, Pruning, Visit, condition as visitCondition, hooks as visitHooks, pruneHooks, pruneTags, put, strings, visitTags } from '../refs';
 import { Condition, condition } from '../../grammar/condition';
+import { hookResultList } from '../../grammar/actionResult';
+import { TAG_PARSERS, type TagClause } from '../../grammar/tagClause';
 import { BY_NAME, mergeFields, overwrittenField } from '../merge';
 import { A_LITERAL_BRACE, parseSegments } from '../../grammar/segment';
 
@@ -212,6 +214,11 @@ export const hiddenIf = (note: string) => ({ parser: condition, keyword: 'hidden
 const conditionFields = (schema: AnySchema): readonly { field: string; site: string }[] =>
   Object.entries(schema.fields).flatMap(([field, spec]) => (spec.parser === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
 
+const tagFields = (schema: AnySchema): readonly string[] =>
+  Object.entries(schema.fields).flatMap(([field, spec]) => (TAG_PARSERS.has(valueOf(spec.parser as Parser<unknown>)) ? [field] : []));
+
+const carriesHooks = (schema: AnySchema): boolean => Object.values(schema.fields).some((spec) => spec.parser === hookResultList);
+
 const namedFields = (schema: AnySchema): readonly Named[] =>
   Object.entries(schema.fields).flatMap(([field, spec]) => {
     const kind = nameKind(spec);
@@ -263,6 +270,8 @@ export const section =
     }
     const names = schema === undefined ? [] : namedFields(schema);
     const conditions = schema === undefined ? [] : conditionFields(schema);
+    const tagged = schema === undefined ? [] : tagFields(schema);
+    const hooked = schema !== undefined && carriesHooks(schema);
     const written = schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar;
     const visited = (value: V, where: string, visit: Visit): void => {
       for (const each of names) {
@@ -271,6 +280,8 @@ export const section =
         else put(value as unknown as Loose, each.field, each.kind, at, visit);
       }
       for (const each of conditions) visitCondition((value as unknown as Loose)[each.field] as Condition | undefined, `${where} ${each.site}`, visit);
+      for (const field of tagged) visitTags((value as unknown as Loose)[field], where, visit);
+      if (hooked) visitHooks(value as unknown as Loose, where, visit);
       walk(value, where, visit);
     };
     const without = (value: V, at: Pruning, where: string): V | null => {
@@ -278,6 +289,18 @@ export const section =
       for (const each of conditions) {
         const written = (value as unknown as Loose)[each.field] as Condition | undefined;
         if (!at.intact(() => visitCondition(written, `${where} ${each.site}`, at.visit))) return null;
+      }
+      for (const field of tagged) {
+        const current = (value as unknown as Loose)[field];
+        if (!Array.isArray(current)) continue;
+        const kept = pruneTags(current as TagClause[], where, at);
+        if (kept.length !== current.length) (held ??= { ...(value as unknown as Loose) })[field] = kept;
+      }
+      if (hooked) {
+        for (const [field, kept] of Object.entries(pruneHooks(value as unknown as Loose, where, at))) {
+          const current = (value as unknown as Loose)[field];
+          if (Array.isArray(current) && kept.length !== current.length) (held ??= { ...(value as unknown as Loose) })[field] = kept;
+        }
       }
       for (const each of names) {
         const current = (value as unknown as Loose)[each.field];

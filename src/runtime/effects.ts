@@ -6,7 +6,7 @@ import { DISCOVERED } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
 import { DropTable } from '../content/sections/droptable';
 import { EventTrigger, GameEvent } from '../content/sections/event';
-import { isPoint, Range, sampleCount, sampleRange, scaleRange } from '../grammar/range';
+import { isPoint, isRange, Range, sampleCount, sampleRange, scaleRange } from '../grammar/range';
 import { Registry, startingLocationId } from '../content/registry';
 import { Resource } from '../content/sections/resource';
 import { evaluateCondition, weighing } from './conditions';
@@ -106,15 +106,15 @@ export function poolFell(segment: Segment, actorId: string, resourceId: string, 
   fireEvents(segment, actorId, 'damage-taken', resourceId, count, fromMilliUnits(taken));
 }
 
-const variesPerSubject = (value: Amount): boolean => isStatAmount(value) || !isPoint(value);
+const variesPerSubject = (held: unknown): boolean => {
+  if (typeof held !== 'object' || held === null) return false;
+  return isRange(held) ? !isPoint(held) : isStatAmount(held as Amount);
+};
 
 export function samplesPerApplication(results: readonly ActionResult[]): boolean {
   return results.some((result) => {
     if (nestedResults(result).length > 0 || result.kind === 'roll') return true;
-    if (result.kind === 'give') return result.amount !== undefined && !isPoint(result.amount);
-    if (result.kind === 'xp') return variesPerSubject(result.amount);
-    if (result.kind === 'pool') return variesPerSubject(result.delta);
-    return false;
+    return Object.values(result).some(variesPerSubject);
   });
 }
 
