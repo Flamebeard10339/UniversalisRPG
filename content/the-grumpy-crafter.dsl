@@ -140,7 +140,7 @@ stocks:
   3 crafters-cap
   3 crafters-cuirass
   3 crafters-blade
-replenish: 10m
+replenish: 120s
 hidden if: not wicks-stall.the-stall
 
 # shop guardsmans-eye

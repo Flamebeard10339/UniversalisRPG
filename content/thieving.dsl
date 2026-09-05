@@ -630,7 +630,7 @@ stocks:
   3 fingerless-gloves
   3 soft-toed-boots
   2 steel-lockpicks
-replenish: 15m
+replenish: 200s
 
 # shop the-fence
 coin: core.coin
@@ -639,7 +639,7 @@ stocks:
   3 climbing-gloves
   6 steel-lockpicks
   12 common-general-thieving
-replenish: 10m
+replenish: 120s
 
 # shop fruit-stall
 coin: core.coin

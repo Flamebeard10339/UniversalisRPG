@@ -35,7 +35,7 @@ stocks:
   4 hammer
   200 bronze-bar
   200 iron-bar
-replenish: 5m
+replenish: 60s
 
 # entity forge-counter
 title: Forge Counter

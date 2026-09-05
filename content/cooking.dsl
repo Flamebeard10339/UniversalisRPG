@@ -178,7 +178,7 @@ stocks:
   2 stove-apron
   2 kitchen-clogs
   1 cooks-whites
-replenish: 5s
+replenish: 60s
 
 # entity cooks-shelf
 title: The Cook's Shelf

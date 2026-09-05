@@ -1000,7 +1000,7 @@ stocks:
   2 fishermans-gansey
   2 waders
   2 hobnailed-river-boots
-replenish: 5s
+replenish: 30s
 
 # entity fishing-supplies
 title: Fishing Supplies
@@ -1242,7 +1242,7 @@ stocks:
   1 rod-and-winch
   2 dressed-silk-line
   1 creel
-replenish: 10m
+replenish: 60s
 hidden if: not hobs-traps.trusted
 
 # quest hobs-traps
