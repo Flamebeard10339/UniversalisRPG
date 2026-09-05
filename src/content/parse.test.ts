@@ -6,7 +6,7 @@ import { location } from './sections/location';
 import { loadModule, loadUniverse } from './load';
 import { Section, parseModule, sections } from './sections';
 import { Cursor, DslError, Parser, parseWhole } from '../grammar/parser';
-import { ListParser } from '../grammar/list';
+import { isList, ListParser } from '../grammar/list';
 import { point } from '../grammar/range';
 import { Authored, DEFAULT_CONTEXT, HydrateContext, SectionSchema, hydrateSection, isPositionalField } from '../grammar/section';
 import { skill } from './sections/skill';
@@ -1003,7 +1003,7 @@ const OPS = ['', '+', '-'];
 describe('a field that takes a block reads one exactly where it reads the same text inline', () => {
   const fields = schemaFields();
   const blockCapable = fields.filter(takesABlock);
-  const oneToALine = blockCapable.filter((field) => 'element' in field.parser);
+  const oneToALine = blockCapable.filter((field) => isList(field.parser));
 
   it('derives its subjects by the predicate the section engine decides a block by', () => {
     const addressable = fields.filter((field) => !field.positional);

@@ -9,6 +9,10 @@ export interface ListParser<E> extends Parser<E[]> {
   lines(): readonly Written[];
 }
 
+export const isList = (parser: unknown): parser is ListParser<unknown> => typeof parser === 'object' && parser !== null && 'element' in parser;
+
+export const elementOf = (parser: Parser<unknown>): Parser<unknown> => (isList(parser) ? parser.element : parser);
+
 export function list<E>(element: Parser<E>): ListParser<E> {
   const parseInline = (cursor: Cursor): E[] => {
     const items: E[] = [];

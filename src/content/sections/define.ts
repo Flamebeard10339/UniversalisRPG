@@ -1,9 +1,9 @@
 import { Action, actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
-import { paired } from '../../grammar/form';
+import { paired, soleHole } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
 import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
-import { ListParser } from '../../grammar/list';
+import { elementOf } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
 import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, alternativesFor, hydrateSection, isListField, neededAlternatives, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
 import { Loose, Pruning, Visit, condition as visitCondition, hooks as visitHooks, pruneHooks, pruneTags, put, strings, visitTags } from '../refs';
@@ -124,7 +124,7 @@ const LISTED = ', …';
 
 const blockOf = (parser: Parser<unknown>): (() => readonly Written[]) | undefined => ('lines' in parser ? () => (parser as { lines(): readonly Written[] }).lines() : undefined);
 
-const valueOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
+
 
 const spelled = (parser: Parser<unknown>, written: (value: string) => string, said: object, shown?: string): Written[] =>
   paired(parser.forms, parser.examples).flatMap((example, at) => (example === undefined ? [] : [{ form: written(parser.forms[at]!), example: written(shown ?? example), ...said }]));
@@ -136,7 +136,7 @@ function pointedAt(parser: Parser<unknown>, written: (value: string) => string, 
   if (shown === undefined) return undefined;
   const held = (said as { holds?: Holds }).holds?.() ?? {};
   const list = parser.forms.every((form) => form.endsWith(LISTED));
-  return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: valueOf(parser) }) };
+  return { ...shown, form: written(`<${called}>${list ? LISTED : ''}`), holds: () => ({ ...held, [called]: elementOf(parser) }) };
 }
 
 function insteadOf(schema: AnySchema, name: string): string | undefined {
@@ -173,7 +173,7 @@ const fieldLines = (schema: AnySchema, name: string, spec: AnyField): Written[] 
   const named = pointedAt(parser, written, said);
   const shapes = named === undefined ? spelled(parser, written, said, spec.example) : [named];
   if (shapes.length === 0) return [];
-  const laid = valueOf(parser) === parser ? {} : filledBy(spec);
+  const laid = elementOf(parser) === parser ? {} : filledBy(spec);
   const held = block === undefined ? undefined : (): readonly Written[] => block().map((line) => ({ ...line, ...laid }));
   return [...shapes, ...(held === undefined ? [] : [{ form: `${keyword}:`, example: `${keyword}:`, ...said, block: held }])];
 };
@@ -184,11 +184,9 @@ export const schemaGrammar = (schema: AnySchema): readonly Written[] => [
   ...(schema.entries === undefined ? [] : schema.entries.body.grammar.map((line) => ({ ...line, over: overwrittenField(schema, schema.entries!.into) }))),
 ];
 
-const ALONE = /^<(?<hole>[a-z][a-z0-9 -]*)>(?:, …)?$/;
-
 function nameKind(spec: AnyField): string | undefined {
   const parser = spec.parser as Parser<unknown>;
-  const holes = parser.forms.map((form) => ALONE.exec(form)?.groups?.hole);
+  const holes = parser.forms.map((form) => soleHole(form));
   if (holes.length === 0 || holes.some((hole) => hole === undefined)) return undefined;
   const held = parser.holds?.() ?? {};
   const said = { ...parser.names, ...spec.names };
@@ -212,10 +210,10 @@ export interface Named {
 export const hiddenIf = (note: string) => ({ parser: condition, keyword: 'hidden if', note }) as const;
 
 const conditionFields = (schema: AnySchema): readonly { field: string; site: string }[] =>
-  Object.entries(schema.fields).flatMap(([field, spec]) => (valueOf(spec.parser as Parser<unknown>) === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
+  Object.entries(schema.fields).flatMap(([field, spec]) => (elementOf(spec.parser as Parser<unknown>) === condition ? [{ field, site: `${spec.keyword ?? field}:` }] : []));
 
 const tagFields = (schema: AnySchema): readonly string[] =>
-  Object.entries(schema.fields).flatMap(([field, spec]) => (TAG_PARSERS.has(valueOf(spec.parser as Parser<unknown>)) ? [field] : []));
+  Object.entries(schema.fields).flatMap(([field, spec]) => (TAG_PARSERS.has(elementOf(spec.parser as Parser<unknown>)) ? [field] : []));
 
 const carriesHooks = (schema: AnySchema): boolean => Object.values(schema.fields).some((spec) => spec.parser === hookResultList);
 

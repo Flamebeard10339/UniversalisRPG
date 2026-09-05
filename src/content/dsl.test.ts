@@ -6,7 +6,7 @@ import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { nestedResults, type ActionResult } from '../grammar/actionResult';
-import { align, holeNames, holesIn, matches, standingIn, valueIn } from '../grammar/form';
+import { align, holeNames, holesIn, matches, soleHole, standingIn, valueIn } from '../grammar/form';
 import { DslError, type Overwritten, type Written } from '../grammar/parser';
 import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
@@ -29,7 +29,6 @@ const CORPUS = fixtureSources();
 
 const problems = (result: { diagnostics: { sourceName: string }[] }): string[] => result.diagnostics.map((each) => formatModuleDiagnostic(each as never));
 
-const POINTS = /^<[a-z][a-z0-9 -]*>$/;
 
 const GRAMMAR: { kind: string; line: Written; under: string; indent: number }[] = [];
 
@@ -89,7 +88,8 @@ describe('a hole of every line of every kind', () => {
     expect(
       GRAMMAR.flatMap(({ kind, line }) =>
         Object.entries(line.names ?? {}).flatMap(([hole, said]) => {
-          if (said === null || (POINTS.test(said) && holeNames(line.form).includes(said.slice(1, -1)))) return [];
+          const pointed = said === null ? undefined : soleHole(said);
+          if (said === null || (pointed !== undefined && holeNames(line.form).includes(pointed))) return [];
           return held.has(said) ? [] : [`# ${kind} ${line.form} says <${hole}> names a # ${said}`];
         }),
       ),

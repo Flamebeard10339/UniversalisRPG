@@ -1,5 +1,5 @@
 import { Cursor, DslError, Filled, Parser, Span, Written } from './parser';
-import { ListParser } from './list';
+import { isList, ListParser } from './list';
 import { RawLine, RawSection, hasBlock, indentLines, sectionParser, takeBlock } from './structure';
 
 export interface HydrateContext {
@@ -92,7 +92,7 @@ export interface AnySchema {
   needs?: Record<string, string | readonly string[]>;
 }
 
-const isListParser = (parser: unknown): boolean => typeof parser === 'object' && parser !== null && 'element' in parser;
+const isListParser = (parser: unknown): boolean => isList(parser);
 
 export const isListField = (schema: AnySchema, name: string): boolean => isListParser(schema.fields[name]?.parser);
 

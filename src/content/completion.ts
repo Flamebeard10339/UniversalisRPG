@@ -1,5 +1,5 @@
-import { align, bare, exampleOf, holeNames, holesIn, valueIn, type Alignment } from '../grammar/form';
-import type { ListParser } from '../grammar/list';
+import { align, bare, exampleOf, holeNames, holesIn, soleHole, valueIn, type Alignment } from '../grammar/form';
+import { elementOf } from '../grammar/list';
 import { DslError, type Filled, type Parser, type Span, type Written } from '../grammar/parser';
 import { DEFAULT_CONTEXT, isPositionalField, typoOf } from '../grammar/section';
 import { indentLines, splitSections } from '../grammar/structure';
@@ -310,10 +310,8 @@ function readSection(text: string): { owner: Section; authored: Record<string, u
 
 const kindWordIn = (hole: string): string | undefined => hole.split(' ').find((word) => sectionFor(word) !== undefined);
 
-const POINTED = /^<(?<hole>[a-z][a-z0-9 -]*)>$/;
-
 function heldName(parser: Parser<unknown>): string | undefined {
-  const alone = POINTED.exec(parser.forms[0] ?? '')?.groups?.hole;
+  const alone = soleHole(parser.forms[0] ?? '');
   if (alone === undefined) return undefined;
   const said = parser.names?.[alone];
   return said === undefined ? kindWordIn(alone) : (said ?? undefined);
@@ -322,7 +320,7 @@ function heldName(parser: Parser<unknown>): string | undefined {
 export function kindNamed(filled: Filled, hole: string, wrote: (hole: string) => string | undefined = () => undefined): string | undefined {
   const said = filled.names?.[hole];
   if (said === null) return undefined;
-  const pointed = said === undefined ? undefined : POINTED.exec(said)?.groups?.hole;
+  const pointed = said === undefined ? undefined : soleHole(said);
   if (pointed !== undefined) {
     const written = wrote(pointed);
     return written !== undefined && sectionFor(written) !== undefined ? written : undefined;
@@ -385,7 +383,7 @@ const addressOffers = (known: readonly Addressed[], kinds: ReadonlySet<string>, 
 
 const KEYED = /^(?<key>[a-z][a-z0-9 -]*?):[ \t]*/;
 
-const oneOf = (parser: Parser<unknown>): Parser<unknown> => ('element' in parser ? (parser as ListParser<unknown>).element : parser);
+
 
 function fieldNamed(owner: Section, written: string, alone: boolean): { key: string | null; parser: Parser<unknown> | null; filled: Filled } {
   const schema = owner.schema;
@@ -394,7 +392,7 @@ function fieldNamed(owner: Section, written: string, alone: boolean): { key: str
   const found = Object.entries(schema.fields).find(([name, spec]) => (key === undefined ? name === schema.clauses : !isPositionalField(schema, name) && (spec.keyword ?? name) === key));
   if (found === undefined) return { key: null, parser: null, filled: {} };
   const parser = found[1].parser as Parser<unknown>;
-  return { key: key ?? null, parser: alone ? oneOf(parser) : parser, filled: { ...filledBy(parser), ...filledBy(found[1]) } };
+  return { key: key ?? null, parser: alone ? elementOf(parser) : parser, filled: { ...filledBy(parser), ...filledBy(found[1]) } };
 }
 
 interface Shape extends Filled {

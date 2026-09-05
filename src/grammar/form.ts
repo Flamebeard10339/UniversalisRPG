@@ -14,8 +14,10 @@ export interface Alignment {
 type Node = { lit: string } | { hole: string } | { rest: true };
 
 const PART = /(<[a-z][a-z0-9 -]*>|\[|\]|, …$)/;
-const PLACEHOLDER = /^<[a-z][a-z0-9 -]*>$/;
+const SOLE = /^<(?<hole>[a-z][a-z0-9 -]*)>(?:, …)?$/;
 const MORE = ',';
+
+export const soleHole = (form: string): string | undefined => SOLE.exec(form)?.groups?.hole;
 
 const pieces = (form: string): string[] => form.split(PART).filter((part) => part !== undefined && part !== '');
 
@@ -40,7 +42,8 @@ function expand(parts: readonly string[]): Node[][] {
     const after = expand(parts.slice(close + 1));
     return [...inner, []].flatMap((taken) => after.map((rest) => [...taken, ...rest]));
   }
-  const node: Node = head === ', …' ? { rest: true } : PLACEHOLDER.test(head!) ? { hole: head!.slice(1, -1) } : { lit: head! };
+  const only = head === ', …' ? undefined : soleHole(head!);
+  const node: Node = head === ', …' ? { rest: true } : only === undefined ? { lit: head! } : { hole: only };
   return expand(tail).map((rest) => [node, ...rest]);
 }
 

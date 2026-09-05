@@ -3,7 +3,7 @@ import { Condition, condition } from './condition';
 import { HOOK_FIELD_REFUSALS, hookLabelProblem } from './hook';
 import { filledBy } from './codec';
 import { paired } from './form';
-import { list, ListParser } from './list';
+import { isList, list, ListParser } from './list';
 import { Cursor, DslError, Filled, Parser, requireEnd, Span, Written } from './parser';
 import { EntryBody } from './section';
 import { RawLine, hasBlock, indentLines, takeBlock } from './structure';
@@ -139,7 +139,7 @@ const statNamed: Parser<string> = { ...id, forms: ['<stat>'], examples: ['luck']
 
 const stoppers = list(eventNamed);
 
-const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => ('element' in parser ? (parser as ListParser<unknown>) : undefined);
+const blockOf = (parser: Parser<unknown>): ListParser<unknown> | undefined => (isList(parser) ? parser : undefined);
 
 function readsWith(written: string, parser: Parser<unknown>): ActionValue {
   const held = blockOf(parser);
