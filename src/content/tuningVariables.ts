@@ -34,6 +34,10 @@ const REFUSED_BELOW: Readonly<Record<string, { least: number; why: string }>> = 
     least: 0,
     why: 'a thing cannot find you before you got there, and zero is how a world says it pounces',
   },
+  [MIN_DAMAGE]: {
+    least: 1,
+    why: 'a blow that lands takes something off, and a fight where neither side can is one nobody walks out of',
+  },
 };
 
 export function validateTuningVariable(variable: Variable): void {

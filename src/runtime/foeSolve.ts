@@ -3,6 +3,7 @@ import { midpoint, point, type Range } from '../grammar/range';
 import { activitiesIn, type Activity } from '../content/activities';
 import type { Registry } from '../content/registry';
 import type { Entity } from '../content/sections/entity';
+import { profile, type Profile } from '../content/sections/profile';
 import { actorEntity } from './actionLookup';
 import { abilityOn, dpsLadder, toughnessLadder, type Ladder } from './pace';
 import { PLAYER } from './state';
@@ -53,9 +54,9 @@ export function ladderedFor(registry: Registry, fight: FightShape): LadderedStat
   return activity === undefined ? undefined : ladderedIn(registry, activity, fight);
 }
 
-export type Factor = 'rate' | 'damage' | 'accuracy' | 'evasion' | 'reduction' | 'pool';
+export type Factor = Exclude<keyof Profile, 'id'>;
 
-export const FACTORS: readonly Factor[] = ['rate', 'damage', 'accuracy', 'evasion', 'reduction', 'pool'];
+export const FACTORS: readonly Factor[] = Object.keys(profile.schema!.fields) as Factor[];
 
 export interface Weighed {
   stat: string;

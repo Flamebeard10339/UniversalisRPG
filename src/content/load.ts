@@ -14,7 +14,7 @@ import { type Maps, buildSection, sectionFor, contentSectionMaps, DEBUG_MARK, is
 import { ModuleSource, ParsedModule, moduleOrderProblems, orderModules, parseModuleSource, parseUniverse } from './universe';
 import { DslError, Span } from '../grammar/parser';
 import { hasNote, NOTE_MARK, withoutNote } from '../grammar/note';
-import { ACTION_MEMBER, memberKey, namesSection, Namespace } from './namespace';
+import { ACTION_MEMBER, memberKey, namesSection, Namespace, spelledSegments } from './namespace';
 import { isOwnedKind } from './sections';
 import { Contribution, emptyMaps, mapOf, everyActionTable, ModuleDiagnostic, ModuleLoadStage, ModuleStatus, PLAYER_ENTITY, Registry, UniverseLoadResult, WORLD_BIT } from './registry';
 import { registrySlots, validateItemSlots, validateSectionReferences, validateTestReferences } from './references';
@@ -296,8 +296,7 @@ function locationIdFromMessage(message: string): string | undefined {
 }
 
 function namesDanglingRoot(kind: ReferenceKind, id: string, danglingRoots: ReadonlySet<string>): boolean {
-  const segments = id.split('.');
-  if (segments[0] === kind && segments.length > 1) segments.shift();
+  const segments = spelledSegments(kind, id, null);
   return segments.length > 1 && danglingRoots.has(segments[0]);
 }
 

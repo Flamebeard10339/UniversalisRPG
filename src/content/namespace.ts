@@ -153,9 +153,7 @@ export class Namespace {
   }
 
   resolve(kind: string, raw: string, self: string | null, visible: ReadonlySet<string | null>, where: string, inner: string | null = null): string {
-    const segments = raw.split('.');
-    if (segments[0] === kind && segments.length > 1) segments.shift();
-    if (segments[0] === SELF && segments.length > 1 && self !== null) segments[0] = self;
+    const segments = spelledSegments(kind, raw, self);
     const suffix = segments.join('.');
     if (segments.length > 1 && this.modules.has(segments[0]) && !visible.has(segments[0])) {
       throw new DslError(`${where} names ${raw}, but ${segments[0]} is not this module or one of its dependencies`);

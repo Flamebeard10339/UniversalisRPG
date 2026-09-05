@@ -5,13 +5,13 @@ import { secondsToMs } from './units';
 const DEFAULT_TRAVEL_SECONDS = 3;
 
 export function travelSeconds(registry: Registry): number {
-  return Math.max(0, registry.variables.get(TRAVEL_SECONDS)?.value ?? DEFAULT_TRAVEL_SECONDS);
+  return registry.variables.get(TRAVEL_SECONDS)?.value ?? DEFAULT_TRAVEL_SECONDS;
 }
 
 const DEFAULT_MIN_DAMAGE = 1;
 
 export function minDamage(registry: Registry): number {
-  return Math.max(1, registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE);
+  return registry.variables.get(MIN_DAMAGE)?.value ?? DEFAULT_MIN_DAMAGE;
 }
 
 const DEFAULT_CONTEST_SPREAD = 100;
@@ -27,17 +27,17 @@ export function defaultActionDuration(registry: Registry): number {
 }
 
 export function inventorySlots(registry: Registry): number {
-  return Math.max(0, registry.variables.get(INVENTORY_SLOTS)?.value ?? 0);
+  return registry.variables.get(INVENTORY_SLOTS)?.value ?? 0;
 }
 
 export function engagementDelay(registry: Registry): number {
-  return Math.max(0, secondsToMs(registry.variables.get(ENGAGEMENT_SECONDS)?.value ?? 0));
+  return secondsToMs(registry.variables.get(ENGAGEMENT_SECONDS)?.value ?? 0);
 }
 
 const DEFAULT_MAP_GRID = 140;
 
 export function mapGrid(registry: Registry): number {
-  return Math.max(1, registry.variables.get(MAP_GRID)?.value ?? DEFAULT_MAP_GRID);
+  return registry.variables.get(MAP_GRID)?.value ?? DEFAULT_MAP_GRID;
 }
 
 export function hitChance(accuracy: number, evasion: number, registry: Registry): number {

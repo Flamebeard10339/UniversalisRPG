@@ -54,7 +54,7 @@ export const HEADER = [
   'where its reasoning lives. Every line names the thing that would close it, and a line',
   'about behaviour may name a proof — a # test in open-tests.dsl, or a describe() in',
   'open-tests.test.ts — instead of describing one. A half with no line left in it is',
-  'deleted, and the folder goes when its last file does.',
+  'deleted, and the folder goes when its second file does.',
   '',
   'This is that header, written here once so that no file carries one of its own.',
 ];
