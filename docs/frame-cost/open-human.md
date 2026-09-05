@@ -1,24 +1,36 @@
 # Open — these wait on the author
 
-## The flash on a new line is a quarter as long a movement as it was
+## Half the flash on a new line is worth another look, and the rest of it is worth a decision
 
 A line that has just arrived is marked by a colour that holds for three seconds
 and then fades over one. That was written as a single four-second animation, three
 quarters of which held one value that was not moving — and at 64x the log gains
 twenty-five lines a second, so about a hundred of them were interpolating a
-background colour at once. Measured in a real Chrome, that was 1188ms of style
-recalculation every 15 seconds, more main-thread time than the game tick and the
-whole React render together; on a CPU throttled to stand in for a phone it was the
-whole difference between 36fps with a quarter of the frames over 33ms and 102fps
-with none.
+background colour at once. It was the largest single cost in the app, larger than
+the game tick and the whole React render together.
 
 The hold is now the delay before the fade, with the colour supplied by a backwards
 fill so it still wins the cascade against the Tailwind background classes the way
-an animation did. It is meant to look identical, and the numbers say a quarter as
-many lines are moving at any moment.
+an animation did. **Verified**: screenshots of a busy log at 64x, before and
+after, are identical — the flash is the same colour over the same lines. And
+measured in a real Chrome at 4x CPU throttle, which is the closest thing here to a
+phone, three runs each:
 
-*Moves when:* the author has watched a busy log at 1x and at 64x and said whether
-the flash still finds the eye. If it does, this line is deleted; if it does not,
-it becomes an agent line to put the four seconds back a cheaper way — the fade can
-be an overlay's opacity, which the compositor runs without touching the main
-thread, at the cost of a layer per line.
+| | style recalc | fps | p90 frame | frames over 33ms |
+|---|---|---|---|---|
+| the four-second animation | 2429ms / 15s | 42 | 66ms | 22% |
+| **as it stands** | **1560ms** | **73** | **31ms** | **8.5%** |
+| the animation turned off | 1004ms | 100 | 17ms | 2.4% |
+
+So it took about 60% of what was there to take. The remaining 40% is Chrome still
+keeping a delayed animation in its running set — the animation count barely moved,
+72 against 74 — so the delay is cheaper than interpolating but not free.
+
+Two things are left, and both are the author's.
+
+*Moves when:* the author has watched a busy log and said whether the **fade** still
+reads. The screenshot settles the hold; it cannot show the fade, which is now a
+full ease-out over one second where it was the tail of an ease-out over four. And
+whether the last 40% is worth having: the fade can be an overlay's opacity, which
+the compositor runs without touching the main thread, at the cost of a layer per
+line — which is a trade a phone might not want either way.
