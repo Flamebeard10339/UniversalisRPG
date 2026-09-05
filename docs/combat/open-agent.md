@@ -270,19 +270,6 @@ same thing. So this closes on the sheet being read, not on the rooms being level
 *Closes when:* the room table is re-read after the re-cut and the rooms that stop short are
 either meant to or given population, with the choice named per room rather than swept.
 
-## The combat tier saves can go, now that a floor walks
-
-`floors/combat-floor.dsl` walks a fighter from the tutorial to level 30 in five routes, so the
-condition `docs/balance/open-agent.md` set for deleting a skill's `tiers.dsl` saves is met for
-combat. Cooking is what is left after it.
-
-What the floor found on landing is in `docs/balance/open-agent.md`: health arrives at 65 while
-attack reaches 30. Deleting the saves and re-cutting against that finding are two jobs and this
-line is only the first.
-
-*Closes when:* the combat saves in `content/tiers.dsl` are deleted and nothing that read them
-has gone quiet.
-
 ## The muster is a room, and now reads as a room that runs out
 
 It is no longer the wall it was reported as, nor the one-sided thing it was: a fighter at the

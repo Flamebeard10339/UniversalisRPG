@@ -6,27 +6,32 @@ what is below is what that plan does not already say to do next.
 
 ---
 
-## An `until:` loop can spin for ever, and `npm run floors` is a CI gate with no clock
+## A route can still run for ever, and nobody has found where
 
-`combat-floor`'s `noeating-hard` looped `until level.combat.attack >= 30` over the muster,
-travelling in, killing what stood there, and travelling out. The muster empties, so a pass that
-finds it empty gains almost nothing — and the engine's guard against a loop going round for ever
-is that **a pass leaving the world exactly as it found it is refused**, which does not fire here
-because the clock moved. So the route span, and took `npm run floors` with it: **over half an
-hour before it was killed by hand, with no timeout anywhere to stop it.**
+`npm run floors` now walks in a child process it kills after five minutes, so CI cannot hang on
+one — a clean walk is 82 seconds, and the routes already printed name the one it stuck on. That
+is a cap, not a cure: the route still runs for ever, it is just stopped from outside.
 
-Two separate things, and the second is the dangerous one. The loop is a route somebody wrote
-badly and it is deleted. **`npm run floors` runs in CI and can hang for ever on one**, and so
-can `npm run probe` — a route that makes progress too slowly to finish is indistinguishable
-from one that never will, and neither tool has a clock.
+**Where the loop is remains unknown, and the places it is not are worth having.** The obvious
+candidate is `wentRound` in `session.ts`, whose `for (let passes = 0; ; passes++)` is bounded
+only by a guard that refuses a pass leaving the world exactly as it found it — which never
+fires when the clock has moved. It is not there. A wall-clock check was put at the top of that
+pass loop, at the top of `resolveUnderWay`'s `for (;;)`, and inside `resolve`'s
+`while (state.time < toTimeMs)`, with an already-expired clock proved to throw in isolation, and
+**none of the three ever fired** on `combat-floor`'s `noeating-hard`. That machinery is deleted
+rather than left in place: one check sat in the innermost loop every simulation runs through.
 
-The guard wants to be *no measurable progress toward the condition* over some number of passes,
-rather than *no change at all*; a pass whose only change is elapsed time is the shape to catch.
-Failing that, a wall-clock or step cap on a single route turns an infinite hang into a red
-route, which is a finding rather than a stuck build.
+So the loop is somewhere else. `resolveUnderWay` has a second escape worth reading before
+hunting further — the aggressor branch does `resolve(...); continue;`, which jumps over its own
+`UNDER_WAY_LIMIT_MS` bound, so a room that keeps re-arming `engagesAt` is unbounded by
+construction whether or not it is this bug.
 
-*Closes when:* a route that cannot reach its condition fails rather than hanging, and no tool
-that CI runs can be stopped only by killing it.
+The route that reproduces it is in the run's workdir rather than the corpus: it loops
+`until level.combat.attack >= 30` over `tulsa.the-muster`, a room that empties, and it is
+`# test noeating-hard` in the module `combat-floor` was cut down from.
+
+*Closes when:* a route that cannot reach its condition fails with a message naming the loop, and
+`npm run probe` is as safe to run as `npm run floors`.
 
 ## Health outruns attack about two to one, and the curve by nine
 
