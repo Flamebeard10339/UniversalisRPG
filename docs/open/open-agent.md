@@ -676,27 +676,23 @@ and so is not walked on its own by the gate, or a form of `run:` that starts the
 the caller's state rather than from its own `load:`. Whichever lands, the swampy hand-in and the
 first-steps tail each get one home.
 
-## A location's inline action silently shadows a declared `# action` of the same name
+## A location cannot reach a declared `# action`, so a mechanic two rooms share is written in each
 
 Measured 2026-09-05 while trying to give fishing's two dusk actions one home. An entity reaches a
 declared `# action` through `uses:`, and its inline block of that name then lays over the declared
-body. A `# location` has no `uses:` and its inline blocks take no `extends:`, so a location block
-whose name matches a declared `# action` does not lay over it at all — it declares a separate,
-empty action of the same name.
+body. A `# location` has no `uses:` and its inline blocks take no `extends:`, so a room that wants
+the world's mechanic has to write the whole of it again — which is shape 5, and the reason fishing
+holds two dusk waits rather than one.
 
-**Nothing says so.** With `# action wait-for-dusk` holding `time: 20` and
-`inflict: the-rise for 3m`, and each water left an `after: say:`, the corpus loaded, round-tripped
-clean and walked all 105 routes green — and dusk was instant and inflicted nothing. An author who
-does this has written a plausible thing and gets no word back from the gate that is meant to be
-their whole verdict.
-
-Two things would each fix it and they are not alternatives — the second is worth having whether or
-not the first lands.
+The silence around it is closed: `shadowed` in `src/runtime/worldRemarks.ts` remarks on any inline
+action block, wherever it stands, whose name is one a `# action` already declares and which does
+not reach it. It derives its owner kinds from `everyActionTable` and its declared names from the
+registry, so a kind that grows action blocks next month is covered with no edit, and it fires
+nowhere in the shipped corpus today. That says *you did not get what you wrote*; it does not give
+a room any way to get it.
 
 *Closes when:* a `# location` can reach a declared `# action`, by a `uses:` of its own or an
-`extends:` on an inline block; **and** `src/runtime/worldRemarks.ts` remarks on any inline action
-block, wherever it stands, whose name is one a `# action` already declares and which does not
-reach it — deriving its subjects from the section list rather than naming locations.
+`extends:` on an inline block, and fishing's two dusk waits are one.
 
 ## Small constants still spelled twice
 

@@ -1,5 +1,7 @@
 import { isBase } from '../content/sections/item';
-import type { Registry } from '../content/registry';
+import { declaredId } from '../content/sections/entity';
+import { namesSection } from '../content/namespace';
+import { everyActionTable, formatModuleDiagnostic, type Registry } from '../content/registry';
 import type { ModuleSource } from '../content/universe';
 import { everyDirective, type Directive } from '../content/sections/test';
 import { keywordsIn, type TagClause } from '../grammar/tagClause';
@@ -9,7 +11,6 @@ import { CHURNING_ROOTS, everyCondition, printCondition } from '../grammar/condi
 import { DEBUG_MARK, isDebug, sectionFor } from '../content/sections';
 import { parseModuleSource } from '../content/universe';
 import { loadUniverseWithDiagnostics } from '../content/load';
-import { formatModuleDiagnostic } from '../content/registry';
 import { rootModules } from '../content/worlds';
 import { NOT_SAID, proseWritten, publishedSurfaces, unsaidFields } from './proseSaid';
 import { grantsOf, passiveTags, passiveTagsOf } from './passiveGrant';
@@ -211,6 +212,26 @@ function unladdered(registry: Registry): Remark[] {
   );
 }
 
+function shadowed(registry: Registry): Remark[] {
+  const declared = [...registry.actions.keys()];
+  return everyActionTable(registry).flatMap(([kind, id, actions]) =>
+    kind === 'action'
+      ? []
+      : actions.flatMap((block) => {
+          if (declaredId(block) !== undefined) return [];
+          const named = declared.find((each) => namesSection(each, block.label));
+          return named === undefined
+            ? []
+            : [
+                {
+                  where: `# ${kind} ${id}`,
+                  says: `writes an inline ${JSON.stringify(block.label)} block, and # action ${named} is already declared under that name — but this block does not reach it. It stands as a separate action that holds only the lines written here, so everything the declaration says is quietly dropped and the world still loads, prints back and walks its routes. Give this a name of its own, or reach the declaration the way an # entity does, with a uses: line and an inline block laid over it.`,
+                },
+              ];
+        }),
+  );
+}
+
 type Rule = (sources: readonly ModuleSource[], registry: Registry) => Remark[];
 
 const RULES: readonly Rule[] = [
@@ -225,6 +246,7 @@ const RULES: readonly Rule[] = [
   (_sources, registry) => lopsided(registry),
   (_sources, registry) => undealt(registry),
   (_sources, registry) => unladdered(registry),
+  (_sources, registry) => shadowed(registry),
   (sources) => saidAnyway(sources),
   (sources) => unpacked(sources),
   (sources) => rootless(sources),
