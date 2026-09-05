@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { sourceFiles } from './lib/dslSources';
+import { sourceFiles, sourceName } from './lib/dslSources';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { everyDirective } from '../src/content/sections/test';
 import { formatVersion } from '../src/grammar/dependency';
@@ -354,7 +354,7 @@ export function splitDocuments(name: string, text: string): ModuleSource[] {
   return documents.map((document, index) => ({ name: `${name}-${index + 1}`, text: document })).filter((source) => source.text.trim() !== '');
 }
 
-const asSource = (file: string): ModuleSource => ({ name: path.basename(file).replace(/\.[^.]*$/, ''), text: readFileSync(file, 'utf8') });
+const asSource = (file: string): ModuleSource => ({ name: sourceName(file), text: readFileSync(file, 'utf8') });
 
 export function readSources(files: readonly string[]): ModuleSource[] {
   return files.flatMap((file) => (file === '-' ? splitDocuments('stdin', readFileSync(0, 'utf8')) : sourceFiles(file).map(asSource)));

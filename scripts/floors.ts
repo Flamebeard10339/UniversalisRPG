@@ -10,7 +10,7 @@ import type { ModuleSource } from '../src/content/universe';
 import { replayTest, SECONDS_A_ROUTE_MAY_WALK } from '../src/runtime/session';
 import { skillLevel } from '../src/runtime/skills';
 import { createGameState } from '../src/runtime/state';
-import { sourceFiles } from './lib/dslSources';
+import { sourceFiles, sourceName } from './lib/dslSources';
 import { ladderForSkill, minutesToReachOn } from '../src/runtime/pace';
 import { readSources } from './probe';
 
@@ -65,7 +65,7 @@ export function goalOf(registry: Registry, testId: string): Goal | undefined {
   return goal;
 }
 
-export const floorIds = (sources: readonly ModuleSource[], under: string): readonly string[] => sourceFiles(under).map((file) => path.basename(file).replace(/\.[^.]*$/, '')).filter((id) => sources.some((source) => source.name === id));
+export const floorIds = (sources: readonly ModuleSource[], under: string): readonly string[] => sourceFiles(under).map(sourceName).filter((id) => sources.some((source) => source.name === id));
 
 export function foldersOf(argv: readonly string[]): { corpus: string; floors: string } {
   const at = argv.indexOf('--world');

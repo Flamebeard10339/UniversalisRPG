@@ -1,5 +1,5 @@
 import { repoPath, repoRoot, splitFiles } from './lib/repo';
-import { sourceFiles } from './lib/dslSources';import { execFileSync } from 'node:child_process';
+import { sourceFiles, sourceName } from './lib/dslSources';import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -128,10 +128,6 @@ function issueList(args: Args): ApprovedModIssue[] {
     }
   }
   return [...byIssue.values()];
-}
-
-function sourceName(file: string): string {
-  return path.basename(file).replace(/\.[^.]*$/, '');
 }
 
 function contentSource(file: string): ModuleSource {

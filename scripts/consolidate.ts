@@ -1,4 +1,5 @@
 import { repoPath, splitFiles } from './lib/repo';
+import { sourceName } from './lib/dslSources';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -274,8 +275,6 @@ export function parseArgs(raw: readonly string[]): Args {
   return args;
 }
 
-
-const sourceName = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '');
 
 export function contentFiles(args: Args): string[] {
   if (args.contentFiles) return args.contentFiles;

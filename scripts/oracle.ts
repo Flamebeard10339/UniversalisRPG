@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { probe, readSources } from './probe';
+import { sourceSlug } from './lib/dslSources';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { remarksOn } from '../src/runtime/worldRemarks';
 import { align, type Hole } from '../src/grammar/form';
@@ -82,7 +83,7 @@ function moduleDeclaredIn(text: string): string | null {
   }
 }
 
-const slug = (file: string): string => path.basename(file).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'draft';
+const slug = (file: string): string => sourceSlug(file) || 'draft';
 
 export function draftModule(file: string, text: string, world: readonly ModuleSource[]): { source: ModuleSource; supplied: boolean } {
   const id = slug(file);
