@@ -204,15 +204,13 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   visit: (value, where, visit) => {
     const held = value as unknown as Loose;
     for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
-    for (const entry of listMembers<Ally>(held.allies)) put(entry, 'entity', 'entity', `${where} allies:`, visit);
     blocks(held.blocks, where, visit);
   },
   prune: (value, at, where) => {
     const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
     const blocks = pruneBlocks(value.blocks, where, at);
-    const allies = value.allies.filter((entry) => !at.gone('entity', entry.entity, `${where} allies:`));
-    const kept = Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length && allies.length === value.allies.length;
-    return kept ? value : { ...value, stats, blocks, allies };
+    const kept = Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length;
+    return kept ? value : { ...value, stats, blocks };
   },
 });
 

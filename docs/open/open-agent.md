@@ -572,32 +572,29 @@ they say what the answer was.
 restating its pace, `melee-combat` holds no `rate:` that `melee-swing` could, and a body that
 extends nothing is still refused with a span.
 
-## Ten kinds hand-write a reference walk their own field declarations could derive
+## Two fields hydrate a pair list into a record, so their walk cannot be derived from the parser
 
-`nameKind` (`src/content/sections/define.ts:189-202`) works out which kind a field's hole names,
-and `namedFields` turns that into the walk that validates and prunes references. It gives up the
-moment a parser's form is anything but a lone hole, so `<count> <entity>`, `<stat> <amount>`,
-`north of <location>`, `<position> <passive>` and `<damage-type> to <damage-type>` all fall out.
+A value parser now declares `lands` — where each of its holes lands on the value it parsed, and
+of what kind — and `landings` in `src/content/sections/define.ts` reads it into the walk that
+resolves, validates and prunes. Fourteen ref sites and one condition site derive that way, and
+`shop`, `skill`, `passive`, `recipe` and `stat` declare no `visit` or `prune` at all.
 
-Measured 2026-09-05: 35 holes on schema fields carry a kind, and **32 are not walked by
-`namedFields`**. Every one is instead walked by hand, in the `section()` call of `clusterJewel`,
-`entity`, `item`, `ladder`, `location`, `passive`, `recipe`, `shop`, `skill` and `stat` — ten
-kinds, four of them one line of the same sentence.
+Two fields are left out, and for one reason: their `hydrate` reshapes the list the parser
+produced into a `Record`, so the held value is not the parsed value and no landing declared on
+the parser can be found in it. `clusterJewel.positions` parses `[<position>, <passive>]` pairs
+and holds `Record<number, string>`; `entity.stats` parses `[<stat>, <range>]` pairs and holds
+`Record<string, Range>`. Both walk by hand in their `section()` call, and both walk the
+*authored* shape in `visit` and the *hydrated* shape in `prune` — which is the same fact written
+twice, in two shapes.
 
-**Relaxing `nameKind` to accept multi-hole forms is the wrong fix and would be shape 1.**
-Knowing that `<item>` in `<count> <item>` names an item does not say *which property of the
-parsed value holds it*, and the mapping is genuinely not uniform: `populationValue`'s
-`<entity>` lands on `.entity`, `edgeValue`'s `<location>` on `.target`, `relativeValue`'s on
-`.of`. The parser has to **declare** it — a `lands` beside the existing `names` — which is a
-fact its author knows and currently expresses by writing the walk out instead.
+`dehydrate` is not the way through: it rebuilds fresh pairs, so a rename written onto one is
+thrown away, and putting a filtered record back needs the `hydrate` that only the load path
+holds a context for.
 
-A live inconsistency this would settle: `recipe` declares a `visit` and no `prune`, so the
-fallback drops the *whole recipe* when an item it names goes, while `shop` declares a `prune`
-and drops only the stock line. Nobody chose that difference.
-
-*Closes when:* a value parser declares where each of its holes lands, `namedFields` derives the
-walk, and `shop`, `skill`, `passive`, `recipe`, `stat` and `clusterJewel` declare no `visit` or
-`prune` of their own.
+*Closes when:* either both fields hold what their parser parsed — a pair list, with a lookup
+helper for the readers that want a map — or a field can declare that its held record is keyed
+by one hole of its parser and valued by another, and `landings` reads that. Prefer the first:
+`Record<number, string>` is read in six places and none of them needs it to be a record.
 
 ## The round-trip proof's root set skips action bodies, so four parsers are unproved
 

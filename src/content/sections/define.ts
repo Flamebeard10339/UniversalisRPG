@@ -2,10 +2,10 @@ import { Action, actionBody, actionLines } from '../../grammar/action';
 import { filledBy } from '../../grammar/codec';
 import { paired, soleHole } from '../../grammar/form';
 import { ActionResult } from '../../grammar/actionResult';
-import { blockCalled, calledBlock, DslError, Holds, Parser, Written } from '../../grammar/parser';
+import { blockCalled, calledBlock, DslError, Holds, Parser, ValueWalk, Written } from '../../grammar/parser';
 import { elementOf } from '../../grammar/list';
 import { RawLine, RawSection, requireNoBlock, sectionParser } from '../../grammar/structure';
-import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, alternativesFor, hydrateSection, isListField, neededAlternatives, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
+import { AnyField, AnySchema, Authored, DEFAULT_CONTEXT, HydrateContext, PrintContext, SectionSchema, alternativesFor, hydrateSection, isListField, listMembers, neededAlternatives, isPositionalField, parseAnySection, printSection, unmetNeed, writtenAs } from '../../grammar/section';
 import { Loose, Pruning, Visit, condition as visitCondition, hooks as visitHooks, pruneHooks, pruneTags, put, strings, visitTags } from '../refs';
 import { Condition, condition } from '../../grammar/condition';
 import { hookResultList } from '../../grammar/actionResult';
@@ -207,7 +207,53 @@ export interface Named {
   site: string;
   list: boolean;
   standsWithout: boolean;
+  needsEvery: boolean;
+  into?: string;
 }
+
+interface Landed {
+  field: string;
+  site: string;
+  list: boolean;
+  standsWithout: boolean;
+  needsEvery: boolean;
+  walks: readonly ValueWalk[];
+}
+
+const landings = (schema: AnySchema): readonly Landed[] =>
+  Object.entries(schema.fields).flatMap(([field, spec]) => {
+    const walks = elementOf(spec.parser as Parser<unknown>).lands as readonly ValueWalk[] | undefined;
+    if (walks === undefined || walks.length === 0) return [];
+    return [{ field, site: `${spec.keyword ?? field}:`, list: isListField(schema, field), standsWithout: spec.standsWithout === true, needsEvery: spec.needsEvery === true, walks }];
+  });
+
+const landedNames = (each: Landed): Named[] =>
+  each.walks.flatMap((walk) => (walk.how === 'ref' ? [{ field: each.field, kind: walk.names, site: each.site, list: each.list, standsWithout: each.standsWithout, needsEvery: each.needsEvery, into: walk.field }] : []));
+
+const heldBy = (value: object, each: Landed): readonly Loose[] => {
+  const current = (value as Loose)[each.field];
+  if (each.list) return listMembers<Loose>(current).filter((one) => typeof one === 'object' && one !== null);
+  return typeof current === 'object' && current !== null ? [current as Loose] : [];
+};
+
+const landedSite = (where: string, each: Landed, walk: ValueWalk, held: Loose): string => `${where} ${each.site}${walk.at === undefined ? '' : ` ${(walk.at as (value: Loose) => string)(held)}`}`;
+
+const walkLanded = (value: object, each: Landed, where: string, visit: Visit): void => {
+  for (const held of heldBy(value, each))
+    for (const walk of each.walks) {
+      const at = landedSite(where, each, walk, held);
+      if (walk.how === 'ref') put(held, walk.field, walk.names, at, visit);
+      else visitCondition(held[walk.field] as Condition | undefined, at, visit);
+    }
+};
+
+const landedGone = (each: Landed, held: Loose, at: Pruning, where: string): boolean =>
+  each.walks.some((walk) => {
+    const site = landedSite(where, each, walk, held);
+    if (walk.how !== 'ref') return !at.intact(() => visitCondition(held[walk.field] as Condition | undefined, site, at.visit));
+    const named = held[walk.field];
+    return typeof named === 'string' && at.gone(walk.names, named, site);
+  });
 
 export const hiddenIf = (note: string) => ({ parser: condition, keyword: 'hidden if', note }) as const;
 
@@ -222,7 +268,7 @@ const carriesHooks = (schema: AnySchema): boolean => Object.values(schema.fields
 const namedFields = (schema: AnySchema): readonly Named[] =>
   Object.entries(schema.fields).flatMap(([field, spec]) => {
     const kind = nameKind(spec);
-    return kind === undefined ? [] : [{ field, kind, site: `${spec.keyword ?? field}:`, list: isListField(schema, field), standsWithout: spec.standsWithout === true }];
+    return kind === undefined ? [] : [{ field, kind, site: `${spec.keyword ?? field}:`, list: isListField(schema, field), standsWithout: spec.standsWithout === true, needsEvery: spec.needsEvery === true }];
   });
 
 function nestedActionLines(kind: string, offered: string, lines: readonly Written[]): readonly Written[] {
@@ -268,17 +314,20 @@ export const section =
     if (schema === undefined && merge === undefined && (map !== undefined || maps !== undefined)) {
       throw new Error(`# ${kind} reads its own body and lands in a map, so it must declare a merge: what a second body written at one of its ids means`);
     }
-    const names = schema === undefined ? [] : namedFields(schema);
+    const landed = schema === undefined ? [] : landings(schema);
+    const plain = schema === undefined ? [] : namedFields(schema);
+    const names = [...plain, ...landed.flatMap(landedNames)];
     const conditions = schema === undefined ? [] : conditionFields(schema);
     const tagged = schema === undefined ? [] : tagFields(schema);
     const hooked = schema !== undefined && carriesHooks(schema);
     const written = schema ? schemaGrammar(schema) : (spec as Bespoke<V>).grammar;
     const visited = (value: V, where: string, visit: Visit): void => {
-      for (const each of names) {
+      for (const each of plain) {
         const at = `${where} ${each.site}`;
         if (each.list) strings(value as unknown as Loose, each.field, each.kind, at, visit);
         else put(value as unknown as Loose, each.field, each.kind, at, visit);
       }
+      for (const each of landed) walkLanded(value, each, where, visit);
       for (const each of conditions) visitCondition((value as unknown as Loose)[each.field] as Condition | undefined, `${where} ${each.site}`, visit);
       for (const field of tagged) visitTags((value as unknown as Loose)[field], where, visit);
       if (hooked) visitHooks(value as unknown as Loose, where, visit);
@@ -302,13 +351,29 @@ export const section =
           if (Array.isArray(current) && kept.length !== current.length) (held ??= { ...(value as unknown as Loose) })[field] = kept;
         }
       }
-      for (const each of names) {
+      for (const each of landed) {
+        const current = (value as unknown as Loose)[each.field];
+        if (each.list) {
+          if (!Array.isArray(current)) continue;
+          const kept = current.filter((one) => typeof one !== 'object' || one === null || !landedGone(each, one as Loose, at, where));
+          if (kept.length === current.length) continue;
+          if (each.needsEvery) return null;
+          (held ??= { ...(value as unknown as Loose) })[each.field] = kept;
+          continue;
+        }
+        if (typeof current !== 'object' || current === null || !landedGone(each, current as Loose, at, where)) continue;
+        if (!each.standsWithout) return null;
+        (held ??= { ...(value as unknown as Loose) })[each.field] = undefined;
+      }
+      for (const each of plain) {
         const current = (value as unknown as Loose)[each.field];
         const site = `${where} ${each.site}`;
         if (each.list) {
           if (!Array.isArray(current)) continue;
           const kept = current.filter((one) => typeof one !== 'string' || !at.gone(each.kind, one, site));
-          if (kept.length !== current.length) (held ??= { ...(value as unknown as Loose) })[each.field] = kept;
+          if (kept.length === current.length) continue;
+          if (each.needsEvery) return null;
+          (held ??= { ...(value as unknown as Loose) })[each.field] = kept;
           continue;
         }
         if (typeof current !== 'string' || !at.gone(each.kind, current, site)) continue;

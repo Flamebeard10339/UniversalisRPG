@@ -5,7 +5,6 @@ import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { point } from '../../grammar/range';
 import { id, number, numberOrStat, produced, Produced, Quantified, quantified, text } from '../../grammar/values';
-import { put, quantified as quantifiedItems, type Loose } from '../refs';
 import { ActionDeclaration } from './action';
 import { section } from './define';
 
@@ -32,6 +31,7 @@ export const recipeSkillValue: Parser<{ skill: string; amount: number }> = {
     return { skill, amount: number.parse(cursor) };
   },
   print: (value) => `${id.print(value.skill)} ${number.print(value.amount)}`,
+  lands: [{ how: 'ref', field: 'skill', names: 'skill' }],
   forms: ['<skill> <xp>'],
   examples: ['smithing 40'],
 };
@@ -110,8 +110,8 @@ export const recipe = section<Recipe>()({
   text: ['title'],
   fields: {
     requiresCapability: { parser: id, keyword: 'station', names: { id: 'station' } },
-    in: { parser: list(quantified), default: () => [], block: true },
-    out: { parser: list(produced), default: () => [], block: true },
+    in: { parser: list(quantified), default: () => [], block: true, needsEvery: true },
+    out: { parser: list(produced), default: () => [], block: true, needsEvery: true },
     skill: { parser: recipeSkillValue, note: 'the experience one craft pays into that skill' },
     say: { parser: text },
     time: { parser: seconds, note: 'how long one craft takes' },
@@ -121,12 +121,7 @@ export const recipe = section<Recipe>()({
       parser: numberOrStat,
       note: 'what the accuracy: stat is weighed against. A number is how hard this dish is, written on the dish — nothing stands across the bench to read a stat off, so a recipe that leaves this out is contested against nothing and every dish of every tier risks the same',
     },
-    burnt: { parser: list(produced), default: () => [], block: true },
+    burnt: { parser: list(produced), default: () => [], block: true, needsEvery: true },
   },
   validate: (value) => (value.burnt.length > 0 && !value.accuracy ? 'burnt: needs an accuracy: stat, or nothing can ever burn' : undefined),
-  visit: (value, where, visit) => {
-    const held = value as unknown as Loose;
-    for (const field of ['in', 'out', 'burnt'] as const) quantifiedItems(held[field], 'item', `${where} ${field}:`, visit);
-    if (held.skill) put(held.skill as Loose & { skill: string }, 'skill', 'skill', `${where} skill:`, visit);
-  },
 });

@@ -13,6 +13,7 @@ export type PrintWhen = 'when-set' | 'always' | 'unless-default';
 
 export interface FieldPrinting extends Filled {
   standsWithout?: true;
+  needsEvery?: true;
   note?: string;
   example?: string;
   family?: string;

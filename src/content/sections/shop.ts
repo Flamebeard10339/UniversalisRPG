@@ -1,6 +1,5 @@
 import { list } from '../../grammar/list';
 import { decimal, duration, id, oneOf, Quantified, quantified } from '../../grammar/values';
-import { quantified as quantifiedItems, type Loose, type Pruning, type Visit } from '../refs';
 import type { Condition } from '../../grammar/condition';
 import { hiddenIf, section } from './define';
 import { Item } from './item';
@@ -86,10 +85,5 @@ export const shop = section<Shop>()({
     if (value.replenish <= 0) return 'replenish: is how long one unit of stock takes to come back, so it cannot be instant';
     const twice = value.stocks.map((entry) => entry.item).find((item, at, all) => all.indexOf(item) !== at);
     return twice === undefined ? undefined : `stocks: names ${twice} twice, and a shop holds one level per item`;
-  },
-  visit: (value, where, visit: Visit) => quantifiedItems((value as unknown as Loose).stocks, 'item', `${where} stocks:`, visit),
-  prune: (value, at: Pruning, where) => {
-    const stocks = value.stocks.filter((entry) => !at.gone('item', entry.item, `${where} stocks:`));
-    return stocks.length === value.stocks.length ? value : { ...value, stocks };
   },
 });

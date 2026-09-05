@@ -7,11 +7,12 @@ import { actionAddress, actionWords } from './sections/action';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { nestedResults, type ActionResult } from '../grammar/actionResult';
 import { align, holeNames, holesIn, matches, soleHole, standingIn, valueIn } from '../grammar/form';
-import { DslError, type Overwritten, type Written } from '../grammar/parser';
+import { DslError, parseWhole, type Overwritten, type Parser, type Written } from '../grammar/parser';
+import { elementOf } from '../grammar/list';
 import { humanizeEn, text } from '../grammar/values';
 import { TITLE_FIELD } from './sections/info';
 import { indentLines, splitSections } from '../grammar/structure';
-import { DEFAULT_CONTEXT, hydrateSection, neededAlternatives, neededWritten, type AnySchema } from '../grammar/section';
+import { DEFAULT_CONTEXT, hydrateSection, isPositionalField, neededAlternatives, neededWritten, type AnySchema } from '../grammar/section';
 import { BY_NAME, mergeFields, overwrittenField } from './merge';
 import { keyedUnderOwnerKind, memberKey, Namespace } from './namespace';
 import { NAMES_THE_SECTION, TOUCHED } from './sections/define';
@@ -182,8 +183,16 @@ describe('a field whose values are names', () => {
     };
   };
 
+  const naming = (owner: (typeof NAMED)[number]['owner'], each: (typeof NAMED)[number]['each']): string => {
+    if (each.into === undefined) return PROBE;
+    const parser = elementOf(owner.schema!.fields[each.field]!.parser as Parser<unknown>);
+    const held = parseWhole(parser, parser.examples[0]!, 0, each.site) as Record<string, unknown>;
+    return parser.print({ ...held, [each.into]: PROBE });
+  };
+
   const holding = (owner: (typeof NAMED)[number]['owner'], each: (typeof NAMED)[number]['each']): { id: string } => {
-    const written = `# ${owner.kind} probe\n${each.site} ${PROBE}`;
+    const wrote = naming(owner, each);
+    const written = `# ${owner.kind} probe\n${isPositionalField(owner.schema!, each.field) ? wrote : `${each.site} ${wrote}`}`;
     const authored = owner.parse(splitSections(written)[0]!);
     return hydrateSection(authored as never, owner.schema as never, DEFAULT_CONTEXT) as { id: string };
   };
@@ -211,7 +220,7 @@ describe('a field whose values are names', () => {
       NAMED.flatMap(({ owner, each, where }) => {
         const held = holding(owner, each);
         const left = owner.prune(held as never, cutting(each.kind), `# ${owner.kind} probe`);
-        if (!each.list && !each.standsWithout) return left === null ? [] : [`${where} keeps a section written around a name nothing declares`];
+        if (each.needsEvery || (!each.list && !each.standsWithout)) return left === null ? [] : [`${where} keeps a section written around a name nothing declares`];
         if (left === null) return [`${where} takes its whole section out over one name it could stand without`];
         const kept = (left as unknown as Record<string, unknown>)[each.field];
         return JSON.stringify(kept ?? null).includes(PROBE) ? [`${where} still holds ${PROBE} after it was removed`] : [];
