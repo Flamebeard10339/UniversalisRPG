@@ -64,7 +64,7 @@ export function validateItemSlots(registry: Registry): void {
   if (declared.size === 0) return;
   for (const item of registry.items.values()) {
     if (item.slot !== undefined && !declared.has(item.slot)) {
-      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`);
+      throw new DslError(`# item ${item.id} slot: names ${item.slot}, which no # entity declares among its equipment-slots:`, undefined, { kind: 'item', id: item.id });
     }
   }
 }

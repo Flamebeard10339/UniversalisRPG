@@ -1,6 +1,6 @@
 import { actionResultLists } from '../../grammar/action';
-import type { ActionResult } from '../../grammar/actionResult';
-import { Action, actionBody, actionLines, actionLinesWritten } from '../../grammar/action';
+import { nestedResults, type ActionResult } from '../../grammar/actionResult';
+import { Action, actionBody, actionKind, actionLines, actionLinesWritten, isTwoSided } from '../../grammar/action';
 import { Cursor, DslError, requireEnd, Span } from '../../grammar/parser';
 import { moduleLocalId } from '../../grammar/section';
 import type { RawSection } from '../../grammar/structure';
@@ -20,6 +20,34 @@ export interface ActionDeclaration extends Action {
 export function actionAddress(action: Action): string {
   const id = declaredId(action);
   return id === undefined ? actionSlug(action.label) : lastSegment(id);
+}
+
+export type AuthoredResults = readonly (readonly [kind: string, id: string, lists: readonly (readonly ActionResult[])[]])[];
+
+export function unperformableAction(authored: AuthoredResults, actions: ReadonlyMap<string, Action>): DslError | null {
+  const blame = (actionId: string, says: string): DslError => new DslError(says, undefined, { kind: 'action', id: actionId });
+  for (const [kind, id, lists] of authored) {
+    const performed: string[] = [];
+    const collect = (results: readonly ActionResult[]): void => {
+      for (const result of results) {
+        if (result.kind === 'perform') performed.push(result.action);
+        for (const nested of nestedResults(result)) collect(nested);
+      }
+    };
+    for (const list of lists) collect(list);
+    for (const actionId of performed) {
+      const action = actions.get(actionId);
+      if (!action) continue;
+      const by = `# ${kind} ${id}`;
+      if (actionKind(action) === 'continuous') {
+        return blame(actionId, `# action ${actionId} is performed by ${by} and is continuous, so it would hold the player for good: a performed action ends on its own, with a time: and no continuous`);
+      }
+      if (isTwoSided(action)) {
+        return blame(actionId, `# action ${actionId} is performed by ${by} and is a contest between two sides, and a performed action has nobody across from the player: write it with a time: and results of its own`);
+      }
+    }
+  }
+  return null;
 }
 
 export function actionWords(action: Action): { text: string; generated: boolean } {

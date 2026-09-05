@@ -17,6 +17,8 @@ export interface RawSection {
 
 const HEADING = /^#[ \t]+(?<kind>[a-z][a-z0-9-]*)(?:[ \t]+(?<id>[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)*))?[ \t]*$/;
 
+export const WORLD_EXTENSION = '.dsl';
+
 export const COMMENT_MARK = '//';
 
 export const isCommentLine = (line: string): boolean => line.trim().startsWith(COMMENT_MARK);

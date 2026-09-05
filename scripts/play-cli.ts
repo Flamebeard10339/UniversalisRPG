@@ -8,7 +8,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { type ModuleSource } from '../src/content/universe';
 
 import { initialLocalChangesModule } from '../src/content/localChanges';
-import { SHIPPED_DIRS } from '../src/content/shipped';
+import { LOCAL_CHANGES_FILE, SHIPPED_DIRS } from '../src/content/shipped';
 import { DEFAULT_MODPORTAL_CACHE, readEntryText, readModportalCache } from './lib/modportalCache';
 import { fileSlots } from './lib/slotFile';
 import { createSaveContext, type SaveContext } from '../src/runtime/saveSlots';
@@ -62,7 +62,7 @@ export function formatResult(result: CommandResult, localizer: Localizer): ReplL
 }
 
 const defaultContent = SHIPPED_DIRS.join(',');
-const defaultLocalChanges = 'content/local-changes.dsl';
+const defaultLocalChanges = LOCAL_CHANGES_FILE;
 const defaultSaves = '.saves';
 const CTRL_C_BYTE = 0x03;
 const EXIT_CODE_INTERRUPTED = 130;

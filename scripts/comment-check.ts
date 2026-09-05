@@ -1,13 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { NOTE_MARK } from '../src/grammar/note';
-import { isCommentLine } from '../src/grammar/structure';
+import { isCommentLine, WORLD_EXTENSION } from '../src/grammar/structure';
 import { sweptFiles } from './lib/layers';
 import { posix, trackedFiles } from './lib/sourceFiles';
 import { commentSpans } from './lib/stripComments';
 
 export const CODE_EXTENSIONS: readonly string[] = ['.ts', '.tsx'];
-export const WORLD_EXTENSION = '.dsl';
 
 export interface Found {
   file: string;
@@ -58,7 +57,7 @@ export function commentCheckOutput(report: CommentReport): CommentCheckOutput {
   const out = [`${report.codeRead} module(s) under src and scripts and ${report.worldRead} ${WORLD_EXTENSION} file(s) read for comments.`];
   const err: string[] = [];
 
-  if (report.codeRead === 0 || report.worldRead === 0) err.push('\nThe sweep found nothing to read. That is a broken enumeration, not a clean tree: this repository has TypeScript under src and scripts and a world written in .dsl.');
+  if (report.codeRead === 0 || report.worldRead === 0) err.push(`\nThe sweep found nothing to read. That is a broken enumeration, not a clean tree: this repository has TypeScript under src and scripts and a world written in ${WORLD_EXTENSION}.`);
 
   if (report.found.length > 0) {
     err.push(`\n${report.found.length} comment(s). This repository writes none:`);

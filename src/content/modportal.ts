@@ -1,3 +1,4 @@
+import { WORLD_EXTENSION } from '../grammar/structure';
 import { globalSectionKinds, sectionOf, type SectionKind } from './sections';
 import { LOCAL_CHANGES_MODULE_ID } from './localChanges';
 import { contributionBase, extractContributionDsl } from './contribution';
@@ -95,16 +96,9 @@ function cloned<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function renamedStats(held: unknown, from: string, to: string): unknown {
-  const renamed = ([statId, range]: [string, unknown]): [string, unknown] => [renamedId(statId, from, to), range];
-  if (Array.isArray(held)) return (held as [string, unknown][]).map(renamed);
-  return Object.fromEntries(Object.entries(held as Record<string, unknown>).map(renamed));
-}
-
 function rewriteSection(kind: SectionKind, key: string, value: object, from: string, to: string): object {
-  const next = cloned(value) as { id?: string; stats?: unknown };
+  const next = cloned(value) as { id?: string };
   if (typeof next.id === 'string') next.id = renamedId(next.id, from, to);
-  if (kind === 'entity' && next.stats) next.stats = renamedStats(next.stats, from, to);
   visitSection(sectionOf(kind, next), `# ${kind} ${key}`, (_kind, id: string) => renamedId(id, from, to));
   return next;
 }
@@ -187,7 +181,7 @@ export function materializeApprovedModIssue(issue: ApprovedModIssue, baseSources
     tier: issueTier(issue),
     base: contribution,
     moduleId,
-    file: `${issue.number}-${moduleId}.dsl`,
+    file: `${issue.number}-${moduleId}${WORLD_EXTENSION}`,
     text,
   };
 }

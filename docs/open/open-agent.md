@@ -713,25 +713,6 @@ the words and refuses anything else, `MODAL_SCREENS` has one reader, and the six
 declare one line — with `event.ts`'s optional prefix passed as a token rather than kept as an
 exception.
 
-## Which section failed is recovered by regex over the prose of its own error
-
-`validateBuiltRegistry` (`src/content/load.ts:627-751`) runs fourteen cross-registry checks and
-attributes each failure to a kind and an id. Most read the id from the value. Three do not:
-`refuseStackedLocations` and `recursivelyResolveRelativeCoordinates` throw a `DslError` whose
-**message** is then re-parsed by `locationIdFromMessage` (`:294`) to recover which location to
-blame, and `validateItemSlots` does the same for an item at `:727`.
-
-Shape 4 — a fact filed under the words one author chose and read back by another. Reword either
-message and the blame silently becomes unattributed: no test reddens, the author just stops
-being told which module to look in.
-
-Three of the fourteen checks also sit in `load.ts` rather than in their kind's file, unlike the
-rest: `startingLocationFailure` (`:619`) is a location fact, `dropTableCycle` (`:406`) a
-droptable one, `performedProblem` (`:422`) an action one.
-
-*Closes when:* `DslError` carries an optional `at: { kind, id }` the throwers set, the three
-regexes are gone, and the three homeless checks live in the files of the kinds they are about.
-
 ## The round-trip proof's root set skips action bodies, so four parsers are unproved
 
 `dsl.test.ts:741-747` derives its subjects, correctly, from `schema.fields` — but an action
@@ -753,26 +734,6 @@ no example silently. If nothing reddens, the gap is real.
 
 *Closes when:* an entry body can offer its parsers to the root set, the four are covered, and
 `exportedCodecs` is used or deleted.
-
-## `modportal` rewrites an entity's stat keys itself, because the kind's walk reads the wrong shape
-
-`src/content/modportal.ts:98-108` carries `renamedStats` and a branch keyed on the entity kind —
-a per-kind special case outside the kind's file, which is the thing `sections/index.ts` exists
-to prevent.
-
-It is there for a reason: `entity.visit` walks `stats` with `listMembers`, which returns nothing
-for a plain object (`grammar/section.ts:107-110`). So it walks the *authored* shape, a list of
-stat-and-range pairs, and not the *built* shape, a record keyed by stat. `modportal` works on
-built contributions, so nothing is walked for it and it rewrites the keys by hand — handling
-both shapes, because it cannot tell which it has.
-
-The derived answer is the same one the `nameKind` line above wants: declare `entity.stats` as a
-keyed reference field and let `define.ts` route it through `keyedBy` (`refs.ts:63`), which does
-exactly this job and has one caller today. Making `entity.visit` handle both shapes instead
-would be shape 6 — a guess made more accurate.
-
-*Closes when:* `renamedStats` and the entity branch beside it are gone and the kind's own
-declaration carries it.
 
 ## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
 

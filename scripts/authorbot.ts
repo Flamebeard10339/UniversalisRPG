@@ -77,7 +77,10 @@ export const moduleNameFor = (brief: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-export const fileFor = (name: string): string => (name.endsWith('.dsl') ? name : `${name}.dsl`);
+import { WORLD_EXTENSION } from '../src/grammar/structure';
+import { worldFileName } from '../src/content/worldDir';
+
+export const fileFor = (name: string): string => (name.endsWith(WORLD_EXTENSION) ? name : worldFileName(name));
 
 export const targetFor = (brief: string): string => fileFor(moduleNameFor(brief));
 
