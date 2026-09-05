@@ -97,13 +97,20 @@ world speaks under it, proved in a `*.dom.test.tsx` beside `Modal.tsx`.
 ## The log's scroll anchor forces a layout on every batch of new lines
 
 `Home.tsx`'s scroll effect reads two `getBoundingClientRect`s, `scrollHeight` and
-`clientHeight`, then writes `scrollTop`. It runs when the transcript changed,
-which at 64x is every tick. Measured in production Chrome: 135ms of every 15
-seconds of play, which is the one app-side cost that survives minification into
-the top three.
+`clientHeight`, then writes `scrollTop`, so the anchor lands where the first new
+line starts. It runs when the transcript changed, which at 64x is every tick.
+Measured in production Chrome: 135ms of every 15 seconds of play, which is the one
+app-side cost that survives minification into the top three.
+
+The reads are already batched — they are consecutive, so the browser flushes
+layout once and answers the rest from it. So there is no win in reading fewer
+times; the 0.9ms is the layout of a column holding up to two hundred lines, and
+the only ways out are to not need the measurement (CSS `overflow-anchor` keeps the
+scroll position across insertions without asking where anything is) or to stop
+laying out lines nobody can see.
 
 It is small next to what has already gone, and it is named here because it is the
 last forced synchronous layout on the frame path rather than because it is urgent.
 
-*Closes when:* anchoring the log reads layout once per batch rather than four
-times, or not at all, and `logRest.test.ts` still holds.
+*Closes when:* a batch of new lines anchors the log without a forced layout, and
+`logRest.test.ts` still holds.
