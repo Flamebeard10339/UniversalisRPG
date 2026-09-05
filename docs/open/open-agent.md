@@ -437,15 +437,24 @@ it — `parsePrimary`/`printCondition` in `src/grammar/condition.ts`, `evaluateC
 `itemMissingFor` in `src/runtime/conditions.ts`, and `condition` in `src/content/refs.ts`,
 where a tag is the one reference kind that names no declared section and so must not `put`.
 
-The **cost is where the care goes**. `requires:` is re-read every cycle of a continuous action
-and again for every action a screen offers, so the answer has to be cheap. The carried half is:
-`itemCopies(state)` already gives every template the player holds, wears or has grown, so the
-tags of an item are one registry lookup away. The passive half is not — reaching what a passive
-supplies means walking each worn item's plane through `allocatedPositions` and
-`passiveTagsOf` per evaluation, and that lands squarely on the tick
-`src/ui/frameCost.dom.test.tsx` gates. Whatever supplies tags wants to be one set derived once
-per change to the player rather than once per ask. **Run that file before putting it on the
-tick**, and read the `# save`-shaped tag set back through it.
+The **cost is where the care goes**, and it is ruled. `requires:` is re-read every cycle of a
+continuous action and again for every action a screen offers. The carried half would be cheap —
+`itemCopies(state)` already gives every template the player holds, wears or has grown. The
+passive half would not: reaching what a passive supplies means walking each worn item's plane
+through `allocatedPositions` and `passiveTagsOf` on every evaluation, which lands on the tick
+`src/ui/frameCost.dom.test.tsx` gates.
+
+Ruled 2026-09-05: **do not ask the inventory. Every worn item resolves onto the player once, and
+every engine check reads the player.** That is the one-home answer and it is not only about
+tags — `statSources` in `src/runtime/stats.ts:159` gathers the player's carriers afresh on
+*every single stat read*, and `statFrom` folds them again each time, so the same ruling says a
+resolved sheet is the home for a stat as much as for a tag. Build the sheet where the player
+changes — worn, unworn, allocated, given, taken — and let `statValue`, the tag check and
+anything else that wants to know about the player read it there.
+
+**Run `src/ui/frameCost.dom.test.tsx` before and after**: a frame must read no DSL and cost what
+it cost at the start of the session, and this change moves work off the tick rather than onto
+it, which that file is the way to show.
 
 *Closes when:* a condition can name a tag rather than an item, satisfied by any combination of
 what the player carries and what their passives supply; `# action rod-cast` requires `rod` and
