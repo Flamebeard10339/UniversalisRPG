@@ -742,26 +742,6 @@ no example silently. If nothing reddens, the gap is real.
 *Closes when:* an entry body can offer its parsers to the root set, the four are covered, and
 `exportedCodecs` is used or deleted.
 
-## `modportal` rewrites an entity's stat keys itself, because the kind's walk reads the wrong shape
-
-`src/content/modportal.ts:98-108` carries `renamedStats` and a branch keyed on the entity kind —
-a per-kind special case outside the kind's file, which is the thing `sections/index.ts` exists
-to prevent.
-
-It is there for a reason: `entity.visit` walks `stats` with `listMembers`, which returns nothing
-for a plain object (`grammar/section.ts:107-110`). So it walks the *authored* shape, a list of
-stat-and-range pairs, and not the *built* shape, a record keyed by stat. `modportal` works on
-built contributions, so nothing is walked for it and it rewrites the keys by hand — handling
-both shapes, because it cannot tell which it has.
-
-The derived answer is the same one the `nameKind` line above wants: declare `entity.stats` as a
-keyed reference field and let `define.ts` route it through `keyedBy` (`refs.ts:63`), which does
-exactly this job and has one caller today. Making `entity.visit` handle both shapes instead
-would be shape 6 — a guess made more accurate.
-
-*Closes when:* `renamedStats` and the entity branch beside it are gone and the kind's own
-declaration carries it.
-
 ## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
 
 `{ '<N>': '1', '<enter>': '', '<directive>': … }` — what to type where a command spec's name is
