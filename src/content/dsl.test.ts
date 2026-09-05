@@ -790,10 +790,21 @@ describe('a second body written at an id a first body already holds', () => {
       }
     });
 
+  const memberWritten = (schema: AnySchema, name: string, word: string): unknown => {
+    const element = elementOf(schema.fields[name]?.parser as Parser<unknown>);
+    try {
+      return parseWhole(element, word, 0, 'a list item');
+    } catch {
+      return word;
+    }
+  };
+
   const branchOf = (schema: AnySchema, name: string): Overwritten => {
     const byName = mergeFields({ [name]: [{ label: 'here', held: 1 }] }, { [name]: [{ label: 'here', added: 2 }, { label: 'other' }] }, schema)[name] as { held?: number; added?: number }[];
     if (Array.isArray(byName) && byName.length === 2 && byName[0]?.held === 1 && byName[0]?.added === 2) return 'by name';
-    const listed = mergeFields({ [name]: ['held'] }, { [name]: { ops: [{ op: '+', values: ['added'] }] } }, schema)[name];
+    const held = memberWritten(schema, name, 'held');
+    const added = memberWritten(schema, name, 'added');
+    const listed = mergeFields({ [name]: [held] }, { [name]: { ops: [{ op: '+', values: [added] }] } }, schema)[name];
     return Array.isArray(listed) && listed.length === 2 ? 'listed' : 'replaced';
   };
 

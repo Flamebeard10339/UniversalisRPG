@@ -104,18 +104,18 @@ and the file it names.
 `src/content/sections/define.ts` is the contract. `section()` takes a kind's
 declaration and fills in the schema-driven half. A kind that declares `fields`
 gets its parser, printer and merge from them; a kind whose grammar does not fit
-key/value declares its own `parse` and `print`. **That is meant to be the whole
-difference** — there is no table of special cases, and adding one would be the
+key/value declares its own `parse` and `print`. **That is the whole difference,
+and the types hold it** — `parse`, `print`, `merge` and `grammar` sit on the
+bespoke half alone, so a kind that declares `fields` and reaches for one of them
+does not compile. There is no table of special cases, and adding one would be the
 failure mode above.
 
-One kind is currently outside it, and it is a hole in the contract rather than a
-licence to make another: `location` declares `fields` **and** overrides `print`
-and `merge`, because its coordinates print on one joined line and its roads merge
-from both ends. Nothing in `section()` gates that — `print` and `merge` sit on
-the common half — so the sentence above is an intention, not a rule, until the
-join is declarable. `docs/open/open-agent.md` holds the line. Do not read
-`location` as permission; if a kind you are adding wants it, that is the line to
-close.
+`location` was the one kind outside it and is not any more. What it used to say in
+code it now declares: `together: [['x', 'y', 'z']]` puts its coordinates on one
+line, the `exclusive:` it already wrote is what keeps them off a location placed
+`relative:` to another, and `merge:` on the `adjacent:` field is how its roads
+merge from both ends. So a kind that wants a printer or a merge of its own asks
+what declaration it is missing, and adds that.
 
 Read `sections/item.ts` (fields, entries, validation, references),
 `sections/droptable.ts` (its own parser and printer, in 25 lines) and

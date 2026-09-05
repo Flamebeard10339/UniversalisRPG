@@ -74,7 +74,9 @@ export function mergeFields(into: Fields, from: Fields, schema: AnySchema): Fiel
   const entries = schema.entries?.into;
   const merged = { ...into };
   for (const [key, value] of Object.entries(from)) {
+    const ownMerge = schema.fields[key]?.merge;
     if (key === entries) merged[key] = mergeEntries((into[key] as Labelled[]) ?? [], value as Labelled[]);
+    else if (ownMerge !== undefined && value !== undefined) merged[key] = ownMerge(into[key], value);
     else if (isListField(schema, key) && isFieldEdits(value)) merged[key] = laidOver(into[key], value);
     else if (value !== undefined) merged[key] = value;
   }
