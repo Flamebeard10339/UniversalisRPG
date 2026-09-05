@@ -28,17 +28,3 @@ hook substituting the token read out of `src/index.css`, about eight lines.
 *Closes when:* the name, the id and the version each have one home that the others are written
 from at build time, or each copy is annotated with what it is a copy of — and `run-web.cmd`'s
 port says why it differs.
-
-## `editor/vscode/package.json` restates what `tmgrammar.ts` declares
-
-`scripts/tmgrammar.ts` writes `editor/vscode/syntaxes/dsl.tmLanguage.json` from the section
-declarations, and `scripts/tmgrammar.test.ts` asserts the checked-in bytes are what it prints —
-so the grammar file itself cannot drift. `editor/vscode/package.json` is outside that: it names
-the scope, the grammar path, the language name and the file extensions again, by hand, and
-nothing checks them against the generator's own constants.
-
-Rename the scope or the output path and the extension silently stops colouring anything, with
-every gate green.
-
-*Closes when:* the extension manifest's language block is written by `npm run tmgrammar` too, or
-`scripts/tmgrammar.test.ts` asserts the manifest agrees with `SCOPE_NAME` and `GRAMMAR_PATH`.

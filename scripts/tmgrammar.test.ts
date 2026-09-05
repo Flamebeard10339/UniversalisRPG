@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { sectionKinds } from '../src/content/sections';
-import { GRAMMAR_PATH, grammarText, literalOf, literalsOf, sigilOf, tmGrammar } from './tmgrammar';
+import { GRAMMAR_PATH, MANIFEST_PATH, grammarText, literalOf, literalsOf, manifestText, sigilOf, tmGrammar } from './tmgrammar';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -35,6 +35,19 @@ const rulePainting = (kind: string, scope: string): Pattern | undefined => every
 describe('the checked-in grammar', () => {
   it('is what the declarations generate', () => {
     expect(readFileSync(path.join(root, GRAMMAR_PATH), 'utf8')).toBe(grammarText());
+  });
+});
+
+describe('the checked-in extension manifest', () => {
+  it('is what the declarations generate', () => {
+    expect(readFileSync(path.join(root, MANIFEST_PATH), 'utf8')).toBe(manifestText());
+  });
+
+  it('points at the grammar the generator writes', () => {
+    const manifest = JSON.parse(manifestText()) as { contributes: { grammars: { scopeName: string; path: string }[] } };
+    const grammar = manifest.contributes.grammars[0]!;
+    expect(grammar.scopeName).toBe((tmGrammar() as { scopeName: string }).scopeName);
+    expect(path.resolve(root, MANIFEST_PATH, '..', grammar.path)).toBe(path.resolve(root, GRAMMAR_PATH));
   });
 });
 

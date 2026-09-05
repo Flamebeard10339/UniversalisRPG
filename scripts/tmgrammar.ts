@@ -1,5 +1,5 @@
 import { escaped } from './lib/idForms';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { Written } from '../src/grammar/parser';
@@ -9,6 +9,16 @@ import { sectionFor, sectionKinds } from '../src/content/sections';
 export const SCOPE_NAME = 'source.dsl';
 
 export const GRAMMAR_PATH = path.join('editor', 'vscode', 'syntaxes', 'dsl.tmLanguage.json');
+
+export const MANIFEST_PATH = path.join('editor', 'vscode', 'package.json');
+
+export const LANGUAGE_ID = 'universalis-dsl';
+
+const LANGUAGE_NAME = 'Universalis DSL';
+
+const FILE_TYPES = ['dsl'];
+
+const CONFIGURATION_PATH = './language-configuration.json';
 
 const DEPTH = 8;
 
@@ -128,9 +138,9 @@ const UNKNOWN: Pattern = {
 
 export function tmGrammar(): object {
   return {
-    name: 'Universalis DSL',
+    name: LANGUAGE_NAME,
     scopeName: SCOPE_NAME,
-    fileTypes: ['dsl'],
+    fileTypes: [...FILE_TYPES],
     patterns: [...sectionKinds().map(sectionPattern), UNKNOWN, { include: '#note' }, { include: '#refused' }],
     repository: {
       note: {
@@ -148,11 +158,32 @@ export function tmGrammar(): object {
 
 export const grammarText = (): string => `${JSON.stringify(tmGrammar(), null, 2)}\n`;
 
+const rootPath = (): string => path.resolve(import.meta.dirname, '..');
+
+const under = (from: string, to: string): string => `./${path.relative(path.dirname(from), to).split(path.sep).join('/')}`;
+
+export const contributes = (): object => ({
+  languages: [
+    {
+      id: LANGUAGE_ID,
+      aliases: [LANGUAGE_NAME],
+      extensions: FILE_TYPES.map((each) => `.${each}`),
+      configuration: CONFIGURATION_PATH,
+    },
+  ],
+  grammars: [{ language: LANGUAGE_ID, scopeName: SCOPE_NAME, path: under(MANIFEST_PATH, GRAMMAR_PATH) }],
+});
+
+export function manifestText(): string {
+  const held = JSON.parse(readFileSync(path.join(rootPath(), MANIFEST_PATH), 'utf8')) as Record<string, unknown>;
+  return `${JSON.stringify({ ...held, displayName: LANGUAGE_NAME, contributes: contributes() }, null, 2)}\n`;
+}
+
 function main(): void {
-  const root = path.resolve(import.meta.dirname, '..');
-  const at = path.join(root, GRAMMAR_PATH);
-  writeFileSync(at, grammarText());
-  console.log(`wrote ${GRAMMAR_PATH} for ${sectionKinds().length} kinds`);
+  const root = rootPath();
+  writeFileSync(path.join(root, GRAMMAR_PATH), grammarText());
+  writeFileSync(path.join(root, MANIFEST_PATH), manifestText());
+  console.log(`wrote ${GRAMMAR_PATH} and ${MANIFEST_PATH} for ${sectionKinds().length} kinds`);
 }
 
 if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
