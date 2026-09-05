@@ -8,7 +8,7 @@ import { withEngineLocale } from '../src/content/engineLocale';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { ModuleSource } from '../src/content/universe';
-import { COMMANDS, runLine, type AuthoringContext, type CommandResult } from '../src/runtime/command';
+import { COMMANDS, runLine, typedFor, type AuthoringContext, type CommandResult } from '../src/runtime/command';
 import { createSaveContext, keptByThePage } from '../src/runtime/saveSlots';
 import { serializeSession, type PlayChoice } from '../src/runtime/session';
 import { slotStore, type SlotDriver } from '../src/runtime/store';
@@ -36,7 +36,7 @@ afterEach(() => {
 
 const STAMP = 1_700_000_000_000;
 
-const SHAPED: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'go to the door' };
+const DIRECTIVE = 'go to the door';
 
 const withStorage = (): (() => Storage) => {
   const storage = pageStorage();
@@ -144,7 +144,7 @@ describe('the two drivers cannot drift', () => {
     let accepted = 0;
 
     for (const spec of COMMANDS) {
-      const bare = SHAPED[spec.name] ?? spec.name;
+      const bare = typedFor(spec, DIRECTIVE);
       if (spec.audience === 'cheat') inStep(repl, gui, '/dev on');
       for (const line of [bare, `${bare} 1`]) {
         if (!refused(inStep(repl, gui, line).result)) accepted += 1;

@@ -621,26 +621,6 @@ no example silently. If nothing reddens, the gap is real.
 *Closes when:* an entry body can offer its parsers to the root set, the four are covered, and
 `exportedCodecs` is used or deleted.
 
-## The symbolic-command map is written four times, and it duplicates a fact rather than a proof
-
-`{ '<N>': '1', '<enter>': '', '<directive>': … }` — what to type where a command spec's name is
-a symbol — stands at `scripts/drift.test.ts:39`, `scripts/printedWords.test.ts:144`,
-`scripts/play-cli.test.ts:1398` (as `SHAPED_IN_DEV`) and `src/runtime/command.test.ts:1942`.
-The first two are byte-identical; the other two differ only in the directive line, which is
-per-world and genuinely theirs.
-
-The key set is derivable — exactly the `COMMANDS` entries whose `name` is bracketed. The two
-world-independent substitutions are not: they are facts about the spec, and belong on it as a
-declared `typedAs`.
-
-**`npm run mutate` will not discriminate these**, and that is the point: they duplicate a fact,
-not a proof. Rename a symbolic spec and all four maps go stale at once, each test then types
-the literal `<blank>` and quietly stops exercising the command rather than going red. Do not
-delete any of the four tests.
-
-*Closes when:* a `CommandSpec` declares what a player types for it, and each driver test
-supplies only its own directive line.
-
 ## `run:` composes a head and nothing else, so every repeated tail still reads twice
 
 Every head that `run:` could reach has been taken, and the decision on the rest is recorded

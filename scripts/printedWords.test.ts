@@ -6,7 +6,7 @@ import { loadInEnglish, withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverse } from '../src/content/load';
 import { hasWords, translationOf, TRANSLATED_LANGUAGE } from '../src/content/translation';
 import { BASE_LANGUAGE, localizerFor } from '../src/runtime/localized';
-import { COMMANDS, newContext, runLine, type CommandContext } from '../src/runtime/command';
+import { COMMANDS, newContext, runLine, typedFor, type CommandContext } from '../src/runtime/command';
 import { serializeSession, startSession, view, type PlayView } from '../src/runtime/session';
 import { shippedModules } from './lib/layers';
 import { stripComments } from './lib/stripComments';
@@ -141,11 +141,11 @@ function play(language: string, script: readonly string[]): Drawn[] {
   return script.map((line) => ({ line, player: playerText(formatResult(runLine(ctx, line), localizer)), view: ctx.view }));
 }
 
-const SHAPED: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'go to the door' };
+const DIRECTIVE = 'go to the door';
 
 const SCRIPT: readonly string[] = [
   ...COMMANDS.flatMap((spec) => {
-    const bare = SHAPED[spec.name] ?? spec.name;
+    const bare = typedFor(spec, DIRECTIVE);
     return [bare, `${bare} 1`];
   }),
   'goto: fixture-town.store',

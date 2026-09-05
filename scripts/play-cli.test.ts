@@ -14,7 +14,7 @@ import { localizerFor } from '../src/runtime/localized';
 import { asLocalized } from '../src/runtime/localizedFixture';
 import { SAVE_VERSION } from '../src/runtime/save';
 import { readRoom, serializeSession, sessionStatus, startSession, view } from '../src/runtime/session';
-import { COMMANDS, NO_SAVES, NOT_LOADED, newContext, runLine, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
+import { COMMANDS, NO_SAVES, NOT_LOADED, newContext, runLine, typedFor, type CommandContext, type CommandResult, type Recorder, type Ticker } from '../src/runtime/command';
 import { AUTOSAVE_SLOT, DEV_SLOT, DEV_SNAPSHOT_SLOT, PLAYER_SLOT, type SaveContext } from '../src/runtime/saveSlots';
 import { driveRun, fileAuthoring, fileSaves, formatLive, formatOutput, formatResult, formatTick, loadModportalSources, openRepl, printed, type ReplLine } from './play-cli';
 import { fixtureSources } from '../src/content/worldFixture';
@@ -1395,7 +1395,7 @@ const ENTERED_HOLDING: ReadonlyArray<readonly [string, (game: Playing) => void]>
   ['a save this build cannot read', (game) => game.write(PLAYER_SLOT, `{"version":${SAVE_VERSION + 900}}`)],
 ];
 
-const SHAPED_IN_DEV: Record<string, string> = { '<N>': '1', '<enter>': '', '<directive>': 'use: entity.chest.open' };
+const DIRECTIVE_IN_DEV = 'use: entity.chest.open';
 
 const ACTS_ON: Record<string, string> = {
   '/inventory': 'gold',
@@ -1426,7 +1426,7 @@ const ACTS_ON: Record<string, string> = {
 };
 
 function linesFor(spec: (typeof COMMANDS)[number]): string[] {
-  const bare = SHAPED_IN_DEV[spec.name] ?? spec.name;
+  const bare = typedFor(spec, DIRECTIVE_IN_DEV);
   const argument = ACTS_ON[spec.name];
   return argument === undefined ? [bare, `${bare} 1`] : [bare, `${bare} ${argument}`];
 }
@@ -1536,7 +1536,7 @@ x: 3, y: 0
   });
 
   it('hands every command that takes an argument one it acts on', () => {
-    const takesOne = COMMANDS.filter((spec) => spec.argHint !== '' && SHAPED_IN_DEV[spec.name] === undefined);
+    const takesOne = COMMANDS.filter((spec) => spec.argHint !== '' && typedFor(spec, DIRECTIVE_IN_DEV) === spec.name);
     expect(takesOne.length).toBeGreaterThan(10);
     expect(takesOne.filter((spec) => ACTS_ON[spec.name] === undefined).map((spec) => spec.name)).toEqual([]);
 
