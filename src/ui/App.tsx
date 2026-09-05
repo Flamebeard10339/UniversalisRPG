@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
 import { dismissal } from './asking';
@@ -25,7 +25,7 @@ import { noticesBetween } from './notice';
 import { declaredFor, type Declared } from './modalManner';
 import { ModalSheet } from './ModalSheet';
 import type { LabelId } from './labels';
-import { LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
+import { drawnPanes, LAYERS, OPENING, pageRested, shellState, shownIn, subpageOf, toLayer, toSubpage, type Layer, type Subpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { PlaytestBar } from './PlaytestBar';
 import { ReplayBar } from './ReplayBar';
@@ -164,8 +164,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
     setEditing((was) => ({ ...was, where: typeof next === 'function' ? next(was.where ?? opening) : next }));
   const view = snapshot.view;
   const dev = snapshot.dev;
-  const localizer = driver.localizer();
-  const words = wordsOf(localizer);
+  const localizer = useMemo(() => driver.localizer(), [snapshot.view]);
+  const words = useMemo(() => wordsOf(localizer), [localizer]);
   const asking = askedOption(view.modals);
   const { arrivals, generation } = useArrivals(view.discovered);
   const rows = view.xp;
@@ -285,6 +285,8 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
     return { shown, columns, page: pageRested(shell.where, at, dev, columns) };
   };
 
+  const drawn = drawnPanes(shell.where, dev, wide);
+
   const bodies = LAYERS.map((layer, at) => {
     const { shown, columns, page } = paging(at);
     return (
@@ -293,7 +295,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
         index={page}
         columns={columns}
         onIndex={(index) => go((held) => toSubpage(held, at, shown[index].id))}
-        panes={shown.map((subpage) => pane(layer, subpage))}
+        panes={shown.map((subpage, index) => (drawn(at, index) ? pane(layer, subpage) : null))}
       />
     );
   });

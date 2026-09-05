@@ -40,11 +40,10 @@ const spoken = (localizer: Localizer, state: GameState, registry: Registry, resu
 
 const standingOf = (at: QuestStage, started: boolean): QuestStanding => (!started ? 'unstarted' : at.complete === true ? 'complete' : 'started');
 
-function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEntry | null {
+function entryFor(registry: Registry, state: GameState, quest: Quest, localizer: Localizer): JournalEntry | null {
   const holds = (asked: Condition): boolean => evaluateCondition(asked, state, registry);
   const at = stageNow(quest, holds);
   if (at === undefined) return null;
-  const localizer = localizerOf(registry, state);
   const standing = standingOf(at, begun(quest, at, (flag) => state.flags[flag] !== undefined && state.flags[flag] !== false));
   const opening = spoken(localizer, state, registry, quest.log);
   const lines =
@@ -61,5 +60,6 @@ function entryFor(registry: Registry, state: GameState, quest: Quest): JournalEn
 }
 
 export function journal(registry: Registry, state: GameState): JournalEntry[] {
-  return listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest) ?? []);
+  const localizer = localizerOf(registry, state);
+  return listedToPlayer(registry.quests.values()).flatMap((quest) => entryFor(registry, state, quest, localizer) ?? []);
 }

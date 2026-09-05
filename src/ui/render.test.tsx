@@ -13,6 +13,7 @@ import { App } from './App';
 import { addressable, offeredBy, searchHint } from './authoringSurface';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { offerCells } from './choices';
+import { journalRows } from './journalPanel';
 import { createDriver, type Driver } from './driver';
 import { MapPane } from './MapPane';
 import { LocationBanner } from './LocationBanner';
@@ -26,7 +27,7 @@ import { FORGOTTEN, recorded } from './editorMemory';
 import { ModalSheet } from './ModalSheet';
 import { LABELS, type LabelId } from './labels';
 import { wordsOf } from './words';
-import { HOME_LAYER, LAYERS, OPENING, toLayer, toSubpage } from './nav';
+import { everyPage, HOME_LAYER, LAYERS, OPENING, toLayer, toSubpage, type Where } from './nav';
 import { Pager } from './Pager';
 import { fixtureSources } from '../content/worldFixture';
 
@@ -83,6 +84,9 @@ const addressesOf = (driver: Driver): ReadonlySet<string> => new Set(addressable
 const packed = (driver: Driver): string[] => driver.snapshot().mods.flatMap((pack) => [pack.pack, ...pack.modules.map((module) => module.id)]);
 
 const engineRuns = (html: string): string[] => readable(html).filter((run) => !SHELL_WORDS.includes(run));
+
+const acrossTheShell = (driver: Driver): string[] =>
+  everyPage(driver.snapshot().dev).flatMap((where) => engineRuns(renderToStaticMarkup(<App driver={driver} opening={where} />)));
 
 function whatStoppingSays(): string[] {
   const session = startSession(loadUniverseWithDiagnostics(fixtureSources()).registry);
@@ -298,7 +302,8 @@ describe('what the shell puts on the screen', () => {
     expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0)).toEqual([]);
 
     const engine = new Set<string>(published(view, addressesOf(driver)));
-    for (const run of readable(renderToStaticMarkup(<App driver={driver} />))) {
+    const pages = everyPage(driver.snapshot().dev).flatMap((where) => readable(renderToStaticMarkup(<App driver={driver} opening={where} />)));
+    for (const run of pages) {
       expect(accountedFor(run, [...engine, ...SHELL_WORDS, ...authored(driver), ...packed(driver)]), `"${run}" is on the screen and no engine value produced it`).toBe(true);
     }
   });
@@ -428,11 +433,12 @@ describe('what the shell puts on the screen', () => {
     expect(workshop.disabled).toBe(true);
   });
 
-  it('draws what the player is carrying, and what they are made of, on the sheet', () => {
+  it('draws what the player is carrying, and what they are made of, somewhere the shell can reach', () => {
     const driver = everyPageFilled();
     const view = driver.snapshot().view;
 
-    const runs = engineRuns(renderToStaticMarkup(<App driver={driver} />));
+    expect(Object.entries(pagesDrawn(view)).filter(([, rows]) => rows === 0), 'a page with no rows would make this vacuous').toEqual([]);
+    const runs = acrossTheShell(driver);
 
     expect(view.stats.map((row) => row.id)).toContain('surveyed.might');
     expect(view.carried.map((row) => row.id)).toContain('surveyed.ore');
@@ -803,5 +809,38 @@ describe('the ways out, laid out the way they lie', () => {
 
     expect(html).toContain('data-drive="compass"');
     expect(compass(html).map((square) => square.bearing)).not.toContain('');
+  });
+});
+
+describe('a frame draws only what a swipe can reach', () => {
+  const CHARACTER = LAYERS.findIndex((layer) => layer.id === 'character');
+
+  const onTheJournal = (): Where => toSubpage(toLayer(OPENING, CHARACTER), CHARACTER, 'journal');
+
+  const questTitles = (driver: Driver): string[] => journalRows(driver.snapshot().view.journal).map((row) => String(row.title));
+
+  const drawnAt = (driver: Driver, opening: Where): string[] => readable(renderToStaticMarkup(<App driver={driver} opening={opening} />));
+
+  it('draws every quest the journal has when the player stands on it, so the claim below is not vacuous', () => {
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
+    const titles = questTitles(driver);
+    const runs = drawnAt(driver, onTheJournal());
+
+    expect(titles.length).toBeGreaterThan(0);
+    for (const title of titles) expect(onScreen(runs, title), title).toBe(true);
+  });
+
+  it('draws none of them while the player stands on the home screen, which no one swipe reaches', () => {
+    const driver = createDriver(fixtureSources(), { ticker: noTicks });
+    const runs = drawnAt(driver, OPENING);
+
+    for (const title of questTitles(driver)) expect(onScreen(runs, title), title).toBe(false);
+  });
+
+  it('still draws the page one swipe away and the layer one drag away, so a gesture has somewhere to go', () => {
+    const html = renderToStaticMarkup(<App driver={createDriver(fixtureSources(), { ticker: noTicks })} opening={OPENING} />);
+
+    expect(html, 'the settings page is one swipe across').toContain('data-drive="mods.pack"');
+    expect(html, 'the map is one drag up').toContain('data-drive="map.recentre"');
   });
 });

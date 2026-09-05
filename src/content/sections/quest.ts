@@ -128,17 +128,33 @@ function whileOn(quest: Quest, at: number): Condition | undefined {
   return all([...(here === undefined ? [] : [here]), ...(stage.doneWhen === undefined ? [] : [not(stage.doneWhen)]), ...past]);
 }
 
+const STOOD_ON = new WeakMap<Quest, Array<Condition | undefined>>();
+
+const REACHED = new WeakMap<Quest, Array<Condition | undefined>>();
+
+function shapedOnce(kept: WeakMap<Quest, Array<Condition | undefined>>, quest: Quest, shape: () => Array<Condition | undefined>): Array<Condition | undefined> {
+  const held = kept.get(quest);
+  if (held !== undefined) return held;
+  const shaped = shape();
+  kept.set(quest, shaped);
+  return shaped;
+}
+
 export function stageNow(quest: Quest, holds: (asked: Condition) => boolean): QuestStage | undefined {
+  const stood = shapedOnce(STOOD_ON, quest, () => quest.stages.map((_, at) => whileOn(quest, at)));
   return quest.stages.find((_, at) => {
-    const when = whileOn(quest, at);
+    const when = stood[at];
     return when === undefined || holds(when);
   });
 }
 
 export function stagesReached(quest: Quest, holds: (asked: Condition) => boolean): QuestStage[] {
-  const held = new Map<number, Condition | undefined>();
+  const reached = shapedOnce(REACHED, quest, () => {
+    const held = new Map<number, Condition | undefined>();
+    return quest.stages.map((_, at) => reachedWhen(quest, at, held));
+  });
   return quest.stages.filter((_, at) => {
-    const when = reachedWhen(quest, at, held);
+    const when = reached[at];
     return when === undefined || holds(when);
   });
 }

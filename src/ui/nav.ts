@@ -1,4 +1,4 @@
-import { clampIndex, pagesIn } from './gesture';
+import { clampIndex, columnsIn, pagesIn } from './gesture';
 import type { LabelId } from './labels';
 
 export type LayerId = 'map' | 'home' | 'character';
@@ -80,6 +80,19 @@ export const pageRested = (where: Where, layer: number, dev: boolean, columns: n
 export function across(layer: number, boundary: number): number {
   return layer === boundary ? boundary + 1 : boundary;
 }
+
+export function drawnPanes(where: Where, dev: boolean, wide: boolean): (layer: number, index: number) => boolean {
+  const bands = LAYERS.map((layer, at) => {
+    const columns = columnsIn(wide, shownIn(layer, dev).length);
+    const page = pageRested(where, at, dev, columns);
+    const reach = at === where.layer ? 1 : 0;
+    return { first: page - reach, last: page + columns - 1 + reach, near: Math.abs(at - where.layer) <= 1 };
+  });
+  return (layer, index) => bands[layer]!.near && index >= bands[layer]!.first && index <= bands[layer]!.last;
+}
+
+export const everyPage = (dev: boolean): readonly Where[] =>
+  LAYERS.flatMap((layer, at) => shownIn(layer, dev).map((subpage) => toSubpage(toLayer(OPENING, at), at, subpage.id)));
 
 export interface Bands {
   height: number;
