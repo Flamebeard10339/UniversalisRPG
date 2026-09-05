@@ -95,16 +95,19 @@ on death:
 # location tulsa.oolga-basement
 +entities: 4 cellar-rat
 
+# flag still-looking-for-sunny
+is: oolgas-basement.seek-sunny and not oolgas-basement.gather-ingredients
+
 # dialogue tulsa.town-crier
 node oolgas-rats:
-  when: oolgas-basement.seek-sunny and not oolgas-basement.gather-ingredients
+  when: still-looking-for-sunny
   ask: About Oolga's rats.
   again: Sunny, at Sha Dynasty's. I already told you as much.
   You want Sunny, out at Sha Dynasty's. She has a way with animals that isn't natural and isn't much spoken of, and a rat's an animal same as anything else.
 
 # dialogue tulsa.charlie
 node oolgas-rats:
-  when: oolgas-basement.seek-sunny and not oolgas-basement.gather-ingredients
+  when: still-looking-for-sunny
   ask: You know anything about clearing rats?
   again: Sunny. Sha Dynasty's. Same as before.
   Rats, mice, anything with a heartbeat and no manners — Sunny at Sha Dynasty's can talk them off a place without laying a hand on one. Everybody round here knows that much, if you ask the right way.

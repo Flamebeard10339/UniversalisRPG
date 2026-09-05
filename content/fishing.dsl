@@ -352,6 +352,9 @@ cut for bait:
 
 # flag weighed-in
 
+# flag match-running
+is: stat.match-clock >= 1
+
 # item raw-shrimp
 title: Raw Shrimp
 examine: Grey and translucent and still flicking.
@@ -1058,7 +1061,7 @@ title: The Weigh-Master
 examine: A steelyard in one hand and a look on his face that says he has weighed a great many disappointing fish this way.
 hidden if: level.fishing < 11
 enter the match:
-  hidden if: stat.match-clock >= 1 or has the-pirn-jewel or fishing-contest-barred
+  hidden if: match-running or has the-pirn-jewel or fishing-contest-barred
   instant
   requires: inventory.coin >= 20
   take: 20 coin
@@ -1071,7 +1074,7 @@ enter the match:
 owner = weigh-master
 
 node weigh-in-trout:
-  when: stat.match-clock >= 1 and has raw-trout
+  when: match-running and has raw-trout
   sticky
   ask: Weigh the trout.
   take: 1 raw-trout
@@ -1079,7 +1082,7 @@ node weigh-in-trout:
   He puts it on the steelyard without much ceremony. "Trout." He does not need to say more than that. "Fenn's got a salmon on his line, already weighed. You've lost this one."
 
 node weigh-in-herring:
-  when: stat.match-clock >= 1 and has core.herring
+  when: match-running and has core.herring
   sticky
   ask: Weigh this one.
   set: fishing-contest-barred
@@ -1088,7 +1091,7 @@ node weigh-in-herring:
   relocate: tulsa.riverside
 
 node weigh-in-salmon:
-  when: stat.match-clock >= 1 and has raw-salmon and not fenn-was-robbed
+  when: match-running and has raw-salmon and not fenn-was-robbed
   sticky
   ask: Weigh the salmon.
   take: 1 raw-salmon
@@ -1096,7 +1099,7 @@ node weigh-in-salmon:
   He puts it on the steelyard and looks at it a moment longer than the trout. "Salmon. Fenn's got one too, and his came in heavier." He shrugs. "A tie goes to the man who has held the title, which is him. Try again next year. Or this one, whichever comes first."
 
 node weigh-in-salmon-fenn-robbed:
-  when: stat.match-clock >= 1 and has raw-salmon and fenn-was-robbed
+  when: match-running and has raw-salmon and fenn-was-robbed
   sticky
   ask: Weigh the salmon.
   take: 1 raw-salmon
@@ -1105,7 +1108,7 @@ node weigh-in-salmon-fenn-robbed:
   He puts it on the steelyard, and then looks down the shingle towards Fenn's peg, where Fenn is standing over an empty keepnet with an expression the weigh-master does not comment on. "Well. Nothing on the other end of the scale, is there." He does not ask why. "Yours, then." He hands over something small and worn smooth. "The Pirn. Wear it well."
 
 node weigh-in-pike:
-  when: stat.match-clock >= 1 and has raw-pike
+  when: match-running and has raw-pike
   sticky
   ask: Weigh the pike.
   take: 1 raw-pike
@@ -1115,7 +1118,7 @@ node weigh-in-pike:
   He puts it on the steelyard and it settles further than a salmon ever has. "That'll do it." He looks past you, down the shingle, at Fenn. "Fenn! Beaten fair, this year." He hands the jewel over. "The Pirn. Four years, he had it. Wear it well."
 
 node weigh-in-sturgeon:
-  when: stat.match-clock >= 1 and has raw-sturgeon
+  when: match-running and has raw-sturgeon
   sticky
   ask: Weigh the sturgeon.
   take: 1 raw-sturgeon
@@ -1125,7 +1128,7 @@ node weigh-in-sturgeon:
   He does not bother finishing the sentence he was about to say. "Right, that settles that." He hands the jewel over without further ceremony. "The Pirn. Nobody has brought a sturgeon to this scale before."
 
 node too-late:
-  when: match-entered and not stat.match-clock >= 1 and not weighed-in
+  when: match-entered and not match-running and not weighed-in
   sticky
   ask: About the match.
   unset: match-entered
@@ -1159,7 +1162,7 @@ node robbed:
 # entity fenns-keepnet
 title: Fenn's Keepnet
 examine: A net staked at the peg below yours, and something heavy in it keeps turning over.
-hidden if: not stat.match-clock >= 1 or fenn-was-robbed
+hidden if: not match-running or fenn-was-robbed
 stats: keepnet-difficulty 70
 lift the salmon out:
   attempts: 1
@@ -1614,7 +1617,7 @@ assert: not has 2 small-fishing-net
 # test winning-the-pirn-off-a-pike-beats-fenn-fair
 load: on-the-shingle-with-a-rod
 use: entity.weigh-master.enter-the-match
-assert: stat.match-clock >= 1
+assert: match-running
 goto: tulsa.the-narrows
 equip: 1
 equip: dried-fish-bait

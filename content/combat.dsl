@@ -275,6 +275,9 @@ value: 32
 item-level: 2-4
 shield, +3 core.defense, +10 core.max-health
 
+# flag iron-armour-earned
+is: level.attack >= 10 and level.health >= 10
+
 # item bronze-sword
 title: Bronze Sword
 examine: A hand and a half of bronze with a real crossguard, and it is the first thing you have held that was made for this and nothing else.
@@ -297,7 +300,7 @@ weapon, +10 physical-damage
 title: Iron Helmet
 examine: A full helm with a slot to see out of, and not much of one.
 slot: head
-requires: level.attack >= 10 and level.health >= 10
+requires: iron-armour-earned
 value: 80
 item-level: 4-8
 armour, +4 core.defense, +55 core.max-health, +3 physical-resistance
@@ -306,7 +309,7 @@ armour, +4 core.defense, +55 core.max-health, +3 physical-resistance
 title: Iron Platebody
 examine: Riveted plate over a padded coat. You feel the weight of it in your knees by evening.
 slot: body
-requires: level.attack >= 10 and level.health >= 10
+requires: iron-armour-earned
 value: 130
 item-level: 6-11
 armour, +7 core.defense, +85 core.max-health, +18% core.max-health, +4 physical-resistance
@@ -315,7 +318,7 @@ armour, +7 core.defense, +85 core.max-health, +18% core.max-health, +4 physical-
 title: Iron Platelegs
 examine: Iron to the shin, hinged at the knee by somebody who had thought about knees.
 slot: legs
-requires: level.attack >= 10 and level.health >= 10
+requires: iron-armour-earned
 value: 110
 item-level: 5-9
 armour, +6 core.defense, +65 core.max-health, +12% core.max-health, +3 physical-resistance
@@ -324,7 +327,7 @@ armour, +6 core.defense, +65 core.max-health, +12% core.max-health, +3 physical-
 title: Iron Boots
 examine: Sabatons, jointed over the instep, and you hear yourself arrive everywhere for the rest of your life.
 slot: boots
-requires: level.attack >= 10 and level.health >= 10
+requires: iron-armour-earned
 value: 70
 item-level: 4-8
 armour, +4 core.defense, +40 core.max-health, +2 physical-resistance
@@ -333,7 +336,7 @@ armour, +4 core.defense, +40 core.max-health, +2 physical-resistance
 title: Iron Shield
 examine: A kite of iron over ash, tall enough to put a shoulder behind and heavy enough that you only do it once a fight. The face of it is scorched in one long streak, from somebody who tried a torch on it and did not try twice.
 slot: offhand
-requires: level.attack >= 10 and level.health >= 10
+requires: iron-armour-earned
 value: 95
 item-level: 4-8
 shield, +6 core.defense, +45 core.max-health, +3 physical-resistance, +15 fire-resistance

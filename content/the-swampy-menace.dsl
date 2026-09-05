@@ -82,6 +82,9 @@ stage settled:
     ask: About Oolga.
     again: Filed. Same as everything else she wastes my guards' time on.
 
+# flag the-captain-is-asking
+is: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+
 # flag oolga-struck
 
 # flag herbs-found
@@ -96,7 +99,7 @@ when hit:
 
 # dialogue tulsa.castle-guard
 node the-captain-wants-you:
-  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  when: the-captain-is-asking
   ask: Anything for me, then?
   again: Round the side, and do not make her ask a third time.
   For once, yes. Captain's been down to this gate twice asking after you by name, and she does not come down to this gate.
@@ -104,14 +107,14 @@ node the-captain-wants-you:
 
 # dialogue tulsa.guardsman
 node the-captain-wants-you:
-  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  when: the-captain-is-asking
   ask: Anything doing?
   again: Barracks. Captain. Today, if it is all the same to you.
   Nothing up here, same as ever. Something at the barracks, though. Captain has had your name written down since the sewers, and she does not write names down for the pleasure of it.
 
 # dialogue tulsa.larry
 node the-captain-wants-you:
-  when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported and not oolgas-errands.errands
+  when: the-captain-is-asking
   ask: Has anyone been asking after me?
   again: She is still asking, and I am still no help to her.
   The captain has, round this very hatch, and I told her I could not say where you were on account of not knowing. She looked at me as though that were my doing as well.

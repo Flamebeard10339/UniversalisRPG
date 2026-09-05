@@ -3,6 +3,7 @@ import { TextSegment } from '../grammar/segment';
 import { RuntimeError } from './error';
 import { Registry } from '../content/registry';
 import { reachedByItself } from '../content/sections/quest';
+import { standsFor } from '../content/sections/flag';
 import { GameState, PLAYER, PLAYER_SHEET, type PlayerField } from './state';
 import { isSettingName, settingStands } from './settings';
 import { highestSkillLevel, skillLevel } from './skills';
@@ -59,6 +60,10 @@ function questReach(path: string[], registry: Registry): Condition | undefined {
   return quest === undefined ? undefined : reachedByItself(quest, path[path.length - 1]!);
 }
 
+function standingFor(path: string[], registry: Registry): Condition | undefined {
+  return standsFor(registry.flags, spelling(path).key) ?? questReach(path, registry);
+}
+
 const deriving = new Set<string>();
 
 const derived = new Map<string, boolean | number | string | undefined>();
@@ -99,7 +104,7 @@ export function answerReference(reference: Reference, state: GameState, registry
     return { value: flag };
   }
   if (derived.has(key)) return { value: derived.get(key) };
-  const reach = questReach(path, registry);
+  const reach = standingFor(path, registry);
   if (reach === undefined) return { value: flag };
   const before = leanedOn.length;
   deriving.add(key);

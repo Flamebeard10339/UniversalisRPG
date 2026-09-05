@@ -46,26 +46,6 @@ line and the quest keeps saying the old one, in the world, with every gate green
 *Closes when:* a text field takes `+`, appending rather than replacing, and the three quests
 above write only the clause they are adding.
 
-## A condition has no name, so one worth naming is written out wherever it is asked
-
-`# flag <id>` takes one word, `bundle`, and nothing else — a flag cannot stand for a
-condition. Nor can a route or a body ask which stage a quest is standing on: the engine states
-a condition may read are `time`, `player.`, `setting.`, `xp.`, `level.`, `highest-level`,
-`resource.`, `inventory.`, `count.`, `stat.`, `us.`, `them.` and `changed.`, and none of them
-is a quest.
-
-Measured 2026-09-05, the largest single instance is not a stage at all: `stat.match-clock >= 1`
-— "the fishing match is running" — is written **ten times** in `content/fishing.dsl`. A stage
-flag is a latch, so "standing on stage X" is written by hand as `X and not <the stage
-after it>`, in `content/ball-of-a-boy.dsl:64,71`, `content/kill-it-with-fire.dsl:100,107`,
-`content/fishing.dsl:1126` and `content/the-swampy-menace.dsl:97,105,113`. Inserting a stage
-between two of them means finding every such condition; nothing derives them. The same gap
-makes `content/combat.dsl:300,309,318,327,336` write one armour requirement five times.
-
-*Closes when:* a condition worth naming can be named once and asked for by name, or a
-condition can read the stage a quest stands on — and the compound conditions above are written
-through it.
-
 ## Market Square is ruled legible, and still carries more than any room in town
 
 Ruled 2026-09-03: **legible**. The square holds more entities and more roads than any other
@@ -153,29 +133,15 @@ in one go is `session.ts:933`, which turns a `wait: <seconds>` directive into a 
 steps the way the loop does and the two structural cases are then unreachable — and
 whichever it is, the parity claim in `runtime.test.ts` grows the case it did not cover.
 
-## A condition wanted in several places is written out in each of them
-
-The three guard threads in `the-swampy-menace.dsl` — the gate guard, the guardsman and Larry,
-each pointing at the captain while the quest is on offer and untaken — carry the same
-`when: kill-it-with-fire.oolgas-basement.cellar-cleared and ball-of-a-boy.down-the-grate.reported
-and not oolgas-errands.errands` written out three times. One fact about when the pointer is live,
-in three places, which is the shape this repository spends its commits undoing.
-
-There is nothing to reach for. `npm run oracle -- dialogue` offers `when: <condition>` and
-nothing that names a condition and points at it; a `# flag` holds a fact somebody sets rather
-than a standing test, and a `# variable` holds a number. So the duplication is the language's
-rather than the author's, and it will recur the moment a fourth speaker joins them.
-
-*Closes when:* a condition can be declared once under a name and named wherever one is taken,
-with `npm run oracle` saying so off the declaration; then those three lines are one.
-
 ## A workaround has no mark at its site
 
 Comments are banned and `npm run comment-check` is the gate, so a workaround can no longer
-carry a note saying why it is written the way it is — the three identical `when:` lines in
-`the-swampy-menace.dsl` are the standing example, and the next reader is invited to "fix" the
-duplication. The reason has a home: the line above this one. What is missing is a mark at the
-site pointing at it.
+carry a note saying why it is written the way it is, and the next reader is invited to "fix"
+it. The standing example was the three identical `when:` lines in `the-swampy-menace.dsl`;
+those closed on 2026-09-05 when a `# flag` learned to stand for a condition, which is the
+other way this goes — the workaround stopped being one. The shape outlives the example: a
+line written the long way round has its reason in an open line here, and nothing at the site
+points at it.
 
 What cannot go stale is a mark that says almost nothing. `@@@` already does this for the
 corpus and `npm run notes` reads them out; the same mark carrying only the id of an open line
