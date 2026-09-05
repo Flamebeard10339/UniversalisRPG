@@ -1,4 +1,5 @@
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
+import { cpus } from 'node:os';
 import path from 'node:path';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
@@ -14,6 +15,8 @@ import { ladderForSkill, minutesToReachOn } from '../src/runtime/pace';
 import { readSources } from './probe';
 
 export const FLOORS_DIR = 'floors';
+
+export const SECONDS_A_ROUTE_MAY_TAKE = 60;
 
 const usage = [
   'Usage: npm run floors [-- --world <dir>]',
@@ -31,6 +34,11 @@ const usage = [
   `  --world  a directory holding a ${CORPUS_DIR}/ and a ${FLOORS_DIR}/ of its own, walked instead of`,
   '           the shipped ones. This is what points it at a copy of the world rather than at this',
   '           checkout, and without it the shipped folders are what it reads.',
+  '',
+  `Each route is walked in a process of its own, as many at once as there are cores, and one`,
+  `still going after ${String(SECONDS_A_ROUTE_MAY_TAKE)} seconds is stopped from outside and reported as failed by name. Routes share`,
+  'nothing: every one starts from a fresh state and walks whatever it `run:`s from the beginning,',
+  'so the only thing a hung route costs is itself.',
 ].join('\n');
 
 const MS_PER_MINUTE = 60_000;
@@ -65,13 +73,13 @@ ${usage}`);
 
 const times = (ratio: number): string => `${ratio.toFixed(2)}×`;
 
-export function floorLines(sources: readonly ModuleSource[], floors: readonly string[]): { lines: string[]; ok: boolean } {
+export function floorLines(sources: readonly ModuleSource[], floors: readonly string[], only?: string): { lines: string[]; ok: boolean } {
   const loaded = loadUniverseWithDiagnostics(withEngineLocale(sources));
   if (loaded.diagnostics.length > 0) return { lines: loaded.diagnostics.map(formatModuleDiagnostic), ok: false };
   const { registry } = loaded;
   const lines: string[] = [];
   let ok = true;
-  const routes = [...registry.tests.keys()].filter((id) => floors.some((floor) => id.startsWith(`${floor}.`))).sort();
+  const routes = [...registry.tests.keys()].filter((id) => (only === undefined ? floors.some((floor) => id.startsWith(`${floor}.`)) : id === only)).sort();
   if (routes.length === 0) lines.push(`no # test stands under ${floors.length === 0 ? 'any floor module' : floors.join(', ')}`);
   for (const id of routes) {
     const state = createGameState();
@@ -106,39 +114,81 @@ export function floorLines(sources: readonly ModuleSource[], floors: readonly st
   return { lines, ok };
 }
 
-export const SECONDS_FLOORS_MAY_TAKE = 300;
 
 const WALKING = '--walking';
 
-function walk(): void {
-  const { corpus, floors } = foldersOf(process.argv.slice(2));
-  const sources = readSources([corpus, floors]);
-  const report = floorLines(sources, floorIds(sources, floors));
-  console.log(report.lines.join('\n'));
-  if (!report.ok) process.exit(1);
+export function floorRouteIds(sources: readonly ModuleSource[], floors: readonly string[]): string[] {
+  const loaded = loadUniverseWithDiagnostics(withEngineLocale(sources));
+  if (loaded.diagnostics.length > 0) return [];
+  return [...loaded.registry.tests.keys()].filter((id) => floors.some((floor) => id.startsWith(`${floor}.`))).sort();
 }
 
-function main(): void {
-  if (process.argv.slice(2).some((arg) => arg === '--help' || arg === '-h')) {
+interface Walked {
+  id: string;
+  lines: string[];
+  ok: boolean;
+}
+
+const stoppedLine = (id: string): string => `${id}: FAILED — still walking after ${String(SECONDS_A_ROUTE_MAY_TAKE)}s of real time, and stopped from outside. A route that cannot reach what it waits for runs for ever rather than failing.`;
+
+function walkApart(id: string, args: readonly string[]): Promise<Walked> {
+  return new Promise((settle) => {
+    const child = spawn(process.execPath, [...process.execArgv, process.argv[1]!, ...args, WALKING, id], { stdio: ['ignore', 'pipe', 'inherit'] });
+    let said = '';
+    let stopped = false;
+    const clock = setTimeout(() => {
+      stopped = true;
+      child.kill('SIGKILL');
+    }, SECONDS_A_ROUTE_MAY_TAKE * 1000);
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => (said += chunk));
+    child.on('close', (code) => {
+      clearTimeout(clock);
+      if (stopped) return settle({ id, lines: [stoppedLine(id)], ok: false });
+      settle({ id, lines: said.split('\n').filter((line) => line.trim() !== ''), ok: code === 0 });
+    });
+  });
+}
+
+async function walkedApart(ids: readonly string[], args: readonly string[], atOnce: number): Promise<Walked[]> {
+  const done: Walked[] = [];
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(atOnce, ids.length) }, async () => {
+    for (let mine = next++; mine < ids.length; mine = next++) done.push(await walkApart(ids[mine]!, args));
+  });
+  await Promise.all(lanes);
+  return done;
+}
+
+async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+  if (args.some((arg) => arg === '--help' || arg === '-h')) {
     console.log(usage);
     return;
   }
-  if (process.argv.includes(WALKING)) {
-    walk();
+  const { corpus, floors } = foldersOf(args);
+  const at = args.indexOf(WALKING);
+  if (at !== -1) {
+    const mine = readSources([corpus, floors]);
+    const report = floorLines(mine, floorIds(mine, floors), args[at + 1]);
+    console.log(report.lines.join('\n'));
+    if (!report.ok) process.exit(1);
     return;
   }
-  const child = spawnSync(process.execPath, [...process.execArgv, process.argv[1]!, ...process.argv.slice(2), WALKING], {
-    stdio: 'inherit',
-    timeout: SECONDS_FLOORS_MAY_TAKE * 1000,
-    killSignal: 'SIGKILL',
-  });
-  if (child.error !== undefined && (child.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
-    console.error(
-      `\nStopped after ${String(SECONDS_FLOORS_MAY_TAKE)} seconds. A route that cannot reach what it waits for runs for ever rather than failing, and the routes printed above are the ones that finished: the next one is where it stuck.`,
-    );
-    process.exit(1);
+
+  const sources = readSources([corpus, floors]);
+  const ids = floorRouteIds(sources, floorIds(sources, floors));
+  if (ids.length === 0) {
+    const report = floorLines(sources, floorIds(sources, floors));
+    console.log(report.lines.join('\n'));
+    if (!report.ok) process.exit(1);
+    return;
   }
-  if (child.status !== 0) process.exit(child.status ?? 1);
+
+  const walked = await walkedApart(ids, args.filter((arg) => arg !== WALKING), Math.max(1, cpus().length - 1));
+  const said = new Map(walked.map((each) => [each.id, each]));
+  console.log(ids.flatMap((id) => said.get(id)?.lines ?? []).join('\n'));
+  if (walked.some((each) => !each.ok)) process.exit(1);
 }
 
-if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) main();
+if (process.argv[1] && import.meta.filename === path.resolve(process.argv[1])) void main();
