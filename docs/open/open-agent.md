@@ -373,3 +373,36 @@ preview tooling rather than through the shell.
 
 *Closes when:* the tool is named, reproduced, and the process it leaves either exits with its
 parent or is documented as something the caller must reap.
+
+## `churns` and `walked` are one question answered twice, so a route may still pin a balance
+
+`ENGINE_ROOTS` in `src/grammar/condition.ts:32-46` carries a `churns` per root, and
+`SAVE_FIELDS` in `src/runtime/save.ts:109-131` carries a `walked` per field. Both answer
+whether a figure moves when the world's numbers are tuned — the one for what an `assert:` may
+pin, the other for what an `expect:` sheet may. Where they overlap they agree today, and
+nothing makes them: `time`, `xp`, `resource(s)` and `inventory` churn and are not walked;
+`player` and `setting(s)` do neither. Root `count` already reads oddly against field `bundles`.
+
+What the split costs is concrete. `pinned` exempts every comparison against zero, because
+`xp.combat.attack > 0` asks whether a thing happened at all. But `inventory.coin = 0` after a
+purchase is CLAUDE.md's own named counter-example — it pins the price against whatever purse
+the save started with — and three routes were carrying one, unremarked, until they were found
+by reading.
+
+Tightening the exemption to `>`, `>=` and `!=` was tried on 2026-09-05 and backed out: it
+then reports `xp.combat.health = 0` in
+`# test combat.a-minute-at-the-post-trains-the-arm-and-not-the-hide`, which is that route's
+own claim — the post trains the arm and not the hide — rather than a magnitude. The two read
+identically. What separates them is whether the route's save started that figure at zero, and
+answering that means mapping a condition root onto the save field it reads, which is the
+correspondence above.
+
+Do it in that direction: an `ENGINE_ROOTS` entry names the `SaveField` it reads, `walked` is
+derived from `churns` wherever a root exists and declared where none does — `flags`, `visits`,
+`location`, `packOrder`, `equipped`, `journey`, `modals`, `instances`, `populations`, `shops`,
+`buffs`, `activeAction` and `rng` have no root. Layers only allow that direction: `grammar`
+cannot read `runtime`.
+
+*Closes when:* one declaration answers whether a figure churns, `pinned` can tell a claim about
+zero from a balance that landed on zero, and `first-steps`'s mirror pair is either covered by it
+or moved to the fixture.
