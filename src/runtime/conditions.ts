@@ -63,12 +63,12 @@ const deriving = new Set<string>();
 
 const derived = new Map<string, boolean | number | string | undefined>();
 
-const leanedOn = new Set<string>();
+const leanedOn: string[] = [];
 
 let deriveDepth = 0;
 
-function settled(key: string, before: ReadonlySet<string>): boolean {
-  for (const leant of leanedOn) if (leant !== key && !before.has(leant)) return false;
+function settled(key: string, from: number): boolean {
+  for (let at = from; at < leanedOn.length; at += 1) if (leanedOn[at] !== key) return false;
   return true;
 }
 
@@ -80,7 +80,7 @@ export function whileNothingChanges<T>(read: () => T): T {
     deriveDepth -= 1;
     if (deriveDepth === 0) {
       derived.clear();
-      leanedOn.clear();
+      leanedOn.length = 0;
     }
   }
 }
@@ -95,13 +95,13 @@ export function answerReference(reference: Reference, state: GameState, registry
   const flag = state.flags[key];
   if (truthy(flag)) return { value: flag };
   if (deriving.has(key)) {
-    leanedOn.add(key);
+    leanedOn.push(key);
     return { value: flag };
   }
   if (derived.has(key)) return { value: derived.get(key) };
   const reach = questReach(path, registry);
   if (reach === undefined) return { value: flag };
-  const before = new Set(leanedOn);
+  const before = leanedOn.length;
   deriving.add(key);
   deriveDepth += 1;
   try {
@@ -113,7 +113,7 @@ export function answerReference(reference: Reference, state: GameState, registry
     deriveDepth -= 1;
     if (deriveDepth === 0) {
       derived.clear();
-      leanedOn.clear();
+      leanedOn.length = 0;
     }
   }
 }
