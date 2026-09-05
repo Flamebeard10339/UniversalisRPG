@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadUniverseWithDiagnostics } from '../../src/content/load';
+import { loadModule, loadUniverseWithDiagnostics } from '../../src/content/load';
 import { fixtureSources } from '../../src/content/worldFixture';
 import { xpForLevel } from '../../src/runtime/skills';
 import { activitiesIn, activitiesPaidBy, poolForTier } from './tiers';
@@ -16,6 +16,10 @@ describe('an activity is a module that declares skills', () => {
     for (const activity of activitiesIn(world)) {
       for (const skill of activity.skills) expect(skill.startsWith(`${activity.id}.`)).toBe(true);
     }
+  });
+
+  it('reads that module off the namespace, so a skill no module declared keeps its whole name', () => {
+    expect(activitiesIn(loadModule('# skill melee\ntitle: Melee\n'))).toEqual([{ id: 'melee', skills: ['melee'] }]);
   });
 
   it('reads a module declaring two skills as one activity of two, and one declaring one as one of one', () => {
