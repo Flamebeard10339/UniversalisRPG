@@ -84,6 +84,8 @@ stage settled:
 
 # flag oolga-struck
 
+# flag herbs-found
+
 # entity tulsa.oolga
 stats: attack 0, defense 999, max-health 999999, attack-rate 20, accuracy 0, evasion 0
 uses: core.melee-combat
@@ -116,11 +118,11 @@ node the-captain-wants-you:
   Go and see her before she comes back and makes it my doing twice.
 
 # droptable herb-find
-if not has marsh-thistle and not has fen-root and not has adders-tongue:
+if herbs-found = 0:
   say: Past the hummock, in the bushes, straw is scattered out of a smashed crate — and in among the straw, a clutch of insect eggs, broken open from the inside, badly and strangely wrong.
-if has marsh-thistle and not has fen-root and not has adders-tongue or not has marsh-thistle and has fen-root and not has adders-tongue or not has marsh-thistle and not has fen-root and has adders-tongue:
+if herbs-found = 1:
   say: The same crate, kicked open further this time: alchemy glass, coils of tube, powders gone to paste in the wet — thrown in and abandoned rather than lost.
-if has marsh-thistle and has fen-root and not has adders-tongue or has marsh-thistle and not has fen-root and has adders-tongue or not has marsh-thistle and has fen-root and has adders-tongue:
+if herbs-found >= 2:
   say: Something surges up out of the mud before your hand closes round it — not a rat, though it was one once, and not a toad either.
 
 # entity tulsa.herb-patch
@@ -128,14 +130,17 @@ pick thistle:
   +before:
     if not has marsh-thistle:
       roll: herb-find
+      add: herbs-found 1
 pull root:
   +before:
     if not has fen-root:
       roll: herb-find
+      add: herbs-found 1
 take the leaf:
   +before:
     if not has adders-tongue:
       roll: herb-find
+      add: herbs-found 1
 
 # entity rat-toad
 title: Rat-Toad
