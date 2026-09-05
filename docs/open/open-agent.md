@@ -452,6 +452,26 @@ resolved sheet is the home for a stat as much as for a tag. Build the sheet wher
 changes — worn, unworn, allocated, given, taken — and let `statValue`, the tag check and
 anything else that wants to know about the player read it there.
 
+Ruled further: **the update is pushed, not pulled. A piece of the player changes what it
+contributes only when it is equipped, unequipped or crafted, and it owns that update itself.**
+
+Reading the code against that: `modifierCarriers` (`src/runtime/stats.ts:91`) gathers eight
+kinds of contributor — the entity's own sheet and modifiers, its passives, its skills, the
+race, buffs, each worn item, the passives allocated on each worn item, and the action being
+performed. Seven of those eight change only on an event that already has a name, so the push
+holds for them.
+
+**The eighth is the one to design around.** `counterLevels` (`:37`) exists because a modifier
+may read `per` a resource, a stack count or a skill level — `foldStatBonuses` takes it as an
+argument. A bonus that is *per resource* moves every tick as the pool drains; one *per stack*
+moves whenever an item is spent. Those cannot be pushed on equip, because nothing equips.
+
+So the sheet wants two halves: what a carrier contributes flatly, folded once when that carrier
+changes and stored on the player; and what it contributes per counter, which stays live and is
+small. The second half is what stops this from being a cache with an invalidation bug — the
+things that genuinely move often are the things that keep being read, and everything else is
+answered from the sheet.
+
 **Run `src/ui/frameCost.dom.test.tsx` before and after**: a frame must read no DSL and cost what
 it cost at the start of the session, and this change moves work off the tick rather than onto
 it, which that file is the way to show.
