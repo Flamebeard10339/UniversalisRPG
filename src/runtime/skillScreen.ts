@@ -5,7 +5,7 @@ import type { ModalFrame } from './state';
 
 export type SkillFrame = Extract<ModalFrame, { name: 'skill-breakdown' }>;
 
-const screen = listedScreen({
+export const skillScreen = listedScreen({
   name: 'skill-breakdown',
   field: 'skill',
   which: 'engine.skill.which',
@@ -17,11 +17,3 @@ const screen = listedScreen({
   },
   known: (registry, chosen) => registry.skills.has(chosen),
 });
-
-export const skillFrame = screen.frame;
-export const skillFocus = screen.focus;
-export const skillOptions = screen.options;
-export const skillSubmit = screen.submit;
-export const sameSkill = screen.same;
-export const holdsSkill = screen.holds;
-export const skillStale = screen.stale;

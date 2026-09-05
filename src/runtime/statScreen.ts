@@ -7,7 +7,7 @@ import type { ModalFrame } from './state';
 
 export type StatFrame = Extract<ModalFrame, { name: 'stat-breakdown' }>;
 
-const screen = listedScreen({
+export const statScreen = listedScreen({
   name: 'stat-breakdown',
   field: 'stat',
   which: 'engine.stat.which',
@@ -19,14 +19,6 @@ const screen = listedScreen({
   },
   known: (registry, chosen) => registry.stats.has(chosen),
 });
-
-export const statFrame = screen.frame;
-export const statFocus = screen.focus;
-export const statOptions = screen.options;
-export const statSubmit = screen.submit;
-export const sameStat = screen.same;
-export const holdsStat = screen.holds;
-export const statStale = screen.stale;
 
 export function madeOf(shares: readonly StatShare[]): Array<{ title: Localized; worth: string }> {
   return shares.map((share) => {

@@ -4,9 +4,7 @@ import { dialogueFrame, keepModals, type ModalName, openModal, popModal, topModa
 import { choose, cursorProblem, menuChoices, standsAtWords } from './dialogue-runtime';
 import { carriedOptions, carriedSubmit } from './carriedScreen';
 import { isPlaneFrameBody, planeFocus, planeOptions, planeStale, planeSubmit } from './planeScreen';
-import { holdsQuest, questFocus, questOptions, questStale, questSubmit } from './questScreen';
-import { holdsStat, statFocus, statOptions, statStale, statSubmit } from './statScreen';
-import { holdsSkill, skillFocus, skillOptions, skillStale, skillSubmit } from './skillScreen';
+import { fromListedScreens, type ListedScreen } from './listedScreens';
 import { countOptions, countSubmit, holdsCount, holdsShop, shopOptions, shopStale, shopSubmit } from './shopScreen';
 import { type PlaneFocus } from './planeReport';
 import { bonusAmount, tagClause, type TagClause } from '../grammar/tagClause';
@@ -64,6 +62,17 @@ function raceChoices(registry: Registry, state: GameState): readonly { value: An
   });
 }
 
+type ListedDefinitions = { [S in ListedScreen as S['name']]: ModalDefinition<Extract<ModalFrame, { name: S['name'] }>> };
+
+const LISTED_DEFINITIONS = fromListedScreens<ListedDefinitions>((screen) => ({
+  options: screen.options,
+  submit: screen.submit,
+  holds: screen.holds,
+  stale: screen.stale,
+  focus: screen.focus,
+  leaves: LEAVE,
+}));
+
 const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { name: K }>> } = {
   'choose-name': {
     options: (_frame, state, registry) => [{ key: 'name', label: localizerOf(registry, state).engine('engine.modal.name'), values: null }],
@@ -92,30 +101,7 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     focus: planeFocus,
     leaves: BACK,
   },
-  'quest-journal': {
-    options: (frame, state, registry) => questOptions(frame, state, registry),
-    submit: (frame) => questSubmit(frame),
-    holds: holdsQuest,
-    stale: questStale,
-    focus: questFocus,
-    leaves: LEAVE,
-  },
-  'stat-breakdown': {
-    options: (frame, state, registry) => statOptions(frame, state, registry),
-    submit: (frame) => statSubmit(frame),
-    holds: holdsStat,
-    stale: statStale,
-    focus: statFocus,
-    leaves: LEAVE,
-  },
-  'skill-breakdown': {
-    options: (frame, state, registry) => skillOptions(frame, state, registry),
-    submit: (frame) => skillSubmit(frame),
-    holds: holdsSkill,
-    stale: skillStale,
-    focus: skillFocus,
-    leaves: LEAVE,
-  },
+  ...LISTED_DEFINITIONS,
   shop: {
     options: shopOptions,
     submit: shopSubmit,

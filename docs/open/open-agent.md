@@ -525,22 +525,6 @@ thing to ask before assuming it may.
 *Closes when:* every module that means *a reference* reads `REFERENCE` rather than respelling
 it, and a decision is recorded about the partial-id spelling in `completion.ts`.
 
-## Three listed screens are consolidated and then unpacked into twenty-one aliases
-
-`listedScreen()` (`src/runtime/listedScreen.ts:35`) already takes the five fields quest, stat
-and skill differ in and returns one object with seven members. Each caller then re-exports
-those seven under its own prefix — `questScreen.ts:18-23`, `statScreen.ts:23-28`,
-`skillScreen.ts:15-21`, twenty-one lines carrying nothing but a name — and the aliases are
-gathered again into three keyed tables: `modals.ts`'s `DEFINITIONS`, and `modalStack.ts`'s
-`OPENERS` (`:25-27`) and `SAME` (`:37-39`).
-
-A fourth listed screen is one `listedScreen()` call plus about ten hand-written lines across
-three files. Two of the three tables are mapped types and so are exhaustive-checked, but only
-after the frame name is added; the aliases and the `DEFINITIONS` body are transcription.
-
-*Closes when:* each screen exports its `Listed` object whole, one list of them stands
-somewhere, and the three tables are built from it rather than typed out.
-
 ## `App.tsx`'s pane falls through to the inventory, so a derived test proves nothing about a new page
 
 `pane()` (`src/ui/App.tsx:233-280`) dispatches over subpage ids by if-chain and ends, on the

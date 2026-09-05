@@ -1,9 +1,7 @@
 import { RuntimeError } from './error';
 import { carriedFrame } from './carried';
 import { samePlane } from './planeScreen';
-import { questFrame, sameQuest } from './questScreen';
-import { sameStat, statFrame } from './statScreen';
-import { sameSkill, skillFrame } from './skillScreen';
+import { fromListedScreens, type PerListed } from './listedScreens';
 import { sameCount, sameShop, shopFrame } from './shopScreen';
 import type { ModalScreen } from '../grammar/actionResult';
 import { type DialogueCursor, GameState, type ModalFrame } from './state';
@@ -22,9 +20,7 @@ const OPENERS: { [K in ModalScreen]: () => Frame<K> } = {
   'choose-name': () => ({ name: 'choose-name', answers: {} }),
   'choose-race': () => ({ name: 'choose-race', answers: {} }),
   'carried-items': () => carriedFrame(),
-  'quest-journal': () => questFrame(),
-  'stat-breakdown': () => statFrame(),
-  'skill-breakdown': () => skillFrame(),
+  ...fromListedScreens<PerListed<'frame'>>((screen) => screen.frame),
 };
 
 const SAME: { [K in ModalName]: Same<K> | null } = {
@@ -32,13 +28,11 @@ const SAME: { [K in ModalName]: Same<K> | null } = {
   'choose-race': null,
   'carried-items': null,
   'item-plane': samePlane,
-  'quest-journal': sameQuest,
-  'stat-breakdown': sameStat,
-  'skill-breakdown': sameSkill,
   shop: sameShop,
   'shop-count': sameCount,
   'welcome-back': null,
   dialogue: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
+  ...fromListedScreens<PerListed<'same'>>((screen) => screen.same),
 };
 
 const NAMES: readonly string[] = Object.keys(SAME);
