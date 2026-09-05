@@ -28,7 +28,7 @@ import { declaredId, isMintedAction } from '../content/sections/entity';
 import { isFight } from '../grammar/action';
 import { stoodHere, type StoodHere } from './population';
 import { truthy, weighing } from './conditions';
-import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, type Focus } from './modals';
+import { answerModal, awaitsAnAnswer, Modal, modalFocus, pruneModals, publishModal, WELCOME_BACK, type Focus } from './modals';
 import { dialogueFrame, openModal, openModalNamed, openShop, topModal } from './modalStack';
 import { heldByForce } from './perform';
 import { carriedEntries, wornRows, type CarriedEntry, type WornRow } from './carried';
@@ -739,6 +739,8 @@ export function wait(session: PlaySession, seconds: number): PlayView {
   applyDirective(session, { kind: 'wait', seconds });
   return view(session);
 }
+
+export const greetingBack = (status: Pick<PlayStatus, 'modals'>): boolean => status.modals.some((modal) => modal.name === WELCOME_BACK);
 
 export function ranWhileAway(session: PlaySession, elapsedRealMs: number, speed: number): boolean {
   const { state, registry } = own(session);

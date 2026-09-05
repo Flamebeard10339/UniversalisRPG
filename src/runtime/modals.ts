@@ -142,6 +142,8 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
 
 export const CARRY_ON = 'carry-on';
 
+export const WELCOME_BACK = 'welcome-back';
+
 export const awaitsAnAnswer = (frame: ModalFrame): boolean => definitionFor(frame).asksNothing?.(frame) !== true;
 
 export const MODAL_NAMES: readonly ModalName[] = Object.keys(DEFINITIONS) as ModalName[];

@@ -12,6 +12,8 @@ const DIGGING = 'use:location.fixture-town.green.dig';
 
 const WAITING = 'use:location.fixture-town.green.loiter';
 
+const LOITERING = WAITING;
+
 const AN_HOUR_MS = 60 * 60 * 1000;
 
 const AN_HOUR_S = 60 * 60;
@@ -53,6 +55,62 @@ function leftUnderWay(shelf: Shelved, speed?: string): Driver {
   if (driver.snapshot().view.action === null) throw new Error('nothing was left under way, so every claim below holds vacuously');
   return driver;
 }
+
+describe('the timer picks back up where the page left it (c2)', () => {
+  const ticking = (): { ticker: (tick: (ms: number) => void) => () => void; fire: (ms: number) => void } => {
+    let held: ((ms: number) => void)[] = [];
+    return {
+      ticker: (tick) => {
+        held.push(tick);
+        return () => void (held = held.filter((each) => each !== tick));
+      },
+      fire: (ms) => {
+        for (const tick of [...held]) tick(ms);
+      },
+    };
+  };
+
+  const shelvedTicking = (clock: ReturnType<typeof ticking>): Shelved => {
+    const slots = memoryDriver();
+    let at = 1_000;
+    return {
+      slots,
+      open: () => createDriver(fixtureSources(), { slots, ticker: clock.ticker, now: () => at }),
+      wait: (ms) => void (at += ms),
+    };
+  };
+
+  it('holds the world still while the screen is up, and runs it on once that is answered', () => {
+    const clock = ticking();
+    const shelf = shelvedTicking(clock);
+    const first = shelf.open();
+    first.choose(position(first, LOITERING));
+    shelf.wait(A_MINUTE_MS);
+
+    const back = shelf.open();
+    expect(greeting(back), 'nothing greeted the page, so every claim below holds vacuously').toBe(true);
+    const greeted = back.snapshot().view.time;
+    clock.fire(5_000);
+    const held = back.snapshot().view.time;
+    back.answer(CARRY_ON, CARRY_ON);
+    clock.fire(5_000);
+
+    expect(held - greeted, 'the world ran on under a screen nobody had answered yet').toBe(0);
+    expect(back.snapshot().view.time - held, 'the timer never picked back up after the screen was answered').toBeGreaterThan(0);
+  });
+
+  it('picks a continuous action back up on a page that comes back to it', () => {
+    const clock = ticking();
+    const shelf = shelvedTicking(clock);
+    const first = shelf.open();
+    first.choose(position(first, LOITERING));
+    expect(first.snapshot().live, 'nothing was left running').not.toBeNull();
+
+    const back = shelf.open();
+
+    expect(back.snapshot().live, 'the page came back to a frozen action').not.toBeNull();
+  });
+});
 
 describe('the world runs on while the page is closed (c1)', () => {
   it('greets nobody on a page that was never closed on anything', () => {

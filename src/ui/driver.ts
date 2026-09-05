@@ -14,7 +14,7 @@ import type { Directive } from '../content/sections/test';
 import { advances, clamped, REPLAY_SPEED } from './replay';
 import { type RecordedRun, type RunHeader, type RunNotes } from '../runtime/runLog';
 import { createSaveContext, modulesTurnedOff, speedKept, turnModulesOff, type SaveContext } from '../runtime/saveSlots';
-import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
+import { greetingBack, sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { packsOf, type PortalPack } from '../content/packs';
@@ -284,6 +284,21 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     publish();
   };
 
+  function runOnUnderWay(): void {
+    if (running !== null) return;
+    if (greetingBack(context.view)) return;
+    let live: LiveRun | null;
+    try {
+      live = liveAgain(context);
+    } catch {
+      return;
+    }
+    if (!live) return;
+    running = live;
+    stopTicking = ticker(advance);
+    advance(0);
+  }
+
   const picked = (line: string): string => {
     const at = /^[ 	]*(\d+)[ 	]*$/.exec(line);
     return at === null ? line : (current.view.choices[Number(at[1]) - 1]?.id ?? line);
@@ -312,6 +327,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       advance(0);
       return;
     }
+    runOnUnderWay();
     publish();
   };
 
@@ -322,6 +338,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     stopTicking?.();
     stopTicking = null;
     openOnce(current.transcript);
+    runOnUnderWay();
     publish();
   };
 
@@ -490,6 +507,8 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       },
     },
   };
+
+  runOnUnderWay();
 
   return driver;
 }
