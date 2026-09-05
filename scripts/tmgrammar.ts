@@ -10,8 +10,6 @@ export const SCOPE_NAME = 'source.dsl';
 
 export const GRAMMAR_PATH = path.join('editor', 'vscode', 'syntaxes', 'dsl.tmLanguage.json');
 
-const OPAQUE_KINDS: readonly string[] = ['save'];
-
 const DEPTH = 8;
 
 interface Pattern {
@@ -113,7 +111,7 @@ const headingCaptures = (kindScope: string): Record<string, { name: string }> =>
 });
 
 function sectionPattern(kind: string): Pattern {
-  const inside = OPAQUE_KINDS.includes(kind) ? [...keywordPatterns(kind), OPAQUE] : [...keywordPatterns(kind), LABEL];
+  const inside = sectionFor(kind)?.opaqueBody === true ? [...keywordPatterns(kind), OPAQUE] : [...keywordPatterns(kind), LABEL];
   return {
     name: `meta.section.${kind}.dsl`,
     begin: `${HEADING}(${escaped(kind)})\\b[ \\t]*(.*)$`,

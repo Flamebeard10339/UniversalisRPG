@@ -78,6 +78,7 @@ export interface Section<V extends { id: string } = { id: string }, M extends Re
   map: string | null;
   maps: Lands<V, M>;
   nestsActions: boolean;
+  opaqueBody: boolean;
   mintedActions?: (value: V) => readonly MintedAction[];
   flags: readonly string[];
   names: readonly Named[];
@@ -100,6 +101,7 @@ interface Common<V extends { id: string }> {
   ids: Ids;
   vocabulary: Vocabulary;
   nestsActions?: string;
+  opaqueBody?: boolean;
   mintedActions?: (value: V) => readonly MintedAction[];
   flags?: readonly string[];
   says?: (value: V) => ActionResult[][];
@@ -258,7 +260,7 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, vocabulary, map, maps, nestsActions, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, vocabulary, map, maps, nestsActions, opaqueBody, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
     if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
@@ -347,6 +349,7 @@ export const section =
       map: map ?? (maps === undefined ? null : Object.keys(maps)[0]!),
       maps: (maps ?? (map === undefined ? {} : { [map]: (value: V) => [[value.id, value] as const] })) as Lands<V, Filled>,
       nestsActions: nestsActions !== undefined,
+      opaqueBody: opaqueBody === true,
       mintedActions,
       flags,
       names,

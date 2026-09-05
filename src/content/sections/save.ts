@@ -97,6 +97,7 @@ export const save = section<SaveSection>()({
   kind: 'save',
   ids: 'owned',
   vocabulary: 'declared',
+  opaqueBody: true,
   merge: writtenWhole,
   maps: {
     saves: (value): readonly (readonly [string, ParsedSave])[] => [[value.id, value]],
