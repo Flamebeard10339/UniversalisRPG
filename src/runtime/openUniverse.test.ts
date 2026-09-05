@@ -209,7 +209,7 @@ describe('an opening stands on what the live slot last held (c5)', () => {
 
     const again = openUniverse([BASE], { save: context() });
 
-    expect(again.resumed).toEqual({ kind: 'resumed', slot: PLAYER_SLOT, pruned: [] });
+    expect(again.resumed).toEqual({ away: null, kind: 'resumed', slot: PLAYER_SLOT, pruned: [] });
     expect(serializeSession(again.session)).toBe(kept);
     expect(serializeSession(again.session)).not.toBe(serializeSession(openUniverse([BASE]).session));
   });

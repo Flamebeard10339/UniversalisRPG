@@ -5,8 +5,8 @@ import type { ModuleSource } from '../content/universe';
 import type { Answer } from './localized';
 import type { PruneWarning } from './pruning';
 import { savedGameFromSerialized } from './save';
-import { liveHolding, liveSlot, type SaveContext } from './saveSlots';
-import { loadSaved, startSession, type PlaySession } from './session';
+import { liveHolding, liveSlot, speedKept, type SaveContext } from './saveSlots';
+import { loadSaved, ranWhileAway, startSession, type AwayRun, type PlaySession } from './session';
 
 export interface UniverseProblem {
   modules: readonly Answer[];
@@ -50,7 +50,7 @@ export const FALLBACK_SOURCE: ModuleSource = {
 
 export type Resumption =
   | { readonly kind: 'new' }
-  | { readonly kind: 'resumed'; readonly slot: Answer; readonly pruned: readonly PruneWarning[] }
+  | { readonly kind: 'resumed'; readonly slot: Answer; readonly pruned: readonly PruneWarning[]; readonly away: AwayRun | null }
   | { readonly kind: 'kept'; readonly slot: Answer; readonly why: string };
 
 export interface OpenedUniverse {
@@ -72,7 +72,8 @@ function resume(session: PlaySession, save: SaveContext): Resumption {
   const saved = savedGameFromSerialized(holding.slot.payload);
   if (saved === null) return { kind: 'kept', slot, why: 'it does not read as a saved game' };
   try {
-    return { kind: 'resumed', slot, pruned: loadSaved(session, saved) };
+    const pruned = loadSaved(session, saved);
+    return { kind: 'resumed', slot, pruned, away: ranWhileAway(session, save.now() - holding.slot.writtenAt, speedKept(save)) };
   } catch (error) {
     return { kind: 'kept', slot, why: because(error) };
   }

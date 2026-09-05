@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { LOCAL_CHANGES_MODULE_ID } from '../content/localChanges';
 import { askedOption } from '../runtime/command';
 import type { PlayView } from '../runtime/session';
@@ -47,6 +47,7 @@ import { useWide } from './wide';
 import { columnsIn } from './gesture';
 import { wordsOf, type Words } from './words';
 import { TransientProvider, type TransientChannel } from './transient';
+import { WelcomeBack } from './WelcomeBack';
 import { VStack } from './VStack';
 
 function useArrivals(discovered: readonly Place[]): { arrivals: readonly string[]; generation: number } {
@@ -91,8 +92,8 @@ function useCrossings(rows: PlayView['xp'], onSkills: boolean): Crossings {
 
 export const REMEMBER_AFTER_MS = 400;
 
-function useEditing(driver: Driver, after: number): [Editing, (next: Editing) => void] {
-  const [editing, setEditing] = useState<Editing>(() => remembered(driver.editorMemory.read()));
+function useEditing(driver: Driver, after: number, opening: Where): [Editing, Dispatch<SetStateAction<Editing>>] {
+  const [editing, setEditing] = useState<Editing>(() => remembered(driver.editorMemory.read(), opening));
 
   useEffect(() => {
     const timer = setTimeout(() => driver.editorMemory.write(recorded(editing)), after);
@@ -156,10 +157,12 @@ const FOCUS_SCREEN: { [K in Reading['kind']]: Draws<K> } = {
 const focusScreen = (focus: PlayView['focus'], drawing: Drawing | null): FocusScreen =>
   focus === null || drawing === null ? {} : (FOCUS_SCREEN[focus.kind] as Draws<Reading['kind']>)(focus, drawing);
 
-export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS }: { driver: Driver; opening?: Where; remembering?: number }): JSX.Element {
+export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS, devBuild = false }: { driver: Driver; opening?: Where; remembering?: number; devBuild?: boolean }): JSX.Element {
   const snapshot = useSyncExternalStore(driver.subscribe, driver.snapshot, driver.snapshot);
-  const [where, setWhere] = useState(opening);
-  const [editing, setEditing] = useEditing(driver, remembering);
+  const [editing, setEditing] = useEditing(driver, remembering, opening);
+  const where = editing.where ?? opening;
+  const setWhere = (next: Where | ((held: Where) => Where)): void =>
+    setEditing((was) => ({ ...was, where: typeof next === 'function' ? next(was.where ?? opening) : next }));
   const view = snapshot.view;
   const dev = snapshot.dev;
   const localizer = driver.localizer();
@@ -237,6 +240,7 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
       return subpage.id === 'settings' ? (
         <SettingsPane
           dev={dev}
+          devBuild={devBuild}
           speed={snapshot.speed}
           settings={view.settings}
           commandLine={editing.commandLine}
@@ -357,14 +361,18 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           columns={here.columns}
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
-        {screen.instead ??
+        {snapshot.away !== null ? (
+          <WelcomeBack away={snapshot.away} words={words} localizer={localizer} onCarryOn={driver.dismissAway} />
+        ) : (
+          screen.instead ??
           (asking ? (
             <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
               {screen.beside}
             </ModalSheet>
           ) : view.action?.forced ? (
             <ForcedSheet action={view.action} />
-          ) : null)}
+          ) : null)
+        )}
       </div>
     </TransientProvider>
   );

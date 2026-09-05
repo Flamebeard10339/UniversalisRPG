@@ -10,6 +10,8 @@ export const AUTOSAVE_SLOT = 'autosave';
 
 export const MODULES_OFF_SLOT = 'modules-off';
 
+export const SPEED_SLOT = 'speed';
+
 export const EDITOR_SLOT = 'editor';
 
 export const TRANSCRIPT_SLOT = 'transcript';
@@ -75,6 +77,19 @@ export function cadenceOrUnreadable(save: SaveContext): Cadence | null {
   if (state.slot.payload === NEVER) return NEVER;
   const seconds = Number(state.slot.payload);
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
+
+export const DEFAULT_SPEED = 1;
+
+export function speedKept(save: SaveContext): number {
+  const state = stateOf(save.store, SPEED_SLOT);
+  if (state.kind !== 'held') return DEFAULT_SPEED;
+  const rate = Number(state.slot.payload);
+  return Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_SPEED;
+}
+
+export function keepSpeed(save: SaveContext, rate: number): void {
+  save.store.write(SPEED_SLOT, String(rate));
 }
 
 export function modulesTurnedOff(save: SaveContext): ReadonlySet<string> {

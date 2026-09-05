@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LOCAL_CHANGES_MODULE_ID } from '../src/content/localChanges';
+import { SPEED_SLOT } from '../src/runtime/saveSlots';
 import { withEngineLocale } from '../src/content/engineLocale';
 import { OPENING_CELLS } from '../src/runtime/openUniverseFixture';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
@@ -133,7 +134,7 @@ describe('the two drivers cannot drift', () => {
 
     expect(gui.snapshot().transcript.entries.length).toBeGreaterThan(script.length);
     const written = slotBytes(slots.repl);
-    expect(Object.keys(written).sort()).toEqual([LOCAL_CHANGES_MODULE_ID, 'player']);
+    expect(Object.keys(written).sort()).toEqual([LOCAL_CHANGES_MODULE_ID, 'player', SPEED_SLOT].sort());
     expect(slotBytes(slots.gui)).toEqual(written);
   });
 

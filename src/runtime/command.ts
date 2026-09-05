@@ -37,9 +37,11 @@ import { ownerRef } from './state';
 import { anId, say, says, type Said } from './said';
 import {
   DEV_SLOT,
+  DEFAULT_SPEED,
   autosave,
   devSnapshot,
   enterDev,
+  keepSpeed,
   leaveDev,
   liveSlot,
   NEVER,
@@ -147,7 +149,7 @@ export function newContext(
     session,
     view: current,
     recorder: options.recorder ?? { history: [], startSave: '' },
-    live: { speed: options.speed ?? 1, driving: options.driving ?? false },
+    live: { speed: options.speed ?? DEFAULT_SPEED, driving: options.driving ?? false },
     authoring: options.authoring,
     save: options.save,
   };
@@ -837,6 +839,17 @@ function autosaved(ctx: CommandContext): ToolMessage | null {
   }
 }
 
+function speedRemembered(ctx: CommandContext, rate: number): ToolMessage | null {
+  if (!ctx.save) return null;
+  try {
+    keepSpeed(ctx.save, rate);
+    return null;
+  } catch (error) {
+    if (error instanceof RuntimeError) return note('error', `how fast time runs could not be kept, so it will open at ${DEFAULT_SPEED}x again: ${error.message}`);
+    throw error;
+  }
+}
+
 function unmasked(ctx: CommandContext, result: CommandResult): CommandResult {
   applyDirective(ctx.session, { kind: 'setting', setting: 'masking', value: 'off' });
   return { ...result, view: view(ctx.session) };
@@ -1014,7 +1027,9 @@ export const COMMANDS: readonly CommandSpec[] = [
     },
     run: (ctx, multiplier) => {
       ctx.live.speed = multiplier;
-      return said('plain', sessionLocalizer(ctx.session).engine('engine.command.speed', { speed: multiplier }));
+      const spoken = said('plain', sessionLocalizer(ctx.session).engine('engine.command.speed', { speed: multiplier }));
+      const problem = speedRemembered(ctx, multiplier);
+      return problem ? { ...spoken, output: [...spoken.output, problem] } : spoken;
     },
   }),
   define({

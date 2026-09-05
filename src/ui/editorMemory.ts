@@ -1,5 +1,7 @@
 import { SURFACES, type SurfaceId } from './authoringSurface';
 import { SPLIT_DEFAULT, splitHeld } from './gesture';
+import { LAYERS, OPENING, toLayer, toSubpage, type Where } from './nav';
+import type { LabelId } from './labels';
 import type { Point } from './viewport';
 
 export { EDITOR_SLOT } from '../runtime/saveSlots';
@@ -21,6 +23,7 @@ export interface Editing {
   split: number;
   commandLine: boolean;
   map: MapWhere;
+  where: Where | null;
 }
 
 export const FORGOTTEN: Editing = {
@@ -34,6 +37,7 @@ export const FORGOTTEN: Editing = {
   split: SPLIT_DEFAULT,
   commandLine: false,
   map: { pan: { x: 0, y: 0 }, zoom: 1, plane: null },
+  where: null,
 };
 
 const held = (value: unknown): Record<string, unknown> => (typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
@@ -54,7 +58,17 @@ function mapWhere(value: unknown): MapWhere {
   };
 }
 
-export function remembered(stored: string | null): Editing {
+function whereHeld(value: unknown, opening: Where): Where | null {
+  const from = held(value);
+  if (typeof from.layer !== 'number' || !Number.isFinite(from.layer) || !Array.isArray(from.subpage)) return null;
+  let standing = toLayer(opening, from.layer);
+  for (const [at, id] of from.subpage.entries()) {
+    if (typeof id === 'string' && at < LAYERS.length) standing = toSubpage(standing, at, id as LabelId);
+  }
+  return standing;
+}
+
+export function remembered(stored: string | null, opening: Where = OPENING): Editing {
   if (stored === null) return FORGOTTEN;
   let parsed: unknown;
   try {
@@ -75,6 +89,7 @@ export function remembered(stored: string | null): Editing {
     split: splitHeld(count(from.split, FORGOTTEN.split)),
     commandLine: from.commandLine === true,
     map: mapWhere(from.map),
+    where: whereHeld(from.where, opening),
   };
 }
 

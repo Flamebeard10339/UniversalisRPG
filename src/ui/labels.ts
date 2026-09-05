@@ -95,6 +95,12 @@ export const LABELS = {
   'replay-parted': 'engine.replay.parted',
   'replay-done': 'engine.replay.done',
   'replay-close': 'engine.replay.close',
+  'away-back': 'engine.away.back',
+  'away-for': 'engine.away.for',
+  'away-nothing': 'engine.away.nothing',
+  'away-carry-on': 'engine.away.carry-on',
+  'playtest-download': 'engine.playtest.download',
+  'playtest-chunk': 'engine.playtest.chunk',
 } as const satisfies Record<string, EngineKey>;
 
 export type LabelId = keyof typeof LABELS;

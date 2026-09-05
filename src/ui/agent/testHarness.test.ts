@@ -17,6 +17,7 @@ function snapshot(overrides: Partial<DriverSnapshot> = {}): DriverSnapshot {
     live: null,
     playtest: null,
     replay: null,
+    away: null,
     transcript: emptyTranscript(),
     view: {
       location: { id: 'start', title: asLocalized('Start'), description: asLocalized('Here') },
@@ -96,6 +97,7 @@ function driver(current: DriverSnapshot, calls: string[] = [], transient: Transi
     editorMemory: { read: () => null, write: (text) => void calls.push(`editorMemory:${text}`) },
     note: (text) => void calls.push(`note:${text}`),
     reopen: () => void calls.push('reopen'),
+    dismissAway: () => void calls.push('dismissAway'),
     clearLocalChanges: () => void calls.push('clearLocalChanges'),
   };
 }

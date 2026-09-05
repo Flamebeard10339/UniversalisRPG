@@ -13,8 +13,8 @@ import type { Answer } from '../runtime/localized';
 import type { Directive } from '../content/sections/test';
 import { advances, clamped, REPLAY_SPEED } from './replay';
 import { type RecordedRun, type RunHeader, type RunNotes } from '../runtime/runLog';
-import { createSaveContext, modulesTurnedOff, turnModulesOff, type SaveContext } from '../runtime/saveSlots';
-import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type PlayView } from '../runtime/session';
+import { createSaveContext, modulesTurnedOff, speedKept, turnModulesOff, type SaveContext } from '../runtime/saveSlots';
+import { sessionLocalizer, serializeSession, startSession, testSteps, view, walkTest, type AwayRun, type PlayView } from '../runtime/session';
 import { memoryDriver, type SlotDriver } from '../runtime/store';
 import { EDITOR_SLOT } from './editorMemory';
 import { packsOf, type PortalPack } from '../content/packs';
@@ -62,6 +62,7 @@ export interface DriverSnapshot {
   speed: number;
   playtest: RecordedRun | null;
   replay: ReplaySnapshot | null;
+  away: AwayRun | null;
   mods: readonly PortalPack[];
 }
 
@@ -97,6 +98,7 @@ export interface Driver {
   editorMemory: { read(): string | null; write(text: string): void };
   note(text: string): void;
   reopen(): void;
+  dismissAway(): void;
   turnModulesOff(names: readonly string[]): void;
   clearLocalChanges(): void;
   playtest: PlaytestControls;
@@ -119,7 +121,7 @@ function open(opened: OpenedUniverse, authoring: AuthoringContext, save: SaveCon
   const { session } = opened;
   const first = view(session);
   return {
-    context: newContext(session, first, { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } }),
+    context: newContext(session, first, { driving: true, authoring, save, speed: speedKept(save), recorder: { history: [], startSave: serializeSession(session) } }),
     output: [
       ...before,
       ...opened.problems.map((problem): CommandOutput => ({ kind: 'message', words: 'tool', tone: 'warn', text: problem.message })),
@@ -148,6 +150,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
   const warn = (text: string, detail?: string[]): CommandOutput => (detail ? { kind: 'message', words: 'tool', tone: 'warn', text, detail } : { kind: 'message', words: 'tool', tone: 'warn', text });
 
   let replay: ReplaySnapshot | null = null;
+  let away: AwayRun | null = null;
   let authoring!: AuthoringContext;
 
   let logKept: Transcript | null = null;
@@ -173,7 +176,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
     }
   };
 
-  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest' | 'replay'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run(), replay });
+  const settled = (next: Omit<DriverSnapshot, 'dev' | 'speed' | 'playtest' | 'replay' | 'away'>): DriverSnapshot => ({ ...next, dev: save.dev, speed: context.live.speed, playtest: record.run(), replay, away });
 
   const readLocal = (): { text: string; complaints: CommandOutput[] } => {
     try {
@@ -206,6 +209,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
     const said = [...local.complaints, ...log.complaints, ...(opened.modules.includes(LOCAL_CHANGES_MODULE_ID) ? shadowing(local.text) : [])];
     const opening = open(opened, authoring, save, said);
+    away = opened.resumed.kind === 'resumed' ? opened.resumed.away : null;
     const kept = log.text === null || opened.resumed.kind !== 'resumed' ? null : keptTranscript(log.text, sessionLocalizer(opening.context.session).identifier);
     const carried = kept ?? before;
     context = opening.context;
@@ -326,7 +330,7 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
 
   const restart = (): void => {
     const session = startSession(context.session.registry);
-    context = newContext(session, view(session), { driving: true, authoring, save, recorder: { history: [], startSave: serializeSession(session) } });
+    context = newContext(session, view(session), { driving: true, authoring, save, speed: context.live.speed, recorder: { history: [], startSave: serializeSession(session) } });
   };
 
   const goTo = (step: number): void => {
@@ -455,6 +459,12 @@ export function createDriver(sources: readonly ModuleSource[], options: DriverOp
       rename: (run, to) => filing(renameRun(context, run, to)),
     },
     reopen,
+    dismissAway: () => {
+      if (away === null) return;
+      away = null;
+      current = { ...current, away };
+      publish();
+    },
     turnModulesOff: (names) => {
       try {
         turnModulesOff(save, names);

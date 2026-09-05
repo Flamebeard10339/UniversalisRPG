@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { DevOnly } from './DevOnly';
-import { devLine, RATES, speedLine } from './devMode';
+import { devLine, RATES, speedLine, speedReachable } from './devMode';
 import type { Localizer } from '../runtime/localized';
 import type { FiledRun } from '../runtime/runFiling';
 import type { SettingRow } from '../runtime/session';
@@ -197,6 +196,7 @@ function Runs({ runs, words, localizer, onReplay, onRename, onDrop }: { runs: re
 
 export function SettingsPane({
   dev,
+  devBuild,
   speed,
   settings,
   commandLine,
@@ -214,6 +214,7 @@ export function SettingsPane({
   onTurnMods,
 }: {
   dev: boolean;
+  devBuild: boolean;
   speed: number;
   settings: readonly SettingRow[];
   commandLine: boolean;
@@ -267,9 +268,7 @@ export function SettingsPane({
 
       <Runs runs={runs} words={words} localizer={localizer} onReplay={onReplayRun} onRename={onRenameRun} onDrop={onDropRun} />
 
-      <DevOnly dev={dev}>
-        <Rates speed={speed} words={words} onSend={onSend} />
-      </DevOnly>
+      {speedReachable(dev, devBuild) ? <Rates speed={speed} words={words} onSend={onSend} /> : null}
     </div>
   );
 }

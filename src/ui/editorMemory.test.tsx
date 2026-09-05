@@ -22,6 +22,7 @@ const MOVED: { [K in keyof Editing]: Editing[K] } = {
   split: 0.3,
   commandLine: true,
   map: { pan: { x: -120.5, y: 88 }, zoom: 2.25, plane: -1 },
+  where: { layer: 0, subpage: ['map', 'settings', 'journal'] },
 };
 
 const KEYS = Object.keys(FORGOTTEN) as Array<keyof Editing>;

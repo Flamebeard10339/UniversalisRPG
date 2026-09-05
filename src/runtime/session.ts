@@ -3,7 +3,7 @@ import { RuntimeError } from './error';
 import { Action } from '../content/sections/entity';
 import { DISCOVERED, Location, type Direction } from '../content/sections/location';
 import { TOUCHED } from '../content/sections/define';
-import { actionProgress, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
+import { actionProgress, actionVisible, ArmResult, armAction, armCraft, armFightAction, armJourney, craft, describeCondition, encounterView, EncounterView, equip, evaluateCondition, GameState, initResources, recipeCraftable, reachedNow, requiresMet, resolve, resolveUnderWay, settleCarried, UNDER_WAY_LIMIT_HOURS, UNDER_WAY_LIMIT_MS, statValue, talk, unequip, useAction, useFight, walkTo } from './runtime';
 import { createGameState, type ActiveAction, type Journey } from './state';
 import { itemCopies, Growth, grownItems, packRows } from './itemInstance';
 import { swappedOrder } from './packOrder';
@@ -45,7 +45,7 @@ import { Answer, AnswerTable, Localized, Localizer, localizerOf } from './locali
 import { skillLevel, xpForLevel } from './skills';
 import { fromMilliUnits, msToSeconds, secondsToMs } from './units';
 import { say } from './said';
-import { spanStart, type SpanStart } from './span';
+import { spanStart, spanSummary, type SpanStart } from './span';
 import { choiceWritten, chosenSetting, isSettingName, settingNamed, settingStands, standingChoice, SETTING_NAMES } from './settings';
 import { grouping, offeredBy, type GroupRow } from './grouping';
 import type { StatShare } from './statShare';
@@ -738,6 +738,32 @@ export function beginAction(session: PlaySession, choiceId: string): PlayView {
 export function wait(session: PlaySession, seconds: number): PlayView {
   applyDirective(session, { kind: 'wait', seconds });
   return view(session);
+}
+
+export interface AwayRun {
+  readonly awayMs: number;
+  readonly ranMs: number;
+  readonly capped: boolean;
+  readonly lines: readonly Localized[];
+}
+
+export function ranWhileAway(session: PlaySession, elapsedRealMs: number, speed: number): AwayRun | null {
+  const internals = own(session);
+  const { state, registry } = internals;
+  if (state.activeAction === null && state.journey === null) return null;
+
+  const wanted = Math.max(0, elapsedRealMs) * speed;
+  const capped = wanted > UNDER_WAY_LIMIT_MS;
+  const span = Math.min(wanted, UNDER_WAY_LIMIT_MS);
+  if (span < 1) return null;
+
+  const start = spanStart(state);
+  resolve(state, registry, state.time + Math.floor(span));
+  const say = localizerOf(registry, state);
+  const because = say.engine(capped ? 'engine.away.capped' : 'engine.away.ran', { hours: UNDER_WAY_LIMIT_HOURS });
+  const lines = spanSummary(start, state, registry, because);
+  internals.logCursor = state.log.length;
+  return { awayMs: elapsedRealMs, ranMs: state.time - start.at, capped, lines };
 }
 
 export function cancelAction(session: PlaySession): PlayView {

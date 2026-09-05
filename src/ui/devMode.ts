@@ -18,3 +18,5 @@ export function devRefusal(line: string, dev: boolean): string | null {
 }
 
 export const RATES = [1, 2, 8, 64] as const;
+
+export const speedReachable = (dev: boolean, devBuild: boolean): boolean => dev || devBuild;

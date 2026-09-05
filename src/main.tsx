@@ -23,6 +23,6 @@ if (import.meta.env.DEV) {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App driver={driver} />
+    <App driver={driver} devBuild={import.meta.env.DEV} />
   </React.StrictMode>,
 );

@@ -50,6 +50,7 @@ function calls(source: { text: string }): string[] {
 
 const DISPATCHES = [
   'amounts',
+  'speedKept',
   'askedOption',
   'madeOf',
   'partsOf',
