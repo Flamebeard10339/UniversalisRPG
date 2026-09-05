@@ -201,3 +201,30 @@ describe('where a quest stands reaches a surface as a group', () => {
     expect(journal(silent, state).map((entry) => entry.group)).toEqual(journal(silent, state).map(() => undefined));
   });
 });
+
+describe('the journal costs no more the deeper a quest runs', () => {
+  const chain = (id: string, stages: number): string =>
+    [
+      `# quest ${id}`,
+      `title: Quest ${id}`,
+      ...Array.from({ length: stages }, (_, at) => [`stage s${at}:`, `  log: stage ${at}`, ...(at + 1 < stages ? [`  done when: time >= ${at + 1}`, `  goto s${at + 1}`] : ['  complete'])]).flat(),
+    ].join('\n');
+
+  const walked = (stages: number): number => {
+    const world = loadInEnglish([WORLD, chain('deep', stages)].join('\n\n'));
+    const state = createGameState();
+    state.location = 'shore';
+    journal(world, state);
+    const at = performance.now();
+    for (let round = 0; round < 20; round += 1) journal(world, state);
+    return (performance.now() - at) / 20;
+  };
+
+  it('reaches a stage by deriving each stage it stands on once, not once per path that reaches it', () => {
+    const shallow = Math.max(walked(12), 0.01);
+    const deep = walked(24);
+
+    expect(journal(loadInEnglish([WORLD, chain('deep', 24)].join('\n\n')), Object.assign(createGameState(), { location: 'shore' })).length).toBe(1);
+    expect(deep / shallow, `twice the stages cost ${(deep / shallow).toFixed(1)}x, which is the shape of a walk that doubles per stage`).toBeLessThan(50);
+  });
+});

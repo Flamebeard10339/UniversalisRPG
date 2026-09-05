@@ -16,7 +16,7 @@ const WATCHED = 60;
 
 const A_LONG_SESSION = 400;
 
-const FRAME_BUDGET_MS = 25;
+const FRAME_BUDGET_MS = 12;
 
 class NothingResizes {
   observe(): void {}

@@ -86,11 +86,14 @@ textarea {
 }
 
 /* Held long enough to be found by a reader who looked away and came back, then
-   let go of slowly enough that nothing blinks. Three quarters of the run is the
-   hold, so the two move together from the one duration below. */
+   let go of slowly enough that nothing blinks. The hold is a colour that is not
+   moving, so it is written as the resting colour and waited out as a delay
+   rather than run as three seconds of animation holding one value: at 64x the
+   log gains twenty-five lines a second, and every line still fading is a style
+   recalculation on every frame. Waiting it out backwards holds the same colour
+   for the same three seconds and leaves a quarter as many lines interpolating. */
 @keyframes arrived {
-  0%,
-  75% {
+  from {
     background-color: var(--color-flash);
   }
   to {
@@ -174,7 +177,7 @@ textarea {
 }
 
 .arrived {
-  animation: arrived 4000ms ease-out;
+  animation: arrived 1000ms ease-out 3000ms backwards;
 }
 
 .risen {
