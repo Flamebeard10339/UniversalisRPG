@@ -1,11 +1,17 @@
 # UniversalisRPG
 
-A JSON-driven text adventure idle RPG built with React, TypeScript, Vite,
-Zustand, React Flow, Tailwind CSS, and Capacitor.
+A text adventure idle RPG built with React, TypeScript, Vite, Tailwind CSS and
+Capacitor.
 
-The game is designed around community-authored universes. Locations, edges,
-actions, skills, and localization strings are loaded from JSON files rather than
-being hard-coded in TypeScript.
+The game is designed around community-authored worlds. Everything a world is —
+its places, the things standing in them, what a player may do, the skills those
+pay into, and every word said to a player — is written in a small line-based
+language under `content/`, and nothing about it is hard-coded in TypeScript.
+
+`npm run oracle` prints that language, derived from the declarations rather than
+written out beside them, and it is the whole reference for writing a world.
+`npm run oracle -- --at content` reads the shipped world back and is the gate it
+answers to. `CLAUDE.md` is the working reference for the repository itself.
 
 ## Development
 
@@ -19,12 +25,6 @@ npm run dev
 ```bash
 npm run build
 ```
-
-## Content
-
-The base universe lives in `public/content/universes/base/`. Contribution mode
-stores local drafts, validates them, previews them in the running game, and can
-package the generated JSON into a GitHub issue.
 
 ## Editor
 

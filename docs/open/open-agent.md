@@ -1,8 +1,9 @@
-## Market Square is ruled legible, and still carries twelve entities
+## Market Square is ruled legible, and still carries more than any room in town
 
-Ruled 2026-09-03: **legible**. The square holds twelve entities and eight roads, and it is
-the room every road in town runs through by design, so it is the worst case for a screen a
-player has to read at a glance. The travel half is already capped — the sheet stops at one
+Ruled 2026-09-03: **legible**. The square holds more entities and more roads than any other
+room — `npm run probe -- content --show location.tulsa.market-square` counts both — and it
+is the room every road in town runs through by design, so it is the worst case for a screen
+a player has to read at a glance. The travel half is already capped — the sheet stops at one
 step out and the rest is on the map — and nothing caps the entity list.
 
 The lever is which entities stand there, not a number in the engine, so this is authoring:
@@ -16,10 +17,11 @@ road reaches, and `walking-the-town` still walks.
 ## Cooking, smithing and crafting still hang off the town rather than writing onto it
 
 Ruled 2026-09-03: **the thieving inversion is the pattern, not the exception**, and fishing
-is its own module on the same terms. Fishing is already off tulsa's `skills:` line
-(`content/tulsa.dsl:1101` names `core.woodcutting, combat.attack, combat.health,
-cooking.cooking, smithing.smithing, crafting.crafting`), so what is left is the three that
-are not.
+is its own module on the same terms. Fishing is already off tulsa's `skills:` line, and so
+are the two combat stats — `content/combat.dsl` lays them back with `+skills: attack,
+health`, which is the move below already made once. What is left is the three that have not
+made it: tulsa's line still names `core.woodcutting, cooking.cooking, smithing.smithing,
+crafting.crafting`.
 
 The move is the one `content/thieving.dsl` already makes and is four-ish lines per module:
 the skill's stat comes off tulsa's `skills:` line and goes back as a `+skills:` laid over
@@ -36,40 +38,7 @@ not the same shape as a town declaring the skill on its player, and nothing abov
 those to move.
 
 *Closes when:* `npm run probe -- content --off cooking --off smithing --off crafting` loads
-clean with tulsa's routes passing, and tulsa's `skills:` line names only `core.woodcutting`
-and the two combat stats.
-
-## Two of the ten quest notes still have no module
-
-Reverse Infiltration and Plague Matters. Plague Matters waits on Reverse Infiltration;
-Reverse Infiltration waited on The Rat Conspiracy and The Swampy Menace, **and both of
-those now stand, so it is next and unblocked.** They are written one wave at a time,
-each merged before the next starts.
-
-Two waves have been measured. Five ran in parallel on 2026-08-30, one brief each,
-Sonnet 5, engine off limits:
-
-| quest | wall | replies | out tok | cost | reaches for the engine |
-|---|---|---|---|---|---|
-| birds-and-the-bees | 16.3 min | 91 | 69,549 | $3.77 | 0 |
-| attention-to-detail | 17.4 min | 126 | 82,829 | $4.64 | 0 |
-| the-bars-crawl | 20.3 min | 120 | 92,014 | $4.31 | 0 |
-| the-swampy-menace | 25.6 min | 154 | 120,603 | $6.97 | 0 |
-| a-grand-blade | 22.7 min | 179 | 106,799 | $8.80 | 0 |
-| the-rat-conspiracy | 12.7 min | 127 | 62,765 | — | 0 |
-
-**Not one of the six reached for the engine.** Every question all six had was answered
-by `npm run oracle` or by the corpus, which is the measurement the harness exists to
-take. The spread is the finding: a-grand-blade cost two and a half times
-birds-and-the-bees and spent replies 59 through 124 hand-building throwaway `DEBUG`
-sections, all of it against a stage-transition defect that has since closed.
-
-The Rat Conspiracy is the first run to come in under fifteen minutes, and it is also the
-first written against a world whose oracle prints its id lists whole. It hung the errand
-off the `tunnel-mouth` / `tunnels` / `ratkin-border` chain tulsa had already declared
-rather than bringing a parallel geography of its own.
-
-*Closes when:* the two are written and merge with the suite green.
+clean with tulsa's routes passing, and tulsa's `skills:` line names only `core.woodcutting`.
 
 ## A route that pins a gate cannot say which refusal it caught
 
@@ -217,21 +186,19 @@ This is the same rule c02d4bc0 made `them.` throw for in a condition, one place 
 the two reading off one declaration rather than two walks — and a `describe` in this folder's
 `open-tests.test.ts` pins the refusal, which is what a focused test is for.
 
-## `ownerOf` answers three things and eight callers hear two
+## `ownerOf` answers three things and its callers hear two
 
-`Namespace.ownerOf` (`src/content/namespace.ts:138`) returns `string | null | undefined`, and
-the three cases are distinct: a module id, `null` for a kind whose ids are global and has no
-owner, and `undefined` for **an id nobody declared**. Eight callers write `?? null` and
-collapse the last two, then build a locale key under the wrong namespace — so a title or a
-line of prose comes back as its own key, or as unauthored, with nothing raised.
+`Namespace.ownerOf` returns `string | null | undefined`, and the three cases are distinct: a
+module id, `null` for a kind whose ids are global and has no owner, and `undefined` for **an
+id nobody declared**. Every caller writing `?? null` collapses the last two, then builds a
+locale key under the wrong namespace — so a title or a line of prose comes back as its own
+key, or as unauthored, with nothing raised. `grep -rn 'ownerOf(' src scripts` names them;
+counting them here only produced a list that went stale.
 
-`src/runtime/localized.ts:62`, `src/runtime/proseSaid.ts:40`, `src/content/load.ts:141`,
-`:225`, `:540`, `:831`, `src/content/references.ts:39`, `src/content/sections/action.ts:46`.
-
-`src/content/serialize.ts:84` is the one caller that does not: it asks
+`src/content/serialize.ts` is the one caller that does not: it asks
 `sectionFor(kind)!.ids === 'global'` first and only then takes `null`. That it had to is the
-evidence the distinction is load-bearing, and that the other eight do not is what makes this
-a line rather than a preference.
+evidence the distinction is load-bearing, and that no other caller does is what makes this a
+line rather than a preference.
 
 *Closes when:* an undeclared id cannot be read as a global-id kind — the caller either asks
 the kind, as `serialize.ts` does, or `ownerOf` refuses a key it does not hold — and no site

@@ -40,22 +40,20 @@ one.
 an hour of it pays, and the handovers stop saying the room table was re-read by hand.
 
 
-## Three `replenish:` lines still read as whole-shelf times, and mean per-unit ones
+## A `replenish:` line may still read as a whole-shelf time, and mean a per-unit one
 
-`c049e157` made `replenish:` the time **one unit** of stock takes to come back, and all five
-shipped lines were written meaning the whole shelf. The two the urchins route asserts were
-re-cut when the route went red on 2026-09-03; the other three were not, because nothing
-empties them and so nothing is wrong today. `forge-supplies` is `replenish: 5m` over 200
-bronze bars and 200 iron, which is a thousand game-minutes to refill a shelf nobody can drain;
-the alley coat's 15m and the Fence's 10m are over stocks of two to twelve, which reads as a
-plausible pace for a lockpick either way.
+`c049e157` made `replenish:` the time **one unit** of stock takes to come back, and the
+shipped lines were written meaning the whole shelf. Every figure this line used to name has
+since been re-cut, so the evidence is gone and the question is not: no shop's `replenish:`
+has been read against the stock a player can actually drain. `grep -rn 'replenish:' content/`
+is the list; the stock each sits over is in the `# shop` above it.
 
-*Closes when: the three lines say the pace their shops are meant to keep, read off what a
-player can actually empty rather than left at whichever number happens not to matter.*
+*Closes when: every `replenish:` says the pace its shop is meant to keep, read off what a
+player can empty rather than left at whichever number happens not to matter.*
 
 ## `tiers.dsl` is being deleted a skill at a time, as each one gets a floor
 
-Its nine reference saves have inventories written out by hand, and a hand-written pack inside a
+Its reference saves have inventories written out by hand, and a hand-written pack inside a
 balance instrument drifts from the world it measures. Measured 2026-09-03: the `cooking-tier-*`
 saves carry the raw ingredients that existed when somebody typed them in, so a sweep from one
 reported cooking's ceiling as **flat at 2,160/h from level 1 to 20, falling from 1.8x the curve
@@ -67,13 +65,14 @@ location starts — the tutorial guide house — which is where those cooking fi
 
 Ruled 2026-09-03: they go. The replacement is already built and is derived rather than typed —
 `npm run simulate-activity -- --after <test>` stands a sweep where a floor route ends, and a
-floor route buys and wears its own gear by walking. `fishing-tier-1`, `-10` and `-20` are
-deleted, because `floors/fishing-floor.dsl` covers that skill at 14, 20 and 30.
+floor route buys and wears its own gear by walking. Fishing's tier saves went first, then
+combat's; `floors/` now holds a route for each of the two.
 
-What is left is combat and cooking, and they stay until the same is true of them: deleting a
-skill's tier saves before it has a floor leaves it with no reference build at all.
+What is left is cooking, and it stays until the same is true of it: deleting a skill's tier
+saves before it has a floor leaves it with no reference build at all. `tiers.dsl` is down to
+`cooking-tier-1`, `-10` and `-20`.
 
-*Closes when: combat and cooking have floor routes, their tier saves are deleted with them, and
+*Closes when: cooking has a floor route, its three tier saves are deleted with it, and
 `tiers.dsl` is gone.*
 
 ## A sweep re-issues one directive, so an offer that is two actions cannot be priced

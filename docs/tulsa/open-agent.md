@@ -77,11 +77,12 @@ over to, and tier-10's best attack offer is inside the town.
 Five actions were said to be shut by `hidden if: level.<skill> < n` with nothing walking up to
 one. Two things about that were measured wrong, both on 2026-09-03.
 
-**The corpus writes the gate two ways.** Exactly two actions carry `hidden if: level.<skill> <
-n` — the pike reach at 11 and the sturgeon hole at 16, both fishing's. The three thieving gates
-the line named are `requires: level.thieving >= n` now, and there are fifteen of those. A claim
-keyed on one spelling misses most of its subjects, so it has to read the gate off the condition
-rather than off the keyword.
+**The corpus writes the gate two ways.** Some actions carry `hidden if: level.<skill> < n`,
+all of them fishing's; the thieving gates the line named are `requires: level.thieving >= n`.
+Both counts have moved since this was written and will move again, so read them —
+`grep -rn 'hidden if: level\.' content/` and `grep -rn 'requires: level\.' content/`. A claim
+keyed on one spelling misses most of its subjects, so it has to read the gate off the
+condition rather than off the keyword.
 
 **It cannot live in `src/content/dsl.test.ts`.** The offering machinery is all in
 `src/runtime/`, `layer-check` sweeps `.test.ts` files, and `content` may not point up at
@@ -125,20 +126,3 @@ exactly this position since it was written, so this closes both or neither.
 *Closes when:* a route slots each into its base and allocates a passive, the way
 `growing-a-heartwood-blade` does for the blade — one route, two jewels, since what is
 being proved is the plane and not the jewel.
-
-## No reference build has ever worn a jewel, so half of every combat row is missing
-
-`tier-build` hands items over and equips them and never slots or allocates, so all
-fifteen saves in `content/tiers.dsl` carry empty planes. That is not a rounding error
-on the combat rows: regeneration is **1** bare and **3.5** on one cluster with an orb
-on it, measured, and what a long fight sustains is exactly that number. Combat reads
-0.55× on attack and 0.24× on health at twenty against builds that could not have been
-worn by anybody who had opened a chest.
-
-`docs/balance/open-agent.md` already carries this as a build-search line. It is worth
-taking on its own first: the search is hours and dressing a tier is one directive per
-allocation, and until a tier can wear a jewel no search has anything to search over.
-
-*Closes when:* `npm run tier-build` accepts a jewel and a set of allocations, the combat
-tiers are regenerated wearing what the level can reach, and the combat rows are re-read
-against them.

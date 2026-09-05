@@ -183,15 +183,11 @@ The briefs live in `.planning/combat-expansion/`, and one that has merged moves 
 list of them here.** Each is one `npm run authorbot -- <brief> --target <module>`, three at a
 time.
 
-The briefs were rewritten 2026-09-04 to ask for tags rather than numbers, and each now says
-plainly not to run `simulate-activity`. The speedrun is the one lane that still iterates,
-because a floor is walked rather than declared. `passives-to-the-curve.md` is the brief for the
-passive line above.
+The briefs were rewritten 2026-09-04 to ask for tags rather than numbers. The speedrun is the
+one lane that still iterates, because a floor is walked rather than declared.
 
-Orders to keep: `a-grand-blade-pass` after `the-grumpy-crafter`; `combat-recut` and the
-passive rename never at once; The Rat Conspiracy gets no pass. **Dispatching is on hold until
-the re-cut lands**, because a run that tunes a fight against the old numbers has to be
-re-read afterwards anyway.
+Orders to keep: `a-grand-blade-pass` after `the-grumpy-crafter`; The Rat Conspiracy gets no
+pass. The re-cut landed 2026-09-04 and the hold that waited on it is lifted.
 
 *Closes when:* the briefs ask for tags rather than numbers, each module is merged with
 `npm run oracle -- --at content` green and its reaches read, and the two finale quests walk.
