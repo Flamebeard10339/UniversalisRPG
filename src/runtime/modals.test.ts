@@ -6,7 +6,7 @@ import { FIXTURE_WORLD } from '../content/worldFixture';
 import { parseDirectiveLine } from '../content/sections/test';
 import { loadUniverse } from '../content/load';
 import { engineLocale, loadInEnglish } from '../content/engineLocale';
-import { answerModal, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
+import { answerModal, CARRY_ON, isModalFrame, Modal, MODAL_NAMES, pruneModals, publishModal } from './modals';
 import { dialogueFrame, openModal, openModalNamed, topModal } from './modalStack';
 import { MODAL_SCREENS } from '../grammar/actionResult';
 import { DEFAULT_LANGUAGE } from '../grammar/section';
@@ -16,7 +16,7 @@ import { receiveItem } from './itemInstance';
 import { choose, createGameState, DialogueCursor, GameState, talk } from './runtime';
 import { applyResultsNow } from './effects';
 import { askedOption } from './command';
-import { apply, applyDirective, PlaySession, PlayStatus, startSession, submitModal, view } from './session';
+import { apply, applyDirective, PlaySession, PlayStatus, ranWhileAway, startSession, submitModal, view } from './session';
 import { fixtureSources } from '../content/worldFixture';
 
 const STACKING_MODULE =
@@ -796,6 +796,9 @@ describe('nothing a player answers with carries words', () => {
     '',
     '# entity sage',
     'title: Sage',
+    'ponder:',
+    '  time: 30',
+    '  continuous',
     '',
     '# race elf',
     'title: Elf',
@@ -943,6 +946,11 @@ describe('nothing a player answers with carries words', () => {
     applyDirective(session, { kind: 'submit-modal', key: 'skill', value: offered(session, 'skill') });
     published();
     applyDirective(session, { kind: 'submit-modal', key: 'close', value: 'close' });
+
+    applyDirective(session, { kind: 'begin', inner: { kind: 'use', obj: 'entity', objId: 'forge.sage', actionId: 'ponder' } });
+    if (!ranWhileAway(session, 60_000, 1)) throw new Error('nothing was left under way, so the welcome-back screen is never raised here');
+    published();
+    applyDirective(session, { kind: 'submit-modal', key: CARRY_ON, value: CARRY_ON });
     return values;
   };
 

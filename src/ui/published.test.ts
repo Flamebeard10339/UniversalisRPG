@@ -29,7 +29,7 @@ interface EveryWayOfAdmittingNothing {
 
 export type TheDerivationNamesEveryWay = Assert<Exactly<AdmitsAbsence<EveryWayOfAdmittingNothing>, 'nullable' | 'undefinable' | 'optional' | 'yields'>>;
 
-type HonestlyAbsentOnASnapshot = 'live' | 'playtest' | 'replay' | 'away';
+type HonestlyAbsentOnASnapshot = 'live' | 'playtest' | 'replay';
 
 type HonestlyAbsentOnTheDriver = 'localChanges';
 

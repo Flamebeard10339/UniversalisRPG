@@ -47,7 +47,6 @@ import { useWide } from './wide';
 import { columnsIn } from './gesture';
 import { wordsOf, type Words } from './words';
 import { TransientProvider, type TransientChannel } from './transient';
-import { WelcomeBack } from './WelcomeBack';
 import { handOver } from './download';
 import { VStack } from './VStack';
 
@@ -364,18 +363,14 @@ export function App({ driver, opening = OPENING, remembering = REMEMBER_AFTER_MS
           columns={here.columns}
           onSelect={(index) => go((held) => toSubpage(held, held.layer, here.shown[index].id))}
         />
-        {snapshot.away !== null ? (
-          <WelcomeBack away={snapshot.away} words={words} localizer={localizer} onCarryOn={driver.dismissAway} />
-        ) : (
-          screen.instead ??
+        {screen.instead ??
           (asking ? (
             <ModalSheet option={asking} manner={declaredFor(view.focus)} onAnswer={driver.answer} onDismiss={leave} leaving={leaving?.value} spoken={view.said} paced={revealing(view.settings)}>
               {screen.beside}
             </ModalSheet>
           ) : view.action?.forced ? (
             <ForcedSheet action={view.action} />
-          ) : null)
-        )}
+          ) : null)}
       </div>
     </TransientProvider>
   );

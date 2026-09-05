@@ -119,6 +119,13 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     stale: shopStale,
     leaves: SHOP_BACK,
   },
+  'welcome-back': {
+    options: (_frame, state, registry) => {
+      const localizer = localizerOf(registry, state);
+      return [{ key: CARRY_ON, label: localizer.engine('engine.modal.welcome-back'), values: [{ value: CARRY_ON, shown: localizer.engine('engine.away.carry-on') }] }];
+    },
+    submit: () => null,
+  },
   dialogue: {
     options: (frame, state, registry) => [
       { key: 'choice', label: localizerOf(registry, state).engine('engine.modal.choice'), values: menuChoices(frame.cursor, registry, state).map((entry) => ({ value: String(entry.index), shown: entry.display })), takesMore: true },
@@ -132,6 +139,8 @@ const DEFINITIONS: { [K in ModalName]: ModalDefinition<Extract<ModalFrame, { nam
     asksNothing: (frame) => standsAtWords(frame.cursor),
   },
 };
+
+export const CARRY_ON = 'carry-on';
 
 export const awaitsAnAnswer = (frame: ModalFrame): boolean => definitionFor(frame).asksNothing?.(frame) !== true;
 

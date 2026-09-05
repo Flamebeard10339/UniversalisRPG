@@ -740,30 +740,22 @@ export function wait(session: PlaySession, seconds: number): PlayView {
   return view(session);
 }
 
-export interface AwayRun {
-  readonly awayMs: number;
-  readonly ranMs: number;
-  readonly capped: boolean;
-  readonly lines: readonly Localized[];
-}
-
-export function ranWhileAway(session: PlaySession, elapsedRealMs: number, speed: number): AwayRun | null {
-  const internals = own(session);
-  const { state, registry } = internals;
-  if (state.activeAction === null && state.journey === null) return null;
+export function ranWhileAway(session: PlaySession, elapsedRealMs: number, speed: number): boolean {
+  const { state, registry } = own(session);
+  if (state.activeAction === null && state.journey === null) return false;
 
   const wanted = Math.max(0, elapsedRealMs) * speed;
   const capped = wanted > UNDER_WAY_LIMIT_MS;
   const span = Math.min(wanted, UNDER_WAY_LIMIT_MS);
-  if (span < 1) return null;
+  if (span < 1) return false;
 
   const start = spanStart(state);
   resolve(state, registry, state.time + Math.floor(span));
   const say = localizerOf(registry, state);
   const because = say.engine(capped ? 'engine.away.capped' : 'engine.away.ran', { hours: UNDER_WAY_LIMIT_HOURS });
-  const lines = spanSummary(start, state, registry, because);
-  internals.logCursor = state.log.length;
-  return { awayMs: elapsedRealMs, ranMs: state.time - start.at, capped, lines };
+  state.log.push(...spanSummary(start, state, registry, because));
+  openModal(state, { name: 'welcome-back', answers: {} });
+  return true;
 }
 
 export function cancelAction(session: PlaySession): PlayView {

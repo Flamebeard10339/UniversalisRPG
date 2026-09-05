@@ -2,11 +2,13 @@
 
 ## The welcome-back screen has not been looked at
 
-`WelcomeBack.tsx` is proved by `src/ui/away.test.tsx`: it is drawn when a page
-comes back on something under way, it says what came of it, and it goes when it
-is answered. Nothing proves it reads well — how the summary is grouped, whether
-five lines is the right amount, whether a run that gained nothing should draw a
-screen at all rather than a notice.
+The screen is the `welcome-back` modal, drawn by `ModalSheet` like every other,
+with the summary arriving as the beat above the card because the away run pushes
+it through `state.log` the way any spoken line travels. `src/ui/away.test.tsx`
+proves it is raised, says what came of it, survives a page closed again before it
+is answered, and goes when it is answered. Nothing proves it reads well — how the
+summary is grouped, whether five lines is the right amount, whether a run that
+gained nothing should raise a screen at all rather than a notice.
 
 *Moves when:* the author has played a reopen and said what should change.
 

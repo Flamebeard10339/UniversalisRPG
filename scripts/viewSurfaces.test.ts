@@ -209,6 +209,8 @@ const bot = once(botRun);
 const cli = once(cliRun);
 const gui = once(guiRun);
 
+const RAISED_BY_REOPENING: readonly string[] = ['welcome-back'];
+
 describe('no driver draws less of a live view than the others', () => {
   const runs = (): SurfaceRun[] => [
     { name: 'the playbot', steps: bot() },
@@ -220,10 +222,18 @@ describe('no driver draws less of a live view than the others', () => {
     expect(cli().armedBy).not.toEqual([]);
   });
 
-  it('opens every screen the engine can raise, so each is put in front of all three drivers', () => {
+  it('opens every screen a line can raise, so each is put in front of all three drivers', () => {
+    const opened = new Set(bot().flatMap((step) => step.view.modals.map((modal) => modal.name)));
+    const byALine = MODAL_NAMES.filter((name) => !RAISED_BY_REOPENING.includes(name));
+
+    expect([...opened].sort()).toEqual([...byALine].sort());
+  });
+
+  it('leaves out only screens a reopening raises, and none this walk has since learned to reach', () => {
     const opened = new Set(bot().flatMap((step) => step.view.modals.map((modal) => modal.name)));
 
-    expect([...opened].sort()).toEqual([...MODAL_NAMES].sort());
+    expect(MODAL_NAMES.filter((name) => RAISED_BY_REOPENING.includes(name)).sort()).toEqual([...RAISED_BY_REOPENING].sort());
+    expect(RAISED_BY_REOPENING.filter((name) => opened.has(name)), 'the walk reaches these now, so they are not exempt any more').toEqual([]);
   });
 
   it('draws what a screen is about beside it, wherever a screen is about something', () => {

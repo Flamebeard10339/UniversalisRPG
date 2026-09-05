@@ -10,7 +10,7 @@ import { LAYERS, shellState, shownIn, toLayer, toSubpage, type ShellState, type 
 import type { PlaneGraph, Plane } from '../planeGraph';
 import type { JournalRow } from '../journalPanel';
 import type { Arriving } from '../reveal';
-import type { AwayRun, JournalEntry, StatRow } from '../../runtime/session';
+import type { JournalEntry, StatRow } from '../../runtime/session';
 import type { StatTab } from '../statTabs';
 import { filled, type SkillPanel } from '../skillPanels';
 import type { TestSurface } from '../testSurface';
@@ -121,14 +121,6 @@ export function playtestSurface(held: AgentSurfaces['playtest']): TestSurface {
         controls.attach(about.turn, notesFrom(value));
       },
     },
-  };
-}
-
-export function awaySurface(held: AgentSurfaces['away']): TestSurface {
-  const { away, controls } = held;
-  return {
-    state: () => (away === null ? { back: false } : { back: true, awayMs: away.awayMs, ranMs: away.ranMs, capped: away.capped, lines: away.lines.map(String) }),
-    actions: { 'carry-on': () => controls.carryOn() },
   };
 }
 
@@ -482,7 +474,6 @@ export interface AgentSurfaces {
   stat: { row: StatRow };
   playtest: { run: RecordedRun | null; controls: PlaytestControls };
   replay: { replay: ReplaySnapshot | null; controls: ReplayControls };
-  away: { away: AwayRun | null; controls: { carryOn(): void } };
   edit: EditHeld;
   mods: { packs: readonly PortalPack[]; controls: { turn(names: readonly string[], on: boolean): void } };
 }
@@ -500,7 +491,6 @@ export const SURFACE_BUILDERS: { [K in keyof AgentSurfaces]: (held: AgentSurface
   skill: (held) => skillSurface(held),
   playtest: (held) => playtestSurface(held),
   replay: (held) => replaySurface(held),
-  away: (held) => awaySurface(held),
   edit: (held) => editSurface(held),
   mods: (held) => modsSurface(held),
 };

@@ -37,6 +37,7 @@ const SAME: { [K in ModalName]: Same<K> | null } = {
   'skill-breakdown': sameSkill,
   shop: sameShop,
   'shop-count': sameCount,
+  'welcome-back': null,
   dialogue: (a, b) => a.cursor.dialogue === b.cursor.dialogue && a.cursor.node === b.cursor.node && a.cursor.resumeIndex === b.cursor.resumeIndex,
 };
 

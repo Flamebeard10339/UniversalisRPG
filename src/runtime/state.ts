@@ -129,6 +129,7 @@ export type ModalFrame =
   | { readonly name: 'skill-breakdown'; readonly answers: ModalAnswers; readonly skill: string }
   | { readonly name: 'shop'; readonly answers: ModalAnswers; readonly shop: string; readonly side?: 'buy' | 'sell' }
   | { readonly name: 'shop-count'; readonly answers: ModalAnswers; readonly shop: string; readonly side: 'buy' | 'sell'; readonly item: string }
+  | { readonly name: 'welcome-back'; readonly answers: ModalAnswers }
   | { readonly name: 'dialogue'; readonly answers: ModalAnswers; readonly cursor: DialogueCursor };
 
 export interface GameState extends RngCursor {

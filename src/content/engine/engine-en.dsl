@@ -302,10 +302,8 @@ engine.repl.plane.blocked: blocked by {beyond}
 engine.repl.plane.holds: holds {beyond}
 engine.away.ran: you came back
 engine.away.capped: the world had run {hours} hours on your behalf, which is as far as it runs unattended
-engine.away.back: Welcome back
-engine.away.for: You were away {away}.
-engine.away.nothing: Nothing came of it.
 engine.away.carry-on: Carry on
+engine.modal.welcome-back: Welcome back
 engine.playtest.download: Download
 engine.playtest.chunk: part {part}
 engine.span.ran: You were at that for {span}s, and stopped because {reason}.
