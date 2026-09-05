@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { VOICE_CLASS } from './lineStyle';
 import { clickingOffLeaves, layerOf, mannerOf, showsTheBeat, type Declared } from './modalManner';
 import type { Localized } from '../runtime/localized';
-import { arriving, A_CHARACTER, landed, OPENS, pressed, typedOn } from './reveal';
+import { arriving, A_CHARACTER, landed, opensOn, pressed, readingOn, spokenUnder, typedOn, type Spoken } from './reveal';
 import { useMoment, useMotionless } from './transient';
 import { useTestSurface } from './useTestSurface';
 import { CARD } from './sheetLayout';
@@ -21,22 +21,24 @@ export function ModalCard({ subject, title, children }: { subject?: string; titl
 const SAID = `whitespace-pre-wrap break-words text-sm leading-snug ${VOICE_CLASS.said}`;
 
 function Beat({ lines, paced }: { lines: readonly Localized[]; paced: boolean }): JSX.Element | null {
-  const [reading, setReading] = useState(OPENS);
+  const [held, setHeld] = useState<Spoken>(() => opensOn(lines));
   const motionless = useMotionless();
-  const beat = arriving(lines, reading, paced);
+  const spoken = spokenUnder(held, lines);
+  if (spoken !== held) setHeld(spoken);
+  const beat = arriving(spoken.lines, spoken.reading, paced);
   const typing = beat.typing;
-  const press = (): void => setReading((was) => pressed(lines, was));
+  const press = (): void => setHeld((was) => readingOn(was, pressed));
 
   useTestSurface('beat', { arriving: beat, controls: { press } });
 
   useEffect(() => {
     if (!typing) return;
-    if (motionless) return void setReading((was) => landed(lines, was));
-    const timer = setTimeout(() => setReading((was) => typedOn(lines, was)), A_CHARACTER);
+    if (motionless) return void setHeld((was) => readingOn(was, landed));
+    const timer = setTimeout(() => setHeld((was) => readingOn(was, typedOn)), A_CHARACTER);
     return () => clearTimeout(timer);
-  }, [typing, motionless, reading.at, reading.typed]);
+  }, [typing, motionless, spoken.reading.at, spoken.reading.typed]);
 
-  if (lines.length === 0) return null;
+  if (spoken.lines.length === 0) return null;
 
   return (
     <ModalCard>
@@ -93,7 +95,7 @@ export function Modal({
       className={`${darkened} ${layerOf(held)}`}
     >
       {about}
-      {showsTheBeat(held) ? <Beat key={spoken.join('\n')} lines={spoken} paced={paced} /> : null}
+      {showsTheBeat(held) ? <Beat key={subject} lines={spoken} paced={paced} /> : null}
       {children}
     </div>
   );

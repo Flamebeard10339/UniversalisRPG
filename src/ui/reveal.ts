@@ -54,3 +54,22 @@ export function pressed(lines: readonly string[], reading: Reading): Reading {
   if (reading.typed < lettersIn(lineAt(lines, reading.at))) return landed(lines, reading);
   return reading.at + 1 < lines.length ? { at: reading.at + 1, typed: 0 } : reading;
 }
+
+export const BEAT_LINES_KEPT = 80;
+
+export interface Spoken {
+  from: readonly string[];
+  lines: readonly string[];
+  reading: Reading;
+}
+
+export const opensOn = (said: readonly string[]): Spoken => ({ from: said, lines: said, reading: OPENS });
+
+export function spokenUnder(held: Spoken, said: readonly string[]): Spoken {
+  if (said.length === 0 || held.from === said) return held;
+  const grown = [...held.lines, ...said];
+  const dropped = Math.max(0, grown.length - BEAT_LINES_KEPT);
+  return { from: said, lines: grown.slice(dropped), reading: { at: Math.max(0, held.reading.at - dropped), typed: held.reading.typed } };
+}
+
+export const readingOn = (held: Spoken, carry: (lines: readonly string[], reading: Reading) => Reading): Spoken => ({ ...held, reading: carry(held.lines, held.reading) });

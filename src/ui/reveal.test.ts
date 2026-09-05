@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../content/load';
 import { startSession, view, type SettingRow } from '../runtime/session';
-import { arriving, cutTo, landed, lettersIn, OPENS, pressed, revealing, typedOn, type Reading } from './reveal';
+import { arriving, BEAT_LINES_KEPT, cutTo, landed, lettersIn, opensOn, OPENS, pressed, revealing, spokenUnder, typedOn, type Reading } from './reveal';
 import { fixtureSources } from '../content/worldFixture';
 
 const ROWS: readonly SettingRow[] = view(startSession(loadUniverseWithDiagnostics(fixtureSources()).registry)).settings;
@@ -139,5 +139,35 @@ describe('what carries a beat on', () => {
 
     expect(read.typing).toBe(false);
     expect(read.awaits).toBe(true);
+  });
+});
+
+describe('a beat the world keeps speaking under', () => {
+  const saying = (count: number, from = 0): string[] => Array.from({ length: count }, (_, at) => `line ${from + at}`);
+
+  it('takes what is said under it without losing the line being read', () => {
+    const held = spokenUnder({ ...opensOn(['first', 'second']), reading: { at: 1, typed: 3 } }, ['third']);
+
+    expect(held.lines).toEqual(['first', 'second', 'third']);
+    expect(held.reading).toEqual({ at: 1, typed: 3 });
+  });
+
+  it('takes nothing from a tick that said nothing, so a quiet frame leaves the reader alone', () => {
+    const opened = opensOn(['first']);
+
+    expect(spokenUnder(opened, [])).toBe(opened);
+  });
+
+  it('stops growing, however long the modal stands open, and never reads past what it still holds', () => {
+    let held = opensOn(saying(1));
+    let widest = 0;
+    for (let tick = 0; tick < BEAT_LINES_KEPT * 3; tick += 1) {
+      held = spokenUnder(held, saying(1, tick + 1));
+      widest = Math.max(widest, held.lines.length);
+      expect(held.lines.length).toBeLessThanOrEqual(BEAT_LINES_KEPT);
+      expect(held.reading.at).toBeLessThan(held.lines.length);
+    }
+
+    expect(widest, 'nothing said under the beat ever reached it').toBe(BEAT_LINES_KEPT);
   });
 });

@@ -18,10 +18,12 @@ would silently stop being raised.
 
 What makes a lazy view unsound is therefore not the laziness but what is reading
 it: something downstream treats the view as a record of when things happened. That
-production half is a line of its own below, and laziness is worth another pass once
-it closes — but only then, and measured rather than assumed, because the tests
-holding a view across a mutation are a second reader and closing the notices line
-says nothing about them.
+production half stands in `open-human.md` — a quest's standing is derived rather
+than recorded, so the one notice of the five that cannot be raised where it happens
+is waiting on a decision — and laziness is worth another pass once it closes, but
+only then, and measured rather than assumed, because the tests holding a view
+across a mutation are a second reader and closing the notices line says nothing
+about them.
 
 What is left that is sound: publish less, or make what is published keep its
 identity. A view field that has not changed can keep the object it had —
@@ -33,31 +35,6 @@ have to take the slices they draw rather than the whole view.
 *Closes when:* a frame with only the home pane drawn does not build the journal,
 the stat breakdowns or the recipe list, and `npm run oracle -- --at content` and
 the suite are unchanged.
-
-## Quest and level notices are a diff where they should be an event
-
-`useNotices` reconstructs by comparison something the runtime already knew when it
-happened. A level is gained in the engine; a notice about it is independent of what
-the player is looking at, and of whether anyone rendered the frame it landed on.
-The same ref-and-effect shape is at `useCrossings` and `useArrivals` beside it,
-comparing through `crossings` and `newlyFound`, so this is a shape rather than a
-site.
-
-Having the runtime raise these as events the app reacts to retires all three
-comparators, and with them the reason a lazy view is unsound in production. The
-push half already exists on the UI side — `TransientChannel` in `transient.ts`,
-held by the driver and drained by `Notices.tsx`. What does not exist is the runtime
-end, and the layer rule is the constraint: `runtime` sits below `ui`, so the
-runtime raises events of its own and the driver forwards them onto that channel.
-The channel cannot move down to meet it.
-
-Watch `RAISED_BY` in `notice.ts`: it is a list every new kind of notice has to be
-added to, so what replaces it should derive its subjects rather than be the same
-list re-homed one layer down.
-
-*Closes when:* a quest step and a level are noticed from events the runtime raised,
-no hook in `App.tsx` holds a previous view or a previous row set in a ref, and the
-notices still arrive with the run at 64x.
 
 ## React re-renders the whole tree ten times a second
 
@@ -121,42 +98,3 @@ standing at all is the signal that migration did not.
 *Closes when:* `view()` on a save carrying 28 grown items costs what it costs on a
 save carrying one, the plane modal still draws its lattice, and a lattice that
 disagrees with the item's recorded stats draws an empty tree instead.
-
-## The modal beat restarts whenever the world speaks under it
-
-`Modal.tsx` draws the typewriter as `<Beat key={spoken.join('\n')} …>`, and
-`spoken` is `view.said`, which is drained and rebuilt on every view. So a line
-being read a character at a time appears to restart from the first character when
-anything else says anything, and goes entirely when a quiet tick leaves `said`
-empty.
-
-This is read off the code and was **not** reproduced: it needs a live run ticking
-under an open modal, and the paths that put a modal up mostly stop the run first.
-No proof stands beside it because a remount can only be seen from a mounted root,
-and the `open` project has no jsdom — so the first job is to find out whether it
-happens at all, in a `*.dom.test.tsx` beside `Modal.tsx`. If it does not, delete
-this line.
-
-*Closes when:* a modal being read a character at a time keeps its place while the
-world speaks under it, proved in a `*.dom.test.tsx` beside `Modal.tsx`.
-
-## The log's scroll anchor forces a layout on every batch of new lines
-
-`Home.tsx`'s scroll effect reads two `getBoundingClientRect`s, `scrollHeight` and
-`clientHeight`, then writes `scrollTop`, so the anchor lands where the first new
-line starts. It runs when the transcript changed, which at 64x is every tick.
-Measured in production Chrome: 135ms of every 15 seconds of play, which is the one
-app-side cost that survives minification into the top three.
-
-The reads are already batched — they are consecutive, so the browser flushes
-layout once and answers the rest from it. So there is no win in reading fewer
-times; the 0.9ms is the layout of a column holding up to two hundred lines, and
-the only ways out are to not need the measurement (CSS `overflow-anchor` keeps the
-scroll position across insertions without asking where anything is) or to stop
-laying out lines nobody can see.
-
-It is small next to what has already gone, and it is named here because it is the
-last forced synchronous layout on the frame path rather than because it is urgent.
-
-*Closes when:* a batch of new lines anchors the log without a forced layout, and
-`logRest.test.ts` still holds.
