@@ -6,6 +6,44 @@ what is below is what that plan does not already say to do next.
 
 ---
 
+## An `until:` loop can spin for ever, and `npm run floors` is a CI gate with no clock
+
+`combat-floor`'s `noeating-hard` looped `until level.combat.attack >= 30` over the muster,
+travelling in, killing what stood there, and travelling out. The muster empties, so a pass that
+finds it empty gains almost nothing — and the engine's guard against a loop going round for ever
+is that **a pass leaving the world exactly as it found it is refused**, which does not fire here
+because the clock moved. So the route span, and took `npm run floors` with it: **over half an
+hour before it was killed by hand, with no timeout anywhere to stop it.**
+
+Two separate things, and the second is the dangerous one. The loop is a route somebody wrote
+badly and it is deleted. **`npm run floors` runs in CI and can hang for ever on one**, and so
+can `npm run probe` — a route that makes progress too slowly to finish is indistinguishable
+from one that never will, and neither tool has a clock.
+
+The guard wants to be *no measurable progress toward the condition* over some number of passes,
+rather than *no change at all*; a pass whose only change is elapsed time is the shape to catch.
+Failing that, a wall-clock or step cap on a single route turns an infinite hang into a red
+route, which is a finding rather than a stuck build.
+
+*Closes when:* a route that cannot reach its condition fails rather than hanging, and no tool
+that CI runs can be stopped only by killing it.
+
+## Health outruns attack about two to one, and the curve by nine
+
+Read off `combat-floor` the day it landed. A fighter climbing to `attack 30` arrives at
+**`health 65`**, in 611 game-minutes where the curve asks 5354 for that level.
+
+Health experience is paid on `damage-taken` at 6× the amount, so a fighter who stands and
+trades is paid for both halves of the exchange while attack is paid once. That is the mechanism
+to look at first, and it is a `# skill` line rather than a ladder one.
+
+Whether the answer is the rate, the ladder, or that health is simply meant to be the cheap arm
+is the author's, and this is the first measurement that puts the question on the table.
+
+*Closes when:* the two arms of a fighter climb at a stated ratio, and the floor is re-read
+against it.
+
+
 ## Nothing asks what every room pays, so the room table is swept by hand
 
 `simulate-activity --at <location>` reads one room; with no `--at` the sweep stands where the

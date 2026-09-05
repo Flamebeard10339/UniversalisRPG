@@ -270,21 +270,18 @@ same thing. So this closes on the sheet being read, not on the rooms being level
 *Closes when:* the room table is re-read after the re-cut and the rooms that stop short are
 either meant to or given population, with the choice named per room rather than swept.
 
-## Combat has no floor, so its tier saves cannot be deleted
+## The combat tier saves can go, now that a floor walks
 
-`docs/balance/open-agent.md` holds the line: `tiers.dsl` goes a skill at a time as each gets a
-floor, and combat and cooking are what is left. `npm run floors` walks fishing's and
-thieving's; nothing walks a fighter from level one to thirty. The brief is
-`.planning/combat-expansion/combat-floor.md`.
+`floors/combat-floor.dsl` walks a fighter from the tutorial to level 30 in five routes, so the
+condition `docs/balance/open-agent.md` set for deleting a skill's `tiers.dsl` saves is met for
+combat. Cooking is what is left after it.
 
-It is dispatchable now: `npm run authorbot -- <brief> --floors` gives a run both folders, writes
-its module into `floors/`, hands it `npm run floors -- --world <its own copy>` as the gate, and
-tells it the opposite of what an authoring run is told — that here balance is measured by
-walking rather than declared, and that a floor may not say `unkillable`, because what a real
-player survives is the whole measurement.
+What the floor found on landing is in `docs/balance/open-agent.md`: health arrives at 65 while
+attack reaches 30. Deleting the saves and re-cutting against that finding are two jobs and this
+line is only the first.
 
-*Closes when:* `floors/combat-floor.dsl` walks a bare fighter and a geared one to the band
-edges, and the combat saves in `content/tiers.dsl` are deleted.
+*Closes when:* the combat saves in `content/tiers.dsl` are deleted and nothing that read them
+has gone quiet.
 
 ## The muster is a room, and now reads as a room that runs out
 
