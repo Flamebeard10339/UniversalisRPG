@@ -80,11 +80,14 @@ rate: us.thieving-rate
 +on attempts exhausted:
   inflict: dazed for daze-duration
 
-# action pick-the-lock
+# action lockpicking
 title: Pick the Lock
 extends: steal
 continuous
 time: 6
+
+# action pick-the-lock
+extends: lockpicking
 +on success:
   stands: open-chest for 3s
 
@@ -468,12 +471,6 @@ bundle
 # flag widows-door-open
 
 # flag widows-cellar-open
-
-# action pick-the-door
-title: Pick the Lock
-extends: steal
-continuous
-time: 6
 
 # action slip-past
 title: Slip Past
@@ -1022,8 +1019,8 @@ title: The Widow's Door
 examine: A door in a frame that has settled, with a lock that has been changed at least once and a bar behind it that has not.
 hidden if: locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 45, npc-thieving-xp 35, npc-thieving-damage 1
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: widows-door-open
   set: widows-door-open
   say: The lock is older than the bar and gives sooner, and the bar was never dropped. The door swings in on a room laid for one.
@@ -1036,8 +1033,8 @@ title: The Widow's Door
 examine: The same door, and a new lock on it, brass, with the fitter's file marks still bright round the plate.
 hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 120, npc-thieving-xp 90, npc-thieving-damage 2
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: widows-door-open
   set: widows-door-open
   say: The new lock is a good one and it takes everything you have, and then it turns, and the bar behind it has not been dropped, which is either forgetfulness or an invitation.
@@ -1060,8 +1057,8 @@ title: The Back Window
 examine: The same small window, shuttered now, with a new latch on the inside of the casement that can be seen through the crack.
 hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 100, npc-thieving-xp 75, npc-thieving-damage 3
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   say: A blade under the latch, worked up a hair at a time until it lifts, and then the shutter, and then you.
   relocate: widows-house
   +on attempts exhausted:
@@ -1072,8 +1069,8 @@ title: The Cellar Door
 examine: Two leaves of grey wood set flat in the yard, and a padlock through the hasp with more rust on it than lock.
 hidden if: locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 20, npc-thieving-xp 25, npc-thieving-damage 1
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: widows-cellar-open
   set: widows-cellar-open
   say: The padlock does not so much open as give up. The leaves come up on a stair going down.
@@ -1086,8 +1083,8 @@ title: The Cellar Door
 examine: The same two leaves, and the rusted padlock is gone from the hasp. The one in its place is steel and has never been rained on.
 hidden if: not locked-out.let-in-by-the-guard
 stats: npc-thieving-difficulty 110, npc-thieving-xp 80, npc-thieving-damage 2
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: widows-cellar-open
   set: widows-cellar-open
   say: Steel, new, and fitted properly. It takes as long as a good lock should take, and then the leaves come up on a stair going down.
@@ -1473,8 +1470,8 @@ title: The Warden's Door
 examine: A door at the top of the stair with WARDEN painted on it in the same hand as the sewer signs, and a lock on it that the town did not pay for.
 flags: unlocked
 stats: npc-thieving-difficulty 120, npc-thieving-xp 80, npc-thieving-damage 2
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: unlocked
   requires: level.thieving >= 15
   time: 8
@@ -1571,8 +1568,8 @@ node at-the-table:
 title: Cell Door
 examine: Bars, a frame, and a lock that was fitted to the frame after the frame was fitted to the wall, by a different hand.
 stats: npc-thieving-difficulty 30, npc-thieving-xp 8, npc-thieving-damage 1
-uses: pick-the-door
-pick-the-door:
+uses: lockpicking
+lockpicking:
   hidden if: cell-open
   set: cell-open
   set: on-the-run
@@ -1822,7 +1819,7 @@ load: on-well-lane-with-a-purse
 talk: the-widow-at-the-door
 choose: I will get you in.
 assert: locked-out.getting-in
-use: entity.widows-door.pick-the-door until widows-house.touched
+use: entity.widows-door.lockpicking until widows-house.touched
 assert: widows-door-open
 assert: locked-out.let-in
 travel: well-lane
@@ -1847,7 +1844,7 @@ choose: Here is twenty-five.
 assert: locked-out.let-in-by-the-guard
 travel: well-lane
 travel: widows-yard
-use: entity.cellar-new-lock.pick-the-door until widows-cellar.touched
+use: entity.cellar-new-lock.lockpicking until widows-cellar.touched
 assert: widows-cellar-open
 travel: widows-house
 use: entity.widows-door-inside.lift-the-bar
@@ -1920,7 +1917,7 @@ use: entity.pear-cart.lift-from-the-stall until jail-cell.touched
 assert: times-caught >= 3
 assert: inventory.core.coin = 0
 assert: count.confiscated >= 1
-use: entity.cell-door.pick-the-door until cell-open
+use: entity.cell-door.lockpicking until cell-open
 assert: on-the-run
 travel: lock-up
 travel: guard-barracks
@@ -1961,7 +1958,7 @@ travel: market-square
 travel: castle-gate
 travel: guard-barracks
 travel: lock-up
-use: entity.wardens-door.pick-the-door until wardens-office.touched
+use: entity.wardens-door.lockpicking until wardens-office.touched
 assert: wardens-door.unlocked
 use: entity.wardens-lockbox.pick-the-lock until count.confiscated < 1
 cancel
