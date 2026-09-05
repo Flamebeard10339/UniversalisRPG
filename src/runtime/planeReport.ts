@@ -2,6 +2,7 @@ import { ClusterEffect, Item } from '../content/sections/item';
 import { Direction, DIRECTIONS, Hex, hexKey, NEIGHBOR_DELTA, opposite, PlaneNode } from '../content/hex';
 import { Registry } from '../content/registry';
 import { getShape } from '../content/shapes';
+import { passiveAt } from '../content/sections/clusterJewel';
 import { BonusAmount, Counter } from '../grammar/tagClause';
 import { carriedName } from './carriedName';
 import { Answer, Localized, Localizer, localizerOf } from './localized';
@@ -115,7 +116,7 @@ function clusterReport(registry: Registry, state: GameState, localizer: Localize
   const shape = getShape(jewel.shape);
   const positions: PositionReport[] = [];
   for (let position = 1; position <= shape.positionCount; position++) {
-    const passive: string | undefined = jewel.positions[position];
+    const passive = passiveAt(jewel, position);
     const node: PlaneNode = { hex, kind: 'position', position };
     const standing = standingOf(registry, plane, node);
     positions.push({

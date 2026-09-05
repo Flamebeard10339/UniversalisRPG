@@ -1,11 +1,10 @@
 import { list } from '../../grammar/list';
 import { Cursor, DslError, Parser, Span, Written } from '../../grammar/parser';
-import { AnySchema, HydrateContext, listMembers, parseAnySection, printSection } from '../../grammar/section';
+import { AnySchema, HydrateContext, parseAnySection, printSection } from '../../grammar/section';
 import { RawLine } from '../../grammar/structure';
 import { id, number, oneOf, text } from '../../grammar/values';
 import { DIRECTIONS, Direction } from '../hex';
 import { getShape, Shape, SHAPES } from '../shapes';
-import { type Loose } from '../refs';
 import { PrintContext, schemaGrammar, section } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -19,9 +18,19 @@ export interface ClusterJewel {
   examine?: string;
   shape: string;
   openConnections: string[];
-  positions: Record<number, string>;
+  positions: [number, string][];
   modSlots: number;
 }
+
+export interface FilledPositions {
+  positions: readonly (readonly [number, string])[];
+}
+
+export const passiveAt = (jewel: FilledPositions, position: number): string | undefined => jewel.positions.find(([at]) => at === position)?.[1];
+
+const positionsFilled = (jewel: FilledPositions): number[] => jewel.positions.map(([at]) => at);
+
+export const passivesCarried = (jewel: FilledPositions): string[] => jewel.positions.map(([, passive]) => passive);
 
 export const positionValue: Parser<[number, string]> = {
   parse(cursor: Cursor) {
@@ -30,19 +39,10 @@ export const positionValue: Parser<[number, string]> = {
     return [position, id.parse(cursor)];
   },
   print: ([position, passive]) => `${number.print(position)} ${id.print(passive)}`,
+  lands: [{ how: 'ref', field: '1', names: 'passive' }],
   forms: ['<position> <passive>'],
   examples: ['0 keen-eye', '3 tough-hide'],
 };
-
-function hydratePositions(parsed: unknown): Record<number, string> {
-  const pairs = parsed as [number, string][];
-  const positions: Record<number, string> = {};
-  for (const [position, passive] of pairs) {
-    if (positions[position] !== undefined) throw new DslError(`position ${position} is filled twice`);
-    positions[position] = passive;
-  }
-  return positions;
-}
 
 export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): string | undefined {
   if (clusterJewel.openConnections.length === 0) return 'open-connections: needs at least one edge, or the plane never has anywhere left to grow';
@@ -54,9 +54,11 @@ export function clusterJewelProblem(clusterJewel: ClusterJewel, shape: Shape): s
     seen.add(direction);
   }
 
-  for (const key of Object.keys(clusterJewel.positions)) {
-    const position = Number(key);
+  const filled = new Set<number>();
+  for (const position of positionsFilled(clusterJewel)) {
     if (position < 1 || position > shape.positionCount) return `passives: position ${position} is outside ${clusterJewel.shape}'s 1-${shape.positionCount} range`;
+    if (filled.has(position)) return `position ${position} is filled twice`;
+    filled.add(position);
   }
   return undefined;
 }
@@ -85,13 +87,7 @@ export const clusterJewel = section<ClusterJewel>()({
     },
     positions: {
       parser: list(positionValue),
-      hydrate: hydratePositions,
-      dehydrate: (held) =>
-        Object.keys(held)
-          .map(Number)
-          .sort((one, other) => one - other)
-          .map((at) => [at, held[at]!] as [number, string]),
-      default: () => ({}),
+      default: () => [],
       keyword: 'passives',
     },
     modSlots: {
@@ -108,16 +104,6 @@ export const clusterJewel = section<ClusterJewel>()({
       if (!(raw instanceof DslError)) throw raw;
       return raw.message;
     }
-  },
-  visit: (value, where, visit) => {
-    for (const assignment of listMembers<[number, string]>((value as unknown as Loose).positions)) {
-      assignment[1] = visit('passive', assignment[1], `${where} passives:`);
-    }
-  },
-  prune: (value, at, where) => {
-    const filled = Object.entries(value.positions).filter(([, passiveId]) => !at.gone('passive', passiveId, `${where} passives:`));
-    if (filled.length === Object.keys(value.positions).length) return value;
-    return { ...value, positions: Object.fromEntries(filled.map(([position, passiveId]) => [Number(position), passiveId])) };
   },
 });
 
@@ -141,7 +127,7 @@ function parseBody(lines: RawLine[]): object {
 }
 
 export const jewelCarried = (body: object, carrier: { id: string }, context: HydrateContext): ClusterJewel =>
-  clusterJewel.build({ ...Object.fromEntries(clusterJewel.text.map((field) => [field, (carrier as unknown as Loose)[field]])), ...body, id: carrier.id }, context);
+  clusterJewel.build({ ...Object.fromEntries(clusterJewel.text.map((field) => [field, (carrier as unknown as Record<string, unknown>)[field]])), ...body, id: carrier.id }, context);
 
 export const carriedJewel: Parser<string> & {
   parseBlock(lines: RawLine[]): object;

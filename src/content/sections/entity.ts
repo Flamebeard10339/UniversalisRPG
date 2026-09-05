@@ -7,7 +7,7 @@ import { list } from '../../grammar/list';
 import { Parser } from '../../grammar/parser';
 import { Range, range } from '../../grammar/range';
 import { REFERENCE } from '../../grammar/structure';
-import { EntryBody, listMembers } from '../../grammar/section';
+import { EntryBody, isFieldEdits, listMembers } from '../../grammar/section';
 import { statBonus, TagClause } from '../../grammar/tagClause';
 import { counted, duration, id, number, text } from '../../grammar/values';
 import { localeKey } from '../locale';
@@ -43,7 +43,7 @@ export interface AuthoredEntity extends HookCarrier {
   examine?: string;
   group?: string;
   capabilities: string[];
-  stats: Record<string, Range>;
+  stats: [string, Range][];
   modifiers: TagClause[];
   skills: string[];
   passives: string[];
@@ -84,7 +84,15 @@ export const SHAPE_FIELDS = ['tier', 'profile', 'level'] as const;
 
 const A_SHEET = ['stats', ...SHAPE_FIELDS] as const;
 
-export const carriesASheet = (entity: AuthoredEntity): boolean => Object.keys(entity.stats).length > 0 || entity.modifiers.length > 0 || SHAPE_FIELDS.some((field) => entity[field] !== undefined);
+export interface WrittenStats {
+  stats: readonly (readonly [string, Range])[];
+}
+
+export const statWritten = (sheet: WrittenStats | undefined, statId: string): Range | undefined => sheet?.stats.find(([each]) => each === statId)?.[1];
+
+export const statsWrittenOn = (sheet: WrittenStats): string[] => sheet.stats.map(([statId]) => statId);
+
+export const carriesASheet = (entity: AuthoredEntity): boolean => entity.stats.length > 0 || entity.modifiers.length > 0 || SHAPE_FIELDS.some((field) => entity[field] !== undefined);
 
 export function offersNothing(entity: Entity, dialogues: ReadonlyMap<string, Dialogue>, stoodIn: string): string | undefined {
   if (entity.actions.length > 0 || entity.shop !== undefined || entity.capabilities.length > 0) return undefined;
@@ -99,8 +107,24 @@ export const statAssignmentValue: Parser<[string, Range]> = {
     return [statId, range.parse(cursor)];
   },
   print: ([statId, value]) => `${id.print(statId)} ${range.print(value)}`,
+  lands: [{ how: 'ref', field: '0', names: 'stat' }],
   forms: ['<stat> <amount>'],
   examples: ['attack 4', 'attack 4-7'],
+};
+
+const sheetAfter = (held: unknown, written: unknown): [string, Range][] => {
+  const by = new Map<string, [string, Range]>();
+  if (!isFieldEdits(written)) {
+    for (const assignment of written as [string, Range][]) by.set(assignment[0], assignment);
+    return [...by.values()];
+  }
+  for (const assignment of listMembers<[string, Range]>(held)) by.set(assignment[0], assignment);
+  for (const { op, values } of written.ops)
+    for (const assignment of values as [string, Range][]) {
+      if (op === '-') by.delete(assignment[0]);
+      else by.set(assignment[0], assignment);
+    }
+  return [...by.values()];
 };
 
 export const allyValue: Parser<Ally> = counted('a roster of 0 brings nobody, so leave the line out', ['bandit', '2 bandit']);
@@ -168,9 +192,8 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
     },
     stats: {
       parser: list(statAssignmentValue),
-      hydrate: (parsed) => Object.fromEntries(parsed as [string, Range][]),
-      dehydrate: (held) => Object.entries(held),
-      default: () => ({}),
+      default: () => [],
+      merge: sheetAfter,
       note: 'the whole of a stat, written out. It stands in place of whatever a tier:, a profile: and a level: would otherwise have derived for that stat, and is what to write where a number is load-bearing for the encounter rather than a consequence of the shape',
     },
     modifiers: {
@@ -202,16 +225,10 @@ export const entity = section<AuthoredEntity, 'aggressive', 'blocks'>()({
   needs: { respawnAfter: A_SHEET, onHit: A_SHEET, whenHit: A_SHEET, aggressive: A_SHEET, allies: A_SHEET },
   keywordsAfter: 'examine',
   entries: { into: 'blocks', body: entityBlock },
-  visit: (value, where, visit) => {
-    const held = value as unknown as Loose;
-    for (const assignment of listMembers<[string, unknown]>(held.stats)) assignment[0] = visit('stat', assignment[0], `${where} stats:`);
-    blocks(held.blocks, where, visit);
-  },
+  visit: (value, where, visit) => blocks((value as unknown as Loose).blocks, where, visit),
   prune: (value, at, where) => {
-    const stats = Object.fromEntries(Object.entries(value.stats).filter(([statId]) => !at.gone('stat', statId, `${where} stats:`)));
-    const blocks = pruneBlocks(value.blocks, where, at);
-    const kept = Object.keys(stats).length === Object.keys(value.stats).length && blocks.length === value.blocks.length;
-    return kept ? value : { ...value, stats, blocks };
+    const kept = pruneBlocks(value.blocks, where, at);
+    return kept.length === value.blocks.length ? value : { ...value, blocks: kept };
   },
 });
 

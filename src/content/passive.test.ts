@@ -25,8 +25,8 @@ describe('# passive', () => {
   it('is named from the global id space, so any number of cluster jewels can reference it', () => {
     const source = ['# stat max-health', '# passive hale', '# cluster-jewel a', 'shape: spindle', 'open-connections: e', 'passives: 1 hale', '# cluster-jewel b', 'shape: spindle', 'open-connections: ne', 'passives: 1 hale'].join('\n');
     const registry = loadModule(source);
-    expect(registry.clusterJewels.get('a')!.positions).toEqual({ 1: 'hale' });
-    expect(registry.clusterJewels.get('b')!.positions).toEqual({ 1: 'hale' });
+    expect(registry.clusterJewels.get('a')!.positions).toEqual([[1, 'hale']]);
+    expect(registry.clusterJewels.get('b')!.positions).toEqual([[1, 'hale']]);
   });
 });
 

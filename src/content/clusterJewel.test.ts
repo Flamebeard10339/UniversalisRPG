@@ -16,15 +16,18 @@ describe('# cluster-jewel', () => {
     const jewel = registry.clusterJewels.get('keen-edge')!;
     expect(jewel.shape).toBe('ring');
     expect(jewel.openConnections).toEqual(['e']);
-    expect(jewel.positions).toEqual({ 1: 'hale', 3: 'mending' });
+    expect(jewel.positions).toEqual([
+      [1, 'hale'],
+      [3, 'mending'],
+    ]);
   });
 
   it('reads passives one pair to a line, the way # entity reads stats: as a block', () => {
     const registry = loadModule([PASSIVES, '# cluster-jewel blood-frenzy', 'shape: double-ring', 'open-connections: e', 'passives:', '  1 hale', '  10 mending'].join('\n'));
-    expect(registry.clusterJewels.get('blood-frenzy')!.positions).toEqual({
-      1: 'hale',
-      10: 'mending',
-    });
+    expect(registry.clusterJewels.get('blood-frenzy')!.positions).toEqual([
+      [1, 'hale'],
+      [10, 'mending'],
+    ]);
   });
 
   it('defaults mod-slots to 2, and reads an explicit override', () => {
@@ -35,7 +38,7 @@ describe('# cluster-jewel', () => {
 
   it('defaults positions to empty, since a jewel may open slots without any passives', () => {
     const registry = loadModule([PASSIVES, '# cluster-jewel crossroads', 'shape: point', 'open-connections: ne, e, se, sw, nw'].join('\n'));
-    expect(registry.clusterJewels.get('crossroads')!.positions).toEqual({});
+    expect(registry.clusterJewels.get('crossroads')!.positions).toEqual([]);
   });
 
   it('rejects a shape that does not exist, listing the ones that do', () => {
@@ -89,7 +92,7 @@ describe('clusterJewelProblem', () => {
           title: 'A',
           shape: 'spindle',
           openConnections: ['e'],
-          positions: { 1: 'hale' },
+          positions: [[1, 'hale']],
           modSlots: 2,
         },
         shape,
@@ -105,7 +108,7 @@ describe('clusterJewelProblem', () => {
           title: 'A',
           shape: 'spindle',
           openConnections: ['e'],
-          positions: { 9: 'hale' },
+          positions: [[9, 'hale']],
           modSlots: 2,
         },
         shape,

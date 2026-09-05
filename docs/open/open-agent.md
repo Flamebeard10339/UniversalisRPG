@@ -474,36 +474,6 @@ records the gap.
 `npc-thieving-damage` and the guard is written once on `# action cross`.
 
 
-## `location` declares fields and overrides the printer anyway, so the contract's one rule has one exception
-
-`CLAUDE.md` says a kind either declares `fields` and gets its parser, printer and merge from
-them, or declares its own `parse` and `print` — and that this is the whole difference.
-Measured 2026-09-05 by walking every `section()` call body: of the twenty-six kinds that
-declare a schema, exactly one also overrides, and it overrides both.
-
-`src/content/sections/location.ts:321-332` spreads `...SCHEMA` and then declares
-`print: printLocation` and `merge: mergeLocations`. Nothing refuses this —
-`define.ts:267` only refuses a kind with *neither* fields nor a `parse`, and `print`/`merge`
-sit on `Common<V>`, reachable from both branches. So the rule reads as a rule and is not one.
-
-Two facts are doing it. **The join:** `printLocation` (`:313-319`) calls `printSection` and
-then folds `x:`, `y:` and `z:` onto one line — recovering which of its own rendered lines are
-the coordinates with a regex, `COORDINATE = /^[xyz]: /` (`:311`), which is a structured fact
-read back out of text the same function just produced. It also drops them entirely when the
-location is `relative:`, since a relative location still carries solved coordinates.
-**The merge:** `mergeLocations` (`:304-309`) folds `adjacent:` through `roadsAfter` so a road
-written from both ends merges rather than replaces, which is the ruled ideal in `docs/map`.
-
-Both are declarations waiting to happen: something like `together: [['x','y','z']]` on the
-schema for the join, a per-field printed-when for the relative case, and a per-field merge for
-`adjacent:`. None of the three asks the engine to guess anything — each is a fact the kind
-already knows and currently expresses as code instead of as a declaration.
-
-*Closes when:* the join, the relative case and the road merge are all declared on
-`location`'s schema, `location.ts` declares no `print` and no `merge`, and `CLAUDE.md`'s
-sentence is true again — with the corpus still round-tripping, which is what would catch a
-coordinate line printed wrong.
-
 ## `continuous` is checked against the body as typed, so an action cannot inherit its own pace
 
 `assembledActionProblem` (`src/grammar/action.ts:337`) refuses a continuous action with no
@@ -537,30 +507,6 @@ they say what the answer was.
 *Closes when:* an action that extends a continuous parent may write `continuous` without
 restating its pace, `melee-combat` holds no `rate:` that `melee-swing` could, and a body that
 extends nothing is still refused with a span.
-
-## Two fields hydrate a pair list into a record, so their walk cannot be derived from the parser
-
-A value parser now declares `lands` — where each of its holes lands on the value it parsed, and
-of what kind — and `landings` in `src/content/sections/define.ts` reads it into the walk that
-resolves, validates and prunes. Fourteen ref sites and one condition site derive that way, and
-`shop`, `skill`, `passive`, `recipe` and `stat` declare no `visit` or `prune` at all.
-
-Two fields are left out, and for one reason: their `hydrate` reshapes the list the parser
-produced into a `Record`, so the held value is not the parsed value and no landing declared on
-the parser can be found in it. `clusterJewel.positions` parses `[<position>, <passive>]` pairs
-and holds `Record<number, string>`; `entity.stats` parses `[<stat>, <range>]` pairs and holds
-`Record<string, Range>`. Both walk by hand in their `section()` call, and both walk the
-*authored* shape in `visit` and the *hydrated* shape in `prune` — which is the same fact written
-twice, in two shapes.
-
-`dehydrate` is not the way through: it rebuilds fresh pairs, so a rename written onto one is
-thrown away, and putting a filtered record back needs the `hydrate` that only the load path
-holds a context for.
-
-*Closes when:* either both fields hold what their parser parsed — a pair list, with a lookup
-helper for the readers that want a map — or a field can declare that its held record is keyed
-by one hole of its parser and valued by another, and `landings` reads that. Prefer the first:
-`Record<number, string>` is read in six places and none of them needs it to be a record.
 
 ## `run:` composes a head and nothing else, so every repeated tail still reads twice
 

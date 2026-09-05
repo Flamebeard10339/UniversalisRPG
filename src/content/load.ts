@@ -5,7 +5,7 @@ import { Condition } from '../grammar/condition';
 import { Dialogue, Spoken } from './sections/dialogue';
 import { parseSegments, printSegments } from '../grammar/segment';
 import { actionAddress, actionTextKey, actionTextOwner, actionWords, unperformableAction, type ActionDeclaration } from './sections/action';
-import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing, shapedByItsTags } from './sections/entity';
+import { Entity, Handler, isHandlerBlock, mintedActions, offersNothing, shapedByItsTags, statWritten } from './sections/entity';
 import { WORLD_FACTION } from './sections/faction';
 import { addLocaleSection, BaseEntry, dialogueAgainField, dialogueChoiceField, dialogueLineField, dialogueSayField, emptyLocales, everySaid, GENERATED_FIELD, localeKey, Locales, ProseShape, sayField, unframedProblem, unsuppliedParameters } from './locale';
 import { actionSlugProblem, proseFieldsOf, textFieldsOf } from './sections';
@@ -507,7 +507,7 @@ function performerStatProblem(entity: Entity, action: Action, registry: Registry
   for (const field of sidedFields(action)) {
     if (field.value.side !== 'us') continue;
     const needed = field.written === 'depletes' ? registry.resources.get(field.value.id)?.max : field.value.id;
-    if (needed === undefined || entity.stats[needed] !== undefined) continue;
+    if (needed === undefined || statWritten(entity, needed) !== undefined) continue;
     const because = field.written === 'depletes' ? `${field.value.id} is measured by ${needed}, which` : `${field.written}: reads ${needed}, which`;
     return `${actionProblem(action.label, because)} stats: does not set`;
   }

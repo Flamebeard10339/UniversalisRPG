@@ -48,10 +48,10 @@ describe('a section applies its fields over what the id already holds', () => {
   it('does not reset unlisted fields to their defaults', () => {
     const entity = loadUniverse([BASE, patch('# entity base.crab', 'examine: Bigger than you remember.')]).entities.get('base.crab')!;
     expect(entity.title).toBe('Sand Crab');
-    expect(entity.stats).toEqual({
-      'base.attack': { min: 2, max: 4 },
-      'base.defence': { min: 9, max: 9 },
-    });
+    expect(entity.stats).toEqual([
+      ['base.attack', { min: 2, max: 4 }],
+      ['base.defence', { min: 9, max: 9 }],
+    ]);
     expect(entity.actions.map((action) => action.label)).toEqual(['pinch', 'flee', 'examine']);
   });
 
@@ -96,24 +96,22 @@ describe('a stat sheet is a list field', () => {
   const DEFENCE = { min: 9, max: 9 };
 
   it('patches one stat of another module’s sheet and leaves the rest', () => {
-    expect(statsOf('+stats: attack 7')).toEqual({
-      'base.attack': { min: 7, max: 7 },
-      'base.defence': DEFENCE,
-    });
-    expect(statsOf('-stats: defence 9')).toEqual({ 'base.attack': ATTACK });
+    expect(statsOf('+stats: attack 7')).toEqual([
+      ['base.attack', { min: 7, max: 7 }],
+      ['base.defence', DEFENCE],
+    ]);
+    expect(statsOf('-stats: defence 9')).toEqual([['base.attack', ATTACK]]);
   });
 
   it('replaces the whole sheet when the key is bare, like every other list field', () => {
-    expect(statsOf('stats: attack 7')).toEqual({
-      'base.attack': { min: 7, max: 7 },
-    });
+    expect(statsOf('stats: attack 7')).toEqual([['base.attack', { min: 7, max: 7 }]]);
   });
 
   it('takes block form', () => {
-    expect(statsOf('stats:', '  attack 7', '  defence 1')).toEqual({
-      'base.attack': { min: 7, max: 7 },
-      'base.defence': { min: 1, max: 1 },
-    });
+    expect(statsOf('stats:', '  attack 7', '  defence 1')).toEqual([
+      ['base.attack', { min: 7, max: 7 }],
+      ['base.defence', { min: 1, max: 1 }],
+    ]);
   });
 });
 

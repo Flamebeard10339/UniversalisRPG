@@ -31,7 +31,10 @@ describe('# item cluster-jewel: written as a block', () => {
   it('declares the jewel at the item, so nothing has to name it and the item is that jewel', () => {
     const registry = loadModule(QUIET_HOUR);
     expect(registry.items.get('quiet-hour-jewel')!.clusterJewel).toBe('quiet-hour-jewel');
-    expect(registry.clusterJewels.get('quiet-hour-jewel')!.positions).toEqual({ 1: 'hale', 3: 'mending' });
+    expect(registry.clusterJewels.get('quiet-hour-jewel')!.positions).toEqual([
+      [1, 'hale'],
+      [3, 'mending'],
+    ]);
   });
 
   it('is hydrated like a section of its own, defaults and all', () => {

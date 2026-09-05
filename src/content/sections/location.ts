@@ -1,13 +1,12 @@
 import { actionResultLists } from '../../grammar/action';
-import { Action, actionBody, actionLines } from '../../grammar/action';
+import { Action, actionBody } from '../../grammar/action';
 import { Condition, condition } from '../../grammar/condition';
 import { list } from '../../grammar/list';
 import { STARTING_LOCATION } from '../../grammar/actionResult';
 import { DslError, Parser } from '../../grammar/parser';
-import { AnySchema, PrintContext, SectionSchema, isFieldEdits, listMembers, printSection } from '../../grammar/section';
+import { SectionSchema, isFieldEdits, listMembers } from '../../grammar/section';
 import { counted, id, lastSegment, number, text } from '../../grammar/values';
 import { actions, pruneActions, type Loose } from '../refs';
-import { mergeFields } from '../merge';
 import { section, TOUCHED } from './define';
 import { TITLE_FIELD } from './info';
 
@@ -263,6 +262,18 @@ export function recursivelyResolveRelativeCoordinates(locations: Map<string, Loc
   }
 }
 
+const roadsAfter = (held: unknown, written: unknown): Edge[] => {
+  const by = new Map<string, Edge>();
+  const lay = (edge: Edge, severing: boolean): Map<string, Edge> => by.set(edge.target, severing ? { target: edge.target, severed: true } : edge);
+  if (!isFieldEdits(written)) {
+    for (const edge of written as Edge[]) lay(edge, false);
+    return [...by.values()];
+  }
+  for (const edge of listMembers<Edge>(held)) lay(edge, false);
+  for (const { op, values } of written.ops) for (const edge of values as Edge[]) lay(edge, op === '-');
+  return [...by.values()];
+};
+
 const SCHEMA: SectionSchema<Location, 'starting' | 'multicombat', 'actions'> = {
   kind: 'location',
   fields: {
@@ -277,6 +288,7 @@ const SCHEMA: SectionSchema<Location, 'starting' | 'multicombat', 'actions'> = {
       parser: list(edgeValue),
       default: () => [],
       block: true,
+      merge: roadsAfter,
       note: 'a road out of here, and it answers from both ends: unless the place at the far end writes a road back of its own, the engine lays that road down there too, carrying whatever `while` this one carries. Writing it at either end is therefore enough, which is how a module reaches a place another module declared — and a far end that writes its own road back under a condition nothing sets is how a road is made one-way. `-adjacent: <location>` says there is no road out of here to that place at all, and that answers from both ends the same way: the far end lays none back down here either, however it writes its own. It stands among the roads as `-<location>` for as long as the far end writes a road this way; where nothing would have laid one down here anyway it has nothing to stop, and is not kept.',
     },
     flags: { parser: list(id), default: () => [], block: true },
@@ -287,37 +299,9 @@ const SCHEMA: SectionSchema<Location, 'starting' | 'multicombat', 'actions'> = {
   },
   keywordsAfter: 'examine',
   bare: 'relative',
+  together: [['x', 'y', 'z']],
   exclusive: [[['x', 'y', 'z'], ['relative']]],
   entries: { into: 'actions', body: actionBody },
-};
-
-const roadsAfter = (held: unknown, written: unknown): Edge[] => {
-  const by = new Map<string, Edge>();
-  const lay = (edge: Edge, severing: boolean): Map<string, Edge> => by.set(edge.target, severing ? { target: edge.target, severed: true } : edge);
-  if (!isFieldEdits(written)) {
-    for (const edge of written as Edge[]) lay(edge, false);
-    return [...by.values()];
-  }
-  for (const edge of listMembers<Edge>(held)) lay(edge, false);
-  for (const { op, values } of written.ops) for (const edge of values as Edge[]) lay(edge, op === '-');
-  return [...by.values()];
-};
-
-const mergeLocations = (into: object | undefined, from: object): object => {
-  const written = (from as Loose).adjacent;
-  const merged = mergeFields((into as Loose) ?? { id: (from as Location).id }, from as Loose, SCHEMA as unknown as AnySchema);
-  if (written !== undefined) merged.adjacent = roadsAfter((into as Loose | undefined)?.adjacent, written);
-  return merged;
-};
-
-const COORDINATE = /^[xyz]: /;
-
-const printLocation = (value: Location, context: PrintContext): readonly string[] => {
-  const lines = printSection(value, SCHEMA as unknown as AnySchema, context, actionLines);
-  const [heading, ...rest] = lines.filter((line) => !COORDINATE.test(line));
-  const coordinates = lines.filter((line) => COORDINATE.test(line));
-  if (value.relative || coordinates.length === 0) return [heading!, ...rest];
-  return [heading!, coordinates.join(', '), ...rest];
 };
 
 export const location = section<Location, 'starting' | 'multicombat', 'actions'>()({
@@ -330,8 +314,6 @@ export const location = section<Location, 'starting' | 'multicombat', 'actions'>
   nestsActions: 'only while the player is standing here',
   text: ['title', 'examine'],
   validate: (value) => (lastSegment(value.id) === STARTING_LOCATION ? `${STARTING_LOCATION} is the name the engine answers with whichever location is marked starting, so nothing may be called it` : undefined),
-  merge: mergeLocations,
-  print: printLocation,
   visit: (value, where, visit) => actions((value as unknown as Loose).actions, where, visit),
   prune: (value, at, where) => {
     const kept = pruneActions(value.actions, where, at);

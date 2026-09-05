@@ -20,6 +20,7 @@ export interface FieldPrinting extends Filled {
   printed?: PrintWhen;
   block?: true;
   generated?: true;
+  merge?: (held: unknown, written: unknown) => unknown;
 }
 
 export interface Field<T, Self> extends FieldPrinting {
@@ -54,6 +55,7 @@ export interface SectionSchema<H extends { id: string }, Flags extends keyof H =
   keywordNotes?: Partial<Record<Flags, string>>;
   keywordsAfter?: Exclude<keyof H, 'id' | Flags | Entries>;
   entries?: { into: Entries; body: EntryBody };
+  together?: readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[];
   exclusive?: readonly (readonly (readonly Exclude<keyof H, 'id' | Flags | Entries>[])[])[];
   needs?: Partial<Record<Exclude<keyof H, 'id'> | Flags, Exclude<keyof H, 'id' | Flags | Entries> | readonly Exclude<keyof H, 'id' | Flags | Entries>[]>>;
 }
@@ -74,6 +76,9 @@ export function clearedBy(schema: Pick<AnySchema, 'exclusive'>, written: Iterabl
   return cleared;
 }
 
+export const displacedBy = (schema: Pick<AnySchema, 'exclusive'>, name: string, held: Record<string, unknown>): boolean =>
+  (alternativesFor(schema, name) ?? []).some((group) => !group.includes(name) && group.some((other) => held[other] !== undefined));
+
 export interface AnyField extends FieldPrinting {
   parser: unknown;
   keyword?: string;
@@ -90,6 +95,7 @@ export interface AnySchema {
   keywordNotes?: Record<string, string>;
   keywordsAfter?: string;
   entries?: { into: string; body: EntryBody };
+  together?: readonly (readonly string[])[];
   exclusive?: readonly (readonly (readonly string[])[])[];
   needs?: Record<string, string | readonly string[]>;
 }
@@ -379,6 +385,7 @@ function fieldLines(schema: AnySchema, name: string, spec: AnyField, held: Recor
   const value = held[name];
   if (value === undefined) return [];
   if (spec.generated && !context.authored(name)) return [];
+  if (displacedBy(schema, name, held)) return [];
   if (isFieldEdits(value)) return writeEdits(schema, name, value);
 
   const parser = spec.parser as Parser<unknown> & Partial<ListParser<unknown>>;
@@ -412,8 +419,16 @@ export function printSection(value: object, schema: AnySchema, context: PrintCon
   const keywordLines = (schema.keywords ?? []).filter((word) => typeof held[word] === 'boolean').map((word) => (held[word] === true ? word : `-${word}`));
   const lines = [`# ${schema.kind} ${moduleLocalId(context.moduleId, context.id)}`];
   if (schema.keywordsAfter === undefined) lines.push(...keywordLines);
-  for (const [name, spec] of Object.entries(schema.fields)) {
-    lines.push(...fieldLines(schema, name, spec, held, context));
+  const written = new Map(Object.entries(schema.fields).map(([name, spec]) => [name, fieldLines(schema, name, spec, held, context)]));
+  for (const group of schema.together ?? []) {
+    const order = Object.keys(schema.fields);
+    const joined = group.flatMap((name) => written.get(name) ?? []);
+    for (const name of group) written.set(name, []);
+    const head = group.reduce((first, name) => (order.indexOf(name) < order.indexOf(first) ? name : first));
+    if (joined.length > 0) written.set(head, [joined.join(', ')]);
+  }
+  for (const name of Object.keys(schema.fields)) {
+    lines.push(...(written.get(name) ?? []));
     if (name === schema.keywordsAfter) lines.push(...keywordLines);
   }
   const entries = schema.entries === undefined ? [] : ((held[schema.entries.into] as never[] | undefined) ?? []);

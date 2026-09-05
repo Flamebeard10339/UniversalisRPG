@@ -110,15 +110,14 @@ interface Common<V extends { id: string }> {
   validate?: (value: V) => string | undefined;
   visit?: (value: V, where: string, visit: Visit) => void;
   prune?: (value: V, at: Pruning, where: string) => V | null;
-  merge?: (into: object | undefined, from: object) => object;
-  print?: (value: V, context: PrintContext) => readonly string[];
 }
 
-type Schematic<V extends { id: string }, F extends keyof V, E extends keyof V> = Common<V> & Omit<SectionSchema<V, F, E>, 'kind'>;
+type Schematic<V extends { id: string }, F extends keyof V, E extends keyof V> = Common<V> & Omit<SectionSchema<V, F, E>, 'kind'> & { parse?: never; print?: never; merge?: never; grammar?: never };
 
 interface Bespoke<V extends { id: string }> extends Common<V> {
   parse: (raw: RawSection) => V;
   print: (value: V, context: PrintContext) => readonly string[];
+  merge?: (into: object | undefined, from: object) => object;
   grammar: readonly Written[];
 }
 
@@ -306,9 +305,12 @@ export const section =
       maps?: Lands<V, Filled>;
     },
   ): Section<V, Filled> => {
-    const { kind, ids, vocabulary, map, maps, nestsActions, opaqueBody, mintedActions, flags = [], says, members, text = [], validate, visit, merge, print, prune } = spec;
+    const { kind, ids, vocabulary, map, maps, nestsActions, opaqueBody, mintedActions, flags = [], says, members, text = [], validate, visit, prune } = spec;
     const walk = visit ?? ((): void => {});
     const schema = 'fields' in spec ? ({ ...spec, kind } as unknown as AnySchema) : undefined;
+    const ownBody = 'fields' in spec ? undefined : (spec as Bespoke<V>);
+    const merge = ownBody?.merge;
+    const print = ownBody?.print;
     if (nestsActions !== undefined) ACTION_OWNERS.add(kind);
   if (schema === undefined && typeof (spec as Bespoke<V>).parse !== 'function') throw new Error(`# ${kind} declares neither fields nor a parse`);
     if (schema === undefined && merge === undefined && (map !== undefined || maps !== undefined)) {

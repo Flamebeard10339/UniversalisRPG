@@ -1774,7 +1774,7 @@ describe('an entity puts the offer it mints second', () => {
   it('holds over something fought as well as something only acted on', () => {
     const registry = world();
     const subjects = speaking(registry);
-    const fought = subjects.filter((group) => Object.keys(registry.entities.get(group.entity)!.stats).length > 0);
+    const fought = subjects.filter((group) => registry.entities.get(group.entity)!.stats.length > 0);
 
     expect(fought.length).toBeGreaterThan(0);
     expect(subjects.length).toBeGreaterThan(fought.length);

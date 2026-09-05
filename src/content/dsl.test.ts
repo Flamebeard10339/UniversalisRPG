@@ -4,6 +4,7 @@ import { collectionFailures, exportedCodecs, formFailures, nameFailures, reachab
 import { kindNamed, offeringAt } from './completion';
 import { declaredBy } from './references';
 import { actionAddress, actionWords } from './sections/action';
+import { statsWrittenOn } from './sections/entity';
 import { actionBody, actionLines, actionLinesWritten } from '../grammar/action';
 import { nestedResults, type ActionResult } from '../grammar/actionResult';
 import { align, holeNames, holesIn, matches, soleHole, standingIn, valueIn } from '../grammar/form';
@@ -195,7 +196,9 @@ describe('a field whose values are names', () => {
     if (each.into === undefined) return PROBE;
     const parser = elementOf(owner.schema!.fields[each.field]!.parser as Parser<unknown>);
     const held = parseWhole(parser, parser.examples[0]!, 0, each.site) as Record<string, unknown>;
-    return parser.print({ ...held, [each.into]: PROBE });
+    const filled = (Array.isArray(held) ? [...(held as unknown[])] : { ...held }) as Record<string, unknown>;
+    filled[each.into] = PROBE;
+    return parser.print(filled);
   };
 
   const holding = (owner: (typeof NAMED)[number]['owner'], each: (typeof NAMED)[number]['each']): { id: string } => {
@@ -596,7 +599,7 @@ describe('a pool a player only has while carrying what grants it', () => {
   const registry = loadUniverseWithDiagnostics(CORPUS).registry;
   const everyResult = (results: readonly ActionResult[]): ActionResult[] => results.flatMap((result) => [result, ...nestedResults(result).flatMap(everyResult)]);
 
-  const born = new Set([...registry.entities.values()].flatMap((entity) => Object.keys(entity.stats)));
+  const born = new Set([...registry.entities.values()].flatMap((entity) => statsWrittenOn(entity)));
   const worn = (statId: string): boolean => !born.has(statId) && registry.stats.get(statId)?.base.max === 0;
 
   const EMPTIED = [...registry.events.values()].flatMap((event) => {
@@ -790,10 +793,21 @@ describe('a second body written at an id a first body already holds', () => {
       }
     });
 
+  const memberWritten = (schema: AnySchema, name: string, word: string): unknown => {
+    const element = elementOf(schema.fields[name]?.parser as Parser<unknown>);
+    try {
+      return parseWhole(element, word, 0, 'a list item');
+    } catch {
+      return word;
+    }
+  };
+
   const branchOf = (schema: AnySchema, name: string): Overwritten => {
     const byName = mergeFields({ [name]: [{ label: 'here', held: 1 }] }, { [name]: [{ label: 'here', added: 2 }, { label: 'other' }] }, schema)[name] as { held?: number; added?: number }[];
     if (Array.isArray(byName) && byName.length === 2 && byName[0]?.held === 1 && byName[0]?.added === 2) return 'by name';
-    const listed = mergeFields({ [name]: ['held'] }, { [name]: { ops: [{ op: '+', values: ['added'] }] } }, schema)[name];
+    const held = memberWritten(schema, name, 'held');
+    const added = memberWritten(schema, name, 'added');
+    const listed = mergeFields({ [name]: [held] }, { [name]: { ops: [{ op: '+', values: [added] }] } }, schema)[name];
     return Array.isArray(listed) && listed.length === 2 ? 'listed' : 'replaced';
   };
 

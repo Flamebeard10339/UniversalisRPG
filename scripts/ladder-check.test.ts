@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadUniverseWithDiagnostics } from '../src/content/load';
 import type { Registry } from '../src/content/registry';
 import { fixtureSources } from '../src/content/worldFixture';
+import { passivesCarried } from '../src/content/sections/clusterJewel';
 import type { ModuleSource } from '../src/content/universe';
 import { activitiesIn } from './lib/tiers';
 import { defaultRungs, delivered, droppedItems, jewelReaches, kitFor, ladderLines, parseLadderArgs, sourcesIn, stockedItems } from './ladder-check';
@@ -180,7 +181,7 @@ describe('the stat a jewel on a piece of gear reaches', () => {
     expect(jewel, jewelId).toBeDefined();
     return [
       ...new Set(
-        Object.values(jewel!.positions).flatMap((passiveId) =>
+        passivesCarried(jewel!).flatMap((passiveId) =>
           (registry.passives.get(passiveId)?.tags ?? []).flatMap((tag) => (tag.kind === 'stat-bonus' ? [tag.statId] : [])),
         ),
       ),
